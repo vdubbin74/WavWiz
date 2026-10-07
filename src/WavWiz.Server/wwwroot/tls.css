@@ -1,0 +1,21 @@
+:root{--accent:#FF3C00;--accent2:#19C3B1;--bg:#14171a;--panel:#1b1f23;--line:#323a42;--ink:#e8edf0;--dim:#98a4ad}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+body{overflow-x:hidden}
+main{max-width:640px;margin:0 auto;padding:12px 14px calc(30px + env(safe-area-inset-bottom,0px))}
+header{display:flex;gap:12px;align-items:center;padding:6px 0 10px;border-bottom:2px solid var(--accent);margin-bottom:12px}
+header img{border-radius:9px} h1{font-size:22px;margin:0} h2{font-size:19px;margin:0 0 6px} h3{font-size:17px;margin:0 0 4px} small{color:var(--dim)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px}
+.card.warn{border-color:#8a6a00} .card.ok{border-color:#2b6b42} .card.bad{border-color:#8a2b26}
+.btn{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:11px;padding:13px 20px;font-size:17px;font-weight:700;text-decoration:none;cursor:pointer}
+.small{font-size:14px;color:var(--dim)} code{background:#0d1013;border-radius:6px;padding:2px 6px;word-break:break-all} .fp{display:block;margin-top:4px;font-size:12px}
+.steps{list-style:none;counter-reset:s;padding:0;margin:0} .steps li{counter-increment:s;position:relative;padding:4px 0 12px 46px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:2px;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.steps li.done::before{content:"\2713";background:#2b9a55}
+.must{color:#ffb300;font-size:14px;font-weight:600}
+.qr{text-align:center} .qr img{background:#fff;padding:10px;border-radius:12px;max-width:100%;height:auto}
+.dev{display:none} .dev.show{display:block}
+.only-desktop{display:none} .only-desktop.show{display:block}
+#advice ul{padding-left:20px;margin:6px 0}
+.spin{display:inline-block;width:16px;height:16px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}

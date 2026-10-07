@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>wavwiz-player</AssemblyName>
+    <RootNamespace>WavWiz.Player</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationDefaultFont>Segoe UI, 9pt</ApplicationDefaultFont>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);MSB3277;WFO0003</NoWarn>    <!-- WFO0003: we deliberately declare PerMonitorV2 in app.manifest (OS-level, no runtime call that could fail) -->
+    <ApplicationIcon>..\..\assets\logo\wavwiz.ico</ApplicationIcon>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\logo\wavwiz.ico" LogicalName="wavwiz.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WavWiz.Core\WavWiz.Core.csproj" />
+    <ProjectReference Include="..\WavWiz.PlayerCore\WavWiz.PlayerCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+</Project>

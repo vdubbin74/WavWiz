@@ -1,0 +1,20 @@
+WavWiz (BETA) - whole-home synchronized music (formerly called Unison)
+
+This is a BETA test version (0.0.x). It is meant for you to try on your own home network. Things will change and some things are missing.
+
+What it does
+  * Plays your own music files and internet radio on several PCs at once, in sync.
+  * You control it from a web page on your phone or PC.
+  * You can set a volume and on/off per device, and group devices into zones and tune each speaker's delay (a phone microphone makes this automatic).
+
+What it never does
+  * It does not send anything to the internet, has no accounts, no analytics and no telemetry.
+  * It listens only on the home-network address you choose (never "all interfaces"), only answers devices on your own network, and every control needs a password or a paired device.
+  * It does not change any antivirus or Windows security setting.
+
+What gets installed
+  * WavWiz Server (a Windows service, "WavWiz Server (BETA)") - on the PC that holds your music.
+  * WavWiz Player - on every PC with speakers (can be the same PC).
+  * A private-network-only Windows Firewall rule for the server.
+
+This installer is not code-signed yet, so Windows SmartScreen may warn you. That is expected for a beta.

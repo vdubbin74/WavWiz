@@ -1,0 +1,32 @@
+FFmpeg in WavWiz - build information and source offer
+=====================================================
+
+WavWiz uses FFmpeg only to DECODE your music files and radio streams and to make small cover-art thumbnails. It runs it as a separate program
+(Server\ffmpeg\ffmpeg.exe) with these shared libraries next to it: avcodec-62.dll, avformat-62.dll, avutil-60.dll, avfilter-11.dll, swresample-6.dll, swscale-9.dll.
+
+LICENSE: GNU Lesser General Public License, version 2.1 or later (the LGPL build of FFmpeg).
+  - Built WITHOUT --enable-gpl, WITHOUT --enable-nonfree, WITHOUT --enable-version3, and WITHOUT any external codec library (no x264, x265, fdk-aac, lame, ...).
+  - No encoders except JPEG (cover thumbnails) and raw PCM (the audio pipe) are included. No GPL code is included.
+  - The libraries are shared DLLs: you can replace them with your own build of the same FFmpeg (ABI: avcodec 62, avformat 62, avutil 60, avfilter 11, swresample 6, swscale 9)
+    or point "ffmpegPath" in C:\ProgramData\WavWiz\server.json at any other ffmpeg.exe. The unmodified source and the build script are included (see below).
+  - zlib 1.3.1 (zlib license) is linked into the FFmpeg libraries; the Windows system TLS library (Schannel) is used for https radio.
+  - License texts: COPYING.LGPLv2.1.txt and COPYING.LGPLv3.txt in this folder. FFmpeg is a trademark of Fabrice Bellard; WavWiz is not endorsed by or affiliated with the FFmpeg project.
+
+VERSION: FFmpeg {{VERSION}}, unmodified release source, built by the WavWiz project for WavWiz BETA {{APPVERSION}} on {{DATE}} with mingw-w64 GCC (cross-compiled for Windows x64).
+
+CONFIGURATION (the exact ./configure line; `ffmpeg.exe -version` prints the same):
+{{CONFIG}}
+
+FILES (SHA-256 of what is installed in Server\ffmpeg\):
+{{FILES}}
+
+MATCHING SOURCE (written offer and copy)
+  The complete corresponding source is in this installation, in the folder  licenses\source\ :
+      {{TARNAME}}   (sha256 {{TARSHA}})   - the unmodified FFmpeg release tarball, as published at https://ffmpeg.org/releases/{{TARNAME}}
+      {{ZNAME}}      (sha256 {{ZSHA}}) - zlib, as published at https://github.com/madler/zlib/releases/tag/v1.3.1
+      build-ffmpeg-lgpl.sh  - the exact script and options used to build the DLLs and ffmpeg.exe from that source
+  The same source is also available at the addresses above. The WavWiz source (including build/build-ffmpeg-lgpl.sh) is in the WavWiz repository this installer was made from.
+  If you cannot find any of it, ask the person who gave you WavWiz for a copy.
+  To rebuild: install mingw-w64 (x86_64-w64-mingw32-gcc), GNU make, perl and curl, then run  build/build-ffmpeg-lgpl.sh
+
+  Note: the build script has been run only on Linux (cross-compiling). The result is not bit-for-bit reproducible across toolchain versions; the source and options are.

@@ -1,0 +1,12 @@
+WavWiz
+Copyright (c) 2026 vdubbin74
+
+This product is licensed under the MIT License. See LICENSE.
+
+Third-party software included with WavWiz is described in THIRD-PARTY-NOTICES.txt
+(also shipped next to the installed program under licenses/). Notable components
+include FFmpeg (LGPL), shairplay / AirPlay receiver (LGPL and related), and
+librespot (MIT). Those components keep their own licenses and copyrights.
+
+AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB.
+WavWiz is not affiliated with, endorsed by, or sponsored by Apple or Spotify.

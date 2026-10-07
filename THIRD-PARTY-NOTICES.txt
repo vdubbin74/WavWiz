@@ -1,0 +1,127 @@
+WavWiz - THIRD-PARTY NOTICES (BETA 0.1.1)
+
+WavWiz itself is licensed as stated in LICENSE.txt. It includes or uses the following third-party components. (0.0.7: the butterchurn / MilkDrop visualizer and its presets were removed; all visualizers - Particle burst, Waveform river, Speaker cone, Ring - are original WavWiz code.) Each keeps its own license and copyright.
+Full texts are in this folder (Licenses\ next to the program, and /licenses/ in the web page) or are quoted below.
+
+============================================================
+1. FFmpeg (bundled, decodes your music)  -  LGPL v2.1 or later
+============================================================
+WavWiz bundles FFmpeg 8.1.3, built by the WavWiz project from the unmodified FFmpeg source release as an LGPL-ONLY build
+(no --enable-gpl, no --enable-nonfree, no --enable-libcdio; zlib linked in; CDDA via separate LGPL wavwiz-cdda helper; chromaprint fpcalc optional) with shared libraries (DLLs), so you may replace them with your own build.
+FFmpeg is a trademark of Fabrice Bellard. WavWiz is not endorsed by or affiliated with the FFmpeg project.
+Build configuration, source download and written offer of the matching source: FFMPEG-BUILD.txt. License texts: COPYING.LGPLv2.1.txt, COPYING.LGPLv3.txt.
+FFmpeg is statically linked with zlib (zlib license, below).
+
+zlib 1.3.1 - Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler - zlib license
+  This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+  Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+  1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+============================================================
+2. NAudio (WavWiz Player: audio output)  -  MIT
+============================================================
+NAudio.Wasapi 3.1.0 (and NAudio.Core) - Copyright (c) Mark Heath and contributors. MIT license. https://github.com/naudio/NAudio
+
+============================================================
+3. QRCoder (pairing QR codes)  -  MIT
+============================================================
+QRCoder 1.8.0 - Copyright (c) 2013-2018 Raffael Herrmann and contributors. MIT license. https://github.com/codebude/QRCoder
+
+============================================================
+4. TagLib# (TagLibSharp, reads music tags and cover art)  -  LGPL v2.1
+============================================================
+TagLibSharp 2.3.0 - Copyright (C) Brian Nickel, Stephen Shaw and contributors. GNU Lesser General Public License v2.1 (COPYING.LGPLv2.1.txt).
+It is used as an unmodified separate DLL (TagLibSharp.dll) next to the program, so it can be replaced by your own build. Source: https://github.com/mono/taglib-sharp
+
+============================================================
+5. Microsoft components  -  see each license
+============================================================
+Microsoft.Data.Sqlite 10.0.12, Microsoft.Extensions.Hosting.WindowsServices 10.0.0, System.Security.Cryptography.ProtectedData 10.0.12 and the .NET 10 runtime (self-contained copy):
+  Copyright (c) .NET Foundation and Contributors / Microsoft - MIT license. https://github.com/dotnet/runtime , https://github.com/dotnet/efcore
+SQLite (inside Microsoft.Data.Sqlite via SQLitePCLRaw / e_sqlite3) - public domain. https://sqlite.org/copyright.html. SQLitePCLRaw - Copyright 2014-2015 Zumero, LLC / Eric Sink - Apache License 2.0.
+Microsoft.Web.WebView2 1.0.4258.31 (WavWiz Player window) - Copyright (c) Microsoft Corporation, BSD-style license in the NuGet package. The Evergreen WebView2 Runtime itself is a Microsoft component installed by Windows/Edge and is not part of this installer.
+
+============================================================
+6. Nunito (wordmark lettering and web page text)  -  SIL Open Font License 1.1
+============================================================
+The "WavWiz" wordmark in the page header was drawn from outlines of Nunito ExtraBold. Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito). License: OFL-Nunito.txt.
+Nunito is not sold on its own with WavWiz; it is used here as a derivative (converted to vector outlines), which the OFL permits.
+
+============================================================
+7. Build-time tools (not included in the installer's program files)
+============================================================
+Inno Setup (installer compiler) - Copyright (C) 1997-2026 Jordan Russell and Martijn Laan. The compiler is not distributed; the generated setup program contains small Inno Setup runtime stubs under the Inno Setup license, which allows free redistribution of installers it creates.
+mingw-w64 / GCC (used to compile FFmpeg) - GPL with runtime library exception; no GCC runtime code beyond the exception is linked in a way that changes the FFmpeg license.
+
+============================================================
+The WavWiz logo
+============================================================
+The WavWiz logo and wordmark are part of WavWiz, covered by LICENSE.txt for their use inside the program. Contact the owner before using them elsewhere.
+
+
+---------------------------------------------------------------------------
+Radio Browser API (https://www.radio-browser.info/)
+---------------------------------------------------------------------------
+Community radio-station directory used by the Radio finder when you search.
+WavWiz contacts it only when you use Find stations. Data is provided by
+radio-browser.info under its terms; station streams are hosted by the
+stations themselves.
+
+---------------------------------------------------------------------------
+MusicBrainz + Cover Art Archive (https://musicbrainz.org/, https://coverartarchive.org/)
+---------------------------------------------------------------------------
+Used by Tag & cover auto-fill and (when available) CD metadata lookup, only
+when you run those tools. Metadata is © MetaBrainz Foundation / contributors
+(CC BY-NC-SA for some MB data — WavWiz stores lookup results in your private
+library database for your own use). Cover Art Archive images follow each
+release's license.
+
+---------------------------------------------------------------------------
+MP3 encoding (LAME)
+---------------------------------------------------------------------------
+NOT bundled. WavWiz's FFmpeg build is LGPL decode-focused plus native FLAC and
+AAC encoders for the CD ripper. MP3 ripping would need LAME (LGPL), which is
+intentionally not shipped; choose FLAC or AAC instead.
+
+
+============================================================
+libcdio and libcdio-paranoia (CDDA optical ripping)  -  LGPL 2.1+
+============================================================
+Bundled as shared DLLs next to the separate wavwiz-cdda.exe helper for audio-CD (CDDA) input (not linked into FFmpeg — FFmpeg's libcdio demuxer requires GPL). The library portions are LGPL; WavWiz does not ship the GPLv2 cd-paranoia command-line programs. Source tarballs are in licenses/source/.
+https://www.gnu.org/software/libcdio/
+
+============================================================
+Chromaprint / fpcalc (AcoustID fingerprints)  -  LGPL 2.1+
+============================================================
+Optional fpcalc.exe beside FFmpeg for AcoustID lookups when an application API key is configured.
+https://acoustid.org/chromaprint
+
+============================================================
+AirPlay receiver (0.1.1): shairplay - wavwiz-airplay.exe
+============================================================
+The AirPlay speaker "WavWiz - Whole House" uses shairplay by Juho Vähä-Herttua and contributors (https://github.com/juhovh/shairplay,
+commit 096b61ad14c90169f438e690d096e3fcf87e504e), unmodified, built by the WavWiz project for Windows x64 together with a small
+WavWiz front end (wavwiz-airplay.c, MIT) into wavwiz-airplay.exe. It runs as a SEPARATE PROGRAM started by the WavWiz server; it is not
+linked into WavWiz. Licenses (see LICENSE-shairplay.txt): shairplay library - GNU Lesser General Public License v2.1 or later
+(COPYING.LGPLv2.1.txt); its ALAC decoder (David Hammerton) - MIT; crypto (axTLS, Cameron Rich) - BSD; http_parser (Joyent / Ryan Dahl) - MIT;
+curve25519-donna (Google / Adam Langley) - BSD-style; ed25519 (Orson Peters) - zlib. The optional FairPlay/playfair part is NOT built.
+Complete corresponding source: source\shairplay-096b61ad14c90169f438e690d096e3fcf87e504e.tar.gz, source\wavwiz-airplay.c and
+source\build-receivers.sh (exact build commands) next to these licenses. You may rebuild and replace wavwiz-airplay.exe with your own build.
+airport.key is the publicly known AirPort Express key shipped in the shairplay source; it is used only to answer AirPlay's device challenge.
+AirPlay is a trademark of Apple Inc. WavWiz is not endorsed by or affiliated with Apple.
+
+============================================================
+Spotify Connect add-on (0.1.1, off by default): librespot - librespot.exe
+============================================================
+librespot 0.8.0 - Copyright (c) 2015 Paul Lietar and the librespot-org contributors. MIT license (LICENSE-librespot.txt).
+https://github.com/librespot-org/librespot. Built by the WavWiz project for Windows x64 (pipe audio output, built-in zeroconf, Windows TLS)
+with two small changes, both in source\librespot-wavwiz.patch / source\libmdns-0.10.1-wavwiz-patched.tar.gz: an mDNS error no longer stops
+the program, and libmdns 0.10.1 (MIT, librespot-org) keeps working when one network adapter refuses multicast. Its Rust dependencies are
+MIT / Apache-2.0 / BSD-style licensed (list: Cargo.lock in source\librespot-v0.8.0.tar.gz). librespot runs as a SEPARATE PROGRAM.
+librespot is an unofficial, open-source Spotify Connect client; it is not made or endorsed by Spotify. Using it requires the listener's own
+Spotify Premium account (signed in on their phone; WavWiz stores no Spotify account or password). Spotify is a trademark of Spotify AB.
+wavwiz-hook.exe (MIT, WavWiz) forwards librespot's track events to the WavWiz server on this PC.
+
+No receiver component is GPL-licensed.

@@ -1,0 +1,2 @@
+{ "name": "WavWiz (BETA)", "short_name": "WavWiz", "start_url": "/", "display": "standalone", "background_color": "#0f1114", "theme_color": "#FF3C00",
+  "icons": [ { "src": "/assets/logo-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" }, { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" } ] }

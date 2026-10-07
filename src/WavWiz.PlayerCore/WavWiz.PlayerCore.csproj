@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>WavWiz.PlayerCore</RootNamespace>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WavWiz.Core\WavWiz.Core.csproj" />
+    <ProjectReference Include="..\WavWiz.Dsp\WavWiz.Dsp.csproj" />
+    <ProjectReference Include="..\WavWiz.Measure\WavWiz.Measure.csproj" />
+  </ItemGroup>
+</Project>
