@@ -10,7 +10,7 @@
 
 **Whole-home audio wizardry.**
 
-WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on every PC, TV, and phone in the house. Phones join from the browser—no app to install. Everything stays on your home network: no cloud accounts, no analytics, no telemetry.
+WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on your PCs, phones, and tablets. Phones play from the browser, with no app to install. No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag/cover lookups, and the optional Spotify Connect reach the internet when you use them.)
 
 > **Public beta.** Expect rough edges and frequent updates. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
@@ -48,11 +48,11 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Features
 
-- **Whole-home sync** — Every room in sync: PCs with the WavWiz Player, TVs, and phones in the browser.
-- **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers, TVs, and Wi-Fi PCs line up instead of echoing between rooms.
+- **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. No sync measurements are published yet.
+- **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers, TV audio, and Wi-Fi PCs line up instead of echoing between rooms.
 - **AirPlay, built in** — The server appears as the AirPlay speaker **WavWiz – Whole House**. Send audio from apps on iPhone, iPad, or Mac; it plays in every room in sync, with title and artwork on Now Playing.
 - **Optional Spotify Connect** — Off by default. Turn it on in Admin settings; WavWiz appears in Spotify’s device list and streams to every room. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
-- **Library** — Browse artists, albums, genres, and folders; playlists; queue; internet radio; optional CD ripping and tag/cover helpers. Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
+- **Library** — Browse artists, albums, genres, and folders; playlists; queue; internet radio; optional CD ripping, and missing tags/covers suggested from MusicBrainz (nothing is written until you approve it). Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
 - **Zones** — Group devices (for example “Downstairs”) with per-device volume and on/off.
 - **Visualizers** — Eight original looks (Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Terrain, VU meters, Graphic EQ), each with its own 0–100% effect controls, a Quality setting (Auto / Low / High / Ultra), and GPU post effects.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.
@@ -66,7 +66,7 @@ AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. WavWi
 | Role | Needs |
 | --- | --- |
 | **Server** | 64-bit Windows 10 (October 2018 Update or newer) or Windows 11, on a PC that stays on; admin rights to install (self-contained installer; nothing else to install for the core app) |
-| **Players** | Windows PCs with speakers (WavWiz Player), or any modern browser on a PC, Mac, phone, tablet, or TV on the same network |
+| **Players** | Windows PCs with speakers (WavWiz Player), or any modern browser on a PC, Mac, phone, or tablet on the same network. Smart-TV built-in browsers don't work yet; for a TV, use a PC or laptop connected to it |
 | **Player window** | Microsoft Edge WebView2 Runtime (included with Windows 11 and current Windows 10); without it the player opens in your default browser |
 | **Spotify Connect** (optional) | Listener’s own **Spotify Premium** account; feature off by default |
 | **AirPlay** | iPhone, iPad, or Mac on the same home network (Private network profile recommended) |
