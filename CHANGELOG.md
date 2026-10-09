@@ -16,6 +16,37 @@ Items below are on the roadmap (not promised for a specific date):
 
 - Authenticode code signing for the public installer (planned for 1.0.0)
 
+## [0.2.1] - 2026-10-09 (beta)
+
+### Added
+
+- **Library makeover:** big tiles on every tab of the Expanded library, the year under each album, hover lift with a round Play and a heart, and a new album page (header tinted with the cover's color, Play, Shuffle, heart, track list).
+- **Online covers and artist photos:** when a song has no embedded picture and no folder.jpg/cover.jpg, the server looks the album up on MusicBrainz and the Cover Art Archive; artist photos come from MusicBrainz and Wikidata/Wikimedia Commons. Lookups run in the background, one at a time, and are cached in the WavWiz data folder. Turn them off with `"onlineArt": false` in server.json or the `library.onlineArt` setting.
+- **Generated covers and portraits:** albums without any picture get a unique cover in the theme colors (initials, wave pattern, note glyph); artists without a photo get a round generated portrait.
+- **Zones sidebar** in Expanded Devices (pick a zone to filter the cards, edit it in place), **Mute all** on the master volume strip.
+- **Device card settings** (••• button): Calibrate, Test sound, exact delay, Sound / EQ, delay history, connection, Rename, Set as reference, Forget.
+- **Sound (EQ) dialog redesign** with three looks (LED bars, Studio faders, Spectrum curve) over the same 10-band EQ; **EQ style** on Settings > Appearance.
+- **Settings > Appearance** as one page (Theme, Visualizer, Now Playing style with a live preview, EQ style, Display size); **Settings > Library > Library view** card.
+- **Highlight**, a third theme color for small accents; Custom colors has five pickers.
+
+### Changed
+
+- Menus: File, Library, Playback, Devices, Help (View removed). Browse library always opens the expanded Library. Radio finder is a tab in Internet radio; the Status card moved to Help > Diagnostics.
+- Devices panel: collapse arrow + Expand button instead of the three-size toggle.
+- Now Playing panel: no ••• menu, Stop or status chips; an EQ button; the Classic heart matches the other controls. The visualizer panel has no title or look name.
+- Theme order: Midnight Neon, Pepecoin, Ember, Arctic, Violet Pulse, Monochrome, Daylight, Nebula, Blue Steel, Lime Circuit, then Custom colors.
+- The Pepecoin note uses the official onDark logo with wordmark from the brand kit, unedited.
+
+### Removed
+
+- The device Details pop-up (everything moved to the card's settings or the zones sidebar).
+
+### Fixed
+
+- The Library filter box lost focus after every keystroke.
+- Menus now switch on hover while one is open, like Windows.
+- The silent installer returned exit code 0 even when a setup step failed.
+
 ## [0.1.3] - 2026-10-07 (first public beta)
 
 ### Added

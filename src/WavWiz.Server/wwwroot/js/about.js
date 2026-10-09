@@ -4,14 +4,14 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.2.1';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  ['Terrain is now Spectrum', 'The Terrain visualizer was retired. If you had it picked, you now get Spectrum: smooth rounded bars in your theme colors with a glossy reflection. Every effect has its own 0–100 % slider (50 % default).'],
-  ['Four Now Playing styles', 'Classic, Center, Stack and Horizon. Pick one in Settings > Appearance; Classic is the default. A Panel effects slider tunes the glow and motion.'],
-  ['Every browser is a speaker', 'Any browser that opens WavWiz - desktop, phone, tablet or smart TV - joins as a speaker by itself and gets a readable name, like “LG TV browser”. The separate “This phone as a device” page is gone. TVs get a light, remote-friendly screen.'],
-  ['This device first', 'The volume and Mute on the Now Playing panel now control only the device you are using. Master volume moved to the top of Devices, and every speaker has its own Mute.'],
-  ['Devices in three sizes', 'The Devices panel is Collapsed, Standard or Expanded. Expanded shows every device with volume, mute, output and delay inline - no more pop-up. The delay is saved per output.'],
-  ['Getting started + admin mode', 'A short Getting started guide opens on first run and from Help > Getting started. File > Sign in as admin unlocks admin settings without signing out; Leave admin mode switches back.'],
-  ['Library and themes', 'Sorting on every tab, favorites (hearts), a cover grid and a big Expanded library. Ten themes, including Blue Steel, an all-green Pepecoin, Nebula and Lime Circuit, and custom themes with four colors.'],
-  ['Calmer calibration', 'Calibration pauses the music and plays it again afterwards, re-syncs the clock before every recording, and waits for you to walk to the next speaker with a Wi-Fi meter.'],
+  ['A Library that looks like an album shelf', 'Big tiles on every tab, the year under each album, and a real album page with Play, Shuffle and a heart. Covers come from your files, then folder.jpg, then the Cover Art Archive; artists get round photos. No picture? Every album gets its own generated cover. Set the default view in Settings > Library.'],
+  ['Zones get their own sidebar', 'Expanded Devices keeps master volume across the top and moves zones to a sidebar on the right: pick one to see just its devices, or edit it right there. The panel now has a collapse arrow and an Expand button, like the Library.'],
+  ['Calmer device cards', 'Calibrate, Test sound, Sound / EQ, delay history, Rename and Forget moved into each card\'s own settings (the ••• button). The old device pop-up is gone. Master volume has a Mute all button.'],
+  ['A new Sound (EQ) dialog', 'The EQ looks like the Graphic EQ visualizer and is the real 10-band EQ: drag a bar, scroll, or use the arrow keys. Pick LED bars, Studio faders or Spectrum curve in Settings > Appearance > EQ style.'],
+  ['Simpler menus and Settings', 'Five menus that do things - File, Library, Playback, Devices and Help - and Settings that set things. Theme, Visualizer, Now Playing style, EQ style and Display size are all on Settings > Appearance, with a live preview.'],
+  ['A cleaner Now Playing panel', 'No more ••• menu or status chips: the EQ has its own button and the heart sits in line with the other controls. The visualizer has no title bar.'],
+  ['Highlight color', 'Themes get a third color for small accents like hearts, the selected tab and EQ caps. Pepecoin now uses the official copper; Custom colors has a Highlight picker. Pepecoin now comes right after Midnight Neon in the list.'],
+  ['Fixes', 'The Library filter box keeps focus while you type, menus open on hover once one is open (like Windows), and a silent install now reports a failure with a non-zero exit code.'],
 ];
 
 const CREDITS = [
