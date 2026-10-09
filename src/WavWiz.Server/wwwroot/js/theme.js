@@ -1,17 +1,20 @@
 import { migrateKey } from './phonejoin.js';
-// Theme: ten presets (0.2.0 items 4-7; Midnight Neon default). Custom uses four colors: Background / Main / Second / Text.
+// Theme: ten presets (0.2.0 items 4-7; Midnight Neon default). Custom uses five colors: Background / Main / Second / Highlight / Text.
 // Panel/line/dim are derived. Color math is pure (no DOM) so it is unit-tested with node.
+// 0.2.1 F14: hl = Highlight, the third color for small accents only (hearts, selected tab underline, EQ / visualizer peak caps, the active
+// zone bar + count, NEW chips, selected node / tooltip borders). Main stays on Play, primary buttons and sliders. Unset = Main.
+// 0.2.1 F15: picker order is the object order below (Custom colors stays last).
 export const PRESETS = {
-  default:  { name: 'Midnight Neon', accent: '#FF3C00', accent2: '#19C3B1', bg: '#14171A', ink: '#E8EDF0' },
-  ember:    { name: 'Ember',         accent: '#FF5A1F', accent2: '#FFB347', bg: '#160E0A', ink: '#E8EDF0' },
-  arctic:   { name: 'Arctic',        accent: '#3BA7FF', accent2: '#A8E6FF', bg: '#0B1218', ink: '#E8EDF0' },
-  pepecoin: { name: 'Pepecoin',      accent: '#269B4D', accent2: '#208241', bg: '#212121', ink: '#FFFFFF' },
-  violet:   { name: 'Violet Pulse',  accent: '#A855F7', accent2: '#C084FC', bg: '#1A1028', ink: '#F5F3FF' },
-  mono:     { name: 'Monochrome',    accent: '#E8EDF0', accent2: '#9AA6AE', bg: '#0E1012', ink: '#E8EDF0' },
-  daylight: { name: 'Daylight',      accent: '#E03500', accent2: '#0E8F82', bg: '#F3F1EE', ink: '#1A1D21' },
-  nebula:   { name: 'Nebula',        accent: '#8B5CF6', accent2: '#2DD4BF', bg: '#0F0B1A', ink: '#EDE9FE' },
-  steel:    { name: 'Blue Steel',    accent: '#A9BCCF', accent2: '#5F7488', bg: '#18202A', ink: '#E3EAF2' },
-  lime:     { name: 'Lime Circuit',  accent: '#A3E635', accent2: '#22D3EE', bg: '#0B120E', ink: '#ECFCCB' },
+  default:  { name: 'Midnight Neon', accent: '#FF3C00', accent2: '#19C3B1', hl: '#F5C542', bg: '#14171A', ink: '#E8EDF0' },
+  pepecoin: { name: 'Pepecoin',      accent: '#269B4D', accent2: '#208241', hl: '#C07A4E', bg: '#212121', ink: '#FFFFFF' },   // all brand-kit colors
+  ember:    { name: 'Ember',         accent: '#FF5A1F', accent2: '#FFB347', hl: '#4FC3F7', bg: '#160E0A', ink: '#E8EDF0' },
+  arctic:   { name: 'Arctic',        accent: '#3BA7FF', accent2: '#A8E6FF', hl: '#6EF7B2', bg: '#0B1218', ink: '#E8EDF0' },
+  violet:   { name: 'Violet Pulse',  accent: '#A855F7', accent2: '#C084FC', hl: '#2EE6D6', bg: '#1A1028', ink: '#F5F3FF' },
+  mono:     { name: 'Monochrome',    accent: '#E8EDF0', accent2: '#9AA6AE', hl: '#FF5A5F', bg: '#0E1012', ink: '#E8EDF0' },
+  daylight: { name: 'Daylight',      accent: '#E03500', accent2: '#0E8F82', hl: '#6B4EE6', bg: '#F3F1EE', ink: '#1A1D21' },
+  nebula:   { name: 'Nebula',        accent: '#8B5CF6', accent2: '#2DD4BF', hl: '#F472B6', bg: '#0F0B1A', ink: '#EDE9FE' },
+  steel:    { name: 'Blue Steel',    accent: '#A9BCCF', accent2: '#5F7488', hl: '#E0B15A', bg: '#18202A', ink: '#E3EAF2' },
+  lime:     { name: 'Lime Circuit',  accent: '#A3E635', accent2: '#22D3EE', hl: '#F472D0', bg: '#0B120E', ink: '#ECFCCB' },
 };
 export const DEFAULT_THEME_ID = 'default';
 const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
@@ -56,8 +59,9 @@ export function derive(t) {
   const accent2 = isHex(t.accent2) ? t.accent2 : companionAccent(accent);
   const light = luminance(bg) > 0.35, toward = light ? '#000000' : '#ffffff';
   const [r, g, b] = hexToRgb(accent);
+  const hl = isHex(t.hl) ? t.hl : accent;         // 0.2.1 F14: no Highlight = Main (the 0.2.0 look)
   return {
-    '--accent': accent, '--accent2': accent2, '--bg': bg,
+    '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl), '--bg': bg,
     '--panel': mix(bg, toward, light ? 0.03 : 0.045), '--panel2': mix(bg, toward, light ? 0.07 : 0.095), '--line': mix(bg, toward, light ? 0.18 : 0.2),
     '--ink': ink, '--dim': mix(ink, bg, 0.42), '--accent-ink': readableOn(accent), '--accent-soft': `rgba(${r},${g},${b},.16)`,
   };
@@ -80,7 +84,7 @@ export function loadTheme() {
     const ink = isHex(saved.ink) ? saved.ink.toUpperCase() : defaultInk(saved.bg.toUpperCase());
     const accent = saved.accent.toUpperCase(), bg = saved.bg.toUpperCase();
     const own = saved.v === 4 && isHex(saved.accent2);
-    const t = { ...base, accent, bg, ink, accent2: own ? saved.accent2.toUpperCase() : companionAccent(accent), preset: 'custom' };
+    const t = { ...base, accent, bg, ink, accent2: own ? saved.accent2.toUpperCase() : companionAccent(accent), hl: isHex(saved.hl) ? saved.hl.toUpperCase() : accent, preset: 'custom' };
     if (!own) saveTheme(t);
     return t;
   }
@@ -89,7 +93,8 @@ export function loadTheme() {
 export function saveTheme(t) {
   const ink = isHex(t.ink) ? t.ink : defaultInk(t.bg);
   const accent2 = t.preset && PRESETS[t.preset] ? PRESETS[t.preset].accent2 : isHex(t.accent2) ? t.accent2 : companionAccent(t.accent);
-  try { localStorage.setItem(KEY, JSON.stringify({ v: 4, accent: t.accent, accent2, bg: t.bg, ink, preset: t.preset })); } catch { /* ignore */ }
+  const hl = t.preset && PRESETS[t.preset] ? PRESETS[t.preset].hl : isHex(t.hl) ? t.hl : t.accent;
+  try { localStorage.setItem(KEY, JSON.stringify({ v: 4, accent: t.accent, accent2, hl, bg: t.bg, ink, preset: t.preset })); } catch { /* ignore */ }
 }
 export function resetTheme() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } return loadTheme(); }
 

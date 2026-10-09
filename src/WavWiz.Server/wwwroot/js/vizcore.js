@@ -292,7 +292,8 @@ export function palette(settings, theme = {}) {
   const soft = c => { const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]; return c.map(v => (v + (l - v) * m.soften) * (1 - m.soften * 0.35)); };
   if (s.colorMode === 'custom') return { p: soft(hexRgb(s.primary)), s: soft(hexRgb(s.secondary)), a: soft(hexRgb(s.accent)) };
   const p = hexRgb(hexOk(theme.accent) ? theme.accent : DEFAULT_SETTINGS.primary), q = hexRgb(hexOk(theme.accent2) ? theme.accent2 : DEFAULT_SETTINGS.secondary);
-  return { p: soft(p), s: soft(q), a: soft(lighten(p, m.glow)) };
+  // 0.2.1 F14: h = the theme's Highlight for peak caps (absent = the old hot glow color)
+  return { p: soft(p), s: soft(q), a: soft(lighten(p, m.glow)), ...(hexOk(theme.hl) && theme.hl.toUpperCase() !== String(theme.accent).toUpperCase() ? { h: soft(hexRgb(theme.hl)) } : {}) };
 }
 
 /** Auto-gain: a loudness envelope with a fast rise and a slow (≈4 s) fall; the gain brings the envelope to a common level so a quiet acoustic track

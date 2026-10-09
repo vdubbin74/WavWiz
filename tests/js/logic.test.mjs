@@ -99,7 +99,7 @@ test('server notes and rms and detailsText', () => {
 // ---------------- theme
 test('theme: Midnight Neon default (orange #FF3C00 + teal); five presets incl. Violet Pulse; valid hex', () => {
   assert.equal(theme.PRESETS.default.accent, '#FF3C00'); assert.equal(theme.PRESETS.default.accent2.toUpperCase(), '#19C3B1'); assert.equal(theme.DEFAULT_THEME_ID, 'default'); assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
-  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);   // 0.2.0 items 4-7: ten presets
+  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);   // 0.2.0 items 4-7: ten presets (0.2.1 F15 order)
   assert.equal(theme.PRESETS.violet.name, 'Violet Pulse'); assert.equal(theme.PRESETS.violet.accent.toUpperCase(), '#A855F7');
   assert.ok(!theme.PRESETS.amber, 'Classic Amber removed');
   assert.ok(!theme.PRESETS.forest && !theme.PRESETS.synthwave);   // 0.2.0: Monochrome is back as an approved preset

@@ -696,7 +696,7 @@ export class GeqScene extends Scene {
         if (refl > 0.02) { const yr = floor + v * H * 0.6; g.quadC(x1, floor + 2, x2, floor + 2, x1, yr, x2, yr, P.p, 0.5 * refl, colAt(v * 0.4), 0); }
       }
       if (!f.idle && v > 0.05) g.sprite((x1 + x2) / 2, floor - v * H, bw * 0.9, colAt(v), 0.12 * I * v);
-      if (capK > 0.02 && this.cap[i] > 0.02) { const yc = floor - this.cap[i] * H - 2 * pxs; g.quad(x1, yc - 2.2 * pxs, x2, yc - 2.2 * pxs, x1, yc, x2, yc, hot, 1); g.sprite((x1 + x2) / 2, yc - pxs, bw * 0.55, hot, 0.25); }
+      if (capK > 0.02 && this.cap[i] > 0.02) { const yc = floor - this.cap[i] * H - 2 * pxs; g.quad(x1, yc - 2.2 * pxs, x2, yc - 2.2 * pxs, x1, yc, x2, yc, P.h || hot, 1); g.sprite((x1 + x2) / 2, yc - pxs, bw * 0.55, P.h || hot, 0.25); }
     }
     g.line(left - bw * 0.3, floor + 1, right + bw * 0.3, floor + 1, (2 + 2 * f.flash) * pxs, mixc(P.p, WHITE, 0.2), 0.7 + 0.3 * f.flash, 1);
     g.flush();

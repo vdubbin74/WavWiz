@@ -1,5 +1,5 @@
 // Theme card on Settings > Appearance (0.2.1 F8: the separate Themes page is folded in). Presets as compact chips + Custom colors…
-// (Background, Main, Second, Text). Saved on this device. 0.2.0 items 4-7 colors unchanged.
+// (Background, Main, Second, Highlight, Text - 0.2.1 F14). Saved on this device. 0.2.0 items 4-7 colors unchanged.
 import { h, toast } from './util.js';
 import { PRESETS, loadTheme, saveTheme, resetTheme, applyTheme, isHex, derive, defaultInk } from './theme.js';
 
@@ -7,7 +7,7 @@ const fire = () => window.dispatchEvent(new CustomEvent('wavwiz:theme'));
 function chip(id, p, current, onPick) {
   const v = derive(p);
   return h('button', { type: 'button', class: 'themechip' + (current ? ' on' : ''), 'data-id': id, 'aria-pressed': String(current), 'aria-label': `Theme ${p.name}${current ? ' (active)' : ''}`, onclick: () => onPick(id) },
-    h('span', { class: 'tsw', style: `background:${p.bg};border-color:${v['--line']}`, 'aria-hidden': 'true' }, h('i', { style: `background:${p.accent}` }), h('i', { style: `background:${v['--accent2']}` })),
+    h('span', { class: 'tsw', style: `background:${p.bg};border-color:${v['--line']}`, 'aria-hidden': 'true' }, h('i', { style: `background:${p.accent}` }), h('i', { style: `background:${v['--accent2']}` }), h('i', { style: `background:${v['--hl']}` })),
     h('span', { class: 'ell' }, p.name));
 }
 /** 0.2.1 F20: the Pepecoin note - official onDark mark, "Pepecoin" written exactly, brand colors only. */
@@ -33,14 +33,14 @@ export function themeCard() {
       box.querySelectorAll('.themechip.on').forEach(c => { c.classList.remove('on'); c.setAttribute('aria-pressed', 'false'); });
     } }), label);
     const pickers = h('div', { class: 'tcustom', hidden: !custom || undefined },
-      h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Main', t.accent), picker('accent2', 'Second', isHex(t.accent2) ? t.accent2 : derive(t)['--accent2']), picker('ink', 'Text', inkVal)),
+      h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Main', t.accent), picker('accent2', 'Second', isHex(t.accent2) ? t.accent2 : derive(t)['--accent2']), picker('hl', 'Highlight', derive(t)['--hl']), picker('ink', 'Text', inkVal)),
       h('div', { class: 'row wrap', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: () => { const n = resetTheme(); applyTheme(n); fire(); draw(); toast('Back to Midnight Neon'); } }, 'Reset to default')));
     box.replaceChildren(h('h3', null, 'Theme'),
       h('p', { class: 'dim small' }, 'Colors for this phone or PC. Midnight Neon is the default.'),
       h('div', { class: 'themechips', role: 'group', 'aria-label': 'Theme' }, Object.entries(PRESETS).map(([id, p]) => chip(id, p, t.preset === id, pick))),
       h('div', { class: 'row wrap', style: 'margin-top:10px;gap:10px' },
         h('button', { class: 'btn', 'aria-expanded': String(custom), onclick: () => { custom = !custom; draw(); } }, 'Custom colors…'),
-        h('span', { class: 'dim small' }, 'Background, Main, Second and Text')),
+        h('span', { class: 'dim small' }, 'Background, Main, Second, Highlight and Text')),
       pickers,
       t.preset === 'pepecoin' ? pepeNote() : null);
   }

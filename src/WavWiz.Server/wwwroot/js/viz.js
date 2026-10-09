@@ -55,7 +55,7 @@ export const autoQuality = () => autoTier(deviceFacts());
 /** 0.2.0: where Auto STARTS: Low on TVs and unknown graphics chips (it climbs to the ceiling only after measured smooth frames). */
 export const autoStart = () => { const f = deviceFacts(); return startsLow({ tv: isTvUa(), renderer: f.renderer }) ? 'low' : null; };
 
-function themeColors() { try { const cs = getComputedStyle(document.documentElement); return { accent: cs.getPropertyValue('--accent').trim().toUpperCase(), accent2: cs.getPropertyValue('--accent2').trim().toUpperCase() }; } catch { return {}; } }
+function themeColors() { try { const cs = getComputedStyle(document.documentElement); return { accent: cs.getPropertyValue('--accent').trim().toUpperCase(), accent2: cs.getPropertyValue('--accent2').trim().toUpperCase(), hl: cs.getPropertyValue('--hl').trim().toUpperCase() }; } catch { return {}; } }
 
 /** Playback position 0..1 (null = live/unknown) for the Waveform river marker; set by Now Playing. */
 let progress = null; export function setVizProgress(f) { progress = f; }

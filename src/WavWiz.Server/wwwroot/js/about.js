@@ -51,7 +51,7 @@ export function aboutBody(S) {
 export function openAbout(S) { return dialog('About WavWiz', aboutBody(S), [{ text: 'Close' }], { cls: 'page' }); }
 
 export function openWhatsNew(onClose) {
-  return dialog(`What's new in WavWiz ${WHATS_NEW_VERSION} BETA`, h('div', { class: 'whatsnew' }, h('div', { class: 'row' }, wordmark('wordmark')), h('ul', null, WHATS_NEW.map(([t, x]) => h('li', null, h('b', null, t), h('div', { class: 'small dim' }, x))))),
+  return dialog(`What's new in WavWiz ${WHATS_NEW_VERSION} BETA`, h('div', { class: 'whatsnew' }, h('div', { class: 'row' }, wordmark('wordmark')), h('ul', null, WHATS_NEW.map(([t, x]) => h('li', null, h('b', null, h('span', { class: 'newchip' }, 'NEW'), t), h('div', { class: 'small dim' }, x))))),
     [{ text: 'Got it', cls: 'primary' }], { cls: 'whatsnew-dlg', onClose });
 }
 /** Shown once per device (keyed on the version in localStorage), never on the sign-in screens. */

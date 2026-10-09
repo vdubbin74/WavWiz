@@ -200,3 +200,32 @@ test('0.2.1 F13: generated covers + portraits are deterministic, unique per albu
   assert.equal(dominantOf(new Uint8ClampedArray(px(120, 120, 120, 16))), 'rgb(120,120,120)');
   assert.match(css, /\.albhead\{--dom:/); assert.match(css, /\.albhead \.cover\.albcover\{[^}]*border-radius:4px/, 'album header art keeps the tight corner rule');
 });
+
+test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on the background), Custom has five pickers; new theme order', async () => {
+  const theme = await imp('theme');
+  assert.deepEqual(Object.values(theme.PRESETS).map(p => p.name), ['Midnight Neon', 'Pepecoin', 'Ember', 'Arctic', 'Violet Pulse', 'Monochrome', 'Daylight', 'Nebula', 'Blue Steel', 'Lime Circuit']);
+  const want = { default: '#F5C542', pepecoin: '#C07A4E', ember: '#4FC3F7', arctic: '#6EF7B2', violet: '#2EE6D6', mono: '#FF5A5F', daylight: '#6B4EE6', nebula: '#F472B6', steel: '#E0B15A', lime: '#F472D0' };
+  const ratio = (a, b) => { const x = theme.luminance(a), y = theme.luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  for (const [id, hl] of Object.entries(want)) {
+    assert.equal(theme.PRESETS[id].hl, hl, id);
+    assert.ok(ratio(hl, theme.PRESETS[id].bg) >= 3, `${id} highlight contrast ${ratio(hl, theme.PRESETS[id].bg).toFixed(2)}`);
+    assert.equal(theme.derive(theme.PRESETS[id])['--hl'], hl);
+  }
+  assert.equal(theme.derive({ bg: '#000000', accent: '#123456' })['--hl'], '#123456', 'unset = Main (the 0.2.0 look)');
+  const st = memStore(); globalThis.localStorage = st;
+  try {
+    theme.saveTheme({ ...theme.PRESETS.pepecoin, preset: 'pepecoin' }); assert.equal(theme.loadTheme().hl, '#C07A4E');
+    theme.saveTheme({ accent: '#112233', accent2: '#445566', hl: '#ABCDEF', bg: '#000000', ink: '#FFFFFF', preset: 'custom' }); assert.equal(theme.loadTheme().hl, '#ABCDEF');
+    st.setItem('wavwiz.theme.v1', JSON.stringify({ v: 4, accent: '#112233', accent2: '#445566', bg: '#000000', ink: '#FFFFFF', preset: 'custom' })); assert.equal(theme.loadTheme().hl, '#112233', '0.2.0 custom saves keep Main');
+  } finally { delete globalThis.localStorage; }
+  const tv = src('themes.js');
+  assert.match(tv, /picker\('bg', 'Background'.*picker\('accent', 'Main'.*picker\('accent2', 'Second'.*picker\('hl', 'Highlight'.*picker\('ink', 'Text'/s);
+  for (const sel of ['.heart.on{color:var(--hl', '.settings-nav button.on{background:none;border-color:var(--hl', '.lib.expanded .xtabs button.on{background:none;color:var(--ink);border-bottom-color:var(--hl', '.eqb-cap{', '.zsrow.on::before', '.zsrow.on .zscount{border-color:var(--hl', '.newchip{', '.eqa-tip{'])
+    assert.ok(css.includes(sel), sel);
+  assert.match(css, /\.tbtn\.play\{width:64px;height:64px;border-radius:50%;background:var\(--accent\)/, 'Play stays Main');
+  const vc = await imp('vizcore');
+  assert.deepEqual(vc.palette({}, { accent: '#FF3C00', accent2: '#19C3B1', hl: '#F5C542' }).h?.length, 3, 'visualizer peak caps get the Highlight');
+  assert.equal(vc.palette({}, { accent: '#FF3C00', accent2: '#19C3B1' }).h, undefined);
+  assert.match(src('vizgl.js'), /P\.h \|\| hot/);
+  assert.match(src('about.js'), /h\('span', \{ class: 'newchip' \}, 'NEW'\)/);
+});

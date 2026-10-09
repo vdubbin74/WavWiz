@@ -14,7 +14,7 @@ const theme = await imp('theme');
 const art = await imp('art');
 
 test('0.1.2 five theme presets; Violet Pulse + Pepecoin; custom knobs are bg/accent/ink', () => {
-  assert.deepEqual(Object.keys(theme.PRESETS).slice(0, 5), ['default', 'ember', 'arctic', 'pepecoin', 'violet']);   // 0.2.0 adds five more
+  for (const k of ['default', 'ember', 'arctic', 'pepecoin', 'violet']) assert.ok(theme.PRESETS[k], k);   // 0.2.0 adds five more (0.2.1 F15 reorders)
   assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
   assert.equal(theme.PRESETS.violet.name, 'Violet Pulse');
   assert.equal(theme.PRESETS.violet.bg.toUpperCase(), '#1A1028');
