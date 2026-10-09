@@ -1198,3 +1198,15 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .dmaster .dvol .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;font-size:12px;white-space:nowrap;margin-left:4px}
 .dmaster .dvol .mutealls .ic svg{width:16px;height:16px}
 .dmaster .dvol .mutealls.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+/* ---- 0.2.1 F18 + F19: a device card's own settings view (••• flips the card); Calibrate / Test sound live here, no Details pop-up ---- */
+.dcard.dset{border-color:color-mix(in srgb,var(--accent2) 55%,var(--line))}
+.dsettings{display:flex;flex-direction:column;gap:10px;min-width:0}
+.dstop{display:flex;align-items:center;gap:8px;min-width:0}
+.dstop .dsback{height:28px;padding:0 10px;font-size:12px;flex:none}
+.dssec{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.dssec .dlbl{margin:0}
+.dsbtns{gap:6px} .dsbtns .btn{height:30px;padding:0 10px;font-size:12px}
+.dssec .latctl{margin:0;gap:6px;flex-wrap:nowrap}
+.dssec .latctl .latlabel,.dssec .latctl .latslider{display:none}   /* the card face has the slider; here you type the exact value */
+.dssec .latctl .latnudge{order:1;min-width:30px;height:30px;padding:0 8px} .dssec .latctl .latbox{order:2;width:76px;height:30px} .dssec .latctl .latnudge:last-of-type{order:3} .dssec .latctl > .small{order:4}
+.dcard .dmore[aria-expanded=true]{color:var(--accent)}

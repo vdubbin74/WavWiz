@@ -71,9 +71,10 @@ try:
     # item 7: delay slider <-> ms box (open the first device that reports outputs)
     zid = next((z['id'] for z in e.api('/zones', jar=e.jar) if z.get('outputs')), None)
     if zid is not None:
-        ev(f"import('/js/zone.js').then(m => {{ m.openZone(window.__wwS || {{ auth: {{ role: 'admin' }} }}, {json.dumps(zid)}, () => {{}}); return true; }})"); time.sleep(1.5)
-        light('device dialog')
-        ok = ev("""(() => { const s = document.querySelector('dialog[open] .latslider'), b = document.querySelector('dialog[open] .latbox'); if (!s || !b) return false;
+        # 0.2.1 F19: no Details pop-up any more - the exact-delay box is in the card's own settings view (the ••• button)
+        ev(f"(() => {{ const c = document.querySelector('.dcard[data-zone-id=\"{zid}\"] .dmore'); c && c.click(); return !!c; }})()"); time.sleep(1.0)
+        light('device settings view')
+        ok = ev("""(() => { const s = document.querySelector('.dset .latslider'), b = document.querySelector('.dset .latbox'); if (!s || !b) return false;
           s.value = 250; s.dispatchEvent(new Event('input')); const a = b.value === '250'; b.value = 333; b.dispatchEvent(new Event('input')); return a && s.value === '335'; })()""")
         check(ok, 'item 7: delay slider and ms box stay in sync (slider snaps to 5 ms)')
         close_dialogs()

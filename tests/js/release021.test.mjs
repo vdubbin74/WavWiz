@@ -241,3 +241,16 @@ test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays sepa
   assert.equal(allMuted([]), false); assert.equal(allMuted([{ muted: true }, { muted: false }]), false); assert.equal(allMuted([{ muted: true }, { muted: true }]), true);
   assert.match(css, /\.dmaster \.dvol \.mutealls\{/);
 });
+
+test('0.2.1 F18 + F19: Calibrate + Test sound live in each card\'s own settings view; the device Details pop-up is gone', () => {
+  const d = src('devices.js');
+  const face = d.slice(d.indexOf('function expandedCard('), d.indexOf('function standardRow('));
+  const face2 = face.slice(face.indexOf('const { vol, pct, mute }'));
+  assert.doesNotMatch(face2, /test-sound|openCalibration|Test sound/, 'no Calibrate / Test sound on the card face');
+  assert.match(face, /cardSettings\(S, ctl, z, flip\)/); assert.match(face, /'aria-label': `Settings for \$\{z\.name\}`/);
+  const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
+  for (const t of ["'SOUND CHECK'", "'🎤 Calibrate'", "'Set delay by ear'", "'🔔 Test sound'", "'Sound / EQ…'", "'Delay history…'", "'CONNECTION'", "'Rename…'", "'Forget device…'", "'Set as reference'", "exactDelay("]) assert.ok(set.includes(t), t);
+  assert.doesNotMatch(d, /openZone|zone\.js|'Details…'/);
+  assert.throws(() => src('zone.js'), /ENOENT/, 'the pop-up module is removed');
+  assert.match(css, /\.dsettings\{/);
+});

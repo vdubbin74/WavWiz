@@ -134,7 +134,7 @@ test('0.0.8 item 2: no hard-coded white or light backgrounds on buttons (CSS and
     if (/button|\.btn|\.tbtn|\.chip|\.plus|\.zbtn|\.iconbtn|\.devchip|\.zadd|\.zedit/.test(sel) && light.test(body)) bad.push(sel);
   }
   assert.deepEqual(bad, [], 'button rules with a white/light background');
-  for (const f of ['devices.js', 'zone.js', 'now.js', 'menu.js', 'settings.js', 'vizpage.js', 'themes.js', 'main.js', 'library.js', 'diag.js', 'latency.js']) {
+  for (const f of ['devices.js', 'eq.js', 'now.js', 'menu.js', 'settings.js', 'vizpage.js', 'themes.js', 'main.js', 'library.js', 'diag.js', 'latency.js']) {
     for (const m of src(f).matchAll(/h\('button',\s*\{[^}]*style:\s*'([^']*)'/g)) assert.doesNotMatch(m[1], light, `${f}: inline button style`);
   }
   assert.match(css, /:where\(button\)\{background-color:var\(--panel2\)/, 'unstyled buttons follow the theme');
@@ -156,14 +156,14 @@ test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop me
 test('0.0.8 item 7: delay slider 0-1000 ms in 5 ms steps, ms box 0-1000 (0.2.0), clamp', () => {
   assert.equal(lat.LAT_MAX_SLIDER, 1000); assert.equal(lat.LAT_STEP, 5); assert.equal(lat.LAT_MAX, 1000);
   assert.equal(lat.clampMs(-5), 0); assert.equal(lat.clampMs(2500), 1000); assert.equal(lat.clampMs('12.6'), 13); assert.equal(lat.clampMs('x'), 0);
-  const z = src('zone.js'); assert.match(z, /latencyControl/); assert.match(z, /live/);
+  const z = src('devices.js'); assert.match(z, /latencyControl/); assert.match(z, /live/);   // 0.2.1 F19: the Details pop-up is gone; the card's settings view has it
   assert.match(css, /\.latslider::-webkit-slider-thumb\{[^}]*width:32px/, 'big thumb on touch screens');
 });
 
 // ---- item 13: US English
 test('0.0.8 item 13: US English spelling in the UI', () => {
   const brit = /\b(colour|favourite|grey|centre|customis|licence|organis|behaviour|analys(e|ing)|catalogue|cancelled|labelled|normalis)/i;
-  for (const f of ['about.js', 'main.js', 'menu.js', 'settings.js', 'themes.js', 'vizpage.js', 'vizcore.js', 'now.js', 'devices.js', 'zone.js', 'calibrate.js', 'calerrors.js', 'radiofinder.js', 'diag.js', 'library.js', 'room.js']) {
+  for (const f of ['about.js', 'main.js', 'menu.js', 'settings.js', 'themes.js', 'vizpage.js', 'vizcore.js', 'now.js', 'devices.js', 'eq.js', 'calibrate.js', 'calerrors.js', 'radiofinder.js', 'diag.js', 'library.js', 'room.js']) {
     const m = src(f).match(brit); assert.equal(m, null, `${f}: ${m?.[0]}`);
   }
   assert.doesNotMatch(css, brit);

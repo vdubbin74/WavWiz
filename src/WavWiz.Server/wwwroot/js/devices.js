@@ -1,6 +1,7 @@
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
-import { openZone } from './zone.js';
+import { openEq } from './eq.js';
+import { latencyControl } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
 import { icon, setIcon } from './icons.js';
@@ -187,20 +188,60 @@ function zoneEditView(S, ctl, side, g, setEdit, setPick) {
   return side;
 }
 
-/** ••• menu of an Expanded card: Rename, Forget device and Set as reference (admin); Details… (connection, delay history, EQ) for everyone. */
-function moreMenu(S, ctl, z, anchor) {
-  document.querySelectorAll('.dmenu').forEach(m => m.remove());
-  const admin = isAdmin(S), close = () => { menu.remove(); document.removeEventListener('click', away, true); };
-  const it = (label, fn, ok = true, extra = null) => { const b = h('button', { type: 'button', onclick: () => { close(); fn(); } }, label, extra); return ro(b, ok); };
-  const menu = h('div', { class: 'dmenu', role: 'menu' },
-    it('Rename…', () => rename(S, ctl, z), admin, admin ? null : h('span', { class: 'small dim' }, ' Admin')),
-    it(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, admin ? null : h('span', { class: 'small dim' }, ' Admin')),
-    it('Details…', () => openZone(S, z.id, ctl.refreshAll)),
-    h('hr'),
-    it('Forget device…', () => forget(ctl, z), admin, h('span', { class: 'small dim' }, ' Admin')));
-  menu.querySelectorAll('button')[3]?.classList.add('err');
-  const away = ev => { if (!menu.contains(ev.target) && ev.target !== anchor) close(); };
-  anchor.after(menu); setTimeout(() => document.addEventListener('click', away, true)); menu.querySelector('button:not([disabled])')?.focus();
+/** 0.2.1 F18 + F19: each card has its own settings view (the ••• button flips the card). Calibrate and Test sound moved here off the card face;
+ * the old device Details… pop-up is gone - everything it had lives here (sound check, Sound / EQ, delay history, connection, Bluetooth
+ * follow) or on the card itself (output + delay), and zone settings live in the zones sidebar's edit view (F7). One card at a time. */
+let settingsFor = null;
+export const cardInSettings = id => settingsFor === id;
+function toggleSettings(S, ctl, z, card, hl) {
+  settingsFor = settingsFor === z.id ? null : z.id;
+  const fresh = expandedCard(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl); card.replaceWith(fresh);
+  (settingsFor === z.id ? fresh.querySelector('.dsback') : fresh.querySelector('.dmore'))?.focus();
+}
+function cardSettings(S, ctl, z, back) {
+  const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z), r = z.room;
+  const testSound = async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } };
+  const sec = (title, ...kids) => h('div', { class: 'dssec' }, h('div', { class: 'dlbl' }, title), ...kids);
+  const btn = (label, fn, ok = true, hint = OWN_HINT, cls = 'btn') => ro(h('button', { type: 'button', class: cls, onclick: fn }, label), ok, hint);
+  const conn = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' ? 'Network cable' : z.link, z.remoteIp].filter(Boolean).join(' · ');
+  const sync = z.syncErrorMs != null ? `Sync error ${z.syncErrorMs.toFixed(1)} ms · buffer ${Math.round(z.bufferMs ?? 0)} ms · re-syncs ${z.hardResyncs ?? 0}` : z.isWeb ? 'A browser cannot measure its own sync error - set the delay by ear.' : 'Sync error shows once something plays.';
+  return h('div', { class: 'dsettings', role: 'group', 'aria-label': `${z.name} settings` },
+    h('div', { class: 'dstop' }, h('button', { type: 'button', class: 'btn dsback', 'aria-label': `Back to ${z.name}`, onclick: back }, '‹ Back'), h('b', { class: 'ell grow', title: z.name }, z.name), h('span', { class: 'small dim' }, 'Settings')),
+    sec('SOUND CHECK',
+      h('div', { class: 'row wrap dsbtns' },
+        btn(z.isWeb ? 'Set delay by ear' : '🎤 Calibrate', () => openCalibration(S, ctl.refreshAll, z.id), tune && z.connected, tune ? 'This device is offline.' : OWN_HINT, 'btn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : '')),
+        btn('🔔 Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.')),
+      h('div', { class: 'small dim' }, z.badge === 'recheck' ? 'The delay needs a re-check.' : z.badge === 'uncalibrated' ? 'The delay is not set yet.' : 'Test sound plays a short chime on this device only.')),
+    cur ? sec('DELAY (EXACT)', exactDelay(S, ctl, z, cur, tune)) : null,
+    sec('SOUND',
+      h('div', { class: 'row wrap dsbtns' },
+        btn('Sound / EQ…', () => openEq(S, ctl.refreshAll, cur?.deviceId), tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
+        btn('Delay history…', () => delayHistory(S, ctl, z, cur), !!cur, 'No output yet.'),
+        cur?.kind === 'bluetooth' ? btn('📌 Follow this speaker', async () => { try { await api('/speakers/profiles/capture', { method: 'POST', body: { deviceId: z.id, name: cur.name, follow: true } }); toast('Saved profile and enabled Follow this speaker'); } catch (e) { toast(e.message, true); } }, tune) : null)),
+    sec('CONNECTION',
+      h('div', { class: 'row wrap' }, r ? h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state) : null, h('span', { class: 'small' }, conn)),
+      h('div', { class: 'small dim' }, sync),
+      r && (r.drops || r.reconnects || r.underrunEvents) ? h('div', { class: 'small dim' }, `Dropped ${r.drops}× · reconnected ${r.reconnects}× · ran dry ${r.underrunEvents}×`) : null),
+    sec('DEVICE',
+      h('div', { class: 'row wrap dsbtns' },
+        btn('Rename…', () => rename(S, ctl, z), admin, ADMIN_HINT),
+        btn(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, z.reference ? 'Already the reference speaker' : ADMIN_HINT),
+        btn('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'btn danger'))));
+}
+/** Slider + ms box for typing an exact delay (0.0.8 item 7; was in the Details pop-up). Live while dragging, saved on release. */
+function exactDelay(S, ctl, z, o, tune) {
+  const put = (v, live) => api(`/outputs/${encodeURIComponent(o.deviceId)}/latency`, { method: 'PUT', body: { latencyMs: v, playerId: z.playerId, method: 'manual', live } });
+  const status = h('span', { class: 'small dim latstatus', 'aria-live': 'polite' });
+  const lat = latencyControl({ value: o.notCalibrated ? 0 : o.latencyMs, onChange: async (v, final) => { try { await put(v, !final); status.textContent = final ? `Saved ${v} ms` : `${v} ms (live)`; } catch (e) { status.textContent = ''; toast(e.message, true); } } });
+  if (!tune) lat.el.querySelectorAll('input').forEach(i => ro(i, false, OWN_HINT));
+  return h('div', null, lat.el, status);
+}
+async function delayHistory(S, ctl, z, o) {
+  if (!o) return;
+  let rows = []; try { rows = await api(`/outputs/${encodeURIComponent(o.deviceId)}/calibrations`); } catch (e) { return toast(e.message, true); }
+  const tune = canTune(S, z);
+  const dd = dialog('Delay history — ' + outputLabel(o), rows.length ? h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['When', 'Delay', 'How', ''].map(x => h('th', null, x)))), h('tbody', null, rows.map(r =>
+    h('tr', null, h('td', null, new Date(r.measuredAt).toLocaleString()), h('td', null, `${Math.round(r.latencyMs)} ms`), h('td', null, r.method), h('td', null, tune ? h('button', { class: 'btn', onclick: async () => { try { await api(`/calibrations/${r.id}/restore`, { method: 'POST' }); toast('Restored'); dd.close(); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, 'Use this') : null))))) : h('p', { class: 'dim' }, 'No saved delays yet.'), [{ text: 'Close' }]);
 }
 function rename(S, ctl, z) {
   const name = h('input', { type: 'text', value: z.name, maxlength: 40, 'aria-label': 'Device name' });
@@ -241,20 +282,24 @@ function outputAndDelay(S, ctl, z) {
 }
 
 function expandedCard(S, ctl, z, hl) {
+  const cls = 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : '');
+  let card;
+  const flip = () => toggleSettings(S, ctl, z, card, hl);
+  if (settingsFor === z.id) return (card = h('div', { class: cls + ' dset', 'data-room': z.name, 'data-zone-id': z.id }, cardSettings(S, ctl, z, flip)));
   const { vol, pct, mute } = volumeRow(S, ctl, z);
-  const moreBtn = h('button', { class: 'dmore', 'aria-label': `More for ${z.name}`, 'aria-haspopup': 'menu', onclick: ev => { ev.stopPropagation(); moreMenu(S, ctl, z, moreBtn); } }, '•••');
+  const moreBtn = h('button', { class: 'dmore', 'aria-label': `Settings for ${z.name}`, title: 'Settings: calibrate, test sound, EQ, rename…', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); flip(); } }, '•••');
+  // 0.2.1 F18: no Calibrate / Test sound buttons on the card face - a small status chip opens the card's settings when the delay needs attention
   const chips = [];
-  if (canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', onclick: () => openCalibration(S, ctl.refreshAll, z.id) }, z.badge === 'recheck' ? 'Re-check delay' : z.isWeb ? 'Set delay by ear' : 'Calibrate'));
+  if (canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
   if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
-  if (canControl(S) && z.connected) chips.push(h('button', { class: 'chip', 'aria-label': `Play a test sound in ${z.name}`, onclick: async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } } }, '🔔 Test sound'));
-  return h('div', { class: 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : ''), 'data-room': z.name, 'data-zone-id': z.id },
+  return (card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
     // name gets its own line so it never truncates to "C…" next to the badges and switch
     h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell grow', title: z.name }, z.name), onSwitch(S, ctl, z), moreBtn),
     h('div', { class: 'dsub' }, ...badges(S, z), h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z))),
     h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'VOLUME'), pct), h('div', { class: 'dvol' }, icon('volume'), vol, mute),
     ...outputAndDelay(S, ctl, z),
     chips.length ? h('div', { class: 'chips' }, chips) : null,
-    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null);
+    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null));
 }
 
 function standardRow(S, ctl, z, open) {
