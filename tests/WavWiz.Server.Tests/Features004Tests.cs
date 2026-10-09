@@ -15,7 +15,7 @@ public class Features004Tests
             var db = new Db(Path.Combine(dir, "t.db"));
             db.Migrate();
             Assert.Equal(Db.Migrations.Length, db.Version());
-            Assert.Equal(4, db.Version());
+            Assert.True(db.Version() >= 4);      // 0.2.0 added v5 (elevated, owner_token_id, favorite)
             // tables exist
             Assert.Equal(0L, Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM scene")));
             Assert.Equal(0L, Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM schedule")));

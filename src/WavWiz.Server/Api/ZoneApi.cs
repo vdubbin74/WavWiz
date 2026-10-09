@@ -124,7 +124,7 @@ public static class ZoneApi
             {
                 // item 28/30 (Wiz B): a regular user calibrates ONLY their own device, against the house reference; the result saves only to their device
                 var mine = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(z => z.Mine);
-                if (mine == null) return Ext.Bad("Only an administrator can calibrate other devices. Open WavWiz on the device you want to calibrate, or sign in as admin.", 403);
+                if (mine == null) return Ext.Bad("This browser is not playing as a speaker yet, so there is no device of yours to calibrate. Only an administrator can calibrate other devices (File > Sign in as admin).", 409);
                 long house = s.Zones.ReferenceZoneId;
                 if (house != 0 && refId != 0 && refId != house) return Ext.Bad(AdminOnly("change the reference speaker"), 403);
                 if (house != 0) refId = house;
