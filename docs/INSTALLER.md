@@ -26,14 +26,13 @@ WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our ow
 
 Examples:
 ```
-WavWiz-Setup-0.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
-WavWiz-Setup-0.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
+WavWiz-Setup-0.2.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
+WavWiz-Setup-0.2.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES            (keeps your data)
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /PURGE=1   (also deletes C:\ProgramData\WavWiz; music files are never touched)
 ```
 
-**Exit codes** (standard Inno Setup): `0` installed, `1` setup failed to start, `2` cancelled before installing, `3` fatal error before the install phase, `4` fatal error while installing, `5` cancelled while installing, `6` setup was killed, `7` the preparing step failed, `8` the preparing step failed and Windows must restart first.
-Note: when the files were copied but the final setup step (service, firewall, settings) did not finish, the installer still returns `0` and shows the error only in the (suppressed) message box. For unattended installs check `C:\ProgramData\WavWiz\setup.done` (it holds `0` on success, `1` if the setup step failed) and `install.log`.
+**Exit codes**: `0` installed, `1` setup failed to start, `2` cancelled before installing, `3` fatal error before the install phase, `4` fatal error while installing, `5` cancelled while installing, `6` setup was killed, `7` the preparing step failed, `8` the preparing step failed and Windows must restart first (`1`-`8` are standard Inno Setup), and **`9` the files were copied but the final setup step (service, firewall, settings) failed or stopped answering** (0.2.1; earlier versions returned `0` here). On `9`, `C:\ProgramData\WavWiz\install.log` has the failing step and `setup.done` holds the script's own exit code. Running the installer again after fixing the cause is safe.
 
 **Upgrades:** the same AppId is used for every version, so running a newer installer upgrades in place; `C:\ProgramData\WavWiz` (library database, settings, admin password, paired devices) is kept, the service is re-configured, not re-created. Running the same version again repairs the install (idempotent).
 

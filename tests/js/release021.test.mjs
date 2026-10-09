@@ -20,3 +20,11 @@ test('0.2.1 F5: the Library filter box is never re-created or re-parented while 
   assert.match(l, /search\._t = setTimeout\([^]*?, 250\)/);
   assert.match(css, /\.libtabslot\{display:contents\}/);
 });
+
+test('0.2.1 F16: a silent install returns 9 (not 0) when the final setup step fails or hangs; documented', () => {
+  const iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8');
+  assert.match(iss, /function GetCustomSetupExitCode: Integer;\s*begin\s*if SetupFailed then Result := 9 else Result := 0;/);
+  assert.match(iss, /or \(Code <> 0\) then\s*begin\s*SetupFailed := True;/);    // both "hung / never reported" and a non-zero script exit set it
+  const doc = readFileSync(new URL('../../docs/INSTALLER.md', import.meta.url), 'utf8');
+  assert.match(doc, /`9` the files were copied but the final setup step/); assert.doesNotMatch(doc, /the installer still returns `0`/);
+});

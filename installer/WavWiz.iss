@@ -451,6 +451,14 @@ begin
   end;
 end;
 
+{ 0.2.1 F16: Inno returns 0 whenever the files were copied, even if the final setup step (service, firewall, settings) failed or hung.
+  Inno calls this only when it would return 0; a non-zero result becomes the process exit code, so a silent install reports the failure.
+  9 = files copied, but the setup step failed or stopped answering (details in C:\ProgramData\WavWiz\install.log). }
+function GetCustomSetupExitCode: Integer;
+begin
+  if SetupFailed then Result := 9 else Result := 0;
+end;
+
 { ---------------------------------------------------------------- uninstall }
 function InitializeUninstall: Boolean;
 begin
