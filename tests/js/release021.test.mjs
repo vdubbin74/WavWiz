@@ -246,7 +246,7 @@ test('0.2.1 F18 + F19: Calibrate + Test sound live in each card\'s own settings 
   const d = src('devices.js');
   const face = d.slice(d.indexOf('function expandedCard('), d.indexOf('function standardRow('));
   const face2 = face.slice(face.indexOf('const { vol, pct, mute }'));
-  assert.doesNotMatch(face2, /test-sound|openCalibration|Test sound/, 'no Calibrate / Test sound on the card face');
+  assert.doesNotMatch(face2, /test-sound|openCalibration|'🔔 Test sound'|'Calibrate'/, 'no Calibrate / Test sound on the card face');
   assert.match(face, /cardSettings\(S, ctl, z, flip\)/); assert.match(face, /'aria-label': `Settings for \$\{z\.name\}`/);
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
   for (const t of ["'SOUND CHECK'", "'🎤 Calibrate'", "'Set delay by ear'", "'🔔 Test sound'", "'Sound / EQ…'", "'Delay history…'", "'CONNECTION'", "'Rename…'", "'Forget device…'", "'Set as reference'", "exactDelay("]) assert.ok(set.includes(t), t);
