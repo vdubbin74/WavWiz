@@ -253,8 +253,8 @@ async function openSetup() {
   const body = await gettingStartedBody(S, a => go(a), ref);
   setupDlg = dialog('Getting started', body, [{ text: 'Close' }], { cls: 'gsdlg', onClose: () => { setupDlg = null; refreshStatus(); } });
 }
-async function maybeAutoSetup() {
-  if (S.page || document.querySelector('dialog[open]')) return;          // never on top of What's new or another dialog
+async function maybeAutoSetup(tries = 0) {
+  if (S.page || document.querySelector('dialog[open]')) { if (tries < 60) setTimeout(() => maybeAutoSetup(tries + 1), 2000); return; }   // never on top of What's new or another dialog: wait for it
   const { shouldAutoOpenSetup } = await import('./diag.js');
   let c = null; try { c = await api('/checklist'); } catch { return; }
   let shown = false; try { shown = localStorage.getItem('wavwiz.gettingStarted.shown') === '1'; } catch { /* ignore */ }

@@ -1,14 +1,17 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.1.3';
+export const WHATS_NEW_VERSION = '0.2.0';
+// 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  ['Graphic EQ replaces Lightning', 'A new Graphic EQ look (classic bars with falling peak caps, segments and a mirror floor) takes Lightning\'s place. If you had Lightning picked, you now get Graphic EQ. Eight looks in all: Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Terrain, VU meters and Graphic EQ.'],
-  ['Sharper, smoother visualizers', 'Every visualizer setting is now a 0–100 % slider with 50 % as the default, and 50 % is a little livelier than before. New Quality setting (Auto, Low, High, Ultra): Auto keeps phones light and smooth and steps down by itself if frames slip, while desktop graphics cards get full resolution, far more particles (drawn on the GPU in Particle burst and Neon tunnel) and longer trails. New glow, light streaks, color fringing on big hits and depth blur on Terrain and Ring, each with its own 0–100 % knob (0 % = off).'],
-  ['VU meters and Terrain reworked', 'VU meters: one bouncier needle per meter with a soft glow and a glass reflection, plus a level bar that hits harder and drops deeper. Terrain: solid, clearly lit ridges with dark valleys instead of a washed-out haze.'],
-  ['Volume leveling + gapless', 'ReplayGain / R128 tags even out loudness between songs (Settings > Library; Automatic uses album levels when an album plays in order). Never clips. Gapless albums from iTunes (AAC) no longer get a short gap at each song change.'],
-  ['NAS logins', 'Music on a NAS that asks for a password? Save the login once in Settings > Library. It is encrypted by Windows and WavWiz reconnects the share by itself.'],
-  ['Receiver health + network helper', 'Diagnostics shows AirPlay and Spotify buffer and drop-outs, finds stuck sessions (Clear orphans) and can restart AirPlay. A Network card says if Windows treats your network as Public (which hides WavWiz) and can switch WavWiz to the PC\'s new address after the router changes it.'],
+  ['Terrain is now Spectrum', 'The Terrain visualizer was retired. If you had it picked, you now get Spectrum: smooth rounded bars in your theme colors with a glossy reflection. Every effect has its own 0–100 % slider (50 % default).'],
+  ['Four Now Playing styles', 'Classic, Center, Stack and Horizon. Pick one in Settings > Appearance; Classic is the default. A Panel effects slider tunes the glow and motion.'],
+  ['Every browser is a speaker', 'Any browser that opens WavWiz - desktop, phone, tablet or smart TV - joins as a speaker by itself and gets a readable name, like “LG TV browser”. The separate “This phone as a device” page is gone. TVs get a light, remote-friendly screen.'],
+  ['This device first', 'The volume and Mute on the Now Playing panel now control only the device you are using. Master volume moved to the top of Devices, and every speaker has its own Mute.'],
+  ['Devices in three sizes', 'The Devices panel is Collapsed, Standard or Expanded. Expanded shows every device with volume, mute, output and delay inline - no more pop-up. The delay is saved per output.'],
+  ['Getting started + admin mode', 'A short Getting started guide opens on first run and from Help > Getting started. File > Sign in as admin unlocks admin settings without signing out; Leave admin mode switches back.'],
+  ['Library and themes', 'Sorting on every tab, favorites (hearts), a cover grid and a big Expanded library. Ten themes, including Blue Steel, an all-green Pepecoin, Nebula and Lime Circuit, and custom themes with four colors.'],
+  ['Calmer calibration', 'Calibration pauses the music and plays it again afterwards, re-syncs the clock before every recording, and waits for you to walk to the next speaker with a Wi-Fi meter.'],
 ];
 
 const CREDITS = [

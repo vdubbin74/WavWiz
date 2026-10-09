@@ -783,6 +783,8 @@ html.tv *{transition:none!important;animation:none!important}
 .dcard .dms{color:var(--accent);font-variant-numeric:tabular-nums}
 .dcard input[type=range]{width:100%}
 .dcard .dscale{display:flex;justify-content:space-between;font-size:10px}
+.dcard .dname{flex:1 1 auto;min-width:0}
+.dcard .dsub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 4px 14px;min-height:18px}
 .dcard .chips{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
 .dmenu{position:absolute;right:10px;top:36px;z-index:30;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:4px;display:flex;flex-direction:column}
 .dmenu button{background:none;border:0;color:var(--ink);text-align:left;padding:7px 10px;cursor:pointer;border-radius:4px}
@@ -797,3 +799,7 @@ html.tv *{transition:none!important;animation:none!important}
 .wifimeter i{width:4px;background:var(--line);border-radius:1px} .wifimeter i:nth-child(1){height:25%} .wifimeter i:nth-child(2){height:50%} .wifimeter i:nth-child(3){height:75%} .wifimeter i:nth-child(4){height:100%}
 .wifimeter[data-level="1"] i:nth-child(-n+1),.wifimeter[data-level="2"] i:nth-child(-n+2){background:var(--amber)}
 .wifimeter[data-level="3"] i:nth-child(-n+3),.wifimeter[data-level="4"] i{background:var(--green)}
+
+.devpanel .devhead{min-width:0} .devpanel:not(.expanded) .devcount{display:none}
+.devpanel:not(.expanded) .segsize button{font-size:9px;padding:3px 5px}
+.drow .dtop .dname{flex:1 1 auto}

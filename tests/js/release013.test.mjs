@@ -17,7 +17,8 @@ test('0.1.3 Graphic EQ replaces Lightning: eight looks, saved Lightning -> Graph
   assert.equal(vc.normEngine('lightning'), 'geq'); assert.equal(vc.normEngine('nope'), 'particles');
   for (const f of ['vizgl.js', 'vizpage.js', 'viz.js']) assert.doesNotMatch(src(f).replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''), /LightningScene|lightning:/, f);
   assert.match(src('vizgl.js'), /geq: GeqScene/);
-  const a = src('about.js'); assert.match(a, /Graphic EQ replaces Lightning/); assert.doesNotMatch(a, /glass table|crystal/i);
+  const a = src('about.js'); // 0.2.0 item 25 replaced the 0.1.3 What's new text; keep the no-Lightning check
+  assert.doesNotMatch(a, /glass table|crystal/i);
 });
 
 test('0.1.3 every level is 0-100 % with 50 % default; 50 % maps to the (livelier) mid anchor', () => {

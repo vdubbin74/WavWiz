@@ -82,8 +82,9 @@ function onSwitch(S, ctl, z) {
   if (!canControl(S)) { sw.setAttribute('aria-disabled', 'true'); sw.classList.add('ro'); sw.title = 'Your access is view-only.'; }
   return sw;
 }
-function badges(S, z) {
+function badges(S, z, compact = false) {
   const me = thisDevice(S);
+  if (compact) return [z.reference ? h('span', { class: 'dbadge ref', title: 'House reference speaker' }, 'REF') : null];   // Standard: this device = accent name; only the reference badge
   return [z.isWeb ? h('span', { class: 'dbadge' }, 'BROWSER') : null, z === me || (me && z.id === me.id) ? h('span', { class: 'dbadge me' }, 'THIS DEVICE') : null, z.reference ? h('span', { class: 'dbadge ref', title: 'House reference speaker: calibration measures the other speakers against this one' }, 'REFERENCE') : null];
 }
 function outputLine(z) {
@@ -170,8 +171,9 @@ function expandedCard(S, ctl, z, hl) {
   if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
   if (canControl(S) && z.connected) chips.push(h('button', { class: 'chip', 'aria-label': `Play a test sound in ${z.name}`, onclick: async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } } }, '🔔 Test sound'));
   return h('div', { class: 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : ''), 'data-room': z.name, 'data-zone-id': z.id },
-    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell' }, z.name), ...badges(S, z),
-      h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), h('span', { class: 'grow' }), onSwitch(S, ctl, z), moreBtn),
+    // name gets its own line so it never truncates to "C…" next to the badges and switch
+    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell grow', title: z.name }, z.name), onSwitch(S, ctl, z), moreBtn),
+    h('div', { class: 'dsub' }, ...badges(S, z), h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z))),
     h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'VOLUME'), pct), h('div', { class: 'dvol' }, icon('volume'), vol, mute),
     ...outputAndDelay(S, ctl, z),
     chips.length ? h('div', { class: 'chips' }, chips) : null,
@@ -182,7 +184,7 @@ function standardRow(S, ctl, z, open) {
   const { vol, pct, mute } = volumeRow(S, ctl, z);
   return h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : ''), 'data-device': z.name },
     h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }),
-      h('button', { class: 'dname ell', title: 'Show this device with all of its controls', onclick: () => open(z.id) }, z.name), ...badges(S, z),
+      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls', onclick: () => open(z.id) }, z.name), ...badges(S, z, true),
       h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), h('span', { class: 'grow' }), onSwitch(S, ctl, z)),
     outputLine(z),
     h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute));
