@@ -952,3 +952,13 @@ html.tv *{transition:none!important;animation:none!important}
 .lib.expanded .tilegrid{grid-template-columns:repeat(auto-fill,minmax(clamp(120px,calc(10.5vw / var(--z,1)),190px),1fr));gap:16px 14px}
 .lib.expanded .libcount{display:none}
 .libtools select.libsort{height:28px;padding:2px 6px}
+/* 0.2.0 items 3 + 8 on TVs (lite mode): no visualizer panel; the Now Playing panel fills the screen with big art and remote-sized buttons */
+html.tv .np-vizpanel{display:none}
+html.tv .nowcol.np12{justify-content:center}
+html.tv .np-ctlpanel{flex:1 1 auto} html.tv .np-ctlpanel .np-ctlbody{flex:1 1 auto;justify-content:center;max-height:none}
+html.tv .np-ctlpanel .np-tablemain{padding:40px 60px;gap:28px 48px;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto}
+html.tv .np-ctlpanel .pn-ctl{grid-column:1 / -1;justify-content:center;gap:48px}
+html.tv .np-ctlpanel .pn-art,html.tv .pn-classic .pn-art{width:clamp(180px,calc(34vh / var(--z,1)),420px);height:clamp(180px,calc(34vh / var(--z,1)),420px)}
+html.tv .np-ctlpanel .np-tabletitles .t1{font-size:2.2rem} html.tv .np-ctlpanel .np-tabletitles .t2{font-size:1.4rem}
+html.tv .np-ctlpanel .np-tablexport .tbtn{width:64px!important;height:64px!important} html.tv .np-ctlpanel .np-tablexport .tbtn.play{width:84px!important;height:84px!important}
+html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
