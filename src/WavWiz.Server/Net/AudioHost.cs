@@ -23,6 +23,8 @@ public sealed class PlayerSession : IStreamSubscriber
     public volatile OutputInfo[] Outputs = Array.Empty<OutputInfo>();
     public volatile bool Dead;
     public bool IsWeb { get; init; }
+    /// <summary>0.2.0: the browser session (api_token id) that opened this web speaker; null for Windows players.</summary>
+    public long? OwnerTokenId { get; init; }
     public volatile string? EndReason;
     public CancellationTokenSource Cts { get; } = new();
     public ChannelReader<byte[]> Reader => _out.Reader;
@@ -112,7 +114,7 @@ public sealed class AudioHost : IAsyncDisposable
                 await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Bye, 0, new Bye("unauthorized: pair this player again")), CancellationToken.None);
                 Log?.Invoke($"player {hello.PlayerId} from {remote} refused (bad token)"); return;
             }
-            sess = new PlayerSession(hello, remote) { IsWeb = webUser != null };
+            sess = new PlayerSession(hello, remote) { IsWeb = webUser != null, OwnerTokenId = webUser?.TokenId };
             if (_sessions.TryRemove(sess.Id, out var old)) { old.EndReason = "replaced by a newer connection from the same player (the old one had silently died)"; old.Close(); try { OnDisconnected?.Invoke(old); } catch { } }           // a reconnect replaces the stale session
             _sessions[sess.Id] = sess;
             string clockKey = "";

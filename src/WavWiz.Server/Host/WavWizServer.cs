@@ -31,7 +31,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var audio = new Net.AudioHost(cfg, auth, cond.Clock, clockHost) { Log = u._log.Write }; audio.Start();
         var dsp = new Dsp.DspService(db);
         var zones = new Zones.ZoneManager(db, audio, cond, events, dsp) { Log = u._log.Write };
-        var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events);
+        var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events, cond);
         var ca = new Tls.LocalCa(cfg.DataDir);
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
         u.S = s; cond.Engine.FrameTap = s.Viz.OnFrame;

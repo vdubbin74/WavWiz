@@ -19,6 +19,7 @@ public static class AuthApi
                 appVersion = WavWizInfo.Version, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
                 setupRequired = s.Auth.SetupRequired, thisMachine = AuthService.IsThisMachine(c.Connection.RemoteIpAddress),
                 authenticated = w != null && w.Role != Role.Player, role = w?.Role.ToString().ToLowerInvariant(), name = w?.Name,
+                elevated = w?.Elevated ?? false, baseRole = w == null ? null : (w.Elevated ? w.BaseRole : w.Role).ToString().ToLowerInvariant(),
                 https = c.Request.IsHttps, tlsEnabled = s.Ca.Enabled, serverName = s.ServerName ?? Environment.MachineName, serverId = s.ServerId,
             });
         }).Anon();
@@ -44,6 +45,21 @@ public static class AuthApi
             var tok = s.Auth.CreateToken("Browser " + ip, Role.Admin); c.SetSession(tok);
             return Results.Json(new { ok = true, token = b.Bool("wantToken") == true ? tok : null });
         }).Anon();
+
+        // 0.2.0 item 31: "Sign in as admin…" / "Leave admin mode" on the CURRENT token (no sign-out, no new pairing code, the speaker identity stays)
+        g.MapPost("/auth/elevate", async (HttpContext c) =>
+        {
+            var ip = c.Client(); if (s.Auth.IsLimited(ip)) return Ext.Bad("Too many attempts. Wait a minute and try again.", 429);
+            var w = c.Who()!; var b = await c.Request.Body();
+            var err = s.Auth.Elevate(w, b.Str("password") ?? "");
+            if (err != null) { s.Auth.NoteFailure(ip); return Ext.Bad(err, 401); }
+            return Results.Json(new { ok = true, role = "admin", elevated = !w.IsAdmin || w.Elevated });
+        }).Req(Role.View);
+        g.MapPost("/auth/leave-admin", (HttpContext c) =>
+        {
+            var w = c.Who()!; var err = s.Auth.LeaveAdmin(w);
+            return err != null ? Ext.Bad(err, 409) : Results.Json(new { ok = true, role = w.BaseRole.ToString().ToLowerInvariant() });
+        }).Req(Role.View);
 
         g.MapPost("/auth/logout", (HttpContext c) =>
         {

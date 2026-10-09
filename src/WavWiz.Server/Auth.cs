@@ -7,7 +7,11 @@ namespace WavWiz.Server;
 
 public enum Role { None = 0, View = 1, Control = 2, Admin = 3, Player = 10 }
 
-public sealed record AuthInfo(Role Role, string Name, long TokenId, string? PlayerId);
+/// <param name="Elevated">0.2.0: a paired (view/control) session that signed in as admin in place ("Sign in as admin"). Role is then Admin and BaseRole the paired role.</param>
+public sealed record AuthInfo(Role Role, string Name, long TokenId, string? PlayerId, bool Elevated = false, Role BaseRole = Role.None)
+{
+    public bool IsAdmin => Role == Role.Admin;
+}
 
 /// <summary>
 /// Tokens, admin password, pairing codes and rate limits (spec 13). Tokens are 32 random bytes, stored only as SHA-256 hashes.
@@ -71,12 +75,30 @@ public sealed class AuthService
     public AuthInfo? Validate(string? token)
     {
         if (string.IsNullOrEmpty(token) || token.Length > 128) return null;
-        var rows = _db.Query("SELECT id,name,role,revoked,player_id FROM api_token WHERE token_hash=$h",
-            r => (Id: r.GetInt64(0), Name: r.GetString(1), Role: r.GetString(2), Revoked: r.GetInt32(3) != 0, Player: r.IsDBNull(4) ? null : r.GetString(4)), ("$h", Hash(token)));
+        var rows = _db.Query("SELECT id,name,role,revoked,player_id,elevated FROM api_token WHERE token_hash=$h",
+            r => (Id: r.GetInt64(0), Name: r.GetString(1), Role: r.GetString(2), Revoked: r.GetInt32(3) != 0, Player: r.IsDBNull(4) ? null : r.GetString(4), Elevated: r.GetInt32(5) != 0), ("$h", Hash(token)));
         if (rows.Count != 1 || rows[0].Revoked) return null;
         if (!Enum.TryParse<Role>(rows[0].Role, true, out var role)) return null;
         _db.Exec("UPDATE api_token SET last_used_at=$t WHERE id=$i", ("$t", _now().ToString("O")), ("$i", rows[0].Id));
-        return new AuthInfo(role, rows[0].Name, rows[0].Id, rows[0].Player);
+        // 0.2.0: an elevated paired session acts as Admin until "Leave admin mode"; a Player token can never be elevated
+        bool elevated = rows[0].Elevated && role is Role.View or Role.Control;
+        return new AuthInfo(elevated ? Role.Admin : role, rows[0].Name, rows[0].Id, rows[0].Player, elevated, role);
+    }
+
+    /// <summary>0.2.0 "Sign in as admin…": raises THIS token to admin (same token, same cookie, so the browser's speaker and pairing are kept).</summary>
+    public string? Elevate(AuthInfo who, string password)
+    {
+        if (who.Role == Role.Player) return "a player connection cannot sign in as admin";
+        if (who.IsAdmin) return null;
+        if (!CheckPassword(password)) return "That password is not right.";
+        _db.Exec("UPDATE api_token SET elevated=1 WHERE id=$i", ("$i", who.TokenId)); return null;
+    }
+
+    /// <summary>0.2.0 "Leave admin mode": back to the paired role. A plain admin sign-in (no paired role underneath) has nothing to fall back to.</summary>
+    public string? LeaveAdmin(AuthInfo who)
+    {
+        if (!who.Elevated) return "This session was opened with the administrator password, so there is no paired role to go back to. Use Sign out instead.";
+        _db.Exec("UPDATE api_token SET elevated=0 WHERE id=$i", ("$i", who.TokenId)); return null;
     }
 
     // ---- 0.0.7: short-lived WebSocket tickets. iOS Safari does not reliably send the SameSite session cookie on the WebSocket handshake over plain http,

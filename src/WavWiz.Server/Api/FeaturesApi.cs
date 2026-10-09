@@ -25,17 +25,17 @@ public static class FeaturesApi
             var members = ParseMembers(b);
             var (id, err) = s.Scenes.Create(b.Str("name"), b.Str("icon"), members);
             return err != null ? Ext.Bad(err) : Results.Json(new { id });
-        }).Req(Role.Control);
-        g.MapPost("/scenes/capture", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Scenes.Capture(b.Str("name"), b.Long("id")); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Control);
-        g.MapPut("/scenes/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Scenes.Update(id, b.Str("name"), b.Str("icon"), ParseMembers(b)); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Control);
-        g.MapDelete("/scenes/{id:long}", (long id) => { s.Scenes.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Control);
+        }).Req(Role.Admin);
+        g.MapPost("/scenes/capture", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Scenes.Capture(b.Str("name"), b.Long("id")); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
+        g.MapPut("/scenes/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Scenes.Update(id, b.Str("name"), b.Str("icon"), ParseMembers(b)); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapDelete("/scenes/{id:long}", (long id) => { s.Scenes.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapPost("/scenes/{id:long}/apply", (long id) => { var err = s.Scenes.Apply(id); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true }); }).Req(Role.Control);
 
         // ---- B4 schedules ----
         g.MapGet("/schedules", () => Results.Json(s.Schedules.List())).Req(Role.View);
-        g.MapPost("/schedules", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Schedules.Create(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Control);
-        g.MapPut("/schedules/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Schedules.Update(id, b); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Control);
-        g.MapDelete("/schedules/{id:long}", (long id) => { s.Schedules.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapPost("/schedules", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Schedules.Create(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
+        g.MapPut("/schedules/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Schedules.Update(id, b); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapDelete("/schedules/{id:long}", (long id) => { s.Schedules.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
 
         // ---- B6 radio finder ----
         g.MapGet("/radio/finder/search", async (string? name, string? tag, string? country, int? limit) =>
@@ -82,10 +82,10 @@ public static class FeaturesApi
             var b = await c.Request.Body();
             try { return Results.Json(await s.TagFix.ScanAsync((int)(b.Long("limit") ?? 40), b.Bool("writeFiles") == true)); }
             catch (Exception e) { return Ext.Bad(e.Message, 502); }
-        }).Req(Role.Control);
-        g.MapPost("/tags/jobs/{id:long}/approvals", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.TagFix.SetApprovals(id, b); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Control);
-        g.MapPost("/tags/jobs/{id:long}/apply", (long id) => { var err = s.TagFix.Apply(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Control);
-        g.MapPost("/tags/jobs/{id:long}/undo", (long id) => { var err = s.TagFix.Undo(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Control);
+        }).Req(Role.Admin);      // 0.2.0 item 28: tag lookups/approval, scenes and schedules editing are admin-only (running a scene stays Control)
+        g.MapPost("/tags/jobs/{id:long}/approvals", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.TagFix.SetApprovals(id, b); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapPost("/tags/jobs/{id:long}/apply", (long id) => { var err = s.TagFix.Apply(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapPost("/tags/jobs/{id:long}/undo", (long id) => { var err = s.TagFix.Undo(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
     }
 
     private static List<(long, double, bool)>? ParseMembers(JsonElement b)

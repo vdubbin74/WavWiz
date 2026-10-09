@@ -6,10 +6,12 @@ namespace WavWiz.Server.Features;
 /// <summary>B6: Radio Browser API search/browse + podcast RSS. Direct stream URLs only (no Spotify/Apple/Pandora/iHeart custom).</summary>
 public sealed class RadioFinderService
 {
+    /// <summary>0.2.0 item 18: built from WavWizInfo.Version (Directory.Build.props), so a version bump updates it with no code edit.</summary>
+    public static string UserAgent => $"WavWiz/{WavWiz.Core.WavWizInfo.Version} (home LAN radio finder)";
     private readonly Db _db;
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(12) };
     private static readonly string[] Hosts = { "de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info" };
-    public RadioFinderService(Db db) { _db = db; _http.DefaultRequestHeaders.UserAgent.ParseAdd("WavWiz/0.0.7 (home LAN radio finder)"); }
+    public RadioFinderService(Db db) { _db = db; _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent); }
 
     public async Task<object> SearchAsync(string? name, string? tag, string? country, int limit = 40)
     {

@@ -9,7 +9,8 @@ namespace WavWiz.Server.Zones;
 public sealed record OutputDto(long EndpointDbId, string DeviceId, string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active,
     double LatencyMs, string LatencySource, string Label, bool NotCalibrated, bool RecheckDue, string? Reason, double? WinLatencyMs, string? Codec, int? DspPresetId, bool DspBypass);
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
-    string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null);
+    string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
+    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null);
 public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active);
 
 /// <summary>
@@ -65,6 +66,7 @@ public sealed class ZoneManager
             int sort = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(sort),0)+1 FROM zone"));
             _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));
         }
+        if (s.OwnerTokenId != null) _db.Exec("UPDATE player SET owner_token_id=$o WHERE id=$i", ("$o", s.OwnerTokenId), ("$i", s.Id));
         Rooms.Connected(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.Hello.LinkType, s.Remote.ToString());
         var z = ZoneRow(s.Id)!;
         PushZone(s); PushDsp(s);
@@ -131,7 +133,10 @@ public sealed class ZoneManager
                 var wantedEp = m.Outputs.FirstOrDefault(o => o.Connected && keys[o.EndpointId] == wanted);
                 if (wantedEp != null && (active == null || keys[active.EndpointId] != wanted)) { PushZone(s, wantedEp.EndpointId); return; }     // switch back to the user's choice
             }
-            if (active != null) { _db.Exec("UPDATE zone SET active_output_device_id=$d WHERE player_id=$p", ("$d", keys[active.EndpointId]), ("$p", s.Id)); }
+            // 0.2.0 item 26: if the output the user chose is gone (unplugged HDMI, Bluetooth off), keep that choice saved and show "Output unavailable";
+            // never silently adopt whatever Windows fell back to. A switch the person makes on the player itself (reason "user") is still adopted.
+            bool wantedGone = wanted != null && !m.Outputs.Any(o => o.Connected && keys[o.EndpointId] == wanted);
+            if (active != null && !(wantedGone && serverWins)) { _db.Exec("UPDATE zone SET active_output_device_id=$d WHERE player_id=$p", ("$d", keys[active.EndpointId]), ("$p", s.Id)); }
             PushZone(s); PushDsp(s);
             _ev.Publish("zones");
             AfterOutputsChanged?.Invoke();
@@ -192,9 +197,35 @@ public sealed class ZoneManager
     private ZRow? ZoneRow(long id) => _db.Query("SELECT id,name,player_id,enabled,volume,muted,active_output_device_id,sort FROM zone WHERE id=$i",
         r => new ZRow(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetDouble(4), r.GetInt32(5) != 0, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7)), ("$i", id)).FirstOrDefault();
 
-    public List<ZoneDto> Zones()
+    /// <summary>0.2.0: the house reference speaker for calibration (setting calibration.referenceZoneId; 0 = none chosen).</summary>
+    public long ReferenceZoneId
+    {
+        get { var j = _db.Setting("calibration.referenceZoneId"); return j != null && long.TryParse(j, out var v) ? v : 0; }
+        set => _db.SetSetting("calibration.referenceZoneId", value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// 0.2.0 item 28: is this device "the one the person is using"? A web speaker belongs to the browser session (api_token) that opened it;
+    /// a Windows Player belongs to whoever browses from the same PC (same remote address, or both on the server PC itself).
+    /// </summary>
+    public static bool IsMine(string playerId, long? ownerTokenId, PlayerSession? live, AuthInfo? who, System.Net.IPAddress? remote)
+    {
+        if (who == null) return false;
+        if (playerId.StartsWith("web-", StringComparison.Ordinal)) return ownerTokenId != null && ownerTokenId == who.TokenId;
+        if (live == null || remote == null) return false;
+        static System.Net.IPAddress N(System.Net.IPAddress a) => a.IsIPv4MappedToIPv6 ? a.MapToIPv4() : a;
+        var a = N(live.Remote); var b = N(remote);
+        if (a.Equals(b)) return true;
+        return AuthService.IsThisMachine(a) && AuthService.IsThisMachine(b);
+    }
+
+    public bool IsMine(long zoneId, AuthInfo? who, System.Net.IPAddress? remote) => Zones(who, remote).FirstOrDefault(z => z.Id == zoneId)?.Mine ?? false;
+
+    public List<ZoneDto> Zones(AuthInfo? who = null, System.Net.IPAddress? remote = null)
     {
         var res = new List<ZoneDto>();
+        long reference = ReferenceZoneId;
+        var owners = _db.Query("SELECT id,owner_token_id FROM player", r => (Id: r.GetString(0), Owner: r.IsDBNull(1) ? (long?)null : r.GetInt64(1))).ToDictionary(x => x.Id, x => x.Owner);
         var rows = _db.Query("SELECT id,name,player_id,enabled,volume,muted,active_output_device_id,sort FROM zone ORDER BY sort,id",
             r => new ZRow(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetDouble(4), r.GetInt32(5) != 0, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7)));
         var memberships = _db.Query("SELECT device_id,group_id FROM zone_group_member", r => (Dev: r.GetInt64(0), Grp: r.GetInt64(1))).ToLookup(x => x.Dev, x => x.Grp);
@@ -220,8 +251,12 @@ public sealed class ZoneManager
             else if (act.RecheckDue) { badge = "recheck"; text = "RE-CHECK DUE"; }
             else if (st != null && !(s?.IsWeb ?? false) && Math.Abs(st.SyncErrorMs) > 3) { badge = "drifting"; text = "RESYNCING"; }
             else { badge = "synced"; text = "SYNCED"; }
+            owners.TryGetValue(z.PlayerId, out var owner);
+            // chosen output known but not connected right now -> amber "Output unavailable" (only meaningful while the PC itself is online)
+            bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
-                (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlaying, StreamAgeMs), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList()));
+                (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlaying, StreamAgeMs), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
+                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null));
         }
         return res;
     }
@@ -245,16 +280,36 @@ public sealed class ZoneManager
         _ev.Publish("zones"); return null;
     }
 
-    /// <summary>Master volume: relative (delta in points) or scale (factor) so the balance between rooms is kept.</summary>
-    public void Master(double? delta, double? scale, double? set)
+    /// <summary>
+    /// Master volume (0.2.0 item 10). Rules:
+    ///  1. Speakers that are switched OFF are skipped (their level is not touched).
+    ///  2. Mute is never changed: a muted speaker stays muted (its level still follows, so it comes back in balance when un-muted).
+    ///  3. Balance is kept by scaling EVERY on-speaker by the SAME factor, based on the loudest one ("the master level" = the loudest on-speaker):
+    ///     delta: loudest' = clamp(loudest + delta, 0, 100); scale: loudest' = clamp(loudest * scale, 0, 100); set: loudest' = clamp(set, 0, 100).
+    ///     factor = loudest' / loudest. Because the loudest speaker reaches 100 first, raising stops there and no other room is ever squashed
+    ///     against the cap (so the ratios between rooms are exactly preserved). If every on-speaker is at 0 there is no ratio to keep: they all get loudest'.
+    /// Returns the new master level (the loudest on-speaker), or null when no speaker is on.
+    /// </summary>
+    public double? Master(double? delta, double? scale, double? set)
     {
-        foreach (var z in Zones())
+        var on = Zones().Where(z => z.Enabled).ToList();
+        if (on.Count == 0) return null;
+        double loud = on.Max(z => z.Volume), target = loud;
+        if (delta != null && double.IsFinite(delta.Value)) target = loud + delta.Value;
+        else if (scale != null && double.IsFinite(scale.Value)) target = loud * Math.Max(0, scale.Value);
+        else if (set != null && double.IsFinite(set.Value)) target = set.Value;
+        target = Math.Clamp(target, 0, 100);
+        foreach (var z in on)
         {
-            double v = z.Volume;
-            if (delta != null) v += delta.Value; else if (scale != null) v *= scale.Value; else if (set != null) v = set.Value;
-            Patch(z.Id, null, Math.Clamp(v, 0, 100), null, null);
+            double v = loud <= 0.0001 ? target : z.Volume * (target / loud);
+            v = Math.Round(Math.Clamp(v, 0, 100), 2);
+            if (Math.Abs(v - z.Volume) > 0.001) Patch(z.Id, null, v, null, null);   // muted: null = never touched
         }
+        return target;
     }
+
+    /// <summary>The level the master slider shows: the loudest speaker that is on (0 when none).</summary>
+    public double MasterLevel() { var on = Zones().Where(z => z.Enabled).ToList(); return on.Count == 0 ? 0 : on.Max(z => z.Volume); }
 
     public string? SetActiveOutput(long zoneId, long endpointDbId)
     {

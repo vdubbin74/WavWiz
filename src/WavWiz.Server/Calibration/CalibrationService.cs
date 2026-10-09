@@ -13,7 +13,12 @@ public sealed class CalSession
 {
     public string Id = Guid.NewGuid().ToString("N")[..16];
     public DateTime Created = DateTime.UtcNow;
-    public string Mode = "phone";               // phone | same-recording
+    public string Mode = "phone";               // phone | same-recording | ear (0.2.0: the by-ear helper also opens a session so music is paused)
+    /// <summary>0.2.0 item 29: music was playing when calibration started (or someone pressed Play mid-session): resume it when the session ends.</summary>
+    public bool ResumeAfter;
+    public bool Ended;
+    /// <summary>0.2.0 item 28: a regular user's session may only measure/save their own device (null = admin, no limit).</summary>
+    public long? OnlyZoneId;
     public long ReferenceZoneId;
     public string MicSource = "phone", MicProcessing = "unknown";
     public readonly ConcurrentDictionary<string, (long ZoneId, long AtUs, double Distance, string Kind, long RunId)> Pending = new();
@@ -36,20 +41,41 @@ public sealed class CalibrationService
     public const long LeadUs = 1_500_000;
     public const double PairGapSec = 5.0;
 
-    public CalibrationService(Db db, IMonotonicClock clock, ZoneManager zones, AudioHost host, EventHub ev) { _db = db; _clock = clock; _zones = zones; _host = host; _ev = ev; }
+    private readonly Playback.Conductor? _cond;
+    public CalibrationService(Db db, IMonotonicClock clock, ZoneManager zones, AudioHost host, EventHub ev, Playback.Conductor? cond = null) { _db = db; _clock = clock; _zones = zones; _host = host; _ev = ev; _cond = cond; }
 
     public CalSession? Get(string id) { Purge(); return _sessions.TryGetValue(id, out var s) ? s : null; }
-    private void Purge() { foreach (var k in _sessions.Where(x => x.Value.Created < DateTime.UtcNow.AddHours(-1)).Select(x => x.Key).ToList()) _sessions.TryRemove(k, out _); }
+    private void Purge() { foreach (var k in _sessions.Where(x => x.Value.Created < DateTime.UtcNow.AddHours(-1)).Select(x => x.Key).ToList()) if (_sessions.TryGetValue(k, out var old)) End(old, "expired"); }
 
-    public (CalSession? S, string? Error) Start(string mode, long referenceZoneId, string? micSource, string? micProcessing)
+    /// <summary>0.2.0 item 29 safe rail: chirps must never be drowned by music. Pauses the house stream if it is playing and remembers to resume it.</summary>
+    public void Quiet(CalSession s)
     {
-        if (mode is not ("phone" or "same-recording")) return (null, "mode must be phone or same-recording");
+        if (_cond == null || s.Ended) return;
+        if (_cond.State == Playback.PlayState.Playing) { _cond.Pause(); lock (s.L) s.ResumeAfter = true; s.Notes.Add("music paused for the measurement"); }
+    }
+
+    /// <summary>Ends a session (finish, save, cancel or failure): resumes the music if calibration paused it. Safe to call more than once.</summary>
+    public bool End(CalSession s, string why = "ended")
+    {
+        bool resume;
+        lock (s.L) { if (s.Ended) return false; s.Ended = true; resume = s.ResumeAfter; s.ResumeAfter = false; }
+        _sessions.TryRemove(s.Id, out _);
+        if (resume && _cond != null && _cond.State == Playback.PlayState.Paused) _cond.Resume();
+        return resume;
+    }
+
+    public int OpenSessions => _sessions.Count(x => !x.Value.Ended);
+
+    public (CalSession? S, string? Error) Start(string mode, long referenceZoneId, string? micSource, string? micProcessing, long? onlyZoneId = null)
+    {
+        if (mode is not ("phone" or "same-recording" or "ear")) return (null, "mode must be phone, same-recording or ear");
+        if (referenceZoneId == 0) referenceZoneId = _zones.ReferenceZoneId;
         var z = _zones.Zone(referenceZoneId);
-        if (z == null) return (null, "reference zone not found");
-        if (!z.Connected) return (null, $"the reference zone \"{z.Name}\" is offline - start its player first");
-        if (z.ActiveDeviceId == null) return (null, $"the reference zone \"{z.Name}\" has no active output");
-        var s = new CalSession { Mode = mode, ReferenceZoneId = referenceZoneId, MicSource = micSource ?? "phone", MicProcessing = micProcessing ?? "unknown" };
-        _sessions[s.Id] = s; return (s, null);
+        if (z == null) return (null, referenceZoneId == 0 ? "choose a reference speaker first" : "reference zone not found");
+        if (!z.Connected) return (null, $"the reference speaker \"{z.Name}\" is offline - start its player first, or pick another reference");
+        if (z.ActiveDeviceId == null) return (null, $"the reference speaker \"{z.Name}\" has no active output");
+        var s = new CalSession { Mode = mode, ReferenceZoneId = referenceZoneId, MicSource = micSource ?? "phone", MicProcessing = micProcessing ?? "unknown", OnlyZoneId = onlyZoneId };
+        _sessions[s.Id] = s; Quiet(s); return (s, null);
     }
 
     private PlayerSession? SessionOfZone(long zoneId, out string? error)
@@ -65,6 +91,7 @@ public sealed class CalibrationService
     public (long AtUs, string? Error) Play(CalSession s, long zoneId, string kind, double distanceM, double levelDb = -20)
     {
         var ps = SessionOfZone(zoneId, out var err); if (ps == null) return (0, err);
+        Quiet(s);      // someone may have pressed Play since the session started
         long at = _clock.NowUs + LeadUs;
         long run = Interlocked.Increment(ref s.RunSeq);
         s.Pending[$"{zoneId}:{kind}"] = (zoneId, at, distanceM, kind, run);
@@ -77,6 +104,7 @@ public sealed class CalibrationService
     {
         var rp = SessionOfZone(s.ReferenceZoneId, out var e1); if (rp == null) return (0, 0, "reference: " + e1);
         var dp = SessionOfZone(deviceZoneId, out var e2); if (dp == null) return (0, 0, e2);
+        Quiet(s);
         long at = _clock.NowUs + LeadUs;
         s.Pending[$"{deviceZoneId}:pair"] = (deviceZoneId, at, 0, "pair", Interlocked.Increment(ref s.RunSeq));
         rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, "reference"));
@@ -85,8 +113,9 @@ public sealed class CalibrationService
     }
 
     /// <summary>By-ear helper: the device's pattern is played <paramref name="candidateMs"/> EARLIER than the reference's, so when the candidate equals the real extra delay they sound together.</summary>
-    public (long AtUs, string? Error) PlayEar(long referenceZoneId, long deviceZoneId, double candidateMs, double levelDb = -20)
+    public (long AtUs, string? Error) PlayEar(long referenceZoneId, long deviceZoneId, double candidateMs, double levelDb = -20, CalSession? session = null)
     {
+        if (session != null) Quiet(session);
         var rp = SessionOfZone(referenceZoneId, out var e1); if (rp == null) return (0, "reference: " + e1);
         var dp = SessionOfZone(deviceZoneId, out var e2); if (dp == null) return (0, e2);
         candidateMs = Math.Clamp(candidateMs, 0, 1500);

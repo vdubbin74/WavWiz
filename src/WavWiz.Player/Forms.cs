@@ -219,7 +219,7 @@ public sealed class AboutForm : Form
         var t = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
         t.Controls.Add(new Label { Text = WavWizInfo.DisplayName, AutoSize = true, Font = new Font(Font.FontFamily, Font.Size * 1.5f, FontStyle.Bold) });
         t.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(U(460), 0), Margin = new Padding(3, U(8), 3, U(8)), Text =
-            "Whole-home music, in sync.\n\nThis is a BETA build: expect rough edges and please report anything odd.\nLAN only - no accounts, no telemetry, nothing leaves your network.\n\n" +
+            "Whole-home music, in sync.\n\nThis is a BETA build: expect rough edges and please report anything odd.\nNo cloud account, no analytics, no telemetry. WavWiz doesn't open ports to the internet.\nInternet radio, tag and cover lookups and Spotify Connect (if you switch it on) use the internet.\n\n" +
             "Credits: FFmpeg (LGPL, decodes your music), NAudio (MIT), QRCoder (MIT), TagLib# (LGPL), SQLite, the .NET runtime and Microsoft WebView2, Nunito font (OFL).\n" +
             "WavWiz is not endorsed by or affiliated with the FFmpeg project, Winamp or Microsoft." });
         var lic = new Button { Text = "Open the license files", AutoSize = true }; var ok = new Button { Text = "Close", AutoSize = true, DialogResult = DialogResult.OK };

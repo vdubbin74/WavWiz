@@ -1,11 +1,16 @@
-WavWiz privacy note (BETA 0.0.3)
+WavWiz privacy note
 
-WavWiz works on your home network only.
-- Nothing is sent to the internet by WavWiz: no telemetry, no analytics, no crash reports, no update check, no account, no advertising.
-- The only internet traffic is the traffic YOU ask for: internet radio stations you add are streamed from the station's own server.
+No cloud account, no analytics, no telemetry. WavWiz doesn't open ports to the internet.
+- WavWiz has no account, no analytics, no telemetry, no crash reports, no advertising and no automatic update check.
+- WavWiz does use the internet for the things you choose to use:
+  - Internet radio: the station you play is streamed from that station's own server. The Radio finder looks stations up at Radio Browser.
+  - Tag and cover lookups (Tag & cover fix): song details are looked up at MusicBrainz and Cover Art Archive, and at AcoustID if you add your own API key.
+  - Spotify Connect (off unless you switch it on): the Spotify app on your phone or PC streams through Spotify's servers as usual.
+  When you don't use these, WavWiz talks only to the devices on your home network.
+- WavWiz doesn't open ports to the internet. By default the server only listens on your private network address. For access away from home, use your own Tailscale.
 - The web page, the visualizers, the fonts and all pictures are served by your own WavWiz server; nothing is loaded from a CDN.
-- Your music files are only read, never changed or copied elsewhere. Small cover-art thumbnails are cached in the WavWiz data folder.
-- Data kept on the server PC (C:\ProgramData\WavWiz): the library index, your settings, the administrator password (stored as a salted hash, never in clear text), pairing tokens (stored as hashes) and logs. Remove it all by uninstalling and deleting that folder.
-- Data kept in your browser: color theme, visualizer choices (favorites), the checklist/what's-new "seen" flags. Nothing there is sent anywhere.
-- Access needs the administrator password or a pairing code/token. By default the server only listens on your private network address, never on all addresses, unless you switch that on.
+- Your music files are only read, never changed unless you approve tag fixes that write to files. Small cover-art thumbnails are cached in the WavWiz data folder.
+- Data kept on the server PC (C:\ProgramData\WavWiz): the library index, your settings, favorites, the administrator password (stored as a salted hash, never in clear text), pairing tokens (stored as hashes) and logs. Remove it all by uninstalling and deleting that folder.
+- Data kept in your browser: color theme, panel style, visualizer choices, the checklist and what's-new "seen" flags. Nothing there is sent anywhere.
+- Access needs the administrator password or a pairing code/token.
 - Diagnostics reports are shown on screen and copied by you if you choose; WavWiz never uploads them.

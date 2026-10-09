@@ -39,6 +39,8 @@ public static class PhoneApi
         app.Map("/ws/room", async (HttpContext c) =>
         {
             if (!c.WebSockets.IsWebSocketRequest) return Results.StatusCode(400);
+            // 0.2.0: the WavWiz Player window already plays through its own Windows audio connection; its page must never ALSO join as a web speaker (that PC would play twice)
+            if (c.Request.Headers.UserAgent.ToString().Contains("WavWizPlayer/", StringComparison.Ordinal)) return Ext.Bad("The WavWiz Player window already plays on this PC.", 409);
             using var ws = await c.WebSockets.AcceptWebSocketAsync();
             await using var stream = WebSocketStream.Create(ws, WebSocketMessageType.Binary, ownsWebSocket: false);
             try { await s.Audio.ServeStream(stream, c.Connection.RemoteIpAddress ?? IPAddress.Loopback, c.Who()); } catch { }

@@ -133,7 +133,7 @@ export async function openSettings(S, refresh, nav, section) {
           } }, 'Reset on this PC'))));
     }
 
-    panes.about.push(h('div', { class: 'card' }, h('h3', null, 'About'), h('p', null, `${st.display} - BETA software. WavWiz works only on your home network: nothing is sent to the internet and there is no tracking.`),
+    panes.about.push(h('div', { class: 'card' }, h('h3', null, 'About'), h('p', null, `${st.display} - BETA software. No cloud account, no analytics, no telemetry, and WavWiz doesn\'t open ports to the internet. Internet radio, tag and cover lookups, and Spotify Connect (if you switch it on) use the internet.`),
       h('p', { class: 'small dim' }, 'Beta limits: your own files, internet radio (incl. Radio Browser finder), devices/zones, scenes, schedules, follow-speaker, CD ripper (FLAC/AAC; libcdio CDDA), tag fix with AcoustID when a key is set, Tailscale remote. Apple Music/Pandora/Cast and opening the server to the public internet are not in this beta. AirPlay and optional Spotify Connect are included.'),
       h('button', { class: 'btn', onclick: () => import('./about.js').then(m => m.openAbout(S)) }, 'About, credits & licenses')));
 

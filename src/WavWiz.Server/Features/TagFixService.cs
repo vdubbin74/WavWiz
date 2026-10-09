@@ -8,6 +8,8 @@ namespace WavWiz.Server.Features;
 /// <summary>B9 / 0.0.5: MusicBrainz + Cover Art Archive + optional AcoustID/Chromaprint tag/cover fills; approve before write; undoable.</summary>
 public sealed class TagFixService
 {
+    /// <summary>0.2.0 item 18: built from WavWizInfo.Version (Directory.Build.props), so a version bump updates it with no code edit.</summary>
+    public static string UserAgent => $"WavWiz/{WavWiz.Core.WavWizInfo.Version} (home LAN tag fixer; +https://github.com/vdubbin74/wavwiz)";
     private readonly Db _db;
     private readonly Library.LibraryService _lib;
     private readonly Library.ArtService _art;
@@ -17,7 +19,7 @@ public sealed class TagFixService
     public TagFixService(Db db, Library.LibraryService lib, Library.ArtService art, EventHub ev, string ffmpeg)
     {
         _db = db; _lib = lib; _art = art; _ev = ev; _ffmpeg = ffmpeg; _ = _art; _ = _lib;
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("WavWiz/0.0.5 (home LAN tag fixer; +https://github.com/vdubbin74/wavwiz)");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);      // 0.2.0 item 18: follows the app version (MusicBrainz asks for a meaningful UA)
     }
 
     public object Status()

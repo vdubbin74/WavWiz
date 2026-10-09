@@ -83,6 +83,12 @@ public sealed class Db
         CREATE TABLE rip_job(id INTEGER PRIMARY KEY, drive TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', format TEXT NOT NULL DEFAULT 'flac',
             dest_folder TEXT, album TEXT, artist TEXT, progress REAL NOT NULL DEFAULT 0, error TEXT, created_at TEXT NOT NULL, finished_at TEXT);
         """,
+        // v5 (0.2.0): "Sign in as admin" on the same token (no re-pair), which browser session owns which web speaker, and server-stored favorites.
+        """
+        ALTER TABLE api_token ADD COLUMN elevated INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE player ADD COLUMN owner_token_id INTEGER;
+        CREATE TABLE favorite(kind TEXT NOT NULL, ref TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(kind, ref));
+        """,
     };
 
     public SqliteConnection Open()
