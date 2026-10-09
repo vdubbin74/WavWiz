@@ -8,7 +8,7 @@ public static class TagFlags { public const int Title = 1, Artist = 2, Album = 4
 
 public sealed record ArtistRow(string Name, int Albums, int Tracks, long ArtTrackId, string? AddedAt = null);   // 0.2.0 item 13: AddedAt for "recently added" sorting
 public sealed record AlbumRow(string Artist, string Album, int? Year, int Tracks, long DurationMs, long ArtTrackId, string AddedAt, string? Genre);
-public sealed record NameCount(string Name, int Tracks, int Albums);
+public sealed record NameCount(string Name, int Tracks, int Albums, long[]? ArtTrackIds = null);   // 0.2.1 F4/F13: up to 4 album covers for the genre / year tiles
 
 /// <summary>Tag-based browsing (0.0.2): Artist / Album / Genre / Year / Recently added never depend on which folder the files are in. Folders are a separate view.</summary>
 public sealed partial class LibraryService
@@ -64,8 +64,43 @@ public sealed partial class LibraryService
         return (tracks, albums);
     }
 
-    public List<NameCount> Genres() => _db.Query("SELECT genre, COUNT(*), COUNT(DISTINCT album_artist||char(31)||album) FROM track WHERE missing=0 AND genre<>'' GROUP BY genre ORDER BY genre COLLATE NOCASE", r => new NameCount(r.GetString(0), r.GetInt32(1), r.GetInt32(2)));
-    public List<NameCount> Years() => _db.Query("SELECT year, COUNT(*), COUNT(DISTINCT album_artist||char(31)||album) FROM track WHERE missing=0 AND year IS NOT NULL GROUP BY year ORDER BY year DESC", r => new NameCount(r.GetInt32(0).ToString(CultureInfo.InvariantCulture), r.GetInt32(1), r.GetInt32(2)));
+    public List<NameCount> Genres()
+    {
+        var art = CoverSamples("genre", "genre<>''");
+        return _db.Query("SELECT genre, COUNT(*), COUNT(DISTINCT album_artist||char(31)||album) FROM track WHERE missing=0 AND genre<>'' GROUP BY genre ORDER BY genre COLLATE NOCASE", r => new NameCount(r.GetString(0), r.GetInt32(1), r.GetInt32(2), art.GetValueOrDefault(r.GetString(0))));
+    }
+    public List<NameCount> Years()
+    {
+        var art = CoverSamples("CAST(year AS TEXT)", "year IS NOT NULL");
+        return _db.Query("SELECT year, COUNT(*), COUNT(DISTINCT album_artist||char(31)||album) FROM track WHERE missing=0 AND year IS NOT NULL GROUP BY year ORDER BY year DESC", r => { var y = r.GetInt32(0).ToString(CultureInfo.InvariantCulture); return new NameCount(y, r.GetInt32(1), r.GetInt32(2), art.GetValueOrDefault(y)); });
+    }
+    /// <summary>0.2.1 F4/F13: for each group key, the first track of up to <paramref name="max"/> albums (albums with a cover first) - the covers a
+    /// genre / year / folder tile shows as a collage or mosaic.</summary>
+    private Dictionary<string, long[]> CoverSamples(string keyExpr, string where, int max = 4)
+    {
+        var rows = _db.Query($"SELECT {keyExpr}, MIN(id), MAX(has_art) FROM track WHERE missing=0 AND {where} GROUP BY {keyExpr}, album_artist, album ORDER BY MAX(has_art) DESC, MAX(added_at) DESC",
+            r => (K: r.IsDBNull(0) ? "" : r.GetString(0), Id: r.GetInt64(1)));
+        var d = new Dictionary<string, List<long>>(StringComparer.Ordinal);
+        foreach (var (k, id) in rows) { if (!d.TryGetValue(k, out var l)) d[k] = l = new List<long>(); if (l.Count < max) l.Add(id); }
+        return d.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.Ordinal);
+    }
+    /// <summary>Album covers under a folder tree, grouped by the child folder name right below <paramref name="prefix"/> (or by root when prefix is null).</summary>
+    private Dictionary<string, long[]> FolderCovers(string? prefix, IEnumerable<string>? roots = null, int max = 4)
+    {
+        var d = new Dictionary<string, List<long>>(StringComparer.OrdinalIgnoreCase);
+        void add(string k, long id) { if (!d.TryGetValue(k, out var l)) d[k] = l = new List<long>(); if (l.Count < max) l.Add(id); }
+        if (prefix == null)
+        {
+            foreach (var r in roots ?? Array.Empty<string>())
+                foreach (var id in _db.Query("SELECT MIN(id) FROM track WHERE missing=0 AND (folder=$p OR folder LIKE $l ESCAPE '\\') GROUP BY album_artist, album ORDER BY MAX(has_art) DESC, MAX(added_at) DESC LIMIT $m", x => x.GetInt64(0), ("$p", r), ("$l", EscapeLike(r) + "%"), ("$m", max))) add(r, id);
+        }
+        else
+        {
+            var rows = _db.Query("SELECT folder, MIN(id) FROM track WHERE missing=0 AND folder LIKE $l ESCAPE '\\' GROUP BY folder, album_artist, album ORDER BY MAX(has_art) DESC, MAX(added_at) DESC", x => (F: x.GetString(0), Id: x.GetInt64(1)), ("$l", EscapeLike(prefix) + "%"));
+            foreach (var (f, id) in rows) { var seg = f[prefix.Length..].Split('\\', '/')[0]; if (seg.Length > 0) add(seg, id); }
+        }
+        return d.ToDictionary(x => x.Key, x => x.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+    }
 
     public List<TrackRow> ByAlbumKey(string albumArtist, string album) => ByAlbum(albumArtist, album);
     public List<TrackRow> ByYear(int year) => _db.Query($"SELECT {Cols} FROM track WHERE missing=0 AND year=$y ORDER BY album_artist, album, disc_no, track_no", Map, ("$y", year));
@@ -94,7 +129,7 @@ public sealed partial class LibraryService
     public object Folders(string? path)
     {
         var roots = _db.Query("SELECT path FROM library_root WHERE enabled=1 ORDER BY path", r => r.GetString(0));
-        if (string.IsNullOrEmpty(path)) return new { path = "", parent = (string?)null, folders = roots.Select(r => new { name = r, path = r, tracks = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM track WHERE missing=0 AND (folder=$p OR folder LIKE $l ESCAPE '\\')", ("$p", r), ("$l", EscapeLike(r) + "%"))) }).ToList(), tracks = new List<TrackRow>() };
+        if (string.IsNullOrEmpty(path)) { var rc = FolderCovers(null, roots); return new { path = "", parent = (string?)null, folders = roots.Select(r => new { name = r, path = r, tracks = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM track WHERE missing=0 AND (folder=$p OR folder LIKE $l ESCAPE '\\')", ("$p", r), ("$l", EscapeLike(r) + "%"))), artTrackIds = rc.GetValueOrDefault(r) ?? Array.Empty<long>() }).ToList(), tracks = new List<TrackRow>() }; }
         char sep = path.Contains('\\') && !path.Contains('/') ? '\\' : (path.Contains('/') ? '/' : System.IO.Path.DirectorySeparatorChar);
         string prefix = path.TrimEnd('\\', '/') + sep;
         var rows = _db.Query("SELECT folder, COUNT(*) FROM track WHERE missing=0 AND folder LIKE $l ESCAPE '\\' GROUP BY folder", r => (F: r.GetString(0), N: r.GetInt32(1)), ("$l", EscapeLike(prefix) + "%"));
@@ -103,7 +138,8 @@ public sealed partial class LibraryService
         var tracks = _db.Query($"SELECT {Cols} FROM track WHERE missing=0 AND folder=$p ORDER BY disc_no, track_no, title COLLATE NOCASE", Map, ("$p", path.TrimEnd('\\', '/')));
         string? parent = null;
         if (!roots.Contains(path.TrimEnd('\\', '/'), StringComparer.OrdinalIgnoreCase)) { var pr = System.IO.Path.GetDirectoryName(path.TrimEnd('\\', '/')); parent = string.IsNullOrEmpty(pr) ? "" : pr; } else parent = "";
-        return new { path, parent, folders = kids.Select(k => new { name = k.Key, path = prefix + k.Key, tracks = k.Value }).ToList(), tracks };
+        var covers = FolderCovers(prefix);
+        return new { path, parent, folders = kids.Select(k => new { name = k.Key, path = prefix + k.Key, tracks = k.Value, artTrackIds = covers.GetValueOrDefault(k.Key) ?? Array.Empty<long>() }).ToList(), tracks };
     }
     private static string EscapeLike(string x) => x.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     public List<TrackRow> TracksInFolderTree(string path)

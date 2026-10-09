@@ -1,12 +1,16 @@
 import { h, api, toast, fmtTime } from './util.js';
 import { cover, trackArt } from './art.js';
 import { attachItem, refTracks, refNode, albumNode, canControl, playNow, addToQueue, chunked, pickPlaylist } from './ui.js';
-import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS } from './libsort.js';
+import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 
 const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites']];
 const GRID_KINDS = new Set(['albums', 'recent', 'favorites']);
 const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', years: 'years', recent: 'albums', folders: 'folders', favorites: 'favorites', songs: 'songs' };
+
+const folderGlyph = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.innerHTML = '<path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l1.8 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>'; return s; };
+/** Artist picture for the round tiles (album art until a real artist photo is found - see F13). */
+const artistArt = a => cover(trackArt(a.artTrackId, 384), 'lg rnd', '♪');
 
 /** Tag-based library: grouping comes from the songs' tags (Artist/Album/Genre/Year), never from the folder layout. Folders is its own tab.
  * 0.2.0 items 13-16: sort + A-Z/Z-A flip on every tab (remembered per tab), letter strip on long name-sorted lists, hearts (server
@@ -15,7 +19,8 @@ const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', ye
 export function libraryView(S, opts = {}) {
   const compact = !!opts.compact;       // desktop left panel: ARTISTS / ALBUMS / GENRES / FOLDERS + a count, Years / Recently added / Favorites under "more"
   let expanded = false;
-  const P = loadLibPrefs(); const seed = (Date.now() & 0xffff) || 1;
+  let P = loadLibPrefs(); const seed = (Date.now() & 0xffff) || 1;
+  const session = {};      // 0.2.1 F4: a Tiles/List pick that is not remembered (Remember view per tab off) lasts until the page reloads
   const st = { tab: (compact ? S.libTabC : S.libTab) || (compact ? 'artists' : 'albums'), stack: [], q: '', count: null, kind: null, dirty: false };
   const root = h('div', { class: compact ? 'lib compact' : 'lib' }), head = h('div'), tools = h('div', { class: 'libtools' }), crumbs = h('div', { class: 'crumbs' }),
     content = h('div', { class: 'libcontent' }), strip = h('nav', { class: 'azstrip', 'aria-label': 'Jump to letter', hidden: true }), countEl = h('div', { class: 'libcount small dim' });
@@ -44,7 +49,9 @@ export function libraryView(S, opts = {}) {
   const push = page => { st.stack.push(page); draw(); };
   const back = () => { st.stack.pop(); draw(); };
   const save = () => saveLibPrefs(P);
-  const gridOn = kind => P.view === 'grid' && GRID_KINDS.has(kind);
+  // 0.2.1 F4: Expanded = tiles on every tab by default (per-tab Tiles/List); the narrow panel keeps its own album grid/list choice.
+  const gridOn = kind => (expanded ? tabView(P, kind, session) === 'grid' : P.compactView === 'grid' && GRID_KINDS.has(kind));
+  const setView = (kind, v) => { if (expanded) { if (P.remember) { P.views[kind] = v; delete session[kind]; } else session[kind] = v; } else P.compactView = v; save(); draw(); };
 
   // ---- rows ----
   const nameRow = (title, sub, art, ref, onopen, glyph = '♪', rnd = false, extra = null) => {
@@ -65,14 +72,40 @@ export function libraryView(S, opts = {}) {
       h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, al.artist));
     return attachItem(S, el, ref, al.album, { more: false });   // tiles: right-click / long-press menu, no ⋯ row
   };
+  // ---- 0.2.1 F4 / F13 tiles: artists (round), genres + years (color blocks with a cover collage), folders (2x2 mosaic) ----
+  const playBtn = (ref, label) => canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${label}`, onclick: ev => { ev.stopPropagation(); playNow(ref); } }, '▶') : null;
+  const artistTile = a => {
+    const ref = refNode('artist:' + a.name);
+    const el = h('li', { class: 'tile atile', onclick: () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }) },
+      h('div', { class: 'tileart rnd' }, artistArt(a), playBtn(ref, a.name)),
+      h('div', { class: 't1 ell', title: a.name }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'} · ${a.tracks} song${a.tracks === 1 ? '' : 's'}`));
+    return attachItem(S, el, ref, a.name, { more: false });
+  };
+  const blockTile = (key, sub) => n => {
+    const ref = refNode(key + ':' + n.name), [c1, c2] = blockColors(n.name);
+    const el = h('li', { class: 'tile btile', onclick: () => push({ title: n.name, kind: 'albums', load: () => albumsPage({ [key]: key === 'year' ? +n.name : n.name }) }) },
+      h('div', { class: 'gblock', style: `--g1:${c1};--g2:${c2}` }, h('b', { class: 'gname ell' }, n.name), h('span', { class: 'gsub' }, sub(n)),
+        h('div', { class: 'gcollage', 'aria-hidden': 'true' }, (n.artTrackIds || []).slice(0, 3).map((id, i) => cover(trackArt(id, 192), 'gc gc' + i, '♫'))), playBtn(ref, n.name)));
+    return attachItem(S, el, ref, n.name, { more: false });
+  };
+  const genreTile = blockTile('genre', n => `${n.albums} album${n.albums === 1 ? '' : 's'}`);
+  const yearTile = blockTile('year', n => `${n.albums} album${n.albums === 1 ? '' : 's'} · ${n.tracks} song${n.tracks === 1 ? '' : 's'}`);
+  const folderTile = f => {
+    const ids = (f.artTrackIds || []).slice(0, 4), name = f.name.split(/[\\/]/).filter(Boolean).pop() || f.name;
+    const el = h('li', { class: 'tile ftile', onclick: () => push({ title: name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) },
+      h('div', { class: 'tileart fmosaic' + (ids.length < 2 ? ' one' : '') }, ...(ids.length ? ids.map(id => cover(trackArt(id, 192), 'fm', '♫')) : [h('div', { class: 'cover fm' }, '📁')]),
+        h('span', { class: 'fbadge', 'aria-hidden': 'true' }, folderGlyph()), playBtn(refNode('folder:' + f.path), name)),
+      h('div', { class: 't1 ell', title: f.name }, name), h('div', { class: 't2' }, `${f.tracks} track${f.tracks === 1 ? '' : 's'}`));
+    return attachItem(S, el, refNode('folder:' + f.path), name, { more: false });
+  };
   const countRow = (glyph, key) => n => nameRow(n.name, `${n.tracks} song${n.tracks === 1 ? '' : 's'} • ${n.albums} album${n.albums === 1 ? '' : 's'}`, null, refNode(key + ':' + n.name), () => push({ title: n.name, kind: 'albums', load: () => albumsPage({ [key]: key === 'year' ? +n.name : n.name }) }), glyph);
 
   // ---- lists (sorted, letter strip) ----
   let jump = null;
-  function list(kind, rows, make) {
+  function list(kind, rows, make, tile = make === albumRow ? albumTile : null) {
     const key = P.sort[kind], sorted = sortRows(kind, rows, key, P.flip[kind], seed); st.count = rows.length; st.kind = kind;
-    const grid = gridOn(kind) && make === albumRow;
-    const mk = grid ? albumTile : make; const ul = h('ul', { class: grid ? 'tilegrid' : 'list' }); const ch = chunked(ul, sorted, (row, i) => mk(row, i, sorted));
+    const grid = !!tile && gridOn(kind);
+    const mk = grid ? tile : make; const ul = h('ul', { class: grid ? 'tilegrid tg-' + kind : 'list' }); const ch = chunked(ul, sorted, (row, i) => mk(row, i, sorted));
     if (isLetterSort(kind, key) && sorted.length >= (expanded ? 20 : 40)) {
       const idx = letterIndex(kind, sorted, key);
       jump = l => { const i = idx.get(l); if (i == null) return; ch?.upTo?.(i); ul.children[i]?.scrollIntoView({ block: 'start' }); };
@@ -103,7 +136,7 @@ export function libraryView(S, opts = {}) {
     const out = [];
     if (path) out.push(h('ul', { class: 'list' }, h('li', { class: 'item', onclick: () => { st.stack.pop(); draw(); } }, h('div', { class: 't' }, h('div', { class: 't1' }, '‹ Up')))));
     const folderRow = f => { const el = h('li', { class: 'item', onclick: () => push({ title: f.name.split(/[\\/]/).pop() || f.name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) }, h('span', { class: 'cover sm' }, '📁'), h('div', { class: 't' }, h('div', { class: 't1 ell' }, f.name), h('div', { class: 't2' }, `${f.tracks} songs`))); return attachItem(S, el, refNode('folder:' + f.path), f.name); };
-    if (r.folders.length) out.push(list('folders', r.folders, folderRow));
+    if (r.folders.length) out.push(list('folders', r.folders, folderRow, folderTile));
     if (r.tracks.length) out.push(h('div', { class: 'sec' }, 'Songs in this folder'), trackList(r.tracks));
     if (!r.folders.length && !r.tracks.length) out.push(empty('This folder has no songs WavWiz can read.'));
     st.count = r.folders.length; st.kind = 'folders';
@@ -127,10 +160,10 @@ export function libraryView(S, opts = {}) {
     return out.length ? out : [empty(`Nothing found for “${q}”.`)];
   }
   const rootPage = {
-    artists: async () => { const rows = await api('/library/artists'); return [rows.length ? list('artists', rows, artistRow) : empty('No music yet. Add a music folder in Settings > Library.')]; },
+    artists: async () => { const rows = await api('/library/artists'); return [rows.length ? list('artists', rows, artistRow, artistTile) : empty('No music yet. Add a music folder in Settings > Library.')]; },
     albums: async () => { const rows = await api('/library/albums?sort=artist'); return [rows.length ? list('albums', rows, albumRow) : empty('No albums yet.')]; },
-    genres: async () => { const rows = await api('/library/genres'); return [rows.length ? list('genres', rows, countRow('♬', 'genre')) : empty('No genre tags found. Songs without a genre appear under Cleanup.')]; },
-    years: async () => { const rows = await api('/library/years'); return [rows.length ? list('years', rows, countRow('📅', 'year')) : empty('No year tags found.')]; },
+    genres: async () => { const rows = await api('/library/genres'); return [rows.length ? list('genres', rows, countRow('♬', 'genre'), genreTile) : empty('No genre tags found. Songs without a genre appear under Cleanup.')]; },
+    years: async () => { const rows = await api('/library/years'); return [rows.length ? list('years', rows, countRow('📅', 'year'), yearTile) : empty('No year tags found.')]; },
     recent: async () => { const rows = await api('/library/recent?limit=120'); return [rows.length ? list('recent', rows, albumRow) : empty('Nothing added yet.')]; },
     folders: async () => foldersPage(''),
     favorites: favoritesPage,
@@ -142,9 +175,10 @@ export function libraryView(S, opts = {}) {
     if (!kind || !SORTS[kind]) { tools.replaceChildren(expanded ? h('span', { class: 'grow' }) : '', expanded && st.count != null ? h('span', { class: 'small dim' }, `${st.count} results`) : ''); return; }
     const sel = h('select', { class: 'libsort', 'aria-label': 'Sort', onchange: ev => { P.sort[kind] = ev.target.value; save(); draw(); } }, SORTS[kind].map(([v, t]) => h('option', { value: v, selected: P.sort[kind] === v }, t)));
     const flip = h('button', { type: 'button', class: 'chipbtn libflip' + (P.flip[kind] ? ' on' : ''), 'aria-pressed': String(P.flip[kind]), title: P.flip[kind] ? 'Reversed - tap for the normal order' : 'Tap to reverse the order', onclick: () => { P.flip[kind] = !P.flip[kind]; save(); draw(); } }, P.flip[kind] ? 'Z–A ↑' : 'A–Z ↓');
-    const gl = GRID_KINDS.has(kind) || kind === 'albums' ? h('span', { class: 'seg libview', role: 'group', 'aria-label': 'Grid or list' },
-      h('button', { type: 'button', class: P.view === 'grid' ? 'on' : '', 'aria-pressed': String(P.view === 'grid'), 'aria-label': 'Cover grid', title: 'Cover grid', onclick: () => { P.view = 'grid'; save(); draw(); } }, '▦'),
-      h('button', { type: 'button', class: P.view === 'list' ? 'on' : '', 'aria-pressed': String(P.view === 'list'), 'aria-label': 'List', title: 'List', onclick: () => { P.view = 'list'; save(); draw(); } }, '☰')) : null;
+    const canGrid = expanded ? VIEW_TABS.includes(kind) : GRID_KINDS.has(kind) || kind === 'albums', cur = gridOn(kind) ? 'grid' : 'list';
+    const gl = canGrid ? h('span', { class: 'seg libview', role: 'group', 'aria-label': 'Tiles or list' },
+      h('button', { type: 'button', class: cur === 'grid' ? 'on' : '', 'aria-pressed': String(cur === 'grid'), 'aria-label': 'Tiles', title: 'Tiles', onclick: () => setView(kind, 'grid') }, '▦'),
+      h('button', { type: 'button', class: cur === 'list' ? 'on' : '', 'aria-pressed': String(cur === 'list'), 'aria-label': 'List', title: 'List', onclick: () => setView(kind, 'list') }, '☰')) : null;
     tools.replaceChildren(expanded ? h('span', { class: 'small dim' }, 'Sort:') : null, sel, flip, gl, h('span', { class: 'grow' }), expanded && st.count != null ? h('span', { class: 'small dim libn' }, `${st.count} ${COUNT_LABEL[kind] || ''}`) : null);
   }
 
@@ -153,7 +187,7 @@ export function libraryView(S, opts = {}) {
   async function draw() {
     if (!visible()) { st.dirty = true; return; }       // hidden copy (phone vs desktop layout): draw when it is shown
     st.dirty = false; const my = ++drawing; st.count = null; jump = null; strip.hidden = true; strip.replaceChildren();
-    root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded);
+    root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded); root.dataset.tiles = P.tileSize;
     tabsSlot.replaceChildren(tabs());
     placeSearch(expanded ? headRow : root);
     search.placeholder = expanded ? 'Filter…' : 'Search songs, albums and artists…';
@@ -170,6 +204,7 @@ export function libraryView(S, opts = {}) {
     } catch (e) { if (my === drawing) content.replaceChildren(h('p', { class: 'err' }, e.message)); }
   }
   window.addEventListener('wavwiz:library', () => draw());
+  window.addEventListener('wavwiz:libprefs', () => { const e = P.expanded; P = loadLibPrefs(); P.expanded = e; for (const k of Object.keys(session)) delete session[k]; draw(); });   // Settings > Library view
   window.addEventListener('wavwiz:favs', () => { if (st.tab === 'favorites' && !st.stack.length && !st.q && visible()) { clearTimeout(draw._f); draw._f = setTimeout(draw, 300); } });
   window.addEventListener('resize', () => { if (st.dirty && visible()) draw(); });
   loadFavs(); draw();

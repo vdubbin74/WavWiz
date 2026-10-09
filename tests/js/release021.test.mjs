@@ -54,3 +54,23 @@ test('0.2.1 F3: no VISUALIZER title and no look-name label on the visualizer pan
   assert.match(n, /const vizPanel = h\('section', \{ class: 'np-vizpanel', 'aria-label': 'Visualizer' \}, stage\);/);
   assert.match(n, /'Looks'/); assert.match(n, /'Full screen visualizer'/); assert.match(n, /'Open the visualizer in its own window'/);
 });
+
+test('0.2.1 F4: Expanded Library opens in tiles on every tab (Large), list toggle remembered per tab, the narrow panel keeps its own choice', async () => {
+  const L = await imp('libsort');
+  const st = memStore(); const p = L.loadLibPrefs(st);
+  assert.equal(p.defView, 'grid'); assert.equal(p.tileSize, 'large'); assert.equal(p.remember, true); assert.equal(p.defSort, 'artist'); assert.equal(p.compactView, 'list');
+  for (const k of ['albums', 'artists', 'genres', 'years', 'recent', 'folders', 'favorites']) assert.equal(L.tabView(p, k), 'grid', k);
+  assert.equal(L.tabView(p, 'songs'), 'list');
+  p.views.genres = 'list'; L.saveLibPrefs(p, st); const q = L.loadLibPrefs(st);
+  assert.equal(L.tabView(q, 'genres'), 'list'); assert.equal(L.tabView(q, 'albums'), 'grid');                // remembered per tab
+  q.remember = false; assert.equal(L.tabView(q, 'genres'), 'grid'); assert.equal(L.tabView(q, 'genres', { genres: 'list' }), 'list');   // not remembered: session only
+  const old = memStore(); old.setItem('wavwiz.libprefs.v1', JSON.stringify({ view: 'grid', sort: {}, flip: {} }));
+  const o = L.loadLibPrefs(old); assert.equal(o.compactView, 'grid'); assert.equal(L.tabView(o, 'artists'), 'grid');  // 0.2.0 save carries over to the narrow panel
+  L.saveLibPrefs(o, old); assert.equal(JSON.parse(old.getItem('wavwiz.libprefs.v1')).view, undefined);
+  const r = L.resetLibView({ ...q, tileSize: 'small', defView: 'list', views: { albums: 'list' } }); assert.equal(r.tileSize, 'large'); assert.equal(r.defView, 'grid'); assert.deepEqual(r.views, {});
+  const l = src('library.js');
+  for (const t of ['artistTile', 'genreTile', 'yearTile', 'folderTile']) assert.match(l, new RegExp(`list\\('\\w+', [^)]*\\)?, ${t}\\)|, ${t}\\)`), t);
+  assert.match(l, /tabView\(P, kind, session\) === 'grid'/); assert.match(l, /root\.dataset\.tiles = P\.tileSize/);
+  assert.match(css, /\.lib\.expanded \.tilegrid\{grid-template-columns:repeat\(auto-fill,minmax\(var\(--tmin\),1fr\)\)/);
+  const lib = L; assert.deepEqual(lib.blockColors('Jazz'), lib.blockColors('Jazz')); assert.notDeepEqual(lib.blockColors('Jazz'), lib.blockColors('Folk'));
+});

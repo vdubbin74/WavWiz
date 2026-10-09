@@ -201,9 +201,9 @@ test('0.2.0 items 13-16: sort on every tab + flip + letter strip, remembered per
   for (const k of ['oldest', 'longest', 'shuffle', 'artist', 'name', 'year', 'recent']) assert.ok(m.SORTS.albums.some(s => s[0] === k), k);
   assert.deepEqual(m.SORTS.songs.map(s => s[0]), ['track', 'title', 'length', 'added']);
   const st = memStore(); const p = m.loadLibPrefs(st);
-  assert.equal(p.sort.albums, 'artist'); assert.equal(p.view, 'list'); assert.equal(p.expanded, false);
-  p.sort.artists = 'songs'; p.flip.artists = true; p.view = 'grid'; p.expanded = true; m.saveLibPrefs(p, st);
-  const q = m.loadLibPrefs(st); assert.equal(q.sort.artists, 'songs'); assert.equal(q.flip.artists, true); assert.equal(q.flip.albums, false); assert.equal(q.view, 'grid'); assert.equal(q.expanded, true);
+  assert.equal(p.sort.albums, 'artist'); assert.equal(p.compactView, 'list'); assert.equal(p.expanded, false);   // 0.2.1 F4: view -> compactView + per-tab views
+  p.sort.artists = 'songs'; p.flip.artists = true; p.compactView = 'grid'; p.expanded = true; m.saveLibPrefs(p, st);
+  const q = m.loadLibPrefs(st); assert.equal(q.sort.artists, 'songs'); assert.equal(q.flip.artists, true); assert.equal(q.flip.albums, false); assert.equal(q.compactView, 'grid'); assert.equal(q.expanded, true);
   const artists = [{ name: 'beta', albums: 1, tracks: 9, addedAt: '2026-01-02' }, { name: 'Alpha', albums: 3, tracks: 2, addedAt: '2026-03-01' }, { name: '10cc', albums: 2, tracks: 5, addedAt: '2025-01-01' }];
   assert.deepEqual(m.sortRows('artists', artists, 'name').map(a => a.name), ['10cc', 'Alpha', 'beta']);
   assert.deepEqual(m.sortRows('artists', artists, 'name', true).map(a => a.name), ['beta', 'Alpha', '10cc']);
