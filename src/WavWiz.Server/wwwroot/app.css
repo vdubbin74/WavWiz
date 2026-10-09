@@ -1159,3 +1159,34 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .eqprevbox{margin-top:12px;border:1px solid color-mix(in srgb,var(--accent2) 55%,var(--line));border-radius:4px;background:var(--bg);padding:8px 10px}
 .eqprevbox .eqarea{zoom:.72}
 .eqprevbox .eqa-plot{height:250px}
+
+/* ---- 0.2.1 F13 Library makeover: generated covers, artist portraits, album page (corners stay the app's tight 4px; only artists are round) ---- */
+.cover.gen{background:var(--panel2)}
+.cover .gencover{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cover.sm .gencover text{font-size:inherit}
+.tile .tileart .cover.lg{transition:filter .16s ease}
+.lib.expanded .tile:hover .tileart{box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.tile .tileart .heart{z-index:2} .tile .tileart .tileplay{z-index:2}
+.albpage{display:flex;flex-direction:column;min-width:0}
+.albhead{--dom:color-mix(in oklab,var(--accent) 55%,var(--accent2));display:flex;gap:22px;align-items:flex-end;padding:22px 20px 18px;margin:0 0 6px;border-radius:4px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--dom) 70%,var(--panel)) 0%,color-mix(in srgb,var(--dom) 22%,var(--panel)) 72%,var(--panel) 100%);transition:background .4s ease}
+.albhead .cover.albcover{width:min(220px,30%);height:auto;aspect-ratio:1/1;border-radius:4px;font-size:64px;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.albmeta{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.albkind{font-size:11px;font-weight:700;letter-spacing:1.6px;color:var(--ink);opacity:.85}
+.albtitle{margin:0;font-size:clamp(22px,calc(3.2vw / var(--z,1)),44px);line-height:1.08;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.albsub{font-size:13px;color:var(--ink);opacity:.9} .albsub b{font-weight:700}
+.albacts{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+.albacts .tbtn{width:44px;height:44px;border-radius:50%;flex:none}
+.albacts .tbtn.albplay{width:54px;height:54px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.albacts .tbtn.albplay .ic svg{width:24px;height:24px}
+.albacts .tbtn.albround,.albacts .heart.tbtn{background:rgba(0,0,0,.25);border:1px solid color-mix(in srgb,var(--ink) 30%,transparent);color:var(--ink)}
+.albacts .heart.tbtn.on{color:var(--hl,var(--accent));border-color:var(--hl,var(--accent))}
+.albcols{display:flex;gap:10px;align-items:center;padding:6px 10px;font-size:11px;letter-spacing:1.2px;color:var(--dim);border-bottom:1px solid var(--line);margin-bottom:4px}
+.albcols .num{width:28px;text-align:center} .albcols .dur{width:56px;text-align:right}
+.albpage .list .item.playing .t1,.lib .list .item.playing .num{color:var(--accent)}
+.lib .list .item.playing{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.lib .list .item.playing .num{font-size:9px;letter-spacing:-1px}
+.lib.compact:not(.expanded) .albhead{flex-direction:column;align-items:flex-start;padding:14px 12px;gap:12px}
+.lib.compact:not(.expanded) .albhead .cover.albcover{width:min(180px,70%)}
+.lib.compact:not(.expanded) .albtitle{font-size:22px}
+@media (max-width:600px){ .albhead{flex-direction:column;align-items:flex-start;padding:14px 12px} .albhead .cover.albcover{width:min(200px,64%)} .albtitle{font-size:24px} }

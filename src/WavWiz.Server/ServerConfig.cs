@@ -20,6 +20,9 @@ public sealed class ServerConfig
     /// <summary>UDP discovery port + mDNS so players find the server without typing an address (0.0.2).</summary>
     public int DiscoveryPort { get; set; } = WavWizInfo.DefaultDiscoveryPort;
     public bool Discovery { get; set; } = true;
+    /// <summary>0.2.1 F13: look up missing album covers (Cover Art Archive) and artist photos (MusicBrainz / Wikidata) online, cached on this PC.
+    /// The admin setting "library.onlineArt" can switch it off too.</summary>
+    public bool OnlineArt { get; set; } = true;
     /// <summary>0.1.1: AirPlay speaker "WavWiz – Whole House" (always on unless switched off here) and its RTSP port; Spotify Connect zeroconf port (the add-on itself is an admin setting, off by default).</summary>
     public bool AirPlay { get; set; } = true;
     public int AirPlayPort { get; set; } = 47804;

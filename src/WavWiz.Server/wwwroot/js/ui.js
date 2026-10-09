@@ -25,6 +25,8 @@ const MIME = 'application/x-wavwiz-ref';
 
 async function act(path, body, ok) { try { await api(path, { method: 'POST', body }); if (ok) toast(ok); return true; } catch (e) { toast(e.message, true); return false; } }
 export const playNow = ref => act('/stream/play', ref);
+/** 0.2.1 F13: album page Shuffle - shuffle on, then play the songs starting from a random one. */
+export async function playShuffled(ids) { if (!ids?.length) return false; if (!(await act('/stream/shuffle', { on: true }))) return false; return act('/stream/play', { kind: 'tracks', ids, index: Math.floor(Math.random() * ids.length) }); }
 export const playNext = ref => act('/queue/add', { ...ref, next: true }, 'Will play next');
 export const addToQueue = ref => act('/queue/add', ref, 'Added to the queue');
 

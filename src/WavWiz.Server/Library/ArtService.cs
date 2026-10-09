@@ -57,12 +57,37 @@ public sealed class ArtService
         return null;
     }
 
-    /// <summary>Returns the cached/rendered JPEG bytes, or null when this track has no picture.</summary>
+    /// <summary>0.2.1 F13: online covers / artist photos (Cover Art Archive, Wikidata), null = off.</summary>
+    public OnlineArt? Online { get; set; }
+
+    /// <summary>Returns the cached/rendered JPEG bytes, or null when this track has no picture. 0.2.1: no embedded or folder picture
+    /// falls back to the album's online cover (cached; looked up in the background the first time).</summary>
     public async Task<byte[]?> GetAsync(TrackRow t, int size, CancellationToken ct)
     {
+        var src = Source(t);
+        if (src == null)
+        {
+            var who = string.IsNullOrWhiteSpace(t.AlbumArtist) ? t.Artist : t.AlbumArtist;
+            if (Online == null || string.IsNullOrWhiteSpace(t.Album)) return null;
+            var key = Online.CacheKey("album", who, t.Album);
+            if (key == null) { Online.Album(who, t.Album); return null; }       // queues the lookup; the generated cover shows meanwhile
+            return await Cached("online|" + key, () => Online.Album(who, t.Album), size, ct);
+        }
+        return await Cached(src.Value.Key, src.Value.Load, size, ct);
+    }
+    /// <summary>0.2.1 F13: an artist photo (online, cached), or null - the web UI then draws a generated portrait.</summary>
+    public async Task<byte[]?> ArtistAsync(string name, int size, CancellationToken ct)
+    {
+        if (Online == null || string.IsNullOrWhiteSpace(name)) return null;
+        var key = Online.CacheKey("artist", name);
+        if (key == null) { Online.Artist(name); return null; }
+        return await Cached("online|" + key, () => Online.Artist(name), size, ct);
+    }
+
+    private async Task<byte[]?> Cached(string srcKey, Func<byte[]?> load, int size, CancellationToken ct)
+    {
         size = SnapSize(size);
-        var src = Source(t); if (src == null) return null;
-        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(src.Value.Key))).ToLowerInvariant();
+        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(srcKey))).ToLowerInvariant();
         var file = Path.Combine(_cache, $"{hash}-{size}.jpg");
         if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
         if (_none.ContainsKey(hash)) return null;
@@ -70,7 +95,7 @@ public sealed class ArtService
         try
         {
             if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
-            var raw = src.Value.Load(); if (raw == null || raw.Length == 0) { _none[hash] = true; return null; }
+            var raw = load(); if (raw == null || raw.Length == 0) { _none[hash] = true; return null; }
             var jpg = await ResizeAsync(raw, size, ct);
             if (jpg == null) { _none[hash] = true; return null; }
             var tmp = file + "." + Environment.CurrentManagedThreadId + ".tmp"; await File.WriteAllBytesAsync(tmp, jpg, ct); File.Move(tmp, file, true);
@@ -78,7 +103,6 @@ public sealed class ArtService
         }
         finally { _gate.Release(); }
     }
-
 
     /// <summary>Fetch a remote image (e.g. Radio Browser favicon), resize to JPEG, cache under artcache/remote-*.</summary>
     public async Task<byte[]?> GetRemoteAsync(string? url, int size, CancellationToken ct)

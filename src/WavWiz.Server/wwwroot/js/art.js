@@ -1,8 +1,11 @@
 import { h } from './util.js';
+import { genNode } from './gencover.js';
 
 const base = '/api/v1/art';
 export const trackArt = (id, size = 192) => id ? `${base}/track/${id}?size=${size}` : null;
 export const albumArt = (artist, album, size = 192) => `${base}/album?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&size=${size}`;
+/** 0.2.1 F13: artist photo (server: MusicBrainz / Wikidata, cached). 204 = none -> the generated portrait stays. */
+export const artistArt = (name, size = 384) => name ? `${base}/artist?name=${encodeURIComponent(name)}&size=${size}` : null;
 export const radioArt = (id, size = 192) => id ? `${base}/radio/${id}?size=${size}` : null;
 
 /** 0.1.1: live sources. radio = internet station; airplay / spotify = a phone sending to the house (title/artist/artwork from the sender). */
@@ -32,10 +35,16 @@ function friendlySender(s) {
   return t;
 }
 
-/** Cover element: themed placeholder underneath, the real picture on top once it loads (no picture = placeholder stays; nothing flickers). */
-export function cover(src, cls = '', glyph = '♪') {
-  const box = h('div', { class: 'cover ' + cls }, glyph);
-  if (src) { const img = h('img', { src, alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.remove(); img.onload = () => { box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); }; box.append(img); }
+/** Cover element: themed placeholder underneath, the real picture on top once it loads (no picture = placeholder stays; nothing flickers).
+ * 0.2.1 F13: gen = { album, artist } draws a unique generated cover as the placeholder, gen = { portrait: name } a round artist portrait. */
+export function cover(src, cls = '', glyph = '♪', gen = null) {
+  const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') }, gen ? '' : glyph);
+  if (gen) box.append(gen.portrait != null ? genNode('artist', gen.portrait) : genNode('album', gen.album, gen.artist));
+  if (src) {
+    const img = h('img', { src, alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.remove();
+    img.onload = () => { if (!img.naturalWidth) { img.remove(); return; } box.classList.add('loaded'); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
+    box.append(img);
+  }
   return box;
 }
 

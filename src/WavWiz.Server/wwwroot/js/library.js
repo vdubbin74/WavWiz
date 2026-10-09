@@ -1,6 +1,7 @@
 import { h, api, toast, fmtTime } from './util.js';
-import { cover, trackArt } from './art.js';
-import { attachItem, refTracks, refNode, albumNode, canControl, playNow, addToQueue, chunked, pickPlaylist } from './ui.js';
+import { cover, trackArt, artistArt as artistPhoto } from './art.js';
+import { icon } from './icons.js';
+import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist } from './ui.js';
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 
@@ -9,8 +10,31 @@ const GRID_KINDS = new Set(['albums', 'recent', 'favorites']);
 const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', years: 'years', recent: 'albums', folders: 'folders', favorites: 'favorites', songs: 'songs' };
 
 const folderGlyph = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.innerHTML = '<path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l1.8 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>'; return s; };
-/** Artist picture for the round tiles (album art until a real artist photo is found - see F13). */
-const artistArt = a => cover(trackArt(a.artTrackId, 384), 'lg rnd', '♪');
+/** 0.2.1 F13: round artist photo (MusicBrainz / Wikidata via the server, cached); a generated portrait until / unless one is found. */
+const artistArt = a => cover(artistPhoto(a.name, 384), 'lg rnd', '♪', { portrait: a.name });
+/** 0.2.1 F13: "Artist · 2021" under album tiles. */
+export const albumSub = al => [al.artist, al.year || null].filter(Boolean).join(' · ');
+/** 0.2.1 F13: album page header color = the cover's dominant color (average of its colorful pixels), applied as --dom. */
+export function dominantColor(img) {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 32, 32);
+    return dominantOf(g.getImageData(0, 0, 32, 32).data);
+  } catch { return null; }
+}
+/** Pure part (tested): the most common colorful hue bucket of RGBA pixels, averaged; mostly gray pictures fall back to the overall average. */
+export function dominantOf(d) {
+  const B = Array.from({ length: 12 }, () => [0, 0, 0, 0]); let R = 0, G = 0, Bl = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); R += r; G += g; Bl += b; n++;
+    if (mx - mn < 40 || mx < 50) continue;
+    let hh = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn); hh = ((hh * 60) + 360) % 360;
+    const k = B[Math.floor(hh / 30) % 12], w = (mx - mn) / 255; k[0] += r * w; k[1] += g * w; k[2] += b * w; k[3] += w;
+  }
+  const best = B.reduce((a, k) => k[3] > a[3] ? k : a, [0, 0, 0, 0]);
+  if (!n) return null;
+  if (best[3] < n * 0.04) return `rgb(${Math.round(R / n)},${Math.round(G / n)},${Math.round(Bl / n)})`;
+  return `rgb(${Math.round(best[0] / best[3])},${Math.round(best[1] / best[3])},${Math.round(best[2] / best[3])})`;
+}
 
 /** Tag-based library: grouping comes from the songs' tags (Artist/Album/Genre/Year), never from the folder layout. Folders is its own tab.
  * 0.2.0 items 13-16: sort + A-Z/Z-A flip on every tab (remembered per tab), letter strip on long name-sorted lists, hearts (server
@@ -54,22 +78,22 @@ export function libraryView(S, opts = {}) {
   const setView = (kind, v) => { if (expanded) { if (P.remember) { P.views[kind] = v; delete session[kind]; } else session[kind] = v; } else P.compactView = v; save(); draw(); };
 
   // ---- rows ----
-  const nameRow = (title, sub, art, ref, onopen, glyph = '♪', rnd = false, extra = null) => {
-    const el = h('li', { class: 'item', onclick: onopen }, cover(art, 'sm' + (rnd ? ' rnd' : ''), glyph), h('div', { class: 't' }, h('div', { class: 't1 ell' }, title), h('div', { class: 't2 ell' }, sub)), extra);
+  const nameRow = (title, sub, art, ref, onopen, glyph = '♪', rnd = false, extra = null, gen = null) => {
+    const el = h('li', { class: 'item', onclick: onopen }, cover(art, 'sm' + (rnd ? ' rnd' : ''), glyph, gen), h('div', { class: 't' }, h('div', { class: 't1 ell' }, title), h('div', { class: 't2 ell' }, sub)), extra);
     return ref ? attachItem(S, el, ref, title) : el;
   };
-  const artistRow = a => nameRow(a.name, `${a.albums} album${a.albums === 1 ? '' : 's'} • ${a.tracks} song${a.tracks === 1 ? '' : 's'}`, trackArt(a.artTrackId, 96), refNode('artist:' + a.name), () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }), '♪', true);
+  const artistRow = a => nameRow(a.name, `${a.albums} album${a.albums === 1 ? '' : 's'} • ${a.tracks} song${a.tracks === 1 ? '' : 's'}`, artistPhoto(a.name, 96), refNode('artist:' + a.name), () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }), '♪', true, null, { portrait: a.name });
   const openAlbum = al => push({ title: al.album, kind: 'songs', load: () => tracksPage(al) });
-  const albumRow = al => nameRow(al.album, [al.artist, al.year || null, `${al.tracks} song${al.tracks === 1 ? '' : 's'}`].filter(Boolean).join(' • '), trackArt(al.artTrackId, 96), refNode(albumNode(al.artist, al.album)), () => openAlbum(al), '♫', false, heartBtn(S, 'album', albumRef(al.artist, al.album), al.album));
+  const albumRow = al => nameRow(al.album, [al.artist, al.year || null, `${al.tracks} song${al.tracks === 1 ? '' : 's'}`].filter(Boolean).join(' • '), trackArt(al.artTrackId, 96), refNode(albumNode(al.artist, al.album)), () => openAlbum(al), '♫', false, heartBtn(S, 'album', albumRef(al.artist, al.album), al.album), { album: al.album, artist: al.artist });
   const playingAlbum = al => { const it = S.now?.item; return !!it && it.album === al.album && (it.albumArtist === al.artist || it.artist === al.artist); };
   const albumTile = al => {
     const ref = refNode(albumNode(al.artist, al.album));
     const el = h('li', { class: 'tile' + (playingAlbum(al) ? ' playing' : ''), onclick: () => openAlbum(al) },
-      h('div', { class: 'tileart' }, cover(trackArt(al.artTrackId, 384), 'lg', '♫'),
+      h('div', { class: 'tileart' }, cover(trackArt(al.artTrackId, 384), 'lg', '♫', { album: al.album, artist: al.artist }),
         playingAlbum(al) ? h('span', { class: 'tilebadge' }, '▮▮▮ Playing') : null,
         heartBtn(S, 'album', albumRef(al.artist, al.album), al.album),
         canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow(ref); } }, '▶') : null),
-      h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, al.artist));
+      h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, albumSub(al)));
     return attachItem(S, el, ref, al.album, { more: false });   // tiles: right-click / long-press menu, no ⋯ row
   };
   // ---- 0.2.1 F4 / F13 tiles: artists (round), genres + years (color blocks with a cover collage), folders (2x2 mosaic) ----
@@ -119,15 +143,33 @@ export function libraryView(S, opts = {}) {
     const rows = await api('/library/albums?' + new URLSearchParams({ ...q, sort: 'artist' }).toString());
     return [rows.length ? list('albums', rows, albumRow) : empty('No albums here.')];
   }
+  /** 0.2.1 F13 album page: header tinted with the cover's dominant color, big cover, ALBUM label, title, artist · year · songs, minutes,
+   * round Play / Shuffle / heart (same round buttons as the F10 control panel), then the track list (# / Title / Time, playing row lit). */
   async function tracksPage(al) {
     const rows = await api(`/library/tracks?artist=${encodeURIComponent(al.artist)}&album=${encodeURIComponent(al.album)}`);
     const ids = rows.map(t => t.id), ref = refNode(albumNode(al.artist, al.album));
-    return [h('div', { class: 'hero' }, cover(trackArt(al.artTrackId ?? ids[0], 384), ''), h('div', { class: 'grow' }, h('h2', null, al.album, ' ', heartBtn(S, 'album', albumRef(al.artist, al.album), al.album)), h('div', { class: 'dim' }, [al.artist, al.year].filter(Boolean).join(' • ')),
-      canControl(S) ? h('div', { class: 'row wrap', style: 'margin-top:8px' }, h('button', { class: 'btn primary', onclick: () => playNow(ref) }, '▶ Play'), h('button', { class: 'btn', onclick: () => addToQueue(ref) }, 'Add to queue'), h('button', { class: 'btn', onclick: () => pickPlaylist(S, ref) }, 'Add to playlist')) : null)),
-    trackList(rows)];
+    const year = al.year || rows.find(t => t.year)?.year, mins = Math.max(1, Math.round(rows.reduce((a, t) => a + (t.durationMs || 0), 0) / 60000));
+    const art = cover(trackArt(al.artTrackId ?? ids[0], 640), 'albcover', '♫', { album: al.album, artist: al.artist });
+    const head = h('header', { class: 'albhead' }, art,
+      h('div', { class: 'albmeta' }, h('div', { class: 'albkind' }, 'ALBUM'), h('h2', { class: 'albtitle', title: al.album }, al.album),
+        h('div', { class: 'albsub' }, h('b', null, al.artist), year ? h('span', null, ' · ' + year) : null, h('span', null, ` · ${rows.length} song${rows.length === 1 ? '' : 's'}, ${mins} min`)),
+        h('div', { class: 'albacts' },
+          canControl(S) ? h('button', { type: 'button', class: 'tbtn albplay', 'aria-label': `Play ${al.album}`, title: 'Play', onclick: () => playNow(ref) }, icon('play')) : null,
+          canControl(S) ? h('button', { type: 'button', class: 'tbtn albround', 'aria-label': `Shuffle ${al.album}`, title: 'Shuffle', onclick: () => playShuffled(ids) }, icon('shuffle')) : null,
+          heartBtn(S, 'album', albumRef(al.artist, al.album), al.album, { round: true }),
+          canControl(S) ? h('button', { type: 'button', class: 'linkbtn', onclick: () => addToQueue(ref) }, 'Add to queue') : null,
+          canControl(S) ? h('button', { type: 'button', class: 'linkbtn', onclick: () => pickPlaylist(S, ref) }, 'Add to playlist') : null)));
+    const img = art.querySelector('img');
+    const tint = () => { const c = dominantColor(img); if (c) head.style.setProperty('--dom', c); };
+    if (img) img.addEventListener('load', () => img.naturalWidth && tint(), { once: true });
+    return [h('div', { class: 'albpage' }, head,
+      h('div', { class: 'albcols', 'aria-hidden': 'true' }, h('span', { class: 'num' }, '#'), h('span', { class: 'grow' }, 'TITLE'), h('span', { class: 'dur' }, 'TIME')),
+      trackList(rows, 'songs', true))];
   }
-  const trackList = (rows, kind = 'songs') => list(kind, rows, (t, i, shown) => {
-    const el = h('li', { class: 'item', onclick: () => canControl(S) ? playNow({ kind: 'tracks', ids: shown.map(x => x.id), index: i }) : toast('Your access is view-only.') }, h('span', { class: 'num' }, t.trackNo ?? i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, [t.artist, t.album].filter(Boolean).join(' • '))),
+  const isPlayingTrack = t => { const it = S.now?.item; return !!it && (it.refId === t.id || (it.kind === 'track' && it.id === t.id)) && it.kind !== 'radio'; };
+  const trackList = (rows, kind = 'songs', albumPage = false) => list(kind, rows, (t, i, shown) => {
+    const on = isPlayingTrack(t);
+    const el = h('li', { class: 'item' + (on ? ' playing' : ''), onclick: () => canControl(S) ? playNow({ kind: 'tracks', ids: shown.map(x => x.id), index: i }) : toast('Your access is view-only.') }, h('span', { class: 'num' }, on ? '▮▮▮' : t.trackNo ?? i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, (albumPage ? [t.artist] : [t.artist, t.album]).filter(Boolean).join(' • '))),
       heartBtn(S, 'track', t.id, t.title), h('span', { class: 'dur' }, fmtTime(t.durationMs)));
     return attachItem(S, el, refTracks([t.id]), t.title);
   });

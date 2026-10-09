@@ -171,3 +171,32 @@ test('0.2.1 F12: three EQ looks over the same DSP; LED bars default; ±12 dB in 
   assert.match(ap, /'EQ style'/); assert.match(ap, /interactive: false/);
   assert.match(src('viz.js'), /export function spectrumTap\(onFrame\)/);
 });
+
+test('0.2.1 F13: generated covers + portraits are deterministic, unique per album, themed; year under album tiles; album page; artist photos', async () => {
+  const g = await imp('gencover');
+  assert.equal(g.initials('Low Tide Radio'), 'LT'); assert.equal(g.initials('Northbound'), 'N'); assert.equal(g.initials('The Glass Harbor'), 'GH');
+  assert.equal(g.initials('Cedar & Smoke'), 'CS'); assert.equal(g.initials('!!!'), '');
+  assert.deepEqual(g.coverSpec('Room Tone', 'Glow Society'), g.coverSpec('Room Tone', 'Glow Society'), 'same album = same cover everywhere');
+  const names = ['Room Tone', 'Northbound', 'Low Tide Radio', 'Slow Motion Summer', 'Quiet Engines', 'Signal Fires'];
+  const sigs = new Set(names.map(n => { const c = g.coverSpec(n, 'x'); return `${c.angle}/${c.mixA}/${c.mixB}/${c.waveCount}`; }));
+  assert.equal(sigs.size, names.length, 'each cover differs');
+  const svg = g.coverSvg('Room Tone', 'Glow Society');
+  assert.match(svg, /var\(--accent\)/); assert.match(svg, /var\(--accent2\)/); assert.match(svg, />RT</); assert.match(svg, /♫/); assert.ok((svg.match(/<path /g) || []).length >= 5, 'wave pattern');
+  assert.match(g.portraitSvg('Blue Lantern'), />BL</);
+  assert.match(g.wavePath(50, 5, 2, 0), /^M0\.0 50\.00/);
+  const art = src('art.js');
+  assert.match(art, /export const artistArt = \(name, size = 384\) => name \? `\$\{base\}\/artist\?name=/);
+  assert.match(art, /gen\.portrait != null \? genNode\('artist', gen\.portrait\) : genNode\('album', gen\.album, gen\.artist\)/);
+  const lib = src('library.js');
+  assert.match(lib, /cover\(artistPhoto\(a\.name, 384\), 'lg rnd', '♪', \{ portrait: a\.name \}\)/);
+  assert.match(lib, /h\('div', \{ class: 't2 ell' \}, albumSub\(al\)\)/);
+  for (const t of ["'ALBUM'", "'TITLE'", "'TIME'", "'albplay'", "playShuffled(ids)", "{ round: true }", "--dom"]) assert.ok(lib.includes(t.replace(/'albplay'/, 'albplay')), t);
+  assert.match(src('ui.js'), /export async function playShuffled\(ids\)/);
+  // pure bits of library.js without a DOM: albumSub + dominantOf
+  const body = lib.slice(lib.indexOf('export function dominantOf'), lib.indexOf('/** Tag-based library'));
+  const dominantOf = new Function(body.replace('export function dominantOf', 'return function') )();
+  const px = (r, g2, b, n) => Array.from({ length: n }, () => [r, g2, b, 255]).flat();
+  assert.equal(dominantOf(new Uint8ClampedArray([...px(230, 90, 40, 60), ...px(30, 200, 180, 30), ...px(20, 20, 20, 10)])), 'rgb(230,90,40)', 'the biggest colorful hue wins, not a muddy average');
+  assert.equal(dominantOf(new Uint8ClampedArray(px(120, 120, 120, 16))), 'rgb(120,120,120)');
+  assert.match(css, /\.albhead\{--dom:/); assert.match(css, /\.albhead \.cover\.albcover\{[^}]*border-radius:4px/, 'album header art keeps the tight corner rule');
+});

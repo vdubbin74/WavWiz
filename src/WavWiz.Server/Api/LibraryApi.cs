@@ -41,6 +41,13 @@ public static class LibraryApi
             var t = L.Track(id); return await Cover(c, s, t, size);
         }).Req(Role.View);
         g.MapGet("/art/album", async (string artist, string album, int? size, HttpContext c) => await Cover(c, s, L.FirstTrackOfAlbum(artist, album), size)).Req(Role.View);
+        // 0.2.1 F13: artist photo (online, cached) - 204 means "none yet": the UI draws a generated portrait
+        g.MapGet("/art/artist", async (string name, int? size, HttpContext c) =>
+        {
+            byte[]? jpg = await s.Art.ArtistAsync(name, size ?? 384, c.RequestAborted);
+            c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";
+            return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");
+        }).Req(Role.View);
         g.MapGet("/art/radio/{id:long}", async (long id, int? size, HttpContext c) =>
         {
             var logo = s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string;
@@ -53,7 +60,7 @@ public static class LibraryApi
     private static async Task<IResult> Cover(HttpContext c, Services s, Library.TrackRow? t, int? size)
     {
         byte[]? jpg = t == null ? null : await s.Art.GetAsync(t, size ?? 192, c.RequestAborted);
-        c.Response.Headers.CacheControl = jpg == null ? "private, max-age=300" : "private, max-age=604800";
+        c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";
         return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");   // 204 = no cover: not an error, so browsers do not log one for every song without art
     }
 }

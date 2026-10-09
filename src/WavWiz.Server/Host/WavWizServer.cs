@@ -34,6 +34,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events, cond);
         var ca = new Tls.LocalCa(cfg.DataDir);
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
+        s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         u.S = s; cond.Engine.FrameTap = s.Viz.OnFrame;
         s.Scenes = new Features.SceneService(db, zones, events);
         s.Schedules = new Features.ScheduleService(db, zones, cond, events);
@@ -154,7 +155,7 @@ public sealed class WavWizServer : IAsyncDisposable
     {
         _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
-        await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Conductor.Dispose();
+        await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Conductor.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();
     }
 }
