@@ -19,9 +19,20 @@ export function libraryView(S, opts = {}) {
   const st = { tab: (compact ? S.libTabC : S.libTab) || (compact ? 'artists' : 'albums'), stack: [], q: '', count: null, kind: null, dirty: false };
   const root = h('div', { class: compact ? 'lib compact' : 'lib' }), head = h('div'), tools = h('div', { class: 'libtools' }), crumbs = h('div', { class: 'crumbs' }),
     content = h('div', { class: 'libcontent' }), strip = h('nav', { class: 'azstrip', 'aria-label': 'Jump to letter', hidden: true }), countEl = h('div', { class: 'libcount small dim' });
-  const search = h('input', { type: 'search', placeholder: 'Search songs, albums and artists…', 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { st.q = ev.target.value.trim(); draw(); }, 250); } });
+  // 0.2.1 F5: the filter box is ONE persistent element. Redraws never re-create or re-parent it while you type (that dropped focus after
+  // every keystroke); filtering is debounced, and focus + caret are restored if a layout switch ever has to move it.
+  const search = h('input', { type: 'search', placeholder: 'Search songs, albums and artists…', 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { const q = ev.target.value.trim(); if (q !== st.q) { st.q = q; draw(); } }, 250); } });
   const searchField = h('div', { class: 'field libsearch' }, search);
+  const tabsSlot = h('div', { class: 'libtabslot' }), headRow = h('div', { class: 'row libhead' }, tabsSlot);
+  head.append(headRow);
   root.append(searchField, head, tools, countEl, crumbs, h('div', { class: 'libscroll' }, content, strip));
+  /** Move the filter box only when the layout really changes, keeping focus and the caret. */
+  const placeSearch = parent => {
+    if (searchField.parentElement === parent) return;
+    const had = document.activeElement === search, a = search.selectionStart, b = search.selectionEnd;
+    if (parent === root) root.prepend(searchField); else parent.append(searchField);
+    if (had) { search.focus({ preventScroll: true }); try { search.setSelectionRange(a, b); } catch { /* type=search */ } }
+  };
 
   const MAIN = ['artists', 'albums', 'genres', 'folders'];
   const pick = k => { st.tab = k; if (compact) S.libTabC = k; else S.libTab = k; st.stack = []; st.q = ''; search.value = ''; draw(); };
@@ -143,8 +154,8 @@ export function libraryView(S, opts = {}) {
     if (!visible()) { st.dirty = true; return; }       // hidden copy (phone vs desktop layout): draw when it is shown
     st.dirty = false; const my = ++drawing; st.count = null; jump = null; strip.hidden = true; strip.replaceChildren();
     root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded);
-    head.replaceChildren(h('div', { class: 'row libhead' }, tabs(), expanded ? searchField : null));
-    if (!expanded && searchField.parentElement !== root) root.prepend(searchField);
+    tabsSlot.replaceChildren(tabs());
+    placeSearch(expanded ? headRow : root);
     search.placeholder = expanded ? 'Filter…' : 'Search songs, albums and artists…';
     crumbs.replaceChildren();
     if (st.stack.length) crumbs.append(h('button', { class: 'btn', onclick: back }, '‹ Back'), h('b', { class: 'ell' }, st.stack[st.stack.length - 1].title));

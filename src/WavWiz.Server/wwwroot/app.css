@@ -962,3 +962,4 @@ html.tv .np-ctlpanel .pn-art,html.tv .pn-classic .pn-art{width:clamp(180px,calc(
 html.tv .np-ctlpanel .np-tabletitles .t1{font-size:2.2rem} html.tv .np-ctlpanel .np-tabletitles .t2{font-size:1.4rem}
 html.tv .np-ctlpanel .np-tablexport .tbtn{width:64px!important;height:64px!important} html.tv .np-ctlpanel .np-tablexport .tbtn.play{width:84px!important;height:84px!important}
 html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
+.libtabslot{display:contents}
