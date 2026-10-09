@@ -803,3 +803,91 @@ html.tv *{transition:none!important;animation:none!important}
 .devpanel .devhead{min-width:0} .devpanel:not(.expanded) .devcount{display:none}
 .devpanel:not(.expanded) .segsize button{font-size:9px;padding:3px 5px}
 .drow .dtop .dname{flex:1 1 auto}
+
+/* ===== 0.2.0 item 8: Now Playing panel styles (Classic default, Center, Stack, Horizon) =====
+   Shared: art LEFT, one matching button style per panel, volume = icon + slider + %, Mute (accent when on), More (⋯).
+   --fx-glow / --fx-motion / --fx-reflect (0..1) come from Settings > Appearance (each slider x the Panel effects master; 50 % default). */
+.np-ctlpanel{--fx-glow:.5;--fx-motion:.5;--fx-reflect:.5}
+.np-ctlpanel .np-tablemain{grid-template-columns:auto minmax(150px,1fr) auto;gap:10px 16px;padding:12px 14px;min-height:124px}
+.np-ctlpanel .pn-ctl{display:flex;align-items:center;gap:14px;min-width:0}
+.np-ctlpanel .np-tablevol{min-width:180px}
+.np-ctlpanel .pn-more{font-size:18px;line-height:1;color:var(--ink)}
+.np-ctlpanel .np-volrow .np-volbtn{width:30px;height:30px;border-radius:50%!important;border:1px solid var(--line)!important;background:var(--panel2)!important;justify-content:center;align-items:center}
+.np-ctlpanel .np-volrow .mutebtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center}
+.np-ctlpanel .np-volrow .mutebtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.np-ctlpanel .np-volrow .mutebtn .ic svg{width:15px;height:15px}
+/* art */
+.pn-art{position:relative;width:96px;height:96px;flex:none;border-radius:10px;touch-action:none}
+.pn-cover{position:relative;z-index:2;width:100%;height:100%;border-radius:8px;overflow:hidden}
+.pn-cover .cover,.pn-refl .cover{width:100%!important;height:100%!important;border-radius:8px}
+.pn-ring,.pn-ringdot,.pn-disc,.pn-refl{display:none}
+.pn-meta > *{min-width:0}
+.pn-titlerow{display:flex;align-items:center;gap:10px;min-width:0} .pn-titlerow .np-tabletitles{flex:1;min-width:0}
+.pn-clock,.pn-lcdrow,.pn-led,.pn-pill,.pn-wave{display:none}
+/* --- Classic: progress ring around the cover (drag to seek), time pill, round buttons --- */
+.pn-classic .pn-art{cursor:grab;padding:5px;width:104px;height:104px}
+.pn-classic .pn-ring{display:block;position:absolute;inset:0;z-index:3;pointer-events:none}
+.pn-ring svg{width:100%;height:100%;overflow:visible}
+.pn-ring rect{fill:none;stroke-width:3;vector-effect:non-scaling-stroke}
+.pn-ring .trk{stroke:var(--line)} .pn-ring .val{stroke:var(--accent);stroke-dasharray:100;stroke-dashoffset:100;stroke-linecap:round;filter:drop-shadow(0 0 calc(8px * var(--fx-glow)) var(--accent));transition:stroke-dashoffset .4s linear}
+.pn-classic .pn-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:4px;margin-top:6px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;font:12px var(--mono);color:var(--ink);background:var(--panel2)}
+.pn-classic .pn-pill i{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 calc(6px * var(--fx-glow)) var(--accent)}
+.pn-classic .pn-pel{color:var(--accent);font-weight:600}
+.pn-classic .np-tableseek{display:none}
+.pn-classic .np-tablexport .tbtn{border-radius:50%!important}
+.pn-classic .np-tablexport .tbtn.play{box-shadow:0 0 calc(18px * var(--fx-glow)) color-mix(in srgb,var(--accent) 70%,transparent)!important}
+/* --- Center: record slides out of the sleeve, full-width waveform seek, soft ghost buttons --- */
+.pn-center .np-tablemain{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto}
+.pn-center .pn-art{grid-row:1 / span 2;margin-right:calc(10px + 34px * var(--fx-motion))}
+.pn-center .pn-disc{display:block;position:absolute;z-index:1;top:4%;left:4%;width:92%;height:92%;border-radius:50%;
+  background:repeating-radial-gradient(circle,#111 0 2px,#1c1c1c 2px 4px);box-shadow:0 0 0 1px #000,0 2px 10px rgba(0,0,0,.6)}
+.pn-center .pn-disc i{position:absolute;inset:36%;border-radius:50%;background:var(--accent)}
+.pn-center .pn-disc i::after{content:'';position:absolute;inset:42%;border-radius:50%;background:var(--bg)}
+.pn-center .pn-disc{translate:12% 0;transition:translate .8s cubic-bezier(.2,.8,.2,1)}
+.pn-center.playing .pn-disc{translate:calc(14% + 34% * var(--fx-motion)) 0;animation:pnspin calc(6s / (0.2 + var(--fx-motion))) linear infinite}
+@keyframes pnspin{from{rotate:0deg}to{rotate:360deg}}
+.pn-center .pn-wave{display:block;position:relative;height:34px;margin-top:6px;cursor:pointer}
+.pn-wbars{position:absolute;inset:0;display:flex;align-items:center;gap:2px;width:100%}
+.pn-wbars i{flex:1;min-width:1px;border-radius:1px;background:color-mix(in srgb,var(--ink) 25%,transparent)}
+.pn-wbars.on i{background:var(--accent);box-shadow:0 0 calc(6px * var(--fx-glow)) color-mix(in srgb,var(--accent) 60%,transparent)}
+.pn-wclip{position:absolute;inset:0;clip-path:inset(0 100% 0 0)}
+.pn-center .np-tableseek .prog{display:none}
+.pn-center .pn-ctl{grid-column:2;justify-content:flex-end}
+.pn-center .np-tablexport .tbtn:not(.play){border-radius:50%!important;border-color:transparent!important;background:color-mix(in srgb,var(--ink) 8%,transparent)!important}
+/* --- Stack: LCD window with a segment clock (ghost 8s), TRACK no., LED-block seek; controls centered in the free gap --- */
+.pn-stack .pn-meta{background:#08090A;border:1px solid color-mix(in srgb,var(--line) 70%,#000);border-radius:8px;padding:8px 12px;box-shadow:inset 0 0 14px rgba(0,0,0,.7);max-width:340px}
+.pn-stack .pn-clock{display:block;position:relative;font:700 30px/1 var(--mono);letter-spacing:2px;flex:none}
+.pn-cghost{color:color-mix(in srgb,var(--accent) 12%,transparent)}
+.pn-cval{position:absolute;right:0;top:0;color:var(--accent);text-shadow:0 0 calc(10px * var(--fx-glow)) var(--accent)}
+.pn-stack .pn-lcdrow{display:flex;justify-content:space-between;font:600 10px var(--mono);letter-spacing:1.5px;color:var(--ink);margin:6px 0 4px}
+.pn-stack .pn-lrev{color:var(--dim)}
+.pn-stack .pn-led{display:block;position:relative;height:9px;cursor:pointer;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 7px,transparent 7px 10px)}
+.pn-ledfill{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(90deg,var(--accent) 0 7px,transparent 7px 10px);filter:drop-shadow(0 0 calc(4px * var(--fx-glow)) var(--accent))}
+.pn-stack .np-tableseek{display:none}
+.pn-stack .pn-ctl{flex-direction:column;align-items:center;justify-self:center;gap:10px}
+.pn-stack .np-tablemain{grid-template-columns:auto minmax(200px,340px) minmax(0,1fr)}
+.pn-stack .np-tablexport .tbtn{border-radius:8px!important}
+.pn-stack .np-volrow .mutebtn,.pn-stack .np-volrow .np-volbtn{border-radius:8px!important}
+/* --- Horizon: cover glow + reflection, seek line from the cover edge, ring buttons --- */
+.pn-horizon .pn-cover{box-shadow:0 0 calc(26px * var(--fx-glow)) color-mix(in srgb,var(--accent) 55%,transparent)}
+.pn-horizon .pn-refl{display:block;position:absolute;left:0;right:0;top:100%;height:40%;margin-top:3px;overflow:hidden;transform:scaleY(-1);opacity:calc(.55 * var(--fx-reflect));
+  -webkit-mask-image:linear-gradient(to top,#000,transparent);mask-image:linear-gradient(to top,#000,transparent);border-radius:8px}
+.pn-horizon .pn-refl .cover{height:250%!important;margin-top:-150%}
+.pn-horizon .np-tablemain{column-gap:0;padding-bottom:20px}
+.pn-horizon .pn-meta{padding-left:16px}
+.pn-horizon .np-tableseek{margin-left:-16px} .pn-horizon .np-times{padding-left:16px}
+.pn-horizon .np-tableseek .prog .bar{background:linear-gradient(90deg,var(--accent),var(--line) 40%)}
+.pn-horizon .pn-ctl{flex-direction:column;align-items:flex-end;gap:8px;padding-left:14px}
+.pn-horizon .np-tablexport .tbtn{border-radius:50%!important;background:transparent!important;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)!important}
+.pn-horizon .np-tablexport .tbtn.play{border-color:var(--accent)!important;background:var(--accent)!important}
+@media (prefers-reduced-motion:reduce){ .pn-center.playing .pn-disc{animation:none} .pn-ring .val{transition:none} }
+/* phones: stacked variant of each style (art + titles, then seek, then controls) */
+@media (max-width:900px){
+  .nowcol.np12 > .np-row{display:none!important}
+  .np-ctlpanel .np-tablemain,.pn-center .np-tablemain,.pn-stack .np-tablemain{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;min-height:0}
+  .np-ctlpanel .pn-art{width:76px;height:76px} .pn-classic .pn-art{width:84px;height:84px}
+  .pn-center .pn-art{grid-row:auto;margin-right:calc(8px + 18px * var(--fx-motion))}
+  .np-ctlpanel .pn-ctl,.pn-center .pn-ctl,.pn-stack .pn-ctl,.pn-horizon .pn-ctl{grid-column:1 / -1;flex-direction:column;align-items:stretch;padding:0}
+  .pn-stack .pn-meta{max-width:none} .pn-stack .pn-clock{font-size:22px}
+  .np-ctlpanel .np-tablevol{min-width:0}
+}

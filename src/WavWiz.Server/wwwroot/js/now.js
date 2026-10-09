@@ -3,6 +3,7 @@ import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, st
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress, vizName } from './viz.js';
 import { icon, setIcon } from './icons.js';
 import { canControl, thisDevice } from './ui.js';
+import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
@@ -41,7 +42,7 @@ export function createNow(S, ctl) {
   const volPop = h('div', { class: 'np-volpop', role: 'group', 'aria-label': 'Stop and sound', hidden: true },
     h('div', { class: 'row' }, h('button', { class: 'tbtn ico', 'aria-label': 'Stop', title: 'Stop', onclick: () => act('/stream/stop') }, icon('stop')), h('span', { class: 'grow' }),
       h('button', { class: 'tbtn tog sound', 'aria-label': 'Sound (EQ)', onclick: () => { volPop.hidden = true; ctl.openEq(); } }, icon('eq'), h('span', null, 'SOUND'))));
-  const volBtn = h('button', { class: 'np-volbtn', 'aria-label': 'Stop and sound', 'aria-expanded': 'false', title: 'More', onclick: ev => { ev.stopPropagation(); volPop.hidden = !volPop.hidden; volBtn.setAttribute('aria-expanded', String(!volPop.hidden)); } }, icon('volume'));
+  const volBtn = h('button', { class: 'np-volbtn', 'aria-label': 'Stop and sound', 'aria-expanded': 'false', title: 'More', onclick: ev => { ev.stopPropagation(); volPop.hidden = !volPop.hidden; volBtn.setAttribute('aria-expanded', String(!volPop.hidden)); } }, h('span', { class: 'pn-more', 'aria-hidden': 'true' }, '⋯'));
   document.addEventListener('click', ev => { if (!volPop.hidden && !volPop.contains(ev.target) && ev.target !== volBtn) { volPop.hidden = true; volBtn.setAttribute('aria-expanded', 'false'); } });
   const upnext = h('div', { class: 'upnext np-upnext', 'aria-label': 'Up next' });
   const chips = h('div', { class: 'devchips np-hchips', 'aria-label': 'Speakers (status)' });
@@ -51,21 +52,50 @@ export function createNow(S, ctl) {
   // 0.1.2 panel hotfix: controls live in their own SOLID panel below a separate visualizer panel (same chrome as Library / Devices / Playlist).
   // Control layout is unchanged: title/times | transport | master volume, device dots underneath.
   const ovT1 = h('div', { class: 't1' }, 'Nothing playing'), ovT2 = h('div', { class: 't2' }, ' ');
-  const tableMeta = h('div', { class: 'np-tablemeta' },
-    h('div', { class: 'np-tabletitles' }, ovT1, ovT2),
+  // 0.2.0 item 8: four panel styles (Classic default, Center, Stack, Horizon) share one set of controls; CSS (.pn-<style>) shows each
+  // style's art + seek treatment. Art LEFT, one matching button style per panel, volume = speaker icon + slider + %, then Mute and More.
+  const seekFrac = f => { if (!canControl(S) || !S.now?.item || isLive(S.now.item) || !S.now.durationMs) return; act('/stream/seek', { ms: Math.round(Math.min(1, Math.max(0, f)) * S.now.durationMs) }); };
+  const fracAt = (el, ev) => { const r = el.getBoundingClientRect(); return (ev.clientX - r.left) / r.width; };
+  const pnCover = h('div', { class: 'pn-cover' }), pnRefl = h('div', { class: 'pn-refl', 'aria-hidden': 'true' }), pnDisc = h('div', { class: 'pn-disc', 'aria-hidden': 'true' }, h('i'));
+  const pnRing = h('span', { class: 'pn-ring', 'aria-hidden': 'true' });
+  pnRing.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect class="trk" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/><rect class="val" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/></svg>';
+  const ringVal = pnRing.querySelector('.val'), ringDot = h('span', { class: 'pn-ringdot', 'aria-hidden': 'true' });
+  const pnArt = h('div', { class: 'pn-art', title: 'Drag around the cover to seek (Classic)' }, pnDisc, pnCover, pnRing, ringDot, pnRefl);
+  let ringDrag = false; const ringSeek = ev => { const r = pnArt.getBoundingClientRect(); seekFrac(ringFrac(r.left + r.width / 2, r.top + r.height / 2, ev.clientX, ev.clientY)); };
+  pnArt.addEventListener('pointerdown', ev => { if (!ctlPanel.classList.contains('pn-classic')) return; ringDrag = true; pnArt.setPointerCapture?.(ev.pointerId); });
+  pnArt.addEventListener('pointerup', ev => { if (ringDrag) { ringDrag = false; ringSeek(ev); } });
+  const pillElv = h('span', { class: 'pn-pel' }, '--:--'), pillDur = h('span', { class: 'pn-pdur' }, '-:--');
+  const pnPill = h('div', { class: 'pn-pill' }, h('i', { 'aria-hidden': 'true' }), pillElv, h('span', { class: 'dim' }, ' / '), pillDur);
+  const waveBase = h('div', { class: 'pn-wbars' }), waveTop = h('div', { class: 'pn-wbars on' }), waveClip = h('div', { class: 'pn-wclip' }, waveTop);
+  const pnWave = h('div', { class: 'pn-wave', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnWave, ev)) }, waveBase, waveClip);
+  const clockVal = h('span', { class: 'pn-cval' }, '--:--'), pnClock = h('div', { class: 'pn-clock', 'aria-hidden': 'true' }, h('span', { class: 'pn-cghost' }, '88:88'), clockVal);
+  const trackNo = h('span', { class: 'pn-trk' }, 'TRACK --'), lcdRev = h('span', { class: 'pn-lrev' }, '-:--');
+  const ledFill = h('div', { class: 'pn-ledfill' });
+  const pnLed = h('div', { class: 'pn-led', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnLed, ev)) }, ledFill);
+  const tableMeta = h('div', { class: 'np-tablemeta pn-meta' },
+    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2), pnClock),
+    h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave,
     h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
-    h('div', { class: 'np-vollbl' }, 'Volume'),
+    h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
     h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, volBtn, liveDot, volPop)));
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
   let ctlCollapsed = false; try { ctlCollapsed = localStorage.getItem('wavwiz.npctlcollapsed') === '1'; } catch { /* ignore */ }
   const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }, ctlCollapsed ? '˄' : '˅');
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
-  const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, tableMeta, tableXport, tableVol));
+  const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, pnArt, tableMeta, h('div', { class: 'pn-ctl' }, tableXport, tableVol)));
   const ctlPanel = h('section', { class: 'np-ctlpanel' + (ctlCollapsed ? ' collapsed' : ''), role: 'group', 'aria-label': 'Playback controls' },
     h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), chips, mutedTag, ctlNow, h('span', { class: 'grow' }), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
+  function applyNpStyle() {
+    const p = loadNpPrefs();
+    for (const [id] of NP_STYLES) ctlPanel.classList.toggle('pn-' + id, p.style === id);
+    for (const [k, v] of Object.entries(npVars(p))) ctlPanel.style.setProperty(k, v);
+    ctlPanel.dataset.style = p.style;
+  }
+  applyNpStyle(); window.addEventListener('wavwiz:npstyle', applyNpStyle);
+  window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') applyNpStyle(); });
   function toggleCtl(force) {
     ctlCollapsed = force ?? !ctlCollapsed;
     ctlPanel.classList.toggle('collapsed', ctlCollapsed);
@@ -179,7 +209,15 @@ export function createNow(S, ctl) {
       coverHolder.replaceChildren(cover(src, '', glyph));
       art.replaceChildren(cover(srcMd, 'md', glyph));
       miniCover.replaceChildren(cover(srcSm, 'sm', glyph));
+      pnCover.replaceChildren(cover(srcMd, 'md', glyph)); pnRefl.replaceChildren(cover(srcMd, 'md', glyph));
     }
+    const wseed = it ? (it.id ?? it.title ?? '') + '' : '';
+    if (pnWave.dataset.seed !== wseed) {
+      pnWave.dataset.seed = wseed; const hs = waveBars(wseed || 'idle');
+      for (const box of [waveBase, waveTop]) box.replaceChildren(...hs.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
+    }
+    trackNo.textContent = 'TRACK ' + (it?.trackNo || it?.track ? String(it.trackNo || it.track).padStart(2, '0') : (n.index >= 0 ? String(n.index + 1).padStart(2, '0') : '--'));
+    ctlPanel.classList.toggle('playing', n.state === 'playing');
     miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
     const playing = n.state === 'playing'; setIcon(play, playing ? 'pause' : 'play'); setIcon(miniPlay, playing ? 'pause' : 'play'); play.classList.toggle('playing', playing);
     shuffle.classList.toggle('on', !!n.shuffle); repeat.classList.toggle('on', n.repeat !== 'off'); shuffle.setAttribute('aria-pressed', String(!!n.shuffle)); repeat.setAttribute('aria-pressed', String(n.repeat !== 'off')); setIcon(repeat, n.repeat === 'one' ? 'repeatOne' : 'repeat');
@@ -204,6 +242,9 @@ export function createNow(S, ctl) {
     elv.textContent = n.item ? fmtTime(pos) : '--:--'; rev.textContent = !n.item ? '-:--' : live ? 'LIVE' : '-' + fmtTime(Math.max(0, dur - pos));
     const frac = live || !dur ? 0 : Math.min(1, pos / dur); fill.style.width = barFill.style.width = frac * 100 + '%'; knob.style.left = barKnob.style.left = frac * 100 + '%'; setVizProgress(live || !dur ? null : frac);
     barElv.textContent = elv.textContent; barRev.textContent = rev.textContent;
+    pillElv.textContent = clockVal.textContent = elv.textContent; lcdRev.textContent = rev.textContent;
+    pillDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
+    ringVal.style.strokeDashoffset = String(100 - frac * 100); ledFill.style.width = frac * 100 + '%'; waveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
   }
   function statusDot(z) {
     if (!z.connected || !z.enabled) return 'bad';       // red = lost / off

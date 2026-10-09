@@ -1,6 +1,7 @@
 import { h, api, toast, dialog } from './util.js';
 import { SCALES, loadScale, applyScale } from './uiscale.js';
 import { networkCard } from './diag.js';
+import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 
 const GROUPS = [
   ['appearance', 'Appearance'],
@@ -37,7 +38,7 @@ export async function openSettings(S, refresh, nav, section) {
       about: [],
     };
 
-    panes.appearance.push(displaySizeCard());      // 0.0.7: themes and visualizers have their own pages (View > Theme…, View > Visualizer…)
+    panes.appearance.push(npStyleCard(), displaySizeCard());      // 0.2.0 item 8: panel styles next to themes      // 0.0.7: themes and visualizers have their own pages (View > Theme…, View > Visualizer…)
 
     // Devices & Zones: pairing, tokens, delay defaults, phone/https
     panes.devices.push(h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
@@ -160,6 +161,24 @@ export async function openSettings(S, refresh, nav, section) {
     const out = h('div', { class: 'mono small', style: 'word-break:break-all' });
     dialog('Create API token', [h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out],
       [{ text: 'Create', cls: 'primary', keep: true, onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } return false; } }, { text: 'Done', onclick: () => { draw(); } }]);
+  }
+  /** 0.2.0 item 8: Now Playing panel style + effects (this browser only). Anyone can pick; Classic is the default. */
+  function npStyleCard() {
+    const p = loadNpPrefs();
+    const box = h('div', { class: 'card', id: 'sec-npstyle' }, h('h3', null, 'Now Playing style (this browser only)'),
+      h('p', { class: 'dim small' }, 'How the playback controls under the visualizer look. Classic is the default.'),
+      h('div', { class: 'row wrap', role: 'group', 'aria-label': 'Now Playing style' }, NP_STYLES.map(([id, name, tip]) =>
+        h('button', { class: 'chipbtn' + (p.style === id ? ' on' : ''), 'aria-pressed': String(p.style === id), title: tip, 'data-npstyle': id, onclick: () => { saveNpPrefs({ ...loadNpPrefs(), style: id }); draw(); } }, name))));
+    const slider = (k, label) => {
+      const out = h('span', { class: 'small dim', style: 'min-width:3em;text-align:right' }, p[k] + '%');
+      const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: p[k], class: 'grow', 'aria-label': label, 'data-npfx': k,
+        oninput: ev => { out.textContent = ev.target.value + '%'; saveNpPrefs({ ...loadNpPrefs(), [k]: +ev.target.value }); } });
+      return h('label', { class: 'row', style: 'gap:10px;margin-top:6px' }, h('span', { style: 'min-width:8.5em' }, label), r, out);
+    };
+    box.append(h('div', { class: 'sec', style: 'margin-top:12px' }, 'Effects'), slider('fx', 'Panel effects'), ...NP_EFFECTS.map(([k, l]) => slider(k, l)),
+      h('p', { class: 'small dim' }, 'Panel effects scales all of them at once. Every slider starts at 50 % and goes up to 100 %.'),
+      h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'btn', onclick: () => { saveNpPrefs({ style: loadNpPrefs().style }); draw(); } }, 'Reset effects')));
+    return box;
   }
   function displaySizeCard() {
     const cur = loadScale();

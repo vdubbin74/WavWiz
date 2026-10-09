@@ -153,3 +153,22 @@ test('0.2.0 item 29: calibration ends its session (music resumes), re-syncs befo
   assert.equal(ce.wifiStability([5, 6, 1500, 5, 6, 5]).level, 1);
   assert.match(ce.describe('WIFI_UNSTABLE').title, /Wi-Fi/); assert.doesNotMatch(ce.describe('SESSION_FAILED').fix.join(' '), /playing is stopped/);
 });
+
+test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 % default / 100 % max, master scales them', async () => {
+  const m = await imp('npstyle');
+  assert.deepEqual(m.NP_STYLES.map(s => s[0]), ['classic', 'center', 'stack', 'horizon']);
+  const st = memStore();
+  assert.deepEqual(m.loadNpPrefs(st), { style: 'classic', fx: 50, glow: 50, motion: 50, reflect: 50 });
+  m.saveNpPrefs({ style: 'stack', glow: 140, motion: -3 }, st);
+  const p = m.loadNpPrefs(st); assert.equal(p.style, 'stack'); assert.equal(p.glow, 100); assert.equal(p.motion, 0); assert.equal(p.fx, 50);
+  assert.equal(m.normNpPrefs({ style: 'terrain' }).style, 'classic');
+  assert.equal(m.effectLevel({ fx: 50, glow: 50 }, 'glow'), 0.5);
+  assert.equal(m.effectLevel({ fx: 0, glow: 100 }, 'glow'), 0);
+  assert.equal(m.effectLevel({ fx: 100, glow: 100 }, 'glow'), 1);
+  assert.equal(m.npVars(null)['--fx-reflect'], '0.500');
+  assert.deepEqual(m.waveBars('a', 10), m.waveBars('a', 10)); assert.ok(m.waveBars('a').every(v => v >= 0.2 && v <= 1));
+  assert.ok(Math.abs(m.ringFrac(0, 0, 10, 0) - 0.25) < 1e-9); assert.ok(Math.abs(m.ringFrac(0, 0, 0, 10) - 0.5) < 1e-9);
+  const s = src('settings.js'); assert.match(s, /npStyleCard\(\), displaySizeCard\(\)/); assert.match(s, /'Panel effects'/);
+  for (const k of ['.pn-classic', '.pn-center', '.pn-stack', '.pn-horizon', '--fx-glow']) assert.ok(css.includes(k), k);
+  assert.match(src('now.js'), /pnArt, tableMeta/);
+});
