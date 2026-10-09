@@ -15,6 +15,9 @@ import { heartBtn } from './fav.js';
  * 0.2.0 item 9: the panel's volume and Mute control ONLY this device (the speaker this page plays on - see ui.js thisDevice); the speaker chips
  * moved to the panel header and are status only (this device first and marked, "+N" for the rest); "This device muted" shows in the header.
  * Master volume moved to the top of Devices (item 10). The same this-device volume/Mute sits on the full-width mini bar (items 16 + 27). */
+/** 0.2.1 F9: the live control panel, so Settings > Appearance can preview it with the very same markup + CSS (cloned, scaled down). */
+let panelTpl = null;
+export const npPanelTemplate = () => panelTpl;
 export function createNow(S, ctl) {
   const E = {}; let viz = null, vizState = { audible: false, error: null, preset: '' }, overlay = null, receivers = null;
   const act = ctl.act;
@@ -97,6 +100,7 @@ export function createNow(S, ctl) {
     for (const [k, v] of Object.entries(npVars(p))) ctlPanel.style.setProperty(k, v);
     ctlPanel.dataset.style = p.style;
   }
+  panelTpl = ctlPanel;
   applyNpStyle(); window.addEventListener('wavwiz:npstyle', applyNpStyle);
   window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') applyNpStyle(); });
   function toggleCtl(force) {

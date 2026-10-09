@@ -1,6 +1,7 @@
 import { h, api, toast, dialog } from './util.js';
 import { networkCard } from './diag.js';
 import { appearancePane } from './appearance.js';
+import { npPreview } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
@@ -38,7 +39,7 @@ export async function openSettings(S, refresh, nav, section) {
       network: [],
     };
 
-    app?.hide?.(); app = appearancePane({ looks: section === 'viz' });
+    app?.hide?.(); app = appearancePane({ looks: section === 'viz', preview: () => npPreview() });
     panes.appearance.push(app.el);
 
     // Devices: phone/https, pairing, tokens, delay defaults

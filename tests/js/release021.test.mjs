@@ -118,3 +118,14 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.match(main, /\[\['mine', 'My stations'\], \['finder', 'Radio finder'\]\]/);
   assert.doesNotMatch(main, /\['finder', 'Finder'\]/);
 });
+
+test('0.2.1 F9: Appearance shows a live preview built from the real panel (clone + example data), updated on every pick', () => {
+  const pv = src('nppreview.js'), now = src('now.js'), st = src('settings.js'), ap = src('appearance.js');
+  assert.match(now, /export const npPanelTemplate = \(\) => panelTpl;/); assert.match(now, /panelTpl = ctlPanel;/);
+  assert.match(pv, /fillSample\(tpl\.cloneNode\(true\), p\)/); assert.match(pv, /'LIVE PREVIEW'/); assert.match(pv, /'EXAMPLE DATA'/); assert.match(pv, /'Updates as you pick\.'/);
+  assert.match(pv, /setAttribute\('inert', ''\)/);
+  assert.match(pv, /addEventListener\('wavwiz:theme', onTheme\); window\.addEventListener\('wavwiz:npstyle', onTheme\)/);
+  assert.match(st, /preview: \(\) => npPreview\(\)/);
+  assert.match(ap, /preview\?\.update\(\)/);
+  assert.match(css, /\.npprev-stage>\.np-ctlpanel\{position:absolute;left:0;top:0;transform-origin:0 0/);
+});
