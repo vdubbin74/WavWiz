@@ -92,4 +92,24 @@ public class Release021Tests
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync("/api/v1/settings", new Dictionary<string, object> { ["library.onlineArt"] = "no" })).StatusCode);
         f.Server.S.Art.Online.Dispose();
     }
+
+    [Fact]
+    public async Task Mute_all_mutes_every_device_and_unmute_all_restores_only_what_it_muted()
+    {
+        await using var f = await ServerFixture.StartAsync(); await f.SetupAdmin(); var admin = f.As(f.Token(Role.Admin, "admin"));
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Kitchen"); await using var b = await FakePc.StartAsync(f, "pc-b", "Garage"); await using var c = await FakePc.StartAsync(f, "pc-c", "Office");
+        await a.WaitConnected(); await b.WaitConnected(); await c.WaitConnected();
+        JsonElement zs = await admin.GetJson("/api/v1/zones");
+        for (int i = 0; i < 100 && zs.GetArrayLength() < 3; i++) { await Task.Delay(50); zs = await admin.GetJson("/api/v1/zones"); }
+        long Id(string pid) => zs.EnumerateArray().First(z => z.GetProperty("playerId").GetString() == pid).GetProperty("id").GetInt64();
+        async Task<Dictionary<string, bool>> Muted() => (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("muted").GetBoolean());
+        (await admin.PatchAsJsonAsync($"/api/v1/zones/{Id("pc-c")}", new { muted = true })).EnsureSuccessStatusCode();      // muted on its own first
+        var r = await admin.PostAsJsonAsync("/api/v1/zones/mute-all", new { muted = true }); r.EnsureSuccessStatusCode();
+        Assert.Equal(2, (await r.Json()).GetProperty("changed").GetInt32());
+        Assert.All((await Muted()).Values, Assert.True);
+        r = await admin.PostAsJsonAsync("/api/v1/zones/mute-all", new { muted = false }); r.EnsureSuccessStatusCode();
+        var m = await Muted(); Assert.False(m["pc-a"]); Assert.False(m["pc-b"]); Assert.True(m["pc-c"]);              // per-device mute stays separate
+        var view = f.As(f.Token(Role.View, "tv"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await view.PostAsJsonAsync("/api/v1/zones/mute-all", new { muted = true })).StatusCode);
+    }
 }

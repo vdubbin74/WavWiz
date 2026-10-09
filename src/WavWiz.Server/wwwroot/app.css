@@ -1193,3 +1193,8 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 
 /* ---- 0.2.1 F14 Highlight: small accents only (Main keeps Play, primary buttons, sliders) ---- */
 .newchip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:1px;padding:1px 5px;border-radius:3px;border:1px solid var(--hl,var(--accent));color:var(--hl,var(--accent));vertical-align:middle;margin-right:6px;line-height:1.4}
+
+/* ---- 0.2.1 F17: Mute all on the master strip (same button style as the rest; muted = Main outline like a muted device) ---- */
+.dmaster .dvol .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;font-size:12px;white-space:nowrap;margin-left:4px}
+.dmaster .dvol .mutealls .ic svg{width:16px;height:16px}
+.dmaster .dvol .mutealls.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}

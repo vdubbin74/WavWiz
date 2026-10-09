@@ -27,6 +27,8 @@ public static class ZoneApi
 
         // 0.2.0 item 10: skips speakers that are off, never changes mute, keeps the balance (see ZoneManager.Master). Body: {delta} | {scale} | {set}.
         g.MapPost("/zones/master", async (HttpContext c) => { var b = await c.Request.Body(); s.Zones.Master(b.Num("delta"), b.Num("scale"), b.Num("set")); return Results.Json(s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress)); }).Req(Role.Control);
+        // 0.2.1 F17: Mute all / Unmute all from the master strip. Body: {muted: true|false}. Unmute all restores only what Mute all muted.
+        g.MapPost("/zones/mute-all", async (HttpContext c) => { var b = await c.Request.Body(); var on = b.Bool("muted") ?? true; var n = s.Zones.MuteAll(on); return Results.Json(new { ok = true, changed = n, zones = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress) }); }).Req(Role.Control);
         g.MapGet("/zones/master", () => Results.Json(new { level = s.Zones.MasterLevel() })).Req(Role.View);
 
         g.MapPost("/zones/{id:long}/output", async (long id, HttpContext c) =>

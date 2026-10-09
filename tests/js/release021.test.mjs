@@ -229,3 +229,15 @@ test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on
   assert.match(src('vizgl.js'), /P\.h \|\| hot/);
   assert.match(src('about.js'), /h\('span', \{ class: 'newchip' \}, 'NEW'\)/);
 });
+
+test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays separate)', async () => {
+  const d = src('devices.js');
+  assert.match(d, /h\('div', \{ class: 'dvol' \}, icon\('volume'\), sl, pct, muteAllButton\(S, ctl\)\)/);
+  assert.match(d, /ctl\.act\('\/zones\/mute-all', \{ muted: want \}\)/);
+  assert.match(d, /m \? 'Unmute all' : 'Mute all'/);
+  assert.match(d, /function muteButton\(S, ctl, z\)/, 'each device keeps its own Mute');
+  const body = d.slice(d.indexOf('export const allMuted'), d.indexOf('\n', d.indexOf('export const allMuted')));
+  const allMuted = new Function('return ' + body.replace('export const allMuted = ', ''))();
+  assert.equal(allMuted([]), false); assert.equal(allMuted([{ muted: true }, { muted: false }]), false); assert.equal(allMuted([{ muted: true }, { muted: true }]), true);
+  assert.match(css, /\.dmaster \.dvol \.mutealls\{/);
+});

@@ -101,7 +101,19 @@ function masterRow(S, ctl) {
   const sl = h('input', { type: 'range', min: 0, max: 100, value: lvl, 'aria-label': 'Master volume', title: 'Raises or lowers every speaker that is on by the same factor (keeps the balance between rooms; never un-mutes)',
     oninput: ev => { pct.textContent = ev.target.value + '%'; clearTimeout(sl._t); sl._t = setTimeout(() => ctl.act('/zones/master', { set: +ev.target.value }), 120); } });
   ro(sl, canControl(S), 'Your access is view-only.');
-  return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER VOLUME'), h('div', { class: 'dvol' }, icon('volume'), sl, pct));
+  return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER VOLUME'), h('div', { class: 'dvol' }, icon('volume'), sl, pct, muteAllButton(S, ctl)));
+}
+/** 0.2.1 F17: every device muted? (drives the Mute all / Unmute all button) */
+export const allMuted = zones => (zones || []).length > 0 && zones.every(z => z.muted);
+/** 0.2.1 F17: Mute all on the master strip. Mutes every device; Unmute all brings back only the ones it muted (the server remembers),
+ * so a device muted on its own stays muted - per-device Mute stays separate. */
+function muteAllButton(S, ctl) {
+  const on = allMuted(S.zones);
+  const b = h('button', { type: 'button', class: 'btn mutealls' + (on ? ' on' : ''), 'aria-pressed': String(on), title: on ? 'Un-mute the devices that Mute all muted' : 'Mute every device (each device keeps its own Mute too)',
+    onclick: () => { const want = !allMuted(S.zones); for (const z of S.zones || []) if (want) z.muted = true; ctl.act('/zones/mute-all', { muted: want }); paint(want); } });
+  const paint = m => { b.classList.toggle('on', m); b.setAttribute('aria-pressed', String(m)); b.replaceChildren(icon(m ? 'mute' : 'volume'), h('span', null, m ? 'Unmute all' : 'Mute all')); };
+  paint(on); ro(b, canControl(S), 'Your access is view-only.');
+  return b;
 }
 function zonesStrip(S, ctl, compact) {
   const admin = isAdmin(S), can = canControl(S);

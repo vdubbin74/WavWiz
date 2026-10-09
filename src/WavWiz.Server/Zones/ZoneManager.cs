@@ -308,6 +308,28 @@ public sealed class ZoneManager
         return target;
     }
 
+    /// <summary>0.2.1 F17: Mute all (master strip). Mutes every device and remembers which ones it muted; Unmute all un-mutes only those, so a
+    /// device you had muted on its own stays muted (per-device mute stays separate). The list is kept in the settings table across restarts.
+    /// Returns the number of devices changed.</summary>
+    public int MuteAll(bool on)
+    {
+        var zs = Zones(); int n = 0;
+        if (on)
+        {
+            var mine = zs.Where(z => !z.Muted).Select(z => z.Id).ToList();
+            var prev = MutedByAll(); _db.SetSetting("zones.mutedByAll", JsonSerializer.Serialize(prev.Union(mine).Distinct().ToList()));
+            foreach (var id in mine) { Patch(id, null, null, true, null); n++; }
+        }
+        else
+        {
+            var ids = MutedByAll(); var list = ids.Count > 0 ? zs.Where(z => z.Muted && ids.Contains(z.Id)).ToList() : zs.Where(z => z.Muted).ToList();
+            _db.SetSetting("zones.mutedByAll", "[]");
+            foreach (var z in list) { Patch(z.Id, null, null, false, null); n++; }
+        }
+        return n;
+    }
+    private HashSet<long> MutedByAll() { try { return JsonSerializer.Deserialize<List<long>>(_db.Setting("zones.mutedByAll") ?? "[]")?.ToHashSet() ?? new(); } catch { return new(); } }
+
     /// <summary>The level the master slider shows: the loudest speaker that is on (0 when none).</summary>
     public double MasterLevel() { var on = Zones().Where(z => z.Enabled).ToList(); return on.Count == 0 ? 0 : on.Max(z => z.Volume); }
 
