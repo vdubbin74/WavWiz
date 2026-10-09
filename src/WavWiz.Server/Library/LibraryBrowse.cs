@@ -6,7 +6,7 @@ namespace WavWiz.Server.Library;
 public static class TagFlags { public const int Title = 1, Artist = 2, Album = 4, Genre = 8, Year = 16, TrackNo = 32;
     public static List<string> Names(int f) { var l = new List<string>(); if ((f & Title) != 0) l.Add("title"); if ((f & Artist) != 0) l.Add("artist"); if ((f & Album) != 0) l.Add("album"); if ((f & Genre) != 0) l.Add("genre"); if ((f & Year) != 0) l.Add("year"); if ((f & TrackNo) != 0) l.Add("track number"); return l; } }
 
-public sealed record ArtistRow(string Name, int Albums, int Tracks, long ArtTrackId);
+public sealed record ArtistRow(string Name, int Albums, int Tracks, long ArtTrackId, string? AddedAt = null);   // 0.2.0 item 13: AddedAt for "recently added" sorting
 public sealed record AlbumRow(string Artist, string Album, int? Year, int Tracks, long DurationMs, long ArtTrackId, string AddedAt, string? Genre);
 public sealed record NameCount(string Name, int Tracks, int Albums);
 
@@ -18,8 +18,8 @@ public sealed partial class LibraryService
     public List<ArtistRow> Artists(string? q = null, int limit = 5000)
     {
         var where = string.IsNullOrWhiteSpace(q) ? "" : " AND LOWER(album_artist) LIKE $q ESCAPE '\\'";
-        return _db.Query($"SELECT album_artist, COUNT(DISTINCT album), COUNT(*), MIN(id) FROM track WHERE missing=0{where} GROUP BY album_artist ORDER BY album_artist COLLATE NOCASE LIMIT {Math.Clamp(limit, 1, 20000)}",
-            r => new ArtistRow(r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.GetInt64(3)), string.IsNullOrWhiteSpace(q) ? Array.Empty<(string, object?)>() : new[] { ("$q", (object?)Like(q!)) });
+        return _db.Query($"SELECT album_artist, COUNT(DISTINCT album), COUNT(*), MIN(id), MAX(added_at) FROM track WHERE missing=0{where} GROUP BY album_artist ORDER BY album_artist COLLATE NOCASE LIMIT {Math.Clamp(limit, 1, 20000)}",
+            r => new ArtistRow(r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.GetInt64(3), r.IsDBNull(4) ? null : r.GetString(4)), string.IsNullOrWhiteSpace(q) ? Array.Empty<(string, object?)>() : new[] { ("$q", (object?)Like(q!)) });
     }
 
     /// <summary>Albums, optionally filtered. sort = name | year | recent | artist.</summary>
@@ -33,6 +33,35 @@ public sealed partial class LibraryService
         var order = sort switch { "name" => "album COLLATE NOCASE", "year" => "MAX(year) DESC, album COLLATE NOCASE", "recent" => "MAX(added_at) DESC", _ => "album_artist COLLATE NOCASE, MAX(year), album COLLATE NOCASE" };
         return _db.Query($"SELECT album_artist, album, MAX(year), COUNT(*), SUM(duration_ms), MIN(id), MAX(added_at), MIN(NULLIF(genre,'')) FROM track WHERE {string.Join(" AND ", w)} GROUP BY album_artist, album ORDER BY {order} LIMIT {Math.Clamp(limit, 1, 20000)} OFFSET {Math.Max(0, offset)}",
             r => new AlbumRow(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetInt32(2), r.GetInt32(3), r.IsDBNull(4) ? 0 : r.GetInt64(4), r.GetInt64(5), r.GetString(6), r.IsDBNull(7) ? null : r.GetString(7)), ps.ToArray());
+    }
+
+    // ---- 0.2.0 item 14: favorites (hearts) stored on the server, so they follow you to every browser. kind = track | album.
+    // A track's ref is its id; an album's ref is "<album artist>\u001f<album>" (the same key the album pages use).
+    public static readonly string[] FavoriteKinds = { "track", "album" };
+    public List<(string Kind, string Ref)> Favorites() => _db.Query("SELECT kind, ref FROM favorite ORDER BY created_at DESC", r => (r.GetString(0), r.GetString(1)));
+    public string? SetFavorite(string? kind, string? reference, bool on)
+    {
+        if (kind == null || !FavoriteKinds.Contains(kind)) return "kind must be track or album";
+        if (string.IsNullOrWhiteSpace(reference) || reference.Length > 1000) return "ref is required";
+        if (kind == "track" && !long.TryParse(reference, NumberStyles.None, CultureInfo.InvariantCulture, out _)) return "a track ref is its id";
+        if (on) _db.Exec("INSERT OR IGNORE INTO favorite(kind, ref, created_at) VALUES($k, $r, $t)", ("$k", kind), ("$r", reference), ("$t", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)));
+        else _db.Exec("DELETE FROM favorite WHERE kind=$k AND ref=$r", ("$k", kind), ("$r", reference));
+        return null;
+    }
+    /// <summary>Hearted songs and albums that are still in the library (newest heart first).</summary>
+    public (List<TrackRow> Tracks, List<AlbumRow> Albums) FavoriteItems()
+    {
+        var tracks = _db.Query($"SELECT {Cols} FROM track JOIN favorite f ON f.kind='track' AND f.ref=CAST(track.id AS TEXT) WHERE missing=0 ORDER BY f.created_at DESC", Map);
+        var albums = new List<AlbumRow>();
+        foreach (var (_, r) in Favorites().Where(f => f.Kind == "album"))
+        {
+            var i = r.IndexOf('\u001f'); if (i < 0) continue;
+            var ar = r[..i]; var al = r[(i + 1)..];
+            var row = _db.Query("SELECT album_artist, album, MAX(year), COUNT(*), SUM(duration_ms), MIN(id), MAX(added_at), MIN(NULLIF(genre,'')) FROM track WHERE missing=0 AND album_artist=$ar AND album=$al GROUP BY album_artist, album",
+                x => new AlbumRow(x.GetString(0), x.GetString(1), x.IsDBNull(2) ? null : x.GetInt32(2), x.GetInt32(3), x.IsDBNull(4) ? 0 : x.GetInt64(4), x.GetInt64(5), x.GetString(6), x.IsDBNull(7) ? null : x.GetString(7)), ("$ar", ar), ("$al", al));
+            albums.AddRange(row);
+        }
+        return (tracks, albums);
     }
 
     public List<NameCount> Genres() => _db.Query("SELECT genre, COUNT(*), COUNT(DISTINCT album_artist||char(31)||album) FROM track WHERE missing=0 AND genre<>'' GROUP BY genre ORDER BY genre COLLATE NOCASE", r => new NameCount(r.GetString(0), r.GetInt32(1), r.GetInt32(2)));

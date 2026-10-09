@@ -193,3 +193,35 @@ test('0.2.0 items 4-7: ten presets with the agreed hexes, four-color custom, old
   assert.doesNotMatch(tv + src('theme.js'), /C07A4E/i); assert.match(tv, /width: 76, height: 76/); assert.match(tv, /not affiliated/);
   assert.match(css, /@media \(max-width:420px\)\{ \.pepe-note\{flex-direction:column/);
 });
+
+test('0.2.0 items 13-16: sort on every tab + flip + letter strip, remembered per tab; grid/list and Expanded remembered', async () => {
+  const m = await imp('libsort');
+  for (const k of ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites', 'songs']) assert.ok(m.SORTS[k]?.length >= 2, k);
+  assert.deepEqual(m.SORTS.artists.map(s => s[0]), ['name', 'albums', 'songs', 'recent']);
+  for (const k of ['oldest', 'longest', 'shuffle', 'artist', 'name', 'year', 'recent']) assert.ok(m.SORTS.albums.some(s => s[0] === k), k);
+  assert.deepEqual(m.SORTS.songs.map(s => s[0]), ['track', 'title', 'length', 'added']);
+  const st = memStore(); const p = m.loadLibPrefs(st);
+  assert.equal(p.sort.albums, 'artist'); assert.equal(p.view, 'list'); assert.equal(p.expanded, false);
+  p.sort.artists = 'songs'; p.flip.artists = true; p.view = 'grid'; p.expanded = true; m.saveLibPrefs(p, st);
+  const q = m.loadLibPrefs(st); assert.equal(q.sort.artists, 'songs'); assert.equal(q.flip.artists, true); assert.equal(q.flip.albums, false); assert.equal(q.view, 'grid'); assert.equal(q.expanded, true);
+  const artists = [{ name: 'beta', albums: 1, tracks: 9, addedAt: '2026-01-02' }, { name: 'Alpha', albums: 3, tracks: 2, addedAt: '2026-03-01' }, { name: '10cc', albums: 2, tracks: 5, addedAt: '2025-01-01' }];
+  assert.deepEqual(m.sortRows('artists', artists, 'name').map(a => a.name), ['10cc', 'Alpha', 'beta']);
+  assert.deepEqual(m.sortRows('artists', artists, 'name', true).map(a => a.name), ['beta', 'Alpha', '10cc']);
+  assert.deepEqual(m.sortRows('artists', artists, 'albums').map(a => a.name), ['Alpha', '10cc', 'beta']);
+  assert.deepEqual(m.sortRows('artists', artists, 'songs').map(a => a.name), ['beta', '10cc', 'Alpha']);
+  assert.deepEqual(m.sortRows('artists', artists, 'recent').map(a => a.name), ['Alpha', 'beta', '10cc']);
+  const albums = [{ artist: 'B', album: 'x', year: 2001, durationMs: 5 }, { artist: 'A', album: 'y', year: 1990, durationMs: 9 }, { artist: 'C', album: 'w', durationMs: 1 }];
+  assert.deepEqual(m.sortRows('albums', albums, 'oldest').map(a => a.album), ['y', 'x', 'w']);
+  assert.deepEqual(m.sortRows('albums', albums, 'longest').map(a => a.album), ['y', 'x', 'w']);
+  assert.deepEqual(m.sortRows('albums', albums, 'shuffle', false, 42), m.sortRows('albums', albums, 'shuffle', false, 42));
+  const songs = [{ id: 5, title: 'b', trackNo: 2, durationMs: 1 }, { id: 9, title: 'a', trackNo: 1, durationMs: 3 }];
+  assert.deepEqual(m.sortRows('songs', songs, 'track').map(s => s.id), [9, 5]); assert.deepEqual(m.sortRows('songs', songs, 'added').map(s => s.id), [9, 5]);
+  assert.equal(m.letterOf('Émile'), 'E'); assert.equal(m.letterOf('10cc'), '#');
+  assert.deepEqual([...m.letterIndex('artists', m.sortRows('artists', artists, 'name'), 'name')], [['#', 0], ['A', 1], ['B', 2]]);
+  assert.ok(m.isLetterSort('albums', 'artist') && !m.isLetterSort('albums', 'year') && !m.isLetterSort('years', 'name'));
+  const lib = src('library.js');
+  assert.match(lib, /\['favorites', '♥ Favorites'\]/); assert.match(lib, /heartBtn\(S, 'track'/); assert.match(lib, /heartBtn\(S, 'album'/); assert.match(lib, /setExpanded/);
+  const main = src('main.js'); assert.match(main, /function toggleLibExpanded/); assert.match(main, /ev\.key === 'Escape'.*libexpanded/);
+  assert.match(css, /\.desk\.libexpanded\{--rightw:46px/); assert.match(css, /\.desk\.devexpanded \.npbar,\.desk\.libexpanded \.npbar\{display:flex\}/);
+  assert.match(src('fav.js'), /Only Control or Admin access can change favorites/);
+});

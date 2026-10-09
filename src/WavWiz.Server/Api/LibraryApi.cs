@@ -10,6 +10,16 @@ public static class LibraryApi
         g.MapGet("/library/artists", (string? q) => Results.Json(L.Artists(q))).Req(Role.View);
         g.MapGet("/library/albums", (string? artist, string? genre, int? year, string? q, string? sort, int? limit, int? offset) => Results.Json(L.Albums(artist, genre, year, q, sort ?? "artist", limit ?? 3000, offset ?? 0))).Req(Role.View);
         g.MapGet("/library/genres", () => Results.Json(L.Genres())).Req(Role.View);
+        // 0.2.0 item 14: favorites (hearts) on the server. Anyone can see them; hearting needs Control (same as playlists).
+        g.MapGet("/favorites", () => Results.Json(L.Favorites().Select(f => new { kind = f.Kind, @ref = f.Ref }))).Req(Role.View);
+        g.MapGet("/favorites/items", () => { var (t, a) = L.FavoriteItems(); return Results.Json(new { tracks = t, albums = a }); }).Req(Role.View);
+        g.MapPut("/favorites", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); var err = L.SetFavorite(b.Str("kind"), b.Str("ref"), b.Bool("on") ?? true);
+            if (err != null) return Ext.Bad(err);
+            s.Events.Publish("favorites");
+            return Results.Json(new { ok = true });
+        }).Req(Role.Control);
         g.MapGet("/library/years", () => Results.Json(L.Years())).Req(Role.View);
         g.MapGet("/library/recent", (int? limit) => Results.Json(L.Albums(sort: "recent", limit: Math.Clamp(limit ?? 60, 1, 500)))).Req(Role.View);
         g.MapGet("/library/tracks", (string? artist, string? album, string? genre, int? year) => Results.Json(L.Tracks(artist, album, genre, year))).Req(Role.View);

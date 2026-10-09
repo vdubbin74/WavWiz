@@ -173,4 +173,29 @@ public class Release020Tests
         (await f.As(f.Token(Role.Control)).PostAsync($"/api/v1/zones/{ida}/test-sound", null)).EnsureSuccessStatusCode();
         c = await admin.GetJson("/api/v1/checklist"); Assert.True(Item(c, "test").GetProperty("done").GetBoolean());
     }
+
+    [Fact]
+    public async Task Favorites_are_stored_on_the_server_need_Control_to_change_and_list_hearted_songs_and_albums()
+    {
+        await using var f = await ServerFixture.StartAsync(); await f.SetupAdmin(); var admin = f.As(f.Token(Role.Admin, "admin"));
+        var music = Directory.CreateDirectory(Path.Combine(f.Dir.Path, "music")).FullName;
+        TestMedia.Run("-f", "lavfi", "-i", "sine=f=440:d=2", "-metadata", "title=Tone", "-metadata", "artist=Test", "-metadata", "album_artist=Test", "-metadata", "album=Tones", Path.Combine(music, "tone.flac"));
+        await admin.PostAsJsonAsync("/api/v1/library/roots", new { path = music });
+        for (int i = 0; i < 100; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() == 1) break; await Task.Delay(100); }
+        var tid = (await admin.GetJson("/api/v1/library/search?q=tone"))[0].GetProperty("id").GetInt64();
+        var viewer = f.As(f.Token(Role.View, "tv")); var ctl = f.As(f.Token(Role.Control, "phone"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PutAsJsonAsync("/api/v1/favorites", new { kind = "track", @ref = tid.ToString(), on = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "song", @ref = "1", on = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "track", @ref = "abc", on = true })).StatusCode);
+        (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "track", @ref = tid.ToString(), on = true })).EnsureSuccessStatusCode();
+        (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "album", @ref = "Test\u001fTones", on = true })).EnsureSuccessStatusCode();
+        (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "album", @ref = "Test\u001fTones", on = true })).EnsureSuccessStatusCode();   // idempotent
+        var favs = await viewer.GetJson("/api/v1/favorites"); Assert.Equal(2, favs.GetArrayLength());              // another browser sees them
+        var items = await viewer.GetJson("/api/v1/favorites/items");
+        Assert.Equal("Tone", items.GetProperty("tracks")[0].GetProperty("title").GetString());
+        Assert.Equal("Tones", items.GetProperty("albums")[0].GetProperty("album").GetString());
+        (await ctl.PutAsJsonAsync("/api/v1/favorites", new { kind = "track", @ref = tid.ToString(), on = false })).EnsureSuccessStatusCode();
+        Assert.Equal(0, (await viewer.GetJson("/api/v1/favorites/items")).GetProperty("tracks").GetArrayLength());
+        var artists = await viewer.GetJson("/api/v1/library/artists"); Assert.False(string.IsNullOrEmpty(artists[0].GetProperty("addedAt").GetString()));   // item 13: recently added
+    }
 }

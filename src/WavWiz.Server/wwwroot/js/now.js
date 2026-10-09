@@ -4,6 +4,7 @@ import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress, 
 import { icon, setIcon } from './icons.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
+import { heartBtn } from './fav.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
@@ -60,6 +61,7 @@ export function createNow(S, ctl) {
   const pnRing = h('span', { class: 'pn-ring', 'aria-hidden': 'true' });
   pnRing.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect class="trk" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/><rect class="val" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/></svg>';
   const ringVal = pnRing.querySelector('.val'), ringDot = h('span', { class: 'pn-ringdot', 'aria-hidden': 'true' });
+  const npHeart = h('span', { class: 'np-heartslot' }), barHeart = h('span', { class: 'np-heartslot' });   // 0.2.0 item 14: heart the playing song
   const pnArt = h('div', { class: 'pn-art', title: 'Drag around the cover to seek (Classic)' }, pnDisc, pnCover, pnRing, ringDot, pnRefl);
   let ringDrag = false; const ringSeek = ev => { const r = pnArt.getBoundingClientRect(); seekFrac(ringFrac(r.left + r.width / 2, r.top + r.height / 2, ev.clientX, ev.clientY)); };
   pnArt.addEventListener('pointerdown', ev => { if (!ctlPanel.classList.contains('pn-classic')) return; ringDrag = true; pnArt.setPointerCapture?.(ev.pointerId); });
@@ -73,7 +75,7 @@ export function createNow(S, ctl) {
   const ledFill = h('div', { class: 'pn-ledfill' });
   const pnLed = h('div', { class: 'pn-led', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnLed, ev)) }, ledFill);
   const tableMeta = h('div', { class: 'np-tablemeta pn-meta' },
-    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2), pnClock),
+    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2), npHeart, pnClock),
     h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave,
     h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, shuffle, prev, play, next, repeat);
@@ -129,7 +131,7 @@ export function createNow(S, ctl) {
   const barVol = mkVol(), barMute = mkMute(), barPct = h('span', { class: 'volpct small dim' }, '');
   const barMore = h('button', { class: 'tbtn', 'aria-label': 'More', title: 'Stop and sound', onclick: ev => { ev.stopPropagation(); volBtn.click(); } }, '⋯');
   const npbar = h('section', { class: 'npbar', 'aria-label': 'Now playing (compact)' },
-    barCover, h('div', { class: 'npb-titles' }, barT1, barT2),
+    barCover, h('div', { class: 'npb-titles' }, barT1, barT2), barHeart,
     h('div', { class: 'transport npb-x', role: 'group', 'aria-label': 'Transport' }, h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), barPlay, h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'))),
     h('div', { class: 'npb-seek' }, barElv, barProg, barRev),
     h('div', { class: 'npb-vol' }, icon('volume'), barVol, barPct, barMute, barMore));
@@ -218,6 +220,8 @@ export function createNow(S, ctl) {
     }
     trackNo.textContent = 'TRACK ' + (it?.trackNo || it?.track ? String(it.trackNo || it.track).padStart(2, '0') : (n.index >= 0 ? String(n.index + 1).padStart(2, '0') : '--'));
     ctlPanel.classList.toggle('playing', n.state === 'playing');
+    const favId = it?.kind === 'track' && !isReceiver(it) ? it.refId : null;
+    if (npHeart.dataset.id !== String(favId ?? '')) { npHeart.dataset.id = barHeart.dataset.id = String(favId ?? ''); npHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); barHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); }
     miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
     const playing = n.state === 'playing'; setIcon(play, playing ? 'pause' : 'play'); setIcon(miniPlay, playing ? 'pause' : 'play'); play.classList.toggle('playing', playing);
     shuffle.classList.toggle('on', !!n.shuffle); repeat.classList.toggle('on', n.repeat !== 'off'); shuffle.setAttribute('aria-pressed', String(!!n.shuffle)); repeat.setAttribute('aria-pressed', String(n.repeat !== 'off')); setIcon(repeat, n.repeat === 'one' ? 'repeatOne' : 'repeat');

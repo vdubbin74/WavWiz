@@ -32,6 +32,7 @@ function menuActions(S, ctl, desktop = false) {
     ],
     library: [
       ['Browse library', browseLib],
+      ['Expanded library', () => (desktop && wideNow() && ctl.toggleLibExpanded ? ctl.toggleLibExpanded() : go('library')), null, () => !(desktop && wideNow())],   // 0.2.0 item 16
       ['Playlist', listPanel, null, () => !desktop],
       ['Playlists', () => go('playlists')],
       ['Queue', () => go('queue')],

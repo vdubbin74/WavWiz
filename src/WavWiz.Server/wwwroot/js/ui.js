@@ -85,5 +85,6 @@ export function chunked(container, rows, make, chunk = 120) {
   const more = () => { const end = Math.min(rows.length, i + chunk); const frag = document.createDocumentFragment(); for (; i < end; i++) frag.append(make(rows[i], i)); container.insertBefore(frag, sentinel); if (i >= rows.length) { io.disconnect(); sentinel.remove(); } };
   const io = new IntersectionObserver(es => { if (es[0].isIntersecting) more(); }, { rootMargin: '600px' });
   container.append(sentinel); more(); if (i < rows.length) io.observe(sentinel);
+  return { upTo: n => { while (i <= n && i < rows.length) more(); } };   // 0.2.0 item 13: the letter strip renders ahead before jumping
 }
 export { MIME };
