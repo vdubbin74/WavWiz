@@ -15,7 +15,8 @@ function menuActions(S, ctl, desktop = false) {
   // 0.0.8: on the desktop layout "Browse library" and "Devices & zones" slide their side panel in or out (no separate page);
   // the phone hamburger keeps opening the full-screen pages (too narrow for side panels).
   const wideNow = () => { try { return !matchMedia('(max-width:900px)').matches; } catch { return true; } };
-  const browseLib = () => (desktop && wideNow() && ctl.toggleLib ? ctl.toggleLib() : go('library'));
+  // 0.2.1 F2: "Browse library" always opens the Expanded Library (no separate "Expanded library" item); the phone opens the full Library page.
+  const browseLib = () => (desktop && wideNow() && ctl.toggleLibExpanded ? ctl.toggleLibExpanded(true) : go('library'));
   const devPanel = () => (desktop && wideNow() && ctl.toggleDev ? ctl.toggleDev() : go('devices'));
   const listPanel = () => (desktop && wideNow() && ctl.toggleList ? ctl.toggleList() : go('queue'));      // 0.1.1: desktop slides the bottom Playlist; phone opens the full page
   const admin = () => S.auth?.role === 'admin';
@@ -32,7 +33,6 @@ function menuActions(S, ctl, desktop = false) {
     ],
     library: [
       ['Browse library', browseLib],
-      ['Expanded library', () => (desktop && wideNow() && ctl.toggleLibExpanded ? ctl.toggleLibExpanded() : go('library')), null, () => !(desktop && wideNow())],   // 0.2.0 item 16
       ['Playlist', listPanel, null, () => !desktop],
       ['Playlists', () => go('playlists')],
       ['Queue', () => go('queue')],

@@ -8,8 +8,8 @@ import { icon, setIcon } from './icons.js';
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
 //  - item 27: the Devices panel has three sizes like the Library - Collapsed (46 px strip) / Standard (narrow list) / Expanded (card grid with
-//    every control inline, replacing the device pop-up). The Devices menu item and the boxed › arrow cycle the sizes; the header has a
-//    Collapsed / Standard / Expanded toggle; tapping a device in Standard opens Expanded with that card highlighted. Saved per browser.
+//    every control inline, replacing the device pop-up); tapping a device in Standard opens Expanded with that card highlighted. Saved per
+//    browser. (0.2.1 F1: arrow = collapse / open, Expand button = wide view; the size toggle and the cycling are gone.)
 //  - item 10: Master volume at the top (Standard + Expanded) and a Mute button on every speaker. Master rules live on the server (ZoneManager.Master).
 //  - item 26: a gray output line under a device that has more than one output, amber "Output unavailable" when the chosen output is gone
 //    (WavWiz never switches by itself); in Expanded an Output dropdown lists every output with its own saved delay, and the Delay slider (0-1000 ms)
@@ -17,9 +17,13 @@ import { icon, setIcon } from './icons.js';
 //  - item 28: everyone with Control can change volume / mute / on-off on any speaker; delay and output only on THEIR OWN device; rename, forget,
 //    zones and "Set as reference" are admin-only. Admin-only controls are shown read-only, never hidden.
 //  - item 30: one house reference speaker (••• > Set as reference, admin) with a "Reference" badge.
+// 0.2.1 F1: no Collapsed / Standard / Expanded toggle and no arrow cycling any more. The panel mirrors the Library: the boxed arrow collapses /
+// opens it, and a separate Expand button switches the wide card view on and off (Esc returns). The three states stay the model underneath.
 export const SIZES = ['collapsed', 'standard', 'expanded'];
-export const SIZE_LABEL = { collapsed: 'Collapsed', standard: 'Standard', expanded: 'Expanded' };
-export const nextSize = s => SIZES[(SIZES.indexOf(s) + 1) % SIZES.length] || 'standard';
+/** Arrow: collapsed <-> open (open = Standard). Pure. */
+export const arrowSize = s => (s === 'collapsed' ? 'standard' : 'collapsed');
+/** Expand button: Expanded <-> Standard (also opens a collapsed panel straight into Expanded). Pure. */
+export const expandSize = s => (s === 'expanded' ? 'standard' : 'expanded');
 const SIZE_KEY = 'wavwiz.devsize';
 /** The saved size for this browser; a 0.1.x "collapsed" flag carries over. */
 export function loadDevSize(store = globalThis.localStorage) {
@@ -196,14 +200,17 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 export function devicesPanel(S, ctl) {
   const root = h('section', { class: 'devpanel', 'aria-label': 'Devices and zones' }), body = h('div', { class: 'devbody' });
   let size = loadDevSize(), hl = null;
-  const colBtn = h('button', { class: 'plus devcol', 'aria-label': 'Change the size of the Devices panel', title: 'Collapsed → Standard → Expanded', onclick: () => ctl.toggleDev?.() }, '›');
-  const seg = h('div', { class: 'segsize', role: 'group', 'aria-label': 'Devices panel size' }, SIZES.map(s => h('button', { type: 'button', 'data-size': s, onclick: () => ctl.setDevSize?.(s) }, SIZE_LABEL[s])));
+  const colBtn = h('button', { class: 'plus devcol', 'aria-label': 'Collapse or open the Devices panel', 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
+  const expBtn = h('button', { class: 'plus devexp', 'aria-label': 'Expand the Devices panel', 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, '⤢');
+  const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
   const count = h('span', { class: 'small dim devcount' });
-  root.append(h('div', { class: 'pane-h devhead' }, colBtn, h('span', { class: 'devtitle' }, 'DEVICES'), seg, h('span', { class: 'grow devtitle' }), count), body);
+  root.append(h('div', { class: 'pane-h devhead' }, colBtn, expBtn, h('span', { class: 'devtitle' }, 'DEVICES'), h('span', { class: 'grow devtitle' }), escHint, count), body);
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;
-    colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-label', `Devices panel: ${SIZE_LABEL[s]}. Change size`);
-    seg.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.size === s); b.setAttribute('aria-pressed', String(b.dataset.size === s)); });
+    colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
+    colBtn.setAttribute('aria-label', s === 'collapsed' ? 'Open the Devices panel' : 'Collapse the Devices panel');
+    expBtn.textContent = s === 'expanded' ? '⤡' : '⤢'; expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
+    expBtn.setAttribute('aria-label', s === 'expanded' ? 'Back to the normal layout' : 'Expand the Devices panel');
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };

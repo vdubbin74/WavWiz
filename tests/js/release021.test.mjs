@@ -28,3 +28,22 @@ test('0.2.1 F16: a silent install returns 9 (not 0) when the final setup step fa
   const doc = readFileSync(new URL('../../docs/INSTALLER.md', import.meta.url), 'utf8');
   assert.match(doc, /`9` the files were copied but the final setup step/); assert.doesNotMatch(doc, /the installer still returns `0`/);
 });
+
+test('0.2.1 F1: Devices header = collapse arrow + separate Expand button (no size toggle, no cycling); Esc returns', async () => {
+  const d = await imp('devices');
+  assert.equal(d.nextSize, undefined); assert.equal(d.SIZE_LABEL, undefined);
+  assert.equal(d.arrowSize('standard'), 'collapsed'); assert.equal(d.arrowSize('expanded'), 'collapsed'); assert.equal(d.arrowSize('collapsed'), 'standard');
+  assert.equal(d.expandSize('standard'), 'expanded'); assert.equal(d.expandSize('collapsed'), 'expanded'); assert.equal(d.expandSize('expanded'), 'standard');
+  const s = src('devices.js'), m = src('main.js');
+  assert.doesNotMatch(s, /segsize/); assert.doesNotMatch(css, /segsize/);
+  assert.match(s, /class: 'plus devcol'/); assert.match(s, /class: 'plus devexp'/); assert.match(s, /ctl\.toggleDevExpanded/);
+  assert.match(m, /function toggleDevExpanded\(force\)/); assert.match(m, /setDevSize\(arrowSize\(devp\.size\)\)/);
+  assert.match(m, /else if \(desk\.classList\.contains\('devexpanded'\)\) toggleDevExpanded\(false\)/);
+  assert.match(css, /\.desk\.devexpanded \.devpanel \.pane-h \.eschint\{display:inline-block\}/);
+});
+
+test('0.2.1 F2: no "Expanded library" menu item; Browse library always opens the Expanded Library', () => {
+  const menu = src('menu.js');
+  assert.doesNotMatch(menu, /'Expanded library'/);
+  assert.match(menu, /const browseLib = \(\) => \(desktop && wideNow\(\) && ctl\.toggleLibExpanded \? ctl\.toggleLibExpanded\(true\) : go\('library'\)\)/);
+});

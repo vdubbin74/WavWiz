@@ -745,11 +745,6 @@ html.tv *{transition:none!important;animation:none!important}
 .npbar .npb-vol{display:flex;align-items:center;gap:8px} .npbar .npb-vol input{width:110px}
 
 /* 0.2.0 item 27: Devices - Collapsed / Standard / Expanded */
-.devpanel .segsize{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-left:4px}
-.devpanel .segsize button{font-size:10px;padding:3px 8px;border:0;background:none;color:var(--dim);cursor:pointer}
-.devpanel .segsize button.on{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);outline:1px solid var(--accent)}
-.desk.devcollapsed .devpanel .segsize{display:none}
-.devpanel:not(.expanded) .segsize{max-width:100%}
 .desk.devexpanded{--libw:46px;grid-template-columns:var(--libw) 0 minmax(0,1fr);grid-template-rows:minmax(0,1fr) 64px}
 .desk.devexpanded .nowcol,.desk.devexpanded .listpanel{display:none}
 .desk.devexpanded .devpanel{grid-area:1/2/2/4}
@@ -801,7 +796,6 @@ html.tv *{transition:none!important;animation:none!important}
 .wifimeter[data-level="3"] i:nth-child(-n+3),.wifimeter[data-level="4"] i{background:var(--green)}
 
 .devpanel .devhead{min-width:0} .devpanel:not(.expanded) .devcount{display:none}
-.devpanel:not(.expanded) .segsize button{font-size:9px;padding:3px 5px}
 .drow .dtop .dname{flex:1 1 auto}
 
 /* ===== 0.2.0 item 8: Now Playing panel styles (Classic default, Center, Stack, Horizon) =====
@@ -935,7 +929,7 @@ html.tv *{transition:none!important;animation:none!important}
 .desk.libexpanded .nowcol,.desk.libexpanded .listpanel{display:none}
 .desk.libexpanded .libpanel{grid-area:1/1/2/3}
 .desk.libexpanded .devpanel{grid-area:1/3/2/4}
-.desk.libexpanded .devpanel .devbody,.desk.libexpanded .devpanel .devtitle,.desk.libexpanded .devpanel .devcount,.desk.libexpanded .devpanel .segsize{display:none}
+.desk.libexpanded .devpanel .devbody,.desk.libexpanded .devpanel .devtitle,.desk.libexpanded .devpanel .devcount,.desk.libexpanded .devpanel .devexp{display:none}
 .desk.libexpanded .devpanel .devhead{justify-content:center;padding:8px 4px}
 .desk.libexpanded .libpanel .pane-h .eschint{display:inline-block}
 .desk.libexpanded .libpanel .pane-h .plus:not(.libexp){display:none}
@@ -963,3 +957,7 @@ html.tv .np-ctlpanel .np-tabletitles .t1{font-size:2.2rem} html.tv .np-ctlpanel 
 html.tv .np-ctlpanel .np-tablexport .tbtn{width:64px!important;height:64px!important} html.tv .np-ctlpanel .np-tablexport .tbtn.play{width:84px!important;height:84px!important}
 html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .libtabslot{display:contents}
+/* 0.2.1 F1: Devices header mirrors the Library - collapse arrow + a separate Expand button (no size toggle) */
+.devpanel .pane-h .eschint{display:none;border:1px solid var(--line);border-radius:3px;padding:1px 6px;margin-right:4px}
+.desk.devexpanded .devpanel .pane-h .eschint{display:inline-block}
+.desk.devcollapsed .devpanel .devexp{display:none}

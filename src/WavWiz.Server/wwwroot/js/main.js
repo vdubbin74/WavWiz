@@ -4,7 +4,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, nextSize, saveDevSize, loadDevSize } from './devices.js';
+import { devicesView, devicesPanel, arrowSize, saveDevSize, loadDevSize } from './devices.js';
 import { listTable } from './listtable.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
@@ -107,7 +107,7 @@ let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, co
 async function startMain() {
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
@@ -119,7 +119,7 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['finder', 'Finder'], ['scenes', 'Scenes'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
@@ -140,7 +140,7 @@ async function startMain() {
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
   window.addEventListener('resize', () => { if (wide() && S.view === 'now') go('library'); });
-  window.addEventListener('keydown', ev => { if (ev.key === 'Escape') { toggleDrawer(false); if (desk.classList.contains('libexpanded') && !document.querySelector('dialog[open],.sheet,.dlg')) toggleLibExpanded(false); } });
+  window.addEventListener('keydown', ev => { if (ev.key === 'Escape') { toggleDrawer(false); if (!document.querySelector('dialog[open],.sheet,.dlg')) { if (desk.classList.contains('libexpanded')) toggleLibExpanded(false); else if (desk.classList.contains('devexpanded')) toggleDevExpanded(false); } } });
   if (loadLibPrefs().expanded && wide()) toggleLibExpanded(true);
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
@@ -152,12 +152,17 @@ async function startMain() {
 function toggleLib(force) { const c = force ?? !desk.classList.contains('libcollapsed'); desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ } const b = libpanel.querySelector('.plus'); b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); if (!c) libC.reload(); }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
 function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); try { localStorage.setItem('wavwiz.listcollapsed', c ? '1' : '0'); } catch { /* ignore */ } listt.setCollapsed?.(c); if (!c) setTimeout(() => listt.relayout?.(), 340); }
-/** 0.2.0 item 27: the Devices panel has three sizes - Collapsed (46 px strip) / Standard / Expanded (card grid over the Now Playing column,
- * with the full-width Now Playing bar). The › arrow and Devices > Devices & zones cycle them; toggleDev(true/false) still collapses / restores. */
+/** 0.2.0 item 27 / 0.2.1 F1: the Devices panel is Collapsed (46 px strip) / Standard / Expanded (card grid over the Now Playing column, with
+ * the full-width Now Playing bar). Like the Library: the arrow (and Devices > Devices & zones) collapses / opens it; toggleDev(true/false)
+ * forces collapsed / open. The separate Expand button (toggleDevExpanded) switches the wide view; Esc returns. */
 function toggleDev(force) {
   if (force === true) return setDevSize('collapsed');
   if (force === false) return setDevSize(devp.size === 'collapsed' ? 'standard' : devp.size);
-  setDevSize(nextSize(devp.size));
+  setDevSize(arrowSize(devp.size));
+}
+function toggleDevExpanded(force) {
+  const on = force ?? devp.size !== 'expanded';
+  setDevSize(on ? 'expanded' : (devp.size === 'expanded' ? 'standard' : devp.size));
 }
 function setDevSize(sz, highlight = null) {
   if (sz !== 'collapsed' && desk.classList.contains('libexpanded')) toggleLibExpanded(false);

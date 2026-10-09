@@ -111,7 +111,7 @@ test('0.2.0 item 31 + 28: File > Sign in as admin… / Leave admin mode, Admin c
 
 test('0.2.0 items 10 + 26 + 27 + 28 + 30: three Devices sizes, master on top, mute per speaker, output line + per-output delay 0-1000, read-only rules, reference badge', async () => {
   const d = await imp('devices');
-  assert.deepEqual(d.SIZES, ['collapsed', 'standard', 'expanded']); assert.equal(d.nextSize('collapsed'), 'standard'); assert.equal(d.nextSize('standard'), 'expanded'); assert.equal(d.nextSize('expanded'), 'collapsed');
+  assert.deepEqual(d.SIZES, ['collapsed', 'standard', 'expanded']);   // 0.2.1 F1: no cycling any more (see release021 F1)
   const st = memStore(); assert.equal(d.loadDevSize(st), 'standard'); st.setItem('wavwiz.devcollapsed', '1'); assert.equal(d.loadDevSize(st), 'collapsed');   // 0.1.x flag carries over
   d.saveDevSize('expanded', st); assert.equal(d.loadDevSize(st), 'expanded');
   assert.equal(d.outputLabel({ kind: 'hdmi', name: 'LG TV' }), 'HDMI · LG TV'); assert.equal(d.outputLabel({ kind: 'spdif', name: '' }), 'Optical (TOSLINK)'); assert.equal(d.outputLabel({ kind: 'analog', name: 'Realtek' }), 'Speakers (Realtek)');
