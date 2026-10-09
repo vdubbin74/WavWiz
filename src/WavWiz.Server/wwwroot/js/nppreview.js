@@ -2,6 +2,7 @@
 // It clones the real panel (same markup, same CSS = same rendering code), drops in example track info, applies the picked style and
 // effects plus the current theme colors, and scales it down to fit the card. Updates instantly on each pick. Never interactive.
 import { h } from './util.js';
+import { iconSvg } from './icons.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars } from './npstyle.js';
 import { npPanelTemplate } from './now.js';
 import { loadTheme, PRESETS } from './theme.js';
@@ -24,7 +25,7 @@ export function fillSample(panel, p = loadNpPrefs()) {
   q('.pn-wclip').forEach(e => { e.style.clipPath = `inset(0 ${100 - S0.frac * 100}% 0 0)`; });
   const bars = waveBars(S0.title); q('.pn-wbars').forEach(b => b.replaceChildren(...bars.map(v => h('i', { style: `height:${Math.round(v * 100)}%` }))));
   q('.pn-cover,.pn-refl').forEach(c => c.replaceChildren(h('div', { class: 'cover md npprev-art', 'aria-hidden': 'true' }, h('span', null, '♪'))));
-  q('.np-heartslot').forEach(s => s.replaceChildren(h('button', { class: 'heart', tabindex: -1, 'aria-hidden': 'true' }, '♡')));
+  q('.np-heartslot').forEach(s => { const b = h('button', { class: s.classList.contains('np-xheart') ? 'heart tbtn ico' : 'heart', tabindex: -1, 'aria-hidden': 'true' }); if (b.classList.contains('ico')) b.innerHTML = iconSvg('heart'); else b.textContent = '♡'; s.replaceChildren(b); });
   q('.np-volpop').forEach(e => { e.hidden = true; });
   q('.mutedtag,.np-mutedtag').forEach(e => { e.hidden = true; });
   const play = panel.querySelector('.np-tablexport .play'); play?.classList.add('playing');

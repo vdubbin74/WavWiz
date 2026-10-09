@@ -2,6 +2,7 @@
 // hearting needs Control or Admin access (like playlists). One shared set; every heart button on the page updates together.
 import { h, api, toast } from './util.js';
 import { canControl } from './ui.js';
+import { iconSvg } from './icons.js';
 
 const favs = new Set(); let loading = null;
 export const favKey = (kind, ref) => `${kind}:${ref}`;
@@ -13,7 +14,7 @@ export function loadFavs(force = false) {
   return loading;
 }
 function paintAll() { for (const b of document.querySelectorAll('.heart[data-fav]')) paint(b); window.dispatchEvent(new CustomEvent('wavwiz:favs')); }
-function paint(b) { const on = favs.has(b.dataset.fav); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.textContent = on ? '♥' : '♡'; b.title = on ? 'Remove from Favorites' : 'Add to Favorites'; }
+function paint(b) { const on = favs.has(b.dataset.fav); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); if (b.classList.contains('ico')) b.innerHTML = iconSvg(on ? 'heartOn' : 'heart'); else b.textContent = on ? '♥' : '♡'; b.title = on ? 'Remove from Favorites' : 'Add to Favorites'; }
 export async function toggleFav(S, kind, ref) {
   if (!canControl(S)) { toast('Only Control or Admin access can change favorites.', true); return; }
   const k = favKey(kind, String(ref)), on = !favs.has(k);
@@ -22,8 +23,9 @@ export async function toggleFav(S, kind, ref) {
   catch (e) { if (on) favs.delete(k); else favs.add(k); paintAll(); toast(e.message, true); }
 }
 /** Heart button. Read-only (disabled with a hint) for View access - never hidden. */
-export function heartBtn(S, kind, ref, label = '') {
-  const b = h('button', { type: 'button', class: 'heart', 'data-fav': favKey(kind, String(ref)), 'aria-label': `Favorite ${label}`.trim(),
+/** `round` (0.2.1 F10): an SVG heart in a round transport button (Classic panel, album page) instead of the small text glyph. */
+export function heartBtn(S, kind, ref, label = '', { round = false } = {}) {
+  const b = h('button', { type: 'button', class: round ? 'heart tbtn ico' : 'heart', 'data-fav': favKey(kind, String(ref)), 'aria-label': `Favorite ${label}`.trim(),
     onclick: ev => { ev.stopPropagation(); toggleFav(S, kind, ref); } });
   if (!canControl(S)) { b.disabled = true; b.title = 'Only Control or Admin access can change favorites.'; }
   paint(b); if (!canControl(S)) b.title = 'Only Control or Admin access can change favorites.';

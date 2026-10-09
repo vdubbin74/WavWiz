@@ -129,3 +129,14 @@ test('0.2.1 F9: Appearance shows a live preview built from the real panel (clone
   assert.match(ap, /preview\?\.update\(\)/);
   assert.match(css, /\.npprev-stage>\.np-ctlpanel\{position:absolute;left:0;top:0;transform-origin:0 0/);
 });
+
+test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular button; Classic heart is a round transport button', () => {
+  const n = src('now.js'), f = src('fav.js');
+  assert.doesNotMatch(n, /np-volpop|np-volbtn|barMore|'aria-label': 'Stop'|act\('\/stream\/stop'\) \}, icon\('stop'\)/);
+  assert.match(n, /const mkEq = \(\) => h\('button', \{ class: 'tbtn eqbtn', 'aria-label': 'Sound \(EQ\)'/);
+  assert.match(n, /muteBtn, h\('div', \{ class: 'np-vol' \}, eqBtn/); assert.match(n, /barMute, barEq\)\)/);
+  assert.match(n, /\{ class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' \}, xHeart, shuffle/);
+  assert.match(f, /round \? 'heart tbtn ico' : 'heart'/);
+  assert.match(css, /\.np-ctlpanel\.pn-classic \.np-xheart\{display:contents\}/);
+  assert.match(css, /@container npctl \(max-width:900px\)/);
+});
