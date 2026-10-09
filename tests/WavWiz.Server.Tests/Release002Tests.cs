@@ -278,6 +278,9 @@ public class LibraryV2Tests
     {
         var f = await ServerFixture.StartAsync(); var music = Directory.CreateDirectory(f.Dir.File("music")).FullName; seed(music);
         var admin = f.As(f.Token(Role.Admin)); (await admin.PostAsJsonAsync("/api/v1/library/roots", new { path = music })).EnsureSuccessStatusCode();
+        // 0.2.0: wait for the WHOLE scan, not just the first artist (the old check raced and saw 3 of 4 songs under load)
+        var files = Directory.GetFiles(music, "*", SearchOption.AllDirectories).Length;
+        for (int i = 0; i < 150; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() >= files) break; await Task.Delay(100); }
         for (int i = 0; i < 100 && (await admin.GetJson("/api/v1/library/artists")).GetArrayLength() == 0; i++) await Task.Delay(100);
         return (f, admin);
     }
