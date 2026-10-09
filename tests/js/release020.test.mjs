@@ -189,7 +189,7 @@ test('0.2.0 items 4-7: ten presets with the agreed hexes, four-color custom, old
     st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#A9BCCF', bg: '#18202A', preset: 'steel' })); assert.equal(theme.loadTheme().preset, 'steel');
   } finally { delete globalThis.localStorage; }
   const tv = src('themes.js'); for (const l of ['Background', 'Main', 'Second', 'Text']) assert.match(tv, new RegExp(`'${l}'`));
-  assert.doesNotMatch(tv, /C07A4E/i); assert.match(tv, /width: 76, height: 76/);   // 0.2.1 F14: copper only as the Pepecoin Highlight in theme.js assert.match(tv, /not affiliated/);
+  assert.match(tv, /pepeNote/);   // 0.2.1 F14/F20: copper is now the official Pepecoin Highlight; the note shows the kit's onDark logo (see release021) assert.match(tv, /not affiliated/);
   assert.match(css, /@media \(max-width:420px\)\{ \.pepe-note\{flex-direction:column/);
 });
 

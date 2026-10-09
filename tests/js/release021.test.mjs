@@ -254,3 +254,22 @@ test('0.2.1 F18 + F19: Calibrate + Test sound live in each card\'s own settings 
   assert.throws(() => src('zone.js'), /ENOENT/, 'the pop-up module is removed');
   assert.match(css, /\.dsettings\{/);
 });
+
+test('0.2.1 F20: Pepecoin logo files are the brand-kit onDark files byte for byte; wording is exactly "Pepecoin"', async () => {
+  const { readFileSync, readdirSync, existsSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const root = new URL('../../src/WavWiz.Server/wwwroot/', import.meta.url);
+  const shipped = readdirSync(new URL('assets/pepecoin/', root));
+  assert.deepEqual(shipped, ['Pepecoin_onDark_RGB.svg'], 'only the onDark logo with wordmark ships');
+  const kit = '/workspace/pepecoin-brand-kit/Pepecoin_onDark_RGB [Converted].svg';
+  const sha = b => createHash('sha256').update(b).digest('hex');
+  const ours = readFileSync(new URL('assets/pepecoin/Pepecoin_onDark_RGB.svg', root));
+  if (existsSync(kit)) assert.equal(sha(ours), sha(readFileSync(kit)), 'identical to the brand kit');
+  assert.equal(sha(ours), '296955f2c5c42c8d' + sha(ours).slice(16), 'the known kit file');
+  const tv = src('themes.js');
+  assert.match(tv, /PEPE_LOGO = '\/assets\/pepecoin\/Pepecoin_onDark_RGB\.svg'/); assert.match(tv, /'aria-label': 'Pepecoin'/);
+  const all = ['themes.js', 'theme.js', 'about.js', 'settings.js', 'appearance.js', 'nppreview.js'].map(src).join('\n') + css;
+  assert.doesNotMatch(all, /PepeCoin|Pepe coin|Pepe Coin|PEPECOIN/);
+  for (const c of ['#269B4D', '#208241', '#212121', '#C07A4E']) assert.ok(src('theme.js').includes(c), c);
+  assert.match(css, /\.pepe-note\{[^}]*background:#212121/);
+});

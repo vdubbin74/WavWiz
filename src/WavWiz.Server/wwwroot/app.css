@@ -887,7 +887,7 @@ html.tv *{transition:none!important;animation:none!important}
 }
 /* 0.2.0 item 4-7: Pepecoin note - bigger logo (76px), logo wraps above the text on narrow screens */
 .pepe-note{display:flex;align-items:center;gap:14px}
-.pepe-note .pepe-logo{flex:none;width:76px;height:76px}
+.pepe-note .pepe-logo{flex:none}
 @media (max-width:420px){ .pepe-note{flex-direction:column;align-items:flex-start} }
 /* ===== 0.2.0 items 13-16: library sort / flip / letter strip, hearts, cover grid, Expanded library ===== */
 .libtools{display:flex;align-items:center;gap:6px;margin:0 0 8px;min-width:0;flex-wrap:wrap}
@@ -1044,7 +1044,10 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .themechip .tsw i{width:9px;height:9px;border-radius:50%}
 .tcustom{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .pepe-note{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:4px;background:#212121}
-.pepe-note .pepe-logo{width:76px;height:76px} .pepe-note .pepe-wordmark{display:block;height:22px;width:auto} .pepe-note .dim{color:#FFFFFF;opacity:.75}
+.pepe-note .pepe-text{margin:0;color:#FFFFFF;opacity:.8}
+/* 0.2.1 F20: the kit SVG is an 842x595 page with the logo at about x 140-720, y 222-370; this window shows just the logo, unedited */
+.pepe-note .pepe-logo{--pw:200px;position:relative;width:var(--pw);height:calc(var(--pw) * 148 / 580);overflow:hidden;background:#212121;border-radius:2px}
+.pepe-note .pepe-logo img{position:absolute;width:calc(var(--pw) * 842 / 580);height:auto;max-width:none;left:calc(var(--pw) * -140 / 580);top:calc(var(--pw) * -222 / 580)}
 .vizlooks{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
 .setfoot{margin:6px 2px 0}
 /* 0.2.1 F9: live preview strip of the Now Playing panel (a scaled-down clone of the real panel) */

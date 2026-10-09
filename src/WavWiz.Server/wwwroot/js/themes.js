@@ -10,13 +10,14 @@ function chip(id, p, current, onPick) {
     h('span', { class: 'tsw', style: `background:${p.bg};border-color:${v['--line']}`, 'aria-hidden': 'true' }, h('i', { style: `background:${p.accent}` }), h('i', { style: `background:${v['--accent2']}` }), h('i', { style: `background:${v['--hl']}` })),
     h('span', { class: 'ell' }, p.name));
 }
-/** 0.2.1 F20: the Pepecoin note - official onDark mark, "Pepecoin" written exactly, brand colors only. */
+/** 0.2.1 F20: the Pepecoin note - the official onDark logo with wordmark (Pepecoin_onDark_RGB, byte-for-byte the brand-kit file, never
+ * edited: the kit's artboard is a full page, so the logo is shown through a window that crops the empty page around it), "Pepecoin" written
+ * exactly, brand colors only (#212121 note background, white text). */
+export const PEPE_LOGO = '/assets/pepecoin/Pepecoin_onDark_RGB.svg';
 export function pepeNote() {
   return h('div', { class: 'pepe-note' },
-    h('img', { src: '/assets/pepecoin/P_onDark.svg', alt: 'Pepecoin logo', width: 76, height: 76, class: 'pepe-logo' }),
-    h('div', { class: 'grow' },
-      h('img', { src: '/assets/pepecoin/Pepecoin_onDark.svg', alt: 'Pepecoin', class: 'pepe-wordmark', height: 22 }),
-      h('p', { class: 'dim small', style: 'margin:4px 0 0' }, 'Colors from the Pepecoin brand guidelines (primary #269B4D, second #208241 on #212121). WavWiz is not affiliated with Pepecoin.')));
+    h('div', { class: 'pepe-logo', role: 'img', 'aria-label': 'Pepecoin' }, h('img', { src: PEPE_LOGO, alt: '', width: 842, height: 595, decoding: 'async' })),
+    h('p', { class: 'small pepe-text' }, 'Colors from the Pepecoin brand guidelines (primary #269B4D, second #208241, highlight #C07A4E on #212121). WavWiz is not affiliated with Pepecoin.'));
 }
 export function themeCard() {
   const box = h('div', { class: 'card', id: 'sec-theme' });
