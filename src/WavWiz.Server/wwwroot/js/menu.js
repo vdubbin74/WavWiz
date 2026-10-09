@@ -1,5 +1,5 @@
-// Nested top menu (0.0.6): File / Library / Playback / Devices / View / Help.
-// View: Theme… and Visualizer… open their own pages (0.0.7); Display size stays a submenu. Phone hamburger reuses the same tree.
+// Top menu: File / Library / Playback / Devices / Help. 0.2.1 F8: menus DO things, Settings SETS things - every item has exactly one home.
+// The View menu is gone: Theme, Visualizer, Now Playing style and Display size all live on Settings > Appearance. Phone hamburger reuses the same tree.
 import { h, api, toast } from './util.js';
 import { openSettings } from './settings.js';
 import { openAbout, openWhatsNew } from './about.js';
@@ -7,7 +7,6 @@ import { openEq } from './eq.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
-import { SCALES, loadScale, applyScale } from './uiscale.js';
 
 
 function menuActions(S, ctl, desktop = false) {
@@ -31,56 +30,45 @@ function menuActions(S, ctl, desktop = false) {
       ['Leave admin mode', () => leaveAdmin(S), null, () => !S.auth?.elevated],
       ['Sign out', async () => { try { await api('/auth/logout', { method: 'POST' }); location.reload(); } catch (e) { toast(e.message, true); } }],
     ],
+    // 0.2.1 F8: one "Queue" (the separate "Playlist" item is gone - on the desktop Queue still slides the bottom panel)
     library: [
       ['Browse library', browseLib],
-      ['Playlist', listPanel, null, () => !desktop],
       ['Playlists', () => go('playlists')],
-      ['Queue', () => go('queue')],
-      ['Tidy up library', () => go('cleanup'), () => !admin()],
+      ['Queue', listPanel],
       'hr',
+      ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
+      ['Tidy up library', () => go('cleanup'), () => !admin()],
       ['Tag & cover fix…', () => go('tags'), () => !admin()],
       ['CD ripper…', () => go('rip'), () => !admin()],
-      ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
     ],
+    // 0.2.1 F8: Radio finder is a tab inside Internet radio; Scenes, Schedules and Calibrate moved to Devices
     playback: [
       ['Play / Pause', () => { if (S.now?.state === 'playing') act('/stream/pause'); else act('/stream/play', {}); }],
       ['Next', () => act('/stream/next')],
       ['Previous', () => act('/stream/prev')],
       'hr',
       ['Internet radio', () => go('radio')],
-      ['Radio finder', () => go('finder')],
-      ['Scenes', () => go('scenes')],
-      ['Schedules', () => go('schedules')],
-      'hr',
       ['Sound / EQ…', () => openEq(S, refreshAll)],
-      ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
     ],
     // 0.2.0 item 2: no "This phone as a device" anywhere - every browser joins as a speaker by itself.
     devices: [
       ['Devices & zones', devPanel],
-      ['Away-from-home…', () => go('remote'), () => !admin()],
+      ['Scenes', () => go('scenes')],
+      ['Schedules', () => go('schedules')],
+      ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       'hr',
       ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
-    ],
-    devicesPhone: [
-      ['Devices & zones', () => go('devices')],
       ['Away-from-home…', () => go('remote'), () => !admin()],
-      'hr',
-      ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
     ],
     help: [
       ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],      // 0.2.0 item 11: the Getting started dialog, not Diagnostics
-      ['Diagnostics', () => go('diag')],
+      ['Diagnostics', () => go('diag')],      // 0.2.1 F8: the Status card lives here now (moved from Settings)
       ["What's new", () => openWhatsNew()],
       ['About WavWiz…', () => openAbout(S)],
     ],
   };
 }
 
-function scaleKids(onPick) {
-  const cur = loadScale();
-  return SCALES.map(([id, name]) => ({ label: name, check: cur === id, run: () => { applyScale(id); onPick?.(); } }));
-}
 export function createMenuBar(S, ctl) {
   const A = menuActions(S, ctl, true);
   let openGroup = null;
@@ -104,20 +92,6 @@ export function createMenuBar(S, ctl) {
       disabled: opts.disabled || undefined,
       onclick: ev => { ev.stopPropagation(); closeAll(); onclick?.(); },
     }, label);
-  }
-  function submenu(label, children) {
-    const sub = h('div', { class: 'msub' });
-    const btn = h('button', {
-      type: 'button',
-      onclick: ev => {
-        ev.stopPropagation();
-        const o = sub.classList.contains('open');
-        bar.querySelectorAll('.msub.open').forEach(x => { if (x !== sub) x.classList.remove('open'); });
-        sub.classList.toggle('open', !o);
-      },
-    }, label);
-    sub.append(btn, h('div', { class: 'mpanel', role: 'menu' }, ...children));
-    return sub;
   }
   function top(label, ...kids) {
     const group = h('div', { class: 'mgroup' });
@@ -147,20 +121,6 @@ export function createMenuBar(S, ctl) {
   topSpec('Library', 'library');
   topSpec('Playback', 'playback');
   topSpec('Devices', 'devices');
-
-  let viewPanel = top('View');
-  function fillView() {
-    viewPanel.replaceChildren(
-      item('Theme…', () => A.go('themes')),
-      submenu('Display size', scaleKids(fillView).map(x => item(x.label, x.run, { check: x.check, nocheck: !x.check }))),
-      item('Visualizer…', () => A.go('visualizer')),
-      h('hr'),
-      item('Settings…', () => openSettings(S, A.refreshAll, A.go, 'appearance')),
-    );
-  }
-  fillView();
-  window.addEventListener('wavwiz:viz', fillView);
-  window.addEventListener('wavwiz:theme', fillView);
 
   topSpec('Help', 'help');
 
@@ -216,14 +176,7 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
     accordion('File', () => fromSpec(A.file)),
     accordion('Library', () => fromSpec(A.library)),
     accordion('Playback', () => fromSpec(A.playback)),
-    accordion('Devices', () => fromSpec(A.devicesPhone)),
-    accordion('View', () => [
-      leaf('Theme…', () => A.go('themes')),
-      nested('Display size', scaleKids(() => {}).map(x => leaf(x.label, () => { x.run(); }, { check: x.check, nocheck: !x.check }))),
-      leaf('Visualizer…', () => A.go('visualizer')),
-      h('hr'),
-      leaf('Settings…', () => openSettings(S, A.refreshAll, A.go, 'appearance')),
-    ]),
+    accordion('Devices', () => fromSpec(A.devices)),
     accordion('Help', () => fromSpec(A.help)),
   );
   return nav;

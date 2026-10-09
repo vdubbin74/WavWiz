@@ -54,7 +54,7 @@ try:
     check(ev("document.querySelectorAll('dialog[open] .vizcard canvas').length === 8"), 'Visualizer page shows 8 live preview cards (0.0.8)')
     ev("document.querySelector('dialog[open] footer button, dialog[open] .btn')?.click()")
     ev("import('/js/main.js').then(m => { m.go('themes'); return true; })"); time.sleep(1); shot('desk-themes.png')
-    check(ev("document.querySelectorAll('dialog[open] .themecard').length >= 10"), 'Themes page shows every theme as a card')
+    check(ev("document.querySelectorAll('dialog[open] .themechip').length >= 10"), 'Settings > Appearance shows every theme (0.2.1 F8)')
     print('JS errors:', e.errors[:8])
     check(not [x for x in e.errors if 'favicon' not in x], 'no JS errors')
 finally:

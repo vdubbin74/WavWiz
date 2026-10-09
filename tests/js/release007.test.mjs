@@ -97,10 +97,10 @@ test('0.0.7 WebGL looks: WebGL 1 (iOS), additive glow, trails, shockwaves, no ev
 
 test('0.0.7 pages: View > Theme… / Visualizer… open pages (desktop + phone); Settings no longer lists themes or looks', () => {
   const m = src('menu.js'), st = src('settings.js'), main = src('main.js');
-  assert.match(m, /item\('Theme…', \(\) => A\.go\('themes'\)\)/); assert.match(m, /leaf\('Theme…', \(\) => A\.go\('themes'\)\)/);
-  assert.match(m, /item\('Visualizer…', \(\) => A\.go\('visualizer'\)\)/); assert.match(m, /leaf\('Visualizer…', \(\) => A\.go\('visualizer'\)\)/);
-  assert.doesNotMatch(st, /themeCard\(|vizCard\(|PRESETS/);
-  assert.match(main, /views\.themes = themesView\(\); views\.visualizer = visualizerView\(\)/);
+  // 0.2.1 F8 supersedes: Theme and Visualizer are folded into Settings > Appearance; old routes open it there
+  assert.doesNotMatch(m, /'Theme…'|'Visualizer…'/);
+  assert.match(st, /appearancePane\(/); assert.match(src('appearance.js'), /themeCard\(\), viz = vizCard\(/);
+  assert.match(main, /if \(k === 'themes' \|\| k === 'visualizer'\) return openSettings\(S, refreshAll, go, k === 'themes' \? 'theme' : 'viz'\)/);
 });
 
 test('0.0.7 transport: SVG icon set, no emoji transport glyphs; themed zone Add', () => {

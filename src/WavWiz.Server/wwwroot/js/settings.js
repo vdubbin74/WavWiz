@@ -1,26 +1,27 @@
 import { h, api, toast, dialog } from './util.js';
-import { SCALES, loadScale, applyScale } from './uiscale.js';
 import { networkCard } from './diag.js';
-import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
+import { appearancePane } from './appearance.js';
+import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
 
+// 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 const GROUPS = [
   ['appearance', 'Appearance'],
-  ['devices', 'Devices & Zones'],
+  ['devices', 'Devices'],
   ['library', 'Library'],
   ['network', 'Network'],
-  ['about', 'About'],
 ];
 
 export async function openSettings(S, refresh, nav, section) {
-  if ((section === 'theme' || section === 'viz') && nav) return nav(section === 'theme' ? 'themes' : 'visualizer');      // 0.0.7: dedicated pages
   const admin = S.auth.role === 'admin';
-  const body = h('div');
-  const d = dialog('Settings', body, [{ text: 'Close' }], { onClose: refresh });
-  let active = section === 'players' || section === 'phone' ? 'devices'
-    : section === 'theme' || section === 'viz' || section === 'appearance' ? 'appearance'
+  const body = h('div', { class: 'settings-body' });
+  // 0.2.1 F8: theme / viz open Appearance (one page) - the visualizer panel's Looks button unfolds the looks gallery there
+  let app = null;
+  const d = dialog('Settings', body, [{ text: 'Close' }], { onClose: () => { app?.hide?.(); refresh?.(); } });
+  let active = section === 'players' || section === 'phone' || section === 'devices' ? 'devices'
     : section === 'library' ? 'library'
-    : section === 'about' ? 'about'
+    : section === 'network' ? 'network'
     : 'appearance';
+  const focusSec = section === 'theme' ? 'sec-theme' : section === 'viz' ? 'sec-viz' : section === 'players' ? 'sec-players' : null;
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
@@ -35,16 +36,12 @@ export async function openSettings(S, refresh, nav, section) {
       devices: [],
       library: [],
       network: [],
-      about: [],
     };
 
-    panes.appearance.push(npStyleCard(), displaySizeCard());      // 0.2.0 item 8: panel styles next to themes      // 0.0.7: themes and visualizers have their own pages (View > Theme…, View > Visualizer…)
+    app?.hide?.(); app = appearancePane({ looks: section === 'viz' });
+    panes.appearance.push(app.el);
 
-    // Devices & Zones: pairing, tokens, delay defaults, phone/https
-    panes.devices.push(h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
-      h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${st.bind}`),
-      st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : h('p', { class: 'okc' }, 'Everything looks fine.'),
-      nav ? h('button', { class: 'btn', onclick: () => { d.close(); nav('diag'); } }, 'Open Diagnostics') : null));
+    // Devices: phone/https, pairing, tokens, delay defaults
 
     panes.devices.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
       h('p', { class: 'dim small' }, 'A phone only allows its microphone (speaker calibration) and reliable sound when it plays as a speaker on a trusted HTTPS page. WavWiz makes its own small certificate that is valid only for this PC\'s address. Install it once on each phone.'),
@@ -73,7 +70,8 @@ export async function openSettings(S, refresh, nav, section) {
         num('bt.defaultLatencyMs', 'Bluetooth speaker (typical)', 200), num('wired.defaultLatencyMs', 'Wired / HDMI / built-in', 0)));
     }
 
-    // Library
+    // Library - 0.2.1 F8: the "Library view" card sits on top
+    panes.library.push(libViewCard());
     const pathIn = h('input', { type: 'text', placeholder: 'D:\\Music   or   \\\\NAS\\music', class: 'grow', 'aria-label': 'Music folder path' });
     panes.library.push(h('div', { class: 'card', id: 'sec-library' }, h('h3', null, 'Music folders'),
       h('p', { class: 'dim small' }, 'Folders are read from the server PC (a local drive or a network share the WavWiz service can read). Files are never modified.'),
@@ -134,18 +132,16 @@ export async function openSettings(S, refresh, nav, section) {
           } }, 'Reset on this PC'))));
     }
 
-    panes.about.push(h('div', { class: 'card' }, h('h3', null, 'About'), h('p', null, `${st.display} - BETA software. No cloud account, no analytics, no telemetry, and WavWiz doesn\'t open ports to the internet. Internet radio, tag and cover lookups, and Spotify Connect (if you switch it on) use the internet.`),
-      h('p', { class: 'small dim' }, 'Beta limits: your own files, internet radio (incl. Radio Browser finder), devices/zones, scenes, schedules, follow-speaker, CD ripper (FLAC/AAC; libcdio CDDA), tag fix with AcoustID when a key is set, Tailscale remote. Apple Music/Pandora/Cast and opening the server to the public internet are not in this beta. AirPlay and optional Spotify Connect are included.'),
-      h('button', { class: 'btn', onclick: () => import('./about.js').then(m => m.openAbout(S)) }, 'About, credits & licenses')));
-
     const navEl = h('div', { class: 'settings-nav', role: 'tablist' }, GROUPS.map(([id, label]) =>
       h('button', { class: active === id ? 'on' : '', 'data-g': id, onclick: () => { active = id; paint(); } }, label)));
     const sections = GROUPS.map(([id]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id }, ...panes[id]));
     body.replaceChildren(navEl, ...sections);
+    if (focusSec) requestAnimationFrame(() => body.querySelector('#' + focusSec)?.scrollIntoView({ block: 'start' }));
 
     function paint() {
       navEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.g === active));
       body.querySelectorAll('.settings-sec').forEach(s => s.classList.toggle('on', s.dataset.g === active));
+      if (active !== 'appearance') app?.hide?.(); else app?.viz?.reload();     // live visualizer previews run only while Appearance is shown
     }
   };
 
@@ -162,29 +158,26 @@ export async function openSettings(S, refresh, nav, section) {
     dialog('Create API token', [h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out],
       [{ text: 'Create', cls: 'primary', keep: true, onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } return false; } }, { text: 'Done', onclick: () => { draw(); } }]);
   }
-  /** 0.2.0 item 8: Now Playing panel style + effects (this browser only). Anyone can pick; Classic is the default. */
-  function npStyleCard() {
-    const p = loadNpPrefs();
-    const box = h('div', { class: 'card', id: 'sec-npstyle' }, h('h3', null, 'Now Playing style (this browser only)'),
-      h('p', { class: 'dim small' }, 'How the playback controls under the visualizer look. Classic is the default.'),
-      h('div', { class: 'row wrap', role: 'group', 'aria-label': 'Now Playing style' }, NP_STYLES.map(([id, name, tip]) =>
-        h('button', { class: 'chipbtn' + (p.style === id ? ' on' : ''), 'aria-pressed': String(p.style === id), title: tip, 'data-npstyle': id, onclick: () => { saveNpPrefs({ ...loadNpPrefs(), style: id }); draw(); } }, name))));
-    const slider = (k, label) => {
-      const out = h('span', { class: 'small dim', style: 'min-width:3em;text-align:right' }, p[k] + '%');
-      const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: p[k], class: 'grow', 'aria-label': label, 'data-npfx': k,
-        oninput: ev => { out.textContent = ev.target.value + '%'; saveNpPrefs({ ...loadNpPrefs(), [k]: +ev.target.value }); } });
-      return h('label', { class: 'row', style: 'gap:10px;margin-top:6px' }, h('span', { style: 'min-width:8.5em' }, label), r, out);
-    };
-    box.append(h('div', { class: 'sec', style: 'margin-top:12px' }, 'Effects'), slider('fx', 'Panel effects'), ...NP_EFFECTS.map(([k, l]) => slider(k, l)),
-      h('p', { class: 'small dim' }, 'Panel effects scales all of them at once. Every slider starts at 50 % and goes up to 100 %.'),
-      h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'btn', onclick: () => { saveNpPrefs({ style: loadNpPrefs().style }); draw(); } }, 'Reset effects')));
-    return box;
-  }
-  function displaySizeCard() {
-    const cur = loadScale();
-    const box = h('div', { class: 'card', id: 'sec-display' }, h('h3', null, 'Display size (this device only)'));
-    box.append(h('p', { class: 'dim small' }, 'Makes the web UI larger or smaller on this phone or PC. Compact is the default.'),
-      h('div', { class: 'row wrap' }, SCALES.map(([id, name]) => h('button', { class: 'chipbtn' + (cur === id ? ' on' : ''), onclick: () => { applyScale(id); draw(); } }, name))));
+  /** 0.2.1 F8: Library view (this device) - how the Expanded Library opens. Saves at once; the Library redraws through 'wavwiz:libprefs'. */
+  function libViewCard() {
+    const box = h('div', { class: 'card', id: 'sec-libview' });
+    const set = patch => { saveLibPrefs({ ...loadLibPrefs(), ...patch }); window.dispatchEvent(new CustomEvent('wavwiz:libprefs')); paintLib(); };
+    const seg = (opts, cur, key, label) => h('div', { class: 'seg', role: 'group', 'aria-label': label }, opts.map(([v, t]) =>
+      h('button', { type: 'button', class: cur === v ? 'on' : '', 'aria-pressed': String(cur === v), 'data-libpref': key + ':' + v, onclick: () => set({ [key]: v }) }, t)));
+    function paintLib() {
+      const p = loadLibPrefs();
+      const sort = h('select', { 'aria-label': 'Default sort', 'data-libpref': 'defSort', onchange: ev => { const q = loadLibPrefs(); set({ defSort: ev.target.value, sort: { ...q.sort, albums: ev.target.value } }); } },
+        DEF_SORTS.map(([v, t]) => h('option', { value: v, selected: p.defSort === v }, t)));
+      const remember = h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: p.remember, 'aria-label': 'Remember view per tab', 'data-libpref': 'remember', onchange: ev => set({ remember: ev.target.checked }) }), h('span', { 'aria-hidden': 'true' }));
+      box.replaceChildren(h('h3', null, 'Library view'),
+        h('p', { class: 'dim small' }, 'How the expanded Library opens on this device.'),
+        h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Default view'), seg([['grid', 'Tiles'], ['list', 'List']], p.defView, 'defView', 'Default view')),
+        h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Tile size'), seg(TILE_SIZES, p.tileSize, 'tileSize', 'Tile size')),
+        h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Default sort'), h('div', { class: 'small dim' }, 'Artist, Album, Recently added, or Year')), sort),
+        h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Remember view per tab'), h('div', { class: 'small dim' }, 'Switching a tab to List keeps it that way')), remember),
+        h('div', { class: 'row', style: 'justify-content:flex-end;margin-top:6px' }, h('button', { class: 'linkbtn', onclick: () => { saveLibPrefs(resetLibView(loadLibPrefs())); window.dispatchEvent(new CustomEvent('wavwiz:libprefs')); paintLib(); } }, 'Reset to defaults')));
+    }
+    paintLib();
     return box;
   }
   function acoustIdCard(settings) {

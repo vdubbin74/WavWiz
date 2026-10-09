@@ -42,9 +42,10 @@ test('0.0.5 CSS is boxy (thin radius, no pill 99px on buttons)', () => {
 test('0.0.5 menu module ships nested File/Library/Playback/Devices/View/Help', () => {
   const src = readFileSync(join(process.env.JS_DIR, 'menu.js'), 'utf8');
   assert.match(src, /export function createMenuBar/);
-  for (const label of ['File', 'Library', 'Playback', 'Devices', 'View', 'Help', 'Theme', 'Display size', 'Visualizer']) {
-    assert.match(src, new RegExp("'" + label + "(…)?'"));      // 0.0.7: 'Theme…' / 'Visualizer…' open pages
+  for (const label of ['File', 'Library', 'Playback', 'Devices', 'Help']) {      // 0.2.1 F8: the View menu is gone (Settings > Appearance)
+    assert.match(src, new RegExp("'" + label + "'"));
   }
+  assert.doesNotMatch(src, /top\('View'\)|accordion\('View'/);
 });
 
 test('0.0.5: no hard-coded private LAN addresses in shipped JS', () => {

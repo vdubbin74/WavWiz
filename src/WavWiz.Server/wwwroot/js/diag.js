@@ -81,10 +81,16 @@ export function networkCard(S) {
 
 export function diagnosticsView(S) {
   const root = h('div'); let timer = null;
+  // 0.2.1 F8: the Status card (moved here from Settings) - shown to everyone, even when the detailed checks need Control access
+  const statusCard = st => h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
+    h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${st.bind}`),
+    st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : h('p', { class: 'okc' }, 'Everything looks fine.'));
   async function draw() {
-    let d; try { d = await api('/diagnostics'); } catch (e) { root.replaceChildren(h('p', { class: 'err' }, e.status === 403 ? 'Diagnostics need Control or Admin access.' : e.message)); return; }
+    const st = await api('/status').catch(() => null), status = st ? statusCard(st) : null;
+    let d; try { d = await api('/diagnostics'); } catch (e) { root.replaceChildren(status || '', h('p', { class: 'err' }, e.status === 403 ? 'Diagnostics need Control or Admin access.' : e.message)); return; }
     const report = () => [`WavWiz ${d.version} ${d.channel} diagnostics ${d.generatedAt}`, d.os, '', ...vizReport().map(([t, s, x]) => `[VIZ ${s.toUpperCase()}] ${t}: ${x}`), '', ...d.checks.map(c => `[${c.status.toUpperCase()}] ${c.title}: ${c.detail}${c.fix ? '  -> ' + c.fix : ''}`), '', ...d.devices.map(r => `DEVICE ${r.name} (${r.link || 'link unknown'}, ${r.remoteIp || 'no ip'}): ${r.state}; drops ${r.drops}, reconnects ${r.reconnects}, underrun events ${r.underrunEvents}\n   ` + r.events.map(e => `${e.at} ${e.kind} ${e.text}`).join('\n   '))].join('\n');
     root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, 'Diagnostics'), h('button', { class: 'btn', onclick: draw }, 'Refresh'), h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(report()); toast('Report copied'); } catch { toast('Could not copy automatically - select the text on the page.', true); } } }, 'Copy report')),
+      ...(status ? [status] : []),
       h('p', { class: 'small dim' }, `Checked ${d.generatedAt}. Nothing here leaves your network. “?” means WavWiz could not check it - never that it is fine.`),
       h('div', { class: 'card' }, d.checks.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark', style: c.status === 'fail' ? 'border-color:#e5483f;color:#e5483f' : c.status === 'warn' ? 'border-color:#ffb300;color:#ffb300' : '' }, ICON[c.status] || '?'),
         h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ' + c.fix) : null)))),

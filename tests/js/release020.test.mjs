@@ -168,7 +168,7 @@ test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 
   assert.equal(m.npVars(null)['--fx-reflect'], '0.500');
   assert.deepEqual(m.waveBars('a', 10), m.waveBars('a', 10)); assert.ok(m.waveBars('a').every(v => v >= 0.2 && v <= 1));
   assert.ok(Math.abs(m.ringFrac(0, 0, 10, 0) - 0.25) < 1e-9); assert.ok(Math.abs(m.ringFrac(0, 0, 0, 10) - 0.5) < 1e-9);
-  const s = src('settings.js'); assert.match(s, /npStyleCard\(\), displaySizeCard\(\)/); assert.match(s, /'Panel effects'/);
+  const s = src('appearance.js'); assert.match(s, /np = npStyleCard\(/); assert.match(s, /disp = displaySizeCard\(\)/); assert.match(s, /'Panel effects'/);      // 0.2.1 F8: moved to appearance.js
   for (const k of ['.pn-classic', '.pn-center', '.pn-stack', '.pn-horizon', '--fx-glow']) assert.ok(css.includes(k), k);
   assert.match(src('now.js'), /pnArt, tableMeta/);
 });

@@ -12,8 +12,6 @@ import { installAutoJoin, deviceName } from './room.js';
 import { installTvMode } from './tv.js';
 import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
-import { themesView } from './themes.js';
-import { visualizerView } from './vizpage.js';
 import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
 import { loadLibPrefs } from './libsort.js';
@@ -97,10 +95,10 @@ function renderLogin() {
 // ---------------------------------------------------------------- main UI
 const NAV = [
   ['now', '♪', 'Now Playing', true], ['library', '☰', 'Library'], ['playlists', '📑', 'Playlists'], ['queue', '≡', 'Queue'], ['devices', '◉', 'Devices & zones'], ['radio', '📻', 'Radio'],
-  ['scenes', '🎬', 'Scenes'], ['schedules', '⏰', 'Schedules'], ['finder', '🔎', 'Radio finder'], ['tags', '🏷', 'Tag & cover fix', false, true], ['rip', '💿', 'CD ripper', false, true], ['remote', '🔐', 'Away-from-home', false, true],
+  ['scenes', '🎬', 'Scenes'], ['schedules', '⏰', 'Schedules'], ['tags', '🏷', 'Tag & cover fix', false, true], ['rip', '💿', 'CD ripper', false, true], ['remote', '🔐', 'Away-from-home', false, true],
   ['cleanup', '🧹', 'Tidy up library', false, true], ['diag', '🩺', 'Diagnostics', false, true], ['about', 'ℹ', 'About & credits']];
 // NAV kept for page titles; phone hamburger uses createPhoneDrawerNav. 0.2.0 item 2: the "This phone as a device" page is gone.
-const PAGE_TITLES = { themes: 'Themes', visualizer: 'Visualizer', playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes', schedules: 'Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
+const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes', schedules: 'Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null;
 
@@ -112,7 +110,6 @@ async function startMain() {
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
   views.scenes = scenesView(S); views.schedules = schedulesView(S); views.finder = radioFinderView(S, act); views.tags = tagsView(S); views.rip = ripView(S); views.remote = remoteView(S);
-  views.themes = themesView(); views.visualizer = visualizerView();
   views.devices = { el: devv.el, reload: () => devv.draw() }; views.about = { el: h('div', { id: 'p-about' }), reload: () => openAboutInto(views.about.el) };
   libC = libraryView(S, { compact: true });
   content = h('main', { class: 'view', id: 'view', tabindex: -1 });
@@ -120,7 +117,7 @@ async function startMain() {
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
-  const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['finder', 'Finder'], ['scenes', 'Scenes'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
+  const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
   // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
@@ -200,6 +197,9 @@ function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.
 export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
+  // 0.2.1 F8: Theme and Visualizer live on Settings > Appearance (one home); Radio finder is a tab inside Internet radio
+  if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, k === 'themes' ? 'theme' : 'viz');
+  if (k === 'finder') { radioTab = 'finder'; k = 'radio'; } else if (k === 'radio') radioTab = 'mine';
   if (wide()) {                               // desktop layout: Now Playing, Library, Devices & Playlist are always on screen; the rest opens as a page
     if (k === 'now') return;
     if (k === 'library') { toggleLib(false); libC.reload(); if (!force) libC.el.querySelector('input[type=search]')?.focus(); return; }
@@ -222,7 +222,7 @@ export async function refreshAll() { await Promise.allSettled([refreshNow(), ref
 async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); nowc.draw(); listt.draw(); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
 async function refreshZones() { try { const [z, g] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups)]); S.zones = z; S.groups = g; devv.draw(); devp.draw(); nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
-async function refreshRadio() { try { S.radio = await api('/radio'); if (S.view === 'radio') drawRadio(); } catch (e) { handleErr(e); } }
+async function refreshRadio() { try { S.radio = await api('/radio'); if ((S.view === 'radio' || S.page === 'radio') && radioTab === 'mine') drawRadio(); } catch (e) { handleErr(e); } }
 function handleErr(e) { if (e instanceof ApiError && e.status === 401) location.reload(); else if (e.status !== 0) toast(e.message, true); }
 async function act(path, body, method = 'POST') { try { await api(path, { method, body }); } catch (e) { toast(e.message, true); } }
 
@@ -305,14 +305,25 @@ function saveQueue() {
 }
 
 // ---------------------------------------------------------------- Radio
+// 0.2.1 F8: Internet radio has two tabs - My stations and Radio finder (the finder is no longer its own page or menu item)
+let radioTab = 'mine';
 function drawRadio() {
-  const root = views.radio.el, can = canControl(S);
+  const root = views.radio.el;
+  const tabsEl = h('div', { class: 'tabs radiotabs', role: 'tablist', 'aria-label': 'Internet radio' }, [['mine', 'My stations'], ['finder', 'Radio finder']].map(([k, t]) =>
+    h('button', { role: 'tab', class: radioTab === k ? 'on' : '', 'aria-selected': String(radioTab === k), 'data-rtab': k, onclick: () => { if (radioTab !== k) { radioTab = k; drawRadio(); } } }, t)));
+  const host = h('div', { class: 'radiotab' });
+  root.replaceChildren(h('h2', { style: 'margin:0 0 10px' }, '📻 Internet radio'), tabsEl, host);
+  if (radioTab === 'finder') { host.append(views.finder.el); views.finder.reload?.(); return; }
+  drawStations(host);
+}
+function drawStations(root) {
+  const can = canControl(S);
   const url = h('input', { type: 'url', placeholder: 'https://… stream address', class: 'grow' }), name = h('input', { type: 'text', placeholder: 'Station name', maxlength: 80 });
-  root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow', style: 'margin:0' }, '📻 Internet radio'), h('button', { class: 'btn', onclick: () => go('finder') }, '🔎 Find stations')),
+  root.replaceChildren(
     ...S.radio.map(r => h('div', { class: 'row card' }, h('button', { class: 'iconbtn', 'aria-label': 'Favorite', onclick: () => act(`/radio/${r.id}`, { favorite: !r.favorite }, 'PUT').then(refreshRadio) }, r.favorite ? '★' : '☆'),
       h('div', { class: 'grow', style: 'min-width:0' }, h('b', { class: 'ell', style: 'display:block' }, r.name), h('div', { class: 'dim small ell' }, r.genre ?? r.url.replace(/^https?:\/\//, '').slice(0, 40))),
       can ? [h('button', { class: 'btn primary', 'aria-label': 'Play', onclick: () => act('/stream/play', { kind: 'radio', id: r.id }) }, '▶'), h('button', { class: 'btn danger', 'aria-label': 'Delete', onclick: () => act(`/radio/${r.id}`, undefined, 'DELETE').then(refreshRadio) }, '✕')] : null)),
-    S.radio.length ? null : h('p', { class: 'dim' }, 'No stations yet. Add one below.'),
+    S.radio.length ? null : h('p', { class: 'dim' }, 'No stations yet. Add one below, or find one on the Radio finder tab.'),
     can ? h('div', { class: 'card' }, h('h3', null, 'Add a station'), h('div', { class: 'field' }, name), h('div', { class: 'row' }, url, h('button', { class: 'btn', onclick: async () => { try { await api('/radio', { method: 'POST', body: { name: name.value, url: url.value } }); refreshRadio(); } catch (e) { toast(e.message, true); } } }, 'Add')),
       h('p', { class: 'dim small' }, 'Use the stream address (an .mp3/.aac/.m3u8 link or a .pls/.m3u playlist). Plain http:// streams are fine on your home network.')) : null);
 }

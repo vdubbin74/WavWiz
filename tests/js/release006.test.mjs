@@ -44,8 +44,7 @@ test('0.0.6 CSS: hamburger hidden on desktop, phone lock, NP styles', () => {
 test('0.0.6 menu: PC Devices drops phone entry; phone drawer export exists', () => {
   const src = readFileSync(join(js, 'menu.js'), 'utf8');
   assert.match(src, /export function createPhoneDrawerNav/);
-  assert.match(src, /go\('visualizer'\)/);      // 0.0.7: View > Visualizer… opens the Visualizer page
-  const pcBlock = src.split('devices:')[1].split('devicesPhone:')[0];
+  const pcBlock = src.split('devices:')[1].split('help:')[0];      // 0.2.1 F8: one Devices list for PC and phone
   assert.ok(!pcBlock.includes('This phone as a device'));
   assert.doesNotMatch(src, /This phone as a device'/);                      // 0.2.0 item 2: gone from the phone drawer too
 });

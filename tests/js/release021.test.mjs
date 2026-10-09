@@ -98,3 +98,23 @@ test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view nev
   assert.deepEqual(zoneFilter(zones, groups, 7).map(z => z.id), [1, 2]);
   assert.deepEqual(zoneFilter(zones, groups, 99).map(z => z.id), [1, 2, 3], 'a deleted zone falls back to All devices');
 });
+
+test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devices/Library/Network; Library view card; Status in Diagnostics; finder is a radio tab', () => {
+  const m = src('menu.js'), st = src('settings.js'), main = src('main.js'), ap = src('appearance.js'), dg = src('diag.js');
+  for (const t of ['File', 'Library', 'Playback', 'Devices', 'Help']) assert.match(m, new RegExp(`'${t}'`));
+  assert.doesNotMatch(m, /'View'|'Theme…'|'Visualizer…'|'Display size'|'Radio finder'|\['Playlist',/);
+  const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
+  assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Queue', 'Rescan folders', 'Tidy up library', 'Tag & cover fix…', 'CD ripper…']);
+  assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…']);
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes', 'Schedules', 'Calibrate speakers…', 'Pair a player…', 'Away-from-home…']);
+  assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
+  assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
+  assert.match(st, /\['appearance', 'Appearance'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n\];/);
+  assert.doesNotMatch(st, /'about'|id: 'sec-status'/);
+  assert.match(dg, /id: 'sec-status'/);
+  assert.match(ap, /theme\.el, viz\.el, np\.el, disp\.el/);
+  assert.match(st, /panes\.library\.push\(libViewCard\(\)\);/);
+  for (const t of ["'Default view'", "'Tile size'", "'Default sort'", "'Remember view per tab'", "'Reset to defaults'", "'wavwiz:libprefs'"]) assert.ok(st.includes(t), t);
+  assert.match(main, /\[\['mine', 'My stations'\], \['finder', 'Radio finder'\]\]/);
+  assert.doesNotMatch(main, /\['finder', 'Finder'\]/);
+});

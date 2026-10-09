@@ -1016,3 +1016,34 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .zside .zsmembers{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto} .zside .zsmember{gap:6px;font-size:12px}
 .zside .zsactions{display:flex;flex-direction:column;gap:6px;margin-top:6px} .zside .zsactions .btn{width:100%}
 @media (max-width:1100px){ .dexp-main{grid-template-columns:minmax(0,1fr) 160px} }
+/* 0.2.1 F8: Settings - underlined tabs (Appearance / Devices / Library / Network), setting rows, segmented choices, switches, Appearance cards */
+.settings-nav{gap:2px;border-bottom:1px solid var(--line);margin:0 0 14px;flex-wrap:nowrap;overflow-x:auto}
+.settings-nav button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--dim);margin-bottom:-1px;white-space:nowrap}
+.settings-nav button:hover{color:var(--ink)}
+.settings-nav button.on{background:none;border-color:var(--hl,var(--accent));color:var(--accent);font-weight:700}
+.setrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.setrow:first-of-type{border-top:0}
+.setrow select{min-width:150px;max-width:220px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;flex:none}
+.seg button{border:0;background:var(--panel2);color:var(--dim);padding:5px 12px;cursor:pointer;font-size:13px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.switch{position:relative;display:inline-block;width:38px;height:20px;flex:none;cursor:pointer}
+.switch input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.switch span{position:absolute;inset:0;border-radius:4px;background:var(--panel2);border:1px solid var(--line);transition:background .15s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:3px;background:var(--dim);transition:transform .15s,background .15s}
+.switch input:checked+span{background:var(--accent);border-color:var(--accent)}
+.switch input:checked+span::after{transform:translateX(18px);background:var(--accent-ink)}
+.switch input:focus-visible+span{outline:2px solid var(--accent2);outline-offset:2px}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;font-size:12px;text-decoration:underline;text-underline-offset:3px;padding:2px 0}
+.themechips{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.themechip{display:flex;align-items:center;gap:8px;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--ink);cursor:pointer;font-size:13px;text-align:left}
+.themechip:hover{border-color:var(--accent)}
+.themechip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel2));color:var(--accent);font-weight:700}
+.themechip .tsw{flex:none;display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid;border-radius:4px}
+.themechip .tsw i{width:9px;height:9px;border-radius:50%}
+.tcustom{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.pepe-note{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:4px;background:#212121}
+.pepe-note .pepe-logo{width:76px;height:76px} .pepe-note .pepe-wordmark{display:block;height:22px;width:auto} .pepe-note .dim{color:#FFFFFF;opacity:.75}
+.vizlooks{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.setfoot{margin:6px 2px 0}
