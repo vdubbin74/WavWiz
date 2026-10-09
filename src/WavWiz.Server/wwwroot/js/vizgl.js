@@ -1,4 +1,4 @@
-// WavWiz WebGL visualizers: Particle burst (3D warp), Waveform river, Speaker cone, Ring, Neon tunnel, Terrain, Graphic EQ (+ VU meters in vizvu.js).
+// WavWiz WebGL visualizers: Particle burst (3D warp), Waveform river, Speaker cone, Ring, Neon tunnel, Spectrum (0.2.0, replaced Terrain), Graphic EQ (+ VU meters in vizvu.js).
 // 0.0.8 crash fix: ONE WebGL context per page, shared by the banner, full screen and every preview card. Each view renders into its own framebuffer
 // (so trails persist per view) and the result is composited onto the view's plain 2D canvas (dark from the first frame, never white).
 // 0.1.3 richer graphics: WebGL 2 with automatic WebGL 1 fallback (GLSL ES 1.00 shaders run on both); half-float render targets where the device can
@@ -622,88 +622,43 @@ export class TunnelScene extends Scene {
   }
 }
 
-/** 0.1.3 Terrain: SOLID landscapes painted far-to-near with opaque fills (0.1.2 summed translucent additive fills, which washed out to white, and
- * left the space below the nearest ridge empty). Each ridge fills down to the next nearer row's ground line (the nearest one to the bottom edge),
- * valleys are shaded dark, crests lit, the far rows fade into a colored haze; starry sky and soft nebulae above the horizon; depth blur on the distance. */
-export class TerrainScene extends Scene {
-  constructor(gl, opts) { super(gl, opts); this.scroll = 0; this.seed = 0; this.stars = null; this.rebuild(); }
-  depthMask() { return { mode: 1, a: 0.18, b: 0.6 }; }
-  rebuild() {
-    const gd = this.fxv('grid', 1.35), tier = this.preview ? 0.5 : this.q.tier === 'ultra' ? 1.35 : this.light ? 0.78 : 1;
-    const nr = Math.max(12, Math.round(36 * tier * gd / 1.35)), nc = Math.max(25, Math.round(64 * tier * gd / 1.35)) | 1;
-    if (this.nr === nr && this.nc === nc && this.rows) return; this.nr = nr; this.nc = nc;
-    this.rows = []; for (let i = 0; i < nr; i++) this.rows.push(this.makeRow(null));
-    const n = this.preview ? 40 : this.light ? 80 : 140; this.stars = [];
-    for (let i = 0; i < n; i++) this.stars.push({ x: this.r(), y: this.r() * 0.38, s: 0.4 + this.r() * 1.4, a: 0.35 + this.r() * 0.65 });
-  }
-  /** Vibrant left-to-right flow (purple / magenta -> cyan -> amber), tinted by the theme. */
-  flow(u, P) {
-    const t = (u + 1) * 0.5;
-    const purple = mixc([0.52, 0.16, 0.82], P.p, 0.28), magenta = mixc([0.88, 0.22, 0.62], P.p, 0.22), cyan = mixc([0.06, 0.82, 0.78], P.s, 0.35), amber = mixc([0.95, 0.48, 0.12], P.p, 0.25);
-    if (t < 0.28) return mixc(purple, magenta, t / 0.28);
-    if (t < 0.55) return mixc(magenta, cyan, (t - 0.28) / 0.27);
-    return mixc(cyan, amber, (t - 0.55) / 0.45);
-  }
-  makeRow(f) {
-    const nc = this.nc, row = new Float32Array(nc), relief = this.fxv('relief', 1.3); this.seed++;
-    for (let c = 0; c < nc; c++) {
-      const u = c / (nc - 1) * 2 - 1, side = Math.abs(u);
-      const m = Math.min(1, Math.max(0, (side - 0.02) / 0.12)), mm = m * m * (3 - 2 * m);
-      const bi = Math.min(63, Math.floor(Math.max(0, side) / 0.98 * 60));
-      const hill = 0.55 + 0.5 * Math.sin(c * 0.22 + this.seed * 0.17) * Math.cos(c * 0.11 - this.seed * 0.14) + 0.28 * Math.sin(c * 0.55 + this.seed * 0.33) * Math.sin(c * 0.08 + this.seed * 0.09)
-        + 0.14 * Math.sin(c * 1.35 + this.seed * 0.51) + 0.08 * Math.sin(c * 2.4 + this.seed * 0.77);
-      const e = f && !f.idle ? 0.5 + 0.75 * Math.min(1, f.energy) : 0.42;
-      const v = f && !f.idle ? Math.max(f.bands[bi] || 0, (f.peaks?.[bi] || 0) * 0.75) : 0;
-      row[c] = (0.08 + Math.pow(Math.max(0, hill), 1.2) * 1.55 * e * relief + Math.pow(v, 1.2) * 1.05 * (0.5 + 0.5 * Math.min(1, side * 1.8))) * (0.35 + 0.65 * mm);
-    }
-    return row;
-  }
+/** 0.2.0 item 17 Spectrum (replaces Terrain): smooth SOLID rounded bars, the theme gradient Main -> Second across the width, a glossy mirrored
+ * reflection floor and a soft glow. Heights are smoothed across neighbors (a flowing curve) and over time. No LED segments and no peak caps -
+ * that is Graphic EQ. Effects: bar count, height, smoothing, reflection, glow, gradient direction (each 0-100 %, 50 % default). */
+export class SpectrumScene extends Scene {
+  constructor(gl, opts) { super(gl, opts); this.v = new Float32Array(160); this.tmp = new Float32Array(160); }
   draw(dt, f) {
-    const g = this.g, s = this.settings, P = this.pal, w = g.w, h = g.h, cx = w / 2, I = s.intensity, ds = dt / 1000; this.t += ds;
-    const [sx, sy, zoom] = this.cam(f); g.begin(sx, sy, zoom);
-    const sky0 = [0.008, 0.01, 0.03], haze = mixc(mixc(P.p, P.s, 0.45), [0.05, 0.04, 0.12], 0.55);
-    g.fade(0, sky0);
-    this.scroll += ds * (f.idle ? 0.45 : 0.95 + f.energy * 1.8 + f.surge * 2.0) * s.speed * this.fxv('scroll', 0.85);
-    while (this.scroll >= 1) { this.scroll -= 1; this.rows.shift(); this.rows.push(this.makeRow(f)); }
-    const nr = this.nr, nc = this.nc, hy = h * 0.40, camH = 0.22, Hs = 1.85 * this.fxv('height', 1.2) * Math.min(1.4, 0.55 + 0.45 * I), vs = Math.min(w * 0.34, h * 2.4),
-      pxs = Math.max(1, h / 300), sun = this.fxv('sun', 0.7);
-    // sky: dark at the top, a colored haze toward the horizon
-    g.quadC(-20, -20, w + 20, -20, -20, hy + 4, w + 20, hy + 4, sky0, 1, mixc(sky0, haze, 0.7), 1); g.flush(true);
-    if (this.stars) for (const q of this.stars) g.sprite(q.x * w, q.y * h, q.s * pxs * (0.7 + 0.3 * Math.sin(this.t * 1.7 + q.x * 20)), WHITE, q.a * (0.55 + 0.45 * (f.idle ? 0.7 : 0.5 + 0.5 * f.flash)) * Math.min(1.2, I));
+    const g = this.g, s = this.settings, P = this.pal, w = g.w, h = g.h, I = s.intensity, ds = dt / 1000, k = dt / 16.7; this.t += ds;
+    const [sx, sy, zoom] = this.cam(f); g.begin(sx, sy, zoom); g.fade(0.25 * this.q.trails);
+    const N = Math.max(12, Math.min(160, Math.round(this.fxv('bars', 64) * (this.preview ? 0.55 : this.light ? 0.75 : 1))));
+    const gainH = this.fxv('height', 1.1), sm = this.fxv('smooth', 0.5), refl = this.fxv('reflect', 0.5), glowK = this.fxv('glow', 0.6), dir = this.fx.direction || 'ltr';
+    const left = w * 0.02, right = w * 0.98, top = h * 0.1, floor = h * (refl > 0.02 ? 0.74 : 0.92), H = floor - top, bw = (right - left) / N, gap = Math.max(1, bw * 0.28), pxs = Math.max(1, h / 300);
+    const gain = (0.7 + 0.45 * I) * gainH;
+    // target heights from the 64 analyzer bands, then a spatial blur so neighbors flow into one curve
+    for (let i = 0; i < N; i++) {
+      const u = dir === 'center' ? Math.abs(i / (N - 1) - 0.5) * 2 : i / Math.max(1, N - 1);
+      const bf = u * 63, b0 = Math.floor(bf), b1 = Math.min(63, b0 + 1), t = bf - b0, val = (f.bands[b0] || 0) * (1 - t) + (f.bands[b1] || 0) * t;
+      this.tmp[i] = f.idle ? 0.05 + 0.04 * (1 + Math.sin(this.t * 1.4 + i * 0.22)) : Math.min(1, val * gain * (0.9 + 0.25 * u));
+    }
+    const rad = Math.round(sm * 4);
+    for (let i = 0; i < N; i++) {
+      let acc = 0, wt = 0; for (let j = -rad; j <= rad; j++) { const q = i + j; if (q < 0 || q >= N) continue; const ww = 1 / (1 + j * j * 0.5); acc += this.tmp[q] * ww; wt += ww; }
+      const target = acc / wt, v = this.v[i], up = Math.min(1, (0.75 - 0.5 * sm) * k * Math.max(0.5, s.speed)), down = ds * (2.4 - 1.6 * sm) * s.speed * (0.4 + v);
+      this.v[i] = target > v ? v + (target - v) * up : Math.max(target, v - down);
+    }
+    const colAt = i => { const u = i / Math.max(1, N - 1); const x = dir === 'rtl' ? 1 - u : dir === 'center' ? 1 - Math.abs(u - 0.5) * 2 : u; return mixc(P.p, P.s, x); };
+    const SEG = 6;
+    for (let i = 0; i < N; i++) {
+      const x1 = left + i * bw + gap / 2, x2 = x1 + bw - gap, cx = (x1 + x2) / 2, r = (x2 - x1) / 2, v = Math.max(0.012, this.v[i]), c = colAt(i), hiC = mixc(c, WHITE, 0.18);
+      const yt = Math.min(floor - r, floor - v * H + r);
+      g.quadC(x1, yt, x2, yt, x1, floor, x2, floor, hiC, 0.97, c, 0.97);
+      for (let j = 0; j < SEG; j++) { const a0 = Math.PI + (j / SEG) * Math.PI, a1 = Math.PI + ((j + 1) / SEG) * Math.PI; g.tri(cx, yt, cx + Math.cos(a0) * r, yt + Math.sin(a0) * r, cx + Math.cos(a1) * r, yt + Math.sin(a1) * r, hiC, 0.97); }
+      if (refl > 0.02) { const yr = floor + v * H * (0.25 + 0.4 * refl); g.quadC(x1, floor + 2 * pxs, x2, floor + 2 * pxs, x1, yr, x2, yr, c, 0.55 * refl, c, 0); }
+      if (glowK > 0.02 && !f.idle && v > 0.04) g.sprite(cx, floor - v * H * 0.6, bw * (0.8 + 0.8 * glowK), c, 0.08 * glowK * I * v);
+    }
+    if (refl > 0.02) g.quadC(left, floor, right, floor, left, floor + 2 * pxs, right, floor + 2 * pxs, WHITE, 0.10 * refl, WHITE, 0);   // glossy floor edge
     g.flush();
-    g.glow(w * 0.22, hy * 0.55, h * 0.28 * Math.max(0.2, sun), mixc(P.s, [0.1, 0.7, 0.75], 0.55), (0.10 + 0.08 * f.energy) * sun * I);
-    g.glow(w * 0.78, hy * 0.5, h * 0.26 * Math.max(0.2, sun), mixc(P.p, [0.75, 0.2, 0.7], 0.5), (0.10 + 0.08 * f.energy) * sun * I);
-    g.glow(cx, hy, h * (0.16 + 0.06 * f.flash) * Math.max(0.2, sun), mixc(P.p, P.s, 0.4), (0.18 + 0.2 * f.energy + 0.25 * f.flash) * sun * I);
-    // project every row (z = distance; rows are 1 apart)
-    const proj = [];
-    for (let r = 0; r < nr; r++) {
-      const z = r + 1 - this.scroll; if (z < 0.4) { proj.push(null); continue; }
-      const row = this.rows[r], cur = new Array(nc), near = 0.18 + 0.82 * Math.pow(Math.min(1, (z - 0.4) / 5), 0.85);
-      for (let c = 0; c < nc; c++) { const u = c / (nc - 1) * 2 - 1; cur[c] = [cx + u * 2.05 / z * w * 0.44, hy + (camH - row[c] * Hs * near) / z * vs, row[c], u]; }
-      proj.push({ z, cur });
-    }
-    const groundY = z => z < 0.4 ? h + 4 : Math.min(h + 4, hy + camH / z * vs);
-    const light = 0.75 + 0.25 * f.energy;
-    // far -> near, opaque: nearer hills cover farther ones
-    for (let r = nr - 1; r >= 0; r--) {
-      const R = proj[r]; if (!R) continue;
-      const { z, cur } = R, gy = groundY(z - 1), depth = Math.min(1, (z - 0.4) / nr), fog = Math.pow(depth, 0.75) * 0.85;
-      const shadeAt = (v, slope, u) => { const base = this.flow(u, P), b = (0.22 + 0.78 * Math.min(1, v * 0.85)) * (0.85 + Math.max(-0.25, Math.min(0.35, slope * 1.4))) * light; return mixc(base.map(x => x * b), haze, fog); };
-      // flat plains out to the screen edges at the row's edge height
-      const L = cur[0], Rt = cur[nc - 1];
-      if (L[0] > -10) { const c = shadeAt(L[2], 0, -1); g.quadC(-20, L[1], L[0], L[1], -20, gy, L[0], gy, c, 1, mixc(c.map(x => x * 0.3), haze, fog), 1); }
-      if (Rt[0] < w + 10) { const c = shadeAt(Rt[2], 0, 1); g.quadC(Rt[0], Rt[1], w + 20, Rt[1], Rt[0], gy, w + 20, gy, c, 1, mixc(c.map(x => x * 0.3), haze, fog), 1); }
-      for (let c = 1; c < nc; c++) {
-        const [x1, y1, v1, u1] = cur[c - 1], [x2, y2, v2, u2] = cur[c];
-        if (x2 < -20 || x1 > w + 20) continue;
-        const top = shadeAt((v1 + v2) * 0.5, v1 - v2, (u1 + u2) * 0.5), bot = mixc(top.map(x => x * 0.28), haze, fog);
-        g.quadC(x1, y1, x2, y2, x1, gy, x2, gy, top, 1, bot, 1);
-        const lit = mixc(top, WHITE, 0.3 + 0.25 * f.flash);
-        g.line(x1, y1, x2, y2, (1.1 + 1.5 / Math.max(0.5, z)) * pxs, lit, (1 - fog) * (0.55 + 0.4 * Math.min(1, (v1 + v2) * 0.5)) * Math.min(1, 0.6 + 0.4 * I), 1);
-      }
-    }
-    g.flush(true);
-    g.glow(cx, h * 0.98, w * 0.5, mixc(P.p, P.s, 0.45), f.flash * 0.1 * I);
+    if (glowK > 0.02) g.glow(w * 0.5, floor, w * 0.5, mixc(P.p, P.s, 0.5), (0.04 + 0.16 * f.flash + 0.08 * f.energy) * I * glowK);
   }
 }
 
@@ -749,4 +704,4 @@ export class GeqScene extends Scene {
   }
 }
 
-export const SCENES = { particles: WarpScene, river: RiverScene, cone: ConeScene, wavwiz: RingScene, tunnel: TunnelScene, terrain: TerrainScene, geq: GeqScene };
+export const SCENES = { particles: WarpScene, river: RiverScene, cone: ConeScene, wavwiz: RingScene, tunnel: TunnelScene, spectrum: SpectrumScene, geq: GeqScene };

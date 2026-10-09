@@ -1,4 +1,4 @@
-// Visualizers. Eight looks (0.1.3): Particle burst (default, 3D warp), Waveform river, Speaker cone, Ring, Neon tunnel, Terrain, VU meters and Graphic EQ
+// Visualizers. Eight looks (0.2.0): Particle burst (default, 3D warp), Waveform river, Speaker cone, Ring, Neon tunnel, Spectrum (replaced Terrain), VU meters and Graphic EQ
 // (Graphic EQ replaced Lightning), all WebGL 2 with WebGL 1 fallback (iPhone Safari included), with a plain 2D fallback.
 // 0.1.3 Quality (Auto / Low / High / Ultra): Auto picks by device (phones Low, strong desktop GPUs Ultra) and a frame-time governor steps it down when
 // frames miss their budget, so a phone never stutters. The visualizer only READS the server's analysis feed; it is never on the audio path. Every look is fed by the SERVER over /ws/viz (1024 samples + stereo levels,

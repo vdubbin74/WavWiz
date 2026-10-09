@@ -17,11 +17,11 @@ const tone = (a, hz = 60) => { const w = new Uint8Array(1024); for (let i = 0; i
 // ---- item 16: looks list (Pepecoin viz removed in 0.1.2 overlay rebuild)
 test('0.0.8 item 16: eight looks, Particle burst default, new looks registered', () => {
   // 0.1.3: Graphic EQ replaced Lightning
-  assert.deepEqual(vc.VIZ_LIST.map(([k]) => k), ['particles', 'river', 'cone', 'wavwiz', 'tunnel', 'terrain', 'vu', 'geq']);
-  assert.deepEqual(vc.VIZ_LIST.map(([, t]) => t), ['Particle burst', 'Waveform river', 'Speaker cone', 'Ring', 'Neon tunnel', 'Terrain', 'VU meters', 'Graphic EQ']);
+  assert.deepEqual(vc.VIZ_LIST.map(([k]) => k), ['particles', 'river', 'cone', 'wavwiz', 'tunnel', 'spectrum', 'vu', 'geq']);   // 0.2.0 item 17: Spectrum replaced Terrain
+  assert.deepEqual(vc.VIZ_LIST.map(([, t]) => t), ['Particle burst', 'Waveform river', 'Speaker cone', 'Ring', 'Neon tunnel', 'Spectrum', 'VU meters', 'Graphic EQ']);
   assert.equal(vc.DEFAULT_ENGINE, 'particles');
-  for (const k of ['tunnel', 'terrain', 'vu', 'geq']) assert.ok(vc.VIZ_BLURB[k], k);
-  const g = src('vizgl.js'); for (const c of ['TunnelScene', 'TerrainScene', 'GeqScene']) assert.match(g, new RegExp('class ' + c)); assert.doesNotMatch(g, /class LightningScene/);
+  for (const k of ['tunnel', 'spectrum', 'vu', 'geq']) assert.ok(vc.VIZ_BLURB[k], k);
+  const g = src('vizgl.js'); for (const c of ['TunnelScene', 'SpectrumScene', 'GeqScene']) assert.match(g, new RegExp('class ' + c)); assert.doesNotMatch(g, /class LightningScene/);
   assert.match(src('viz.js'), /VuScene/);
 });
 
@@ -33,7 +33,7 @@ test('0.0.8 item 15: every look has its own effect controls, clamped and saved p
   const st = memStore();
   vc.saveSettings('tunnel', { fx: { twist: 75 } }, st); vc.saveSettings('vu', { fx: { style: 'neon' } }, st);
   assert.equal(vc.loadSettings('tunnel', st).fx.twist, 75); assert.equal(vc.loadSettings('vu', st).fx.style, 'neon');
-  assert.equal(vc.loadSettings('terrain', st).fx.height, 50);
+  assert.equal(vc.loadSettings('spectrum', st).fx.height, 50);
   assert.equal(vc.resetSettings('vu', st).fx.style, 'classic');
   assert.match(src('vizpage.js'), /data-fx/);
 });

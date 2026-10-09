@@ -3,21 +3,22 @@
 import { magnitudes, bands } from './vizmath.js';
 
 export const VIZ_LIST = [['particles', 'Particle burst'], ['river', 'Waveform river'], ['cone', 'Speaker cone'], ['wavwiz', 'Ring'],
-  ['tunnel', 'Neon tunnel'], ['terrain', 'Terrain'], ['vu', 'VU meters'], ['geq', 'Graphic EQ']];
+  ['tunnel', 'Neon tunnel'], ['spectrum', 'Spectrum'], ['vu', 'VU meters'], ['geq', 'Graphic EQ']];
 export const VIZ_BLURB = {
   particles: '3D warp starfield on the GPU: tens of thousands of stars rush past, kicks fire shockwave bursts.',
   river: 'Layered translucent waveforms flowing across the banner with a glowing position marker.',
   cone: 'A hi-fi woofer that flexes with the bass and throws shockwave ripples on beats.',
   wavwiz: 'A 3D spectrum ring with depth, shockwave rings and sparkle on the highs.',
   tunnel: 'Fly through glowing neon rings past thousands of light streaks; every kick launches a new ring toward you.',
-  terrain: 'Solid, vibrant landscapes (filled hills and valleys) flowing toward a starry horizon.',
+  spectrum: 'Smooth rounded bars in your theme colors flowing as one curve, with a glossy reflection on the floor.',
   vu: 'Two analog VU meters on the GPU: one glowing, bouncy needle each, peak LEDs and a punchy level bar.',
   geq: 'A classic graphic equalizer: glowing LED bars in your theme colors with falling peak caps.',
 };
 export const DEFAULT_ENGINE = 'particles';
 export const vizName = k => (VIZ_LIST.find(([id]) => id === k) || VIZ_LIST[0])[1];
-/** Old saved choices: 'milkdrop' (removed in 0.0.7) -> Particle burst; 'lightning' (replaced in 0.1.3) -> Graphic EQ; anything unknown -> Particle burst. */
-export const normEngine = e => e === 'lightning' ? 'geq' : VIZ_LIST.some(([k]) => k === e) ? e : DEFAULT_ENGINE;
+/** Old saved choices: 'milkdrop' (removed in 0.0.7) -> Particle burst; 'lightning' (replaced in 0.1.3) -> Graphic EQ; 'terrain' (retired in 0.2.0) -> Spectrum;
+ * anything unknown -> Particle burst. */
+export const normEngine = e => e === 'lightning' ? 'geq' : e === 'terrain' ? 'spectrum' : VIZ_LIST.some(([k]) => k === e) ? e : DEFAULT_ENGINE;
 
 /**
  * 0.1.3: EVERY level setting is a percentage 0..100 (default 50, max 100). Each maps onto the value the picture runs with through
@@ -58,7 +59,8 @@ export const FX = {
   cone: [['ripple', 'Ripple size', [0.3, 1.15, 2.5], 'how far beat ripples travel'], ['flex', 'Cone flex', [0.3, 1.15, 2.5], 'how far the cone moves with the bass']],
   wavwiz: [['spin', 'Rotation speed', [0, 1.1, 3]], ['thick', 'Ring thickness', [0.4, 1.1, 2.5]]],
   tunnel: [['fly', 'Fly-through speed', [0.2, 1.15, 3]], ['twist', 'Twist', [0, 0.35, 2], 'how much the tunnel bends'], ['rings', 'Ring count', [0.5, 1.1, 2]]],
-  terrain: [['height', 'Peak height', [0.3, 1.3, 2.5]], ['scroll', 'Scroll speed', [0, 0.95, 3]], ['grid', 'Grid density', [0.5, 1.35, 2.5]], ['relief', 'Terrain relief', [0.4, 1.35, 2.5]], ['sun', 'Horizon glow', [0, 0.8, 2]]],
+  spectrum: [['bars', 'Bar count', [24, 64, 128, 'int'], 'how many bars'], ['height', 'Height (sensitivity)', [0.4, 1.1, 2]], ['smooth', 'Smoothing', [0, 0.5, 1], 'flowing curve and calmer motion'],
+    ['reflect', 'Reflection', [0, 0.5, 1]], ['glow', 'Glow', [0, 0.6, 1.5]], ['direction', 'Gradient direction', null, [['ltr', 'Main → Second'], ['rtl', 'Second → Main'], ['center', 'Mirrored from the center']], 'ltr']],
   vu: [['needle', 'Needle speed', [0.3, 1.2, 2.5], 'how quickly the needles respond'], ['bounce', 'Needle bounce', [1.3, 0.42, 0.16], 'more = more overshoot and bounce'],
     ['peakHold', 'Peak LED hold', [0.2, 1.2, 3], 'how long a peak LED stays lit'], ['bar', 'Level bar punch', [0.3, 1, 1.8], 'bigger hits and deeper lows'],
     ['style', 'Meter style', null, [['classic', 'Classic (warm backlight)'], ['dark', 'Dark studio'], ['neon', 'Neon (theme colors)']], 'classic']],
@@ -178,7 +180,7 @@ export const reactRaw = r => ({ sensitivity: pmap(r.sensitivity, SENS_MAP), auto
 /** 0.1.3 post-processing, device-wide, 0..100 % each (default 50 %, 0 % = off). Every effect respects the Quality setting. */
 export const POST_KEY = 'wavwiz.viz.post.v1';
 export const POST = [['bloom', 'Soft bloom', [0, 0.55, 1.6], 'glow around bright light'], ['streaks', 'Light streaks', [0, 0.4, 1.3], 'horizontal flares off bright spots (High/Ultra)'],
-  ['fringe', 'Color fringing on big hits', [0, 0.5, 1.6], 'subtle red/blue edge split on kicks'], ['depth', 'Depth blur', [0, 0.55, 1.2], 'Terrain and Ring: soft focus on the far distance (High/Ultra)']];
+  ['fringe', 'Color fringing on big hits', [0, 0.5, 1.6], 'subtle red/blue edge split on kicks'], ['depth', 'Depth blur', [0, 0.55, 1.2], 'Ring: soft focus on the far distance (High/Ultra)']];
 export function loadPost(st = store()) { let r = {}; try { r = JSON.parse(st?.getItem(POST_KEY) || '{}') || {}; } catch { r = {}; } return Object.fromEntries(POST.map(([k]) => [k, pct(r[k])])); }
 export function savePost(p, st = store()) { const c = Object.fromEntries(POST.map(([k]) => [k, pct(p?.[k])])); try { st?.setItem(POST_KEY, JSON.stringify(c)); } catch { /* private mode */ } return c; }
 export const postRaw = p => Object.fromEntries(POST.map(([k, , m]) => [k, pmap(p[k], m)]));

@@ -225,3 +225,16 @@ test('0.2.0 items 13-16: sort on every tab + flip + letter strip, remembered per
   assert.match(css, /\.desk\.libexpanded\{--rightw:46px/); assert.match(css, /\.desk\.devexpanded \.npbar,\.desk\.libexpanded \.npbar\{display:flex\}/);
   assert.match(src('fav.js'), /Only Control or Admin access can change favorites/);
 });
+
+test('0.2.0 item 17: Spectrum replaces Terrain - in the picker, saved terrain migrates, effects 50 % default, no LED segments or peak caps', async () => {
+  const vc = await imp('vizcore');
+  assert.ok(vc.VIZ_LIST.some(([k, n]) => k === 'spectrum' && n === 'Spectrum')); assert.ok(!vc.VIZ_LIST.some(([k]) => k === 'terrain'));
+  assert.equal(vc.normEngine('terrain'), 'spectrum'); assert.equal(vc.normEngine('lightning'), 'geq');
+  assert.deepEqual(vc.FX.spectrum.map(d => d[0]), ['bars', 'height', 'smooth', 'reflect', 'glow', 'direction']);
+  const d = vc.cleanSettings({}, 'spectrum'); for (const k of ['bars', 'height', 'smooth', 'reflect', 'glow']) assert.equal(d.fx[k], 50, k); assert.equal(d.fx.direction, 'ltr');
+  assert.equal(vc.pmap(50, vc.FX.spectrum[0][2]), 64);
+  const g = src('vizgl.js'); const body = g.slice(g.indexOf('class SpectrumScene'), g.indexOf('class GeqScene'));
+  assert.match(g, /spectrum: SpectrumScene/); assert.doesNotMatch(g, /class TerrainScene/);
+  assert.doesNotMatch(body, /this\.cap|segN|fxv\('(segments|caps)'/);
+  assert.match(src('about.js'), /Terrain is now Spectrum/);
+});

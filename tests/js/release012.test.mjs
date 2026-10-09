@@ -38,8 +38,8 @@ test('0.1.2 five theme presets; Violet Pulse + Pepecoin; custom knobs are bg/acc
 test('0.1.2 removed themes migrate to Midnight Neon; Pepecoin viz gone; terrain relief stays', () => {
   assert.ok(!vc.VIZ_LIST.some(([k]) => k === 'pepecoin'));
   assert.ok(!vc.FX.pepecoin);
-  assert.ok(vc.FX.terrain.some(d => d[0] === 'relief'));
-  assert.equal(vc.loadSettings('terrain', { getItem: () => null, setItem() {}, removeItem() {} }).fx.height, 50);
+  assert.ok(!vc.FX.terrain && vc.FX.spectrum.some(d => d[0] === 'reflect'));   // 0.2.0 item 17: Terrain retired
+  assert.equal(vc.loadSettings('spectrum', { getItem: () => null, setItem() {}, removeItem() {} }).fx.height, 50);
   const store = {}; globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } };
   store['unison.theme.v1'] = JSON.stringify({ accent: '#2ECC71', accent2: '#A8E6CF', bg: '#0C1410', preset: 'forest' });
   assert.equal(theme.loadTheme().preset, 'default');
@@ -80,7 +80,7 @@ test('0.1.2 Now Playing viz panel + solid control panel, playlist collapse-down,
   assert.match(css, /listcollapsed.*--listh:36px|--listh:36px/);
   assert.match(css, /--listh:clamp\(110px/);   // short-screen uses var, not hard-coded grid rows
   assert.doesNotMatch(css, /grid-template-rows:minmax\(0,1fr\) clamp\(110px/);
-  assert.match(src('vizgl.js'), /flowing SOLID|SOLID vibrant|flow\(u, P\)/);
+  assert.match(src('vizgl.js'), /smooth SOLID rounded bars/);   // 0.2.0 item 17: Spectrum replaced the flowing Terrain
   assert.match(src('vizgl.js'), /g\.quad\(/);
   assert.match(src('settings.js'), /airplay\.levelDb/);
   assert.match(src('settings.js'), /spotify\.levelDb/);

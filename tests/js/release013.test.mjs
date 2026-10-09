@@ -22,9 +22,9 @@ test('0.1.3 Graphic EQ replaces Lightning: eight looks, saved Lightning -> Graph
 });
 
 test('0.1.3 every level is 0-100 % with 50 % default; 50 % maps to the (livelier) mid anchor', () => {
-  const d = vc.cleanSettings({}, 'terrain');
+  const d = vc.cleanSettings({}, 'spectrum');   // 0.2.0: Terrain -> Spectrum
   for (const k of ['intensity', 'speed', 'density', 'shake']) assert.equal(d[k], 50, k);
-  for (const [k] of vc.FX.terrain) assert.equal(d.fx[k], 50, k);
+  for (const [k, , m, , def] of vc.FX.spectrum) assert.equal(d.fx[k], m === null ? def : 50, k);
   for (const [k, , map] of vc.SHARED) { assert.equal(vc.pmap(50, map), map[1], k); assert.equal(vc.pmap(0, map), map[0]); assert.equal(vc.pmap(100, map), map[2]); assert.equal(vc.pinv(vc.pmap(37, map), map), 37); }
   assert.ok(vc.SHARED.find(x => x[0] === 'intensity')[2][1] > 1, '50 % is a bit more energetic than the old 1.0 default');
   const r = vc.loadReact(memStore()); assert.deepEqual(r, { energy: 50, sensitivity: 50, autoGain: 50 });
