@@ -991,3 +991,28 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .tile .fmosaic .cover{width:100%;height:100%;border-radius:0;font-size:26px}
 .tile .fmosaic .fbadge{position:absolute;left:8px;bottom:8px;width:28px;height:24px;border-radius:4px;background:rgba(0,0,0,.65);color:var(--accent2);display:flex;align-items:center;justify-content:center}
 .lib.compact .tile .gblock .gname{font-size:13px}
+/* 0.2.1 F7: Expanded Devices - zones sidebar on the right (~180 px), the master strip stays full width */
+.dexp-main{display:grid;grid-template-columns:minmax(0,1fr) 184px;gap:12px;align-items:start}
+.dexp-main>.dgrid,.dexp-main>p{min-width:0}
+.zside{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);padding:8px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;min-width:0}
+.zside .zshead{display:flex;align-items:center;gap:6px;padding:2px 2px 6px} .zside .zshead .dlbl{margin:0}
+.zside .zslist{display:flex;flex-direction:column;gap:2px}
+.zsrow{position:relative;display:flex;align-items:center;gap:7px;width:100%;padding:6px 8px 6px 10px;border:0;border-radius:4px;background:none;color:var(--ink);cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.zsrow:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.zsrow.on{background:color-mix(in srgb,var(--hl,var(--accent)) 12%,transparent);font-weight:700}
+.zsrow.on::before{content:"";position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--hl,var(--accent))}
+.zsrow.off{opacity:.55}
+.zsrow .zsname{flex:1 1 auto;min-width:0}
+.zsrow .zscount{min-width:20px;text-align:center;font-size:11px;padding:0 5px;border:1px solid var(--line);border-radius:4px;color:var(--dim)}
+.zsrow.on .zscount{border-color:var(--hl,var(--accent));color:var(--hl,var(--accent))}
+.zsrow .zsplay{font-size:9px;color:var(--accent2)}
+.zsrow .zsedit{opacity:0;font-size:12px;color:var(--dim);padding:0 2px;border-radius:3px}
+.zsrow:hover .zsedit,.zsrow:focus-within .zsedit,.zsrow.on .zsedit{opacity:1} .zsrow .zsedit:hover{color:var(--accent)}
+.zdot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--dim)} .zdot.live{background:var(--green)} .zdot.hollow{background:none;border:1px solid var(--dim)}
+.zside .zscenes{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.zside .zschips{display:flex;flex-wrap:wrap;gap:6px} .zside .zscene{font-size:12px}
+.zside .zsempty{margin:4px 2px}
+.zside.editing{gap:6px} .zside .zsback{align-self:flex-start;background:none;border:0;color:var(--accent);cursor:pointer;padding:2px 0;font:inherit;font-size:12px}
+.zside .zsmembers{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto} .zside .zsmember{gap:6px;font-size:12px}
+.zside .zsactions{display:flex;flex-direction:column;gap:6px;margin-top:6px} .zside .zsactions .btn{width:100%}
+@media (max-width:1100px){ .dexp-main{grid-template-columns:minmax(0,1fr) 160px} }

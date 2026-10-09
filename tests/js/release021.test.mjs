@@ -81,3 +81,20 @@ test('0.2.1 F6: Windows-style menu bar - click opens, hover switches while a men
   assert.match(m, /document\.addEventListener\('click', \(\) => closeAll\(\)\)/); assert.match(m, /ev\.key === 'Escape'\) closeAll\(\)/);
   assert.match(m, /ArrowRight/);
 });
+
+// F7: zones sidebar in Expanded Devices (variant B)
+test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view never redrawn under typing', async () => {
+  const d = src('devices.js');
+  assert.match(d, /export function zoneFilter/); assert.match(d, /export function zoneState/);
+  assert.match(d, /zonesSidebar\(/); assert.match(d, /'All devices'/); assert.match(d, /dexp-main/);
+  assert.match(d, /size === 'expanded' && zedit !== null\) return/);
+  assert.match(css, /\.dexp-main\{display:grid;grid-template-columns:minmax\(0,1fr\) 184px/);
+  assert.match(css, /\.zsrow\.on::before/);
+  const body = d.slice(d.indexOf('export function zoneFilter'));
+  const fnSrc = body.slice(0, body.indexOf('\n}\n') + 2).replace('export ', '');
+  const zoneFilter = new Function(fnSrc + '; return zoneFilter;')();
+  const zones = [{ id: 1 }, { id: 2 }, { id: 3 }], groups = [{ id: 7, deviceIds: [1, 2] }];
+  assert.deepEqual(zoneFilter(zones, groups, null).map(z => z.id), [1, 2, 3]);
+  assert.deepEqual(zoneFilter(zones, groups, 7).map(z => z.id), [1, 2]);
+  assert.deepEqual(zoneFilter(zones, groups, 99).map(z => z.id), [1, 2, 3], 'a deleted zone falls back to All devices');
+});

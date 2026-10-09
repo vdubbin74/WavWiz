@@ -114,6 +114,67 @@ function zonesStrip(S, ctl, compact) {
   return h('div', { class: 'dzones' }, h('span', { class: 'dlbl' }, 'ZONES'), zs.length ? zs : h('span', { class: 'small dim' }, 'None yet (optional groups, like “Downstairs”)'), add);
 }
 
+/** 0.2.1 F7: which devices a sidebar pick shows. 'all' (default) = every device; a zone id = only that zone's devices. Pure. */
+export function zoneFilter(zones, groups, pick) {
+  if (pick == null || pick === 'all') return zones || [];
+  const g = (groups || []).find(x => x.id === pick); if (!g) return zones || [];
+  const ids = new Set(g.deviceIds || []); return (zones || []).filter(z => ids.has(z.id));
+}
+/** 0.2.1 F7: a zone is "off" (dimmed) when none of its devices is switched on; its dot is live when one is on and connected. Pure. */
+export function zoneState(zones, g) {
+  const ms = (zones || []).filter(z => (g.deviceIds || []).includes(z.id));
+  return { count: g.members ?? ms.length, off: !ms.some(z => z.enabled), live: ms.some(z => z.enabled && z.connected) };
+}
+const ZPICK_KEY = 'wavwiz.devzone';
+const loadZonePick = () => { try { const v = sessionStorage.getItem(ZPICK_KEY); return v == null || v === 'all' ? 'all' : +v; } catch { return 'all'; } };
+const saveZonePick = v => { try { sessionStorage.setItem(ZPICK_KEY, String(v)); } catch { /* ignore */ } };
+let scenesCache = { at: 0, list: [] };
+async function loadScenes(force) {
+  if (!force && Date.now() - scenesCache.at < 30000) return scenesCache.list;
+  try { scenesCache = { at: Date.now(), list: await api('/scenes') }; } catch { scenesCache.at = Date.now(); }
+  return scenesCache.list;
+}
+/** 0.2.1 F7 (variant B): the ~180 px ZONES sidebar on the right of Expanded Devices - All devices (default) + every zone with its count and
+ * a live dot (off zones dimmed); picking one filters the cards. Optional SCENES chips below. F19: a zone's settings live in the sidebar's
+ * own edit view (name, devices, play here, remove) - there is no zone Details pop-up. */
+function zonesSidebar(S, ctl, pick, setPick, edit, setEdit) {
+  const admin = isAdmin(S), can = canControl(S), groups = S.groups || [];
+  const side = h('aside', { class: 'zside', 'aria-label': 'Zones' });
+  if (edit !== null) return zoneEditView(S, ctl, side, groups.find(g => g.id === edit) || null, setEdit, setPick);
+  const row = (key, name, count, extra = {}) => h('button', { type: 'button', class: 'zsrow' + (pick === key ? ' on' : '') + (extra.off ? ' off' : ''), 'aria-pressed': String(pick === key), 'data-zone': name,
+    title: key === 'all' ? 'Show every device' : `Show only the devices in ${name}`, onclick: () => setPick(key) },
+    h('span', { class: 'zdot' + (extra.live ? ' live' : '') + (extra.off ? ' hollow' : ''), 'aria-hidden': 'true' }), h('span', { class: 'zsname ell' }, name),
+    extra.off ? h('span', { class: 'small dim' }, 'Off') : null, extra.active ? h('span', { class: 'zsplay', title: 'Playing in this zone only' }, '▶') : null,
+    h('span', { class: 'zscount' }, String(count)));
+  const list = h('div', { class: 'zslist', role: 'group', 'aria-label': 'Show devices in' },
+    row('all', 'All devices', (S.zones || []).length, { live: (S.zones || []).some(z => z.enabled && z.connected) }),
+    ...groups.map(g => { const st = zoneState(S.zones, g); const r = row(g.id, g.name, st.count, { off: st.off, live: st.live, active: g.active });
+      r.append(h('span', { class: 'zsedit', role: 'button', tabindex: 0, 'aria-label': `Zone settings for ${g.name}`, title: 'Zone settings', onclick: ev => { ev.stopPropagation(); setEdit(g.id); }, onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); setEdit(g.id); } } }, '⚙'));
+      return r; }));
+  const add = ro(h('button', { class: 'plus zbtn zadd', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), admin);
+  const scenes = h('div', { class: 'zscenes' });
+  loadScenes().then(list => scenes.replaceChildren(...(list.length ? [h('div', { class: 'zshead' }, h('span', { class: 'dlbl' }, 'SCENES'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, 'optional')),
+    h('div', { class: 'zschips' }, list.map(sc => ro(h('button', { type: 'button', class: 'chip zscene', title: `Apply the scene “${sc.name}”`, onclick: async () => { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`Scene “${sc.name}” applied`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, '▶ ' + sc.name), can, 'Your access is view-only.')))] : [])));
+  side.append(h('div', { class: 'zshead' }, h('span', { class: 'dlbl' }, 'ZONES'), h('span', { class: 'grow' }), add), list,
+    groups.length ? null : h('p', { class: 'small dim zsempty' }, 'Zones are optional groups, like “Downstairs”.'), scenes);
+  return side;
+}
+/** F19: one zone's settings inside the sidebar (replaces the old pop-ups): name, devices, play in this zone only, remove. Admin edits; others read. */
+function zoneEditView(S, ctl, side, g, setEdit, setPick) {
+  const admin = isAdmin(S), can = canControl(S);
+  const back = h('button', { type: 'button', class: 'zsback', onclick: () => setEdit(null) }, '‹ Zones');
+  if (!g) { side.append(back, h('p', { class: 'small dim' }, 'This zone no longer exists.')); return side; }
+  const name = ro(h('input', { type: 'text', maxlength: 60, value: g.name, 'aria-label': 'Zone name' }), admin), picked = new Set(g.deviceIds || []);
+  const boxes = (S.zones || []).map(z => h('label', { class: 'row zsmember' }, ro(h('input', { type: 'checkbox', checked: picked.has(z.id), onchange: ev => { ev.target.checked ? picked.add(z.id) : picked.delete(z.id); } }), admin), h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell' }, z.name)));
+  const save = ro(h('button', { class: 'btn primary', onclick: async () => { try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: name.value, deviceIds: [...picked] } }); toast('Zone saved'); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, 'Save'), admin);
+  const play = ro(h('button', { class: 'btn', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.active ? '▶ Playing here' : '▶ Play here only'), can, 'Your access is view-only.');
+  const del = ro(h('button', { class: 'btn danger', onclick: () => confirmRemoveZone(S, g, () => { setEdit(null); setPick('all'); ctl.refreshAll(); }) }, 'Remove zone'), admin);
+  side.classList.add('editing');
+  side.append(back, h('div', { class: 'dlbl' }, 'ZONE NAME'), name, h('div', { class: 'dlbl' }, 'DEVICES'), h('div', { class: 'zsmembers' }, boxes.length ? boxes : h('p', { class: 'small dim' }, 'No devices yet.')),
+    h('div', { class: 'zsactions' }, save, play, del));
+  return side;
+}
+
 /** ••• menu of an Expanded card: Rename, Forget device and Set as reference (admin); Details… (connection, delay history, EQ) for everyone. */
 function moreMenu(S, ctl, z, anchor) {
   document.querySelectorAll('.dmenu').forEach(m => m.remove());
@@ -199,7 +260,9 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 /** Right-hand panel of the desktop layout in three sizes. ctl.setDevSize(size, highlightZoneId) switches size. */
 export function devicesPanel(S, ctl) {
   const root = h('section', { class: 'devpanel', 'aria-label': 'Devices and zones' }), body = h('div', { class: 'devbody' });
-  let size = loadDevSize(), hl = null;
+  let size = loadDevSize(), hl = null, zpick = loadZonePick(), zedit = null;
+  const setPick = v => { zpick = v; saveZonePick(v); draw(true); };
+  const setEdit = v => { zedit = v; draw(true); };
   const colBtn = h('button', { class: 'plus devcol', 'aria-label': 'Collapse or open the Devices panel', 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
   const expBtn = h('button', { class: 'plus devexp', 'aria-label': 'Expand the Devices panel', 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, '⤢');
   const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
@@ -217,11 +280,17 @@ export function devicesPanel(S, ctl) {
   function draw(force) {
     if (!force && body.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return;   // do not fight the user's finger
     if (!force && body.querySelector('.dmenu')) return;
+    if (!force && size === 'expanded' && zedit !== null) return;          // F19: never redraw a zone's settings under the user's typing
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
     if (size === 'expanded') {
-      body.replaceChildren(h('div', { class: 'dexp-top' }, masterRow(S, ctl), zonesStrip(S, ctl, false)),
-        S.zones.length ? h('div', { class: 'dgrid' }, S.zones.map(z => expandedCard(S, ctl, z, z.id === hl))) : h('p', { class: 'dim small pad' }, EMPTY));
+      // 0.2.1 F7: master volume keeps the full-width strip; zones move to the ~180 px sidebar on the right (variant B) and filter the cards
+      if (zpick !== 'all' && !(S.groups || []).some(g => g.id === zpick)) zpick = 'all';
+      const shown = zoneFilter(S.zones, S.groups, zpick);
+      body.replaceChildren(h('div', { class: 'dexp-top' }, masterRow(S, ctl)),
+        h('div', { class: 'dexp-main' },
+          S.zones.length ? (shown.length ? h('div', { class: 'dgrid' }, shown.map(z => expandedCard(S, ctl, z, z.id === hl))) : h('p', { class: 'dim small pad' }, 'No devices in this zone yet. Use ⚙ next to the zone to add some.')) : h('p', { class: 'dim small pad' }, EMPTY),
+          zonesSidebar(S, ctl, zpick, setPick, zedit, setEdit)));
       return;
     }
     const un = unassigned(S.zones, S.groups || []);
