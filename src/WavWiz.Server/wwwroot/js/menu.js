@@ -121,7 +121,11 @@ export function createMenuBar(S, ctl) {
   }
   function top(label, ...kids) {
     const group = h('div', { class: 'mgroup' });
-    const btn = h('button', { class: 'mtop', type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); toggle(group, btn); } }, label);
+    // 0.2.1 F6: Windows-style - one click opens a menu; while any menu is open, hovering another top-level menu switches to it (no click);
+    // a click outside or Esc closes; Left / Right move between open menus.
+    const btn = h('button', { class: 'mtop', type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); toggle(group, btn); },
+      onmouseenter: () => { if (openGroup && openGroup !== group) toggle(group, btn); },
+      onkeydown: ev => { if (!openGroup || (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft')) return; ev.preventDefault(); const tops = [...bar.querySelectorAll('.mtop')], i = tops.indexOf(btn), n = tops[(i + (ev.key === 'ArrowRight' ? 1 : tops.length - 1)) % tops.length]; n.focus(); toggle(n.parentElement, n); } }, label);
     const panel = h('div', { class: 'mpanel', role: 'menu' }, ...kids.filter(Boolean));
     group.append(btn, panel);
     bar.append(group);

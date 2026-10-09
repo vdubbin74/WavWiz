@@ -74,3 +74,10 @@ test('0.2.1 F4: Expanded Library opens in tiles on every tab (Large), list toggl
   assert.match(css, /\.lib\.expanded \.tilegrid\{grid-template-columns:repeat\(auto-fill,minmax\(var\(--tmin\),1fr\)\)/);
   const lib = L; assert.deepEqual(lib.blockColors('Jazz'), lib.blockColors('Jazz')); assert.notDeepEqual(lib.blockColors('Jazz'), lib.blockColors('Folk'));
 });
+
+test('0.2.1 F6: Windows-style menu bar - click opens, hover switches while a menu is open, click outside / Esc closes', () => {
+  const m = src('menu.js');
+  assert.match(m, /onmouseenter: \(\) => \{ if \(openGroup && openGroup !== group\) toggle\(group, btn\); \}/);
+  assert.match(m, /document\.addEventListener\('click', \(\) => closeAll\(\)\)/); assert.match(m, /ev\.key === 'Escape'\) closeAll\(\)/);
+  assert.match(m, /ArrowRight/);
+});
