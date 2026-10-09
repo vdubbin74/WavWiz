@@ -1,4 +1,4 @@
-# Installer (WavWiz BETA 0.0.x)
+# Installer (WavWiz BETA)
 
 **Full self-contained installer only** (`WavWiz-Setup-<version>.exe`); the target PCs have no .NET. There is no slim variant.
 Unsigned. **Built and compiled on Linux (Inno Setup under Wine); never run on Windows yet.**
@@ -6,6 +6,39 @@ Unsigned. **Built and compiled on Linux (Inno Setup under Wine); never run on Wi
 ## Wizard
 Welcome (BETA) > info page (what it does / never does) > folder > components (Server, Player) > **home-network address** (server only; auto-detected, editable, 0.0.0.0 refused) or **server address** (player-only) > tasks (player autostart, desktop link) > ready memo > install > final page (open the first-run web page, start the player).
 Silent: `/VERYSILENT /SUPPRESSMSGBOXES /COMPONENTS="server,player" /LANIP=192.168.1.20` (`/SERVERHOST=<addr>` seeds the player-only address). Without `/LANIP` the setup script keeps the address in an existing `server.json`, else detects one, else uses 127.0.0.1 with a notice. Other switches: `/SKIPSETUP=1`, `/NOSTART=1`; uninstall `/PURGE=1`.
+
+## Silent install switches (0.2.0, checked against `installer/WavWiz.iss` and `installer/scripts/setup.ps1`; prep for a future winget listing - nothing is published)
+WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our own. Run from an elevated prompt (the installer needs admin: it installs a service and firewall rules).
+
+| Switch | Meaning |
+|---|---|
+| `/VERYSILENT` (or `/SILENT`) | No wizard (`/SILENT` shows only the progress window). |
+| `/SUPPRESSMSGBOXES` | Answers every message box with its default. With it, the uninstaller keeps your data (the "also delete your data?" question defaults to No). |
+| `/NORESTART` | Never restart Windows (WavWiz never asks for a restart anyway). |
+| `/COMPONENTS="server,player"` | What to install: `server`, `player` or both. Default: both. |
+| `/TASKS="autostart,desktopicon"` | Optional tasks: `autostart` (start the Player at sign-in, player only), `desktopicon` (desktop link to the web page, server only). Without `/TASKS` the defaults apply (autostart on, desktop link off). |
+| `/LANIP=192.168.1.20` | Server only: the one home-network IPv4 address the server listens on. `0.0.0.0` and anything that is not a single IPv4 address is refused (setup fails with that message in `install.log`). Without it an existing `server.json` keeps its address; otherwise one is detected, else 127.0.0.1 with a notice. |
+| `/SERVERHOST=192.168.1.20` | Player-only installs: seeds the server address the Player connects to. |
+| `/NOSTART=1` | Install and configure, but do not start the service or the Player. |
+| `/SKIPSETUP=1` | Copy files only; skip the service / firewall / settings step (for testing). |
+| `/DIR="D:\Apps\WavWiz"` | Install folder (default `C:\Program Files\WavWiz`; an upgrade reuses the previous folder). |
+| `/LOG="C:\Temp\wavwiz-setup.log"` | Inno's own log, in addition to `C:\ProgramData\WavWiz\install.log`. |
+
+Examples:
+```
+WavWiz-Setup-0.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
+WavWiz-Setup-0.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
+"C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES            (keeps your data)
+"C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /PURGE=1   (also deletes C:\ProgramData\WavWiz; music files are never touched)
+```
+
+**Exit codes** (standard Inno Setup): `0` installed, `1` setup failed to start, `2` cancelled before installing, `3` fatal error before the install phase, `4` fatal error while installing, `5` cancelled while installing, `6` setup was killed, `7` the preparing step failed, `8` the preparing step failed and Windows must restart first.
+Note: when the files were copied but the final setup step (service, firewall, settings) did not finish, the installer still returns `0` and shows the error only in the (suppressed) message box. For unattended installs check `C:\ProgramData\WavWiz\setup.done` (it holds `0` on success, `1` if the setup step failed) and `install.log`.
+
+**Upgrades:** the same AppId is used for every version, so running a newer installer upgrades in place; `C:\ProgramData\WavWiz` (library database, settings, admin password, paired devices) is kept, the service is re-configured, not re-created. Running the same version again repairs the install (idempotent).
+
+## Store / directory icon (0.2.0 item 19)
+Transparent square icons for listings (Uptodown, winget manifests, etc.): `assets/logo/wavwiz-1024-transparent.png`, `wavwiz-512-transparent.png`, `wavwiz-256-transparent.png` (real alpha outside the rounded tile). `assets/logo/wavwiz.ico` (16-256 px) is made from the same transparent art and is used for the installer, the Player and the shortcuts. The opaque `wavwiz-<size>.png` files stay for the web app and the wizard images.
 
 ## What setup does (installer\scripts, Windows PowerShell 5.1, each step in its own time-limited child process)
 `setup.ps1` (orchestrator) > `install-server.ps1` (data folder + LocalService permission, `server.json` merge, service `WavWizServer` delayed-auto/LocalService/recovery actions, netsh firewall rules, start + HTTP readiness check) and `install-player.ps1` (server address defaults, WebView2 check = warning only). `uninstall.ps1` removes service + rules (+ data with purge).
