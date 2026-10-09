@@ -65,7 +65,7 @@ test('0.1.1 Visualizer page has the Mood control and keeps Sensitivity, Auto-gai
 test('0.1.1 Playlist panel: arrow + desktop Library > Playlist toggle, saved per device, slides with the grid rows; phone keeps the page', () => {
   const m = src('main.js'), menu = src('menu.js'), lt = src('listtable.js');
   assert.match(m, /function toggleList/); assert.match(m, /wavwiz\.listcollapsed/); assert.match(m, /toggleList: f => toggleList\(f\)/);
-  assert.match(menu, /\['Playlist', listPanel, \(\) => !desktop\]/); assert.match(menu, /go\('queue'\)/);
+  assert.match(menu, /\['Playlist', listPanel, null, \(\) => !desktop\]/); assert.match(menu, /go\('queue'\)/);
   assert.match(lt, /Collapse or expand the playlist/); assert.match(lt, /setCollapsed/);
   assert.match(css, /\.desk\.listcollapsed\{--listh:36px\}/); assert.match(css, /grid-template-rows \.32s/);
 });

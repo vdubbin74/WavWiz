@@ -1,6 +1,21 @@
 import { h, api, toast, dialog } from './util.js';
 
 export const canControl = S => S.auth && S.auth.role !== 'view';
+/** 0.2.0 item 28: admin-only controls are shown READ-ONLY (disabled, with this hint) to everyone else - never hidden. */
+export const isAdmin = S => S?.auth?.role === 'admin';
+export const ADMIN_HINT = 'Only an administrator can change this. Use File > Sign in as admin.';
+/** The browser speaker id of this page (0.2.0 key, or the 0.1.x one before it is migrated). */
+export function webRoomId() { try { return localStorage.getItem('wavwiz.webRoom.id') || localStorage.getItem('unison.webRoom.id'); } catch { return null; } }
+/** 0.2.0 item 9: "this device" = the speaker this page plays on: this browser's own web speaker, else a Player on the same PC that the
+ * server marked as mine (the WavWiz Player window, or a browser on a PC that runs a Player). */
+export function thisDevice(S, rid = webRoomId()) {
+  const zs = S?.zones || [];
+  return zs.find(z => rid && z.playerId === rid && z.connected) || zs.find(z => z.mine && z.connected) || zs.find(z => rid && z.playerId === rid) || zs.find(z => z.mine) || null;
+}
+/** Can this session change delay/output on zone z? Admins: any device. Everyone else: only their own (server enforces the same). */
+export const canTune = (S, z) => isAdmin(S) || (canControl(S) && !!z?.mine);
+/** Disable a control for non-admins and explain why (title + aria). Returns the element. */
+export function adminOnly(S, el, ok = isAdmin(S)) { if (!ok) { el.disabled = true; el.title = ADMIN_HINT; el.setAttribute('aria-disabled', 'true'); el.classList.add('ro'); } return el; }
 
 // ---- "refs": what a row stands for when you play it, queue it, drag it or add it to a playlist ----
 export const refTracks = ids => ({ kind: 'tracks', ids });

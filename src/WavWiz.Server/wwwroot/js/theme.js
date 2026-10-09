@@ -1,3 +1,4 @@
+import { migrateKey } from './phonejoin.js';
 // Theme: five presets (Midnight Neon default, Ember, Arctic, Pepecoin, Violet Pulse); custom uses Background / Accent / Text only.
 // Secondary/highlight/muted/panel/line are derived. Color math is pure (no DOM) so it is unit-tested with node.
 export const PRESETS = {
@@ -8,7 +9,8 @@ export const PRESETS = {
   violet:   { name: 'Violet Pulse',  accent: '#A855F7', accent2: '#C084FC', bg: '#1A1028', ink: '#F5F3FF' },
 };
 export const DEFAULT_THEME_ID = 'default';
-const KEY = 'unison.theme.v1';
+const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
+const migrate = () => { try { migrateKey(localStorage, 'unison.theme.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
 /** Preset ids removed in 0.1.2 theme slim-down — migrate to Midnight Neon. */
 const REMOVED = new Set(['charcoal', 'steel', 'midnight', 'forest', 'synthwave', 'mono', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown']);
 
@@ -56,7 +58,7 @@ export function derive(t) {
 }
 
 export function loadTheme() {
-  let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* private mode / corrupt */ }
+  let saved = null; try { saved = JSON.parse((migrate(), localStorage.getItem(KEY)) || 'null'); } catch { /* private mode / corrupt */ }
   const base = { ...PRESETS[DEFAULT_THEME_ID] };
   if (saved && isHex(saved.accent) && isHex(saved.bg)) {
     let preset = saved.preset || 'custom';

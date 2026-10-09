@@ -23,7 +23,7 @@ public static class ZoneApi
             return Results.Json(new { room = z.Room, link = z.Link, remoteIp = z.RemoteIp, isWeb = z.IsWeb, events = s.Zones.Rooms.Events(z.PlayerId).Take(40).Select(e => new { at = e.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), kind = e.Kind, text = e.Text }) });
         }).Req(Role.View);
 
-        g.MapPost("/zones/{id:long}/test-sound", (long id) => { var err = s.Zones.TestSound(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 409) : Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapPost("/zones/{id:long}/test-sound", (long id) => { var err = s.Zones.TestSound(id); if (err == null) PlaybackApi.MarkFirstSound(s); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 409) : Results.Json(new { ok = true }); }).Req(Role.Control);
 
         // 0.2.0 item 10: skips speakers that are off, never changes mute, keeps the balance (see ZoneManager.Master). Body: {delta} | {scale} | {set}.
         g.MapPost("/zones/master", async (HttpContext c) => { var b = await c.Request.Body(); s.Zones.Master(b.Num("delta"), b.Num("scale"), b.Num("set")); return Results.Json(s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress)); }).Req(Role.Control);

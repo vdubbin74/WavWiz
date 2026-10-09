@@ -239,6 +239,38 @@ export class FrameGovernor {
   }
 }
 
+/* ---------------------------------------------------------------- 0.2.0 item 3: safe start for weak browsers and TVs
+ * A smart-TV page once froze so hard that Quality could not even be changed, and visualizer choices are per-browser, so no other device could
+ * rescue it. Now: ?lite or ?viz=off starts with every visualizer off (WebGL is never created); TVs start with the visualizer OFF unless this
+ * browser turned it on itself; TVs and unknown GPUs start Auto at Low and step up only after measured smooth frames; and a watchdog in the first
+ * seconds drops Quality to Low, then turns the visualizer Off, with a toast. */
+/** Pure: what the page may start with. `search` = location.search, `tv` = TV user agent, `storedOn` = the saved on/off (undefined = never chosen). */
+export function safeStart({ search = '', tv = false, storedOn } = {}) {
+  let q; try { q = new URLSearchParams(search); } catch { q = new URLSearchParams(); }
+  const lite = q.has('lite') && q.get('lite') !== '0' && q.get('lite') !== 'false';
+  const vizOff = (q.get('viz') || '').toLowerCase() === 'off';
+  if (lite || vizOff) return { forceOff: true, lite, defaultOn: false, startLow: true };
+  return { forceOff: false, lite: false, defaultOn: storedOn !== undefined ? storedOn !== false : !tv, startLow: tv };
+}
+/** Auto starts at Low (and climbs only after smooth frames) on TVs and on devices whose graphics chip is unknown. */
+export const startsLow = ({ tv = false, renderer = '' } = {}) => tv || !String(renderer).trim();
+
+/** Frame-time watchdog for the first seconds of a visualizer. push(intervalMs) per frame; returns null, 'low' or 'off' once per step.
+ * "Bad" = the average frame interval over a 1-second window stays above 80 ms (under ~12 fps) - a stall, not a slightly slow frame. */
+export class StallWatchdog {
+  constructor({ watchMs = 12000, windowMs = 1000, badMs = 80, startTier = 'high' } = {}) { this.watchMs = watchMs; this.windowMs = windowMs; this.badMs = badMs; this.t = 0; this.acc = 0; this.n = 0; this.atLow = isLight(startTier); this.done = false; }
+  push(intervalMs) {
+    if (this.done || !(intervalMs > 0)) return null;
+    this.t += intervalMs; this.acc += intervalMs; this.n++;
+    if (this.acc < this.windowMs) return null;
+    const avg = this.acc / this.n; this.acc = 0; this.n = 0;
+    let step = null;
+    if (avg > this.badMs) { if (!this.atLow) { this.atLow = true; step = 'low'; this.t = 0; } else { this.done = true; step = 'off'; } }   // a step to Low gets a fresh watch period
+    if (this.t >= this.watchMs) this.done = true;
+    return step;
+  }
+}
+
 /** The settings a look actually runs with (raw values): its saved percentages mapped through their anchors, scaled by the Energy level.
  * The sliders on the Visualizer page show the saved percentages. `mood` is the Energy level (0..100) or a 0.1.1 mood name. */
 export function effectiveSettings(engine, mood = loadReact().energy, st = store()) {

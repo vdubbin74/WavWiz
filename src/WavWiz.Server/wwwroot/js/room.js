@@ -3,13 +3,16 @@ import { MSG, FrameParser, encodeJson, decodeJson, decodeAudio, decodeEpoch } fr
 import { OffsetEstimator, pairClocks, ctxTimeFor, FrameScheduler, roomHealth, volumeToGain } from './roomsched.js';
 import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
-import { isPhoneUa, wantsAutoJoin } from './phonejoin.js';
-export { isPhoneUa, wantsAutoJoin };
+import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
+export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const idKey = 'unison.webRoom.id', nameKey = 'unison.webRoom.name', wantKey = 'unison.webRoom.autojoin';
+const idKey = 'wavwiz.webRoom.id', nameKey = 'wavwiz.webRoom.name', wantKey = 'wavwiz.webRoom.autojoin';
+// 0.2.0 item 12: carry the 0.1.x "unison.webRoom.*" keys over once, so a browser keeps its speaker id, name and on/off choice.
+try { for (const k of ['id', 'name', 'autojoin']) migrateKey(localStorage, 'unison.webRoom.' + k, 'wavwiz.webRoom.' + k); } catch { /* no storage */ }
 export function roomId() { let id = localStorage.getItem(idKey); if (!id) { id = 'web-' + [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem(idKey, id); } return id; }
-export function defaultRoomName() { return localStorage.getItem(nameKey) || (/iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : /Android/.test(navigator.userAgent) ? 'Android phone' : 'This browser'); }
+/** 0.2.0 item 1: every browser names itself from its user agent ("LG TV browser", "iPhone", "Chrome on Windows"); an admin can rename it in Devices. */
+export function defaultRoomName() { let n = null; try { n = localStorage.getItem(nameKey); } catch { /* ignore */ } return n || deviceName(); }
 
 /**
  * The phone (or any browser) as a WavWiz device. It speaks the same wire frames as the Windows player over /ws/room, keeps its clock aligned to the
@@ -66,7 +69,7 @@ export class PhoneRoom {
     ws.onmessage = ev => { this.rx = Date.now(); try { for (const f of this.parser.push(ev.data)) this.onFrame(f); } catch (e) { this.emit({ error: e.message }); try { ws.close(); } catch { /* closing */ } } };
     ws.onclose = () => { if (this.ws === ws) this.ws = null; this.emit(); this.dropAudio(); if (this.running) { this.reconnects = (this.reconnects || 0) + 1; this.retryNet(); } };
     this.send(MSG.Hello, { playerId: roomId(), deviceToken: null, appVersion: 'web', codecs: ['pcm24'], maxRate: 48000, linkType: 'wifi', name: this.name, machineName: 'Web page' });
-    this.send(MSG.Outputs, { outputs: [{ endpointId: 'web-speaker', name: 'Phone speaker', kind: 'other', btAddress: null, connected: true, active: true, winLatencyMs: null, codec: null, containerId: null }], reason: 'hello' });
+    this.send(MSG.Outputs, { outputs: [{ endpointId: 'web-speaker', name: isTvUa() ? 'TV speakers' : isPhoneUa() ? 'Phone speaker' : 'Browser audio', kind: 'other', btAddress: null, connected: true, active: true, winLatencyMs: null, codec: null, containerId: null }], reason: 'hello' });
     this.emit();
   }
   retryNet(ms) { clearTimeout(this._nrt); this._nrt = setTimeout(() => { if (this.running && !this.ws) this.connect().catch(() => this.retryNet()); }, ms ?? backoffMs(this.netTries = (this.netTries || 0) + 1)); }
@@ -136,44 +139,18 @@ export class PhoneRoom {
   }
 }
 
-/** The "This phone as a device" screen. */
-export function roomView(S, refreshAll) {
-  const root = h('div');
-  const env = environment();
-  const statusEl = h('div', { class: 'card', 'aria-live': 'polite' }), msgs = h('div');
-  const nameIn = h('input', { type: 'text', maxlength: 40, value: defaultRoomName(), 'aria-label': 'Name of this device' });
-  const limits = h('div', { class: 'card' }, h('h3', null, 'Please read: what a phone can and cannot do'), h('ul', { class: 'small' },
-    h('li', null, env.ios ? 'iPhone / iPad: the sound stops soon after the screen locks or you open another app (Safari pauses web pages). Keep WavWiz on screen. Turn off Auto-Lock (Settings > Display & Brightness) while you listen. This cannot be fixed by a web page.' : 'Android Chrome often keeps playing with the screen off, but some phones stop background pages. Keep WavWiz open if the sound cuts out.'),
-    h('li', null, 'The silent switch and volume buttons of the phone control this device; the device volume in WavWiz works too.'),
-    h('li', null, 'Timing depends on the Wi-Fi. It is not measured: set this device\'s delay by ear (Devices > this phone > Delay) until it lines up with the other devices. Sync error is shown as “unknown”, never as zero.'),
-    h('li', null, 'The microphone calibration chirps cannot be played by a phone page; use “By ear” for this device.')));
-  const start = h('button', { class: 'btn primary', onclick: async () => {
-    unlockAudio();                       // synchronously inside the tap: unlocks iOS audio
-    msgs.replaceChildren(); start.disabled = true;
-    try {
-      localStorage.setItem(nameKey, nameIn.value.trim());
-      await startPhoneAsDevice(nameIn.value.trim() || 'Phone');
-      toast('This phone is now a device — joining the stream');
-    } catch (e) {
-      msgs.replaceChildren(h('div', { class: 'card', role: 'alert', style: 'border-color:#8a2b26' }, h('b', { class: 'err' }, 'Could not start'), h('p', null, e.message)));
-    }
-    start.disabled = false; sync();
-  } }, 'Connect this phone (joins the stream)');
-  const stopBtn = h('button', { class: 'btn', hidden: true, onclick: async () => { await stopPhoneDevice(); sync(); refreshAll && refreshAll(); } }, 'Stop');
-  function sync() { const on = !!sharedDevice?.running; stopBtn.hidden = !on; start.hidden = on; }
-  function draw(st) {
-    sync();
-    const z = st.zone;
-    statusEl.replaceChildren(h('div', { class: 'row' }, h('span', { class: 'pill ' + ({ ok: 'ok', buffering: 'warn', syncing: 'warn', paused: 'bad', reconnecting: 'bad', background: 'warn', stopped: 'idle' }[st.state] || 'idle') }, st.state), h('b', null, st.text)),
-      st.error ? h('p', { class: 'err' }, st.error) : null,
-      sharedDevice?.running && !sharedDevice.audioReady ? h('button', { class: 'btn primary', onclick: () => unlockAudio() }, 'Tap to start sound') : null,
-      z ? h('p', { class: 'small dim' }, `Device delay ${z.notCalibrated ? 'unknown (not set yet) - using 0 ms' : Math.round(z.latencyMs) + ' ms'}${z.source ? ' • ' + z.source : ''} • clock round trip ${st.rtt != null ? (st.rtt / 1000).toFixed(1) + ' ms' : 'unknown'} • frames played ${st.stats?.played ?? 0}, dropped late ${st.stats?.dropped ?? 0}, re-syncs ${st.stats?.resyncs ?? 0}`) : null);
-  }
-  draw({ state: 'idle', text: 'Not playing in this phone yet', zone: null });
-  window.addEventListener('wavwiz:phone', ev => draw(ev.detail));
-  root.append(h('h2', null, 'This phone as a device'), h('p', { class: 'dim' }, 'Turn this phone (or any browser) into one more speaker that plays in sync with your other devices. Audio joins the current stream as soon as you connect — no separate Play button.'),
-    h('div', { class: 'field' }, h('label', null, 'Name of this device'), nameIn), h('div', { class: 'row wrap' }, start, stopBtn), msgs, statusEl, limits);
-  return root;
+/* 0.2.0 item 2: the separate "This phone as a device" page is gone. Every browser joins as a speaker on its own; this device's
+ * volume and mute sit on the Now Playing panel, and Settings > This device can switch joining off (or back on). */
+export function thisDeviceToggle(refreshAll) {
+  const on = () => !!sharedDevice?.running || !!starting;
+  const btn = h('button', { class: 'btn', onclick: async () => {
+    btn.disabled = true;
+    try { if (on()) await stopPhoneDevice(); else { unlockAudio(); await startPhoneAsDevice(defaultRoomName()); } } catch (e) { toast(e.message, true); }
+    btn.disabled = false; draw(); refreshAll && refreshAll();
+  } });
+  const draw = () => { btn.textContent = on() ? 'Stop playing on this device' : 'Play on this device'; };
+  draw(); window.addEventListener('wavwiz:phone', draw);
+  return btn;
 }
 
 /* ---------------------------------------------------------------- 0.0.7 phone audio unlock + auto-join
@@ -208,11 +185,13 @@ export function unlockAudio() {
   } catch { /* optional */ }
   return true;
 }
-export function installPhoneAutoJoin(S, refreshAll) {
-  const phone = isPhoneUa() || matchMedia('(max-width:900px)').matches && matchMedia('(pointer:coarse)').matches;
+/** 0.2.0 item 1: every browser (desktop, phone, tablet, smart TV) joins as a speaker on load - except the WavWiz Player window, which
+ * already plays through Windows (the server also refuses it). Switched off per browser with "Stop playing on this device". */
+export function installAutoJoin(S, refreshAll) {
+  if (isPlayerUa()) return;
   let stored = null; try { stored = localStorage.getItem(wantKey); } catch { /* ignore */ }
   installGestureUnlock();
-  if (!wantsAutoJoin(stored, phone)) return;
+  if (!wantsAutoJoin(stored)) return;
   const go = () => startPhoneAsDevice(defaultRoomName()).then(() => refreshAll && refreshAll()).catch(e => { showUnlock(e.message); setTimeout(() => { if (!sharedDevice?.running) go(); }, 4000); });
   setTimeout(go, 150);
 }
@@ -224,8 +203,8 @@ function installGestureUnlock() {
 
 function showUnlock(detail) {
   if (unlockOverlay || ctx0?.state === 'running' && !detail) return;
-  unlockOverlay = h('div', { class: 'phone-unlock', role: 'button', tabindex: 0, 'aria-label': 'Tap to start the music on this phone', onclick: () => { unlockAudio(); if (!sharedDevice?.running) startPhoneAsDevice(defaultRoomName()).catch(() => {}); if (ctx0?.state === 'running' || !detail) hideUnlock(); } },
-    h('div', { class: 'card' }, h('div', { class: 'unlock-icon', 'aria-hidden': 'true' }, '▶'), h('h2', null, 'Tap anywhere to start sound'), h('p', { class: 'dim' }, 'This phone will play in sync with your other speakers.'), detail ? h('p', { class: 'small dim' }, detail) : null));
+  unlockOverlay = h('div', { class: 'phone-unlock', role: 'button', tabindex: 0, 'aria-label': 'Tap or press OK to start the sound on this device', onclick: () => { unlockAudio(); if (!sharedDevice?.running) startPhoneAsDevice(defaultRoomName()).catch(() => {}); if (ctx0?.state === 'running' || !detail) hideUnlock(); } },
+    h('div', { class: 'card' }, h('div', { class: 'unlock-icon', 'aria-hidden': 'true' }, '▶'), h('h2', null, isTvUa() ? 'Press OK to start sound' : 'Tap anywhere to start sound'), h('p', { class: 'dim' }, 'This device will play in sync with your other speakers.'), detail ? h('p', { class: 'small dim' }, detail) : null));
   document.body.append(unlockOverlay);
 }
 function hideUnlock() { unlockOverlay?.remove(); unlockOverlay = null; }
@@ -246,3 +225,4 @@ export async function startPhoneAsDevice(name) {
   return starting;
 }
 export async function stopPhoneDevice() { const d = sharedDevice; sharedDevice = null; hideUnlock(); try { localStorage.setItem(wantKey, '0'); } catch { /* ignore */ } await d?.stop(); }
+export const installPhoneAutoJoin = installAutoJoin;   // 0.1.x name

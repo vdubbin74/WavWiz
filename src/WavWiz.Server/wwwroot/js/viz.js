@@ -10,10 +10,13 @@
 import { WavWizRing } from './wzviz.js';
 import { ParticleBurst } from './particles.js';
 import { liveSocket } from './wsconn.js';
-import { Features, VIZ_LIST, normEngine, vizName, effectiveSettings, loadReact, reactRaw, loadPost, postRaw, DEFAULT_ENGINE, QUALITY, normQuality, qualityFromLight, autoTier, FrameGovernor, isLight } from './vizcore.js';
+import { Features, VIZ_LIST, normEngine, vizName, effectiveSettings, loadReact, reactRaw, loadPost, postRaw, DEFAULT_ENGINE, QUALITY, normQuality, qualityFromLight, autoTier, FrameGovernor, isLight, safeStart, startsLow, StallWatchdog, TIERS } from './vizcore.js';
+import { isTvUa, migrateKey } from './phonejoin.js';
+const toast = (...a) => { import('./util.js').then(m => m.toast(...a)).catch(() => {}); };   // lazy: util.js needs the DOM (viz.js is also loaded by node tests)
 import { SCENES, webglOk, sharedGL, sharedGen, sharedInfo } from './vizgl.js';
 import { VuScene, VuGLScene } from './vizvu.js';
-const KEY = 'unison.viz.v1';           // storage key kept from 0.0.2 so a device keeps its choices
+const KEY = 'wavwiz.viz.v1';           // 0.2.0 item 12: was unison.viz.v1 (0.0.2..0.1.3); moved over once so a device keeps its choices
+const migrate = () => { try { migrateKey(localStorage, 'unison.viz.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
 export const isPhone = () => { try { return matchMedia('(max-width:900px)').matches || /iPhone|iPad|Android/.test(navigator?.userAgent || ''); } catch { return false; } };
 export const inDesktopPlayer = () => /(WavWiz|Unison)Player\//.test(navigator.userAgent);
 export const ENGINES = VIZ_LIST.map(([k, t]) => [k, k === DEFAULT_ENGINE ? t + ' (default)' : t]);
@@ -21,11 +24,25 @@ export { VIZ_LIST, vizName };
 
 /** quality: 'auto' | 'low' | 'high' | 'ultra' (0.1.3; a 0.1.2 "Detail" choice carries over: Automatic -> Auto, Light -> Low, Full -> High). */
 export function vizPrefs() {
-  let p = {}; try { p = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* ignore */ }
+  let p = {}; try { migrate(); p = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* ignore */ }
   const quality = p.quality ? normQuality(p.quality) : qualityFromLight(p.light);
-  return { on: p.on !== false, engine: normEngine(p.engine), quality, light: quality === 'low' || (quality === 'auto' && isPhone()), lightSetting: p.light || 'auto', names: p.names !== false };
+  const ss = startInfo(p.on);                                  // 0.2.0 item 3: ?lite / ?viz=off / TV default off
+  return { on: !ss.forceOff && ss.defaultOn, forced: ss.forceOff, engine: normEngine(p.engine), quality, light: quality === 'low' || (quality === 'auto' && isPhone()), lightSetting: p.light || 'auto', names: p.names !== false };
 }
-export function saveVizPrefs(p) { try { localStorage.setItem(KEY, JSON.stringify({ on: p.on, engine: normEngine(p.engine), quality: normQuality(p.quality), light: p.lightSetting, names: p.names })); } catch { /* ignore */ } }
+export function saveVizPrefs(p) { try { let on = p.on; if (p.forced) { try { on = JSON.parse(localStorage.getItem(KEY) || '{}').on; } catch { on = undefined; } }   // ?lite never overwrites the saved on/off
+  localStorage.setItem(KEY, JSON.stringify({ on, engine: normEngine(p.engine), quality: normQuality(p.quality), light: p.lightSetting, names: p.names })); } catch { /* ignore */ } }
+/** 0.2.0 item 3: the safe-start facts for this page. */
+export function startInfo(storedOn) { let search = ''; try { search = location.search; } catch { /* worker */ } return safeStart({ search, tv: isTvUa(), storedOn }); }
+/** Never create a WebGL context before the page is interactive: wait for "load" and one idle moment (or 1.5 s at most). */
+let interactive = null;
+export function whenInteractive() {
+  if (interactive) return interactive;
+  interactive = new Promise(res => {
+    const idle = () => { if (globalThis.requestIdleCallback) requestIdleCallback(() => res(), { timeout: 1500 }); else setTimeout(res, 200); };
+    try { if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true }); } catch { res(); }
+  });
+  return interactive;
+}
 export function webgl2Ok() { return webglOk(); }      // kept name for older callers: true when WebGL (2 or 1) works
 /** What Auto starts with on this device. */
 export function deviceFacts() {
@@ -35,6 +52,8 @@ export function deviceFacts() {
     phoneUa: /iPhone|iPad|iPod|Android/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1), renderer: (() => { try { return sharedGL()?.renderer || ''; } catch { return ''; } })() };
 }
 export const autoQuality = () => autoTier(deviceFacts());
+/** 0.2.0: where Auto STARTS: Low on TVs and unknown graphics chips (it climbs to the ceiling only after measured smooth frames). */
+export const autoStart = () => { const f = deviceFacts(); return startsLow({ tv: isTvUa(), renderer: f.renderer }) ? 'low' : null; };
 
 function themeColors() { try { const cs = getComputedStyle(document.documentElement); return { accent: cs.getPropertyValue('--accent').trim().toUpperCase(), accent2: cs.getPropertyValue('--accent2').trim().toUpperCase() }; } catch { return {}; } }
 
@@ -61,7 +80,7 @@ export class Viz {
   constructor(host, { onStatus, engine = null, preview = false } = {}) {
     this.host = host; this.onStatus = onStatus || (() => {}); this.fixed = engine ? normEngine(engine) : null; this.preview = preview; this.prefs = vizPrefs();
     this.engine = this.fixed || this.prefs.engine; this.running = false; this.frames = 0; this.lastError = ''; this.failed = null; this.presetName = '';
-    this.features = new Features(); this.applyReact(); this.applyQuality(true); this.ftInt = 16.7; this.ftWork = 1; this.lastRaf = 0; this.fpsT = performance.now(); this.fpsN = 0; this.fps = 0; this.canvas = null; this.ctx = null; this.mode = null; this.target = null; this.gen = -1; live.add(this);
+    this.features = new Features(); this.applyReact(); this.applyQuality(true, true); this.ftInt = 16.7; this.ftWork = 1; this.lastRaf = 0; this.fpsT = performance.now(); this.fpsN = 0; this.fps = 0; this.canvas = null; this.ctx = null; this.mode = null; this.target = null; this.gen = -1; live.add(this);
   }
   get ok() { return !this.failed && !!(this.scene || this.fallback); }
   get audible() { return feed.audible; }
@@ -69,10 +88,11 @@ export class Viz {
   setError(msg) { this.lastError = msg; this.status('error', msg); }
   applyReact() { const r = reactRaw(loadReact()); this.features.sensitivity = r.sensitivity; this.features.autoGain = r.autoGain; this.features.mood = r.energy; this.post = postRaw(loadPost()); }
   /** Quality from the prefs: an explicit tier, or Auto = the device's tier as a ceiling with the frame-time governor below it. */
-  applyQuality(first = false) {
+  applyQuality(first = false, noProbe = false) {
     const want = this.prefs.quality, auto = want === 'auto';
     if (this.preview) { this.tier = 'low'; this.gov = null; }
-    else if (auto) { const ceil = autoQuality(); if (!this.gov || this.gov.ceilingName !== ceil) { this.gov = new FrameGovernor(ceil); this.gov.ceilingName = ceil; } this.tier = this.gov.tier; }
+    else if (auto && noProbe) { this.tier = 'low'; this.gov = null; }      // 0.2.0: probing the graphics chip creates WebGL - wait until the page is interactive
+    else if (auto) { const ceil = autoQuality(); if (!this.gov || this.gov.ceilingName !== ceil) { this.gov = new FrameGovernor(ceil); this.gov.ceilingName = ceil; const lo = first && autoStart(); if (lo && TIERS.indexOf(lo) < this.gov.level) this.gov.level = TIERS.indexOf(lo); } this.tier = this.gov.tier; }
     else { this.gov = null; this.tier = want; }
     this.q = QUALITY[this.tier] || QUALITY.high;
     if (!first) { this.resize(); this.scene?.configure?.({ q: this.q }); }
@@ -96,7 +116,12 @@ export class Viz {
 
   async start() {
     if (this.started) return; this.started = true;
-    try { this.makeCanvas(); this.useEngine(this.engine); feedSub(this); this.attach(); }
+    if (!this.preview && vizPrefs().forced) { this.fail('The visualizer is off for this page (?lite or ?viz=off).'); return; }
+    try { this.makeCanvas(); } catch (e) { this.fail(e.message || String(e)); return; }
+    await whenInteractive(); if (this.destroyed) return;          // 0.2.0 item 3: no WebGL before the page is interactive
+    this.applyQuality(true);
+    if (!this.preview) this.watch = new StallWatchdog({ startTier: this.tier });
+    try { this.useEngine(this.engine); feedSub(this); this.attach(); }
     catch (e) { this.fail(e.message || String(e)); }
   }
   freeTarget() { const g = this.scene?.g; try { this.scene?.dispose?.(); } catch { /* lost */ } if (this.target && g && !g.lost()) g.freeTarget(this.target); this.target = null; }
@@ -160,6 +185,7 @@ export class Viz {
       } else if (this.fallback) { this.fallback.setWave(w); if (this.fallback.draw(t)) this.frames++; }
       this.fpsN++; const now = performance.now(); if (now - this.fpsT > 1000) { this.fps = Math.round(this.fpsN * 1000 / (now - this.fpsT)); this.fpsN = 0; this.fpsT = now; }
       const work = now - t0; if (interval) { this.ftInt += (interval - this.ftInt) * 0.05; this.ftWork += (work - this.ftWork) * 0.05; }
+      if (this.watch && interval && !document.hidden) this.stall(this.watch.push(interval));
       if (this.gov && interval && !document.hidden) { const before = this.tier, tier = this.gov.push(interval, work); if (tier !== before) { this.tier = tier; this.q = QUALITY[tier]; this.resize(); this.scene?.configure?.({ q: this.q }); } }
     } catch (e) { this.fail('The picture stopped: ' + (e.message || e)); this.paintDark(); }
   }
@@ -169,6 +195,18 @@ export class Viz {
     const p = this.post || {}, q = this.q, f = this.features, P = this.scene?.pal;
     return { levels: q.bloom, bloom: p.bloom || 0, streaks: q.streaks ? p.streaks || 0 : 0, fringe: (p.fringe || 0) * Math.min(1, f.flash * 1.2), depth: q.depth ? p.depth || 0 : 0,
       mask: this.scene?.depthMask?.() || null, tint: P ? [0.55 + 0.45 * P.p[0], 0.55 + 0.45 * P.p[1], 0.55 + 0.45 * P.p[2]] : [1, 1, 1] };
+  }
+  /** 0.2.0 item 3: the first-seconds watchdog said the page is stalling: Low first (with a toast), then Off (saved for this browser, with a toast). */
+  stall(step) {
+    if (!step) return;
+    if (step === 'low') {
+      this.tier = 'low'; this.q = QUALITY.low; if (this.gov) { this.gov.level = Math.min(this.gov.level, TIERS.indexOf('low')); this.gov.reset(); }
+      this.resize(); this.scene?.configure?.({ q: this.q }); try { toast('The visualizer was slow here, so its quality is now Low.'); } catch { /* no DOM */ }
+    } else if (step === 'off') {
+      if (this.mode === 'webgl' && !this.triedFallback) { this.triedFallback = true; this.useFallback('too slow on this device'); this.watch = new StallWatchdog({ startTier: 'low' }); return; }   // hard fallback: a plain 2D picture first
+      const p = vizPrefs(); p.on = false; saveVizPrefs(p); this.fail('The visualizer was turned off because this device could not keep up.');
+      try { toast('The visualizer was too slow on this device, so it is now off. Turn it back on with the ✦ button.', true); window.dispatchEvent(new CustomEvent('wavwiz:viz')); } catch { /* no DOM */ }
+    }
   }
   fail(msg) { this.failed = msg; this.stopLoop(); this.setError(msg); }
   setLight() { this.configure(); }

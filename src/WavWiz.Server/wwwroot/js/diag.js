@@ -98,12 +98,63 @@ export function diagnosticsView(S) {
   return { el: root, reload: draw };
 }
 
+/* 0.2.0 item 12: the "checklist dismissed" flag moved from unison.checklist.dismissed to wavwiz.checklist.dismissed (old value read once). */
+export const CHECK_KEY = 'wavwiz.checklist.dismissed';
+export function checklistDismissedLocal() {
+  try { const v = localStorage.getItem(CHECK_KEY); if (v != null) return v === '1'; const old = localStorage.getItem('unison.checklist.dismissed'); if (old != null) { localStorage.setItem(CHECK_KEY, old); localStorage.removeItem('unison.checklist.dismissed'); } return old === '1'; } catch { return false; }
+}
+async function dismissChecklist(S, on = true) {
+  try { localStorage.setItem(CHECK_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  try { if (S.auth.role === 'admin') await api('/settings', { method: 'PUT', body: { 'ui.checklistDismissed': on } }); } catch { /* local only */ }
+  window.dispatchEvent(new CustomEvent('wavwiz:checklist'));
+}
+
 /** The first-run checklist card (shown at the top of Devices/Now Playing until everything is done or dismissed). */
 export async function checklistCard(S, go, force = false) {
   let c; try { c = await api('/checklist'); } catch { return null; }
-  const local = localStorage.getItem('unison.checklist.dismissed') === '1';
+  const local = checklistDismissedLocal();
   if (!force && (c.dismissed || local)) return null;
-  const dismiss = async () => { localStorage.setItem('unison.checklist.dismissed', '1'); try { if (S.auth.role === 'admin') await api('/settings', { method: 'PUT', body: { 'ui.checklistDismissed': true } }); } catch { /* local only */ } window.dispatchEvent(new CustomEvent('wavwiz:checklist')); };
+  const dismiss = () => dismissChecklist(S);
   return h('div', { class: 'card', style: 'border-color:var(--accent)' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, c.done ? 'All set up 🎉' : `Getting started (${c.remaining} to go)`), h('button', { class: 'btn', onclick: dismiss }, c.done ? 'Hide' : 'Hide this')),
     c.items.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''), h('div', { class: 'grow' }, h('div', null, h('b', null, i.title), i.required ? '' : h('span', { class: 'dim small' }, ' (optional)')), h('div', { class: 'small dim' }, i.detail), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => go(i.action) }, 'Do this') : null))));
 }
+
+/** 0.2.0 items 11 + 24: the ONE Getting started dialog. Opens by itself on first run (until done or dismissed) and ALWAYS from
+ * Help > Getting started, even after it was dismissed. Three guided steps on top (music folder, a speaker in Devices, a test sound), the rest of
+ * the checklist below. Steps an administrator must do stay visible and read-only for everyone else. */
+export async function gettingStartedBody(S, go, { close } = {}) {
+  let c; try { c = await api('/checklist'); } catch (e) { return h('p', { class: 'err' }, e.message); }
+  const { isAdmin, canControl, thisDevice, ADMIN_HINT } = await import('./ui.js');
+  const item = id => c.items.find(i => i.id === id) || { done: false, detail: '' };
+  const admin = isAdmin(S), control = canControl(S), me = thisDevice(S);
+  const goClose = k => { close?.(); go(k); };
+  const step = (n, it, title, actions, roNote) => h('div', { class: 'gs-step chk ' + (it.done ? 'done' : '') },
+    h('span', { class: 'mark', 'aria-hidden': 'true' }, it.done ? '✓' : String(n)),
+    h('div', { class: 'grow' }, h('b', null, title), h('div', { class: 'small dim' }, it.detail), roNote ? h('div', { class: 'small warn' }, roNote) : null,
+      actions ? h('div', { class: 'row wrap', style: 'margin-top:6px;gap:6px' }, actions) : null));
+  const folderBtn = h('button', { class: 'btn', onclick: () => goClose('settings:library') }, 'Choose a music folder…');
+  if (!admin) { folderBtn.disabled = true; folderBtn.title = ADMIN_HINT; }
+  const testBtn = h('button', { class: 'btn', disabled: !control || !me?.connected, onclick: async () => {
+    testBtn.disabled = true;
+    try { await api(`/zones/${me.id}/test-sound`, { method: 'POST' }); toast('Test sound sent to ' + me.name); } catch (e) { toast(e.message, true); }
+    testBtn.disabled = false; refresh();
+  } }, me ? `Play a test sound on ${me.name}` : 'Play a test sound');
+  const steps = [
+    step(1, item('library'), 'Pick a music folder', [folderBtn], admin ? null : 'An administrator adds music folders (File > Sign in as admin…).'),
+    step(2, item('speaker'), 'Check that a speaker shows up in Devices', [h('button', { class: 'btn', onclick: () => goClose('devices') }, 'Open Devices')]),
+    step(3, item('test'), 'Play a test song or a test sound', [testBtn, h('button', { class: 'btn', disabled: !control, onclick: () => goClose('library') }, 'Pick a song')], control ? null : 'Your access is view-only, so you can browse but not play.'),
+  ];
+  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test'].includes(i.id));
+  const body = h('div', { class: 'gs' },
+    h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'Three quick steps and WavWiz is playing in sync on your speakers.'),
+    steps,
+    rest.length ? h('details', { open: c.done }, h('summary', { class: 'small' }, 'More (optional)'), rest.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''),
+      h('div', { class: 'grow' }, h('b', null, i.title), h('div', { class: 'small dim' }, i.detail), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => goClose(i.action) }, 'Do this') : null)))) : null,
+    h('label', { class: 'row small', style: 'gap:6px;margin-top:10px' }, h('input', { type: 'checkbox', checked: c.dismissed || checklistDismissedLocal(), onchange: ev => dismissChecklist(S, ev.target.checked) }), "Don't open this by itself again (Help > Getting started always opens it)"));
+  const holder = h('div', null, body);
+  async function refresh() { const nb = await gettingStartedBody(S, go, { close }); holder.replaceChildren(nb); }
+  return holder;
+}
+
+/** Should Getting started open by itself? First run on this browser, essentials not done, not dismissed (here or by an admin). */
+export function shouldAutoOpenSetup(c, local, shownBefore) { return !!c && !c.done && !c.dismissed && !local && !shownBefore; }

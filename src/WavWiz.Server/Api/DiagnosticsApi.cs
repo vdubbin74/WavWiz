@@ -27,13 +27,17 @@ public static class DiagnosticsApi
         int players = Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM player WHERE revoked=0 AND token_hash IS NOT NULL AND id NOT LIKE 'web-%'"));
         int cals = Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM calibration WHERE is_current=1"));
         bool dismissed = s.Db.Setting("ui.checklistDismissed") == "true";
+        int speakers = s.Zones.Zones().Count(z => z.Connected);
+        bool firstSound = s.Db.Setting("ui.firstSound") == "true";
         var items = new List<object>
         {
             new { id = "server", title = "WavWiz server is running", done = true, detail = $"Version {WavWizInfo.Version}, listening on {s.Cfg.BindAddress}.", action = (string?)null, required = true },
             new { id = "library", title = "Add your music folder", done = roots > 0 && tracks > 0, detail = roots == 0 ? "No folder yet. Open Settings > Library and add the folder that holds your music." : tracks == 0 ? (s.Scanning ? "Scanning now - this can take a few minutes the first time." : "The folder has no songs WavWiz can read yet. Run a rescan in Settings > Library.") : $"{tracks:N0} songs found.", action = "settings:library", required = true },
-            new { id = "player", title = "Connect your first player (a PC with speakers)", done = players > 0, detail = players > 0 ? $"{players} player(s) paired." : "On the PC with the speakers, open WavWiz Player and type the 6-digit code from Settings > Players. WavWiz finds the server by itself.", action = "settings:players", required = true },
-            new { id = "calibrate", title = "Calibrate your first speaker", done = cals > 0, detail = cals > 0 ? "At least one speaker has a measured delay." : "Open Devices, pick a speaker and choose Calibrate. Until then the delay is shown as unknown, never zero.", action = "zones", required = true },
-            new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone and to use the phone as a device.", action = "settings:phone", required = false },
+            // 0.2.0 item 24: "a speaker shows up in Devices" - any connected Player OR browser speaker (every browser now joins by itself)
+            new { id = "speaker", title = "Check that a speaker shows up in Devices", done = speakers > 0, detail = speakers > 0 ? $"{speakers} speaker(s) online now{(players > 0 ? $", {players} PC player(s) paired" : "")}." : "This browser joins as a speaker by itself (tap once to allow sound). For a PC with speakers, open WavWiz Player there and type the 6-digit code from Settings > Players.", action = "devices", required = true },
+            new { id = "test", title = "Play a test song or test sound", done = firstSound, detail = firstSound ? "Sound has gone out to your speakers." : "Pick any song in the Library, or use Test sound on a speaker in Devices.", action = "library", required = true },
+            new { id = "calibrate", title = "Calibrate your speakers (optional)", done = cals > 0, detail = cals > 0 ? "At least one speaker has a measured delay." : "Open Devices, pick a speaker and choose Calibrate. Until then the delay is shown as unknown, never zero.", action = "devices", required = false },
+            new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone, and for reliable sound when a phone plays as a speaker.", action = "settings:phone", required = false },
         };
         var req = items.Cast<dynamic>().Where(i => i.required).ToList();
         return new { items, done = req.All(i => (bool)i.done), dismissed, remaining = req.Count(i => !(bool)i.done) };

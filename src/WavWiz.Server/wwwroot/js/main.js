@@ -8,7 +8,9 @@ import { devicesView, devicesPanel } from './devices.js';
 import { listTable } from './listtable.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { installPhoneAutoJoin } from './room.js';
+import { installAutoJoin, deviceName } from './room.js';
+import { installTvMode } from './tv.js';
+import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
 import { themesView } from './themes.js';
 import { visualizerView } from './vizpage.js';
@@ -16,8 +18,7 @@ import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
-import { diagnosticsView, roomPill } from './diag.js';
-import { roomView } from './room.js';
+import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
 import { canControl } from './ui.js';
 import { scenesView } from './scenes.js';
 import { schedulesView } from './schedules.js';
@@ -27,6 +28,7 @@ import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
+installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
 
 export const S = { auth: null, now: null, queue: [], zones: [], groups: [], radio: [], status: null, view: null, ws: null, localPos: 0, localAt: 0 };
 const app = document.getElementById('app');
@@ -76,7 +78,7 @@ function renderLogin() {
   const draw = () => {
     const msg = h('p', { class: 'err', role: 'alert' });
     const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code' });
-    const name = h('input', { type: 'text', maxlength: 40, placeholder: 'e.g. Sam\'s phone', id: 'devname', value: /iPhone|Android/.test(navigator.userAgent) ? 'Phone' : 'Browser' });
+    const name = h('input', { type: 'text', maxlength: 40, placeholder: 'e.g. Sam\'s phone', id: 'devname', value: deviceName() });
     const pw = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw' });
     root.replaceChildren(
       h('h2', null, 'Sign in'),
@@ -95,19 +97,19 @@ function renderLogin() {
 const NAV = [
   ['now', '♪', 'Now Playing', true], ['library', '☰', 'Library'], ['playlists', '📑', 'Playlists'], ['queue', '≡', 'Queue'], ['devices', '◉', 'Devices & zones'], ['radio', '📻', 'Radio'],
   ['scenes', '🎬', 'Scenes'], ['schedules', '⏰', 'Schedules'], ['finder', '🔎', 'Radio finder'], ['tags', '🏷', 'Tag & cover fix', false, true], ['rip', '💿', 'CD ripper', false, true], ['remote', '🔐', 'Away-from-home', false, true],
-  ['phone', '📱', 'This phone as a device', false, true], ['cleanup', '🧹', 'Tidy up library', false, true], ['diag', '🩺', 'Diagnostics', false, true], ['about', 'ℹ', 'About & credits']];
-// NAV kept for page titles; phone hamburger uses createPhoneDrawerNav (PC menus no longer list "This phone as a device").
-const PAGE_TITLES = { themes: 'Themes', visualizer: 'Visualizer', playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', phone: 'This phone as a device', about: 'About WavWiz', scenes: 'Scenes', schedules: 'Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
+  ['cleanup', '🧹', 'Tidy up library', false, true], ['diag', '🩺', 'Diagnostics', false, true], ['about', 'ℹ', 'About & credits']];
+// NAV kept for page titles; phone hamburger uses createPhoneDrawerNav. 0.2.0 item 2: the "This phone as a device" page is gone.
+const PAGE_TITLES = { themes: 'Themes', visualizer: 'Visualizer', playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes', schedules: 'Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null;
 
 async function startMain() {
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
-  views.phone = { el: roomView(S, refreshAll), reload() {} }; views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
+  views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
   views.scenes = scenesView(S); views.schedules = schedulesView(S); views.finder = radioFinderView(S, act); views.tags = tagsView(S); views.rip = ripView(S); views.remote = remoteView(S);
   views.themes = themesView(); views.visualizer = visualizerView();
   views.devices = { el: devv.el, reload: () => devv.draw() }; views.about = { el: h('div', { id: 'p-about' }), reload: () => openAboutInto(views.about.el) };
@@ -116,10 +118,12 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['finder', 'Finder'], ['scenes', 'Scenes'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
-  const bar = topbar([menubar, h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
+  const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
+  // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
+  window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });
 
   const libC0 = localStorage.getItem('wavwiz.libcollapsed') === '1';
   const colBtn = h('button', { class: 'plus', 'aria-label': 'Collapse or expand the library', 'aria-expanded': String(!libC0), title: 'Collapse / expand the library', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
@@ -136,7 +140,8 @@ async function startMain() {
   await refreshAll();
   drawStatus(); maybeWhatsNew(S);
   setInterval(() => nowc.tickPos(), 250);
-  installPhoneAutoJoin(S, refreshAll);
+  installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
+  setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
 function toggleLib(force) { const c = force ?? !desk.classList.contains('libcollapsed'); desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ } const b = libpanel.querySelector('.plus'); b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); if (!c) libC.reload(); }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
@@ -156,7 +161,7 @@ async function openAboutInto(el) { const { aboutBody } = await import('./about.j
 
 function buildDrawer() {
   navButtons = [];
-  const nav = createPhoneDrawerNav(S, { go, refreshAll, act }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
+  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
   return h('div', { class: 'drawer', id: 'drawer', role: 'dialog', 'aria-label': 'Menu' }, h('div', { class: 'scrim', onclick: () => toggleDrawer(false) }), nav);
 }
 function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
@@ -185,7 +190,7 @@ const checklistGo = a => go(a);
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
 async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); nowc.draw(); listt.draw(); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
 async function refreshZones() { try { const [z, g] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups)]); S.zones = z; S.groups = g; devv.draw(); devp.draw(); nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
-async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || localStorage.getItem('unison.checklist.dismissed') === '1' ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
+async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); if (S.view === 'radio') drawRadio(); } catch (e) { handleErr(e); } }
 function handleErr(e) { if (e instanceof ApiError && e.status === 401) location.reload(); else if (e.status !== 0) toast(e.message, true); }
 async function act(path, body, method = 'POST') { try { await api(path, { method, body }); } catch (e) { toast(e.message, true); } }
@@ -227,7 +232,24 @@ function drawStatus() {
     S.setupLeft ? h('button', { class: 'sb link', onclick: () => openSetup() }, `Getting started: ${S.setupLeft} to go`) : null,
     h('button', { class: 'sb link', onclick: () => go('about'), title: 'About, credits and licenses' }, `WavWiz BETA ${S.auth?.appVersion ?? ''}`));
 }
-async function openSetup() { const { checklistCard } = await import('./diag.js'); const c = await checklistCard(S, a => { go(a); }, true); if (c) dialog('Getting started', c, [{ text: 'Close' }]); }
+/** 0.2.0 items 11 + 24: the one Getting started dialog (Help > Getting started, the status-bar link, and first run). */
+let setupDlg = null;
+async function openSetup() {
+  if (setupDlg) return;
+  const { gettingStartedBody } = await import('./diag.js');
+  const ref = { close: () => setupDlg?.close() };
+  const body = await gettingStartedBody(S, a => go(a), ref);
+  setupDlg = dialog('Getting started', body, [{ text: 'Close' }], { cls: 'gsdlg', onClose: () => { setupDlg = null; refreshStatus(); } });
+}
+async function maybeAutoSetup() {
+  if (S.page || document.querySelector('dialog[open]')) return;          // never on top of What's new or another dialog
+  const { shouldAutoOpenSetup } = await import('./diag.js');
+  let c = null; try { c = await api('/checklist'); } catch { return; }
+  let shown = false; try { shown = localStorage.getItem('wavwiz.gettingStarted.shown') === '1'; } catch { /* ignore */ }
+  if (!shouldAutoOpenSetup(c, checklistDismissedLocal(), shown)) return;
+  try { localStorage.setItem('wavwiz.gettingStarted.shown', '1'); } catch { /* ignore */ }
+  openSetup();
+}
 
 // ---------------------------------------------------------------- Queue
 function drawQueue() {

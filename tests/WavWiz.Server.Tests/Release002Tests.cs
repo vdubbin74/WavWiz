@@ -410,8 +410,8 @@ public class ArtAndEndpointsTests
         Assert.Equal("fail", checks.EnumerateArray().First(c => c.GetProperty("title").GetString()!.Contains("Library", StringComparison.OrdinalIgnoreCase)).GetProperty("status").GetString() is "fail" ? "fail" : "fail");
         Assert.True(d.TryGetProperty("devices", out _)); Assert.Equal(HttpStatusCode.Forbidden, (await f.As(f.Token(Role.View)).GetAsync("/api/v1/diagnostics")).StatusCode);
         var c1 = await f.As(f.Token(Role.View)).GetJson("/api/v1/checklist"); var ids = c1.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()).ToArray();
-        Assert.Equal(new[] { "server", "library", "player", "calibrate", "phone" }, ids);
-        Assert.False(c1.GetProperty("items")[1].GetProperty("done").GetBoolean()); Assert.False(c1.GetProperty("items")[3].GetProperty("done").GetBoolean());       // not calibrated = not done
+        Assert.Equal(new[] { "server", "library", "speaker", "test", "calibrate", "phone" }, ids);     // 0.2.0 item 24: speaker + test steps
+        Assert.False(c1.GetProperty("items")[1].GetProperty("done").GetBoolean()); Assert.False(c1.GetProperty("items")[4].GetProperty("done").GetBoolean());       // not calibrated = not done
         (await a.PutAsJsonAsync("/api/v1/settings", new Dictionary<string, object> { ["ui.checklistDismissed"] = true })).EnsureSuccessStatusCode();
     }
 

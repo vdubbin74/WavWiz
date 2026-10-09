@@ -709,3 +709,14 @@ input[type=range]:disabled{opacity:.45}
 .rcv:last-of-type{border-bottom:0}
 #diag-network ul,#diag-receivers ul{margin:4px 0 4px 18px;padding:0}
 .naslist .row{gap:8px}
+
+/* 0.2.0 item 1: TV / lite mode - lightweight Now Playing, big text, remote-friendly focus */
+html.tv{font-size:20px}
+html.tv .desk{grid-template-columns:0 minmax(0,1fr) 0;grid-template-rows:minmax(0,1fr) 0;gap:0}
+html.tv .libpanel,html.tv .devpanel,html.tv .listpanel,html.tv .navwide,html.tv .statusbar{display:none}
+html.tv .nowcol{border:0}
+html.tv .stage{display:none}
+html.tv .nowcol .np-meta .npart .cover,html.tv .nowcol .cover{width:clamp(140px,calc(22vh / var(--z,1)),260px);height:clamp(140px,calc(22vh / var(--z,1)),260px)}
+html.tv .nowcol button,html.tv .menubar button{min-height:48px;min-width:48px;font-size:1.05rem}
+html.tv :focus-visible,html.tv button:focus,html.tv [tabindex]:focus{outline:4px solid var(--accent);outline-offset:3px;box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent)}
+html.tv *{transition:none!important;animation:none!important}

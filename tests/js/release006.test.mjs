@@ -47,7 +47,7 @@ test('0.0.6 menu: PC Devices drops phone entry; phone drawer export exists', () 
   assert.match(src, /go\('visualizer'\)/);      // 0.0.7: View > Visualizer… opens the Visualizer page
   const pcBlock = src.split('devices:')[1].split('devicesPhone:')[0];
   assert.ok(!pcBlock.includes('This phone as a device'));
-  assert.match(src, /devicesPhone:[\s\S]*This phone as a device/);
+  assert.doesNotMatch(src, /This phone as a device'/);                      // 0.2.0 item 2: gone from the phone drawer too
 });
 
 test('0.0.6 particles module ships', () => {
@@ -70,6 +70,6 @@ test('0.0.6 index viewport locks zoom', () => {
 
 test('0.0.6 room auto-join helpers', () => {
   const src = readFileSync(join(js, 'room.js'), 'utf8');
-  assert.match(src, /export function installPhoneAutoJoin/);
+  assert.match(src, /export function installAutoJoin/);                      // 0.2.0: every browser, not only phones
   assert.match(src, /export async function startPhoneAsDevice/);
 });

@@ -76,7 +76,7 @@ public static class PlaybackApi
             if (err != null) return Ext.Bad(err); if (items.Count == 0) return Ext.Bad("nothing to play");
             int index = (int)(b.Long("index") ?? 0); long start = b.Long("startMs") ?? 0;
             if (b.Bool("enqueue") == true) { s.Conductor.Add(items, b.Bool("next") == true); return Results.Json(new { ok = true, added = items.Count }); }
-            s.Conductor.PlayItems(items, index, start); return Results.Json(new { ok = true });
+            s.Conductor.PlayItems(items, index, start); MarkFirstSound(s); return Results.Json(new { ok = true });
         }).Req(Role.Control);
 
         g.MapPost("/queue/add", async (HttpContext c) =>
@@ -237,4 +237,6 @@ public static class PlaybackApi
         foreach (var it in items)
             s.Db.Exec("INSERT INTO playlist_item(playlist_id,position,track_id,radio_id) VALUES($p,$o,$t,$r)", ("$p", playlistId), ("$o", pos++), ("$t", it.Kind == "track" ? it.RefId : null), ("$r", it.Kind == "radio" ? it.RefId : null));
     }
+    /** 0.2.0 item 24: the Getting started step "Play a test song or test sound" is done once anything was played or a test sound went out. */
+    public static void MarkFirstSound(Services s) { try { if (s.Db.Setting("ui.firstSound") != "true") s.Db.SetSetting("ui.firstSound", "true"); } catch { /* best effort */ } }
 }

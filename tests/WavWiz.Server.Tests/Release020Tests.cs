@@ -164,4 +164,13 @@ public class Release020Tests
         Assert.Contains("WavWiz/" + WavWiz.Core.WavWizInfo.Version + " ", Features.RadioFinderService.UserAgent);
         Assert.DoesNotContain("0.0.5", Features.TagFixService.UserAgent); Assert.DoesNotContain("0.0.7", Features.RadioFinderService.UserAgent);
     }
+    [Fact]
+    public async Task Getting_started_marks_the_speaker_and_test_sound_steps_done()
+    {
+        var (f, admin, a, b, ida, idb) = await TwoPcs(); await using var _f = f; await using var _a = a; await using var _b = b;
+        var c = await admin.GetJson("/api/v1/checklist"); JsonElement Item(JsonElement x, string id) => x.GetProperty("items").EnumerateArray().First(i => i.GetProperty("id").GetString() == id);
+        Assert.True(Item(c, "speaker").GetProperty("done").GetBoolean()); Assert.False(Item(c, "test").GetProperty("done").GetBoolean());
+        (await f.As(f.Token(Role.Control)).PostAsync($"/api/v1/zones/{ida}/test-sound", null)).EnsureSuccessStatusCode();
+        c = await admin.GetJson("/api/v1/checklist"); Assert.True(Item(c, "test").GetProperty("done").GetBoolean());
+    }
 }

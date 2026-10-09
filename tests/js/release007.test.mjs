@@ -39,7 +39,7 @@ test('0.0.7 phone audio: one shared AudioContext, unlock on touchend/click, auto
   const room = await imp('phonejoin');
   assert.equal(room.wantsAutoJoin(null, true), true);
   assert.equal(room.wantsAutoJoin('0', true), false);
-  assert.equal(room.wantsAutoJoin(null, false), false);
+  assert.equal(room.wantsAutoJoin(null, false), true);          // 0.2.0 item 1: every browser joins, not only phones
   assert.equal(room.wantsAutoJoin('1', false), true);
   assert.equal(room.isPhoneUa('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), true);
 });

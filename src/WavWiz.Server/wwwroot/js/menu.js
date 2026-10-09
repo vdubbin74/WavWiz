@@ -5,7 +5,8 @@ import { openSettings } from './settings.js';
 import { openAbout, openWhatsNew } from './about.js';
 import { openEq } from './eq.js';
 import { openCalibration } from './calibrate.js';
-import { canControl } from './ui.js';
+import { canControl, ADMIN_HINT } from './ui.js';
+import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { SCALES, loadScale, applyScale } from './uiscale.js';
 
 
@@ -21,18 +22,22 @@ function menuActions(S, ctl, desktop = false) {
   const control = () => canControl(S);
   return {
     go, refreshAll, act, admin, control,
+    // 0.2.0 item 31: elevate in place (same pairing, same speaker), and drop back again - no sign-out, no new pairing code
     file: [
       ['Settings…', () => openSettings(S, refreshAll, go)],
+      'hr',
+      ['Sign in as admin…', () => signInAsAdmin(S), null, () => admin()],
+      ['Leave admin mode', () => leaveAdmin(S), null, () => !S.auth?.elevated],
       ['Sign out', async () => { try { await api('/auth/logout', { method: 'POST' }); location.reload(); } catch (e) { toast(e.message, true); } }],
     ],
     library: [
       ['Browse library', browseLib],
-      ['Playlist', listPanel, () => !desktop],
+      ['Playlist', listPanel, null, () => !desktop],
       ['Playlists', () => go('playlists')],
       ['Queue', () => go('queue')],
-      ['Tidy up library', () => go('cleanup'), () => !control()],
+      ['Tidy up library', () => go('cleanup'), () => !admin()],
       'hr',
-      ['Tag & cover fix…', () => go('tags'), () => !control()],
+      ['Tag & cover fix…', () => go('tags'), () => !admin()],
       ['CD ripper…', () => go('rip'), () => !admin()],
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
     ],
@@ -49,7 +54,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Sound / EQ…', () => openEq(S, refreshAll)],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
     ],
-    // PC menus: no "This phone as a device" (phone hamburger adds it under Devices).
+    // 0.2.0 item 2: no "This phone as a device" anywhere - every browser joins as a speaker by itself.
     devices: [
       ['Devices & zones', devPanel],
       ['Away-from-home…', () => go('remote'), () => !admin()],
@@ -58,13 +63,12 @@ function menuActions(S, ctl, desktop = false) {
     ],
     devicesPhone: [
       ['Devices & zones', () => go('devices')],
-      ['This phone as a device', () => go('phone')],
       ['Away-from-home…', () => go('remote'), () => !admin()],
       'hr',
       ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
     ],
     help: [
-      ['Getting started', () => go('diag')],
+      ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],      // 0.2.0 item 11: the Getting started dialog, not Diagnostics
       ['Diagnostics', () => go('diag')],
       ["What's new", () => openWhatsNew()],
       ['About WavWiz…', () => openAbout(S)],
@@ -125,16 +129,19 @@ export function createMenuBar(S, ctl) {
   function fromSpec(spec) {
     return spec.map(s => {
       if (s === 'hr') return h('hr');
-      const [label, fn, dis] = s;
-      if (dis?.()) return null;
-      return item(label, fn);
+      const [label, fn, dis, hide] = s;
+      if (hide?.()) return null;
+      const b = item(label, fn, { disabled: !!dis?.() }); if (dis?.()) b.title = ADMIN_HINT;     // 0.2.0 item 28: read-only, never hidden
+      return b;
     }).filter(Boolean);
   }
 
-  top('File', ...fromSpec(A.file));
-  top('Library', ...fromSpec(A.library));
-  top('Playback', ...fromSpec(A.playback));
-  top('Devices', ...fromSpec(A.devices));
+  // 0.2.0 item 31: the menus refill when the role changes (Sign in as admin / Leave admin mode) - no page reload, so the sound keeps playing
+  const topSpec = (label, key) => { const panel = top(label, ...fromSpec(A[key])); window.addEventListener('wavwiz:auth', () => panel.replaceChildren(...fromSpec(A[key]))); return panel; };
+  topSpec('File', 'file');
+  topSpec('Library', 'library');
+  topSpec('Playback', 'playback');
+  topSpec('Devices', 'devices');
 
   let viewPanel = top('View');
   function fillView() {
@@ -150,7 +157,7 @@ export function createMenuBar(S, ctl) {
   window.addEventListener('wavwiz:viz', fillView);
   window.addEventListener('wavwiz:theme', fillView);
 
-  top('Help', ...fromSpec(A.help));
+  topSpec('Help', 'help');
 
   document.addEventListener('click', () => closeAll());
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeAll(); });
@@ -176,9 +183,10 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
   function fromSpec(spec) {
     return spec.map(s => {
       if (s === 'hr') return h('hr');
-      const [label, fn, dis] = s;
-      if (dis?.()) return null;
-      return leaf(label, fn);
+      const [label, fn, dis, hide] = s;
+      if (hide?.()) return null;
+      const b = leaf(label, fn, { disabled: !!dis?.() }); if (dis?.()) b.title = ADMIN_HINT;
+      return b;
     }).filter(Boolean);
   }
   function accordion(label, kidsBuilder) {
