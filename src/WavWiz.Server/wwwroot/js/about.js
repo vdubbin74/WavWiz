@@ -1,7 +1,7 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.0';
+export const WHATS_NEW_VERSION = '0.2.1';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
   ['Terrain is now Spectrum', 'The Terrain visualizer was retired. If you had it picked, you now get Spectrum: smooth rounded bars in your theme colors with a glossy reflection. Every effect has its own 0–100 % slider (50 % default).'],
