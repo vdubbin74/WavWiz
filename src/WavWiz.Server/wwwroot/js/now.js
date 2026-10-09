@@ -10,10 +10,8 @@ import { heartBtn } from './fav.js';
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
  *  [album art | title, artist (accent), genre line with an equalizer icon | divider | bordered transport box: shuffle, prev, big round play, next, repeat]
  *  [Up next ─────────]
- *  [bordered strip: monitor icon, device chips (active = accent outline, phone chip with phone icon) | divider | volume button + status dot]
- *  The volume slider, Stop and Sound (EQ) live in the volume button's pop-up.
- * 0.2.0 item 9: the panel's volume and Mute control ONLY this device (the speaker this page plays on - see ui.js thisDevice); the speaker chips
- * moved to the panel header and are status only (this device first and marked, "+N" for the rest); "This device muted" shows in the header.
+ * 0.2.0 item 9: the panel's volume and Mute control ONLY this device (the speaker this page plays on - see ui.js thisDevice).
+ * 0.2.1 F10/F11: no pop-up menu, no Stop, Sound (EQ) is a regular button; no speaker status in the header (it lives in the Devices panel).
  * Master volume moved to the top of Devices (item 10). The same this-device volume/Mute sits on the full-width mini bar (items 16 + 27). */
 /** 0.2.1 F9: the live control panel, so Settings > Appearance can preview it with the very same markup + CSS (cloned, scaled down). */
 let panelTpl = null;
@@ -41,14 +39,11 @@ export function createNow(S, ctl) {
   const mkMute = () => h('button', { class: 'tbtn tog mutebtn', 'aria-label': 'Mute this device', 'aria-pressed': 'false', title: 'Mute this device', onclick: toggleMute }, icon('volume'));
   const vol = mkVol(), muteBtn = mkMute();
   const volPct = h('span', { class: 'volpct small dim' }, '');
-  const mutedTag = h('span', { class: 'np-mutedtag', hidden: true, role: 'status' }, 'This device muted');
   const genre = h('div', { class: 'np-genre' }, h('span', { class: 'np-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')), t3line);
-  const liveDot = h('span', { class: 'np-dot', 'aria-hidden': 'true' });
   // 0.2.1 F10: no three-dot menu and no Stop - Sound (EQ) is a regular panel button next to Mute (one click), styled like Shuffle / Repeat
   const mkEq = () => h('button', { class: 'tbtn eqbtn', 'aria-label': 'Sound (EQ)', title: 'Sound (EQ)', onclick: () => ctl.openEq() }, icon('eq'));
   const eqBtn = mkEq();
   const upnext = h('div', { class: 'upnext np-upnext', 'aria-label': 'Up next' });
-  const chips = h('div', { class: 'devchips np-hchips', 'aria-label': 'Speakers (status)' });
   const strip = h('div', { class: 'phone-only' }), checklist = h('div', { class: 'checklist' });
   Object.assign(E, { t1, t2, t3, elv, rev, fill, knob, play, shuffle, repeat, vol });
   const prev = h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), next = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
@@ -85,7 +80,7 @@ export function createNow(S, ctl) {
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
-    h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn, liveDot)));
+    h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn)));
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
   let ctlCollapsed = false; try { ctlCollapsed = localStorage.getItem('wavwiz.npctlcollapsed') === '1'; } catch { /* ignore */ }
@@ -93,7 +88,7 @@ export function createNow(S, ctl) {
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
   const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, pnArt, tableMeta, h('div', { class: 'pn-ctl' }, tableXport, tableVol)));
   const ctlPanel = h('section', { class: 'np-ctlpanel' + (ctlCollapsed ? ' collapsed' : ''), role: 'group', 'aria-label': 'Playback controls' },
-    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), chips, mutedTag, ctlNow, h('span', { class: 'grow' }), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
+    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, h('span', { class: 'grow' }), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
   function applyNpStyle() {
     const p = loadNpPrefs();
     for (const [id] of NP_STYLES) ctlPanel.classList.toggle('pn-' + id, p.style === id);
@@ -146,7 +141,6 @@ export function createNow(S, ctl) {
     for (const r of [vol, barVol]) { r.disabled = !can; r.title = z ? `Volume of this device (${z.name})` : 'This page is not playing as a speaker yet'; }
     syncVol(z ? z.volume : 0); if (!z) volPct.textContent = barPct.textContent = '—';
     for (const b of [muteBtn, barMute]) { b.disabled = !can; b.classList.toggle('on', !!z?.muted); b.setAttribute('aria-pressed', String(!!z?.muted)); setIcon(b, z?.muted ? 'mute' : 'volume'); b.title = z?.muted ? 'Unmute this device' : 'Mute this device'; }
-    mutedTag.hidden = !z?.muted;
   }
 
   function drawVBtns() {
@@ -253,30 +247,9 @@ export function createNow(S, ctl) {
     pillDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
     ringVal.style.strokeDashoffset = String(100 - frac * 100); ledFill.style.width = frac * 100 + '%'; waveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
   }
-  function statusDot(z) {
-    if (!z.connected || !z.enabled) return 'bad';       // red = lost / off
-    const st = z.room?.state;
-    if (st === 'buffering' || st === 'reconnecting') return 'warn';  // yellow
-    if (st === 'dropped') return 'bad';
-    return 'ok';                                         // green = connected
-  }
-  function statusLabel(z) {
-    if (!z.enabled) return 'Off';
-    if (!z.connected) return 'Lost';
-    return ({ ok: 'Playing', idle: 'Idle', buffering: 'Buffering', dropped: 'Dropped', reconnecting: 'Reconnecting', offline: 'Lost' }[z.room?.state] || (S.now?.state === 'playing' ? 'Playing' : 'Idle'));
-  }
-  /** 0.2.0 item 9: status only - no picking speakers here. This device first (marked), then the others; at most three, then "+N". */
-  const CHIP_MAX = 3;
-  function drawChips() {
-    const mine = me(), zones = (S.zones || []).filter(z => z.enabled).sort((a, b) => (b === mine) - (a === mine));
-    drawMine();
-    if (!zones.length) { chips.replaceChildren(h('span', { class: 'small dim' }, 'No speakers on')); liveDot.classList.remove('on'); return; }
-    const shown = zones.slice(0, CHIP_MAX), more = zones.length - shown.length;
-    chips.replaceChildren(...shown.map(z => h('span', { class: 'np-spk' + (z === mine ? ' me' : '') + (z.muted ? ' muted' : ''), title: `${z.name}${z === mine ? ' (this device)' : ''}: ${z.muted ? 'Muted' : statusLabel(z)}` },
-      h('span', { class: 'dot ' + statusDot(z), 'aria-hidden': 'true' }), h('span', { class: 'ell' }, z.name))),
-      more > 0 ? h('span', { class: 'np-spk more', title: zones.slice(CHIP_MAX).map(z => `${z.name}: ${z.muted ? 'Muted' : statusLabel(z)}`).join('\n') }, '+' + more) : '');
-    liveDot.classList.toggle('on', zones.some(z => z.connected) && S.now?.state === 'playing');
-  }
+  // 0.2.1 F11: no speaker status chips, live dot or "muted" tag in the panel header - device status lives in the Devices panel
+  // (this device's Mute button still shows its own state). Kept as a hook: the zone refresh still repaints this device's volume / mute.
+  function drawChips() { drawMine(); }
   async function refreshReceivers() {
     try { receivers = await api('/receivers'); } catch { receivers = null; }
     paintSrcChip();

@@ -172,7 +172,7 @@ test('0.0.8 item 13: US English spelling in the UI', () => {
 // ---- item 14: Now Playing per the mockup
 test('0.0.8/0.1.2 item 14: Now Playing visualizer panel + control panel', () => {
   const n = src('now.js');
-  for (const k of ['np-times', 'np-genre', 'np-eq', 'np-dot', 'eqbtn', 'np-srcchip', 'np-vizpanel', 'np-ctlpanel']) assert.match(n, new RegExp(k), k);      // 0.2.1 F10: np-volbtn / np-volpop (⋯ menu) gone
+  for (const k of ['np-times', 'np-genre', 'np-eq', 'eqbtn', 'np-srcchip', 'np-vizpanel', 'np-ctlpanel']) assert.match(n, new RegExp(k), k);      // 0.2.1 F10: np-volbtn / np-volpop (⋯ menu) gone; F11: np-dot gone
   assert.match(n, /h\('section', \{ class: 'np-vizpanel'[^]*stage\)/, 'the stage sits inside the visualizer panel');
   assert.match(n, /openEq/); assert.match(n, /Master volume/);   // volume and Sound stay reachable (0.2.1 F10: Stop is gone from the panel; Play/Pause covers it)
 });

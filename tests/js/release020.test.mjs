@@ -137,8 +137,8 @@ test('0.2.0 item 9: the panel volume and Mute are this device only; chips are st
   const n = src('now.js');
   assert.doesNotMatch(n, /'Master volume'/); assert.doesNotMatch(n, /'\/zones\/master'/);
   assert.match(n, /act\(`\/zones\/\$\{z\.id\}`, \{ volume: v \}, 'PATCH'\)/); assert.match(n, /\{ muted: z\.muted \}/);
-  assert.match(n, /This device muted/); assert.match(n, /CHIP_MAX = 3/); assert.match(n, /'\+' \+ more/);
-  assert.doesNotMatch(n, /np-spk'[^)]*onclick/, 'chips do not pick speakers');
+  // 0.2.1 F11 supersedes the header chips / "This device muted" tag: no device status in the panel at all (the Mute button shows its own state)
+  assert.doesNotMatch(n, /np-spk|CHIP_MAX|This device muted/);
   assert.match(n, /class: 'npbar'/);
 });
 
