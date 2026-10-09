@@ -1,6 +1,6 @@
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
-import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress, vizName } from './viz.js';
+import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon } from './icons.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
@@ -19,9 +19,10 @@ export function createNow(S, ctl) {
   const E = {}; let viz = null, vizState = { audible: false, error: null, preset: '' }, overlay = null, receivers = null;
   const act = ctl.act;
   const stage = h('div', { class: 'stage np-stage' }), coverHolder = h('div', { class: 'stagecover' }), host = h('div', { class: 'vizhost' }), vname = h('div', { class: 'vname' }), vbtns = h('div', { class: 'vbtns' });
-  const vlabel = h('div', { class: 'np-vlabel', 'aria-hidden': 'true' }), vcenter = h('span', { class: 'np-vcenter ell' });
+  // 0.2.1 F3: clean visualizer panel - no "VISUALIZER" title and no look-name label; only the small Looks / full screen / pop-out buttons.
+  // The AirPlay / Spotify Connect source chip (shown only while a phone streams) floats in the stage's top-left corner instead.
   const srcChip = h('div', { class: 'np-srcchip', hidden: true });
-  stage.append(coverHolder, host, vlabel, vname, vbtns);
+  stage.append(coverHolder, host, srcChip, vname, vbtns);
   const art = h('div', { class: 'npart' });
   const t1 = h('div', { class: 't1' }, 'Nothing playing'), t2 = h('div', { class: 't2' }, ' '), t3line = h('div', { class: 't3line' }, ''), t3 = h('div', { class: 'notice' });
   const fill = h('div', { class: 'fill' }), knob = h('div', { class: 'knob' }), elv = h('span', { class: 'np-elv' }, '--:--'), rev = h('span', { class: 'np-rev' }, '-:--');
@@ -107,9 +108,8 @@ export function createNow(S, ctl) {
     try { localStorage.setItem('wavwiz.npctlcollapsed', ctlCollapsed ? '1' : '0'); } catch { /* ignore */ }
     setTimeout(() => viz?.resize(), 340);
   }
-  // Visualizer panel: header + the stage (no longer full-bleed behind overlays). Source chip (AirPlay / Spotify Connect) sits in its header.
-  const vizPanel = h('section', { class: 'np-vizpanel', 'aria-label': 'Visualizer' },
-    h('div', { class: 'pane-h' }, h('span', { class: 'grow ell' }, 'VISUALIZER'), srcChip), stage);
+  // Visualizer panel: just the stage (0.2.1 F3: no header bar). Source chip (AirPlay / Spotify Connect) floats in the stage corner.
+  const vizPanel = h('section', { class: 'np-vizpanel', 'aria-label': 'Visualizer' }, stage);
   const ovTitles = { children: [ovT1, ovT2] };   // draw() updates title/artist via E.ovTitles
   const el = h('section', { class: 'nowcol np8 np12' + (ctlCollapsed ? ' ctlcollapsed' : ''), id: 'p-now', 'aria-label': 'Now playing' },
     h('h2', { class: 'sr-only' }, 'Now playing'), vizPanel,
@@ -169,7 +169,6 @@ export function createNow(S, ctl) {
     // Show canvas whenever viz is on and healthy (including idle animation); cover only when viz off.
     const show = p.on && viz?.ok;
     stage.classList.toggle('viz', !!show); vname.textContent = vizState.error ? vizState.error : '';
-    const lbl = show ? (vizState.preset || vizName(p.engine) || '') : ''; vlabel.textContent = p.names !== false ? lbl : ''; vcenter.textContent = lbl;
     vname.classList.toggle('bad', !!vizState.error);
   }
   function fullscreen() {
@@ -184,7 +183,7 @@ export function createNow(S, ctl) {
   const esc = ev => { if (ev.key === 'Escape' && overlay) closeFull(); };
   function closeFull() {
     if (!overlay) return; document.removeEventListener('fullscreenchange', fsc); document.removeEventListener('keydown', esc);
-    stage.insertBefore(host, vlabel); overlay.remove(); overlay = null; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* ok */ } viz?.resize(); paintStage();
+    stage.insertBefore(host, srcChip); overlay.remove(); overlay = null; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* ok */ } viz?.resize(); paintStage();
   }
   window.addEventListener('wavwiz:viz', () => { const p = vizPrefs(); if (viz) { viz.setLight(); if (viz.engine !== p.engine) viz.useEngine(p.engine); } ensureViz(); drawVBtns(); paintStage(); });
 

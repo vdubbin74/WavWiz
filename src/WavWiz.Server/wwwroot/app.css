@@ -961,3 +961,4 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .devpanel .pane-h .eschint{display:none;border:1px solid var(--line);border-radius:3px;padding:1px 6px;margin-right:4px}
 .desk.devexpanded .devpanel .pane-h .eschint{display:inline-block}
 .desk.devcollapsed .devpanel .devexp{display:none}
+.np-vizpanel .np-stage .np-srcchip{position:absolute;left:10px;top:8px;z-index:3;max-width:calc(100% - 200px)}   /* 0.2.1 F3 */

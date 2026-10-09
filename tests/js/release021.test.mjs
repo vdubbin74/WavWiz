@@ -47,3 +47,10 @@ test('0.2.1 F2: no "Expanded library" menu item; Browse library always opens the
   assert.doesNotMatch(menu, /'Expanded library'/);
   assert.match(menu, /const browseLib = \(\) => \(desktop && wideNow\(\) && ctl\.toggleLibExpanded \? ctl\.toggleLibExpanded\(true\) : go\('library'\)\)/);
 });
+
+test('0.2.1 F3: no VISUALIZER title and no look-name label on the visualizer panel; the small buttons stay', () => {
+  const n = src('now.js');
+  assert.doesNotMatch(n, /'VISUALIZER'/); assert.doesNotMatch(n, /np-vlabel/); assert.doesNotMatch(n, /vlabel\.textContent/);
+  assert.match(n, /const vizPanel = h\('section', \{ class: 'np-vizpanel', 'aria-label': 'Visualizer' \}, stage\);/);
+  assert.match(n, /'Looks'/); assert.match(n, /'Full screen visualizer'/); assert.match(n, /'Open the visualizer in its own window'/);
+});

@@ -52,7 +52,7 @@ try:
     check(wb >= 1440 - 2 * 46 - 60, f'item 3: both panels collapsed -> Now Playing ~full width ({wb:.0f} px)')
     ev("document.querySelector('.libpanel .plus').click(); document.querySelector('.devpanel .devcol').click(); true"); time.sleep(0.5)
     # item 14: Now Playing parts
-    for sel, what in (('.np-stage .np-seek, .stage .np-seek', 'progress bar inside the visualizer panel'), ('.np-vlabel', 'visualizer name label'), ('.np-genre', 'genre line'),
+    for sel, what in (('.np-stage .np-seek, .stage .np-seek', 'progress bar inside the visualizer panel'), ('.np-genre', 'genre line'),
                       ('.np-transport', 'bordered transport box'), ('.np-upnext', 'Up next line'), ('.np-strip', 'bottom device strip')):
         check(ev(f"!!document.querySelector({json.dumps(sel)})"), f'item 14: Now Playing has the {what}')
     shot('desk-now.png')
