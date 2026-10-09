@@ -57,13 +57,13 @@ test('0.1.2 streaming source chip labels', () => {
 
 test('0.1.2 Now Playing viz panel + solid control panel, playlist collapse-down, flowing Terrain', () => {
   const n = src('now.js');
-  for (const k of ['np-vizpanel', 'np-ctlpanel', 'np-ctlbody', 'np-tablemeta', 'np-tablexport', 'np-tablevol', 'np-tablefoot', 'np-srcchip', 'streamingChip']) assert.match(n, new RegExp(k), k);
+  for (const k of ['np-vizpanel', 'np-ctlpanel', 'np-ctlbody', 'np-tablemeta', 'np-tablexport', 'np-tablevol', 'np-hchips', 'np-srcchip', 'streamingChip'])   // 0.2.0 item 9: chips moved from the foot to the header assert.match(n, new RegExp(k), k);
   assert.match(n, /˅/);
   assert.match(n, /˄/);
   assert.doesNotMatch(n, /np-glasspod/);
   assert.doesNotMatch(n, /FOLLOWED SPEAKERS/);
   // panel hotfix: control layout unchanged (title/times | transport | volume, device dots below)
-  assert.match(n, /np-tablemain' \}, tableMeta, tableXport, tableVol\), tableFoot/);
+  assert.match(n, /np-tablemain' \}, tableMeta, tableXport, tableVol\)\)/);
   assert.match(n, /shuffle, prev, play, next, repeat/);
   // arrow reuses the Playlist toggle class (plus listcol), persisted per device; collapse grows the viz panel
   assert.match(n, /class: 'plus listcol np-ctlcol'/);

@@ -108,3 +108,48 @@ test('0.2.0 item 31 + 28: File > Sign in as admin… / Leave admin mode, Admin c
   const e = src('elevate.js'); assert.match(e, /'\/auth\/elevate'/); assert.match(e, /'\/auth\/leave-admin'/); assert.match(e, /'wavwiz:auth'/); assert.doesNotMatch(e, /location\.reload/);
   assert.match(src('main.js'), /adminChip\(S\)/);
 });
+
+test('0.2.0 items 10 + 26 + 27 + 28 + 30: three Devices sizes, master on top, mute per speaker, output line + per-output delay 0-1000, read-only rules, reference badge', async () => {
+  const d = await imp('devices');
+  assert.deepEqual(d.SIZES, ['collapsed', 'standard', 'expanded']); assert.equal(d.nextSize('collapsed'), 'standard'); assert.equal(d.nextSize('standard'), 'expanded'); assert.equal(d.nextSize('expanded'), 'collapsed');
+  const st = memStore(); assert.equal(d.loadDevSize(st), 'standard'); st.setItem('wavwiz.devcollapsed', '1'); assert.equal(d.loadDevSize(st), 'collapsed');   // 0.1.x flag carries over
+  d.saveDevSize('expanded', st); assert.equal(d.loadDevSize(st), 'expanded');
+  assert.equal(d.outputLabel({ kind: 'hdmi', name: 'LG TV' }), 'HDMI · LG TV'); assert.equal(d.outputLabel({ kind: 'spdif', name: '' }), 'Optical (TOSLINK)'); assert.equal(d.outputLabel({ kind: 'analog', name: 'Realtek' }), 'Speakers (Realtek)');
+  const o = (id, extra = {}) => ({ deviceId: id, endpointDbId: id.length, kind: 'analog', name: id, connected: true, active: false, latencyMs: 0, notCalibrated: true, ...extra });
+  assert.equal(d.showOutputLine({ outputs: [o('a', { active: true })] }), false);                              // single output: no line
+  assert.equal(d.showOutputLine({ outputs: [o('a', { active: true }), o('bb')] }), true);
+  assert.equal(d.showOutputLine({ outputs: [o('a')], outputUnavailable: true }), true);                        // chosen output gone: amber line
+  assert.equal(d.chosenOutput({ outputs: [o('a', { connected: false }), o('bb')], chosenDeviceId: 'a' }).deviceId, 'a');   // never silently the other one
+  assert.equal(d.masterLevel([{ enabled: true, volume: 40 }, { enabled: true, volume: 70 }, { enabled: false, volume: 100 }]), 70);   // off speakers skipped
+  const s = src('devices.js');
+  assert.match(s, /MASTER VOLUME/); assert.match(s, /'\/zones\/master', \{ set:/); assert.match(s, /mutebtn/);
+  assert.match(s, /max: 1000, step: 5/); assert.match(s, /Output unavailable/); assert.match(s, /'\/calibration\/reference', \{ method: 'PUT'/);
+  assert.match(s, /REFERENCE/); assert.match(s, /Set as reference/); assert.match(s, /canTune\(S, z\)/); assert.match(s, /Forget device…/); assert.match(s, /Rename…/);
+  assert.doesNotMatch(s, /can \? h\('button'/, 'no control is hidden because of the role');
+  const ui = await imp('ui');
+  const S = { auth: { role: 'control' }, zones: [{ id: 1, playerId: 'web-1', connected: true, mine: true }, { id: 2, playerId: 'pc', connected: true, mine: false }] };
+  assert.equal(ui.canTune(S, S.zones[0]), true); assert.equal(ui.canTune(S, S.zones[1]), false); assert.equal(ui.canTune({ auth: { role: 'admin' } }, S.zones[1]), true);
+  assert.equal(ui.thisDevice(S, 'web-1').id, 1); assert.equal(ui.thisDevice({ zones: [{ id: 5, playerId: 'pc', connected: true, mine: true }] }, 'web-x').id, 5);
+  const m = src('main.js'); assert.match(m, /function setDevSize/); assert.match(m, /devexpanded/); assert.match(css, /\.desk\.devexpanded\{/); assert.match(css, /\.dcard\.hl\{/);
+});
+
+test('0.2.0 item 9: the panel volume and Mute are this device only; chips are status only with +N; master left the panel', () => {
+  const n = src('now.js');
+  assert.doesNotMatch(n, /'Master volume'/); assert.doesNotMatch(n, /'\/zones\/master'/);
+  assert.match(n, /act\(`\/zones\/\$\{z\.id\}`, \{ volume: v \}, 'PATCH'\)/); assert.match(n, /\{ muted: z\.muted \}/);
+  assert.match(n, /This device muted/); assert.match(n, /CHIP_MAX = 3/); assert.match(n, /'\+' \+ more/);
+  assert.doesNotMatch(n, /np-spk'[^)]*onclick/, 'chips do not pick speakers');
+  assert.match(n, /class: 'npbar'/);
+});
+
+test('0.2.0 item 29: calibration ends its session (music resumes), re-syncs before every recording, walk pause with Wi-Fi meter', async () => {
+  const c = src('calibrate.js');
+  assert.match(c, /\/calibration\/sessions\/\$\{id\}\/end/); assert.match(c, /cleanup = \(\) => \{[^\n]*endSession\(\)/);
+  assert.match(c, /re-sync the clock before EVERY recording/); assert.match(c, /const o2 = await syncClock\(\)/);
+  assert.match(c, /then tap Continue/); assert.match(c, /Wi-Fi is stable here, start recording/);
+  assert.match(c, /mode: 'ear'/); assert.match(c, /max: 1000, step: 1/);
+  const ce = await imp('calerrors');
+  assert.equal(ce.wifiStability([5, 6, 5, 7, 6, 5]).stable, true); assert.equal(ce.wifiStability([5, 300, 20, 900, 40, 5]).stable, false); assert.equal(ce.wifiStability([5, 5]).stable, false);
+  assert.equal(ce.wifiStability([5, 6, 1500, 5, 6, 5]).level, 1);
+  assert.match(ce.describe('WIFI_UNSTABLE').title, /Wi-Fi/); assert.doesNotMatch(ce.describe('SESSION_FAILED').fix.join(' '), /playing is stopped/);
+});

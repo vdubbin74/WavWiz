@@ -145,7 +145,7 @@ test('0.0.8 item 2: no hard-coded white or light backgrounds on buttons (CSS and
 // ---- items 3-6: panels and menus
 test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop menu toggles panels, phone keeps pages', () => {
   const m = src('main.js'), d = src('devices.js'), menu = src('menu.js');
-  assert.match(m, /wavwiz\.devcollapsed/); assert.match(m, /function toggleDev/); assert.match(css, /\.desk\.devcollapsed\{--rightw:46px\}/);
+  assert.match(d, /wavwiz\.devcollapsed/); assert.match(m, /function toggleDev/);           // 0.2.0: the size (incl. the 0.1.x collapsed flag) lives in devices.js assert.match(css, /\.desk\.devcollapsed\{--rightw:46px\}/);
   assert.match(css, /\.desk\{transition:grid-template-columns/); assert.match(d, /devcol/);
   assert.match(menu, /menuActions\(S, ctl, true\)/, 'desktop menu bar asks for panel toggles');
   assert.match(menu, /\['Browse library', browseLib\]/); assert.match(menu, /\['Devices & zones', devPanel\]/);
@@ -153,9 +153,9 @@ test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop me
 });
 
 // ---- item 7: delay slider
-test('0.0.8 item 7: delay slider 0-1000 ms in 5 ms steps, ms box 0-2000, clamp', () => {
-  assert.equal(lat.LAT_MAX_SLIDER, 1000); assert.equal(lat.LAT_STEP, 5); assert.equal(lat.LAT_MAX, 2000);
-  assert.equal(lat.clampMs(-5), 0); assert.equal(lat.clampMs(2500), 2000); assert.equal(lat.clampMs('12.6'), 13); assert.equal(lat.clampMs('x'), 0);
+test('0.0.8 item 7: delay slider 0-1000 ms in 5 ms steps, ms box 0-1000 (0.2.0), clamp', () => {
+  assert.equal(lat.LAT_MAX_SLIDER, 1000); assert.equal(lat.LAT_STEP, 5); assert.equal(lat.LAT_MAX, 1000);
+  assert.equal(lat.clampMs(-5), 0); assert.equal(lat.clampMs(2500), 1000); assert.equal(lat.clampMs('12.6'), 13); assert.equal(lat.clampMs('x'), 0);
   const z = src('zone.js'); assert.match(z, /latencyControl/); assert.match(z, /live/);
   assert.match(css, /\.latslider::-webkit-slider-thumb\{[^}]*width:32px/, 'big thumb on touch screens');
 });

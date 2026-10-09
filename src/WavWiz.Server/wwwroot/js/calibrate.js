@@ -2,24 +2,45 @@ import { h, api, toast, dialog } from './util.js';
 import { CalError, environment, describe, classifyMicError, detailsText, rms } from './calerrors.js';
 import { OffsetEstimator, pairClocks } from './roomsched.js';
 import { openOnce } from './wsconn.js';
+import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
+import { wifiStability } from './calerrors.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Phone-microphone delay calibration wizard (spec 8). Needs HTTPS (secure context) for the microphone; otherwise it points at the phone set-up page and
 // offers the manual / by-ear paths, which work on plain HTTP.
+// 0.2.0 item 29: the server pauses the music for the whole session (and again if someone presses Play mid-session) and resumes it when the session
+// ENDS - finish, cancel or failure all call /calibration/sessions/{id}/end. The clock is re-synced before EVERY recording, and between speakers the
+// wizard waits: "Move the phone near <next speaker>, then tap Continue", with a live Wi-Fi stability meter.
+// 0.2.0 items 28 + 30: the house reference speaker is pre-selected; a regular user calibrates only their own device against it (the choices are
+// shown read-only); calibrating several devices or picking another reference needs an administrator.
 export async function openCalibration(S, refresh, presetZoneId) {
   const zones = S.zones.filter(z => z.connected && z.outputs.some(o => o.active));
-  const body = h('div'); let stop = false; let micStream = null, ctx = null, wake = null, clockWs = null;
-  const cleanup = () => { stop = true; try { micStream?.getTracks().forEach(t => t.stop()); } catch { } try { ctx?.close(); } catch { } try { wake?.release(); } catch { } try { clockWs?.close(); } catch { } };
+  const body = h('div'); let stop = false; let micStream = null, ctx = null, wake = null, clockWs = null, sessionId = null, meter = null;
+  const endSession = () => { const id = sessionId; sessionId = null; if (id) api(`/calibration/sessions/${id}/end`, { method: 'POST' }).then(r => { if (r?.resumed) toast('Calibration ended - the music is playing again'); }).catch(() => {}); };
+  const cleanup = () => { stop = true; meter?.stop(); meter = null; try { micStream?.getTracks().forEach(t => t.stop()); } catch { } try { ctx?.close(); } catch { } try { wake?.release(); } catch { } try { clockWs?.close(); } catch { } endSession(); };
   const d = dialog('Calibrate speaker delay', body, [], { onClose: () => { cleanup(); refresh && refresh(); } });
   if (zones.length < 2) { body.replaceChildren(h('p', null, 'You need at least two connected devices: one is the reference (the one you leave alone) and the other is measured against it.'), h('p', { class: 'dim' }, 'You can still type a delay by hand: open a device (tap its name) and use Delay → Save.')); return; }
 
   const secure = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
-  const st = { mode: 'phone', ref: presetZoneId ? (zones.find(z => z.id !== presetZoneId)?.id ?? zones[0].id) : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id), sel: new Set(presetZoneId ? [presetZoneId] : zones.slice(1).map(z => z.id)), dist: 0, level: -20, same: false };
-  if (presetZoneId && presetZoneId === st.ref) st.ref = zones.find(z => z.id !== presetZoneId).id;
+  const admin = isAdmin(S), house = S.zones.find(z => z.reference) || null, mine = thisDevice(S);
+  const hold = !!(house && !house.connected);
+  if (hold) {
+    body.replaceChildren(h('div', { class: 'card', role: 'alert' }, h('h3', { class: 'amber' }, `The reference speaker “${house.name}” is offline`),
+      h('p', null, 'Calibration measures every speaker against the house reference speaker, so it must be on and connected.'),
+      h('p', { class: 'small' }, admin ? 'Turn it on, or pick another reference: Devices > Expanded > ••• > Set as reference.' : 'Turn it on, or ask an administrator to pick another reference (Devices > ••• > Set as reference).'),
+      admin ? h('div', { class: 'field' }, h('label', null, 'Use another reference for this calibration'), h('select', { onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, h('option', { value: '' }, 'Pick a speaker…'), zones.map(z => h('option', { value: z.id }, z.name)))) : null));
+  }
+  if (hold && !admin) return;
+  if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the device you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other devices'))); return; }
+  const defRef = house?.connected ? house.id : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);
+  const st = { mode: 'phone', ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), dist: 0, level: -20, same: false };
+  if (presetZoneId && presetZoneId === st.ref) { const other = zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
+  if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the house reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
 
   function intro() {
-    const refSel = h('select', { 'aria-label': 'Reference device', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name)));
+    const refSel = h('select', { 'aria-label': 'Reference device', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : ''))));
+    if (!admin) { refSel.disabled = true; refSel.title = 'Only an administrator can change the reference speaker.'; }
     const mode = h('select', { 'aria-label': 'Method', onchange: ev => { st.mode = ev.target.value; intro(); } },
       h('option', { value: 'phone', selected: st.mode === 'phone' }, 'Phone microphone (recommended)'), h('option', { value: 'same', selected: st.mode === 'same' }, 'Phone microphone — one recording per device (for phones with unreliable timing)'), h('option', { value: 'ear', selected: st.mode === 'ear' }, 'By ear (no microphone)'));
     const lvl = h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' });
@@ -29,7 +50,9 @@ export async function openCalibration(S, refresh, presetZoneId) {
         h('ul', { class: 'small dim' }, h('li', null, 'Put the phone about 1–2 m from the speaker being measured, and keep the house quiet.'), h('li', null, 'Keep this screen on; the sound is quiet and takes about a minute per device.'), h('li', null, 'The reference device is not changed.'))),
       h('div', { class: 'field' }, h('label', null, 'Method'), mode),
       h('div', { class: 'field' }, h('label', null, 'Reference device (left as it is)'), refSel),
-      h('div', { class: 'field' }, h('label', null, 'Devices to calibrate'), zones.filter(z => z.id !== st.ref).map(z => h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), onchange: ev => ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id) }), z.name, h('span', { class: 'small dim' }, z.outputs.find(o => o.active)?.label ?? '')))),
+      h('div', { class: 'field' }, h('label', null, 'Devices to calibrate'), zones.filter(z => z.id !== st.ref).map(z => { const own = admin || z.id === mine?.id; return h('label', { class: 'row' + (own ? '' : ' ro'), title: own ? '' : 'Only an administrator can calibrate other devices.' }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), disabled: !own, onchange: ev => ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id) }), z.name, h('span', { class: 'small dim' }, z.outputs.find(o => o.active)?.label ?? '')); }),
+        admin ? null : h('p', { class: 'small dim' }, 'You can calibrate the device you are using; the result is saved only to it.')),
+      h('p', { class: 'small dim' }, 'The music pauses while calibrating and plays again when you finish or cancel.'),
       st.mode !== 'ear' ? h('div', { class: 'field' }, h('label', null, 'Test sound level'), lvl) : null,
       h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn primary', onclick: () => { st.sel.delete(st.ref); if (!st.sel.size) return toast('Choose at least one device to calibrate.', true); st.mode === 'ear' ? ear() : phone(); } }, 'Start')));
   }
@@ -95,16 +118,18 @@ export async function openCalibration(S, refresh, presetZoneId) {
       mark('audio', 'ok', `${ctx.sampleRate} Hz, ${recorder.kind}`);
       // 4. clock
       mark('clock', 'run'); status.textContent = 'Syncing the phone clock with the server…';
-      const off = await syncClock(); track(`clock ok rtt ${off.rttMs.toFixed(1)}ms n=${off.n}`);
+      let off = await syncClock(); track(`clock ok rtt ${off.rttMs.toFixed(1)}ms n=${off.n}`);
       mark('clock', 'ok', `round trip ${off.rttMs.toFixed(1)} ms`);
       if (off.rttMs > 60) note('The Wi-Fi round trip is slow; the result may be less exact.', true);
       const serverUsNow = () => performance.now() * 1000 + off.offsetUs;
       let sess, pat;
       try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: st.mode === 'same' ? 'same-recording' : 'phone', referenceZoneId: st.ref, micSource: 'phone', micProcessing: rawOk ? 'raw' : 'processed' } }); pat = await api('/calibration/pattern'); }
       catch (e) { throw new CalError('SESSION_FAILED', e.message); }
-      const sid = sess.id;
+      const sid = sess.id; sessionId = sid; note('The music is paused while calibrating.');
 
       const record = async (playPath, playBody, lengthMsFn, cap) => {
+        // 0.2.0 item 29: re-sync the clock before EVERY recording (Wi-Fi timing drifts while you walk around)
+        try { const o2 = await syncClock(); off = o2; track(`resync rtt ${o2.rttMs.toFixed(1)}ms n=${o2.n}`); } catch (e) { if (e instanceof CalError && e.code === 'CLOCK_UNSTABLE') throw new CalError('WIFI_UNSTABLE', e.detail); throw e; }
         recorder.start(); await sleep(400);
         const play = await api(playPath, { method: 'POST', body: playBody }).catch(e => { throw new CalError('SESSION_FAILED', e.message); });
         const wait = Math.max(0, (play.atUs - serverUsNow()) / 1000) + lengthMsFn(play) + 1500;
@@ -123,18 +148,22 @@ export async function openCalibration(S, refresh, presetZoneId) {
         plan.push({ label: 'Reference device again (drift check)', kind: 'ref-end', zone: st.ref });
       } else for (const z of zones.filter(z => st.sel.has(z.id))) for (let i = 0; i < 3; i++) plan.push({ label: `${z.name} with reference (${i + 1}/3)`, kind: 'pair', zone: z.id });
       mark('heard', 'run');
-      let done = 0, failed = 0, heard = 0;
+      let done = 0, failed = 0, heard = 0, lastZone = null;
+      const nameOf = id => zones.find(z => z.id === id)?.name || 'the next speaker';
       for (const r of plan) {
-        if (stop) return; status.textContent = `Measuring: ${r.label}`;
+        if (stop) return;
+        // 0.2.0 item 29: walk pause - before each new speaker (and before the reference drift check), wait for Continue with a live Wi-Fi meter
+        if (r.zone !== lastZone) { await walkPause(nameOf(r.zone), lastZone == null, status); if (stop) return; lastZone = r.zone; }
+        status.textContent = `Measuring: ${r.label}`;
         let res;
         try {
           res = r.kind === 'pair'
             ? await record(`/calibration/sessions/${sid}/play-pair`, { zoneId: r.zone, levelDb: st.level }, p => (p.gapSec * 1000) + p.patternMs, r)
             : await record(`/calibration/sessions/${sid}/play`, { kind: r.kind, zoneId: r.zone, distanceM: st.dist, levelDb: st.level }, p => p.patternMs, r);
-        } catch (e) { if (e instanceof CalError && ['SCREEN_HIDDEN', 'MIC_SILENT', 'SESSION_FAILED'].includes(e.code)) return fail('heard', e); res = { ok: false, note: e.message }; }
+        } catch (e) { if (e instanceof CalError && ['SCREEN_HIDDEN', 'MIC_SILENT', 'SESSION_FAILED', 'WIFI_UNSTABLE', 'CLOCK_TIMEOUT', 'CLOCK_WS_FAILED'].includes(e.code)) return fail(e.code === 'WIFI_UNSTABLE' || e.code.startsWith('CLOCK') ? 'clock' : 'heard', e); res = { ok: false, note: e.message }; }
         done++; bar.value = done / plan.length * 100; track(`${r.label}: ${res.ok ? 'heard' : res.note}`);
         if (res.ok) { heard++; note(`${r.label}: heard it (confidence ${(res.confidence * 100).toFixed(0)}%).`); } else { failed++; note(`${r.label}: ${res.note}`, true); }
-        await sleep(600);
+        await sleep(300);
       }
       micStream.getTracks().forEach(t => t.stop()); micStream = null; recorder.close();
       document.removeEventListener('visibilitychange', onVis);
@@ -172,6 +201,36 @@ export async function openCalibration(S, refresh, presetZoneId) {
     return { kind, start() { blocks = []; total = 0; first = null; on = true; }, async stop() { await sleep(120); on = false; return finish(); }, close() { try { sp.disconnect(); src.disconnect(); mute.disconnect(); } catch { /* closed */ } } };
   }
 
+  /** "Move the phone near <speaker>, then tap Continue" + a live Wi-Fi stability meter (clock round trips every 300 ms). */
+  function walkPause(name, first, status) {
+    return new Promise(resolve => {
+      status.textContent = '';
+      const bars = h('span', { class: 'wifimeter', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')), txt = h('span', { class: 'small' }, 'Checking the Wi-Fi…');
+      const go = h('button', { class: 'btn primary', onclick: () => { meter?.stop(); meter = null; box.remove(); resolve(); } }, 'Start recording anyway');
+      const box = h('div', { class: 'card walk', role: 'group', 'aria-label': 'Move the phone' },
+        h('h3', null, `${first ? 'Hold' : 'Move'} the phone near ${name}, then tap Continue`),
+        h('p', { class: 'small dim' }, 'Stand still about 1-2 m from the speaker. Recording starts when you tap the button.'),
+        h('div', { class: 'row', style: 'gap:8px' }, bars, txt), h('div', { class: 'row' }, h('span', { class: 'grow' }), go));
+      body.insertBefore(box, body.children[1] || null);
+      meter?.stop(); meter = wifiMeter(stats => {
+        const w = wifiStability(stats.rtts);
+        bars.dataset.level = String(w.level); txt.textContent = w.text;
+        go.textContent = w.stable ? 'Wi-Fi is stable here, start recording' : 'Start recording anyway';
+        go.classList.toggle('primary', true);
+      });
+    });
+  }
+  /** Live round trips over the clock socket for the meter (never used for the timing itself). */
+  function wifiMeter(onStats) {
+    let ws = null, seq = 0, timer = 0, closed = false; const rtts = [], sent = new Map();
+    openOnce('/ws/clock', { timeoutMs: 6000 }).then(w => {
+      if (closed) { try { w.close(); } catch { /* ok */ } return; }
+      ws = w; ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch { return; } if (m.type !== 'clock.pong' || !sent.has(m.seq)) return; rtts.push(performance.now() - sent.get(m.seq)); sent.delete(m.seq); if (rtts.length > 12) rtts.shift(); onStats({ rtts: [...rtts], lost: sent.size }); };
+      timer = setInterval(() => { try { const i = seq++; sent.set(i, performance.now()); ws.send(JSON.stringify({ type: 'clock.ping', seq: i, t0: performance.now() * 1000 })); for (const [k, t] of sent) if (performance.now() - t > 1500) { sent.delete(k); rtts.push(1500); if (rtts.length > 12) rtts.shift(); } } catch { /* closed */ } }, 300);
+    }).catch(() => onStats({ rtts: [1500, 1500, 1500], lost: 3 }));
+    return { stop() { closed = true; clearInterval(timer); try { ws?.close(); } catch { /* ok */ } } };
+  }
+
   async function syncClock() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     let ws; try { ws = await openOnce('/ws/clock', { timeoutMs: 6000 }); } catch (e) { throw new CalError(e.message === 'timed out' ? 'CLOCK_TIMEOUT' : 'CLOCK_WS_FAILED', e.message === 'timed out' ? 'open timed out' : 'WebSocket error before open (' + proto + ')'); }
@@ -198,24 +257,25 @@ export async function openCalibration(S, refresh, presetZoneId) {
         : h('p', { class: 'err' }, 'Nothing could be measured.'),
       fin.messages.length ? h('ul', { class: 'small amber' }, fin.messages.map(m => h('li', null, m))) : null,
       failed ? h('p', { class: 'small dim' }, `${failed} test sound(s) were not heard. Moving the phone closer, turning the device up or quieting the house usually fixes it.`) : null,
-      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => intro() }, 'Redo'), h('span', { class: 'grow' }),
-        h('button', { class: 'btn primary', disabled: !props.some(p => p.commit), onclick: async () => { try { const r = await api(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...checks].filter(([, v]) => v).map(([k]) => k) } }); toast(`Saved ${r.saved} device(s).`); d.close(); } catch (e) { toast(e.message, true); } } }, 'Save delays')));
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { endSession(); intro(); } }, 'Redo'), h('span', { class: 'grow' }),
+        h('button', { class: 'btn primary', disabled: !props.some(p => p.commit), onclick: async () => { try { const r = await api(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...checks].filter(([, v]) => v).map(([k]) => k) } }); toast(`Saved ${r.saved} device(s).${r.skipped ? ` ${r.skipped} skipped (only your own device is saved).` : ''}`); sessionId = null; d.close(); } catch (e) { toast(e.message, true); } } }, 'Save delays')));
   }
 
   // ------------------------------------------------------------ by ear (no microphone, works on http)
-  function ear() {
-    const zs = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref); const refZ = zones.find(z => z.id === st.ref); let i = 0;
+  async function ear() {
+    const zs = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref && (admin || z.id === mine?.id)); const refZ = zones.find(z => z.id === st.ref); let i = 0;
+    try { const sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'ear', referenceZoneId: st.ref } }); sessionId = sess.id; } catch (e) { toast(e.message, true); }   // pauses the music
     const show = () => {
-      const z = zs[i]; if (!z) { d.close(); return; }
+      const z = zs[i]; if (!z) { endSession(); d.close(); return; }
       const base = refZ.outputs.find(o => o.active)?.latencyMs ?? 0, out = z.outputs.find(o => o.active);
-      const ms = h('input', { type: 'range', min: 0, max: 600, step: 1, value: 0, 'aria-label': 'Extra delay', oninput: ev => { n.value = ev.target.value; } });
-      const n = h('input', { type: 'number', min: 0, max: 1500, value: 0, style: 'width:90px', oninput: ev => { ms.value = ev.target.value; } });
+      const ms = h('input', { type: 'range', min: 0, max: 1000, step: 1, value: 0, 'aria-label': 'Extra delay', oninput: ev => { n.value = ev.target.value; } });
+      const n = h('input', { type: 'number', min: 0, max: 1000, value: 0, style: 'width:90px', oninput: ev => { ms.value = ev.target.value; } });
       body.replaceChildren(h('h3', null, `${z.name} (${i + 1}/${zs.length})`), h('p', { class: 'dim' }, `Press “Play”. You hear a short tick pattern from ${refZ.name} and from ${z.name}. Move the slider until both sound like a single sound, with no echo.`),
-        h('div', { class: 'row' }, ms, n, 'ms'), h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', onclick: async () => { try { await api('/calibration/ear/play', { method: 'POST', body: { referenceZoneId: st.ref, deviceZoneId: z.id, candidateMs: +n.value } }); } catch (e) { toast(e.message, true); } } }, '▶ Play'),
+        h('div', { class: 'row' }, ms, n, 'ms'), h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', onclick: async () => { try { await api('/calibration/ear/play', { method: 'POST', body: { referenceZoneId: st.ref, deviceZoneId: z.id, candidateMs: +n.value, sessionId } }); } catch (e) { toast(e.message, true); } } }, '▶ Play'),
           h('button', { class: 'btn', onclick: async () => { try { await api(`/outputs/${encodeURIComponent(out.deviceId)}/latency`, { method: 'PUT', body: { latencyMs: base + +n.value, playerId: z.playerId, method: 'ear' } }); toast(`${z.name}: ${Math.round(base + +n.value)} ms saved`); i++; show(); } catch (e) { toast(e.message, true); } } }, 'Save & next'),
           h('button', { class: 'btn', onclick: () => { i++; show(); } }, 'Skip')));
     };
     show();
   }
-  intro();
+  if (!hold) intro();
 }

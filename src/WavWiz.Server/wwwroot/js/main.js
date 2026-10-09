@@ -4,7 +4,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel } from './devices.js';
+import { devicesView, devicesPanel, nextSize, saveDevSize, loadDevSize } from './devices.js';
 import { listTable } from './listtable.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
@@ -106,7 +106,7 @@ let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, co
 async function startMain() {
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
@@ -118,7 +118,7 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleDev: f => toggleDev(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['finder', 'Finder'], ['scenes', 'Scenes'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
@@ -129,8 +129,9 @@ async function startMain() {
   const colBtn = h('button', { class: 'plus', 'aria-label': 'Collapse or expand the library', 'aria-expanded': String(!libC0), title: 'Collapse / expand the library', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
   libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, h('div', { class: 'pane-h' }, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), colBtn), h('div', { class: 'libbody' }, libC.el));
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
-  desk = h('div', { class: 'desk' + (localStorage.getItem('wavwiz.libcollapsed') === '1' ? ' libcollapsed' : '') + (localStorage.getItem('wavwiz.devcollapsed') === '1' ? ' devcollapsed' : '') + (localStorage.getItem('wavwiz.listcollapsed') === '1' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el);
-  devp.setCollapsed?.(desk.classList.contains('devcollapsed')); listt.setCollapsed?.(desk.classList.contains('listcollapsed'));
+  const dsz = loadDevSize();
+  desk = h('div', { class: 'desk' + (localStorage.getItem('wavwiz.libcollapsed') === '1' ? ' libcollapsed' : '') + (dsz === 'collapsed' ? ' devcollapsed' : dsz === 'expanded' ? ' devexpanded' : '') + (localStorage.getItem('wavwiz.listcollapsed') === '1' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
+  listt.setCollapsed?.(desk.classList.contains('listcollapsed'));
   tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
@@ -146,8 +147,19 @@ async function startMain() {
 function toggleLib(force) { const c = force ?? !desk.classList.contains('libcollapsed'); desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ } const b = libpanel.querySelector('.plus'); b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); if (!c) libC.reload(); }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
 function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); try { localStorage.setItem('wavwiz.listcollapsed', c ? '1' : '0'); } catch { /* ignore */ } listt.setCollapsed?.(c); if (!c) setTimeout(() => listt.relayout?.(), 340); }
-/** 0.0.8: the right-hand Devices & zones panel collapses to a thin strip with its arrow (mirrors the Library panel); saved per device. */
-function toggleDev(force) { const c = force ?? !desk.classList.contains('devcollapsed'); desk.classList.toggle('devcollapsed', c); try { localStorage.setItem('wavwiz.devcollapsed', c ? '1' : '0'); } catch { /* ignore */ } devp.setCollapsed?.(c); if (!c) devp.draw(); }
+/** 0.2.0 item 27: the Devices panel has three sizes - Collapsed (46 px strip) / Standard / Expanded (card grid over the Now Playing column,
+ * with the full-width Now Playing bar). The › arrow and Devices > Devices & zones cycle them; toggleDev(true/false) still collapses / restores. */
+function toggleDev(force) {
+  if (force === true) return setDevSize('collapsed');
+  if (force === false) return setDevSize(devp.size === 'collapsed' ? 'standard' : devp.size);
+  setDevSize(nextSize(devp.size));
+}
+function setDevSize(sz, highlight = null) {
+  if (sz === 'expanded' && desk.classList.contains('libexpanded')) toggleLibExpanded?.(false);
+  desk.classList.toggle('devcollapsed', sz === 'collapsed'); desk.classList.toggle('devexpanded', sz === 'expanded');
+  saveDevSize(sz); devp.setSize(sz, highlight); setTimeout(() => nowc.viz?.resize?.(), 340);
+}
+let toggleLibExpanded = null;
 
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {

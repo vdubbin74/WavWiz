@@ -720,3 +720,80 @@ html.tv .nowcol .np-meta .npart .cover,html.tv .nowcol .cover{width:clamp(140px,
 html.tv .nowcol button,html.tv .menubar button{min-height:48px;min-width:48px;font-size:1.05rem}
 html.tv :focus-visible,html.tv button:focus,html.tv [tabindex]:focus{outline:4px solid var(--accent);outline-offset:3px;box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 30%,transparent)}
 html.tv *{transition:none!important;animation:none!important}
+
+/* 0.2.0 item 9: header status chips, "This device muted", this-device Mute (accent when on) */
+.np-ctlpanel>.pane-h{gap:10px;min-width:0}
+.np-ctlpanel>.pane-h .np-hchips{display:inline-flex;flex-wrap:nowrap;gap:10px;border:0;margin:0;padding:0;overflow:hidden;min-width:0;flex:0 1 auto}
+.np-spk{cursor:default} .np-spk:hover{color:var(--ink)}
+.np-spk.me{color:var(--accent);font-weight:600} .np-spk.me::after{content:'•';margin-left:2px;color:var(--accent)}
+.np-spk.muted .ell{text-decoration:line-through;opacity:.7}
+.np-spk.more{color:var(--dim);font-size:11px}
+.np-mutedtag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:1px 6px;flex:none}
+.np-mutedtag[hidden]{display:none}
+.tbtn.mutebtn{width:30px;height:30px;padding:0;display:inline-grid;place-items:center}
+.tbtn.mutebtn.on,.mutebtn.on{color:var(--accent);border-color:var(--accent)}
+.ro{opacity:.55;cursor:not-allowed}
+
+/* 0.2.0 items 16 + 27: full-width Now Playing bar for the expanded views */
+.npbar{display:none;grid-area:2/1/3/4;align-items:center;gap:14px;padding:6px 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);min-width:0}
+.desk.devexpanded .npbar,.desk.libexpanded .npbar{display:flex}
+.npbar .npb-art .cover{width:46px;height:46px}
+.npbar .npb-titles{min-width:0;width:clamp(120px,calc(14vw / var(--z,1)),220px)} .npbar .t1{font-weight:600} .npbar .t2{color:var(--accent);font-size:12px}
+.npbar .npb-x{display:flex;gap:8px;align-items:center} .npbar .tbtn{width:34px;height:34px} .npbar .tbtn.play{width:42px;height:42px}
+.npbar .npb-seek{flex:1;display:flex;align-items:center;gap:10px;min-width:0} .npbar .npb-seek .prog{flex:1}
+.npbar .np-elv{color:var(--accent);font-variant-numeric:tabular-nums} .npbar .np-rev{color:var(--dim);font-variant-numeric:tabular-nums}
+.npbar .npb-vol{display:flex;align-items:center;gap:8px} .npbar .npb-vol input{width:110px}
+
+/* 0.2.0 item 27: Devices - Collapsed / Standard / Expanded */
+.devpanel .segsize{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-left:4px}
+.devpanel .segsize button{font-size:10px;padding:3px 8px;border:0;background:none;color:var(--dim);cursor:pointer}
+.devpanel .segsize button.on{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);outline:1px solid var(--accent)}
+.desk.devcollapsed .devpanel .segsize{display:none}
+.devpanel:not(.expanded) .segsize{max-width:100%}
+.desk.devexpanded{--libw:46px;grid-template-columns:var(--libw) 0 minmax(0,1fr);grid-template-rows:minmax(0,1fr) 64px}
+.desk.devexpanded .nowcol,.desk.devexpanded .listpanel{display:none}
+.desk.devexpanded .devpanel{grid-area:1/2/2/4}
+.desk.devexpanded .libpanel .libbody,.desk.devexpanded .libpanel .libtitle{display:none}
+.devpanel .devbody{font-size:12.5px}
+.devpanel .dlbl{font-size:10px;letter-spacing:.08em;color:var(--dim);margin:8px 0 3px;display:flex;align-items:center;gap:6px}
+.devpanel .dlbl .pct,.dcard .dlbl .pct{color:var(--ink)}
+.dmaster{padding:8px 0 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.dvol{display:flex;align-items:center;gap:8px;min-width:0} .dvol input[type=range]{flex:1;min-width:0} .dvol .pct{width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.mutebtn{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--ink);display:inline-grid;place-items:center;padding:0;cursor:pointer;flex:none}
+.mutebtn .ic svg{width:15px;height:15px}
+.mutebtn.on{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.drow{padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.drow .dtop,.dcard .dtop{display:flex;align-items:center;gap:6px;min-width:0}
+.drow .dname{background:none;border:0;color:var(--ink);font-weight:600;padding:0;cursor:pointer;text-align:left;min-width:0}
+.drow .dname:hover{color:var(--accent)} .drow.mine .dname,.dcard.mine .dname{color:var(--accent)}
+.doutline{margin:2px 0 3px 14px} .doutline.warn{color:var(--amber,#F5A524);font-size:12px}
+.dbadge{font-size:9px;letter-spacing:.06em;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--dim);flex:none}
+.dbadge.me{border-color:var(--accent);color:var(--accent)} .dbadge.ref{border-color:var(--accent2);color:var(--accent2)}
+.dexp-top{display:flex;flex-wrap:wrap;align-items:center;gap:18px;padding:8px 0 10px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.dexp-top .dmaster{border:0;margin:0;padding:0;flex:1 1 320px;display:flex;align-items:center;gap:10px} .dexp-top .dmaster .dlbl{margin:0;white-space:nowrap} .dexp-top .dmaster .dvol{flex:1}
+.dzones{display:flex;flex-wrap:wrap;align-items:center;gap:8px} .dzones .dlbl{margin:0}
+.zchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:4px;padding:3px 8px}
+.zchip.active{border-color:var(--accent2)} .zchip .zname{background:none;border:0;color:var(--ink);cursor:pointer;padding:0;font-weight:600}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px} .dgrid.one{grid-template-columns:1fr}
+.dcard{position:relative;border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;background:var(--panel2);min-width:0}
+.dcard.off{opacity:.7}
+.dcard.hl{border-color:var(--accent2);box-shadow:inset 3px 0 0 var(--accent),0 0 0 1px var(--accent2)}
+.dcard .dmore{background:none;border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:0 6px;cursor:pointer;line-height:20px}
+.dcard .dsel{width:100%} .dcard .dsel.warn{border-color:var(--amber,#F5A524);color:var(--amber,#F5A524)}
+.dcard .dms{color:var(--accent);font-variant-numeric:tabular-nums}
+.dcard input[type=range]{width:100%}
+.dcard .dscale{display:flex;justify-content:space-between;font-size:10px}
+.dcard .chips{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.dmenu{position:absolute;right:10px;top:36px;z-index:30;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:4px;display:flex;flex-direction:column}
+.dmenu button{background:none;border:0;color:var(--ink);text-align:left;padding:7px 10px;cursor:pointer;border-radius:4px}
+.dmenu button:hover:not([disabled]){background:color-mix(in srgb,var(--accent) 15%,transparent)} .dmenu button.err{color:var(--accent)}
+.dmenu hr{border:0;border-top:1px solid var(--line);margin:3px 0}
+.adminchip{font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--accent);color:var(--accent);border-radius:3px;padding:1px 7px;margin:0 6px}
+.adminchip[hidden]{display:none}
+.gs-step .mark{display:inline-grid;place-items:center}
+/* 0.2.0 item 29: walk pause + Wi-Fi meter */
+.card.walk{border-color:var(--accent2)}
+.wifimeter{display:inline-flex;align-items:flex-end;gap:2px;height:16px}
+.wifimeter i{width:4px;background:var(--line);border-radius:1px} .wifimeter i:nth-child(1){height:25%} .wifimeter i:nth-child(2){height:50%} .wifimeter i:nth-child(3){height:75%} .wifimeter i:nth-child(4){height:100%}
+.wifimeter[data-level="1"] i:nth-child(-n+1),.wifimeter[data-level="2"] i:nth-child(-n+2){background:var(--amber)}
+.wifimeter[data-level="3"] i:nth-child(-n+3),.wifimeter[data-level="4"] i{background:var(--green)}

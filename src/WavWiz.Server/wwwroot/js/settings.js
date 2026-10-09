@@ -46,7 +46,7 @@ export async function openSettings(S, refresh, nav, section) {
       nav ? h('button', { class: 'btn', onclick: () => { d.close(); nav('diag'); } }, 'Open Diagnostics') : null));
 
     panes.devices.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
-      h('p', { class: 'dim small' }, 'A phone only allows its microphone (speaker calibration) and reliable audio (phone as a device) on a trusted HTTPS page. WavWiz makes its own small certificate that is valid only for this PC\'s address. Install it once on each phone.'),
+      h('p', { class: 'dim small' }, 'A phone only allows its microphone (speaker calibration) and reliable sound when it plays as a speaker on a trusted HTTPS page. WavWiz makes its own small certificate that is valid only for this PC\'s address. Install it once on each phone.'),
       st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'HTTPS is on.'),
         h('div', { class: 'row wrap', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: '/tls/qr.svg?to=setup', alt: 'QR code for the phone set-up page', width: 200, height: 200 })),
           h('div', { class: 'grow' }, h('p', null, h('b', null, 'On the phone: '), 'point the camera at the code and tap the link. It shows the steps (about two minutes) and checks they worked.'),

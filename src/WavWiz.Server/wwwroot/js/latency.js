@@ -1,11 +1,11 @@
 import { h } from './util.js';
 
 /**
- * 0.0.8: per-device delay control. A slider (0-1000 ms in 5 ms steps) kept in sync with the ms box (0-2000 ms, 1 ms steps)
+ * 0.0.8: per-device delay control. A slider (0-1000 ms in 5 ms steps) kept in sync with the ms box (0-1000 ms since 0.2.0, 1 ms steps)
  * and -/+ buttons for 1 ms fine-tuning. Changes apply live while you drag (debounced) and once more when you let go.
  * onChange(ms, final) - final is true on release / typed value / button press.
  */
-export const LAT_MAX_SLIDER = 1000, LAT_STEP = 5, LAT_MAX = 2000;
+export const LAT_MAX_SLIDER = 1000, LAT_STEP = 5, LAT_MAX = 1000;     // 0.2.0: the UI range is 0-1000 ms everywhere (the API still accepts up to 2000)
 export const clampMs = v => Math.max(0, Math.min(LAT_MAX, Math.round(Number.isFinite(+v) ? +v : 0)));
 
 export function latencyControl({ value = 0, onChange = () => {}, label = 'Delay', liveMs = 220 } = {}) {
