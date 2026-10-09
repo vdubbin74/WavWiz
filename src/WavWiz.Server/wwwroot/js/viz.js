@@ -69,6 +69,8 @@ function feedSub(v) {
     onClose: () => { feed.audible = false; } });
 }
 function feedUnsub(v) { feed.subs.delete(v); if (!feed.subs.size && feed.live) { feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; } }
+/** 0.2.1 F12: the Sound (EQ) spectrum glow reads the same shared feed. onFrame(waveBytes|null, audible); returns an unsubscribe function. */
+export function spectrumTap(onFrame) { const sub = { kick: () => onFrame(feed.win, feed.audible) }; feedSub(sub); return () => feedUnsub(sub); }
 
 export const live = new Set();          // running controllers, read by Diagnostics
 export function vizStats() { const v = [...live].find(x => !x.preview) || [...live][0]; return v ? v.stats() : null; }

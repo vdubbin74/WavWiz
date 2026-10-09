@@ -112,7 +112,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.match(st, /\['appearance', 'Appearance'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n\];/);
   assert.doesNotMatch(st, /'about'|id: 'sec-status'/);
   assert.match(dg, /id: 'sec-status'/);
-  assert.match(ap, /theme\.el, viz\.el, np\.el, disp\.el/);
+  assert.match(ap, /theme\.el, viz\.el, np\.el, eqs\.el, disp\.el/);
   assert.match(st, /panes\.library\.push\(libViewCard\(\)\);/);
   for (const t of ["'Default view'", "'Tile size'", "'Default sort'", "'Remember view per tab'", "'Reset to defaults'", "'wavwiz:libprefs'"]) assert.ok(st.includes(t), t);
   assert.match(main, /\[\['mine', 'My stations'\], \['finder', 'Radio finder'\]\]/);
@@ -146,4 +146,28 @@ test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song l
   assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, h\('span', \{ class: 'grow' \}\), h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
   assert.match(n, /h\('div', \{ class: 'np-vol' \}, eqBtn\)\)\)/);
+});
+
+test('0.2.1 F12: three EQ looks over the same DSP; LED bars default; ±12 dB in 0.5 dB steps; keys/drag/wheel; glow 50 % default; Save asks a name', async () => {
+  const m = await imp('eqstyle');
+  assert.deepEqual(m.EQ_STYLES.map(s => s[0]), ['led', 'faders', 'curve']);
+  assert.deepEqual(m.EQ_STYLES.map(s => s[1]), ['LED bars', 'Studio faders', 'Spectrum curve']);
+  const st = memStore();
+  assert.deepEqual(m.loadEqPrefs(st), { style: 'led', glow: 50 });
+  m.saveEqPrefs({ style: 'curve', glow: 140 }, st); assert.deepEqual(m.loadEqPrefs(st), { style: 'curve', glow: 100 });
+  m.saveEqPrefs({ style: 'nope', glow: -5 }, st); assert.deepEqual(m.loadEqPrefs(st), { style: 'led', glow: 0 });
+  assert.equal(m.snapDb(3.26), 3.5); assert.equal(m.snapDb(30), 12); assert.equal(m.snapDb(-30), -12); assert.equal(m.snapDb(-0.1), 0);
+  assert.equal(m.fracToDb(0), 12); assert.equal(m.fracToDb(1), -12); assert.equal(m.fracToDb(0.5), 0); assert.equal(m.dbToFrac(6), 0.25);
+  assert.equal(m.keyStep('ArrowUp', 2), 2.5); assert.equal(m.keyStep('ArrowDown', -12), -12); assert.equal(m.keyStep('PageUp', 11), 12); assert.equal(m.keyStep('Home', 0), 12); assert.equal(m.keyStep('x', 0), null);
+  assert.deepEqual(m.EQ_BANDS, [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);
+  assert.ok(Math.abs(m.colX(31) - 0.05) < 1e-9 && Math.abs(m.colX(16000) - 0.95) < 1e-9);
+  assert.deepEqual(m.glowWords('curve'), ['Spectrum glow', 'Brightness of the live-music fill']);
+  const r = m.approxResponse(m.EQ_EXAMPLE, 40); assert.equal(r.hz.length, 40); assert.ok(r.db.every(Number.isFinite));
+  const v = src('eqview.js'), e = src('eq.js'), ap = src('appearance.js');
+  assert.match(v, /role: 'slider'/); assert.match(v, /addEventListener\('wheel'/); assert.match(v, /setPointerCapture/); assert.match(v, /ArrowLeft' \|\| ev\.key === 'ArrowRight'/);
+  assert.match(v, /dbToFrac\(r\.db\[k\] - pg\)/, 'the curve overlay shows the EQ shape (pre-gain added back)');
+  assert.match(e, /\/dsp\/preview/); assert.match(e, /\/dsp\/response/); assert.match(e, /'Save as a new preset'/); assert.doesNotMatch(e, /'aria-label': 'Preset name', oninput/);
+  for (const t of ["'Auto pre-gain'", "'Loudness'", "'Limiter'", "'Bypass'", "'Flat'", "'Revert'", "'Save & use on this speaker'", "'Previewing live'"]) assert.ok(e.includes(t), t);
+  assert.match(ap, /'EQ style'/); assert.match(ap, /interactive: false/);
+  assert.match(src('viz.js'), /export function spectrumTap\(onFrame\)/);
 });

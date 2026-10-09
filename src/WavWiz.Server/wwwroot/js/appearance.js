@@ -6,6 +6,8 @@ import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 import { vizPrefs, saveVizPrefs, ENGINES } from './viz.js';
 import { visualizerView } from './vizpage.js';
 import { themeCard } from './themes.js';
+import { EQ_STYLES, EQ_EXAMPLE, loadEqPrefs, saveEqPrefs } from './eqstyle.js';
+import { eqArea } from './eqview.js';
 
 /** Visualizer card: the active look as a dropdown + "Looks…" which unfolds the full gallery (live previews, colors, energy) in place. */
 function vizCard(openLooks) {
@@ -53,6 +55,23 @@ function npStyleCard(preview) {
   return { el: box, reload: draw };
 }
 
+/** 0.2.1 F12: EQ style (this device) - LED bars (default), Studio faders, Spectrum curve - with a small still preview of the Sound (EQ) area. */
+function eqStyleCard() {
+  const box = h('div', { class: 'card', id: 'sec-eqstyle' });
+  let prev = null;
+  function draw() {
+    const p = loadEqPrefs();
+    prev?.destroy(); prev = eqArea({ style: p.style, gains: [...EQ_EXAMPLE], glow: p.glow, interactive: false });
+    box.replaceChildren(h('h3', null, 'EQ style'),
+      h('p', { class: 'dim small' }, 'How the Sound (EQ) window looks on this device. All three set the same 10-band EQ.'),
+      h('div', { class: 'row wrap', role: 'group', 'aria-label': 'EQ style' }, EQ_STYLES.map(([id, name, tip]) =>
+        h('button', { class: 'chipbtn' + (p.style === id ? ' on' : ''), 'aria-pressed': String(p.style === id), title: tip, 'data-eqstyle': id, onclick: () => { saveEqPrefs({ ...loadEqPrefs(), style: id }); draw(); } }, name))),
+      h('div', { class: 'eqprevbox', 'aria-label': 'Preview of the EQ style' }, h('div', { class: 'npprev-h' }, h('span', { class: 'npprev-live' }, h('i', { 'aria-hidden': 'true' }), 'PREVIEW'), h('span', { class: 'grow' }), h('span', { class: 'npprev-ex' }, 'EXAMPLE DATA')), prev.el));
+  }
+  draw();
+  return { el: box, reload: draw };
+}
+
 function displaySizeCard() {
   const box = h('div', { class: 'card', id: 'sec-display' });
   function draw() {
@@ -67,8 +86,8 @@ function displaySizeCard() {
 
 /** The whole Appearance pane. `opts.looks` unfolds the visualizer gallery (the panel's Looks button); `opts.preview` builds the F9 strip. */
 export function appearancePane(opts = {}) {
-  const theme = themeCard(), viz = vizCard(opts.looks), np = npStyleCard(opts.preview?.() || null), disp = displaySizeCard();
-  const el = h('div', { class: 'appearance' }, theme.el, viz.el, np.el, disp.el,
+  const theme = themeCard(), viz = vizCard(opts.looks), np = npStyleCard(opts.preview?.() || null), eqs = eqStyleCard(), disp = displaySizeCard();
+  const el = h('div', { class: 'appearance' }, theme.el, viz.el, np.el, eqs.el, disp.el,
     h('p', { class: 'small dim setfoot' }, 'Changes save automatically and apply to this device only.'));
-  return { el, hide: viz.hide, theme, viz, np, disp };
+  return { el, hide: viz.hide, theme, viz, np, eqs, disp };
 }
