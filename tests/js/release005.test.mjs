@@ -20,7 +20,7 @@ test('0.0.5/0.1.2 themes: Midnight Neon default; charcoal/steel/midnight removed
   assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
   assert.equal(theme.PRESETS.default.accent, '#FF3C00');
   assert.ok(!theme.PRESETS.charcoal);
-  assert.ok(!theme.PRESETS.steel);
+  assert.equal(theme.PRESETS.steel.name, 'Blue Steel');   // 0.2.0: the gray Steel stays gone; Blue Steel (option B) is new
   assert.ok(!theme.PRESETS.midnight);
   assert.ok(theme.PRESETS.ember && theme.PRESETS.arctic && theme.PRESETS.pepecoin && theme.PRESETS.violet);
 });

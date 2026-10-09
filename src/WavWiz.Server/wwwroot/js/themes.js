@@ -1,4 +1,4 @@
-// Themes page: five presets + custom Background / Accent / Text. Saved on this device.
+// Themes page: ten presets + custom Background / Main / Second / Text (0.2.0 items 4-7). Saved on this device.
 import { h, toast } from './util.js';
 import { PRESETS, loadTheme, saveTheme, resetTheme, applyTheme, isHex, derive, defaultInk } from './theme.js';
 
@@ -30,16 +30,15 @@ export function themesView() {
       root.querySelectorAll('.themecard.on').forEach(c => c.classList.remove('on'));
     } }), label);
     root.replaceChildren(
-      h('p', { class: 'dim small' }, 'Tap a theme to use it on this phone or PC. Midnight Neon is the default. Custom themes use Background, Accent and Text — everything else is derived. Visualizers follow the theme unless you give a look its own colors (View > Visualizer).'),
+      h('p', { class: 'dim small' }, 'Tap a theme to use it on this phone or PC. Midnight Neon is the default. Custom themes use four colors: Background, Main, Second and Text. Visualizers follow the theme unless you give a look its own colors (View > Visualizer).'),
       h('div', { class: 'themegrid' }, Object.entries(PRESETS).map(([id, p]) => previewCard(id, p, t.preset === id, pick))),
-      t.preset === 'pepecoin' ? h('div', { class: 'card', style: 'margin-top:12px' },
-        h('div', { class: 'row', style: 'gap:12px;align-items:center' },
-          h('img', { src: '/assets/pepecoin/P_onDark.svg', alt: '', width: 40, height: 40, style: 'flex:none' }),
-          h('div', { class: 'grow' },
-            h('b', null, 'Pepecoin'),
-            h('p', { class: 'dim small', style: 'margin:4px 0 0' }, 'Colors from the Pepecoin brand guidelines (primary #269B4D, accent #C07A4E). WavWiz is not affiliated with Pepecoin.')))) : null,
+      t.preset === 'pepecoin' ? h('div', { class: 'card pepe-note', style: 'margin-top:12px' },
+        h('img', { src: '/assets/pepecoin/P_onDark.svg', alt: 'Pepecoin logo', width: 76, height: 76, class: 'pepe-logo' }),
+        h('div', { class: 'grow' },
+          h('b', null, 'Pepecoin'),
+          h('p', { class: 'dim small', style: 'margin:4px 0 0' }, 'Colors from the Pepecoin brand guidelines (primary #269B4D, second #208241 on #212121). WavWiz is not affiliated with Pepecoin.'))) : null,
       h('div', { class: 'card' }, h('h3', null, 'Custom colors'),
-        h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Accent', t.accent), picker('ink', 'Text', inkVal)),
+        h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Main', t.accent), picker('accent2', 'Second', isHex(t.accent2) ? t.accent2 : derive(t)['--accent2']), picker('ink', 'Text', inkVal)),
         h('div', { class: 'row wrap', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: () => { const n = resetTheme(); applyTheme(n); window.dispatchEvent(new CustomEvent('wavwiz:theme')); draw(); toast('Back to Midnight Neon'); } }, 'Reset to default'))));
   }
   return { el: root, reload: draw };

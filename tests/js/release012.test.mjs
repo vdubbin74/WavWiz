@@ -14,7 +14,7 @@ const theme = await imp('theme');
 const art = await imp('art');
 
 test('0.1.2 five theme presets; Violet Pulse + Pepecoin; custom knobs are bg/accent/ink', () => {
-  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet']);
+  assert.deepEqual(Object.keys(theme.PRESETS).slice(0, 5), ['default', 'ember', 'arctic', 'pepecoin', 'violet']);   // 0.2.0 adds five more
   assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
   assert.equal(theme.PRESETS.violet.name, 'Violet Pulse');
   assert.equal(theme.PRESETS.violet.bg.toUpperCase(), '#1A1028');
@@ -22,7 +22,7 @@ test('0.1.2 five theme presets; Violet Pulse + Pepecoin; custom knobs are bg/acc
   assert.equal(theme.PRESETS.violet.ink.toUpperCase(), '#F5F3FF');
   assert.equal(theme.PRESETS.violet.accent2.toUpperCase(), '#C084FC');
   assert.equal(theme.PRESETS.pepecoin.accent.toUpperCase(), '#269B4D');
-  assert.equal(theme.PRESETS.pepecoin.accent2.toUpperCase(), '#C07A4E');
+  assert.equal(theme.PRESETS.pepecoin.accent2.toUpperCase(), '#208241');   // 0.2.0 item 7: all-green Pepecoin
   assert.equal(theme.PRESETS.pepecoin.bg.toUpperCase(), '#212121');
   assert.ok(theme.companionAccent);
   assert.ok(theme.isHex(theme.companionAccent('#FF3C00')));
@@ -30,9 +30,9 @@ test('0.1.2 five theme presets; Violet Pulse + Pepecoin; custom knobs are bg/acc
   assert.equal(d['--ink'], '#E8EDF0');
   assert.ok(theme.isHex(d['--accent2']));
   assert.match(src('themes.js'), /Background/);
-  assert.match(src('themes.js'), /['"]Accent['"]/);
+  assert.match(src('themes.js'), /['"]Main['"]/);   // 0.2.0 items 4-7: Background / Main / Second / Text
   assert.match(src('themes.js'), /['"]Text['"]/);
-  assert.doesNotMatch(src('themes.js'), /Second color/);
+  assert.match(src('themes.js'), /['"]Second['"]/);
 });
 
 test('0.1.2 removed themes migrate to Midnight Neon; Pepecoin viz gone; terrain relief stays', () => {

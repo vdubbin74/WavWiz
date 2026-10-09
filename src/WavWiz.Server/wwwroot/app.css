@@ -891,3 +891,7 @@ html.tv *{transition:none!important;animation:none!important}
   .pn-stack .pn-meta{max-width:none} .pn-stack .pn-clock{font-size:22px}
   .np-ctlpanel .np-tablevol{min-width:0}
 }
+/* 0.2.0 item 4-7: Pepecoin note - bigger logo (76px), logo wraps above the text on narrow screens */
+.pepe-note{display:flex;align-items:center;gap:14px}
+.pepe-note .pepe-logo{flex:none;width:76px;height:76px}
+@media (max-width:420px){ .pepe-note{flex-direction:column;align-items:flex-start} }

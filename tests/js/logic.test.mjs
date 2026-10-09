@@ -99,10 +99,10 @@ test('server notes and rms and detailsText', () => {
 // ---------------- theme
 test('theme: Midnight Neon default (orange #FF3C00 + teal); five presets incl. Violet Pulse; valid hex', () => {
   assert.equal(theme.PRESETS.default.accent, '#FF3C00'); assert.equal(theme.PRESETS.default.accent2.toUpperCase(), '#19C3B1'); assert.equal(theme.DEFAULT_THEME_ID, 'default'); assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
-  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet']);
+  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);   // 0.2.0 items 4-7: ten presets
   assert.equal(theme.PRESETS.violet.name, 'Violet Pulse'); assert.equal(theme.PRESETS.violet.accent.toUpperCase(), '#A855F7');
   assert.ok(!theme.PRESETS.amber, 'Classic Amber removed');
-  assert.ok(!theme.PRESETS.forest && !theme.PRESETS.synthwave && !theme.PRESETS.mono);
+  assert.ok(!theme.PRESETS.forest && !theme.PRESETS.synthwave);   // 0.2.0: Monochrome is back as an approved preset
   assert.ok(!JSON.stringify(theme.PRESETS).toLowerCase().includes('brown'));
   assert.ok(!JSON.stringify(Object.values(theme.PRESETS).map(p => p.name)).toLowerCase().includes('amber'));
   for (const p of Object.values(theme.PRESETS)) { assert.ok(theme.isHex(p.accent) && theme.isHex(p.accent2) && theme.isHex(p.bg)); }

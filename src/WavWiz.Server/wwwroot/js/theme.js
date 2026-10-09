@@ -1,18 +1,24 @@
 import { migrateKey } from './phonejoin.js';
-// Theme: five presets (Midnight Neon default, Ember, Arctic, Pepecoin, Violet Pulse); custom uses Background / Accent / Text only.
-// Secondary/highlight/muted/panel/line are derived. Color math is pure (no DOM) so it is unit-tested with node.
+// Theme: ten presets (0.2.0 items 4-7; Midnight Neon default). Custom uses four colors: Background / Main / Second / Text.
+// Panel/line/dim are derived. Color math is pure (no DOM) so it is unit-tested with node.
 export const PRESETS = {
   default:  { name: 'Midnight Neon', accent: '#FF3C00', accent2: '#19C3B1', bg: '#14171A', ink: '#E8EDF0' },
   ember:    { name: 'Ember',         accent: '#FF5A1F', accent2: '#FFB347', bg: '#160E0A', ink: '#E8EDF0' },
   arctic:   { name: 'Arctic',        accent: '#3BA7FF', accent2: '#A8E6FF', bg: '#0B1218', ink: '#E8EDF0' },
-  pepecoin: { name: 'Pepecoin',      accent: '#269B4D', accent2: '#C07A4E', bg: '#212121', ink: '#E8EDF0' },
+  pepecoin: { name: 'Pepecoin',      accent: '#269B4D', accent2: '#208241', bg: '#212121', ink: '#FFFFFF' },
   violet:   { name: 'Violet Pulse',  accent: '#A855F7', accent2: '#C084FC', bg: '#1A1028', ink: '#F5F3FF' },
+  mono:     { name: 'Monochrome',    accent: '#E8EDF0', accent2: '#9AA6AE', bg: '#0E1012', ink: '#E8EDF0' },
+  daylight: { name: 'Daylight',      accent: '#E03500', accent2: '#0E8F82', bg: '#F3F1EE', ink: '#1A1D21' },
+  nebula:   { name: 'Nebula',        accent: '#8B5CF6', accent2: '#2DD4BF', bg: '#0F0B1A', ink: '#EDE9FE' },
+  steel:    { name: 'Blue Steel',    accent: '#A9BCCF', accent2: '#5F7488', bg: '#18202A', ink: '#E3EAF2' },
+  lime:     { name: 'Lime Circuit',  accent: '#A3E635', accent2: '#22D3EE', bg: '#0B120E', ink: '#ECFCCB' },
 };
 export const DEFAULT_THEME_ID = 'default';
 const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
 const migrate = () => { try { migrateKey(localStorage, 'unison.theme.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
 /** Preset ids removed in 0.1.2 theme slim-down — migrate to Midnight Neon. */
-const REMOVED = new Set(['charcoal', 'steel', 'midnight', 'forest', 'synthwave', 'mono', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown']);
+// 0.2.0: 'steel' and 'mono' are presets again (Blue Steel, Monochrome), so they no longer migrate.
+const REMOVED = new Set(['charcoal', 'midnight', 'forest', 'synthwave', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown']);
 
 export const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 export function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -69,17 +75,21 @@ export function loadTheme() {
     if (preset !== 'custom' && PRESETS[preset]) {
       return { ...PRESETS[preset], preset };
     }
-    // custom: Background / Accent / Text; derive accent2
+    // custom: Background / Main / Second / Text. Old three-color saves (before 0.2.0, or the 0.1.2-0.1.4 saves whose second was
+    // always derived) get their second derived once and written back, so it is a stored color from then on.
     const ink = isHex(saved.ink) ? saved.ink.toUpperCase() : defaultInk(saved.bg.toUpperCase());
     const accent = saved.accent.toUpperCase(), bg = saved.bg.toUpperCase();
-    return { ...base, accent, bg, ink, accent2: companionAccent(accent), preset: 'custom' };
+    const own = saved.v === 4 && isHex(saved.accent2);
+    const t = { ...base, accent, bg, ink, accent2: own ? saved.accent2.toUpperCase() : companionAccent(accent), preset: 'custom' };
+    if (!own) saveTheme(t);
+    return t;
   }
   return { ...base, preset: DEFAULT_THEME_ID };
 }
 export function saveTheme(t) {
   const ink = isHex(t.ink) ? t.ink : defaultInk(t.bg);
-  const accent2 = t.preset && PRESETS[t.preset] ? PRESETS[t.preset].accent2 : companionAccent(t.accent);
-  try { localStorage.setItem(KEY, JSON.stringify({ accent: t.accent, accent2, bg: t.bg, ink, preset: t.preset })); } catch { /* ignore */ }
+  const accent2 = t.preset && PRESETS[t.preset] ? PRESETS[t.preset].accent2 : isHex(t.accent2) ? t.accent2 : companionAccent(t.accent);
+  try { localStorage.setItem(KEY, JSON.stringify({ v: 4, accent: t.accent, accent2, bg: t.bg, ink, preset: t.preset })); } catch { /* ignore */ }
 }
 export function resetTheme() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } return loadTheme(); }
 

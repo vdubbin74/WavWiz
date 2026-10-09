@@ -11,7 +11,7 @@ test('0.0.4/0.1.2 themes: Midnight Neon default, Classic Amber gone, five preset
   assert.equal(theme.PRESETS.default.name, 'Midnight Neon');
   assert.equal(theme.PRESETS.default.accent, '#FF3C00');
   assert.ok(!theme.PRESETS.amber);
-  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet']);
+  assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'ember', 'arctic', 'pepecoin', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);   // 0.2.0 items 4-7
   for (const k of ['default', 'ember', 'arctic', 'pepecoin', 'violet']) assert.ok(theme.isHex(theme.PRESETS[k].accent));
 });
 

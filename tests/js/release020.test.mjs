@@ -172,3 +172,24 @@ test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 
   for (const k of ['.pn-classic', '.pn-center', '.pn-stack', '.pn-horizon', '--fx-glow']) assert.ok(css.includes(k), k);
   assert.match(src('now.js'), /pnArt, tableMeta/);
 });
+
+test('0.2.0 items 4-7: ten presets with the agreed hexes, four-color custom, old three-color saves migrate, Pepecoin polish', async () => {
+  const theme = await imp('theme');
+  const want = { default: ['#FF3C00', '#19C3B1', '#14171A', '#E8EDF0'], ember: ['#FF5A1F', '#FFB347', '#160E0A', '#E8EDF0'], arctic: ['#3BA7FF', '#A8E6FF', '#0B1218', '#E8EDF0'],
+    pepecoin: ['#269B4D', '#208241', '#212121', '#FFFFFF'], violet: ['#A855F7', '#C084FC', '#1A1028', '#F5F3FF'], mono: ['#E8EDF0', '#9AA6AE', '#0E1012', '#E8EDF0'],
+    daylight: ['#E03500', '#0E8F82', '#F3F1EE', '#1A1D21'], nebula: ['#8B5CF6', '#2DD4BF', '#0F0B1A', '#EDE9FE'], steel: ['#A9BCCF', '#5F7488', '#18202A', '#E3EAF2'], lime: ['#A3E635', '#22D3EE', '#0B120E', '#ECFCCB'] };
+  assert.deepEqual(Object.keys(theme.PRESETS), Object.keys(want));
+  for (const [id, [a, a2, bg, ink]] of Object.entries(want)) assert.deepEqual([theme.PRESETS[id].accent, theme.PRESETS[id].accent2, theme.PRESETS[id].bg, theme.PRESETS[id].ink], [a, a2, bg, ink], id);
+  assert.equal(theme.PRESETS.steel.name, 'Blue Steel');
+  const st = memStore(); globalThis.localStorage = st;
+  try {
+    st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#112233', accent2: '#AABBCC', bg: '#000000', ink: '#FFFFFF', preset: 'custom' }));   // 0.1.x save: second was derived
+    const t = theme.loadTheme(); assert.equal(t.accent2, theme.companionAccent('#112233'));
+    assert.equal(JSON.parse(st.getItem('wavwiz.theme.v1')).v, 4, 'migrated once');
+    theme.saveTheme({ ...t, accent2: '#123456' }); assert.equal(theme.loadTheme().accent2, '#123456', 'second is stored, not derived');
+    st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#A9BCCF', bg: '#18202A', preset: 'steel' })); assert.equal(theme.loadTheme().preset, 'steel');
+  } finally { delete globalThis.localStorage; }
+  const tv = src('themes.js'); for (const l of ['Background', 'Main', 'Second', 'Text']) assert.match(tv, new RegExp(`'${l}'`));
+  assert.doesNotMatch(tv + src('theme.js'), /C07A4E/i); assert.match(tv, /width: 76, height: 76/); assert.match(tv, /not affiliated/);
+  assert.match(css, /@media \(max-width:420px\)\{ \.pepe-note\{flex-direction:column/);
+});
