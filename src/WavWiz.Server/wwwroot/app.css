@@ -1371,3 +1371,8 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .pm-status .dot.wait{background:var(--dim);animation:pmwait 1.4s ease-in-out infinite}
 @keyframes pmwait{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){ .pm-status .dot.wait{animation:none} }
+/* 0.2.2 T1: the Auto pre-gain badge gets its own line under the hint (it used to run into the Loudness switch in the LED look) */
+.eqsw-extra{display:flex;margin-top:3px;min-width:0}
+.eqsw-extra:not(:has(> :not([hidden]))){display:none}
+.eqpregain{white-space:nowrap;flex:none}
+.eqsws > .eqsw{min-width:0}

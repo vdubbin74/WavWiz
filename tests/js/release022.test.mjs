@@ -134,3 +134,10 @@ test('0.2.2 T9: Calibrate speakers offers "Use your phone as the microphone" (QR
   assert.match(t, /setTimeout\(\(\) => location\.replace\(secureHome\(\)\), 900\)/);
   assert.match(css, /\.pm-status \.dot\.ok\{/);
 });
+
+test('0.2.2 T1: the Auto pre-gain badge sits on its own line under the hint, never over the Loudness switch', () => {
+  const e = src('eq.js');
+  assert.match(e, /h\('span', null, h\('b', null, lbl\), h\('span', \{ class: 'small dim' \}, hint\), extra \? h\('span', \{ class: 'eqsw-extra' \}, extra\) : null\)/);
+  assert.match(e, /sw\('Auto pre-gain', 'Prevents clipping when boosting', \(\) => cur\.autoPreamp, v => \{ cur\.autoPreamp = v; \}, preGain\)/);
+  assert.match(css, /\.eqsw-extra\{display:flex;margin-top:3px;min-width:0\}/); assert.match(css, /\.eqpregain\{white-space:nowrap;flex:none\}/);
+});

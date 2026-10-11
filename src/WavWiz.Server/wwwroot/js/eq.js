@@ -20,7 +20,7 @@ export async function openEq(S, refresh, deviceId) {
   d.el.querySelector('header .grow')?.append(h('span', { class: 'small dim eqsub' }, 'Changes play live on the speaker you pick.'));
 
   const liveTag = h('span', { class: 'eqprev small', hidden: true }, h('i', { 'aria-hidden': 'true' }), 'Previewing live');
-  const preGain = h('span', { class: 'eqpregain', hidden: true });
+  const preGain = h('span', { class: 'eqpregain', hidden: true, title: 'Level drop applied by Auto pre-gain so boosts never clip' });
   const sync = debounce(async () => {
     try { lastResp = await api('/dsp/response', { method: 'POST', body: { preset: cur } }); area?.setResponse(lastResp); preGain.hidden = !lastResp.preGainDb; preGain.textContent = `${fmtDb(lastResp.preGainDb || 0)} dB`; } catch { area?.setResponse(null); }
     try { await api('/dsp/preview', { method: 'POST', body: { deviceId: dev, preset: cur, bypass: cur.bypass } }); previewing = true; liveTag.hidden = false; } catch (e) { toast(e.message, true); }
@@ -48,7 +48,7 @@ export async function openEq(S, refresh, deviceId) {
   };
   const sw = (lbl, hint, get, set, extra) => {
     const i = h('input', { type: 'checkbox', role: 'switch', checked: get(), 'aria-label': lbl, onchange: ev => { set(ev.target.checked); changed(); } });
-    return { el: h('label', { class: 'eqsw' }, h('span', { class: 'switch' }, i, h('span', { 'aria-hidden': 'true' })), h('span', null, h('span', { class: 'row', style: 'gap:6px' }, h('b', null, lbl), extra || null), h('span', { class: 'small dim' }, hint))), i, get };
+    return { el: h('label', { class: 'eqsw' }, h('span', { class: 'switch' }, i, h('span', { 'aria-hidden': 'true' })), h('span', null, h('b', null, lbl), h('span', { class: 'small dim' }, hint), extra ? h('span', { class: 'eqsw-extra' }, extra) : null)), i, get };   // 0.2.2 T1: a badge sits on its own line, never over the next switch
   };
   let ctl = [];
   const lower = h('div', { class: 'card eqlower' });
