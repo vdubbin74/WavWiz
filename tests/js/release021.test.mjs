@@ -32,7 +32,7 @@ test('0.2.1 F16: a silent install returns 9 (not 0) when the final setup step fa
 test('0.2.1 F1: Devices header = collapse arrow + separate Expand button (no size toggle, no cycling); Esc returns', async () => {
   const d = await imp('devices');
   assert.equal(d.nextSize, undefined); assert.equal(d.SIZE_LABEL, undefined);
-  assert.equal(d.arrowSize('standard'), 'collapsed'); assert.equal(d.arrowSize('expanded'), 'collapsed'); assert.equal(d.arrowSize('collapsed'), 'standard');
+  assert.equal(d.arrowSize('standard'), 'collapsed'); assert.equal(d.arrowSize('expanded'), 'standard'); // 0.2.2 T5: arrow while Expanded returns to normal first assert.equal(d.arrowSize('collapsed'), 'standard');
   assert.equal(d.expandSize('standard'), 'expanded'); assert.equal(d.expandSize('collapsed'), 'expanded'); assert.equal(d.expandSize('expanded'), 'standard');
   const s = src('devices.js'), m = src('main.js');
   assert.doesNotMatch(s, /segsize/); assert.doesNotMatch(css, /segsize/);

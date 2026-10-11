@@ -58,3 +58,20 @@ test('0.2.2 T3: song block (thumb, title · artist, progress + times) moves into
   assert.match(css, /\.desk\.npcollapsed \.listpanel > \.pane-h\{min-height:42px\}/);
   assert.match(css, /\.desk\.npcollapsed\.listcollapsed\{--listh:44px\}/);
 });
+
+test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expanded -> normal -> collapsed); same labels; accent title', async () => {
+  const d = await imp('devices');
+  assert.equal(d.arrowSize('expanded'), 'standard'); assert.equal(d.arrowSize('standard'), 'collapsed'); assert.equal(d.arrowSize('collapsed'), 'standard');
+  assert.equal(d.expandSize('collapsed'), 'expanded');
+  for (const w of ['Library', 'Devices']) {
+    assert.equal(d.arrowLabel(w, 'collapsed'), `Open the ${w} panel`); assert.equal(d.arrowLabel(w, 'standard'), `Collapse the ${w} panel`);
+    assert.equal(d.arrowLabel(w, 'expanded'), 'Back to the normal layout'); assert.equal(d.expandLabel(w, false), `Expand the ${w} panel`);
+  }
+  const s = src('devices.js'), m = src('main.js');
+  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)/);
+  assert.match(m, /h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
+  assert.match(m, /if \(force === undefined && exp\) \{ toggleLibExpanded\(false\); return; \}/);
+  assert.match(m, /setDevSize\(arrowSize\(devp\.size\)\)/);
+  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);
+  assert.doesNotMatch(css, /\.desk\.libexpanded \.libpanel \.pane-h \.plus:not\(\.libexp\)\{display:none\}/);
+});

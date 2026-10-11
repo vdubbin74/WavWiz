@@ -22,7 +22,13 @@ import { icon, setIcon } from './icons.js';
 // opens it, and a separate Expand button switches the wide card view on and off (Esc returns). The three states stay the model underneath.
 export const SIZES = ['collapsed', 'standard', 'expanded'];
 /** Arrow: collapsed <-> open (open = Standard). Pure. */
-export const arrowSize = s => (s === 'collapsed' ? 'standard' : 'collapsed');
+// 0.2.2 T5: one rule for Library and Devices: the arrow while Expanded first returns to the normal layout; the next press collapses.
+export const arrowSize = s => (s === 'collapsed' || s === 'expanded' ? 'standard' : 'collapsed');
+/** 0.2.2 T5: the same arrow labels for both side panels (which = 'Library' | 'Devices'). Pure. */
+export function arrowLabel(which, state) {
+  return state === 'collapsed' ? `Open the ${which} panel` : state === 'expanded' ? 'Back to the normal layout' : `Collapse the ${which} panel`;
+}
+export const expandLabel = (which, on) => (on ? 'Back to the normal layout' : `Expand the ${which} panel`);
 /** Expand button: Expanded <-> Standard (also opens a collapsed panel straight into Expanded). Pure. */
 export const expandSize = s => (s === 'expanded' ? 'standard' : 'expanded');
 const SIZE_KEY = 'wavwiz.devsize';
@@ -320,17 +326,18 @@ export function devicesPanel(S, ctl) {
   let size = loadDevSize(), hl = null, zpick = loadZonePick(), zedit = null;
   const setPick = v => { zpick = v; saveZonePick(v); draw(true); };
   const setEdit = v => { zedit = v; draw(true); };
-  const colBtn = h('button', { class: 'plus devcol', 'aria-label': 'Collapse or open the Devices panel', 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
-  const expBtn = h('button', { class: 'plus devexp', 'aria-label': 'Expand the Devices panel', 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, '⤢');
+  // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
+  const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
+  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, '⤢');
   const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
   const count = h('span', { class: 'small dim devcount' });
-  root.append(h('div', { class: 'pane-h devhead' }, colBtn, expBtn, h('span', { class: 'devtitle' }, 'DEVICES'), h('span', { class: 'grow devtitle' }), escHint, count), body);
+  root.append(h('div', { class: 'pane-h devhead' }, expBtn, colBtn, escHint, h('span', { class: 'devtitle' }, 'DEVICES'), h('span', { class: 'grow devtitle' }), count), body);
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;
     colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
-    colBtn.setAttribute('aria-label', s === 'collapsed' ? 'Open the Devices panel' : 'Collapse the Devices panel');
+    colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
     expBtn.textContent = s === 'expanded' ? '⤡' : '⤢'; expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
-    expBtn.setAttribute('aria-label', s === 'expanded' ? 'Back to the normal layout' : 'Expand the Devices panel');
+    expBtn.setAttribute('aria-label', expandLabel('Devices', s === 'expanded'));
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };

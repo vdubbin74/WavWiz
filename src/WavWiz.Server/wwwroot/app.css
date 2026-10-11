@@ -932,7 +932,7 @@ html.tv *{transition:none!important;animation:none!important}
 .desk.libexpanded .devpanel .devbody,.desk.libexpanded .devpanel .devtitle,.desk.libexpanded .devpanel .devcount,.desk.libexpanded .devpanel .devexp{display:none}
 .desk.libexpanded .devpanel .devhead{justify-content:center;padding:8px 4px}
 .desk.libexpanded .libpanel .pane-h .eschint{display:inline-block}
-.desk.libexpanded .libpanel .pane-h .plus:not(.libexp){display:none}
+/* 0.2.2 T5: the arrow stays visible while Expanded (it returns to the normal layout first), same as Devices */
 .desk.libexpanded .libpanel .libbody{overflow:hidden;display:flex;padding:6px 14px 10px}
 .lib.expanded{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 .lib.expanded .libhead{align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
@@ -1278,3 +1278,9 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .desk.npcollapsed.listcollapsed{--listh:44px}
 .np-ctlpanel.collapsed > .pane-h > .np-strip{background:none;border:0;box-shadow:none}
 .np-ctlpanel.collapsed > .pane-h > .np-ctltitle,.np-ctlpanel.collapsed > .pane-h > .listcolwrap{position:relative;z-index:1}
+/* 0.2.2 T5: Devices header = mirror image of Library (Expand on the outer edge, then the arrow, Esc hint, title); same size/spacing; accent title */
+.devpanel .devhead{gap:8px}
+.devpanel .pane-h .devexp{margin-right:4px}
+.devpanel .pane-h .eschint{margin-right:0;margin-left:4px}
+.devpanel .devhead > .devtitle:not(.grow),.libpanel .pane-h > .libtitle{color:var(--accent)}
+.desk.devexpanded .libpanel .libexp,.desk.devexpanded .libpanel .eschint{display:none} .desk.devexpanded .libpanel .pane-h{justify-content:center;padding:8px 4px} .desk.devexpanded .libpanel .pane-h .grow{display:none}

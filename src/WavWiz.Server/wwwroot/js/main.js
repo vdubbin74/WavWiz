@@ -4,7 +4,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, arrowSize, saveDevSize, loadDevSize } from './devices.js';
+import { devicesView, devicesPanel, arrowSize, arrowLabel, expandLabel, saveDevSize, loadDevSize } from './devices.js';
 import { listTable } from './listtable.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
@@ -125,9 +125,9 @@ async function startMain() {
   window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });
 
   const libC0 = localStorage.getItem('wavwiz.libcollapsed') === '1';
-  const colBtn = h('button', { class: 'plus', 'aria-label': 'Collapse or expand the library', 'aria-expanded': String(!libC0), title: 'Collapse / expand the library', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
+  const colBtn = h('button', { class: 'plus libcol', 'aria-label': arrowLabel('Library', libC0 ? 'collapsed' : 'standard'), 'aria-expanded': String(!libC0), title: 'Collapse / open the Library panel', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
   // 0.2.0 item 16: Expand button top-right of the Library header (the collapse arrow moves one slot left); the same button or Esc returns.
-  const expBtn = h('button', { class: 'plus libexp', 'aria-label': 'Expand the library', 'aria-pressed': 'false', title: 'Expanded library (Esc returns)', onclick: () => toggleLibExpanded() }, '⤢');
+  const expBtn = h('button', { class: 'plus libexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library (Esc returns)', onclick: () => toggleLibExpanded() }, '⤢');
   const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
   libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, h('div', { class: 'pane-h' }, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), escHint, colBtn, expBtn), h('div', { class: 'libbody' }, libC.el));
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
@@ -148,7 +148,19 @@ async function startMain() {
   installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
-function toggleLib(force) { const c = force ?? !desk.classList.contains('libcollapsed'); desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ } const b = libpanel.querySelector('.plus'); b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); if (!c) libC.reload(); }
+/** Library arrow (0.2.2 T5, same rule as Devices): while Expanded it first returns to the normal layout; otherwise it collapses / opens. */
+function toggleLib(force) {
+  const exp = desk.classList.contains('libexpanded');
+  if (force === undefined && exp) { toggleLibExpanded(false); return; }
+  const c = force ?? !desk.classList.contains('libcollapsed');
+  if (c && exp) toggleLibExpanded(false);
+  desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ }
+  paintLibArrow(); if (!c) libC.reload();
+}
+function paintLibArrow() {
+  const c = desk.classList.contains('libcollapsed'), x = desk.classList.contains('libexpanded'), b = libpanel.querySelector('.libcol');
+  b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); b.setAttribute('aria-label', arrowLabel('Library', c ? 'collapsed' : x ? 'expanded' : 'standard'));
+}
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
 /** 0.2.2 T3: with the Now Playing panel collapsed, the song block sits in the Playlist title bar, lined up with the control panel column
  *  (thumbnail at the column's left edge, progress ending at its right edge), never running into PLAYLIST or the right-hand controls. */
@@ -198,7 +210,7 @@ function toggleLibExpanded(force) {
   if (on && desk.classList.contains('devexpanded')) setDevSize('standard');
   if (on && desk.classList.contains('libcollapsed')) toggleLib(false);
   desk.classList.toggle('libexpanded', on);
-  const b = libpanel.querySelector('.libexp'); b.textContent = on ? '⤡' : '⤢'; b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', on ? 'Back to the normal layout' : 'Expand the library');
+  const b = libpanel.querySelector('.libexp'); b.textContent = on ? '⤡' : '⤢'; b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', expandLabel('Library', on)); paintLibArrow();
   libC.setExpanded(on); setTimeout(() => nowc.viz?.resize?.(), 340);
 }
 
