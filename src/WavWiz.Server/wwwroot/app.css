@@ -1046,7 +1046,8 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .pepe-note{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:4px;background:#212121}
 .pepe-note .pepe-text{margin:0;color:#FFFFFF;opacity:.8}
 /* 0.2.1 F20: the kit SVG is an 842x595 page with the logo at about x 140-720, y 222-370; this window shows just the logo, unedited */
-.pepe-note .pepe-logo{--pw:200px;position:relative;width:var(--pw);height:calc(var(--pw) * 148 / 580);overflow:hidden;background:#212121;border-radius:2px}
+/* 0.2.2 T6: about 20% smaller in the Themes menu (200 -> 160 px wide; the logo reads about 60 px tall instead of 75 on a 150% display). Same unedited file. */
+.pepe-note .pepe-logo{--pw:160px;position:relative;width:var(--pw);height:calc(var(--pw) * 148 / 580);overflow:hidden;background:#212121;border-radius:2px}
 .pepe-note .pepe-logo img{position:absolute;width:calc(var(--pw) * 842 / 580);height:auto;max-width:none;left:calc(var(--pw) * -140 / 580);top:calc(var(--pw) * -222 / 580)}
 .vizlooks{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
 .setfoot{margin:6px 2px 0}
@@ -1376,3 +1377,4 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .eqsw-extra:not(:has(> :not([hidden]))){display:none}
 .eqpregain{white-space:nowrap;flex:none}
 .eqsws > .eqsw{min-width:0}
+.themes-page .tcustomcard{margin-top:12px}

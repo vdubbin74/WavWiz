@@ -141,3 +141,10 @@ test('0.2.2 T1: the Auto pre-gain badge sits on its own line under the hint, nev
   assert.match(e, /sw\('Auto pre-gain', 'Prevents clipping when boosting', \(\) => cur\.autoPreamp, v => \{ cur\.autoPreamp = v; \}, preGain\)/);
   assert.match(css, /\.eqsw-extra\{display:flex;margin-top:3px;min-width:0\}/); assert.match(css, /\.eqpregain\{white-space:nowrap;flex:none\}/);
 });
+
+test('0.2.2 T6: the Pepecoin logo in the Themes menu is about 20% smaller; still the official unedited file', () => {
+  assert.match(css, /\.pepe-note \.pepe-logo\{--pw:160px;/);
+  assert.doesNotMatch(css, /\.pepe-note \.pepe-logo\{--pw:200px;/);
+  const th = src('themes.js');
+  assert.match(th, /PEPE_LOGO = '\/assets\/pepecoin\/Pepecoin_onDark_RGB\.svg'/); assert.match(th, /t\.preset === 'pepecoin' \? pepeNote\(\) : null/);
+});

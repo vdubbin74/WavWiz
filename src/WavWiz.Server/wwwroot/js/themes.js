@@ -76,7 +76,7 @@ export function themeCard() {
       h('p', { class: 'dim small' }, 'Tap a theme to use it on this phone or PC. Midnight Neon is the default. Custom themes use five colors: Background, Main, Second, Highlight and Text. Visualizers follow the theme unless you give a look its own colors.'),
       h('div', { class: 'themegrid', role: 'group', 'aria-label': 'Theme' }, Object.entries(PRESETS).map(([id, p]) => previewCard(id, p, t.preset === id, pick, prev.hover))),
       t.preset === 'pepecoin' ? pepeNote() : null,
-      h('div', { class: 'card tcustom' }, h('h3', null, 'Custom colors'),
+      h('div', { class: 'card tcustomcard' }, h('h3', null, 'Custom colors'),
         h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Main', t.accent), picker('accent2', 'Second', isHex(t.accent2) ? t.accent2 : derive(t)['--accent2']), picker('hl', 'Highlight', derive(t)['--hl']), picker('ink', 'Text', inkVal)),
         h('div', { class: 'row wrap', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: () => { const n = resetTheme(); applyTheme(n); fire(); draw(); toast('Back to Midnight Neon'); } }, 'Reset to default'))));
     prev.update();
