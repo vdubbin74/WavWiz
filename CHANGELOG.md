@@ -12,6 +12,18 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.2.4] - 2026-10-11 (beta)
+
+### Fixed
+
+- **Phone set-up page works with the HTTPS redirect on:** with "send other devices to the secure (HTTPS) address" switched on, the set-up page's own logo and script were sent to the secure address and blocked, so the steps stayed hidden and Check my phone did nothing. The page's own files now load normally.
+- **The calibration QR code goes straight to calibration:** the set-up page opened from Calibrate speakers shows a Continue to secure calibration button, so the hand-off works even if the page's script cannot run.
+- **Install steps when the phone does not trust the certificate:** the iPhone / Android steps are always visible, and a phone that is not trusted yet gets its download button and highlighted install steps.
+
+### Changed
+
+- **Certificate and profile names say WavWiz:** the downloaded certificate is wavwiz-root-ca.crt and the iPhone profile wavwiz-root-ca.mobileconfig (organization WavWiz). A server whose certificate still carried the old name gets a new WavWiz certificate on first start (the old files are kept as backups); phones need to install and trust the new certificate once.
+
 ## [0.2.3] - 2026-10-11 (beta)
 
 First public release since 0.1.3. Versions 0.2.0, 0.2.1 and 0.2.2 were test builds and were not published on their own; their changes are listed below and are all included in 0.2.3.

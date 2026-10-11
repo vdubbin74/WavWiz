@@ -147,8 +147,7 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
 
 test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.3'/);
-  for (const t of ['Now Playing on one line', 'Up next', 'Lock EQ', 'Your real EQ in Appearance', 'Previews stay in view', 'Tidier side panels', 'Steady device settings']) assert.ok(a.includes(t), t);
+  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.[3-9]'/);   // 0.2.4: What's new moved on to the 0.2.4 list; the 0.2.3 changes stay in the CHANGELOG
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));

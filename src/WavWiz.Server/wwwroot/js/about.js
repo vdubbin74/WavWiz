@@ -1,18 +1,13 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.3';
+export const WHATS_NEW_VERSION = '0.2.4';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  ['Now Playing on one line', 'Minimize the control panel and everything stays on one bar: cover, song and artist over the progress bar, then every control, scaled to fit. The bar matches your control panel style and theme.'],
-  ['Up next', 'Minimize the Playlist and its bar shows the next song, centered under Now Playing. Save as playlist and Clear stay at the right.'],
-  ['Lock EQ', 'A Lock EQ checkbox in the Sound (EQ) window keeps the mouse wheel, dragging and clicks from changing the EQ, so scrolling never changes the sound. This device remembers it.'],
-  ['Your real EQ in Appearance', 'Settings > Appearance > EQ shows this speaker\'s actual EQ in each style. It opens locked, so you can browse styles safely. Uncheck Lock EQ to make changes.'],
-  ['Previews stay in view', 'The Theme, Visualizer, EQ and Now Playing previews stay pinned at the top while you scroll, so the last theme cards preview too. Display size has no preview, because the whole app changes as you pick.'],
-  ['Revoked devices disappear', 'Revoking a phone or browser in Settings > Devices > Paired devices & tokens now removes its speakers from the Devices list right away, on every open page, and it has to pair again. Forget device works at once too.'],
-  ['Device settings open in place', 'In the Expanded Devices view, each device card has a Settings button with an arrow. It opens that device\'s settings right under the card; click it again or press Esc to close. In the normal Devices list, tap a device\'s name to jump to its card.'],
-  ['Steady device settings', 'An open device card no longer refreshes while you use it. Typed delays, dropdowns and slider drags stay as they are while live status keeps updating.'],
-  ['Tidier side panels', 'The Expand buttons point the way each panel moves, and the Devices title sits at the right edge, mirroring Library.'],
+  ['Phone set-up page fixed', 'The phone set-up page works again when WavWiz sends other devices to the secure (HTTPS) address: the logo shows, the steps for your phone appear and Check my phone works.'],
+  ['QR code goes straight to calibration', 'Scanning the Calibrate speakers QR code now takes your phone straight on to calibration, with a Continue to secure calibration button right on the page.'],
+  ['Install steps when needed', 'If your phone does not trust WavWiz yet, the set-up page shows the download button and the install steps for your phone right away.'],
+  ['Certificate says WavWiz', 'The security certificate and the phone profile are now named WavWiz everywhere. If your server still had an older certificate, it gets a new one: install and trust it on each phone once (open the set-up page from the QR code in Settings > Phone & HTTPS).'],
 ];
 
 const CREDITS = [
