@@ -76,7 +76,7 @@ AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. WavWi
 | Role | Needs |
 | --- | --- |
 | **Server** | 64-bit Windows 10 (October 2018 Update or newer) or Windows 11, on a PC that stays on; admin rights to install (self-contained installer; nothing else to install for the core app) |
-| **Players** | Windows PCs with speakers (WavWiz Player), or any modern browser on a PC, Mac, phone, or tablet on the same network. Smart-TV built-in browsers don't work yet; for a TV, use a PC or laptop connected to it |
+| **Players** | Windows PCs with speakers (WavWiz Player), or any modern browser on a PC, Mac, phone, or tablet on the same network. Smart-TV browsers are still in testing (they get a lighter layout and visualizer), and older LG webOS sets don't finish loading yet, so for now use a PC or laptop connected to the TV. Feedback on your TV is welcome |
 | **Player window** | Microsoft Edge WebView2 Runtime (included with Windows 11 and current Windows 10); without it the player opens in your default browser |
 | **Spotify Connect** (optional) | Listener’s own **Spotify Premium** account; feature off by default |
 | **AirPlay** | iPhone, iPad, or Mac on the same home network (Private network profile recommended) |
@@ -124,6 +124,7 @@ Project layout and deeper notes: see `docs/` in this repository (architecture, i
 - Help / bugs: [SUPPORT.md](SUPPORT.md)
 - Security: [SECURITY.md](SECURITY.md) — please **do not** file public issues for vulnerabilities
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Community: Discord server and r/WavWiz, coming soon.
 
 ---
 
