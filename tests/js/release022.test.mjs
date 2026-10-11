@@ -106,3 +106,11 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(css, /\.appsplit\{display:grid;grid-template-columns:150px minmax\(0,1fr\)/);
   assert.match(css, /\.themecard\{border-radius:6px\}/);
 });
+
+test('0.2.2 T10: "Connected" lives only in the top-right indicator; the status bar shows "Reconnecting…" only when the connection drops', () => {
+  const m = src('main.js'), body = m.split('function drawStatus() {')[1].split('\n}\n')[0];
+  assert.doesNotMatch(body, /'Connected'/);
+  assert.match(body, /S\.connected === false \? h\('span', \{ class: 'sb sbconn', role: 'status' \}, h\('span', \{ class: 'dot bad' \}\), 'Reconnecting…'\) : null/);
+  assert.match(body, /device\$\{S\.zones\.length === 1 \? '' : 's'\} online/); assert.match(body, /Playing on /);
+  assert.match(m, /setConn\(true, 'Connected'\)/, 'the top-right indicator keeps its text');
+});
