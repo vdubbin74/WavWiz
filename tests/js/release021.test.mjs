@@ -275,8 +275,9 @@ test('0.2.1 F20: Pepecoin logo files are the brand-kit onDark files byte for byt
 });
 
 test('0.2.1: What\'s new lists the 0.2.1 changes in US English, each with a NEW chip', async () => {
-  const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.1'/);
-  for (const t of ['A Library that looks like an album shelf', 'Zones get their own sidebar', 'Calmer device cards', 'A new Sound (EQ) dialog', 'Highlight color', 'Fixes']) assert.ok(a.includes(t), t);
+  const a = src('about.js');   // 0.2.2: What's new moved on to 0.2.2; the 0.2.1 notes live on in the CHANGELOG
+  const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
+  assert.match(cl, /## \[0\.2\.1\] - 2026-10-09 \(beta\)/);
+  for (const t of ['Library makeover', 'Zones sidebar', 'Sound (EQ) dialog redesign', 'Highlight']) assert.ok(cl.includes(t), t);
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre)\b/i);
 });

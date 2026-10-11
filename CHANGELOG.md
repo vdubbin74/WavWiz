@@ -16,6 +16,31 @@ Items below are on the roadmap (not promised for a specific date):
 
 - Authenticode code signing for the public installer (planned for 1.0.0)
 
+## [0.2.2] - 2026-10-10 (beta)
+
+### Added
+
+- **One-line Now Playing:** collapsing the control panel leaves a single strip with every control (heart, shuffle, previous, Play / Pause on the exact center line, next, repeat, volume + %, mute, EQ). The song (cover, title, artist, progress with times) moves into the Playlist title bar, lined up with the Now Playing column; the visualizer grows into the freed space. Works with all four panel styles.
+- **Settings > Appearance sub-sections** with a left sub-nav: Theme, Visualizer, EQ, Now Playing, Display size. Theme and Visualizer are the 0.2.0 page layouts again (theme cards, look cards, Graphics, Reactivity, look settings); EQ gets a fuller page. Every sub-section has a live preview (app preview that recolors on hover, live mini visualizer, try-out EQ, panel preview, Display size slice).
+- **Use your phone as the microphone** on Calibrate speakers: QR code + short link that goes through the one-time certificate check to the secure (HTTPS) calibration page, four numbered steps, and a live "Phone connected / waiting" line. A link made by an administrator also signs the phone in (one-time pairing code) and lets it calibrate every speaker. Links expire after 20 minutes.
+- **Artist pictures from album covers:** artists without a photo show their album covers (2x2 mosaic with four or more, else one cover) before the generated portrait. TheAudioDB is a second source of artist photos; covers and photos appear live as they arrive.
+- **Online art status** in Settings > Library: found / not found / pending counts for artists and albums, a switch, and Retry missing photos.
+- Installer: `/NOCLOSE` switch; exit code `7` when a running WavWiz could not be closed.
+
+### Changed
+
+- The Devices header mirrors the Library header (Expand and the arrow on the outer edge, Esc hint, accent-colored title). One rule for both panels: the arrow while expanded returns to the normal layout first, then collapses.
+- Menu > Devices > Devices & zones always opens the expanded Devices view on the desktop (the phone keeps its page).
+- The status bar no longer repeats "Connected" (the top-right indicator stays); it shows "Reconnecting…" only when the connection drops.
+- Online art: lookups are never dropped (unbounded queue), "not found" is retried after 7 days instead of never, and network errors back off from 1 hour to 1 day. The 0.2.1 "not found" marks are cleared once so everything is tried again.
+- The Pepecoin logo in the Themes menu is about 20% smaller (same unedited brand-kit file).
+
+### Fixed
+
+- Installing over a running WavWiz no longer fails: the installer stops the service, asks the Player to exit (then forces it after a timeout), retries locked files, shows "Closing WavWiz…", and starts the service and Player again afterwards. Silent installs do the same and return non-zero only when WavWiz truly cannot be closed.
+- Starting the WavWiz Player from the Start menu or a shortcut opens its window (only the sign-in auto-start stays in the tray); a second start brings the running window to the front.
+- The EQ Auto pre-gain badge no longer overlaps the Loudness switch in the LED look.
+
 ## [0.2.1] - 2026-10-09 (beta)
 
 ### Added

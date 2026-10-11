@@ -76,7 +76,24 @@ Used by Tag & cover auto-fill and (when available) CD metadata lookup, only
 when you run those tools. Metadata is © MetaBrainz Foundation / contributors
 (CC BY-NC-SA for some MB data — WavWiz stores lookup results in your private
 library database for your own use). Cover Art Archive images follow each
-release's license.
+release's license. Since 0.2.1 the server also looks up missing album covers
+and artist photos in the background (switch: Settings > Library > Online
+covers and artist photos, or "onlineArt": false in server.json).
+
+---------------------------------------------------------------------------
+Wikidata / Wikimedia Commons (https://www.wikidata.org/, https://commons.wikimedia.org/)
+---------------------------------------------------------------------------
+Artist photos (background online art, 0.2.1+). Wikidata data is CC0; each
+Commons image keeps its own license and author, shown on its Commons page.
+Images are cached in your WavWiz data folder for your own use.
+
+---------------------------------------------------------------------------
+TheAudioDB (https://www.theaudiodb.com/)
+---------------------------------------------------------------------------
+Second source of artist photos (background online art, 0.2.2+), used only when
+Wikidata has none, through TheAudioDB's free public API. Artist images are
+provided by TheAudioDB and its contributors and are credited in Settings >
+Library. Images are cached in your WavWiz data folder for your own use.
 
 ---------------------------------------------------------------------------
 MP3 encoding (LAME)

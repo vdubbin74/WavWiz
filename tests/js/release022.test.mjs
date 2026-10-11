@@ -148,3 +148,14 @@ test('0.2.2 T6: the Pepecoin logo in the Themes menu is about 20% smaller; still
   const th = src('themes.js');
   assert.match(th, /PEPE_LOGO = '\/assets\/pepecoin\/Pepecoin_onDark_RGB\.svg'/); assert.match(th, /t\.preset === 'pepecoin' \? pepeNote\(\) : null/);
 });
+
+test('0.2.2: What\'s new lists the 0.2.2 changes in US English; CHANGELOG has the 0.2.2 entry; TheAudioDB credited', () => {
+  const a = src('about.js');
+  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.2'/);
+  for (const t of ['Now Playing folds down to one line', 'Appearance in sections', 'Use your phone as the microphone', 'Devices works like the Library', 'More artist pictures', 'Smoother updates on Windows', 'Fixes']) assert.ok(a.includes(t), t);
+  assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence)\b/i);
+  const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
+  assert.match(cl, /## \[0\.2\.2\] - 2026-10-10 \(beta\)/); assert.ok(cl.indexOf('## [0.2.2]') < cl.indexOf('## [0.2.1]'));
+  const n = readFileSync(new URL('../../THIRD-PARTY-NOTICES.txt', import.meta.url), 'utf8');
+  assert.match(n, /TheAudioDB \(https:\/\/www\.theaudiodb\.com\/\)/); assert.match(n, /Wikidata \/ Wikimedia Commons/);
+});

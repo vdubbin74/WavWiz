@@ -1,17 +1,16 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.1';
+export const WHATS_NEW_VERSION = '0.2.2';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  ['A Library that looks like an album shelf', 'Big tiles on every tab, the year under each album, and a real album page with Play, Shuffle and a heart. Covers come from your files, then folder.jpg, then the Cover Art Archive; artists get round photos. No picture? Every album gets its own generated cover. Set the default view in Settings > Library.'],
-  ['Zones get their own sidebar', 'Expanded Devices keeps master volume across the top and moves zones to a sidebar on the right: pick one to see just its devices, or edit it right there. The panel now has a collapse arrow and an Expand button, like the Library.'],
-  ['Calmer device cards', 'Calibrate, Test sound, Sound / EQ, delay history, Rename and Forget moved into each card\'s own settings (the ••• button). The old device pop-up is gone. Master volume has a Mute all button.'],
-  ['A new Sound (EQ) dialog', 'The EQ looks like the Graphic EQ visualizer and is the real 10-band EQ: drag a bar, scroll, or use the arrow keys. Pick LED bars, Studio faders or Spectrum curve in Settings > Appearance > EQ style.'],
-  ['Simpler menus and Settings', 'Five menus that do things - File, Library, Playback, Devices and Help - and Settings that set things. Theme, Visualizer, Now Playing style, EQ style and Display size are all on Settings > Appearance, with a live preview.'],
-  ['A cleaner Now Playing panel', 'No more ••• menu or status chips: the EQ has its own button and the heart sits in line with the other controls. The visualizer has no title bar.'],
-  ['Highlight color', 'Themes get a third color for small accents like hearts, the selected tab and EQ caps. Pepecoin now uses the official copper; Custom colors has a Highlight picker. Pepecoin now comes right after Midnight Neon in the list.'],
-  ['Fixes', 'The Library filter box keeps focus while you type, menus open on hover once one is open (like Windows), and a silent install now reports a failure with a non-zero exit code.'],
+  ['Now Playing folds down to one line', 'Collapse the control panel and every control stays on one strip, with Play / Pause right in the middle. The song, its cover and the progress bar move up into the Playlist bar, and the visualizer gets the extra room.'],
+  ['Appearance in sections', 'Settings > Appearance has its own menu on the left: Theme, Visualizer, EQ, Now Playing and Display size. Theme and Visualizer are the big pages you liked from 0.2.0 again, and every section shows a live preview.'],
+  ['Use your phone as the microphone', 'Devices > Calibrate speakers shows a QR code. Scan it, install the WavWiz certificate once if asked, allow the microphone and follow the prompts. The PC page shows when your phone is connected.'],
+  ['Devices works like the Library', 'The Devices header is a mirror image of the Library header, the arrow and Expand button behave the same in both, and Devices & zones always opens the expanded view.'],
+  ['More artist pictures', 'Artists without a photo show their album covers, four at a time. Photos also come from TheAudioDB now, missing pictures are tried again later, and Settings > Library shows how many were found, with a Retry button.'],
+  ['Smoother updates on Windows', 'The installer closes a running WavWiz by itself and starts it again afterwards. The Player opens its window when you start it from the Start menu, and a second start brings the open window to the front.'],
+  ['Fixes', 'The Auto pre-gain badge no longer covers the Loudness switch, the status bar shows "Reconnecting…" only when the connection drops (the top-right light shows Connected), and the Pepecoin logo is a bit smaller.'],
 ];
 
 const CREDITS = [
@@ -40,7 +39,7 @@ export function aboutBody(S) {
       h('li', null, 'No cloud account, no analytics, no telemetry. WavWiz doesn\'t open ports to the internet; by default it only listens on your home network.'),
       h('li', null, 'WavWiz does use the internet for what you choose: internet radio (and the Radio finder), tag and cover lookups, and Spotify Connect if you switch it on.'),
       h('li', null, 'Your music files are only read, never changed. The library, passwords (stored as hashes) and settings stay in the WavWiz data folder on the server PC.'),
-      h('li', null, 'Internet radio stations are contacted only when you play one. The Radio finder and tag auto-fill contact Radio Browser / MusicBrainz / Cover Art Archive / AcoustID only when you use those tools (AcoustID needs your own API key). Phones and browsers talk to the server directly.'))),
+      h('li', null, 'Internet radio stations are contacted only when you play one. The Radio finder and tag auto-fill contact Radio Browser / MusicBrainz / Cover Art Archive / AcoustID only when you use those tools (AcoustID needs your own API key). Online covers and artist photos (MusicBrainz, Cover Art Archive, Wikidata / Wikimedia Commons, TheAudioDB) are looked up in the background unless you switch them off in Settings > Library. Phones and browsers talk to the server directly.'))),
     h('div', { class: 'card' }, h('h3', null, 'Credits'), h('p', { class: 'small dim' }, 'WavWiz is built with the open-source work of others. Thank you.'),
       h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['Component', 'License', 'Used for'].map(x => h('th', null, x)))),
         h('tbody', null, CREDITS.map(([n, l, u, url]) => h('tr', null, h('td', null, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, n)), h('td', null, l), h('td', { class: 'small' }, u)))))),
