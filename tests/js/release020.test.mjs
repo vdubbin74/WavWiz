@@ -235,5 +235,5 @@ test('0.2.0 item 17: Spectrum replaces Terrain - in the picker, saved terrain mi
   const g = src('vizgl.js'); const body = g.slice(g.indexOf('class SpectrumScene'), g.indexOf('class GeqScene'));
   assert.match(g, /spectrum: SpectrumScene/); assert.doesNotMatch(g, /class TerrainScene/);
   assert.doesNotMatch(body, /this\.cap|segN|fxv\('(segments|caps)'/);
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.2\.2'/);   // 0.2.2: What's new lists the 0.2.2 changes (the Terrain note was 0.2.0's)
+  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.2\.[2-9]'/);   // 0.2.2: What's new lists the 0.2.2 changes (the Terrain note was 0.2.0's)
 });

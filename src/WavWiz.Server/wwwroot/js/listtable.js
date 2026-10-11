@@ -16,9 +16,9 @@ export function listTable(S, ctl) {
   const setCollapsed = c => { colBtn.textContent = c ? '˄' : '˅'; colBtn.setAttribute('aria-expanded', String(!c)); };
   const head = h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Playlist' }, head, wrap);
-  /** 0.2.2 T3: hosts the now-playing song block (collapsed control panel) in the title bar. */
-  const setSongBlock = el => { head.insertBefore(el, meta); };
-  /** Left edge of the right-hand header controls (count, Save, Clear, arrow), for lining up the song block. */
+  /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
+  const setNextBlock = el => { head.insertBefore(el, meta); };
+  /** Left edge of the right-hand header controls (count, Save, Clear, arrow), for keeping the Up next line clear of them. */
   const rightEdge = () => Math.min(...[meta, btns, colBtn].map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
   const leftEdge = () => { const r = document.createRange(); r.selectNodeContents(title); return r.getBoundingClientRect().right; };
 
@@ -61,5 +61,5 @@ export function listTable(S, ctl) {
     const row = tbody.querySelector('tr.cur'); if (row && !wrap.matches(':hover')) row.scrollIntoView({ block: 'nearest' });
   }
   buildHead();
-  return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setSongBlock, leftEdge, rightEdge };
+  return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setNextBlock, leftEdge, rightEdge };
 }

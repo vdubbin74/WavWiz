@@ -86,8 +86,9 @@ export function createNow(S, ctl) {
   let ctlCollapsed = false; try { ctlCollapsed = localStorage.getItem('wavwiz.npctlcollapsed') === '1'; } catch { /* ignore */ }
   const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }, ctlCollapsed ? '˄' : '˅');
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
-  // 0.2.2 T3 (final): collapsed = a one-line control strip with EVERY control (heart, shuffle, prev | PLAY | next, repeat, volume + %, mute, EQ).
-  // Play/Pause sits on the exact center line of the strip; the other controls fall in on either side. Same round buttons, sized to the bar.
+  // 0.2.3 U1 (replaces 0.2.2 T3): collapsed = ONE line - thumbnail, title · artist over a progress bar with elapsed / total, then every
+  // control (heart, shuffle, prev, play/pause, next, repeat, volume + %, mute, EQ), all scaled to fit; nothing moves to the Playlist bar.
+  // U3: the line wears the selected panel style (.pn-<style> on the panel: buttons, progress look, thumbnail effect) in the theme's colors.
   const sHeart = h('span', { class: 'np-heartslot' }, idleHeart());
   const sShuffle = h('button', { class: 'tbtn tog', 'aria-label': 'Shuffle', 'aria-pressed': 'false', onclick: () => shuffle.click() }, icon('shuffle'));
   const sRepeat = h('button', { class: 'tbtn tog', 'aria-label': 'Repeat', 'aria-pressed': 'false', onclick: () => repeat.click() }, icon('repeat'));
@@ -95,16 +96,19 @@ export function createNow(S, ctl) {
   const sNext = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
   const sPlay = h('button', { class: 'tbtn play', 'aria-label': 'Play or pause', onclick: () => play.click() }, icon('play'));
   const sVol = mkVol(), sPct = h('span', { class: 'volpct' }, ''), sMute = mkMute(), sEq = mkEq();
-  const ctlStrip = h('div', { class: 'np-strip', role: 'group', 'aria-label': 'Playback controls (compact)' },
-    h('div', { class: 'np-strip-l' }, sHeart, sShuffle, sPrev),
-    h('div', { class: 'np-strip-c' }, sPlay),
-    h('div', { class: 'np-strip-r' }, sNext, sRepeat, h('span', { class: 'np-strip-vol' }, icon('volume'), sVol, sPct), sMute, sEq));
-  // T3: the song (thumbnail, title, artist, progress) moves up into the Playlist title bar, lined up under the control panel column (main.js places it)
-  const psCover = h('div', { class: 'ps-art' }), psT1 = h('span', { class: 'ps-t1 ell' }, 'Nothing playing'), psT2 = h('span', { class: 'ps-t2 ell' }, '');
-  const psFill = h('div', { class: 'fill' }), psKnob = h('div', { class: 'knob' }), psElv = h('span', { class: 'ps-elv' }, '--:--'), psDur = h('span', { class: 'ps-dur' }, '-:--');
-  const psProg = h('div', { class: 'prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(psProg, ev)) }, h('div', { class: 'bar' }), psFill, psKnob);
-  const songBlock = h('div', { class: 'plsong', 'aria-label': 'Now playing', hidden: true }, psCover,
-    h('div', { class: 'ps-main' }, h('div', { class: 'ps-titles' }, psT1, h('span', { class: 'ps-dot', 'aria-hidden': 'true' }, '·'), psT2), h('div', { class: 'ps-seek' }, psElv, psProg, psDur)));
+  const sArt = h('div', { class: 'ns-art' }), sT1 = h('span', { class: 'ns-t1 ell' }, 'Nothing playing'), sT2 = h('span', { class: 'ns-t2 ell' }, '');
+  const sElv = h('span', { class: 'ns-elv' }, '--:--'), sDur = h('span', { class: 'ns-dur' }, '-:--');
+  const sFill = h('div', { class: 'fill' }), sKnob = h('div', { class: 'knob' }), sLedFill = h('div', { class: 'ns-ledfill' });
+  const sWaveBase = h('div', { class: 'pn-wbars' }), sWaveTop = h('div', { class: 'pn-wbars on' }), sWaveClip = h('div', { class: 'pn-wclip' }, sWaveTop);
+  const sProg = h('div', { class: 'ns-prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(sProg, ev)) },
+    h('div', { class: 'bar' }), sFill, sKnob, h('div', { class: 'ns-led', 'aria-hidden': 'true' }, sLedFill), h('div', { class: 'ns-wave', 'aria-hidden': 'true' }, sWaveBase, sWaveClip));
+  const ctlStrip = h('div', { class: 'np-strip', role: 'group', 'aria-label': 'Now playing (compact)' },
+    h('div', { class: 'ns-song' }, sArt, h('div', { class: 'ns-main' }, h('div', { class: 'ns-titles' }, sT1, h('span', { class: 'ns-dot', 'aria-hidden': 'true' }, '·'), sT2), h('div', { class: 'ns-seek' }, sElv, sProg, sDur))),
+    h('div', { class: 'ns-x', role: 'group', 'aria-label': 'Transport' }, sHeart, sShuffle, sPrev, sPlay, sNext, sRepeat),
+    h('div', { class: 'ns-vol' }, icon('volume'), sVol, sPct, sMute, sEq));
+  // U2: with the Playlist minimized its title bar shows only "Up next: Title · Artist", centered on the Now Playing column (main.js places it)
+  const nxArt = h('div', { class: 'pln-art' }), nxT1 = h('span', { class: 'pln-t1 ell' }, ''), nxT2 = h('span', { class: 'pln-t2 ell' }, '');
+  const nextBlock = h('div', { class: 'plnext', 'aria-label': 'Up next', hidden: true }, h('span', { class: 'pln-lbl' }, 'UP NEXT'), nxArt, nxT1, h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·'), nxT2);
   const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, pnArt, tableMeta, h('div', { class: 'pn-ctl' }, tableXport, tableVol)));
   const ctlPanel = h('section', { class: 'np-ctlpanel' + (ctlCollapsed ? ' collapsed' : ''), role: 'group', 'aria-label': 'Playback controls' },
     h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, ctlStrip, h('span', { class: 'grow' }), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
@@ -127,9 +131,8 @@ export function createNow(S, ctl) {
     paintCollapsed();
     setTimeout(() => viz?.resize(), 340);
   }
-  /** T3: the desk knows the panel is collapsed (the Playlist title bar then shows the song block). */
+  /** The desk knows the panel is collapsed (layout hooks); 0.2.3 U1: the song stays on the panel's own line. */
   function paintCollapsed() {
-    songBlock.hidden = !ctlCollapsed;
     el.closest?.('.desk')?.classList.toggle('npcollapsed', ctlCollapsed);
     window.dispatchEvent(new CustomEvent('wavwiz:npcollapsed', { detail: ctlCollapsed }));
   }
@@ -235,12 +238,12 @@ export function createNow(S, ctl) {
       art.replaceChildren(cover(srcMd, 'md', glyph));
       miniCover.replaceChildren(cover(srcSm, 'sm', glyph));
       pnCover.replaceChildren(cover(srcMd, 'md', glyph)); pnRefl.replaceChildren(cover(srcMd, 'md', glyph));
-      psCover.replaceChildren(cover(srcSm, 'sm', glyph));
+      sArt.replaceChildren(cover(srcSm, 'sm', glyph));
     }
     const wseed = it ? (it.id ?? it.title ?? '') + '' : '';
     if (pnWave.dataset.seed !== wseed) {
       pnWave.dataset.seed = wseed; const hs = waveBars(wseed || 'idle');
-      for (const box of [waveBase, waveTop]) box.replaceChildren(...hs.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
+      for (const box of [waveBase, waveTop, sWaveBase, sWaveTop]) box.replaceChildren(...hs.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
     }
     trackNo.textContent = 'TRACK ' + (it?.trackNo || it?.track ? String(it.trackNo || it.track).padStart(2, '0') : (n.index >= 0 ? String(n.index + 1).padStart(2, '0') : '--'));
     ctlPanel.classList.toggle('playing', n.state === 'playing');
@@ -251,7 +254,7 @@ export function createNow(S, ctl) {
     for (const b of [shuffle, sShuffle]) { b.classList.toggle('on', !!n.shuffle); b.setAttribute('aria-pressed', String(!!n.shuffle)); }
     for (const b of [repeat, sRepeat]) { b.classList.toggle('on', n.repeat !== 'off'); b.setAttribute('aria-pressed', String(n.repeat !== 'off')); setIcon(b, n.repeat === 'one' ? 'repeatOne' : 'repeat'); }
     setIcon(sPlay, playing ? 'pause' : 'play'); sPlay.classList.toggle('playing', playing);
-    psT1.textContent = t1.textContent; psT2.textContent = t2.textContent.trim(); songBlock.title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
+    sT1.textContent = t1.textContent; sT2.textContent = t2.textContent.trim(); ctlStrip.querySelector('.ns-titles').title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
     drawMine(); barT1.textContent = t1.textContent; barT2.textContent = t2.textContent; barPlay.classList.toggle('playing', playing); setIcon(barPlay, playing ? 'pause' : 'play');
     if (barCover.dataset.src !== (srcSm || '')) { barCover.dataset.src = srcSm || ''; barCover.replaceChildren(cover(srcSm, 'sm', glyph)); }
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
@@ -263,8 +266,19 @@ export function createNow(S, ctl) {
       nxt ? h('span', { class: 'ell np-uptitle' }, `${nxt.title}${nxt.artist ? ' - ' + nxt.artist : ''}${nxt.durationMs ? ' • ' + fmtDur(nxt.durationMs) : (nxt.kind === 'radio' ? ' • LIVE' : '')}`) : null,
       h('span', { class: 'np-upline', 'aria-hidden': 'true' }));
     upnext.title = nxt ? '' : (it ? 'Nothing queued after this' : 'Pick something from the library');
+    drawNext(nxt);
     ensureViz(); tickPos(); drawChips(); paintSrcChip();
     if (isReceiver(S.now?.item)) refreshReceivers();
+  }
+  /** U2: the minimized Playlist's "Up next" line (next song in the queue; a quiet note when nothing follows). */
+  function drawNext(nxt) {
+    nextBlock.classList.toggle('none', !nxt);
+    nxT1.textContent = nxt ? nxt.title || 'Untitled' : 'Nothing queued after this';
+    nxT2.textContent = nxt ? (nxt.kind === 'radio' ? 'Internet radio' : nxt.artist || '') : '';
+    const src = nxt ? itemArtUrl(nxt, 96) : null;
+    if (nxArt.dataset.src !== (src || '') || !nxArt.firstChild) { nxArt.dataset.src = src || ''; nxArt.replaceChildren(nxt ? cover(src, 'sm', nxt.kind === 'radio' ? '📻' : '♪') : ''); }
+    nextBlock.title = nxt ? ['Up next', nxt.title, nxt.artist].filter(Boolean).join(' · ') : 'Nothing queued after this';
+    window.dispatchEvent(new CustomEvent('wavwiz:upnext'));
   }
   function tickPos() {
     const n = S.now; if (!n) return;
@@ -272,8 +286,9 @@ export function createNow(S, ctl) {
     const live = isLive(n.item), dur = n.durationMs;
     elv.textContent = n.item ? fmtTime(pos) : '--:--'; rev.textContent = !n.item ? '-:--' : live ? 'LIVE' : '-' + fmtTime(Math.max(0, dur - pos));
     const frac = live || !dur ? 0 : Math.min(1, pos / dur); fill.style.width = barFill.style.width = frac * 100 + '%'; knob.style.left = barKnob.style.left = frac * 100 + '%'; setVizProgress(live || !dur ? null : frac);
-    barElv.textContent = psElv.textContent = elv.textContent; barRev.textContent = rev.textContent;
-    psDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0); psFill.style.width = frac * 100 + '%'; psKnob.style.left = frac * 100 + '%';
+    barElv.textContent = sElv.textContent = elv.textContent; barRev.textContent = rev.textContent;
+    sDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
+    sFill.style.width = sLedFill.style.width = frac * 100 + '%'; sKnob.style.left = frac * 100 + '%'; sWaveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`; ctlStrip.style.setProperty('--ns-frac', frac.toFixed(4));
     pillElv.textContent = clockVal.textContent = elv.textContent; lcdRev.textContent = rev.textContent;
     pillDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
     ringVal.style.strokeDashoffset = String(100 - frac * 100); ledFill.style.width = frac * 100 + '%'; waveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
@@ -300,5 +315,5 @@ export function createNow(S, ctl) {
   window.addEventListener('wavwiz:checklist', drawChecklist);
   drawVBtns();
   queueMicrotask(paintCollapsed);
-  return { el, mini, npbar, songBlock, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
+  return { el, mini, npbar, nextBlock, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
 }

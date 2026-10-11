@@ -1,7 +1,7 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.2';
+export const WHATS_NEW_VERSION = '0.2.3';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
   ['Now Playing folds down to one line', 'Collapse the control panel and every control stays on one strip, with Play / Pause right in the middle. The song, its cover and the progress bar move up into the Playlist bar, and the visualizer gets the extra room.'],

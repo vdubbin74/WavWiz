@@ -258,7 +258,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 /* 0.1.1/0.1.2 hotfix: bottom Playlist collapses DOWN to a thin header strip so Now Playing/viz gains height; --listh drives the grid row (incl. short-screen media). */
 .listpanel .qwrap{transition:opacity .25s ease,transform .32s cubic-bezier(.4,0,.2,1),max-height .32s cubic-bezier(.4,0,.2,1);max-height:2000px}
 .desk.listcollapsed .listpanel .qwrap{opacity:0;transform:translateY(100%);max-height:0;flex:0 0 0;min-height:0;overflow:hidden;pointer-events:none;border:0;margin:0;padding:0}
-.desk.listcollapsed .listpanel .pane-h .small,.desk.listcollapsed .listpanel .pane-h .row:not(.listcolwrap){display:none}
+/* 0.2.3 U2: the minimized Playlist keeps its count, Save and Clear at the right (Up next sits centered on the Now Playing column) */
 .desk.listcollapsed .listpanel .pane-h{border-bottom:0;min-height:34px}
 .listcol{margin-left:6px}
 @media (prefers-reduced-motion:reduce){ .listpanel .qwrap{transition:none} }
@@ -1223,62 +1223,8 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .oachip{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);font-size:12px;color:var(--dim)}
 .oachip.ok{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 45%,var(--line))}
 .oachip.pend{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
-/* 0.2.2 T3 (final): collapsed control panel = one-line strip with every control; Play/Pause on the exact center line */
-.np-strip{display:none}
-.np-ctlpanel.collapsed .np-ctlnow{display:none}
-.np-ctlpanel.collapsed > .pane-h{position:relative;min-height:44px}
-.np-ctlpanel.collapsed .np-strip{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:8px;position:absolute;inset:0;pointer-events:none;padding:0 46px 0 0;padding-left:46px;text-transform:none;letter-spacing:0;font-weight:400}
-.np-strip > div{display:inline-flex;align-items:center;gap:6px;min-width:0;pointer-events:auto}
-.np-strip-l{justify-self:end} .np-strip-r{justify-self:start} .np-strip-c{justify-self:center}
-.np-strip .tbtn{width:28px;height:28px;flex:none;padding:0;border-radius:50%;color:var(--ink);background:var(--panel2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center}
-.np-strip .tbtn:hover{border-color:var(--accent)}
-.np-strip .tbtn.tog.on{color:var(--accent);border-color:var(--accent)}
-.np-strip .tbtn.tog.on::after{display:none}
-.np-strip .tbtn.play{width:34px;height:34px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 2px var(--accent-soft);animation:none}
-.np-strip .tbtn .ic svg{width:14px;height:14px} .np-strip .tbtn.play .ic svg{width:16px;height:16px}
-.np-strip .np-heartslot{display:inline-flex}
-.np-strip .np-heartslot > *{width:28px;height:28px}
-.np-strip-vol{display:inline-flex;align-items:center;gap:6px;min-width:0}
-.np-strip-vol > .ic svg{width:15px;height:15px;color:var(--accent2)}
-.np-strip-vol input[type=range]{width:clamp(48px,calc(50cqw - 300px),120px);min-width:0}
-.np-strip-vol .volpct{font-size:12px;font-family:var(--mono);color:var(--ink);min-width:2.6em;text-align:right}
-.np-strip .np-vol,.np-strip .np-volbtn{flex:none}
-/* the NOW PLAYING title gives way to the strip when the column is narrow */
-@container npctl (max-width:760px){ .np-strip-vol .volpct{display:none} .np-strip-vol input[type=range]{width:clamp(48px,calc(50cqw - 262px),120px)} }
-@container npctl (max-width:540px){ .np-ctlpanel.collapsed .np-ctltitle{visibility:hidden} }
-@container npctl (max-width:580px){ .np-strip-vol > .ic{display:none} .np-strip > div,.np-strip-vol{gap:4px} .np-ctlpanel.collapsed .np-strip{column-gap:5px;padding-right:40px} .np-strip .tbtn,.np-strip .np-heartslot > *{width:24px;height:24px} .np-strip .tbtn.play{width:30px;height:30px} }
-.np-ctlpanel{container:npctl / inline-size}
-@media (max-width:900px){ .np-ctlpanel.collapsed .np-strip{column-gap:4px} .np-strip-vol{display:none} .np-ctlpanel.collapsed .np-ctltitle{display:none} }
-/* T3: song block in the Playlist title bar (only while the control panel is collapsed); bar grows to ~42px */
-.listpanel > .pane-h{position:relative}
-.plsong{display:none}
-.desk.npcollapsed .listpanel > .pane-h{min-height:42px}
-.desk.npcollapsed .plsong:not([hidden]){display:flex;align-items:center;gap:10px;position:absolute;top:0;bottom:0;min-width:0;text-transform:none;letter-spacing:0;font-weight:400}
-.plsong .ps-art .cover{width:32px;height:32px;border-radius:5px;flex:none}
-.plsong .ps-art{flex:none;display:inline-flex}
-.plsong .ps-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.plsong .ps-titles{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:13px;line-height:1.2}
-.plsong .ps-t1{font-weight:700;color:var(--ink);min-width:0;flex:0 1 auto}
-.plsong .ps-t2{color:var(--accent2);min-width:0;flex:0 1 auto}
-.plsong .ps-t2:empty,.plsong .ps-t2:empty ~ *{display:none}
-.plsong .ps-titles .ps-dot{color:var(--dim)}
-.plsong .ps-t2:empty + .ps-dot,.plsong .ps-dot:has(+ .ps-t2:empty){display:none}
-.plsong .ps-seek{display:flex;align-items:center;gap:8px;font-size:11px;font-family:var(--mono)}
-.plsong .ps-elv{color:var(--accent);font-weight:600;flex:none}
-.plsong .ps-dur{color:var(--dim);flex:none}
-.plsong .prog{flex:1;height:12px;position:relative;cursor:pointer;min-width:30px}
-.plsong .prog .bar{position:absolute;left:0;right:0;top:5px;height:3px;border-radius:2px;background:var(--line);border:0}
-.plsong .prog .fill{position:absolute;left:0;top:5px;height:3px;border-radius:2px;background:var(--accent)}
-.plsong .prog .knob{position:absolute;top:1px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-.plsong.tight .ps-t2,.plsong.tight .ps-dot{display:none}
-.desk.listcollapsed .listpanel .pane-h .plsong .ps-elv,.desk.listcollapsed .listpanel .pane-h .plsong .ps-dur{display:inline}
-.desk.npcollapsed.listcollapsed .listpanel .pane-h{min-height:42px}
-@media (max-width:900px){ .desk.npcollapsed .plsong{display:none!important} .desk.npcollapsed .listpanel > .pane-h{min-height:0} }
 /* 0.2.2: hidden mosaic must not cover the portrait while album covers load */
 .acover .amosaic[hidden]{display:none}
-.desk.npcollapsed.listcollapsed{--listh:44px}
-.np-ctlpanel.collapsed > .pane-h > .np-strip{background:none;border:0;box-shadow:none}
-.np-ctlpanel.collapsed > .pane-h > .np-ctltitle,.np-ctlpanel.collapsed > .pane-h > .listcolwrap{position:relative;z-index:1}
 /* 0.2.2 T5: Devices header = mirror image of Library (Expand on the outer edge, then the arrow, Esc hint, title); same size/spacing; accent title */
 .devpanel .devhead{gap:8px}
 .devpanel .pane-h .devexp{margin-right:4px}
@@ -1378,3 +1324,78 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .eqpregain{white-space:nowrap;flex:none}
 .eqsws > .eqsw{min-width:0}
 .themes-page .tcustomcard{margin-top:12px}
+/* ===== 0.2.3 U1: minimized Now Playing = ONE line: thumbnail, title · artist over the progress bar (elapsed / total), then every control,
+   all scaled to fit. U3: the line wears the selected panel style (buttons, progress look, thumbnail effect) in the theme's colors. ===== */
+.np-strip{display:none}
+.np-ctlpanel.collapsed .np-ctlnow,.np-ctlpanel.collapsed .np-ctltitle,.np-ctlpanel.collapsed > .pane-h > .grow{display:none}
+.np-ctlpanel.collapsed > .pane-h{min-height:54px;padding:6px 10px 6px 8px;gap:10px}
+.np-ctlpanel.collapsed .np-strip{display:flex;align-items:center;gap:14px;flex:1;min-width:0;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;color:var(--ink)}
+.ns-song{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0}
+.ns-art{position:relative;flex:none;width:40px;height:40px;border-radius:5px}
+.ns-art .cover{width:100%!important;height:100%!important;border-radius:4px;display:block}
+.ns-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ns-titles{display:flex;align-items:baseline;gap:6px;min-width:0;line-height:1.25}
+.ns-t1{font-weight:700;font-size:14px;color:var(--ink);flex:0 1 auto;min-width:0}
+.ns-t2,.ns-dot{color:var(--accent2);flex:0 1 auto;min-width:0} .ns-dot{flex:none}
+.ns-t2:empty,.ns-dot:has(+ .ns-t2:empty){display:none}
+.ns-seek{display:flex;align-items:center;gap:8px;font:600 11px var(--mono)}
+.ns-elv{color:var(--accent);flex:none} .ns-dur{color:var(--ink);flex:none}
+.ns-prog{position:relative;flex:1;min-width:40px;height:12px;cursor:pointer}
+.ns-prog .bar{position:absolute;left:0;right:0;top:5px;height:3px;border-radius:2px;background:var(--line)}
+.ns-prog .fill{position:absolute;left:0;top:5px;height:3px;width:0;border-radius:2px;background:var(--accent)}
+.ns-prog .knob{position:absolute;top:1px;left:0;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);box-shadow:0 0 calc(8px * var(--fx-glow)) var(--accent)}
+.ns-led,.ns-wave{display:none;position:absolute;inset:0}
+.ns-x,.ns-vol{display:flex;align-items:center;gap:6px;flex:none}
+.ns-vol > .ic svg{width:15px;height:15px;color:var(--accent2)}
+.ns-vol input[type=range]{width:clamp(56px,calc(100cqw - 640px),110px);min-width:0;height:22px;min-height:0}
+.ns-vol input[type=range]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-4px}
+.ns-vol .volpct{font:12px var(--mono);color:var(--ink);min-width:2.8em;text-align:right}
+.np-strip .tbtn{width:30px;height:30px;flex:none;padding:0;border-radius:50%;color:var(--ink);background:var(--panel2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;box-shadow:none;animation:none}
+.np-strip .tbtn:hover{border-color:var(--accent)}
+.np-strip .tbtn.tog.on{color:var(--accent);border-color:var(--accent)}
+.np-strip .tbtn.tog.on::after{display:none}
+.np-strip .tbtn.mutebtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.np-strip .tbtn.play{width:36px;height:36px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.np-strip .tbtn svg{width:14px;height:14px} .np-strip .tbtn.play svg{width:16px;height:16px} .np-strip .heart.tbtn.ico svg{width:15px;height:15px}
+.np-strip .np-heartslot{display:inline-flex} .np-strip .np-heartslot > *{width:30px;height:30px}
+/* U3 Classic: progress ring around the thumbnail (like the ring around the cover), glowing round Play, round buttons */
+.pn-classic .ns-art{padding:2px;background:conic-gradient(var(--accent) calc(var(--ns-frac,0) * 1turn),var(--line) 0);box-shadow:0 0 calc(8px * var(--fx-glow)) color-mix(in srgb,var(--accent) 45%,transparent)}
+.pn-classic .np-strip .tbtn.play{box-shadow:0 0 calc(14px * var(--fx-glow)) color-mix(in srgb,var(--accent) 70%,transparent)}
+/* U3 Center: soft ghost buttons and the waveform seek */
+.pn-center .np-strip .tbtn:not(.play):not(.on){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.pn-center .ns-prog{height:16px} .pn-center .ns-prog > .bar,.pn-center .ns-prog > .fill,.pn-center .ns-prog > .knob{display:none}
+.pn-center .ns-wave{display:block}
+.pn-center .ns-art{border-radius:50%} .pn-center .ns-art .cover{border-radius:50%}
+.pn-center.playing .ns-art .cover{animation:pnspin calc(6s / (0.2 + var(--fx-motion))) linear infinite}
+/* U3 Stack: a small LCD window (glowing elapsed, LED-block seek) and squared buttons */
+.pn-stack .ns-main{background:#08090A;border:1px solid color-mix(in srgb,var(--line) 70%,#000);border-radius:4px;padding:3px 8px;box-shadow:inset 0 0 10px rgba(0,0,0,.7)}
+.pn-stack .ns-elv{text-shadow:0 0 calc(8px * var(--fx-glow)) var(--accent)}
+.pn-stack .ns-prog{height:8px} .pn-stack .ns-prog > .bar,.pn-stack .ns-prog > .fill,.pn-stack .ns-prog > .knob{display:none}
+.pn-stack .ns-led{display:block;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 6px,transparent 6px 8px)}
+.ns-ledfill{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 8px);filter:drop-shadow(0 0 calc(4px * var(--fx-glow)) var(--accent))}
+.pn-stack .np-strip .tbtn,.pn-stack .np-strip .np-heartslot > *{border-radius:6px}
+/* U3 Horizon: glowing thumbnail, the seek line flowing out of it, outline ring buttons */
+.pn-horizon .ns-art .cover{box-shadow:0 0 calc(16px * var(--fx-glow)) color-mix(in srgb,var(--accent) 55%,transparent)}
+.pn-horizon .ns-prog .bar{background:linear-gradient(90deg,var(--accent),var(--line) 40%)}
+.pn-horizon .np-strip .tbtn{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+.pn-horizon .np-strip .tbtn.play,.pn-horizon .np-strip .tbtn.mutebtn.on{background:var(--accent);border-color:var(--accent)}
+.pn-horizon .np-strip .tbtn.tog.on{border-color:var(--accent)}
+@media (prefers-reduced-motion:reduce){ .pn-center.playing .ns-art .cover{animation:none} }
+/* scaled to fit: the line gives up the least important pieces first as the column narrows */
+@container npctl (max-width:860px){ .ns-vol .volpct{display:none} .np-ctlpanel.collapsed .np-strip{gap:10px} }
+@container npctl (max-width:720px){ .ns-vol > .ic,.ns-vol input[type=range]{display:none} .ns-dur{display:none} .ns-x,.ns-vol{gap:4px} }
+@container npctl (max-width:600px){ .np-strip .tbtn,.np-strip .np-heartslot > *{width:26px;height:26px} .np-strip .tbtn.play{width:32px;height:32px}
+  .ns-x .np-heartslot,.ns-x .tog,.ns-elv{display:none} .ns-art{width:34px;height:34px} }
+@container npctl (max-width:440px){ .ns-art,.ns-vol .eqbtn{display:none} }
+@media (max-width:900px){ .ns-vol > .ic,.ns-vol input[type=range],.ns-vol .volpct{display:none} }
+/* ===== 0.2.3 U2: minimized Playlist title bar = "UP NEXT  [art] Title · Artist", centered on the Now Playing column ===== */
+.listpanel > .pane-h{position:relative}
+.plnext{display:none}
+.desk.listcollapsed .plnext:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;position:absolute;top:0;bottom:0;transform:translateX(-50%);min-width:0;white-space:nowrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
+.pln-lbl{flex:none;font-size:11px;font-weight:800;letter-spacing:1.6px;color:var(--dim)}
+.pln-art{flex:none;width:24px;height:24px;border-radius:4px;overflow:hidden} .pln-art:empty{display:none}
+.pln-art .cover{width:100%!important;height:100%!important;border-radius:4px}
+.pln-t1{font-weight:700;color:var(--ink);min-width:0;flex:0 1 auto} .pln-t2,.pln-dot{color:var(--accent2);min-width:0;flex:0 1 auto} .pln-dot{flex:none}
+.pln-t2:empty,.pln-dot:has(+ .pln-t2:empty){display:none}
+.plnext.none .pln-t1{font-weight:400;color:var(--dim)}
+.plnext.tight .pln-t2,.plnext.tight .pln-dot{display:none}
