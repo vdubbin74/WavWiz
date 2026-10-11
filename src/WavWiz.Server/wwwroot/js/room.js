@@ -90,7 +90,13 @@ export class PhoneRoom {
       case MSG.StopAt: { const s = decodeEpoch(f.payload); this.stopAtUs = s.us; this.stopSoon(s.us); break; }
       case MSG.ZoneUpdate: { const z = decodeJson(f.payload); this.zone = { volume: z.volume ?? 1, muted: !!z.muted, enabled: z.enabled !== false, latencyMs: z.latencyMs ?? 0, source: z.latencySource, notCalibrated: !!z.notCalibrated }; this.applyGain(); this.emit(); break; }
       case MSG.CalCmd: { const c = decodeJson(f.payload); this.onCal(c); break; }
-      case MSG.Bye: { const b = decodeJson(f.payload); this.emit({ error: b.reason }); break; }
+      case MSG.Bye: {
+        const b = decodeJson(f.payload); this.emit({ error: b.reason });
+        // 0.2.3 U11: "unauthorized" = this speaker was forgotten or its session revoked. Stop for good instead of reconnecting at once (which put a
+        // forgotten browser speaker straight back on every device list); it joins again the next time WavWiz is opened here (and paired, if revoked).
+        if (/^unauthorized/i.test(b?.reason || '')) { this.removed = true; this.stop().then(() => this.onState({ state: 'stopped', text: 'Removed from WavWiz' })); }
+        break;
+      }
       default: break;      // Outputs/DspConfig: not used by a phone speaker (no EQ in this beta)
     }
   }

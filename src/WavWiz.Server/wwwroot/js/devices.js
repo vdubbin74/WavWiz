@@ -345,10 +345,17 @@ export function devicesPanel(S, ctl) {
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };
+  // 0.2.3 U11: a skipped redraw used to be dropped, so a device removed (revoked/forgotten) while a slider, menu or zone editor was open stayed on the
+  // list until some later change. Now a skipped redraw is retried until it can run - except that a removed device is never kept: it goes at once.
+  let pending = 0;
+  const later = () => { clearTimeout(pending); pending = setTimeout(() => { pending = 0; draw(); }, 700); };
+  const removedShown = () => [...body.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
   function draw(force) {
-    if (!force && body.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return;   // do not fight the user's finger
-    if (!force && body.querySelector('.dmenu')) return;
-    if (!force && size === 'expanded' && zedit !== null) return;          // F19: never redraw a zone's settings under the user's typing
+    if (!force && removedShown()) force = true;
+    if (!force && body.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();   // do not fight the user's finger
+    if (!force && body.querySelector('.dmenu')) return later();
+    if (!force && size === 'expanded' && zedit !== null) return later();          // F19: never redraw a zone's settings under the user's typing
+    clearTimeout(pending); pending = 0;
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
     if (size === 'expanded') {
@@ -380,9 +387,13 @@ export function devicesPanel(S, ctl) {
 export function devicesView(S, ctl) {
   const root = h('div', { id: 'p-zones' }), top = h('div'), list = h('div', { class: 'dgrid one' }), foot = h('div', { class: 'row wrap', style: 'margin-top:6px' });
   root.append(h('h2', { class: 'pagetitle' }, 'Devices & zones'), top, list, foot);
+  let pending = 0;      // 0.2.3 U11: same rule as the side panel - retry a skipped redraw, never keep a removed device on screen
+  const later = () => { clearTimeout(pending); pending = setTimeout(() => { pending = 0; draw(); }, 700); };
   function draw() {
-    if (root.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return;
-    if (root.querySelector('.dmenu')) return;
+    const gone = [...list.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
+    if (!gone && root.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();
+    if (!gone && root.querySelector('.dmenu')) return later();
+    clearTimeout(pending); pending = 0;
     top.replaceChildren(masterRow(S, ctl), zonesStrip(S, ctl, false));
     list.replaceChildren(...(S.zones.length ? S.zones.map(z => expandedCard(S, ctl, z, false)) : [h('div', { class: 'card' }, h('h3', null, 'No devices yet'), h('p', { class: 'dim' }, EMPTY))]));
     const live = S.zones.some(z => z.enabled && z.connected);

@@ -35,6 +35,10 @@ Fine-tunes on top of 0.2.2 (which was not published on its own); 0.2.3 includes 
 
 - **Lock EQ (U9):** a checkbox with a padlock in the Sound (EQ) window header and on the Appearance > EQ preview. Locked, the EQ sliders ignore the mouse wheel (the page scrolls instead), dragging, clicks and keys, and look slightly dimmed with a small lock. Remembered per device; off by default (the wheel still fine-adjusts in 0.5 dB steps).
 
+### Fixed
+
+- **Revoking a device removes it from the Devices list (U11):** revoking a paired phone or browser (Settings > Devices > Paired devices & tokens) left the speakers it had opened in that browser on every Devices list, still connected and playing, because only WavWiz Player tokens were handled. Now everything the token owns leaves the list at once on every open page (Standard, Expanded, zones and the Devices page), its connections close, and it has to pair again. Forget device on a browser speaker no longer lets it rejoin straight away, and a list that was busy (a slider, menu or zone editor open) no longer keeps a removed device.
+
 ## [0.2.2] - 2026-10-10 (beta)
 
 ### Added

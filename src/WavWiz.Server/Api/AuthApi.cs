@@ -110,9 +110,9 @@ public static class AuthApi
         g.MapDelete("/tokens/{id:long}", (long id, HttpContext c) =>
         {
             var pid = s.Db.Scalar("SELECT player_id FROM api_token WHERE id=$i", ("$i", id)) as string;
-            if (pid != null && c.Request.Query["removeFromList"] == "1") { s.Auth.Revoke(id); s.Zones.RemovePlayer(pid); return Results.Json(new { ok = true, removed = true }); }
-            s.Auth.Revoke(id); if (pid != null) { s.Audio.Get(pid)?.CloseUnauthorized(); s.Events.Publish("zones"); }
-            return Results.Json(new { ok = true });
+            s.Auth.Revoke(id);           // first: from here on a reconnect (cookie, Bearer or an already issued ws ticket) is refused
+            var gone = s.Zones.RemoveOwnedBy(id, pid, c.Request.Query["removeFromList"] == "1");      // 0.2.3 U11: its speakers leave every list at once
+            return Results.Json(new { ok = true, removed = gone.Count > 0, players = gone });
         }).Req(Role.Admin);
 
         g.MapPost("/auth/password", async (HttpContext c) =>

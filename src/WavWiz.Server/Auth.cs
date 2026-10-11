@@ -115,10 +115,18 @@ public sealed class AuthService
     {
         if (string.IsNullOrEmpty(ticket) || ticket.Length > 96) return null;
         if (!_wsTickets.TryRemove(ticket, out var e) || e.Expires < _now()) return null;
-        return e.Who;
+        return IsRevoked(e.Who.TokenId) ? null : e.Who;      // 0.2.3 U11: a ticket from a session revoked in the meantime is dead too
     }
 
-    public void Revoke(long id) => _db.Exec("UPDATE api_token SET revoked=1 WHERE id=$i", ("$i", id));
+    /// <summary>0.2.3 U11: raised after a token is revoked, so live connections it opened (the UI event socket) close at once.</summary>
+    public event Action<long>? Revoked;
+    public void Revoke(long id)
+    {
+        _db.Exec("UPDATE api_token SET revoked=1 WHERE id=$i", ("$i", id));
+        foreach (var k in _wsTickets.Where(kv => kv.Value.Who.TokenId == id).Select(kv => kv.Key).ToList()) _wsTickets.TryRemove(k, out _);
+        try { Revoked?.Invoke(id); } catch { }
+    }
+    private bool IsRevoked(long id) => Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM api_token WHERE id=$i AND revoked=0", ("$i", id))) == 0;
 
     public static bool Allows(Role have, Role need) => have == Role.Player ? need == Role.None : (int)have >= (int)need;
 

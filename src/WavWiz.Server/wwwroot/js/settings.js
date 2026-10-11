@@ -152,7 +152,8 @@ export async function openSettings(S, refresh, nav, section) {
   function revokeToken(t) {
     const rm = h('input', { type: 'checkbox', checked: true, id: 'rev-rm' });
     dialog(`Revoke “${t.name}”?`, h('div', null, h('p', null, 'This device is signed out at once and can no longer control WavWiz or play music. A player that is still running will say “not paired” and offer to pair again.'),
-      h('label', { class: 'row' }, rm, 'Also remove it from the device list')),
+      h('p', { class: 'small dim' }, 'Speakers it opened in a browser leave the device list at once, on every open page.'),
+      h('label', { class: 'row' }, rm, 'Also remove its WavWiz Player from the device list')),
     [{ text: 'Revoke', cls: 'danger', onclick: async () => { try { await api(`/tokens/${t.id}${rm.checked ? '?removeFromList=1' : ''}`, { method: 'DELETE' }); toast('Revoked'); } catch (e) { toast(e.message, true); return false; } draw(); } }, { text: 'Cancel' }]);
   }
   async function putSettings(o) { try { await api('/settings', { method: 'PUT', body: o }); toast('Saved'); } catch (e) { toast(e.message, true); } }

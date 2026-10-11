@@ -120,15 +120,19 @@ public static class SystemApi
             if (!c.WebSockets.IsWebSocketRequest) return Results.StatusCode(400);
             using var ws = await c.WebSockets.AcceptWebSocketAsync();
             var (id, reader) = s.Events.Subscribe();
+            // 0.2.3 U11: a revoked session loses its live event feed at once (its reconnect is refused, so the page goes back to sign-in/pairing)
+            using var cut = CancellationTokenSource.CreateLinkedTokenSource(c.RequestAborted); var me = c.Who()?.TokenId;
+            Action<long> onRevoke = t => { if (t == me) try { cut.Cancel(); } catch { } };
+            s.Auth.Revoked += onRevoke;
             try
             {
                 await Send(ws, JsonSerializer.Serialize(new { type = "hello", data = new { appVersion = WavWizInfo.Version, channel = WavWizInfo.Channel } }));
-                var recv = Task.Run(async () => { var buf = new byte[1024]; try { while (ws.State == WebSocketState.Open) { var r = await ws.ReceiveAsync(buf, c.RequestAborted); if (r.MessageType == WebSocketMessageType.Close) break; } } catch { } });
-                await foreach (var m in reader.ReadAllAsync(c.RequestAborted)) { await Send(ws, m); if (recv.IsCompleted) break; }
+                var recv = Task.Run(async () => { var buf = new byte[1024]; try { while (ws.State == WebSocketState.Open) { var r = await ws.ReceiveAsync(buf, cut.Token); if (r.MessageType == WebSocketMessageType.Close) break; } } catch { } });
+                await foreach (var m in reader.ReadAllAsync(cut.Token)) { await Send(ws, m); if (recv.IsCompleted) break; }
             }
             catch (OperationCanceledException) { }
             catch (WebSocketException) { }
-            finally { s.Events.Unsubscribe(id); }
+            finally { s.Auth.Revoked -= onRevoke; s.Events.Unsubscribe(id); if (cut.IsCancellationRequested && !c.RequestAborted.IsCancellationRequested) try { ws.Abort(); } catch { } }
             return Results.Empty;
         }).Req(Role.View);
 

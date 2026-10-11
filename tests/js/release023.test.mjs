@@ -154,3 +154,34 @@ test('0.2.3: What\'s new lists the U1-U10 changes in US English; CHANGELOG has t
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
   for (const u of ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10']) assert.match(cl, new RegExp(`[(, ]${u}[,)]`), u);
 });
+
+test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no skipped redraw keeps it, a forgotten browser speaker does not rejoin', () => {
+  const d = src('devices.js');
+  // side panel (Standard + Expanded + zones sidebar): a skipped redraw is retried, and a card whose device is gone forces the redraw
+  assert.match(d, /const removedShown = \(\) => \[\.\.\.body\.querySelectorAll\('\[data-zone-id\]'\)\]\.some\(el => !S\.zones\.some\(z => String\(z\.id\) === el\.dataset\.zoneId\)\)/);
+  assert.match(d, /if \(!force && removedShown\(\)\) force = true;/);
+  const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('function draw(force)') + 900);
+  assert.equal((panel.match(/return later\(\);/g) || []).length, 3, 'slider, menu and zone editor skips all retry');
+  assert.doesNotMatch(panel, /\) return;/);
+  // the phone Devices page follows the same rule
+  const page = d.slice(d.indexOf('export function devicesView'));
+  assert.match(page, /const gone = \[\.\.\.list\.querySelectorAll\('\[data-zone-id\]'\)\]/);
+  assert.match(page, /if \(!gone && root\.querySelector\('\.dmenu'\)\) return later\(\);/);
+  // the "zones" push redraws every view (side panel, page, strip) from fresh /zones + /groups - nothing cached
+  const m = src('main.js');
+  assert.match(m, /m\.type === 'zones'\) \{ refreshZones\(\);/);
+  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; devv\.draw\(\); devp\.draw\(\);/);
+  // a browser speaker told "unauthorized" (forgotten / revoked) stops instead of reconnecting straight back onto the list
+  const r = src('room.js');
+  assert.match(r, /if \(\/\^unauthorized\/i\.test\(b\?\.reason \|\| ''\)\) \{ this\.removed = true; this\.stop\(\)/);
+  // the revoke dialog says what happens
+  assert.match(src('settings.js'), /Speakers it opened in a browser leave the device list at once, on every open page\./);
+});
+
+test('0.2.3 U11: the panel logic - a removed device is detected even while a slider has focus', () => {
+  // the same predicate the panel uses, run on plain data
+  const removedShown = (shownIds, zones) => shownIds.some(id => !zones.some(z => String(z.id) === id));
+  assert.equal(removedShown(['1', '2'], [{ id: 1 }, { id: 2 }]), false);
+  assert.equal(removedShown(['1', '2'], [{ id: 1 }]), true);
+  assert.equal(removedShown([], []), false);
+});

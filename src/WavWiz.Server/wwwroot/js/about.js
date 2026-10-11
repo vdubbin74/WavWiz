@@ -9,6 +9,7 @@ export const WHATS_NEW = [
   ['Lock EQ', 'A Lock EQ checkbox in the Sound (EQ) window keeps the mouse wheel, dragging and clicks from changing the EQ, so scrolling never changes the sound. This device remembers it.'],
   ['Your real EQ in Appearance', 'Settings > Appearance > EQ shows this speaker\'s actual EQ in each style. It opens locked, so you can browse styles safely. Uncheck Lock EQ to make changes.'],
   ['Previews stay in view', 'The Theme, Visualizer, EQ and Now Playing previews stay pinned at the top while you scroll, so the last theme cards preview too. Display size has no preview, because the whole app changes as you pick.'],
+  ['Revoked devices disappear', 'Revoking a phone or browser in Settings > Devices > Paired devices & tokens now removes its speakers from the Devices list right away, on every open page, and it has to pair again. Forget device works at once too.'],
   ['Tidier side panels', 'The Expand buttons point the way each panel moves, and the Devices title sits at the right edge, mirroring Library.'],
 ];
 

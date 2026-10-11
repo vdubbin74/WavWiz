@@ -451,7 +451,27 @@ public sealed class ZoneManager
     }
 
     /// <summary>Forget a device: the server stops trusting it (token revoked, open connection closed with "unauthorized" so a still-running player shows "not paired") and it leaves every list and zone.</summary>
-    public string? RemovePlayer(string playerId)
+    public string? RemovePlayer(string playerId) { RemovePlayerRows(playerId); _ev.Publish("zones"); return null; }
+
+    /// <summary>
+    /// 0.2.3 U11: revoking a token takes everything that token owns off the device list at once. Before, only a PLAYER token (player_id set) was handled and
+    /// only with ?removeFromList=1; revoking a paired phone/browser (a Control token, player_id null) left its "web-…" speakers (player.owner_token_id) in
+    /// every list, still connected and still playing, because a speaker connection is only authorized when it opens. Now: every speaker owned by the token
+    /// (by owner_token_id or by a live session it opened) is removed and its connection closed with "unauthorized"; the token's own player is removed too
+    /// when <paramref name="removePlayer"/> (else it is signed out and stays listed as offline, as before). One "zones" event tells every open page.
+    /// The caller revokes the token first, so a reconnect is refused and the device has to pair again.
+    /// </summary>
+    public IReadOnlyList<string> RemoveOwnedBy(long tokenId, string? tokenPlayerId, bool removePlayer)
+    {
+        var ids = _db.Query("SELECT id FROM player WHERE owner_token_id=$t", r => r.GetString(0), ("$t", tokenId)).ToList();
+        foreach (var s in _host.Sessions) if (s.OwnerTokenId == tokenId && !ids.Contains(s.Id)) ids.Add(s.Id);
+        if (tokenPlayerId != null && removePlayer && !ids.Contains(tokenPlayerId)) ids.Add(tokenPlayerId);
+        foreach (var id in ids) RemovePlayerRows(id);
+        if (tokenPlayerId != null && !removePlayer) _host.Get(tokenPlayerId)?.CloseUnauthorized();
+        _ev.Publish("zones"); return ids;
+    }
+
+    private void RemovePlayerRows(string playerId)
     {
         foreach (var zid in _db.Query("SELECT id FROM zone WHERE player_id=$p", r => r.GetInt64(0), ("$p", playerId))) _db.Exec("DELETE FROM zone_group_member WHERE device_id=$d", ("$d", zid));
         _db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", playerId));
@@ -460,7 +480,6 @@ public sealed class ZoneManager
         _db.Exec("DELETE FROM zone WHERE player_id=$p", ("$p", playerId));
         _db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", playerId));
         _db.Exec("DELETE FROM output_endpoint WHERE player_id=$p", ("$p", playerId));
-        _db.Exec("DELETE FROM player WHERE id=$p", ("$p", playerId)); Rooms.Forget(playerId);
-        _ev.Publish("zones"); return null;
+        _db.Exec("DELETE FROM player WHERE id=$p", ("$p", playerId)); Rooms.Forget(playerId); _lastHealth.Remove(playerId);
     }
 }
