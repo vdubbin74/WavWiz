@@ -240,6 +240,7 @@ export function go(k, force) {
   if (wide()) {                               // desktop layout: Now Playing, Library, Devices & Playlist are always on screen; the rest opens as a page
     if (k === 'now') return;
     if (k === 'library') { toggleLib(false); libC.reload(); if (!force) libC.el.querySelector('input[type=search]')?.focus(); return; }
+    if (k === 'devices') { if (pageDlg) { pageDlg.close(); pageDlg = null; } toggleDevExpanded(true); return; }   // 0.2.2 T8: same as Menu > Devices & zones
     if (k === 'queue') { listt.el.classList.add('flash'); setTimeout(() => listt.el.classList.remove('flash'), 900); return; }
     return openPage(k);
   }

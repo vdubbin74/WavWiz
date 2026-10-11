@@ -16,7 +16,8 @@ function menuActions(S, ctl, desktop = false) {
   const wideNow = () => { try { return !matchMedia('(max-width:900px)').matches; } catch { return true; } };
   // 0.2.1 F2: "Browse library" always opens the Expanded Library (no separate "Expanded library" item); the phone opens the full Library page.
   const browseLib = () => (desktop && wideNow() && ctl.toggleLibExpanded ? ctl.toggleLibExpanded(true) : go('library'));
-  const devPanel = () => (desktop && wideNow() && ctl.toggleDev ? ctl.toggleDev() : go('devices'));
+  // 0.2.2 T8: "Devices & zones" always opens the EXPANDED Devices view on the desktop, from any state (like Browse library); the phone keeps its page.
+  const devPanel = () => (desktop && wideNow() && ctl.toggleDevExpanded ? ctl.toggleDevExpanded(true) : go('devices'));
   const listPanel = () => (desktop && wideNow() && ctl.toggleList ? ctl.toggleList() : go('queue'));      // 0.1.1: desktop slides the bottom Playlist; phone opens the full page
   const admin = () => S.auth?.role === 'admin';
   const control = () => canControl(S);

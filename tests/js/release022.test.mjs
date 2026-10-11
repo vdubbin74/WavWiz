@@ -75,3 +75,10 @@ test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expa
   assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);
   assert.doesNotMatch(css, /\.desk\.libexpanded \.libpanel \.pane-h \.plus:not\(\.libexp\)\{display:none\}/);
 });
+
+test('0.2.2 T8: Menu > Devices > Devices & zones always opens the EXPANDED Devices view on the desktop; phone keeps the page', () => {
+  const mn = src('menu.js'), m = src('main.js');
+  assert.match(mn, /const devPanel = \(\) => \(desktop && wideNow\(\) && ctl\.toggleDevExpanded \? ctl\.toggleDevExpanded\(true\) : go\('devices'\)\)/);
+  assert.match(m, /if \(k === 'devices'\) \{ if \(pageDlg\) \{ pageDlg\.close\(\); pageDlg = null; \} toggleDevExpanded\(true\); return; \}/);
+  assert.match(m, /if \(sz !== 'collapsed' && desk\.classList\.contains\('libexpanded'\)\) toggleLibExpanded\(false\)/);
+});
