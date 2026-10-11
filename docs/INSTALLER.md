@@ -1,13 +1,13 @@
 # Installer (WavWiz BETA)
 
 **Full self-contained installer only** (`WavWiz-Setup-<version>.exe`); the target PCs have no .NET. There is no slim variant.
-Unsigned. **Built and compiled on Linux (Inno Setup under Wine); never run on Windows yet.**
+Unsigned. Built and compiled on Linux (Inno Setup under Wine); installs and upgrades are tested by hand on Windows PCs.
 
 ## Wizard
 Welcome (BETA) > info page (what it does / never does) > folder > components (Server, Player) > **home-network address** (server only; auto-detected, editable, 0.0.0.0 refused) or **server address** (player-only) > tasks (player autostart, desktop link) > ready memo > install > final page (open the first-run web page, start the player).
 Silent: `/VERYSILENT /SUPPRESSMSGBOXES /COMPONENTS="server,player" /LANIP=192.168.1.20` (`/SERVERHOST=<addr>` seeds the player-only address). Without `/LANIP` the setup script keeps the address in an existing `server.json`, else detects one, else uses 127.0.0.1 with a notice. Other switches: `/SKIPSETUP=1`, `/NOSTART=1`; uninstall `/PURGE=1`.
 
-## Silent install switches (0.2.0, checked against `installer/WavWiz.iss` and `installer/scripts/setup.ps1`; prep for a future winget listing - nothing is published)
+## Silent install switches (checked against `installer/WavWiz.iss` and `installer/scripts/setup.ps1`)
 WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our own. Run from an elevated prompt (the installer needs admin: it installs a service and firewall rules).
 
 | Switch | Meaning |
@@ -37,7 +37,7 @@ WavWiz-Setup-0.2.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="pla
 
 **Upgrades:** the same AppId is used for every version, so running a newer installer upgrades in place; `C:\ProgramData\WavWiz` (library database, settings, admin password, paired devices) is kept, the service is re-configured, not re-created. Running the same version again repairs the install (idempotent).
 
-## Store / directory icon (0.2.0 item 19)
+## Store / directory icon
 Transparent square icons for listings (Uptodown, winget manifests, etc.): `assets/logo/wavwiz-1024-transparent.png`, `wavwiz-512-transparent.png`, `wavwiz-256-transparent.png` (real alpha outside the rounded tile). `assets/logo/wavwiz.ico` (16-256 px) is made from the same transparent art and is used for the installer, the Player and the shortcuts. The opaque `wavwiz-<size>.png` files stay for the web app and the wizard images.
 
 ## What setup does (installer\scripts, Windows PowerShell 5.1, each step in its own time-limited child process)
@@ -51,8 +51,8 @@ No hidden window waits for input; no WinForms from the hidden process (`show-not
 `pwsh build/build.ps1` (publish self-contained win-x64 + pinned ffmpeg), `pwsh build/make-installer.ps1` (ISCC; Wine on Linux: set `RR_ISCC`).
 Tests: `pwsh tests/pwsh/install-flow.tests.ps1`, `pwsh tools/scan-ps51.ps1`, `python3 tests/ui-smoke/smoke.py --dll <wavwiz-server.dll>`.
 
-## Not verified on Windows
-PowerShell 5.1 itself, real sc.exe/netsh/icacls behavior, UAC, the Inno wizard pages, SmartScreen, the service as LocalService (file permissions, UNC), firewall behavior, WebView2, WASAPI, DPAPI, tray, autostart.
+## Windows testing
+The automated tests in this repository run on Linux (pwsh with shims, ISCC under Wine). Since 0.2.2, installing, upgrading over a running WavWiz, the service and the Player are also checked by hand on real Windows PCs; PowerShell 5.1, sc.exe/netsh/icacls, UAC, the wizard pages, SmartScreen, firewall rules, WebView2, WASAPI and DPAPI are covered only by those manual installs.
 
 ## 0.0.2 notes
 * Installer is `WavWiz-Setup-0.0.2.exe` (full, self-contained only). Running it over 0.0.1 is an upgrade: `server.json`, the database (library, playlists, settings), the administrator password, paired players and the player defaults are kept; the service is re-configured, not re-created; the firewall rules are replaced (the UDP rule now also opens 47803 discovery and 5353 mDNS).

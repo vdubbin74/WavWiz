@@ -31,12 +31,15 @@ After Server install, open the WavWiz web page (shortcut or the address the wiza
 1. Choose a strong **administrator password** when prompted.
 2. You will need it for Settings that change the house (library folders, network options, Spotify Connect, and so on).
 3. Ordinary listening from phones can use pairing / normal access without giving everyone the admin password.
+4. On a paired device you can switch to admin at any time with **File → Sign in as admin…** (no sign-out, no new pairing code); **File → Leave admin mode** switches back. An **Admin** chip shows while it is on. Admin-only items stay visible but read-only for everyone else.
+
+A short **Getting started** guide opens on first run; reopen it any time from **Help → Getting started**.
 
 If you forget the admin password, use the **password reset** path documented for your version (reset on the **server PC only**; your music library files stay put).
 
 ## 4. Add music folders
 
-In **Settings → Library** (wording may vary slightly by beta):
+In **File → Settings… → Library → Music folders**:
 
 1. Add the folder(s) where your files live (local disks are simplest).
 2. Let WavWiz scan; browse by artist / album / genre / folders.
@@ -47,12 +50,40 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 
 ## 5. Pair players and phones
 
-- **Player PCs:** install Player; it usually finds the server. If asked, enter the pairing code from Settings → pair a phone or PC player.
-- **Phones:** open the server URL on the same Wi-Fi; complete pairing if prompted. Sound on iPhone often needs a first tap to unlock audio.
+- **Player PCs:** install Player; it usually finds the server. If asked, type the 6-digit code from **Settings → Devices → Pair a phone or a PC player** (or **Devices → Pair a player…**).
+- **Phones and browsers:** open the server's address on the same Wi-Fi and complete pairing if prompted. Every browser that opens WavWiz joins as a speaker by itself, with a readable name such as "Chrome on Windows". Sound on iPhone often needs a first tap to unlock audio.
+- **Removing a device:** **Settings → Devices → Paired devices & tokens → Revoke** (or **Forget device…** in a device card's settings) removes it from the Devices list on every open page right away; it has to pair again to come back.
 
-Use **per-device delay (0–1000 ms)** if Bluetooth speakers or TVs lag behind other rooms.
+## 6. Devices, zones and delay
 
-## 6. AirPlay tip (VPN / isolation)
+- **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
+- **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
+- Each device card has a **Settings** button with an arrow. It opens that device's settings right under the card: **Set delay by ear**, **Test sound**, the exact delay, **Sound / EQ…**, its audio output, connection details, **Rename…**, **Set as reference** and **Forget device…**. Click it again or press **Esc** to close.
+- Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other rooms. On PCs the delay is kept per audio output.
+
+### Calibrate with your phone
+
+**Devices → Calibrate speakers…** measures each speaker's delay with a phone microphone. The music pauses while it measures and resumes afterwards, and it waits for you to walk to the next speaker.
+
+1. A phone only allows its microphone on a trusted HTTPS page. Once, as admin, open **Settings → Devices → Phone & HTTPS → Set up HTTPS**, then scan the QR code with each phone and follow the steps to install WavWiz's certificate (about two minutes).
+2. In Calibrate speakers, use **Use your phone as the microphone**: scan the QR code (or type the short link) on the phone and follow the numbered steps. The line under it shows when the phone is connected. Links expire after 20 minutes.
+3. A link made by an administrator also signs the phone in and lets it calibrate every speaker; other users can calibrate only their own device.
+
+## 7. Settings and appearance
+
+Menus do things, Settings sets things:
+
+- **File:** Settings…, Sign in as admin… / Leave admin mode, Sign out
+- **Library:** Browse library (opens the Expanded library), Playlists, Queue, Rescan folders, plus admin tools (Tidy up library, Tag & cover fix…, CD ripper…)
+- **Playback:** Play / Pause, Next, Previous, Internet radio, Sound / EQ…
+- **Devices:** Devices & zones, Scenes, Schedules, Calibrate speakers…, Pair a player…, Away-from-home…
+- **Help:** Getting started, Diagnostics, What's new, About WavWiz…
+
+**Settings** has four tabs: **Appearance**, **Devices**, **Library** and **Network**. Appearance has its own sub-pages: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
+
+**Lock EQ:** the Sound (EQ) window and **Appearance → EQ** have a **Lock EQ** checkbox. When it is checked, the EQ sliders ignore the mouse wheel, dragging, clicks and keys, so scrolling the page never changes the sound. Each device remembers it (off by default; unlocked, the wheel fine-tunes a slider in 0.5 dB steps). **Appearance → EQ** shows this speaker's real EQ and always opens locked; uncheck it to make changes, which are saved to the speaker's own preset.
+
+## 8. AirPlay tip (VPN / isolation)
 
 AirPlay discovery uses your **local** network (multicast / mDNS). Many **VPN** clients, “kill switches,” or “network isolation” modes hide LAN devices.
 
@@ -62,22 +93,22 @@ If **WavWiz – Whole House** does not appear on iPhone, iPad, or Mac:
 2. Pause or disconnect the **VPN** (or allow LAN access in the VPN app).
 3. Confirm Windows network is **Private** and WavWiz Server is running.
 4. Retry AirPlay from Control Center / the app’s AirPlay icon.
-5. Still stuck? Open **Diagnostics** and use **Restart AirPlay** (and **Clear orphans** if it lists leftover receiver processes).
+5. Still stuck? Open **Help → Diagnostics** and use **Restart AirPlay** (and **Clear orphans** if it lists leftover receiver processes).
 
 AirPlay is built in for this beta; WavWiz is **not** affiliated with Apple. AirPlay is a trademark of Apple Inc.
 
-## 7. Spotify Connect (optional, Premium)
+## 9. Spotify Connect (optional, Premium)
 
 Spotify Connect is **off by default**.
 
 1. Sign in to Spotify on your phone with **Spotify Premium** (required).
-2. In WavWiz, as admin, enable Spotify Connect under network / admin settings.
+2. In WavWiz, as admin, turn on **Spotify Connect** in **Settings → Network → AirPlay & Spotify Connect**.
 3. Choose WavWiz in Spotify’s device list; audio should play through the house sync pipeline.
 
 This uses an **unofficial** open-source client. WavWiz does not store your Spotify password. Spotify is a trademark of Spotify AB; WavWiz is not affiliated with Spotify.
 
-## 8. When something goes wrong
+## 10. When something goes wrong
 
-Open **Diagnostics** in the app, copy the text, and include it with your version and OS in a [GitHub Issue](https://github.com/vdubbin74/WavWiz/issues). See [SUPPORT.md](../SUPPORT.md).
+Open **Help → Diagnostics** in the app, copy the text, and include it with your version and OS in a [GitHub Issue](https://github.com/vdubbin74/WavWiz/issues). See [SUPPORT.md](../SUPPORT.md).
 
 Security problems: email **vdubbin74@proton.me** only — see [SECURITY.md](../SECURITY.md).

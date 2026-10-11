@@ -10,7 +10,7 @@
 
 **Whole-home audio wizardry.**
 
-WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on your PCs, phones, and tablets. Phones play from the browser, with no app to install. No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag/cover lookups, and the optional Spotify Connect reach the internet when you use them.)
+WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on your PCs, phones, and tablets. Phones play from the browser, with no app to install. No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
 
 > **Public beta.** Expect rough edges and frequent updates. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
@@ -20,19 +20,25 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Screenshots
 
-![WavWiz main window with the library, visualizer, Now Playing, three connected devices and the playlist](docs/img/wavwiz-main.png)
+![WavWiz main window with the library, Now Playing, three connected devices and the playlist](docs/img/wavwiz-main.png)
 
-| Phone (browser) | Per-device delay | Add a music folder |
+| Device settings, opened in place | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
 | --- | --- | --- |
-| ![WavWiz Now Playing on a phone](docs/img/wavwiz-phone.png) | ![Per-device delay slider for Living Room, with Kitchen and Patio in the device list](docs/img/wavwiz-delay.png) | ![Settings, Music folders with a network folder being added](docs/img/wavwiz-settings-library.png) |
+| ![Two device cards, one opened to show sound check, exact delay, Sound / EQ, connection and Rename / Set as reference / Forget](docs/img/wavwiz-device-settings.png) | ![The 10-band EQ in the LED look with Lock EQ checked](docs/img/wavwiz-eq-lock.png) | ![Theme cards with the live preview pinned at the top](docs/img/wavwiz-appearance-theme.png) |
+
+**Minimized Now Playing: everything on one line**
+
+![Minimized Now Playing bar with cover, title, progress and every control on one line, and the Playlist bar showing Up next](docs/img/wavwiz-minimized-bar.png)
+
+| Phone (browser) | Add a music folder |
+| --- | --- |
+| ![WavWiz Now Playing on a phone](docs/img/wavwiz-phone.png) | ![Settings, Music folders with a network folder being added](docs/img/wavwiz-settings-library.png) |
 
 **Visualizers**
 
-| Graphic EQ | Ring | Speaker cone |
-| --- | --- | --- |
-| ![Graphic EQ visualizer](docs/img/wavwiz-viz-graphic-eq.png) | ![Ring visualizer](docs/img/wavwiz-viz-ring.png) | ![Speaker cone visualizer](docs/img/wavwiz-viz-speaker-cone.png) |
-| **Terrain** | **VU meters** | |
-| ![Terrain visualizer](docs/img/wavwiz-viz-terrain.png) | ![VU meters visualizer](docs/img/wavwiz-viz-vu-meters.png) | |
+| Graphic EQ | Ring | Speaker cone | VU meters |
+| --- | --- | --- | --- |
+| ![Graphic EQ visualizer](docs/img/wavwiz-viz-graphic-eq.png) | ![Ring visualizer](docs/img/wavwiz-viz-ring.png) | ![Speaker cone visualizer](docs/img/wavwiz-viz-speaker-cone.png) | ![VU meters visualizer](docs/img/wavwiz-viz-vu-meters.png) |
 
 **Themes**
 
@@ -48,13 +54,17 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Features
 
-- **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. No sync measurements are published yet.
-- **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers, TV audio, and Wi-Fi PCs line up instead of echoing between rooms.
+- **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. Every browser that opens WavWiz joins as a speaker by itself. No sync measurements are published yet.
+- **Devices and zones** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. Each device card opens its settings in place: sound check, exact delay, Sound / EQ, audio output, connection, Rename, Set as reference, and Forget. Optional zones (for example “Downstairs”) in a sidebar. Revoking a device removes it everywhere at once; it has to pair again.
+- **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers and Wi-Fi PCs line up instead of echoing between rooms; on PCs the delay is kept per audio output. **Calibrate speakers** measures it with your phone as the microphone (scan a QR code; needs the one-time HTTPS setup). The music pauses while it measures.
 - **AirPlay, built in** — The server appears as the AirPlay speaker **WavWiz – Whole House**. Send audio from apps on iPhone, iPad, or Mac; it plays in every room in sync, with title and artwork on Now Playing.
-- **Optional Spotify Connect** — Off by default. Turn it on in Admin settings; WavWiz appears in Spotify’s device list and streams to every room. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
-- **Library** — Browse artists, albums, genres, and folders; playlists; queue; internet radio; optional CD ripping, and missing tags/covers suggested from MusicBrainz (nothing is written until you approve it). Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
-- **Zones** — Group devices (for example “Downstairs”) with per-device volume and on/off.
-- **Visualizers** — Eight original looks (Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Terrain, VU meters, Graphic EQ), each with its own 0–100% effect controls, a Quality setting (Auto / Low / High / Ultra), and GPU post effects.
+- **Optional Spotify Connect** — Off by default. Turn it on in Settings → Network; WavWiz appears in Spotify’s device list and streams to every room. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
+- **Library** — Big cover tiles, album pages, artists, genres, and folders, with sorting and a letter strip on every tab, favorites (hearts), playlists, queue, internet radio, and optional CD ripping. Missing covers and artist photos are looked up online (MusicBrainz, Cover Art Archive, Wikidata / Wikimedia Commons, TheAudioDB; can be switched off), and anything still missing gets a generated cover in your theme colors. Missing tags/covers can be suggested from MusicBrainz (nothing is written until you approve it). Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
+- **Now Playing** — Four control panel styles (Classic, Center, Stack, Horizon) with adjustable panel effects. Minimized, the whole panel fits on one line in your style and theme, and the minimized Playlist shows what's up next.
+- **10-band EQ per speaker** — Three looks (LED bars, Studio faders, Spectrum curve), pre-gain, loudness and limiter. **Lock EQ** keeps the mouse wheel and stray clicks from changing it.
+- **Visualizers** — Eight original looks (Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Spectrum, VU meters, Graphic EQ), each with its own 0–100% effect controls (50% default), a Quality setting (Auto / Low / High / Ultra), and GPU post effects.
+- **Themes** — Ten presets plus Custom colors (Background, Main, Second, Highlight, Text). Settings → Appearance has live, pinned previews for Theme, Visualizer, EQ, and Now Playing.
+- **Admin mode** — File → Sign in as admin… unlocks house settings on any paired device without signing out; admin-only items are read-only (never hidden) for everyone else.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.
 
 AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. WavWiz is not affiliated with either.
@@ -80,9 +90,12 @@ The installer is **not Authenticode-signed yet**, so Windows SmartScreen may war
 1. Open [Releases](https://github.com/vdubbin74/WavWiz/releases/latest) and download the latest `WavWiz-Setup-*.exe`.
 2. Verify the published SHA-256 if one is listed on the release.
 3. Run the installer:
-   - On the music PC: install **WavWiz Server**, keep the **Private / home-network** address (do not bind to all interfaces), finish, open the web UI, set an administrator password, add music folders.
-   - On each PC with speakers: install **WavWiz Player**; it discovers the server—pair with the code from Settings if asked.
-4. Read [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for Private network, AirPlay, and optional Spotify Connect tips.
+   - On the music PC: install **WavWiz Server**, keep the **Private / home-network** address (do not bind to all interfaces), finish, open the web UI, set an administrator password, and add music folders in **File → Settings… → Library**.
+   - On each PC with speakers: install **WavWiz Player**; it discovers the server—pair with the 6-digit code from **Settings → Devices** if asked.
+   - On phones and tablets: open the server's web page in the browser on your home Wi-Fi.
+4. Read [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for Private network, devices and calibration, the menus and Settings, AirPlay, and optional Spotify Connect tips.
+
+Upgrading? Run the new installer over the old one, even while WavWiz is running; it closes WavWiz first and keeps your library, settings, and pairings.
 
 More detail: [wavwiz.com](https://wavwiz.com).
 

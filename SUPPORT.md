@@ -24,7 +24,7 @@ WavWiz is a **public beta**. Best-effort help from the community and maintainers
 - **Windows version** (and whether the problem is on Server PC, Player PC, or phone browser)
 - **What you expected** vs **what happened**
 - **Steps to reproduce**
-- A copy of **Diagnostics** from the app (Settings / Diagnostics — paste text; redact personal folder paths if you prefer)
+- A copy of **Diagnostics** from the app (Help → Diagnostics — paste text; redact personal folder paths if you prefer)
 - Whether AirPlay or Spotify Connect was involved
 - Screenshots or short clips when UI-related
 

@@ -145,14 +145,16 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
   assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);   // same title color
 });
 
-test('0.2.3: What\'s new lists the U1-U10 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
+test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
   const a = src('about.js');
   assert.match(a, /WHATS_NEW_VERSION = '0\.2\.3'/);
   for (const t of ['Now Playing on one line', 'Up next', 'Lock EQ', 'Your real EQ in Appearance', 'Previews stay in view', 'Tidier side panels']) assert.ok(a.includes(t), t);
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
-  for (const u of ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10', 'U11', 'U12']) assert.match(cl, new RegExp(`[(, ]${u}[,)]`), u);
+  // the public changelog names each 0.2.3 change in words (no internal item codes)
+  for (const t of ['Minimized Now Playing is one line', 'Minimized Playlist shows "Up next"', 'follows the selected control panel style and theme', 'Display size', 'Pinned previews', 'Expand buttons', 'Devices header', 'Device cards open into their settings', 'Appearance > EQ shows the real EQ', 'Lock EQ', 'Revoking a device removes it from the Devices list']) assert.ok(cl.includes(t), t);
+  assert.doesNotMatch(cl, /\bU\d+\b/);
 });
 
 test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no skipped redraw keeps it, a forgotten browser speaker does not rejoin', () => {

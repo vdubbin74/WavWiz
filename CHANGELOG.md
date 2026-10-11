@@ -10,35 +10,31 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
-### Planned
-
-Items below are on the roadmap (not promised for a specific date):
-
-- Authenticode code signing for the public installer (planned for 1.0.0)
+Nothing yet.
 
 ## [0.2.3] - 2026-10-11 (beta)
 
-Fine-tunes on top of 0.2.2 (which was not published on its own); 0.2.3 includes everything from 0.2.2.
+First public release since 0.1.3. Versions 0.2.0, 0.2.1 and 0.2.2 were test builds and were not published on their own; their changes are listed below and are all included in 0.2.3.
 
 ### Changed
 
-- **Minimized Now Playing is one line (U1):** album thumbnail, title · artist over the progress bar (elapsed / total), then heart, shuffle, previous, Play / Pause, next, repeat, volume + %, mute and EQ, all on the Now Playing bar and scaled to fit (less important pieces drop out first on narrow columns). Nothing moves to the Playlist title bar any more, and Play / Pause is no longer forced to the center.
-- **Minimized Playlist shows "Up next" (U2):** the next song in the queue (cover, title · artist), centered on the Now Playing column; the track count, Save as playlist and Clear stay at the right.
-- **The one-line bar follows the selected control panel style and theme (U3):** Classic (progress ring around the thumbnail, glowing round Play), Center (soft buttons, waveform seek, spinning record thumbnail), Stack (small LCD window, LED-block seek, squared buttons), Horizon (glowing thumbnail, seek line flowing from it, ring buttons), in the theme's Main / Second colors; the panel effect sliders apply.
-- **Settings > Appearance > Display size** has no preview pane (U4); the whole app already changes live.
-- **Pinned previews (U5, U8):** the Theme, Visualizer, EQ and Now Playing live previews stay at the top of the page while the settings below scroll, at every Display size (the pinned preview shrinks on short windows).
-- **Expand buttons (U6)** point the way the panel travels: Devices expands to the left and returns to the right; Library is the mirror image.
-- **Devices header (U7):** the DEVICES title sits at the right edge, a true mirror of LIBRARY.
-- **Device cards open into their settings (U12):** the ••• button on each device card is now a themed chevron **Settings** button (it matches the Library / Devices expand arrows). It opens the device's settings (sound check, exact delay, Sound / EQ, connection, Rename / Set as reference / Forget) downward under the card, in place, in both the Standard and Expanded Devices views; the chevron flips, and the button or Esc closes them. Admin-only items stay visible but read-only for other users. Each card remembers being open for the browser session.
-- **Appearance > EQ shows the real EQ (U10):** the preview mirrors this device's speaker (bands, preset, pre-gain, loudness), live, in the chosen style. It opens with Lock EQ checked every time; unchecked, changes play at once and are kept in the speaker's own preset ("<speaker> EQ").
+- **Minimized Now Playing is one line:** album thumbnail, title · artist over the progress bar (elapsed / total), then heart, shuffle, previous, Play / Pause, next, repeat, volume + %, mute and EQ, all on the Now Playing bar and scaled to fit (less important pieces drop out first on narrow columns). Nothing moves to the Playlist title bar any more, and Play / Pause is no longer forced to the center.
+- **Minimized Playlist shows "Up next":** the next song in the queue (cover, title · artist), centered on the Now Playing column; the track count, Save as playlist and Clear stay at the right.
+- **The one-line bar follows the selected control panel style and theme:** Classic (progress ring around the thumbnail, glowing round Play), Center (soft buttons, waveform seek, spinning record thumbnail), Stack (small LCD window, LED-block seek, squared buttons), Horizon (glowing thumbnail, seek line flowing from it, ring buttons), in the theme's Main / Second colors; the panel effect sliders apply.
+- **Settings > Appearance > Display size** has no preview pane; the whole app already changes live.
+- **Pinned previews:** the Theme, Visualizer, EQ and Now Playing live previews stay at the top of the page while the settings below scroll, at every Display size (the pinned preview shrinks on short windows).
+- **Expand buttons** point the way the panel travels: Devices expands to the left and returns to the right; Library is the mirror image.
+- **Devices header:** the DEVICES title sits at the right edge, a true mirror of LIBRARY.
+- **Device cards open into their settings:** the ••• button on each device card is now a themed chevron **Settings** button (it matches the Library / Devices expand arrows). It opens the device's settings (sound check, exact delay, Sound / EQ, connection, Rename / Set as reference / Forget) downward under the card, in place, in both the Standard and Expanded Devices views; the chevron flips, and the button or Esc closes them. Admin-only items stay visible but read-only for other users. Each card remembers being open for the browser session.
+- **Appearance > EQ shows the real EQ:** the preview mirrors this device's speaker (bands, preset, pre-gain, loudness), live, in the chosen style. It opens with Lock EQ checked every time; unchecked, changes play at once and are kept in the speaker's own preset ("<speaker> EQ").
 
 ### Added
 
-- **Lock EQ (U9):** a checkbox with a padlock in the Sound (EQ) window header and on the Appearance > EQ preview. Locked, the EQ sliders ignore the mouse wheel (the page scrolls instead), dragging, clicks and keys, and look slightly dimmed with a small lock. Remembered per device; off by default (the wheel still fine-adjusts in 0.5 dB steps).
+- **Lock EQ:** a checkbox with a padlock in the Sound (EQ) window header and on the Appearance > EQ preview. Locked, the EQ sliders ignore the mouse wheel (the page scrolls instead), dragging, clicks and keys, and look slightly dimmed with a small lock. Remembered per device; off by default (the wheel still fine-adjusts in 0.5 dB steps).
 
 ### Fixed
 
-- **Revoking a device removes it from the Devices list (U11):** revoking a paired phone or browser (Settings > Devices > Paired devices & tokens) left the speakers it had opened in that browser on every Devices list, still connected and playing, because only WavWiz Player tokens were handled. Now everything the token owns leaves the list at once on every open page (Standard, Expanded, zones and the Devices page), its connections close, and it has to pair again. Forget device on a browser speaker no longer lets it rejoin straight away, and a list that was busy (a slider, menu or zone editor open) no longer keeps a removed device.
+- **Revoking a device removes it from the Devices list:** revoking a paired phone or browser (Settings > Devices > Paired devices & tokens) left the speakers it had opened in that browser on every Devices list, still connected and playing, because only WavWiz Player tokens were handled. Now everything the token owns leaves the list at once on every open page (Standard, Expanded, zones and the Devices page), its connections close, and it has to pair again. Forget device on a browser speaker no longer lets it rejoin straight away, and a list that was busy (a slider, menu or zone editor open) no longer keeps a removed device.
 
 ## [0.2.2] - 2026-10-10 (beta)
 
@@ -95,6 +91,36 @@ Fine-tunes on top of 0.2.2 (which was not published on its own); 0.2.3 includes 
 - The Library filter box lost focus after every keystroke.
 - Menus now switch on hover while one is open, like Windows.
 - The silent installer returned exit code 0 even when a setup step failed.
+
+## [0.2.0] - 2026-10-08 (beta)
+
+### Added
+
+- **Every browser is a speaker:** any desktop, phone or tablet browser that opens WavWiz joins as a speaker by itself, with a readable name (for example "Chrome on Windows"). The separate "This phone as a device" page is gone.
+- **Safe start for slower browsers:** the visualizer starts after the page is ready, a stall watchdog switches to a lighter mode if the page freezes, and `?lite` opens the light layout directly.
+- **Getting started:** one short guide on first run and from Help > Getting started (speakers, test sound, next steps).
+- **Sign in as admin / Leave admin mode** (File menu): unlock admin settings in place without signing out or pairing again; an Admin chip shows while it is on. Admin-only items are read-only for everyone else, never hidden.
+- **Master volume** at the top of Devices, and a Mute button on every speaker.
+- **Outputs:** each PC speaker shows its audio output, can switch it, and keeps its delay (0–1000 ms) per output.
+- **Set as reference:** pick a house reference speaker once; calibration uses it by default.
+- **Four Now Playing styles:** Classic (default), Center, Stack and Horizon, each with Panel effects sliders (50% default).
+- **Ten theme presets**, including Blue Steel, an all-green Pepecoin, Nebula and Lime Circuit; custom themes with more color pickers.
+- **Library:** sorting with a flip button and a letter strip on every tab, favorites (hearts) with a Favorites tab, a cover grid, and the big Expanded library view.
+- **Spectrum visualizer** (smooth rounded bars in the theme colors with a glossy reflection), every effect 0–100% with a 50% default.
+- **What's new** pop-up, shown once after an update.
+- Transparent square app icons; silent-install switches, exit codes and upgrade behavior documented in [docs/INSTALLER.md](docs/INSTALLER.md).
+
+### Changed
+
+- The volume and Mute on the Now Playing panel control only the device you are using; the header chips only show status.
+- Regular users can set the delay and output of their own device; house-wide settings stay with the administrator.
+- **Calibration** pauses the music and resumes it afterwards, re-syncs the clock before every recording, and waits for you to walk to the next speaker, with a Wi-Fi meter.
+- The About box and privacy note now say plainly which features reach the internet (internet radio, tag and cover lookups, Spotify Connect).
+- MusicBrainz lookups identify themselves with the current WavWiz version.
+
+### Removed
+
+- The Terrain visualizer (a saved Terrain choice switches to Spectrum).
 
 ## [0.1.3] - 2026-10-07 (first public beta)
 
