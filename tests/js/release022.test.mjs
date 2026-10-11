@@ -130,7 +130,7 @@ test('0.2.2 T6: the Pepecoin logo in the Themes menu is about 20% smaller; still
 test('0.2.2: What\'s new lists the 0.2.2 changes in US English; CHANGELOG has the 0.2.2 entry; TheAudioDB credited', () => {
   const a = src('about.js');
   assert.match(a, /WHATS_NEW_VERSION = '0\.2\.[2-9]'/);
-  for (const t of ['Now Playing folds down to one line', 'Appearance in sections', 'Use your phone as the microphone', 'Devices works like the Library', 'More artist pictures', 'Smoother updates on Windows', 'Fixes']) assert.ok(a.includes(t), t);
+  // 0.2.3: What's new moved on to the 0.2.3 list (0.2.2 was never published on its own; its changes stay in the CHANGELOG)
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.2\] - 2026-10-10 \(beta\)/); assert.ok(cl.indexOf('## [0.2.2]') < cl.indexOf('## [0.2.1]'));

@@ -144,3 +144,13 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
   assert.match(m, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
   assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);   // same title color
 });
+
+test('0.2.3: What\'s new lists the U1-U10 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
+  const a = src('about.js');
+  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.3'/);
+  for (const t of ['Now Playing on one line', 'Up next', 'Lock EQ', 'Your real EQ in Appearance', 'Previews stay in view', 'Tidier side panels']) assert.ok(a.includes(t), t);
+  assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
+  const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
+  assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
+  for (const u of ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10']) assert.match(cl, new RegExp(`[(, ]${u}[,)]`), u);
+});

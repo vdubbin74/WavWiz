@@ -16,6 +16,25 @@ Items below are on the roadmap (not promised for a specific date):
 
 - Authenticode code signing for the public installer (planned for 1.0.0)
 
+## [0.2.3] - 2026-10-11 (beta)
+
+Fine-tunes on top of 0.2.2 (which was not published on its own); 0.2.3 includes everything from 0.2.2.
+
+### Changed
+
+- **Minimized Now Playing is one line (U1):** album thumbnail, title · artist over the progress bar (elapsed / total), then heart, shuffle, previous, Play / Pause, next, repeat, volume + %, mute and EQ, all on the Now Playing bar and scaled to fit (less important pieces drop out first on narrow columns). Nothing moves to the Playlist title bar any more, and Play / Pause is no longer forced to the center.
+- **Minimized Playlist shows "Up next" (U2):** the next song in the queue (cover, title · artist), centered on the Now Playing column; the track count, Save as playlist and Clear stay at the right.
+- **The one-line bar follows the selected control panel style and theme (U3):** Classic (progress ring around the thumbnail, glowing round Play), Center (soft buttons, waveform seek, spinning record thumbnail), Stack (small LCD window, LED-block seek, squared buttons), Horizon (glowing thumbnail, seek line flowing from it, ring buttons), in the theme's Main / Second colors; the panel effect sliders apply.
+- **Settings > Appearance > Display size** has no preview pane (U4); the whole app already changes live.
+- **Pinned previews (U5, U8):** the Theme, Visualizer, EQ and Now Playing live previews stay at the top of the page while the settings below scroll, at every Display size (the pinned preview shrinks on short windows).
+- **Expand buttons (U6)** point the way the panel travels: Devices expands to the left and returns to the right; Library is the mirror image.
+- **Devices header (U7):** the DEVICES title sits at the right edge, a true mirror of LIBRARY.
+- **Appearance > EQ shows the real EQ (U10):** the preview mirrors this device's speaker (bands, preset, pre-gain, loudness), live, in the chosen style. It opens with Lock EQ checked every time; unchecked, changes play at once and are kept in the speaker's own preset ("<speaker> EQ").
+
+### Added
+
+- **Lock EQ (U9):** a checkbox with a padlock in the Sound (EQ) window header and on the Appearance > EQ preview. Locked, the EQ sliders ignore the mouse wheel (the page scrolls instead), dragging, clicks and keys, and look slightly dimmed with a small lock. Remembered per device; off by default (the wheel still fine-adjusts in 0.5 dB steps).
+
 ## [0.2.2] - 2026-10-10 (beta)
 
 ### Added

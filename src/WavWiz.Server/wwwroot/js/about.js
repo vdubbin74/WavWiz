@@ -4,13 +4,12 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.2.3';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  ['Now Playing folds down to one line', 'Collapse the control panel and every control stays on one strip, with Play / Pause right in the middle. The song, its cover and the progress bar move up into the Playlist bar, and the visualizer gets the extra room.'],
-  ['Appearance in sections', 'Settings > Appearance has its own menu on the left: Theme, Visualizer, EQ, Now Playing and Display size. Theme and Visualizer are the big pages you liked from 0.2.0 again, and every section shows a live preview.'],
-  ['Use your phone as the microphone', 'Devices > Calibrate speakers shows a QR code. Scan it, install the WavWiz certificate once if asked, allow the microphone and follow the prompts. The PC page shows when your phone is connected.'],
-  ['Devices works like the Library', 'The Devices header is a mirror image of the Library header, the arrow and Expand button behave the same in both, and Devices & zones always opens the expanded view.'],
-  ['More artist pictures', 'Artists without a photo show their album covers, four at a time. Photos also come from TheAudioDB now, missing pictures are tried again later, and Settings > Library shows how many were found, with a Retry button.'],
-  ['Smoother updates on Windows', 'The installer closes a running WavWiz by itself and starts it again afterwards. The Player opens its window when you start it from the Start menu, and a second start brings the open window to the front.'],
-  ['Fixes', 'The Auto pre-gain badge no longer covers the Loudness switch, the status bar shows "Reconnecting…" only when the connection drops (the top-right light shows Connected), and the Pepecoin logo is a bit smaller.'],
+  ['Now Playing on one line', 'Minimize the control panel and everything stays on one bar: cover, song and artist over the progress bar, then every control, scaled to fit. The bar matches your control panel style and theme.'],
+  ['Up next', 'Minimize the Playlist and its bar shows the next song, centered under Now Playing. Save as playlist and Clear stay at the right.'],
+  ['Lock EQ', 'A Lock EQ checkbox in the Sound (EQ) window keeps the mouse wheel, dragging and clicks from changing the EQ, so scrolling never changes the sound. This device remembers it.'],
+  ['Your real EQ in Appearance', 'Settings > Appearance > EQ shows this speaker\'s actual EQ in each style. It opens locked, so you can browse styles safely. Uncheck Lock EQ to make changes.'],
+  ['Previews stay in view', 'The Theme, Visualizer, EQ and Now Playing previews stay pinned at the top while you scroll, so the last theme cards preview too. Display size has no preview, because the whole app changes as you pick.'],
+  ['Tidier side panels', 'The Expand buttons point the way each panel moves, and the Devices title sits at the right edge, mirroring Library.'],
 ];
 
 const CREDITS = [
