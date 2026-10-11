@@ -49,13 +49,19 @@ async function check() {
     set('bad', 'Not trusted yet', plain.ok ? 'Your phone can reach WavWiz, but the secure connection was refused. That means the certificate is not installed or not trusted yet - or port ' + https + ' is blocked.' : 'Your phone could not reach WavWiz at all (' + host + ').', [ul(adv)]);
   } finally { btn.disabled = false; btn.textContent = 'Check my phone'; }
 }
+// 0.2.2 T9: arrived from the Calibrate speakers QR code (?cal=CODE[&pair=CODE]): once the phone trusts WavWiz, go straight on to the secure
+// calibration page (the music pauses there automatically). Only these two short codes are passed on.
+const calQ = (() => { const q = new URLSearchParams(location.search), cal = q.get('cal') || '', pair = q.get('pair') || ''; if (!/^[A-Za-z0-9]{6}$/.test(cal)) return ''; return 'cal=' + cal + (/^[0-9]{6}$/.test(pair) ? '&pair=' + pair : ''); })();
+const secureHome = () => `https://${host}:${https}/` + (calQ ? '?' + calQ : '');
+if (calQ) { const t = $('statusTitle'); if (t) t.textContent = 'Getting your phone ready to calibrate'; }
 function good(msg) {
   set('ok', 'All set', msg);
+  if (calQ) { $('statusText').textContent = msg + ' Opening the calibration page...'; setTimeout(() => location.replace(secureHome()), 900); }
   document.querySelectorAll('.steps li').forEach(l => l.classList.add('done'));
   const d = $('done'); if (d) d.hidden = false;
-  const a = $('advice'); const p = document.createElement('p'); const link = document.createElement('a'); link.className = 'btn'; link.href = `https://${host}:${https}/`; link.textContent = 'Open WavWiz (secure)'; p.append(link); a.append(p);
+  const a = $('advice'); const p = document.createElement('p'); const link = document.createElement('a'); link.className = 'btn'; link.href = secureHome(); link.textContent = calQ ? 'Open the calibration page' : 'Open WavWiz (secure)'; p.append(link); a.append(p);
 }
 if (enabled) {
   $('check').addEventListener('click', check);
-  if (B.dataset.mode === 'check' || location.protocol === 'https:') check();
+  if (B.dataset.mode === 'check' || location.protocol === 'https:' || calQ) check();
 }

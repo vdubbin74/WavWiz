@@ -4,6 +4,7 @@ import { OffsetEstimator, pairClocks } from './roomsched.js';
 import { openOnce } from './wsconn.js';
 import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
 import { wifiStability } from './calerrors.js';
+import { isPhoneUa } from './phonejoin.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -14,16 +15,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // wizard waits: "Move the phone near <next speaker>, then tap Continue", with a live Wi-Fi stability meter.
 // 0.2.0 items 28 + 30: the house reference speaker is pre-selected; a regular user calibrates only their own device against it (the choices are
 // shown read-only); calibrating several devices or picking another reference needs an administrator.
-export async function openCalibration(S, refresh, presetZoneId) {
+// 0.2.2 T9: on a PC the page also offers "Use your phone as the microphone" (QR code + short link, numbered steps, live Phone connected /
+// waiting). The phone lands on the secure page with ?cal=CODE and main.js opens this wizard there with opts.link (+ opts.linkAdmin when an
+// administrator made the link, so the phone can calibrate every speaker), opts.onPhase and opts.onClose for the live status.
+export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   const zones = S.zones.filter(z => z.connected && z.outputs.some(o => o.active));
   const body = h('div'); let stop = false; let micStream = null, ctx = null, wake = null, clockWs = null, sessionId = null, meter = null;
   const endSession = () => { const id = sessionId; sessionId = null; if (id) api(`/calibration/sessions/${id}/end`, { method: 'POST' }).then(r => { if (r?.resumed) toast('Calibration ended - the music is playing again'); }).catch(() => {}); };
   const cleanup = () => { stop = true; meter?.stop(); meter = null; try { micStream?.getTracks().forEach(t => t.stop()); } catch { } try { ctx?.close(); } catch { } try { wake?.release(); } catch { } try { clockWs?.close(); } catch { } endSession(); };
-  const d = dialog('Calibrate speaker delay', body, [], { onClose: () => { cleanup(); refresh && refresh(); } });
+  let phoneCard = null;
+  const d = dialog('Calibrate speaker delay', body, [], { onClose: () => { cleanup(); phoneCard?.stop(); opts.onClose?.(); refresh && refresh(); } });
   if (zones.length < 2) { body.replaceChildren(h('p', null, 'You need at least two connected devices: one is the reference (the one you leave alone) and the other is measured against it.'), h('p', { class: 'dim' }, 'You can still type a delay by hand: open a device (tap its name) and use Delay → Save.')); return; }
 
   const secure = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
-  const admin = isAdmin(S), house = S.zones.find(z => z.reference) || null, mine = thisDevice(S);
+  const admin = isAdmin(S) || !!opts.linkAdmin, house = S.zones.find(z => z.reference) || null, mine = thisDevice(S);
   const hold = !!(house && !house.connected);
   if (hold) {
     body.replaceChildren(h('div', { class: 'card', role: 'alert' }, h('h3', { class: 'amber' }, `The reference speaker “${house.name}” is offline`),
@@ -34,7 +39,7 @@ export async function openCalibration(S, refresh, presetZoneId) {
   if (hold && !admin) return;
   if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the device you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other devices'))); return; }
   const defRef = house?.connected ? house.id : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);
-  const st = { mode: 'phone', ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), dist: 0, level: -20, same: false };
+  const st = { mode: 'phone', ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef && !(opts.link && z.id === mine?.id)).map(z => z.id)), dist: 0, level: -20, same: false };
   if (presetZoneId && presetZoneId === st.ref) { const other = zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
   if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the house reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
 
@@ -44,8 +49,11 @@ export async function openCalibration(S, refresh, presetZoneId) {
     const mode = h('select', { 'aria-label': 'Method', onchange: ev => { st.mode = ev.target.value; intro(); } },
       h('option', { value: 'phone', selected: st.mode === 'phone' }, 'Phone microphone (recommended)'), h('option', { value: 'same', selected: st.mode === 'same' }, 'Phone microphone — one recording per device (for phones with unreliable timing)'), h('option', { value: 'ear', selected: st.mode === 'ear' }, 'By ear (no microphone)'));
     const lvl = h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' });
+    const usePhone = !opts.link && !isPhoneUa();
+    if (usePhone) phoneCard ??= phoneMicCard(S, admin);
     body.replaceChildren(
-      !secure ? h('div', { class: 'card' }, h('p', { class: 'amber' }, 'The phone microphone needs a secure (HTTPS) page, and this page is not secure.'), h('p', { class: 'small' }, 'Open ', h('a', { href: '/tls/setup', target: '_blank', rel: 'noopener' }, 'the phone set-up page'), ' on the server PC, install the certificate on your phone once, then open this site on the HTTPS address. Meanwhile you can use “By ear”.')) : null,
+      usePhone ? phoneCard.el : null,
+      !secure && !usePhone ? h('div', { class: 'card' }, h('p', { class: 'amber' }, 'The phone microphone needs a secure (HTTPS) page, and this page is not secure.'), h('p', { class: 'small' }, 'Open ', h('a', { href: '/tls/setup', target: '_blank', rel: 'noopener' }, 'the phone set-up page'), ' on the server PC, install the certificate on your phone once, then open this site on the HTTPS address. Meanwhile you can use “By ear”.')) : null,
       h('div', { class: 'card' }, h('p', null, 'WavWiz plays a short chirp sequence from one device at a time. The phone listens and works out how late each speaker is compared with the reference device, so everything lines up.'),
         h('ul', { class: 'small dim' }, h('li', null, 'Put the phone about 1–2 m from the speaker being measured, and keep the house quiet.'), h('li', null, 'Keep this screen on; the sound is quiet and takes about a minute per device.'), h('li', null, 'The reference device is not changed.'))),
       h('div', { class: 'field' }, h('label', null, 'Method'), mode),
@@ -60,6 +68,7 @@ export async function openCalibration(S, refresh, presetZoneId) {
   // ------------------------------------------------------------ phone microphone
   // The wizard shows a live checklist; the FIRST thing that fails stops it with a plain-English reason and what to do (see calerrors.js).
   async function phone() {
+    opts.onPhase?.('measuring');
     const env = environment();
     const checklist = [['secure', 'Secure page (HTTPS)'], ['mic', 'Microphone allowed'], ['audio', 'Audio engine started'], ['clock', 'Clock synced with the server'], ['heard', 'Test sounds heard']];
     const state = new Map(checklist.map(([k]) => [k, { s: 'todo', t: '' }]));
@@ -123,7 +132,7 @@ export async function openCalibration(S, refresh, presetZoneId) {
       if (off.rttMs > 60) note('The Wi-Fi round trip is slow; the result may be less exact.', true);
       const serverUsNow = () => performance.now() * 1000 + off.offsetUs;
       let sess, pat;
-      try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: st.mode === 'same' ? 'same-recording' : 'phone', referenceZoneId: st.ref, micSource: 'phone', micProcessing: rawOk ? 'raw' : 'processed' } }); pat = await api('/calibration/pattern'); }
+      try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: st.mode === 'same' ? 'same-recording' : 'phone', referenceZoneId: st.ref, micSource: 'phone', micProcessing: rawOk ? 'raw' : 'processed', linkToken: opts.link } }); pat = await api('/calibration/pattern'); }
       catch (e) { throw new CalError('SESSION_FAILED', e.message); }
       const sid = sess.id; sessionId = sid; note('The music is paused while calibrating.');
 
@@ -247,6 +256,7 @@ export async function openCalibration(S, refresh, presetZoneId) {
   }
 
   function results(sid, fin, failed) {
+    opts.onPhase?.('done');
     const props = fin.proposals;
     const checks = new Map(props.map(p => [p.zoneId, p.commit]));
     body.replaceChildren(
@@ -264,7 +274,7 @@ export async function openCalibration(S, refresh, presetZoneId) {
   // ------------------------------------------------------------ by ear (no microphone, works on http)
   async function ear() {
     const zs = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref && (admin || z.id === mine?.id)); const refZ = zones.find(z => z.id === st.ref); let i = 0;
-    try { const sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'ear', referenceZoneId: st.ref } }); sessionId = sess.id; } catch (e) { toast(e.message, true); }   // pauses the music
+    try { const sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'ear', referenceZoneId: st.ref, linkToken: opts.link } }); sessionId = sess.id; } catch (e) { toast(e.message, true); }   // pauses the music
     const show = () => {
       const z = zs[i]; if (!z) { endSession(); d.close(); return; }
       const base = refZ.outputs.find(o => o.active)?.latencyMs ?? 0, out = z.outputs.find(o => o.active);
@@ -278,4 +288,49 @@ export async function openCalibration(S, refresh, presetZoneId) {
     show();
   }
   if (!hold) intro();
+}
+
+/** 0.2.2 T9: "Use your phone as the microphone" - QR code + short link to the phone's secure calibration page (through the one-time
+ *  certificate step when needed), the four steps, and a live Phone connected / waiting line (pushed "calphone" events + a light poll). */
+export const PHONE_STEPS = ['Scan the QR code with your phone.', 'If asked, install the WavWiz certificate (one time).', 'Allow the microphone.', 'Stand at the listening spot and follow the prompts (music pauses automatically).'];
+export function phoneStatusText(st) {
+  if (!st) return ['wait', 'Waiting for your phone…'];
+  if (st.expired) return ['bad', 'This QR code has expired. Make a new one.'];
+  if (!st.connected) return st.state === 'left' ? ['wait', `${st.device || 'The phone'} left. Waiting for your phone…`] : ['wait', 'Waiting for your phone…'];
+  const what = { opened: 'follow the prompts on the phone', measuring: 'measuring - keep the house quiet', done: 'measured - check the results on the phone' }[st.state] || 'connected';
+  return ['ok', `Phone connected: ${st.device || 'phone'} - ${what}`];
+}
+function phoneMicCard(S, admin) {
+  let link = null, timer = null, stopped = false;
+  const qr = h('div', { class: 'pm-qr' }, h('span', { class: 'small dim' }, 'Making a QR code…'));
+  const short = h('code', { class: 'pm-link' }, '…');
+  const dot = h('span', { class: 'dot' }), stTxt = h('span', null, 'Waiting for your phone…');
+  const status = h('div', { class: 'pm-status', role: 'status', 'aria-live': 'polite' }, dot, stTxt);
+  const notes = h('div');
+  const el = h('div', { class: 'card pm-card', 'aria-label': 'Use your phone as the microphone' }, h('h3', null, 'Use your phone as the microphone'),
+    h('div', { class: 'pm-row' }, qr, h('div', { class: 'pm-steps' }, h('ol', null, PHONE_STEPS.map(t => h('li', null, t))),
+      h('p', { class: 'small dim' }, 'No camera? On the phone type ', short), status)), notes);
+  const paint = st => { const [k, t] = phoneStatusText(st); dot.className = 'dot ' + (k === 'ok' ? 'ok' : k === 'bad' ? 'bad' : 'wait'); stTxt.textContent = t; };
+  async function make() {
+    try { link = await api('/calibration/phone-link', { method: 'POST', body: {} }); }
+    catch (e) { qr.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
+    qr.replaceChildren(h('img', { src: `/api/v1/calibration/phone-link/${link.token}/qr.svg`, alt: 'QR code that opens the calibration page on your phone', width: 168, height: 168 }));
+    short.textContent = link.shortUrl.replace(/^http:\/\//, '');
+    notes.replaceChildren(
+      !link.https ? h('p', { class: 'small amber' }, 'HTTPS is not set up on this PC yet, so the phone cannot use its microphone. ',
+        admin ? h('button', { class: 'btn sm', onclick: async () => { try { await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up'); make(); } catch (e) { toast(e.message, true); } } }, 'Set up HTTPS')
+          : 'Ask the administrator to set it up (Settings > Devices > Phone & HTTPS).') : null,
+      !link.signsIn ? h('p', { class: 'small dim' }, 'The phone needs to be paired with WavWiz already (an administrator\'s QR code signs it in by itself), and it can calibrate only its own speaker.') : null);
+    paint(null); poll();
+  }
+  async function poll() {
+    clearTimeout(timer); if (stopped || !link) return;
+    if (!el.isConnected) { timer = setTimeout(poll, 3000); return; }
+    try { paint(await api(`/calibration/phone-link/${link.token}`)); } catch (e) { if (e.status === 404) { paint({ expired: true }); return; } }
+    timer = setTimeout(poll, 3000);
+  }
+  const onPush = ev => { if (link && ev.detail?.token === link.token) poll(); };
+  window.addEventListener('wavwiz:calphone', onPush);
+  make();
+  return { el, stop: () => { stopped = true; clearTimeout(timer); window.removeEventListener('wavwiz:calphone', onPush); } };
 }

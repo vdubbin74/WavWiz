@@ -12,7 +12,8 @@ public static class RedirectPolicy
     {
         if (isHttps || !redirectSettingOn || !caEnabled || thisMachine) return false;
         if (!(HttpMethods.IsGet(method) || HttpMethods.IsHead(method))) return false;
-        if (path.StartsWith("/tls", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/ws", StringComparison.OrdinalIgnoreCase)) return false;
+        if (path.StartsWith("/tls", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/ws", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/c/", StringComparison.OrdinalIgnoreCase)) return false;   // 0.2.2 T9: the phone-mic short link goes through the certificate check first
         if (userAgent != null && (userAgent.Contains("WavWizPlayer/", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("UnisonPlayer/", StringComparison.OrdinalIgnoreCase))) return false;
         return true;
     }

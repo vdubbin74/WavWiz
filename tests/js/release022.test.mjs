@@ -114,3 +114,23 @@ test('0.2.2 T10: "Connected" lives only in the top-right indicator; the status b
   assert.match(body, /device\$\{S\.zones\.length === 1 \? '' : 's'\} online/); assert.match(body, /Playing on /);
   assert.match(m, /setConn\(true, 'Connected'\)/, 'the top-right indicator keeps its text');
 });
+
+test('0.2.2 T9: Calibrate speakers offers "Use your phone as the microphone" (QR + short link, four steps, live Phone connected / waiting)', async () => {
+  globalThis.window ??= globalThis; globalThis.navigator ??= { userAgent: 'node' };
+  const c = src('calibrate.js'), m = src('main.js'), t = src('tls-setup.js');
+  assert.match(c, /export const PHONE_STEPS = \['Scan the QR code with your phone\.', 'If asked, install the WavWiz certificate \(one time\)\.', 'Allow the microphone\.', 'Stand at the listening spot and follow the prompts \(music pauses automatically\)\.'\]/);
+  assert.match(c, /h\('h3', null, 'Use your phone as the microphone'\)/);
+  assert.match(c, /src: `\/api\/v1\/calibration\/phone-link\/\$\{link\.token\}\/qr\.svg`/);
+  assert.match(c, /window\.addEventListener\('wavwiz:calphone', onPush\)/);
+  assert.match(c, /const admin = isAdmin\(S\) \|\| !!opts\.linkAdmin/); assert.match(c, /linkToken: opts\.link/);
+  const cal = await imp('calibrate');
+  assert.deepEqual(cal.phoneStatusText(null), ['wait', 'Waiting for your phone…']);
+  assert.deepEqual(cal.phoneStatusText({ connected: true, state: 'opened', device: 'iPhone' }), ['ok', 'Phone connected: iPhone - follow the prompts on the phone']);
+  assert.deepEqual(cal.phoneStatusText({ connected: false, state: 'left', device: 'iPhone' }), ['wait', 'iPhone left. Waiting for your phone…']);
+  assert.equal(cal.phoneStatusText({ expired: true })[0], 'bad');
+  assert.match(m, /if \(CAL\.cal\) startPhoneCal\(CAL\.cal\); else maybeWhatsNew\(S\)/);
+  assert.match(m, /api\('\/auth\/pair', \{ method: 'POST', body: \{ code: CAL\.pair, name: deviceName\(\) \} \}\)/);
+  assert.match(m, /m\.type === 'calphone'/);
+  assert.match(t, /setTimeout\(\(\) => location\.replace\(secureHome\(\)\), 900\)/);
+  assert.match(css, /\.pm-status \.dot\.ok\{/);
+});

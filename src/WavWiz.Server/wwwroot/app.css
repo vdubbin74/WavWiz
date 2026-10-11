@@ -1357,3 +1357,17 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .appsub .tp-mini{height:78px} .appsub .tp-body{padding:5px;gap:6px} .appsub .tp-art{width:24px;height:24px} .appsub .tp-name{font-size:12px}
 .appsub .vizgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .appsub .vizcard{border-radius:6px} .appsub .vizcard .vp-meta .small{display:none}
+/* 0.2.2 T9: Calibrate speakers - Use your phone as the microphone */
+.pm-card h3{margin-top:0}
+.pm-row{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.pm-qr{flex:none;width:168px;min-height:168px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:6px;padding:6px}
+.pm-qr img{display:block;width:168px;height:168px}
+.pm-steps{flex:1;min-width:220px}
+.pm-steps ol{margin:0 0 8px;padding-left:1.4em;display:flex;flex-direction:column;gap:6px}
+.pm-link{font-family:var(--mono);color:var(--accent2);user-select:all}
+.pm-status{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-weight:600}
+.pm-status .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.pm-status .dot.ok{background:#3DDC84;box-shadow:0 0 6px #3DDC84} .pm-status .dot.bad{background:#FF5A5A}
+.pm-status .dot.wait{background:var(--dim);animation:pmwait 1.4s ease-in-out infinite}
+@keyframes pmwait{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){ .pm-status .dot.wait{animation:none} }

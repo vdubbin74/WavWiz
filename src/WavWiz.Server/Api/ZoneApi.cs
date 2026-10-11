@@ -122,7 +122,9 @@ public static class ZoneApi
         g.MapPost("/calibration/sessions", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); long refId = b.Long("referenceZoneId") ?? 0; long? only = null;
-            if (!IsAdmin(c))
+            // 0.2.2 T9: a phone that came in through an administrator's "use your phone as the microphone" link calibrates like the administrator
+            bool viaAdminLink = CalPhoneApi.Valid(b.Str("linkToken"), DateTimeOffset.UtcNow) is { ByAdmin: true };
+            if (!IsAdmin(c) && !viaAdminLink)
             {
                 // item 28/30 (Wiz B): a regular user calibrates ONLY their own device, against the house reference; the result saves only to their device
                 var mine = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(z => z.Mine);
