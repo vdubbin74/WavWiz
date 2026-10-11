@@ -698,8 +698,8 @@ input[type=range]:disabled{opacity:.45}
   .np-tablexport.transport{width:100%;justify-content:space-between}
   .nowcol.np12 .np-tablexport.transport .tbtn{width:40px;height:40px}
   .nowcol.np12 .np-tablexport.transport .tbtn.play{width:52px;height:52px}
-  /* Phone keeps the meta row; hide duplicate titles in the control panel */
-  .np-tablemeta .t1,.np-tablemeta .t2{display:none}
+  /* 0.2.4 fix: no longer hides the control panel's title + artist here. 0.1.3 hid them as duplicates of the meta row, but since 0.2.0 the meta row
+     (.np-row) is hidden on phones (stacked panel styles below), so phones showed no song title at all on Now Playing. */
 }
 /* 0.1.3 */
 .vchoice{display:grid;grid-template-columns:130px 1fr;align-items:center;gap:8px;margin:6px 0}

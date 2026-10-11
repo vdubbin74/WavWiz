@@ -19,6 +19,7 @@ Nothing yet.
 - **Phone set-up page works with the HTTPS redirect on:** with "send other devices to the secure (HTTPS) address" switched on, the set-up page's own logo and script were sent to the secure address and blocked, so the steps stayed hidden and Check my phone did nothing. The page's own files now load normally.
 - **The calibration QR code goes straight to calibration:** the set-up page opened from Calibrate speakers shows a Continue to secure calibration button, so the hand-off works even if the page's script cannot run.
 - **Install steps when the phone does not trust the certificate:** the iPhone / Android steps are always visible, and a phone that is not trusted yet gets its download button and highlighted install steps.
+- **Song title and artist on phones:** on a phone, Now Playing showed the cover, time and controls but not the song title or artist. They show again in every control panel style.
 
 ### Changed
 
