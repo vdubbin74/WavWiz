@@ -5,8 +5,9 @@ const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh
 const inApp = /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\/|; wv\)|Snapchat|Twitter/.test(ua);
 const safari = ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
 
-document.querySelector('.dev-ios')?.classList.toggle('show', ios || (!android));
-document.querySelector('.dev-android')?.classList.toggle('show', android || (!ios));
+// 0.2.3 fix: the step sections are visible by default (tls.css) so they still show if this script cannot load; here only the OTHER phone's steps are hidden
+document.querySelector('.dev-ios')?.classList.toggle('hide', android);
+document.querySelector('.dev-android')?.classList.toggle('hide', ios);
 document.querySelector('.only-desktop')?.classList.toggle('show', !ios && !android);
 if (ios && !safari && enabled) {
   const w = document.createElement('div'); w.className = 'card warn';
@@ -46,7 +47,13 @@ async function check() {
     adv.push(`The PC's firewall must allow port ${https}. WavWiz's installer opens it for the home network; a "Public" network profile in Windows blocks it (WavWiz > Settings > Diagnostics tells you).`);
     adv.push('If the server\'s address changed, press "Set up HTTPS" again on the PC.');
     adv.push('Phone date/time wrong? An out-of-date clock makes every certificate look invalid.');
-    set('bad', 'Not trusted yet', plain.ok ? 'Your phone can reach WavWiz, but the secure connection was refused. That means the certificate is not installed or not trusted yet - or port ' + https + ' is blocked.' : 'Your phone could not reach WavWiz at all (' + host + ').', [ul(adv)]);
+    // 0.2.3 fix: not trusted -> put the download button for THIS phone right here and point at the install steps below
+    const steps = [...document.querySelectorAll('.dev')].filter(d => !d.classList.contains('hide'));
+    const dl = document.createElement('p');
+    for (const d of steps) { const b = d.querySelector('a.btn[href^="/tls/root-ca"]'); if (b) { const c = b.cloneNode(true); c.style.marginRight = '8px'; dl.append(c); } }
+    steps.forEach(d => d.classList.add('focus'));
+    set('bad', 'Not trusted yet', plain.ok ? 'Your phone can reach WavWiz, but the secure connection was refused. That means the certificate is not installed or not trusted yet - or port ' + https + ' is blocked.' : 'Your phone could not reach WavWiz at all (' + host + ').', [dl, ul(adv)]);
+    if (B.dataset.mode === 'check' && steps[0]) { const n = document.createElement('p'); n.className = 'small'; n.textContent = 'Follow the install steps below, then tap Check my phone again.'; $('advice').append(n); }
   } finally { btn.disabled = false; btn.textContent = 'Check my phone'; }
 }
 // 0.2.2 T9: arrived from the Calibrate speakers QR code (?cal=CODE[&pair=CODE]): once the phone trusts WavWiz, go straight on to the secure
@@ -58,6 +65,7 @@ function good(msg) {
   set('ok', 'All set', msg);
   if (calQ) { $('statusText').textContent = msg + ' Opening the calibration page...'; setTimeout(() => location.replace(secureHome()), 900); }
   document.querySelectorAll('.steps li').forEach(l => l.classList.add('done'));
+  document.querySelectorAll('.dev.focus').forEach(d => d.classList.remove('focus'));
   const d = $('done'); if (d) d.hidden = false;
   const a = $('advice'); const p = document.createElement('p'); const link = document.createElement('a'); link.className = 'btn'; link.href = secureHome(); link.textContent = calQ ? 'Open the calibration page' : 'Open WavWiz (secure)'; p.append(link); a.append(p);
 }

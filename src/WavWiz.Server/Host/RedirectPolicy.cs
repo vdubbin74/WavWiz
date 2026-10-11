@@ -8,12 +8,18 @@ namespace WavWiz.Server.Host;
 /// </summary>
 public static class RedirectPolicy
 {
+    /// <summary>0.2.3 fix: the static files the phone set-up pages (/tls/setup, /tls/check) load. They must come over plain http from the same origin as the page:
+    /// redirected to https they are blocked by the page's CSP ('self' = the http origin), refused as a cross-origin module script, and on a phone that does not
+    /// trust WavWiz yet they could not load anyway. These are public, non-secret files (no auth gate on static files); only the redirect is skipped.</summary>
+    public static readonly string[] SetupPageAssets = { "/tls.css", "/js/tls-setup.js", "/assets/logo-64.png", "/favicon.ico" };
+
     public static bool ShouldRedirect(string method, string path, bool isHttps, bool redirectSettingOn, bool caEnabled, bool thisMachine, string? userAgent)
     {
         if (isHttps || !redirectSettingOn || !caEnabled || thisMachine) return false;
         if (!(HttpMethods.IsGet(method) || HttpMethods.IsHead(method))) return false;
         if (path.StartsWith("/tls", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/ws", StringComparison.OrdinalIgnoreCase)
             || path.StartsWith("/c/", StringComparison.OrdinalIgnoreCase)) return false;   // 0.2.2 T9: the phone-mic short link goes through the certificate check first
+        if (Array.Exists(SetupPageAssets, a => string.Equals(a, path, StringComparison.OrdinalIgnoreCase))) return false;
         if (userAgent != null && (userAgent.Contains("WavWizPlayer/", StringComparison.OrdinalIgnoreCase) || userAgent.Contains("UnisonPlayer/", StringComparison.OrdinalIgnoreCase))) return false;
         return true;
     }

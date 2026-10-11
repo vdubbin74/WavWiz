@@ -14,7 +14,8 @@ header img{border-radius:9px} h1{font-size:22px;margin:0} h2{font-size:19px;marg
 .steps li.done::before{content:"\2713";background:#2b9a55}
 .must{color:#ffb300;font-size:14px;font-weight:600}
 .qr{text-align:center} .qr img{background:#fff;padding:10px;border-radius:12px;max-width:100%;height:auto}
-.dev{display:none} .dev.show{display:block}
+.dev{display:block} .dev.hide{display:none}   /* 0.2.3 fix: steps visible even if the script never runs; the script hides the other phone's steps */
+.card.focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
 .only-desktop{display:none} .only-desktop.show{display:block}
 #advice ul{padding-left:20px;margin:6px 0}
 .spin{display:inline-block;width:16px;height:16px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
