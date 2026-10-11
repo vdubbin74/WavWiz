@@ -28,6 +28,9 @@ export const arrowSize = s => (s === 'collapsed' || s === 'expanded' ? 'standard
 export function arrowLabel(which, state) {
   return state === 'collapsed' ? `Open the ${which} panel` : state === 'expanded' ? 'Back to the normal layout' : `Collapse the ${which} panel`;
 }
+/** 0.2.3 U6: Expand button arrows point the way the panel travels: Devices (right side) grows to the LEFT and goes back to the right;
+ *  the Library (left side) is the mirror image. Pure: side = 'left' | 'right'. */
+export const expandIcon = (side, expanded) => ((side === 'right') !== !!expanded ? 'expandL' : 'expandR');
 export const expandLabel = (which, on) => (on ? 'Back to the normal layout' : `Expand the ${which} panel`);
 /** Expand button: Expanded <-> Standard (also opens a collapsed panel straight into Expanded). Pure. */
 export const expandSize = s => (s === 'expanded' ? 'standard' : 'expanded');
@@ -328,15 +331,16 @@ export function devicesPanel(S, ctl) {
   const setEdit = v => { zedit = v; draw(true); };
   // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
   const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
-  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, '⤢');
+  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, icon(expandIcon('right', false)));
   const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
   const count = h('span', { class: 'small dim devcount' });
-  root.append(h('div', { class: 'pane-h devhead' }, expBtn, colBtn, escHint, h('span', { class: 'devtitle' }, 'DEVICES'), h('span', { class: 'grow devtitle' }), count), body);
+  // 0.2.3 U7: the DEVICES title sits at the right edge, the true mirror image of LIBRARY at the left edge of the Library header
+  root.append(h('div', { class: 'pane-h devhead' }, expBtn, colBtn, escHint, h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES')), body);
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;
     colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
     colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
-    expBtn.textContent = s === 'expanded' ? '⤡' : '⤢'; expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
+    setIcon(expBtn, expandIcon('right', s === 'expanded')); expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
     expBtn.setAttribute('aria-label', expandLabel('Devices', s === 'expanded'));
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);

@@ -19,6 +19,9 @@ const P = {
   monitor: '<rect x="3" y="4.5" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16.5V20"/>',
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   popout: '<path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
+  // 0.2.3 U6: the Expand button shows the way the panel travels (bar = the edge it stays on, arrow = where it goes)
+  expandL: '<path d="M20 5v14"/><path d="M16 12H4.5"/><path d="M8.5 8l-4 4 4 4"/>',
+  expandR: '<path d="M4 5v14"/><path d="M8 12h11.5"/><path d="M15.5 8l4 4-4 4"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',   // 0.2.3 U9: Lock EQ
   wave: '<path d="M3 12h1.5M6.5 8v8M10 5v14M13.5 9v6M17 7v10M20.5 11v2"/>',
 };

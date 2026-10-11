@@ -124,3 +124,23 @@ test('0.2.3 U10: Appearance > EQ mirrors the real EQ of this device, opens locke
   assert.match(ap, /eqStyleCard\(opts\.S \|\| null\)/); assert.match(src('settings.js'), /appearancePane\(\{ S, /);
   assert.match(src('eq.js'), /window\.dispatchEvent\(new CustomEvent\('wavwiz:eqchanged'/);
 });
+
+test('0.2.3 U6: Expand button arrows point the way the panel travels (Devices left / back right; Library mirrored)', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem() {} };
+  const d = await imp('devices');
+  assert.equal(d.expandIcon('right', false), 'expandL');   // Devices normal: it will grow to the left
+  assert.equal(d.expandIcon('right', true), 'expandR');    // Devices expanded: it goes back to the right
+  assert.equal(d.expandIcon('left', false), 'expandR');    // Library normal: grows to the right
+  assert.equal(d.expandIcon('left', true), 'expandL');     // Library expanded: goes back to the left
+  const i = src('icons.js'); assert.match(i, /expandL: '<path d="M20 5v14"\/>/); assert.match(i, /expandR: '<path d="M4 5v14"\/>/);
+  assert.match(src('devices.js'), /setIcon\(expBtn, expandIcon\('right', s === 'expanded'\)\)/);
+  assert.match(src('main.js'), /setIcon\(b, expandIcon\('left', on\)\)/);
+  assert.doesNotMatch(src('devices.js') + src('main.js'), /'⤢'|'⤡'/);
+});
+
+test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring LIBRARY at the left edge', () => {
+  const s = src('devices.js'), m = src('main.js');
+  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)\)/);
+  assert.match(m, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
+  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);   // same title color
+});

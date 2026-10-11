@@ -45,7 +45,7 @@ test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expa
     assert.equal(d.arrowLabel(w, 'expanded'), 'Back to the normal layout'); assert.equal(d.expandLabel(w, false), `Expand the ${w} panel`);
   }
   const s = src('devices.js'), m = src('main.js');
-  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)/);
+  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)\)/);   // 0.2.3 U7: title at the right edge
   assert.match(m, /h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
   assert.match(m, /if \(force === undefined && exp\) \{ toggleLibExpanded\(false\); return; \}/);
   assert.match(m, /setDevSize\(arrowSize\(devp\.size\)\)/);

@@ -4,8 +4,9 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, arrowSize, arrowLabel, expandLabel, saveDevSize, loadDevSize } from './devices.js';
+import { devicesView, devicesPanel, arrowSize, arrowLabel, expandLabel, expandIcon, saveDevSize, loadDevSize } from './devices.js';
 import { listTable } from './listtable.js';
+import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
 import { installAutoJoin, deviceName } from './room.js';
@@ -134,7 +135,7 @@ async function startMain() {
   const libC0 = localStorage.getItem('wavwiz.libcollapsed') === '1';
   const colBtn = h('button', { class: 'plus libcol', 'aria-label': arrowLabel('Library', libC0 ? 'collapsed' : 'standard'), 'aria-expanded': String(!libC0), title: 'Collapse / open the Library panel', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
   // 0.2.0 item 16: Expand button top-right of the Library header (the collapse arrow moves one slot left); the same button or Esc returns.
-  const expBtn = h('button', { class: 'plus libexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library (Esc returns)', onclick: () => toggleLibExpanded() }, '⤢');
+  const expBtn = h('button', { class: 'plus libexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library (Esc returns)', onclick: () => toggleLibExpanded() }, icon(expandIcon('left', false)));
   const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
   libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, h('div', { class: 'pane-h' }, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), escHint, colBtn, expBtn), h('div', { class: 'libbody' }, libC.el));
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
@@ -233,7 +234,7 @@ function toggleLibExpanded(force) {
   if (on && desk.classList.contains('devexpanded')) setDevSize('standard');
   if (on && desk.classList.contains('libcollapsed')) toggleLib(false);
   desk.classList.toggle('libexpanded', on);
-  const b = libpanel.querySelector('.libexp'); b.textContent = on ? '⤡' : '⤢'; b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', expandLabel('Library', on)); paintLibArrow();
+  const b = libpanel.querySelector('.libexp'); setIcon(b, expandIcon('left', on)); b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', expandLabel('Library', on)); paintLibArrow();
   libC.setExpanded(on); setTimeout(() => nowc.viz?.resize?.(), 340);
 }
 

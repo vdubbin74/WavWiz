@@ -1421,3 +1421,6 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .eqreal-sum{margin:-2px 0 6px;color:var(--ink);font-family:var(--mono);font-size:11px}
 .eqprevbox .npprev-h .ell{min-width:0}
 .npprev-live,.npprev-ex{white-space:nowrap;flex:none}
+/* ===== 0.2.3 U6: Expand buttons show which way the panel travels (Devices: left to expand, right to go back; Library: the mirror) ===== */
+.plus.libexp .ic,.plus.devexp .ic{display:inline-flex}
+.plus.libexp svg,.plus.devexp svg{width:15px;height:15px}
