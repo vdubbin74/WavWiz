@@ -22,3 +22,9 @@ test('0.2.3 fix: check mode, not trusted -> download button for this phone + hig
   assert.match(t, /\.dev\.focus'\)\.forEach\(d => d\.classList\.remove\('focus'\)\)/, 'trusted: highlight cleared');
   assert.match(css, /\.card\.focus\{/);
 });
+
+test('0.2.3 fix: the script keeps the same ?cal= rules and secure address as the server-rendered "Continue to secure calibration" link', () => {
+  assert.match(t, /if \(!\/\^\[A-Za-z0-9\]\{6\}\$\/\.test\(cal\)\) return ''; return 'cal=' \+ cal \+ \(\/\^\[0-9\]\{6\}\$\/\.test\(pair\) \? '&pair=' \+ pair : ''\)/);
+  assert.match(t, /const secureHome = \(\) => `https:\/\/\$\{host\}:\$\{https\}\/` \+ \(calQ \? '\?' \+ calQ : ''\)/);
+  assert.match(t, /setTimeout\(\(\) => location\.replace\(secureHome\(\)\), 900\)/, 'trusted phone: still redirects on its own');
+});

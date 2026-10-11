@@ -76,9 +76,23 @@ public static class PhoneApi
 
     private static string E(string x) => WebUtility.HtmlEncode(x);
 
+    private static readonly System.Text.RegularExpressions.Regex CalCode = new("^[A-Za-z0-9]{6}$"), PairCode = new("^[0-9]{6}$");
+
+    /// <summary>0.2.3 fix: the secure calibration address for a set-up page opened with ?cal=CODE[&amp;pair=CODE] (from the Calibrate speakers QR / short link),
+    /// or null. Same rules as /js/tls-setup.js: cal must be 6 letters/digits, pair 6 digits (an invalid pair is dropped, an invalid cal means no link);
+    /// same host (PhoneHost) and HTTPS port the script uses, so the hand-off works even when the script cannot run.</summary>
+    public static string? SecureCalUrl(HttpContext c, Services s)
+    {
+        var cal = c.Request.Query["cal"].ToString(); var pair = c.Request.Query["pair"].ToString();
+        if (!CalCode.IsMatch(cal)) return null;
+        return CalPhoneApi.SecureUrl(PhoneHost(c, s), s.Cfg.HttpsPort, cal, PairCode.IsMatch(pair) ? pair : null);
+    }
+
     private static string Page(HttpContext c, Services s, string mode)
     {
         var host = PhoneHost(c, s); var http = $"http://{host}:{s.Cfg.HttpPort}"; var https = $"https://{host}:{s.Cfg.HttpsPort}";
+        var calUrl = s.Ca.Enabled ? SecureCalUrl(c, s) : null;
+        if (calUrl != null) c.Response.Headers.CacheControl = "no-store";     // may carry a one-time pairing code
         var h = new StringBuilder();
         h.Append("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name=theme-color content='#FF3C00'>")
          .Append("<title>WavWiz - phone set-up</title><link rel=icon href='/favicon.ico'><link rel=stylesheet href='/tls.css'></head>")
@@ -93,6 +107,10 @@ public static class PhoneApi
         {
             h.Append("<section class='card only-desktop'><h2>Scan this with your phone's camera</h2><p>Point the camera at the square. Tap the link that appears.</p>")
              .Append($"<div class=qr><img src='/tls/qr.svg?to=setup' alt='QR code for {E(http)}/tls/setup' width=220 height=220></div><p class=small>No camera? On the phone open Safari and type:<br><code>{E(http)}/tls/setup</code></p></section>");
+            if (calUrl != null)
+                h.Append("<section class='card focus' id=calgo><h2>Calibrate with this phone</h2><p>Once this phone trusts WavWiz (steps below), continue to the secure calibration page. The music pauses there automatically.</p>")
+                 .Append($"<p><a class=btn id=calgoLink href='{E(calUrl)}'>Continue to secure calibration</a></p>")
+                 .Append("<p class=small>If Safari shows a certificate warning (&ldquo;This Connection Is Not Private&rdquo;), the certificate is not trusted yet: install it below first, and on iPhone switch it on in Settings &rsaquo; General &rsaquo; About &rsaquo; Certificate Trust Settings. Then come back and tap the button again.</p></section>");
             h.Append("<section class=card id=status><h2 id=statusTitle>Does this phone already trust WavWiz?</h2><p id=statusText>Tap the button to find out. It takes a few seconds.</p><p><button class=btn id=check>Check my phone</button></p><div id=advice></div></section>");
             h.Append("<section class='card dev dev-ios'><h2>iPhone / iPad - 4 steps</h2><p class=small>Use <b>Safari</b> (not a browser inside another app, and not a Private tab).</p><ol class=steps>")
              .Append("<li data-step=1><h3>Download the profile</h3><p>Tap the button, then tap <b>Allow</b> when iPhone asks &ldquo;This website is trying to download a configuration profile&rdquo;.</p><p><a class=btn href='/tls/root-ca.mobileconfig'>Download profile</a></p><p class=small>Then tap <b>Close</b>. Nothing is installed yet.</p></li>")

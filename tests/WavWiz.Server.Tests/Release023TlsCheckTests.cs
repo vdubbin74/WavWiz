@@ -66,4 +66,83 @@ public class TlsCheckPageTests
             if (expect.TryGetValue(u, out var ct)) Assert.Contains(ct, a.Content.Headers.ContentType!.ToString());
         }
     }
+
+    // ---- 0.2.3 fix: the ?cal= hand-off is in the page HTML itself, so it works even if tls-setup.js cannot run ----
+    private static async Task<(ServerFixture f, HttpClient phone)> Phone(bool redirect, bool ca = true)
+    {
+        var f = await ServerFixture.StartAsync(c => { c.TestTreatAllClientsAsRemote = true; c.WebRoot = RealWebRoot(); });
+        await f.SetupAdmin();
+        if (ca) f.Server.S.Ca.Enable(IPAddress.Parse("192.168.1.50"));
+        f.Server.S.Db.SetSetting("tls.redirect", redirect ? "true" : "false");
+        var phone = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(f.Base) };
+        phone.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1");
+        return (f, phone);
+    }
+
+    [Theory]
+    [InlineData("/tls/check", true)]
+    [InlineData("/tls/check", false)]
+    [InlineData("/tls/setup", true)]
+    [InlineData("/tls/setup", false)]
+    public async Task A_valid_cal_code_puts_a_secure_calibration_link_in_the_page(string page, bool redirect)
+    {
+        var (f, phone) = await Phone(redirect);
+        await using var _ = f; using var __ = phone;
+        var r = await phone.GetAsync(page + "?cal=ABC234&pair=123456");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Contains("no-store", r.Headers.CacheControl!.ToString());
+        var html = await r.Content.ReadAsStringAsync();
+        var want = $"https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=ABC234&amp;pair=123456";
+        Assert.Contains($"<a class=btn id=calgoLink href='{want}'>Continue to secure calibration</a>", html);
+        Assert.Equal(CalPhoneApi_SecureUrl(f, "ABC234", "123456"), WebUtility.HtmlDecode(want));
+        Assert.Contains("Certificate Trust Settings. Then come back and tap the button again.", html);
+        // the install steps are on the same page, after the button
+        Assert.True(html.IndexOf("id=calgoLink", StringComparison.Ordinal) < html.IndexOf("Download profile", StringComparison.Ordinal));
+        // without a pairing code the link carries only cal=
+        var h2 = await (await phone.GetAsync(page + "?cal=abc234")).Content.ReadAsStringAsync();
+        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=abc234'>", h2);
+    }
+
+    private static string CalPhoneApi_SecureUrl(ServerFixture f, string cal, string? pair) => Api.CalPhoneApi.SecureUrl("127.0.0.1", f.Cfg.HttpsPort, cal, pair);
+
+    [Theory]
+    [InlineData("ABC23")]                       // too short
+    [InlineData("ABC2345")]                     // too long
+    [InlineData("AB%27C23")]                    // AB'C23
+    [InlineData("%3Cscript%3Ealert(1)%3C/script%3E")]
+    [InlineData("ABC%2023")]                    // space
+    [InlineData("")]
+    public async Task A_bad_cal_code_gets_no_link_and_never_reaches_the_page(string cal)
+    {
+        var (f, phone) = await Phone(true);
+        await using var _ = f; using var __ = phone;
+        var html = await (await phone.GetAsync("/tls/check?cal=" + cal + "&pair=123456")).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("calgoLink", html); Assert.DoesNotContain("?cal=", html);
+        Assert.DoesNotContain("<script>alert", html); Assert.DoesNotContain("AB'C23", html);
+        Assert.Contains("Download profile", html);
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("12345a")]
+    [InlineData("123456%27%3E%3Cb%3E")]
+    public async Task A_bad_pair_code_is_dropped_but_the_cal_link_stays(string pair)
+    {
+        var (f, phone) = await Phone(false);
+        await using var _ = f; using var __ = phone;
+        var html = await (await phone.GetAsync("/tls/check?cal=ABC234&pair=" + pair)).Content.ReadAsStringAsync();
+        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=ABC234'>", html);
+        Assert.DoesNotContain("pair=", html); Assert.DoesNotContain("'><b>", html);
+    }
+
+    [Fact]
+    public async Task No_calibration_link_while_HTTPS_is_not_set_up_or_without_cal()
+    {
+        var (f, phone) = await Phone(false, ca: false);
+        await using (f) using (phone)
+            Assert.DoesNotContain("calgoLink", await (await phone.GetAsync("/tls/check?cal=ABC234")).Content.ReadAsStringAsync());
+        var (g, p2) = await Phone(true);
+        await using (g) using (p2)
+            Assert.DoesNotContain("calgoLink", await (await p2.GetAsync("/tls/check")).Content.ReadAsStringAsync());
+    }
 }
