@@ -55,9 +55,9 @@ export function visualizerView({ nested = false } = {}) {
   function reactCard() {
     const r = loadReact(), set = patch => { saveReact({ ...loadReact(), ...patch }); changed(); };
     return h('div', { class: 'card vizreact' }, h('h3', null, 'Reactivity (all looks)'),
-      slider({ label: 'Energy', value: r.energy, hint: '0 % = calm and soothing, 50 % = lively but refined, 100 % = big, fast motion', key: 'energy', onInput: v => set({ energy: v }) }),
+      slider({ label: 'Energy', value: r.energy, hint: '0% = calm and soothing, 50% = lively but refined, 100% = big, fast motion', key: 'energy', onInput: v => set({ energy: v }) }),
       slider({ label: 'Sensitivity', value: r.sensitivity, hint: 'higher = bigger motion and more beats detected', key: 'sensitivity', onInput: v => set({ sensitivity: v }) }),
-      slider({ label: 'Auto-gain', value: r.autoGain, offAtZero: true, hint: 'quiet and loud songs move the same (0 % = off)', key: 'autoGain', onInput: v => set({ autoGain: v }) }),
+      slider({ label: 'Auto-gain', value: r.autoGain, offAtZero: true, hint: 'quiet and loud songs move the same (0% = off)', key: 'autoGain', onInput: v => set({ autoGain: v }) }),
       h('div', { class: 'row wrap', style: 'margin-top:6px' }, h('button', { class: 'btn', onclick: () => { saveReact({ ...DEFAULT_REACT }); changed(); draw(); } }, 'Reset reactivity')));
   }
   function graphicsCard(p) {
@@ -87,7 +87,7 @@ export function visualizerView({ nested = false } = {}) {
     }
     ctlHost = h('div', { class: 'vizctl-host' });
     root.replaceChildren(
-      h('p', { class: 'dim small' }, 'Tap a look to use it on Now Playing; its settings appear below. Each look follows the theme colors unless you switch it to Custom. Every level runs 0–100 % (50 % is the default). Settings are saved for each look on this device.'),
+      h('p', { class: 'dim small' }, 'Tap a look to use it on Now Playing; its settings appear below. Each look follows the theme colors unless you switch it to Custom. Every level runs 0–100% (50% is the default). Settings are saved for each look on this device.'),
       grid,
       nested ? null : h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
       nested ? fold('Graphics (this device)', 'Quality: Auto, bloom, streaks, fringing, depth blur', graphicsCard(p)) : graphicsCard(p),

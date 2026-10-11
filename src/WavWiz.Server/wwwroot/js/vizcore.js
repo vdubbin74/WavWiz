@@ -45,7 +45,7 @@ export const SHARED = [
   ['intensity', 'Intensity', [0.2, 1.15, 2], 'glow, flashes, shockwaves'],
   ['speed', 'Speed', [0.25, 1.05, 2]],
   ['density', 'Particle density', [0.25, 1.1, 2], 'more particles use more battery'],
-  ['shake', 'Camera shake', [0, 0.6, 1.4], 'on heavy beats (0 % = off)'],
+  ['shake', 'Camera shake', [0, 0.6, 1.4], 'on heavy beats (0% = off)'],
 ];
 export const RANGES = Object.fromEntries(SHARED.map(([k, , a]) => [k, a]));
 
@@ -55,7 +55,7 @@ export const RANGES = Object.fromEntries(SHARED.map(([k, , a]) => [k, a]));
  */
 export const FX = {
   particles: [['warp', 'Warp speed', [0.25, 1.15, 3], 'how fast the stars rush past'], ['trail', 'Trail length', [0, 0.55, 1], 'motion-blur streaks']],
-  river: [['sweep', 'Color-shift sweep speed', [0, 1.1, 3], 'how fast the colors sweep left and right (0 % = still)'], ['layers', 'Ribbon layers', [0.5, 1.1, 2]]],
+  river: [['sweep', 'Color-shift sweep speed', [0, 1.1, 3], 'how fast the colors sweep left and right (0% = still)'], ['layers', 'Ribbon layers', [0.5, 1.1, 2]]],
   cone: [['ripple', 'Ripple size', [0.3, 1.15, 2.5], 'how far beat ripples travel'], ['flex', 'Cone flex', [0.3, 1.15, 2.5], 'how far the cone moves with the bass']],
   wavwiz: [['spin', 'Rotation speed', [0, 1.1, 3]], ['thick', 'Ring thickness', [0.4, 1.1, 2.5]]],
   tunnel: [['fly', 'Fly-through speed', [0.2, 1.15, 3]], ['twist', 'Twist', [0, 0.35, 2], 'how much the tunnel bends'], ['rings', 'Ring count', [0.5, 1.1, 2]]],
@@ -64,8 +64,8 @@ export const FX = {
   vu: [['needle', 'Needle speed', [0.3, 1.2, 2.5], 'how quickly the needles respond'], ['bounce', 'Needle bounce', [1.3, 0.42, 0.16], 'more = more overshoot and bounce'],
     ['peakHold', 'Peak LED hold', [0.2, 1.2, 3], 'how long a peak LED stays lit'], ['bar', 'Level bar punch', [0.3, 1, 1.8], 'bigger hits and deeper lows'],
     ['style', 'Meter style', null, [['classic', 'Classic (warm backlight)'], ['dark', 'Dark studio'], ['neon', 'Neon (theme colors)']], 'classic']],
-  geq: [['bands', 'Bars', [10, 31, 64, 'int'], 'how many frequency bars'], ['segments', 'LED segments', [0, 0.5, 1], '0 % = smooth solid bars'],
-    ['caps', 'Peak caps', [0, 0.5, 1], 'how long the caps float before falling (0 % = off)'], ['reflect', 'Floor reflection', [0, 0.45, 1]]],
+  geq: [['bands', 'Bars', [10, 31, 64, 'int'], 'how many frequency bars'], ['segments', 'LED segments', [0, 0.5, 1], '0% = smooth solid bars'],
+    ['caps', 'Peak caps', [0, 0.5, 1], 'how long the caps float before falling (0% = off)'], ['reflect', 'Floor reflection', [0, 0.45, 1]]],
 };
 /** 0.1.2 defaults (raw values): a saved value equal to these was never touched, so it moves to the new 50 % default instead of being carried over. */
 const OLD_DEFAULTS = { intensity: 1, speed: 1, density: 1, warp: 1, trail: 0.5, sweep: 1, layers: 1, ripple: 1, flex: 1, spin: 1, thick: 1, fly: 1, twist: 0.25, rings: 1,
