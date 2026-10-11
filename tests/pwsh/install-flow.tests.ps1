@@ -221,7 +221,7 @@ Test 'UPGRADE over 0.0.1: database, server.json (custom keys), admin data and pa
     Set-Content (Join-Path $sb.State 'rules.txt') @('WavWiz Server (web, audio, clock) | netsh advfirewall firewall add rule localport=47800,47443,47801', 'WavWiz Server (web, audio, clock) (UDP) | netsh advfirewall firewall add rule localport=47802')
     $dbHash = (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash; $cfgHash = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash; $defHash = (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Eq (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash $dbHash 'database changed by the installer'
+    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database changed by the installer'
     Eq (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash $cfgHash 'server.json rewritten although nothing needed to change'
     Eq (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash $defHash 'player defaults rewritten'
     if (Test-Path (Join-Path $sb.Data 'server.json.bak')) { throw 'backup made for an unchanged file' }
@@ -409,7 +409,7 @@ Test 'UPGRADE from Unison 0.0.2: data MOVED (db, wal, certs, art cache, config i
     $dbHash = (Get-FileHash (Join-Path $ld 'unison.db')).Hash; $walHash = (Get-FileHash (Join-Path $ld 'unison.db-wal')).Hash; $defHash = (Get-FileHash (Join-Path $ld 'player-defaults.json')).Hash
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     if (Test-Path $ld) { throw 'the old Unison data folder is still there (it must be moved, not copied)' }
-    Eq (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash $dbHash 'database changed or lost'; Eq (Get-FileHash (Join-Path $sb.Data 'unison.db-wal')).Hash $walHash 'wal changed or lost'
+    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database changed or lost'; Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db-wal')).Hash $walHash 'wal changed or lost'
     Eq (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash $defHash 'player defaults changed'
     Eq (Get-Content (Join-Path $sb.Data 'certs/unison-root-ca.crt') -Raw).Trim() 'CERT' 'certificate lost'; if (-not (Test-Path (Join-Path $sb.Data 'artcache/1.jpg'))) { throw 'art cache lost' }
     $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
@@ -433,10 +433,10 @@ Test 'UPGRADE from Unison 0.0.2: data MOVED (db, wal, certs, art cache, config i
 Test 'upgrade is IDEMPOTENT: running setup again right after changes nothing and does not touch the data or the new service definition twice' {
     $sb = New-Sandbox; $ld = New-LegacyInstall $sb
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    $h1 = (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash; $c1 = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash
+    $h1 = (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash; $c1 = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash
     $before = (Get-Calls $sb) -split "`n" | Where-Object { $_ -match 'UnisonServer' } | Measure-Object | ForEach-Object Count
     $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb
-    Eq (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash $h1 'database changed on re-run'; Eq (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash $c1 'server.json changed on re-run'
+    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $h1 'database changed on re-run'; Eq (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash $c1 'server.json changed on re-run'
     Has (Get-Log $sb) 'no earlier "Unison" installation found'
     $after = (Get-Calls $sb) -split "`n" | Where-Object { $_ -match 'UnisonServer' } | Measure-Object | ForEach-Object Count
     Eq ($after - $before) 1 'only the read-only query for the old service may be repeated'
@@ -451,14 +451,14 @@ Test 'upgrade after an INTERRUPTED first attempt (old service already gone, data
     Remove-Item (Join-Path $sb.State 'legacy-svc.state')
     $dbHash = (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Eq (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash $dbHash 'database lost'; if (-not (Test-Path (Join-Path $sb.Data 'certs/unison-root-ca.crt'))) { throw 'certs not moved' }; if (Test-Path $ld) { throw 'old data folder left' }
+    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database lost'; if (-not (Test-Path (Join-Path $sb.Data 'certs/unison-root-ca.crt'))) { throw 'certs not moved' }; if (Test-Path $ld) { throw 'old data folder left' }
 }
 Test 'BOTH folders hold a database: the WavWiz one wins, the old folder is left untouched, a plain notice says so' {
     $sb = New-Sandbox; $ld = New-LegacyInstall $sb
     New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null; [IO.File]::WriteAllBytes((Join-Path $sb.Data 'unison.db'), [byte[]](77, 77, 77))
     $oldHash = (Get-FileHash (Join-Path $ld 'unison.db')).Hash
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Eq (Get-FileHash (Join-Path $ld 'unison.db')).Hash $oldHash 'old database was touched'; Eq ([IO.File]::ReadAllBytes((Join-Path $sb.Data 'unison.db'))).Length 3 'the WavWiz database was replaced'
+    Eq (Get-FileHash (Join-Path $ld 'unison.db')).Hash $oldHash 'old database was touched'; Eq ([IO.File]::ReadAllBytes((Join-Path $sb.Data 'wavwiz.db'))).Length 3 'the WavWiz database was replaced'
     Has (Get-Content (Join-Path $sb.Data 'setup-notices.txt') -Raw) 'contain a library database'
 }
 Test 'an InstallLocation that does not look like an old Unison install (or is the NEW install folder) is never deleted' {
@@ -488,7 +488,7 @@ Test 'a move that fails stops the install with the folder named, deletes nothing
     $r = Invoke-Setup $sb; if ($r.ExitCode -eq 0) { throw 'should have failed' }
     if (-not (Test-Path (Join-Path $ld 'unison.db'))) { throw 'the old database was lost after a failed move' }
     Remove-Item $sb.Data -Force; Set-Content (Join-Path $sb.State 'legacy-svc.state') 'RUNNING'
-    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb; if (-not (Test-Path (Join-Path $sb.Data 'unison.db'))) { throw 'second attempt did not move the database' }
+    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb; if (-not (Test-Path (Join-Path $sb.Data 'wavwiz.db'))) { throw 'second attempt did not move the database' }
 }
 
 
