@@ -7,6 +7,8 @@ public sealed record ServerBeacon(string Id, string Name, string Host, int HttpP
 {
     public const string Probe = "UNISON?1";
     private static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
+    /// <summary>0.2.4: servers answer "wavwiz" on /ping and /discover; the UDP beacon still says "unison" so 0.0.2..0.2.3 players keep finding new servers. Accept both.</summary>
+    public static bool IsOurApp(string? app) => app is "wavwiz" or "unison";
     public byte[] ToUdp() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { app = "unison", v = 1, id = Id, name = Name, host = Host, httpPort = HttpPort, httpsPort = HttpsPort, audioPort = AudioPort, version = Version }, J));
 
     public static ServerBeacon? FromUdp(ReadOnlySpan<byte> data, IPAddress? sender = null)
@@ -14,7 +16,7 @@ public sealed record ServerBeacon(string Id, string Name, string Host, int HttpP
         try
         {
             using var d = JsonDocument.Parse(data.ToArray()); var r = d.RootElement;
-            if (r.ValueKind != JsonValueKind.Object || !r.TryGetProperty("app", out var a) || a.GetString() != "unison") return null;
+            if (r.ValueKind != JsonValueKind.Object || !r.TryGetProperty("app", out var a) || !IsOurApp(a.GetString())) return null;
             string host = r.TryGetProperty("host", out var h) && h.GetString() is { Length: > 0 } hs && IPAddress.TryParse(hs, out var hip) && !IPAddress.IsLoopback(hip) && !hip.Equals(IPAddress.Any) ? hs : sender?.ToString() ?? "";
             if (host.Length == 0) return null;
             int Int(string n, int def) => r.TryGetProperty(n, out var v) && v.TryGetInt32(out var i) && i is > 0 and < 65536 ? i : def;

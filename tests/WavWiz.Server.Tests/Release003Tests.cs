@@ -86,7 +86,7 @@ public class WireCompatibilityTests
     public async Task Ping_and_discover_still_say_app_unison_and_a_0_0_2_style_pairing_still_works()
     {
         await using var f = await ServerFixture.StartAsync();
-        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("unison", ping.GetProperty("app").GetString());
+        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("wavwiz", ping.GetProperty("app").GetString());   // 0.2.4: was "unison"; pages and players accept both
         await f.SetupAdmin();
         var r = await f.Http.PostAsJsonAsync("/api/v1/auth/pair-player", new { playerId = "old-player", name = "Old PC" }); r.EnsureSuccessStatusCode();     // same body a 0.0.2 PairingClient sends
         Assert.False(string.IsNullOrEmpty((await r.Json()).GetProperty("token").GetString()));

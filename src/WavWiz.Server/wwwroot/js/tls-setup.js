@@ -23,9 +23,11 @@ const set = (cls, title, text, extra) => {
 const li = t => { const e = document.createElement('li'); e.textContent = t; return e; };
 const ul = items => { const u = document.createElement('ul'); items.forEach(i => u.append(li(i))); return u; };
 
+// 0.2.4: servers answer app:'wavwiz' (0.2.3 and older said 'unison'); accept both so a cached page and any server version agree
+const isOurApp = app => app === 'wavwiz' || app === 'unison';
 async function ping(url, ms = 7000) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
-  try { const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); const j = await r.json(); return j && j.app === 'unison' ? { ok: true, https: j.https } : { ok: false, why: 'unexpected answer' }; }
+  try { const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); const j = await r.json(); return j && isOurApp(j.app) ? { ok: true, https: j.https } : { ok: false, why: 'unexpected answer' }; }
   catch (e) { return { ok: false, why: e && e.name === 'AbortError' ? 'timeout' : 'blocked' }; }
   finally { clearTimeout(t); }
 }
@@ -41,7 +43,7 @@ async function check() {
     const sec = await ping(`https://${host}:${https}/api/v1/ping?t=${Date.now()}`);
     if (sec.ok) { good('Your phone trusts the WavWiz certificate.'); return; }
     const adv = [];
-    if (ios) { adv.push('Settings > General > About > Certificate Trust Settings: is "WavWiz Local CA (BETA)" switched ON? This is the step people miss.'); adv.push('Settings (top) > "Profile Downloaded": if it is still there, tap it and install it first.'); }
+    if (ios) { adv.push('Settings > General > About > Certificate Trust Settings: is "WavWiz Local CA (BETA)" switched ON? This is the step people miss.'); adv.push('Settings (top) > "Profile Downloaded": if it is still there, tap it and install it first.'); adv.push('Set this phone up before? WavWiz may have a new certificate: install the new profile below and switch it on. The old profile can be removed in Settings > General > VPN & Device Management.'); }
     else if (android) { adv.push('Settings > Security > Encryption & credentials > Install a certificate > CA certificate: choose the downloaded file.'); }
     adv.push('Make sure you are on the home Wi-Fi (not mobile data) and the same network as the WavWiz PC.');
     adv.push(`The PC's firewall must allow port ${https}. WavWiz's installer opens it for the home network; a "Public" network profile in Windows blocks it (WavWiz > Settings > Diagnostics tells you).`);

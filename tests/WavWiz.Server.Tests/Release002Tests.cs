@@ -118,7 +118,7 @@ public class DiscoveryTests
         var wanted = await ServerFinder.FindAsync(TimeSpan.FromSeconds(3), new ServerFinder.Options(DiscoveryPort: port, HttpPort: new Uri(f.Base).Port, Mdns: false, Broadcast: false, UdpSweep: false, HttpSweep: false, ExtraProbeTargets: new[] { IPAddress.Loopback }, WantedId: f.Server.S.ServerId));
         Assert.Single(wanted);
         // /ping and /discover tell the same story over http (the last-resort path), without a login
-        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("unison", ping.GetProperty("app").GetString());
+        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("wavwiz", ping.GetProperty("app").GetString());
         Assert.Equal(f.Server.S.ServerId, (await f.Http.GetJson("/api/v1/discover")).GetProperty("id").GetString());
         Assert.Equal(f.Server.S.ServerId, (await f.Http.GetJson("/api/v1/auth/state")).GetProperty("serverId").GetString());
     }

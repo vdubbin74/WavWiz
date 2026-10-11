@@ -93,7 +93,7 @@ public static class DiagnosticsApi
             checks.Add(new("tls", "HTTPS certificate", days is null ? "warn" : days < 0 ? "fail" : days < 30 ? "warn" : "ok",
                 days is null ? "The server certificate could not be read." : days < 0 ? "The server certificate has expired." : $"Valid for another {days:0} days (renews itself).",
                 days is null or < 30 ? "Settings > Phone & HTTPS > Set up HTTPS again (this keeps the phone's trusted profile)." : null));
-            checks.Add(new("tls-phone", "Phone trusts the certificate", "unknown", "WavWiz cannot see this from the PC.", "On the phone open the set-up page (QR code in Settings > Phone & HTTPS) and tap 'Check my phone'."));
+            checks.Add(new("tls-phone", "Phone trusts the certificate", s.Ca.RegeneratedFromLegacyAt is { } rn ? "warn" : "unknown", s.Ca.RegeneratedFromLegacyAt is { } rn2 ? $"The certificate was renewed with the WavWiz name on {rn2.ToLocalTime():d}. Phones set up before then must install the new one. WavWiz cannot see this from the PC." : "WavWiz cannot see this from the PC.", "On the phone open the set-up page (QR code in Settings > Phone & HTTPS) and tap 'Check my phone'."));
         }
 
         // --- ffmpeg ---

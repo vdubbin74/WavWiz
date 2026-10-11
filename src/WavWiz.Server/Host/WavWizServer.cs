@@ -33,6 +33,9 @@ public sealed class WavWizServer : IAsyncDisposable
         var zones = new Zones.ZoneManager(db, audio, cond, events, dsp) { Log = u._log.Write };
         var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events, cond);
         var ca = new Tls.LocalCa(cfg.DataDir);
+        // 0.2.4: unison-root-ca.crt -> wavwiz-root-ca.crt; a root that still says "Unison" (0.0.1/0.0.2 betas) is replaced by a WavWiz one (phones re-trust it)
+        try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
+        catch (Exception e) { u._log.Write("TLS: certificate rename/migration failed (" + e.Message + "); the old certificate stays in use"); }
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live

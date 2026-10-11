@@ -16,7 +16,7 @@ public class TlsTests
 
     private static X509Certificate2 Issue(string dir, string? dns, IPAddress? ip)
     {
-        using var ca = X509Certificate2.CreateFromPem(File.ReadAllText(Path.Combine(dir, "tls", "unison-root-ca.crt")));
+        using var ca = X509Certificate2.CreateFromPem(File.ReadAllText(Path.Combine(dir, "tls", "wavwiz-root-ca.crt")));
         using var caKey = RSA.Create(); caKey.ImportFromPem(File.ReadAllText(Path.Combine(dir, "tls", "ca.key.pem")));
         using var caFull = ca.CopyWithPrivateKey(caKey);
         using var k = RSA.Create(2048);

@@ -6,8 +6,8 @@ public static class AuthApi
 {
     public static void Map(RouteGroupBuilder g, Services s)
     {
-        g.MapGet("/ping", (HttpContext c) => { c.Response.Headers["Access-Control-Allow-Origin"] = "*"; return Results.Json(new { ok = true, app = "unison", version = WavWizInfo.Version, https = c.Request.IsHttps }); }).Anon();
-        g.MapGet("/discover", (HttpContext c) => { c.Response.Headers["Access-Control-Allow-Origin"] = "*"; var b = s.Beacon(); return Results.Json(new { app = "unison", id = b.Id, name = b.Name, host = string.IsNullOrEmpty(b.Host) ? c.Connection.LocalIpAddress?.ToString() : b.Host, httpPort = b.HttpPort, httpsPort = b.HttpsPort, audioPort = b.AudioPort, version = b.Version }); }).Anon();
+        g.MapGet("/ping", (HttpContext c) => { c.Response.Headers["Access-Control-Allow-Origin"] = "*"; return Results.Json(new { ok = true, app = "wavwiz", version = WavWizInfo.Version, https = c.Request.IsHttps }); }).Anon();
+        g.MapGet("/discover", (HttpContext c) => { c.Response.Headers["Access-Control-Allow-Origin"] = "*"; var b = s.Beacon(); return Results.Json(new { app = "wavwiz", id = b.Id, name = b.Name, host = string.IsNullOrEmpty(b.Host) ? c.Connection.LocalIpAddress?.ToString() : b.Host, httpPort = b.HttpPort, httpsPort = b.HttpsPort, audioPort = b.AudioPort, version = b.Version }); }).Anon();
 
         g.MapPost("/auth/ws-ticket", (HttpContext c) => Results.Json(new { ticket = s.Auth.IssueWsTicket(c.Who()!) })).Req(Role.View);
 
