@@ -26,8 +26,8 @@ WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our ow
 
 Examples:
 ```
-WavWiz-Setup-0.2.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
-WavWiz-Setup-0.2.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
+WavWiz-Setup-0.2.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
+WavWiz-Setup-0.2.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES            (keeps your data)
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /PURGE=1   (also deletes C:\ProgramData\WavWiz; music files are never touched)
 ```

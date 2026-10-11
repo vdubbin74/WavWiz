@@ -2,7 +2,7 @@
   <!-- THE one place the version lives (spec 0.4). All builds are BETA (0.0.x, then 0.1.x) until the first full release 1.0.0.
        The installer, binaries' file version, About box, tray tooltip, web UI and API appVersion all read this. -->
   <PropertyGroup>
-    <WavWizVersion>0.2.1</WavWizVersion>
+    <WavWizVersion>0.2.2</WavWizVersion>
     <WavWizChannel>BETA</WavWizChannel>
     <Version>$(WavWizVersion)</Version>
     <AssemblyVersion>$(WavWizVersion).0</AssemblyVersion>
