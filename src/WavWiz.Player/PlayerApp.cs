@@ -13,14 +13,34 @@ internal sealed class PlayerApp : ApplicationContext
     private readonly CancellationTokenSource _cts = new(); private WebUiForm? _web; private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new SynchronizationContext();
     private readonly string _logPath = Path.Combine(PlayerSettings.Dir, "logs", "player.log");
 
-    public PlayerApp()
+    private readonly bool _showWindow;
+    private readonly EventWaitHandle _showEvt = new(false, EventResetMode.AutoReset, StartArgs.ShowEventName);
+    private readonly EventWaitHandle _exitEvt = new(false, EventResetMode.ManualReset, StartArgs.ExitEventName);
+
+    /// <param name="showWindow">0.2.2 T7: false only for the sign-in auto-start (--autostart / --background / --tray / --minimized).</param>
+    public PlayerApp(bool showWindow = true)
     {
+        _showWindow = showWindow;
         _s = PlayerSettings.Load(); Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
         _outputs = new WasapiOutputProvider(_clock);
         _tray = new NotifyIcon { Icon = MakeIcon(), Text = Tip("Starting"), ContextMenuStrip = _menu, Visible = true };
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) OpenUi(); };
         _menu.Opening += (_, _) => BuildMenu();
         ApplyAutostart();
+        // 0.2.2 T7/T11: a second manual launch shows the window; the installer asks the Player to exit before it replaces the files.
+        // Session end / Restart Manager (installer's CloseApplications) also exits cleanly.
+        var watch = new Thread(() =>
+        {
+            var hs = new WaitHandle[] { _exitEvt, _showEvt };
+            while (true)
+            {
+                int i; try { i = WaitHandle.WaitAny(hs); } catch { return; }
+                if (i == 0) { Log("exit requested (installer or --exit)"); _ui.Post(_ => ExitApp(), null); return; }
+                _ui.Post(_ => OpenUi(), null);
+            }
+        }) { IsBackground = true, Name = "single-instance" };
+        watch.Start();
+        SystemEvents.SessionEnded += (_, _) => _ui.Post(_ => ExitApp(), null);
         _ = StartAsync();
     }
 
@@ -70,6 +90,7 @@ internal sealed class PlayerApp : ApplicationContext
             _client.ServerUnreachable += n => { Log($"server unreachable ({n} attempts); looking for it on the network"); _ = RefindAsync(); };
             _outputs.DevicesChanged += () => { try { _ = _client?.SendOutputsAsync("devices"); } catch { } };
             _ = Task.Run(() => _client.RunAsync(_cts.Token));
+            if (_showWindow) _ui.Post(_ => OpenUi(), null);       // 0.2.2 T7: a Start menu / desktop launch opens the window
         }
         catch (Exception e) { Log("start failed: " + e); _tray.ShowBalloonTip(5000, WavWizInfo.DisplayName, "WavWiz Player could not start: " + e.Message, ToolTipIcon.Error); }
     }
@@ -156,8 +177,15 @@ internal sealed class PlayerApp : ApplicationContext
 
     private void OpenUi()
     {
-        if (_web is { IsDisposed: false }) { if (_web.WindowState == FormWindowState.Minimized) _web.WindowState = FormWindowState.Normal; _web.Activate(); return; }
-        _web = new WebUiForm(_s); _web.Show();
+        if (_exiting) return;
+        if (_web is { IsDisposed: false })
+        {
+            if (!_web.Visible) _web.Show();
+            if (_web.WindowState == FormWindowState.Minimized) _web.WindowState = FormWindowState.Normal;
+            // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
+            _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
+        }
+        _web = new WebUiForm(_s); _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()
@@ -172,7 +200,8 @@ internal sealed class PlayerApp : ApplicationContext
         catch { }
     }
 
-    private void ExitApp() { _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
+    private bool _exiting;
+    private void ExitApp() { if (_exiting) return; _exiting = true; try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
 
     /// <summary>The final WavWiz logo (embedded multi-size .ico); Windows picks the size that fits the tray.</summary>
     private static Icon MakeIcon()
