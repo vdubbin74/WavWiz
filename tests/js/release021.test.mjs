@@ -87,7 +87,7 @@ test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view nev
   const d = src('devices.js');
   assert.match(d, /export function zoneFilter/); assert.match(d, /export function zoneState/);
   assert.match(d, /zonesSidebar\(/); assert.match(d, /'All devices'/); assert.match(d, /dexp-main/);
-  assert.match(d, /size === 'expanded' && zedit !== null\) return/);
+  assert.match(d, /size === 'expanded' && zedit !== null && oldSide \? oldSide :/);   // 0.2.3 fix: the zone editor is kept as is (was: whole redraw skipped)
   assert.match(css, /\.dexp-main\{display:grid;grid-template-columns:minmax\(0,1fr\) 184px/);
   assert.match(css, /\.zsrow\.on::before/);
   const body = d.slice(d.indexOf('export function zoneFilter'));

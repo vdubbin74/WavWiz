@@ -162,8 +162,9 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   // side panel (Standard + Expanded + zones sidebar): a skipped redraw is retried, and a card whose device is gone forces the redraw
   assert.match(d, /const removedShown = \(\) => \[\.\.\.body\.querySelectorAll\('\[data-zone-id\]'\)\]\.some\(el => !S\.zones\.some\(z => String\(z\.id\) === el\.dataset\.zoneId\)\)/);
   assert.match(d, /if \(!force && removedShown\(\)\) force = true;/);
-  const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('function draw(force)') + 900);
-  assert.ok((panel.match(/return later\(\);/g) || []).length >= 3, 'slider, menu and zone editor skips all retry');
+  const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('export function devicesView'));
+  assert.match(panel, /if \(!force && body\.querySelector\('\.dmenu'\)\) return later\(\);/);
+  assert.match(panel, /if \(busy\.v\) later\(\);/, 'a card / slider / zone editor kept for the user retries');
   assert.doesNotMatch(panel, /\) return;/);
   // the phone Devices page follows the same rule
   const page = d.slice(d.indexOf('export function devicesView'));
@@ -197,7 +198,8 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   const row = d.slice(d.indexOf('function standardRow('), d.indexOf('const EMPTY = '));
   for (const [n, f] of [['Expanded', card], ['Standard', row]]) {
     assert.match(f, /settingsToggle\(z\.name, open, flip\)/, n + ' has the Expand control');
-    assert.match(f, /open \? cardSettings\(S, ctl, z\) : null\);\n  return escCloses\(/, n + ': settings open below the face, Esc closes');
+    assert.match(f, /settings = open \? cardSettings\(S, ctl, z\) : null/, n + ': settings open below the face');
+    assert.match(f, /\n    settings\);\n[\s\S]*\n  return escCloses\(/, n + ': Esc closes');
     assert.match(f, /'aria-controls', `dset-\$\{z\.id\}`/);
   }
   assert.match(d, /id: `dset-\$\{z\.id\}`/);
