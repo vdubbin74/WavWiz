@@ -1284,3 +1284,76 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .devpanel .pane-h .eschint{margin-right:0;margin-left:4px}
 .devpanel .devhead > .devtitle:not(.grow),.libpanel .pane-h > .libtitle{color:var(--accent)}
 .desk.devexpanded .libpanel .libexp,.desk.devexpanded .libpanel .eschint{display:none} .desk.devexpanded .libpanel .pane-h{justify-content:center;padding:8px 4px} .desk.devexpanded .libpanel .pane-h .grow{display:none}
+/* 0.2.2 T2: Settings > Appearance in sub-sections - left sub-nav (Theme, Visualizer, EQ, Now Playing, Display size), one page each with a live preview */
+.appsplit{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:start}
+.appnav{display:flex;flex-direction:column;gap:2px;position:sticky;top:0}
+.appnav-h{font-size:10px;font-weight:800;letter-spacing:1.4px;color:var(--dim);padding:4px 10px 6px}
+.appnav button{background:none;border:0;border-left:3px solid transparent;border-radius:4px;color:var(--ink);text-align:left;padding:7px 10px;font-size:13px;cursor:pointer}
+.appnav button:hover{background:var(--panel2)}
+.appnav button.on{background:color-mix(in srgb,var(--hl) 16%,var(--panel2));border-left-color:var(--hl);font-weight:700}
+.appsub{min-width:0}
+.appsub > .card:first-child,.appsub > .themes-page,.appsub > .appsub-viz{margin-top:0}
+@media (max-width:640px){ .appsplit{grid-template-columns:1fr} .appnav{position:static;flex-direction:row;overflow-x:auto;gap:4px} .appnav-h{display:none}
+  .appnav button{border-left:0;border-bottom:3px solid transparent;white-space:nowrap} .appnav button.on{border-bottom-color:var(--hl)} }
+/* Theme page: the 0.2.0 cards with tight corners + the live app preview */
+.themecard{border-radius:6px} .tp-mini{border-radius:5px}
+.tp-bar{display:flex;align-items:center;gap:0} .tp-hl{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:auto}
+.apprev{margin:0 0 10px}
+.ap-stage{border-radius:4px;overflow:hidden}
+.ap-app{background:var(--bg);color:var(--ink);font-size:9px;display:flex;flex-direction:column;gap:4px;padding:0 0 5px;height:210px}
+.ap-top{display:flex;align-items:center;gap:1px;padding:4px 8px;background:var(--panel);border-bottom:1px solid var(--line);font-size:11px}
+.ap-w1{color:var(--accent)} .ap-w2{color:var(--accent2)}
+.ap-beta{margin-left:6px;font-size:7px;font-weight:800;background:var(--accent);color:var(--accent-ink);padding:0 4px;border-radius:2px}
+.ap-dot{width:6px;height:6px;border-radius:50%;background:#3DDC84}
+.ap-desk{flex:1;display:grid;grid-template-columns:24% 1fr 24%;gap:4px;padding:0 5px;min-height:0}
+.ap-col{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 5px;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:3px}
+.ap-h{font-size:7px;font-weight:800;letter-spacing:1px;color:var(--accent)}
+.ap-row{display:flex;align-items:center;gap:4px} .ap-row.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-radius:2px}
+.ap-av{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));flex:none}
+.ap-ln{height:3px;border-radius:2px;background:var(--dim);flex:1;opacity:.7}
+.ap-tog{width:12px;height:6px;border-radius:3px;background:var(--accent);flex:none}
+.ap-mid{padding:0;gap:0;background:none;border:0}
+.ap-viz{flex:1;display:flex;align-items:flex-end;gap:2px;padding:4px;background:#05070b;border:1px solid var(--line);border-radius:4px 4px 0 0}
+.ap-viz i{flex:1;background:linear-gradient(to top,var(--accent),var(--accent2));border-radius:1px 1px 0 0;opacity:.9}
+.ap-np{display:flex;align-items:center;gap:6px;padding:4px 6px;background:var(--panel);border:1px solid var(--line);border-top:0;border-radius:0 0 4px 4px}
+.ap-art{width:20px;height:20px;border-radius:3px;background:linear-gradient(135deg,var(--accent),var(--accent2));flex:none}
+.ap-t{display:flex;flex-direction:column;flex:1;min-width:0;line-height:1.15} .ap-t span{color:var(--accent2)}
+.ap-prog{height:2px;background:var(--line);margin-top:2px} .ap-prog span{display:block;width:40%;height:100%;background:var(--accent)}
+.ap-btn{width:10px;height:10px;border-radius:50%;background:var(--panel2);border:1px solid var(--line)} .ap-play{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.ap-heart{color:var(--hl);font-style:normal}
+.ap-list{margin:0 5px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 5px;display:flex;flex-direction:column;gap:3px}
+.ap-cap{text-align:center;margin:6px 0 0}
+/* Visualizer page: live mini visualizer of the active look */
+.vlive{margin:0 0 10px}
+.vlive-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:12px;align-items:center}
+.vlive-stage{position:relative;aspect-ratio:16/9;background:#05070b;border-radius:4px;overflow:hidden}
+.vlive-meta b{font-size:15px} .vlive-meta .row{gap:8px}
+@media (max-width:640px){ .vlive-row{grid-template-columns:1fr} }
+.vfold{border:1px solid var(--line);border-radius:4px;background:var(--panel2);margin:8px 0}
+.vfold > summary{cursor:pointer;padding:8px 12px;display:flex;gap:10px;align-items:baseline;list-style:none}
+.vfold > summary::-webkit-details-marker{display:none}
+.vfold > summary::after{content:'›';margin-left:auto;color:var(--dim);transition:transform .2s} .vfold[open] > summary::after{transform:rotate(90deg)}
+.vfold > .card{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 4px 4px}
+/* EQ page: big try-out preview + the other looks */
+.eqprev-big .eqarea{zoom:.85}
+.eqprev-big .eqa-plot{height:260px}
+.npprev-cap{text-align:center;margin:6px 0 0}
+.eqothers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.eqother{display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--ink);cursor:pointer;text-align:left;font-weight:600}
+.eqother:hover{border-color:var(--accent)}
+.eqother-prev{height:110px;overflow:hidden;border-radius:4px;background:var(--bg);pointer-events:none}
+.eqother-prev .eqarea{zoom:.42}
+/* Display size page: a Playlist slice at the chosen size */
+.dsprev .ds-stage{overflow:hidden;border-radius:4px}
+.ds-ui{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:.5em .8em}
+.ds-h{display:flex;align-items:center;gap:.6em;padding-bottom:.4em;border-bottom:1px solid var(--line);margin-bottom:.3em}
+.ds-title{color:var(--accent);font-weight:800;letter-spacing:1.4px;font-size:.85em}
+.ds-btn{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:.15em .6em;font-size:.9em}
+.ds-row{display:grid;grid-template-columns:2em minmax(0,1.3fr) minmax(0,1fr) auto;gap:.6em;padding:.25em .3em;align-items:center}
+.ds-row.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-radius:3px} .ds-row.on .ds-n{color:var(--accent)}
+.ds-a{color:var(--dim)} .ds-d{font-family:var(--mono)}
+/* T2: the theme and look cards sit five / four to a row inside the Appearance sub-page, like the 0.2.0 pages */
+.appsub .themegrid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.appsub .tp-mini{height:78px} .appsub .tp-body{padding:5px;gap:6px} .appsub .tp-art{width:24px;height:24px} .appsub .tp-name{font-size:12px}
+.appsub .vizgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.appsub .vizcard{border-radius:6px} .appsub .vizcard .vp-meta .small{display:none}

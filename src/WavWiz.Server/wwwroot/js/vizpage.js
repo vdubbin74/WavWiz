@@ -7,7 +7,9 @@ import { h, toast } from './util.js';
 import { Viz, vizPrefs, saveVizPrefs } from './viz.js';
 import { VIZ_LIST, VIZ_BLURB, vizName, loadSettings, saveSettings, resetSettings, SHARED, FX, loadReact, saveReact, loadPost, savePost, POST, QUALITY_LIST, DEFAULT_REACT } from './vizcore.js';
 
-export function visualizerView() {
+/** 0.2.2 T2: `nested` = the page inside Settings > Appearance > Visualizer (the Show switch lives in the live preview card above it,
+ *  Graphics and Reactivity fold into rows so the look settings stay close to the cards). */
+export function visualizerView({ nested = false } = {}) {
   const root = h('div', { class: 'viz-page' }); let previews = [], editing = null, cards = {}, ctlHost = null;
   const changed = () => window.dispatchEvent(new CustomEvent('wavwiz:vizsettings'));
   function setActive(k) {
@@ -68,6 +70,7 @@ export function visualizerView() {
       ...POST.map(([key, label, , hint]) => slider({ label, value: post[key], hint, key, offAtZero: true, onInput: v => set({ [key]: v }) })),
       h('div', { class: 'row wrap', style: 'margin-top:6px' }, h('button', { class: 'btn', onclick: () => { savePost({}); changed(); draw(); } }, 'Reset graphics')));
   }
+  const fold = (title, sub, card) => { card.querySelector('h3')?.remove(); return h('details', { class: 'vfold' }, h('summary', null, h('b', null, title), h('span', { class: 'small dim' }, sub)), card); };
   function drawControls() { if (ctlHost) ctlHost.replaceChildren(controls(editing)); }
   function draw() {
     stopPreviews(); cards = {};
@@ -86,9 +89,10 @@ export function visualizerView() {
     root.replaceChildren(
       h('p', { class: 'dim small' }, 'Tap a look to use it on Now Playing; its settings appear below. Each look follows the theme colors unless you switch it to Custom. Every level runs 0–100 % (50 % is the default). Settings are saved for each look on this device.'),
       grid,
-      h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
-      graphicsCard(p), reactCard(), ctlHost);
+      nested ? null : h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
+      nested ? fold('Graphics (this device)', 'Quality: Auto, bloom, streaks, fringing, depth blur', graphicsCard(p)) : graphicsCard(p),
+      nested ? fold('Reactivity (all looks)', 'Energy, Sensitivity, Auto-gain', reactCard()) : reactCard(), ctlHost);
     markCards(); drawControls();
   }
-  return { el: root, reload: draw, hide: stopPreviews };
+  return { el: root, reload: draw, hide: stopPreviews, mark: markCards };
 }

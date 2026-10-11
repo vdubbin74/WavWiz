@@ -99,7 +99,7 @@ test('0.0.7 pages: View > Theme… / Visualizer… open pages (desktop + phone);
   const m = src('menu.js'), st = src('settings.js'), main = src('main.js');
   // 0.2.1 F8 supersedes: Theme and Visualizer are folded into Settings > Appearance; old routes open it there
   assert.doesNotMatch(m, /'Theme…'|'Visualizer…'/);
-  assert.match(st, /appearancePane\(/); assert.match(src('appearance.js'), /themeCard\(\), viz = vizCard\(/);
+  assert.match(st, /appearancePane\(/); assert.match(src('appearance.js'), /themeCard\(\), viz = vizCard\(\)/);   // 0.2.2 T2: sub-sections
   assert.match(main, /if \(k === 'themes' \|\| k === 'visualizer'\) return openSettings\(S, refreshAll, go, k === 'themes' \? 'theme' : 'viz'\)/);
 });
 

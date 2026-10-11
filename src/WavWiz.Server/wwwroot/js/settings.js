@@ -12,6 +12,8 @@ const GROUPS = [
   ['network', 'Network'],
 ];
 
+// 0.2.2 T2: deep links into the Appearance sub-sections
+const APP_SECTION = { theme: 'theme', themes: 'theme', viz: 'viz', visualizer: 'viz', eq: 'eq', eqstyle: 'eq', np: 'np', npstyle: 'np', display: 'display' };
 export async function openSettings(S, refresh, nav, section) {
   const admin = S.auth.role === 'admin';
   const body = h('div', { class: 'settings-body' });
@@ -22,7 +24,7 @@ export async function openSettings(S, refresh, nav, section) {
     : section === 'library' ? 'library'
     : section === 'network' ? 'network'
     : 'appearance';
-  const focusSec = section === 'theme' ? 'sec-theme' : section === 'viz' ? 'sec-viz' : section === 'players' ? 'sec-players' : null;
+  const focusSec = section === 'players' ? 'sec-players' : null;
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
@@ -39,7 +41,7 @@ export async function openSettings(S, refresh, nav, section) {
       network: [],
     };
 
-    app?.hide?.(); app = appearancePane({ looks: section === 'viz', preview: () => npPreview() });
+    app?.hide?.(); app = appearancePane({ looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview() });
     panes.appearance.push(app.el);
 
     // Devices: phone/https, pairing, tokens, delay defaults
@@ -143,7 +145,7 @@ export async function openSettings(S, refresh, nav, section) {
     function paint() {
       navEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.g === active));
       body.querySelectorAll('.settings-sec').forEach(s => s.classList.toggle('on', s.dataset.g === active));
-      if (active !== 'appearance') app?.hide?.(); else app?.viz?.reload();     // live visualizer previews run only while Appearance is shown
+      if (active !== 'appearance') app?.hide?.(); else app?.resume?.();     // live visualizer previews run only while Appearance is shown
     }
   };
 

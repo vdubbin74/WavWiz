@@ -112,7 +112,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.match(st, /\['appearance', 'Appearance'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n\];/);
   assert.doesNotMatch(st, /'about'|id: 'sec-status'/);
   assert.match(dg, /id: 'sec-status'/);
-  assert.match(ap, /theme\.el, viz\.el, np\.el, eqs\.el, disp\.el/);
+  assert.match(ap, /const pages = \{ theme, viz, eq: eqs, np, display: disp \}/);   // 0.2.2 T2: one sub-section at a time
   assert.match(st, /panes\.library\.push\(libViewCard\(\)\);/);
   for (const t of ["'Default view'", "'Tile size'", "'Default sort'", "'Remember view per tab'", "'Reset to defaults'", "'wavwiz:libprefs'"]) assert.ok(st.includes(t), t);
   assert.match(main, /\[\['mine', 'My stations'\], \['finder', 'Radio finder'\]\]/);

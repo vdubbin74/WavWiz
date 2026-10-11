@@ -82,3 +82,27 @@ test('0.2.2 T8: Menu > Devices > Devices & zones always opens the EXPANDED Devic
   assert.match(m, /if \(k === 'devices'\) \{ if \(pageDlg\) \{ pageDlg\.close\(\); pageDlg = null; \} toggleDevExpanded\(true\); return; \}/);
   assert.match(m, /if \(sz !== 'collapsed' && desk\.classList\.contains\('libexpanded'\)\) toggleLibExpanded\(false\)/);
 });
+
+test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playing, Display size), one page each with a live preview', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem() {} };
+  const ap = src('appearance.js'), th = src('themes.js'), vp = src('vizpage.js'), st = src('settings.js');
+  assert.match(ap, /export const APP_SUBS = \[\['theme', 'Theme'\], \['viz', 'Visualizer'\], \['eq', 'EQ'\], \['np', 'Now Playing'\], \['display', 'Display size'\]\]/);
+  assert.match(ap, /h\('nav', \{ class: 'appnav', 'aria-label': 'Appearance sections' \}/);
+  // Theme = the 0.2.0 Themes page layout (theme cards + Custom colors card) + live app preview that recolors on hover
+  assert.match(th, /function previewCard\(id, p, current, onPick, onHover\)/); assert.match(th, /class: 'themegrid'/); assert.match(th, /h\('h3', null, 'Custom colors'\)/);
+  assert.match(th, /export function appPreview\(\)/); assert.match(th, /Recolors as you hover or pick/);
+  for (const l of ['Background', 'Main', 'Second', 'Highlight', 'Text']) assert.match(th, new RegExp(`picker\\('[a-z0-9]+', '${l}'`));
+  assert.match(th, /Object\.entries\(PRESETS\)\.map\(\(\[id, p\]\) => previewCard/, 'F15 order = PRESETS order');
+  const theme = await imp('theme'); assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);
+  // Visualizer = the 0.2.0 Visualizer page + live mini visualizer of the active look
+  assert.match(ap, /visualizerView\(\{ nested: true \}\)/); assert.match(ap, /new Viz\(stage, \{ engine: p\.engine, preview: true \}\)/);
+  assert.match(vp, /export function visualizerView\(\{ nested = false \} = \{\}\)/); assert.match(vp, /fold\('Graphics \(this device\)'/);
+  // EQ = fuller page: big try-out preview, other styles, glow 0-100 % (50 % default)
+  assert.match(ap, /interactive: true \}\);   \/\/ try-out only: no onChange, nothing is sent/); assert.match(ap, /'Other styles'/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
+  assert.match(ap, /interactive: false/);
+  // Now Playing keeps the F9 preview; Display size gets a preview slice
+  assert.match(ap, /preview \? preview\.el : null/); assert.match(ap, /class: 'npprev dsprev'/);
+  assert.match(st, /section: APP_SECTION\[section\]/); assert.match(st, /else app\?\.resume\?\.\(\)/);
+  assert.match(css, /\.appsplit\{display:grid;grid-template-columns:150px minmax\(0,1fr\)/);
+  assert.match(css, /\.themecard\{border-radius:6px\}/);
+});
