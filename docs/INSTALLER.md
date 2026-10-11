@@ -21,6 +21,7 @@ WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our ow
 | `/SERVERHOST=192.168.1.20` | Player-only installs: seeds the server address the Player connects to. |
 | `/NOSTART=1` | Install and configure, but do not start the service or the Player. |
 | `/SKIPSETUP=1` | Copy files only; skip the service / firewall / settings step (for testing). |
+| `/NOCLOSE=1` | Do not close a running WavWiz first (for testing; locked files then fail the copy). |
 | `/DIR="D:\Apps\WavWiz"` | Install folder (default `C:\Program Files\WavWiz`; an upgrade reuses the previous folder). |
 | `/LOG="C:\Temp\wavwiz-setup.log"` | Inno's own log, in addition to `C:\ProgramData\WavWiz\install.log`. |
 
@@ -32,7 +33,7 @@ WavWiz-Setup-0.2.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="pla
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /PURGE=1   (also deletes C:\ProgramData\WavWiz; music files are never touched)
 ```
 
-**Exit codes**: `0` installed, `1` setup failed to start, `2` cancelled before installing, `3` fatal error before the install phase, `4` fatal error while installing, `5` cancelled while installing, `6` setup was killed, `7` the preparing step failed, `8` the preparing step failed and Windows must restart first (`1`-`8` are standard Inno Setup), and **`9` the files were copied but the final setup step (service, firewall, settings) failed or stopped answering** (0.2.1; earlier versions returned `0` here). On `9`, `C:\ProgramData\WavWiz\install.log` has the failing step and `setup.done` holds the script's own exit code. Running the installer again after fixing the cause is safe.
+**Exit codes**: `0` installed, `1` setup failed to start, `2` cancelled before installing, `3` fatal error before the install phase, `4` fatal error while installing, `5` cancelled while installing, `6` setup was killed, `7` the preparing step failed, `8` the preparing step failed and Windows must restart first (`1`-`8` are standard Inno Setup), and **`7` also when a running WavWiz could not be closed before copying (0.2.2; nothing was changed, the reason is in `install.log` and `close-error.txt`)**, **`9` the files were copied but the final setup step (service, firewall, settings) failed or stopped answering** (0.2.1; earlier versions returned `0` here). On `9`, `C:\ProgramData\WavWiz\install.log` has the failing step and `setup.done` holds the script's own exit code. Running the installer again after fixing the cause is safe.
 
 **Upgrades:** the same AppId is used for every version, so running a newer installer upgrades in place; `C:\ProgramData\WavWiz` (library database, settings, admin password, paired devices) is kept, the service is re-configured, not re-created. Running the same version again repairs the install (idempotent).
 
@@ -94,3 +95,18 @@ PowerShell 5.1 itself, real sc.exe/netsh/icacls behavior, UAC, the Inno wizard p
 * Built 2026-10-06 (Linux, ISCC via Wine), unsigned, NOT yet run on Windows.
 * Size: 101925142 bytes
 * SHA-256 (uppercase): 03E543ABA52D68DA476674A6553FBE948B341100734E471D0EE6A9DD046798A3
+
+## Upgrading over a running WavWiz (0.2.2)
+
+Before any file is replaced the installer shows **Closing WavWiz...** and runs `scripts/close-wavwiz.ps1` (hidden, with a 2-minute limit):
+
+1. stops the **WavWiz Server** service and waits up to 30 s; if it does not stop, its process is ended;
+2. asks every **WavWiz Player** to exit (0.2.2+ Players listen for `Local\WavWizPlayer.Exit`; older ones get a window close), waits 8 s, then ends the ones still running;
+3. ends anything else still running from the install folder (AirPlay / Spotify receivers, ffmpeg);
+4. retries for up to 20 s until no `.exe` / `.dll` in the install folder is locked.
+
+After the install the service is started again by the setup step (or directly when only the Player part was installed), and a Player that was running in the installing user's session is started again in the tray (`--background`, as the signed-in user, not elevated), in silent installs too. Players closed in *other* Windows sessions start again at their next sign-in. A silent install returns non-zero (`7`) only when something truly could not be closed. The uninstaller runs the same close step.
+
+## How the Player starts (0.2.2)
+
+Only the sign-in auto-start (`--autostart` from the installer, `--background` from the Player's own "Start with Windows", or `--tray` / `--minimized`) starts hidden in the tray. A Start menu or desktop launch opens the window. The Player is single-instance per Windows session: a second manual launch brings the running window to the front. `wavwiz-player.exe --exit` asks a running Player to close.

@@ -76,6 +76,8 @@ Source: "{#RepoDir}\assets\logo\wavwiz.ico"; DestDir: "{app}"; Flags: ignorevers
 ; wizard-time LAN address detection: extracted to the Setup temp folder
 Source: "{#RepoDir}\installer\scripts\lib.ps1"; Flags: dontcopy
 Source: "{#RepoDir}\installer\scripts\detect-lan.ps1"; Flags: dontcopy
+; 0.2.2 T11: closes a running WavWiz (service, Player, receivers) before the files are replaced
+Source: "{#RepoDir}\installer\scripts\close-wavwiz.ps1"; Flags: dontcopy
 
 [Registry]
 ; All-users autostart for the player (removed on uninstall). The player also has its own per-user switch (tray menu).
@@ -89,7 +91,8 @@ Name: "{group}\Uninstall WavWiz (BETA)"; Filename: "{uninstallexe}"; IconFilenam
 
 [Run]
 Filename: "{code:FirstRunUrl}"; Description: "Open WavWiz in my browser to finish set-up (choose the administrator password)"; Flags: postinstall shellexec skipifsilent; Check: HasFirstRun
-Filename: "{app}\Player\wavwiz-player.exe"; Description: "Start WavWiz Player now"; Flags: postinstall nowait skipifsilent; Components: player
+; 0.2.2: no extra start when setup already restarted a Player that was running before (T11); this launch opens the window (T7)
+Filename: "{app}\Player\wavwiz-player.exe"; Description: "Start WavWiz Player now"; Flags: postinstall nowait skipifsilent runasoriginaluser; Components: player; Check: not PlayerRestarted
 Filename: "{app}\docs\FIRST-RUN.txt"; Description: "Read the plain-language ""what next"" page"; Flags: postinstall shellexec skipifsilent unchecked
 
 [UninstallRun]
@@ -110,6 +113,9 @@ var
   LanDetected: Boolean;
   SetupFailed: Boolean;
   UninstPurgeFlag: Boolean;
+  { 0.2.2 T11: what was running before setup closed it (started again after the install) }
+  ServiceWasRunning, PlayerWasRunning, PlayerRestartedFlag: Boolean;
+  CloseFailure: String;
 
 function GetTickCount: LongWord; external 'GetTickCount@kernel32.dll stdcall';
 
@@ -372,16 +378,104 @@ begin
     'This is a BETA. If something fails, install.log says what and where.' + #13#10;
 end;
 
+function PlayerRestarted: Boolean; begin Result := PlayerRestartedFlag; end;
+
+{ 0.2.2 T11: close a running WavWiz before any file is replaced. close-wavwiz.ps1 (hidden, elevated) stops the service, asks every Player to exit and
+  ends it after a timeout, ends leftovers from the install folder (receivers, ffmpeg) and retries until no file is locked. The wizard shows a friendly
+  "Closing WavWiz..." page meanwhile and never waits more than 2 minutes. If the script cannot run at all, sc stop + taskkill are the fallback and
+  Inno's own Restart Manager / file-replace retries take over. Returns '' (go on) or the reason it truly could not close WavWiz. }
+function CloseRunningWavWiz: String;
+var
+  Exe, Params, DoneFile, StateFile, StepFile, Step, LastStep: String; A: AnsiString;
+  Code, PingCode: Integer; T0: LongWord; Finished: Boolean; Page: TOutputProgressWizardPage;
+begin
+  Result := ''; ServiceWasRunning := False; PlayerWasRunning := False;
+  Page := nil;
+  if not WizardSilent then
+  begin
+    Page := CreateOutputProgressPage('Closing WavWiz' + #$2026, 'If WavWiz is running, Setup closes it so its files can be updated. Whatever it closes starts again when Setup is done.');
+    Page.SetText('Closing WavWiz' + #$2026, '');
+    Page.ProgressBar.Style := npbstMarquee;
+    Page.Show;
+  end;
+  try
+    ExtractTemporaryFile('lib.ps1'); ExtractTemporaryFile('close-wavwiz.ps1');
+    DoneFile := ExpandConstant('{tmp}\close.done'); StateFile := ExpandConstant('{tmp}\close.state');
+    StepFile := ExpandConstant('{commonappdata}\WavWiz\current-step.txt');
+    DeleteFile(DoneFile); DeleteFile(StateFile);
+    Exe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\close-wavwiz.ps1')) + ' -Root ' + QuoteArg(ExpandConstant('{app}')) +
+      ' -StateFile ' + QuoteArg(StateFile) + ' -DoneFile ' + QuoteArg(DoneFile);
+    Finished := False; LastStep := '';
+    if Exec(Exe, Params, '', SW_HIDE, ewNoWait, Code) then
+    begin
+      T0 := GetTickCount;
+      while Integer(GetTickCount - T0) < 120000 do
+      begin
+        if FileExists(DoneFile) then begin Finished := True; Break; end;
+        if (Page <> nil) and FileExists(StepFile) and LoadStringFromFile(StepFile, A) then
+        begin
+          Step := Trim(String(A));
+          if (Step <> LastStep) and (Copy(Step, 1, 5) = 'USER:') then
+          begin
+            LastStep := Step; StringChangeEx(Step, '...', #$2026, True);
+            Page.SetText(Trim(Copy(Step, 6, 400)), '');
+          end;
+        end;
+        { about a second with the message loop running }
+        if not Exec(ExpandConstant('{sys}\ping.exe'), '-n 2 127.0.0.1', '', SW_HIDE, ewWaitUntilTerminated, PingCode) then Sleep(1000);
+      end;
+    end;
+    if Finished then
+    begin
+      if LoadStringFromFile(StateFile, A) then
+      begin
+        ServiceWasRunning := (Pos('service=RUNNING', String(A)) > 0) or (Pos('service=START_PENDING', String(A)) > 0) or (Pos('service=PAUSED', String(A)) > 0);
+        PlayerWasRunning := Pos('player=1', String(A)) > 0;
+      end;
+      Code := 1; if LoadStringFromFile(DoneFile, A) then Code := StrToIntDef(Trim(String(A)), 1);
+      if Code <> 0 then
+      begin
+        if LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\close-error.txt'), A) then Result := Copy(Trim(String(A)), 1, 800) else Result := 'WavWiz could not be closed.';
+      end;
+    end
+    else
+    begin
+      { the script did not run or did not finish: the plain fallback (the file-replace step retries locked files on its own) }
+      Log('close-wavwiz.ps1 did not finish; falling back to sc stop + taskkill');
+      Exec(ExpandConstant('{sys}\sc.exe'), 'stop WavWizServer', '', SW_HIDE, ewWaitUntilTerminated, Code);
+      Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM wavwiz-player.exe /T /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
+      Exec(ExpandConstant('{sys}\ping.exe'), '-n 5 127.0.0.1', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    end;
+  finally
+    if Page <> nil then Page.Hide;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var Code: Integer;
 begin
   Result := '';
-  { Repair / upgrade: ask the service to stop so its files can be replaced (setup.ps1 starts it again). Failure here is fine: the Restart Manager / file replace logic takes over. }
-  if (not BoolParam('SKIPSETUP', False)) and FileExists(ExpandConstant('{app}\Server\wavwiz-server.exe')) then
+  { 0.2.2 T11: always close a running WavWiz first (not only the service): an open Player or receiver locks its files. /NOCLOSE skips it (tests). }
+  if (not BoolParam('NOCLOSE', False)) and (DirExists(ExpandConstant('{app}')) or RegKeyExists(HKLM64, 'SYSTEM\CurrentControlSet\Services\WavWizServer')) then
   begin
-    Exec(ExpandConstant('{sys}\sc.exe'), 'stop WavWizServer', '', SW_HIDE, ewWaitUntilTerminated, Code);
-    Exec(ExpandConstant('{sys}\ping.exe'), '-n 5 127.0.0.1', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    CloseFailure := CloseRunningWavWiz;
+    if CloseFailure <> '' then
+      Result := 'Setup could not close WavWiz, so nothing was changed:' + #13#10#13#10 + CloseFailure + #13#10#13#10 +
+        'Close WavWiz Player (right-click its tray icon > Exit), or restart Windows, then run Setup again. Details: C:\ProgramData\WavWiz\install.log';
   end;
+end;
+
+{ 0.2.2 T11: start again what setup closed. The service: setup.ps1 starts it when the server part was installed; otherwise it is started here.
+  The Player: started as the signed-in (not elevated) user, in the tray as before (--background), also in a silent install. }
+procedure RestartClosedWavWiz;
+var Code: Integer;
+begin
+  if ServiceWasRunning and ((not WantServer) or BoolParam('SKIPSETUP', False)) and (not BoolParam('NOSTART', False)) then
+    Exec(ExpandConstant('{sys}\sc.exe'), 'start WavWizServer', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  if PlayerWasRunning and WantPlayer and FileExists(ExpandConstant('{app}\Player\wavwiz-player.exe')) then
+    if ExecAsOriginalUser(ExpandConstant('{app}\Player\wavwiz-player.exe'), '--background', ExpandConstant('{app}\Player'), SW_SHOWNORMAL, ewNoWait, Code) then
+      PlayerRestartedFlag := True
+    else Log('could not start WavWiz Player again: ' + SysErrorMessage(Code));
 end;
 
 procedure MakeUrlShortcut(const Path, Url: String);
@@ -398,7 +492,7 @@ var
 begin
   if CurStep <> ssPostInstall then Exit;
   SaveStringToFile(ExpandConstant('{app}\docs\FIRST-RUN.txt'), AnsiString(FirstRunText), False);
-  if BoolParam('SKIPSETUP', False) then Exit;
+  if BoolParam('SKIPSETUP', False) then begin RestartClosedWavWiz; Exit; end;
 
   DoneFile := ExpandConstant('{commonappdata}\WavWiz\setup.done');
   ForceDirectories(ExpandConstant('{commonappdata}\WavWiz'));
@@ -449,6 +543,7 @@ begin
     SuppressibleMsgBox('Please read:' + #13#10#13#10 + Copy(String(ErrAnsi), 1, 1800), mbInformation, MB_OK, IDOK);
   end;
   end;
+  RestartClosedWavWiz;      { 0.2.2 T11: also after a failed setup step, so the Player is never left closed }
 end;
 
 { 0.2.1 F16: Inno returns 0 whenever the files were copied, even if the final setup step (service, firewall, settings) failed or hung.

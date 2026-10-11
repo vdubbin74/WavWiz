@@ -17,6 +17,10 @@ Step 'uninstall: stop and remove the service' {
         [void](Invoke-Sc 'delete' @('delete', $svc) -AllowFail); Say 'Service removed.'
     } else { Say 'No WavWiz service to remove.' }
 }
+Step 'uninstall: close WavWiz Player and anything else running from the install folder (0.2.2 T11)' {
+    $cs = Join-Path $PSScriptRoot 'close-wavwiz.ps1'
+    if ($Root -and (Test-Path -LiteralPath $cs)) { & $cs -Root $Root -PlayerWaitSec 5 -LockRetrySec 5 | Out-Null }
+}
 Step 'uninstall: remove firewall rules' { Remove-ServerFirewall; Say 'Firewall rules removed.' }
 Step 'uninstall: remove the player autostart for this user' {
     if (-not (Test-TestHost)) { Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'WavWizPlayer' -ErrorAction SilentlyContinue }

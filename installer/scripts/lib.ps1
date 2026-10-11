@@ -48,7 +48,7 @@ function Read-TextFile([string]$Path) { return ([IO.File]::ReadAllText($Path)).T
 # ---- install log + steps (C:\ProgramData\WavWiz\install.log). Never write secrets here.
 $script:InstallLog = $null; $script:CurrentStep = ''; $script:CurrentStepStart = $null
 function Get-WavWizDataRoot { $pd = $env:ProgramData; if (-not $pd) { $pd = 'C:\ProgramData' }; return (Join-Path $pd 'WavWiz') }
-# 0.1.2: rename unison.db → wavwiz.db on upgrade (library + password kept). Idempotent.
+# 0.1.2: rename unison.db -> wavwiz.db on upgrade (library + password kept). Idempotent.
 function Rename-WavWizLibraryDb([string]$DataDir) {
     if (-not $DataDir) { return }
     $neu = Join-Path $DataDir 'wavwiz.db'; $old = Join-Path $DataDir 'unison.db'
@@ -494,7 +494,7 @@ function Get-PreflightReport([string]$Root, [string]$Role) {
 # Unison 0.0.x used the names: service UnisonServer, folder %ProgramData%\Unison, firewall rules "Unison Server (web, audio, clock)" (+ " (UDP)"), Run value UnisonPlayer,
 # install folder ...\Unison with its own Inno uninstall entry. WavWiz is a NEW installer identity, so Setup cannot upgrade in place by itself: this function moves everything over.
 # Rules: (1) nothing the person owns is ever deleted before it is safely in its new place; (2) every step is best-effort and logged; (3) running it again changes nothing;
-# (4) the database, certificates, tokens, settings, admin password and library stay exactly as they were (certificates keep legacy names such as unison-root-ca.crt; 0.1.2 renames unison.db → wavwiz.db).
+# (4) the database, certificates, tokens, settings, admin password and library stay exactly as they were (certificates keep legacy names such as unison-root-ca.crt; 0.1.2 renames unison.db -> wavwiz.db).
 $script:LegacyServiceName = 'UnisonServer'
 $script:LegacyFirewallNames = @('Unison Server (web, audio, clock)')
 $script:LegacyUninstallSubKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1'

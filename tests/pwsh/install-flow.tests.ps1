@@ -491,6 +491,61 @@ Test 'a move that fails stops the install with the folder named, deletes nothing
     $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb; if (-not (Test-Path (Join-Path $sb.Data 'unison.db'))) { throw 'second attempt did not move the database' }
 }
 
+
+Write-Host '0.2.2 T11: closing a running WavWiz before the files are replaced'
+function Invoke-Close($sb, [hashtable]$extraEnv = @{}, [string[]]$more = @()) {
+    $done = Join-Path $sb.State 'close.done'; $stf = Join-Path $sb.State 'close.state'; Remove-Item $done, $stf -ErrorAction SilentlyContinue
+    $a = @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'close-wavwiz.ps1'), '-Root', $sb.App, '-StateFile', $stf, '-DoneFile', $done, '-ServiceWaitSec', '2', '-PlayerWaitSec', '2', '-LockRetrySec', '2') + $more
+    $r = Invoke-Direct $sb $a $extraEnv
+    $dc = $null; if (Test-Path $done) { $dc = (Get-Content $done -Raw).Trim() }
+    $st = ''; if (Test-Path $stf) { $st = Get-Content $stf -Raw }
+    return [pscustomobject]@{ ExitCode = $r.ExitCode; Output = $r.Output; Done = $dc; State = $st }
+}
+function Set-Procs($sb, [string[]]$lines) { Set-Content (Join-Path $sb.State 'procs.txt') $lines }
+function Get-Procs($sb) { $f = Join-Path $sb.State 'procs.txt'; if (Test-Path $f) { return (Get-Content $f -Raw) } else { return '' } }
+Test 'running 0.2.1 (service + Player that ignores the exit request + a receiver): service stopped, Player ended after the wait, receiver ended, exit 0, state says restart both' {
+    $sb = New-Sandbox; Set-Content (Join-Path $sb.State 'svc.state') 'RUNNING'
+    Set-Procs $sb @("wavwiz-player.exe|4100|$($sb.App)/Player/wavwiz-player.exe|1", "librespot.exe|4200|$($sb.App)/Server/receivers/librespot.exe|0")
+    $r = Invoke-Close $sb
+    if ($r.ExitCode -ne 0 -or $r.Done -ne '0') { throw "close failed: $($r.Output)`n$(Get-Log $sb)" }
+    Eq (Get-Content (Join-Path $sb.State 'svc.state') -Raw).Trim() 'STOPPED' 'service state'
+    Has (Get-Calls $sb) 'sc.exe stop WavWizServer'; Has (Get-Calls $sb) 'taskkill.exe /PID 4100 /T /F'; Has (Get-Calls $sb) 'taskkill.exe /PID 4200 /T /F'
+    Has $r.State 'service=RUNNING'; Has $r.State 'player=1'; Eq "$(Get-Procs $sb)".Trim() '' 'processes left'
+    Has (Get-Log $sb) 'STEP> USER:Closing WavWiz...'
+}
+Test 'a 0.2.2 Player that exits when asked is not force-ended' {
+    $sb = New-Sandbox; Set-Content (Join-Path $sb.State 'svc.state') 'STOPPED'
+    Set-Procs $sb @("wavwiz-player.exe|4100|$($sb.App)/Player/wavwiz-player.exe|1")
+    $r = Invoke-Close $sb @{ WAVWIZ_TEST_PLAYER_GRACEFUL = '1' }
+    Eq $r.Done '0' 'done'; HasNot (Get-Calls $sb) 'taskkill.exe /PID 4100' 'force-ended a Player that had exited'; HasNot (Get-Calls $sb) 'sc.exe stop' 'stopped a stopped service'
+    Has $r.State 'service=STOPPED'; Has $r.State 'player=1'
+}
+Test 'nothing installed / nothing running (fresh install): exit 0, nothing ended, state says nothing to restart' {
+    $sb = New-Sandbox; $r = Invoke-Close $sb
+    Eq $r.Done '0' 'done'; HasNot (Get-Calls $sb) 'taskkill' 'ended something'; Has $r.State 'service=missing'; Has $r.State 'player=0'
+}
+Test 'a Player in ANOTHER Windows session is ended but not restarted from this session' {
+    $sb = New-Sandbox; Set-Procs $sb @("wavwiz-player.exe|4300|$($sb.App)/Player/wavwiz-player.exe|2")
+    $r = Invoke-Close $sb; Eq $r.Done '0' 'done'; Has (Get-Calls $sb) 'taskkill.exe /PID 4300'; Has $r.State 'player=0'
+}
+Test 'a process that cannot be ended: exit 3 with the reason in close-error.txt (the installer then stops before copying)' {
+    $sb = New-Sandbox; Set-Procs $sb @("wavwiz-player.exe|4100|$($sb.App)/Player/wavwiz-player.exe|1")
+    $r = Invoke-Close $sb @{ WAVWIZ_TEST_UNKILLABLE = '4100' }
+    Eq $r.ExitCode 3 'exit'; Eq $r.Done '3' 'done'; Has (Get-Log $sb 'close-error.txt') 'wavwiz-player.exe (process 4100)'
+}
+Test 'a file that stays locked is retried, then reported (exit 3); once free the next run passes' {
+    $sb = New-Sandbox; Set-Content (Join-Path $sb.App 'Server/WavWiz.Server.dll') 'fake'
+    $r = Invoke-Close $sb @{ WAVWIZ_TEST_LOCKED = 'Server/WavWiz.Server.dll' }
+    Eq $r.Done '3' 'done'; Has (Get-Log $sb) 'In use, retrying: Server'; Has (Get-Log $sb 'close-error.txt') 'WavWiz.Server.dll'
+    $r2 = Invoke-Close $sb; Eq $r2.Done '0' 'second run'; if (Test-Path (Join-Path $sb.Data 'close-error.txt')) { throw 'stale close-error.txt left' }
+}
+Test 'a service that will not stop: its process is ended; still running = exit 3' {
+    $sb = New-Sandbox; Set-Content (Join-Path $sb.State 'svc.state') 'RUNNING'
+    Set-Procs $sb @("wavwiz-server.exe|4000|$($sb.App)/Server/wavwiz-server.exe|0")
+    $r = Invoke-Close $sb @{ WAVWIZ_TEST_SC_FAIL = 'stop'; WAVWIZ_TEST_UNKILLABLE = '4000' }
+    Eq $r.Done '3' 'done'; Has (Get-Calls $sb) 'taskkill.exe /PID 4000'; Has (Get-Log $sb 'close-error.txt') 'service did not stop'
+}
+
 $listener.Stop(); foreach ($s in $sandboxes) { try { Remove-Item -Recurse -Force $s -ErrorAction SilentlyContinue } catch { } }
 Write-Host ("`n{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail -gt 0) { exit 1 } else { exit 0 }
