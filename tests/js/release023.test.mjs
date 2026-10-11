@@ -148,12 +148,12 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
 test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
   const a = src('about.js');
   assert.match(a, /WHATS_NEW_VERSION = '0\.2\.3'/);
-  for (const t of ['Now Playing on one line', 'Up next', 'Lock EQ', 'Your real EQ in Appearance', 'Previews stay in view', 'Tidier side panels']) assert.ok(a.includes(t), t);
+  for (const t of ['Now Playing on one line', 'Up next', 'Lock EQ', 'Your real EQ in Appearance', 'Previews stay in view', 'Tidier side panels', 'Steady device settings']) assert.ok(a.includes(t), t);
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
   // the public changelog names each 0.2.3 change in words (no internal item codes)
-  for (const t of ['Minimized Now Playing is one line', 'Minimized Playlist shows "Up next"', 'follows the selected control panel style and theme', 'Display size', 'Pinned previews', 'Expand buttons', 'Devices header', 'Device cards open into their settings', 'Appearance > EQ shows the real EQ', 'Lock EQ', 'Revoking a device removes it from the Devices list']) assert.ok(cl.includes(t), t);
+  for (const t of ['Minimized Now Playing is one line', 'Minimized Playlist shows "Up next"', 'follows the selected control panel style and theme', 'Display size', 'Pinned previews', 'Expand buttons', 'Devices header', 'Device cards open into their settings', 'Appearance > EQ shows the real EQ', 'Lock EQ', 'Revoking a device removes it from the Devices list', 'Open device settings stay put']) assert.ok(cl.includes(t), t);
   assert.doesNotMatch(cl, /\bU\d+\b/);
 });
 

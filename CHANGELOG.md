@@ -35,6 +35,7 @@ First public release since 0.1.3. Versions 0.2.0, 0.2.1 and 0.2.2 were test buil
 ### Fixed
 
 - **Revoking a device removes it from the Devices list:** revoking a paired phone or browser (Settings > Devices > Paired devices & tokens) left the speakers it had opened in that browser on every Devices list, still connected and playing, because only WavWiz Player tokens were handled. Now everything the token owns leaves the list at once on every open page (Standard, Expanded, zones and the Devices page), its connections close, and it has to pair again. Forget device on a browser speaker no longer lets it rejoin straight away, and a list that was busy (a slider, menu or zone editor open) no longer keeps a removed device.
+- **Open device settings stay put:** with a device card's Settings open, the section with Delay kept refreshing every few seconds, which closed dropdowns, reset a delay you were typing and interrupted slider drags. Device cards are now updated in place: live values (status, volume, mute, delay, connection) change without rebuilding the card, and nothing you are typing in or dragging is replaced. A removed device still leaves the list at once.
 
 ## [0.2.2] - 2026-10-10 (beta)
 
