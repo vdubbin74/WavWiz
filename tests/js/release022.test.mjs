@@ -77,8 +77,8 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   // EQ = fuller page: big try-out preview, other styles, glow 0-100 % (50 % default)
   assert.match(ap, /interactive: true \}\);   \/\/ try-out only: no onChange, nothing is sent/); assert.match(ap, /'Other styles'/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
   assert.match(ap, /interactive: false/);
-  // Now Playing keeps the F9 preview; Display size gets a preview slice
-  assert.match(ap, /preview \? preview\.el : null/); assert.match(ap, /class: 'npprev dsprev'/);
+  // Now Playing keeps the F9 preview (0.2.3 U4: Display size has no preview any more - see release023)
+  assert.match(ap, /preview \? preview\.el : null/);
   assert.match(st, /section: APP_SECTION\[section\]/); assert.match(st, /else app\?\.resume\?\.\(\)/);
   assert.match(css, /\.appsplit\{display:grid;grid-template-columns:150px minmax\(0,1fr\)/);
   assert.match(css, /\.themecard\{border-radius:6px\}/);

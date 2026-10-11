@@ -93,19 +93,15 @@ function eqStyleCard() {
   return { el: box, reload: draw, hide: () => { prev?.destroy(); others.forEach(o => o.destroy()); prev = null; others = []; } };
 }
 
-/** Display size sub-section: the five sizes + a preview slice of the UI (a Playlist strip) drawn at the chosen size. */
+/** Display size sub-section. 0.2.3 U4: no preview pane - picking a size already resizes the whole app live. */
 function displaySizeCard() {
   const box = h('div', { class: 'card', id: 'sec-display' });
   function draw() {
-    const cur = loadScale(), z = scaleFactor(cur), name = (SCALES.find(([id]) => id === cur) || SCALES[1])[1];
-    const row = (n, t, a, d, on) => h('div', { class: 'ds-row' + (on ? ' on' : '') }, h('span', { class: 'ds-n' }, on ? '▶' : String(n)), h('b', { class: 'ell' }, t), h('span', { class: 'ell ds-a' }, a), h('span', { class: 'ds-d' }, d));
+    const cur = loadScale(), z = scaleFactor(cur);
     box.replaceChildren(h('h3', null, 'Display size'),
-      h('p', { class: 'dim small' }, 'Makes the web UI larger or smaller on this phone or PC only.'),
+      h('p', { class: 'dim small' }, 'Makes the web UI larger or smaller on this phone or PC only. The whole app changes as you pick.'),
       h('div', { class: 'row wrap', role: 'group', 'aria-label': 'Display size' }, SCALES.map(([id, nm]) => h('button', { class: 'chipbtn' + (cur === id ? ' on' : ''), 'aria-pressed': String(cur === id), 'data-scale': id, onclick: () => { applyScale(id); draw(); } }, nm))),
-      h('div', { class: 'npprev dsprev', 'aria-label': 'Preview of the display size' }, prevHead('EXAMPLE DATA', `${name.replace(' (default)', '')} - ${Math.round(z * 100)}%`),
-        h('div', { class: 'ds-stage', inert: '' }, h('div', { class: 'ds-ui', style: `font-size:${(13 * z).toFixed(1)}px` },
-          h('div', { class: 'ds-h' }, h('span', { class: 'ds-title' }, 'PLAYLIST'), h('span', { class: 'grow' }), h('span', { class: 'ds-btn' }, 'Save as playlist'), h('span', { class: 'ds-btn' }, 'Clear')),
-          row(1, 'Night Swim', 'Faded Atlas', '03:20', true), row(2, 'Paper Satellites', 'Amber Kites', '04:05', false)))));
+      h('p', { class: 'small dim', style: 'margin-top:8px' }, `Now ${Math.round(z * 100)}%.`));
   }
   draw();
   return { el: box, reload: draw };

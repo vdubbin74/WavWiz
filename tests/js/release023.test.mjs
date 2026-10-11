@@ -52,3 +52,9 @@ test('0.2.3 U3: the one-line bar wears the selected panel style (all four) in th
   assert.match(n, /for \(const box of \[waveBase, waveTop, sWaveBase, sWaveTop\]\)/);
   assert.match(n, /ctlStrip\.style\.setProperty\('--ns-frac', frac\.toFixed\(4\)\)/);
 });
+
+test('0.2.3 U4: Settings > Appearance > Display size has no preview pane (the whole app already changes live)', () => {
+  const ap = src('appearance.js'), body = ap.split('function displaySizeCard() {')[1].split('\n}\n')[0];
+  assert.doesNotMatch(body, /npprev|dsprev|ds-stage|prevHead/);
+  assert.match(body, /data-scale': id, onclick: \(\) => \{ applyScale\(id\); draw\(\); \}/);
+});
