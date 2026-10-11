@@ -3,7 +3,8 @@
 // Every band is a real slider for keyboard / screen readers: Up/Down 0.5 dB, PageUp/PageDown 3 dB, Home/End ±12 dB, Left/Right next band;
 // drag up/down or scroll the wheel to set the gain. Only the look differs - all three drive the same 10-band DSP.
 import { h } from './util.js';
-import { EQ_BANDS, EQ_LABELS, dbToFrac, fracToDb, keyStep, fmtDb, logX, colX, snapDb, EQ_STEP, approxResponse } from './eqstyle.js';
+import { EQ_BANDS, EQ_LABELS, dbToFrac, fracToDb, keyStep, fmtDb, logX, colX, snapDb, approxResponse, wheelGain } from './eqstyle.js';
+import { iconSvg } from './icons.js';
 import { magnitudes, bands as specBands, bandEdges, smooth } from './vizmath.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -15,11 +16,14 @@ const valCls = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero');
 // band centre frequencies of the glow bars (same edges the visualizers use, 48 kHz feed)
 const GLOW_HZ = (() => { const e = bandEdges(GLOW_BARS), binHz = 48000 / 1024; return Array.from({ length: GLOW_BARS }, (_, b) => Math.sqrt(e[b] * e[b + 1]) * binHz); })();
 
-export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50, interactive = true, onChange = () => {}, onSelect = () => {} } = {}) {
+export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50, interactive = true, locked = false, onChange = () => {}, onSelect = () => {} } = {}) {
+  let isLocked = !!locked;
   let g = gains.slice(), sel = -1, glowLvl = glow, untap = null, levels = new Float64Array(GLOW_BARS), meter = new Float64Array(10);
   const xOf = style === 'curve' ? hz => logX(hz) : hz => colX(hz);
   const live = h('span', { class: 'eqa-live', hidden: true }, h('i', { 'aria-hidden': 'true' }), 'Live music');
-  const head = h('div', { class: 'eqa-h' }, h('b', null, TITLES[style][0]), h('span', { class: 'small dim' }, TITLES[style][1]), h('span', { class: 'grow' }), live);
+  // 0.2.3 U9: small padlock shown on the area while Lock EQ is on
+  const lockMark = h('span', { class: 'eqa-lock', title: 'Lock EQ is on - uncheck it to change the EQ', hidden: true }); lockMark.innerHTML = iconSvg('lock');
+  const head = h('div', { class: 'eqa-h' }, h('b', null, TITLES[style][0]), h('span', { class: 'small dim' }, TITLES[style][1]), h('span', { class: 'grow' }), live, lockMark);
   const canvas = h('canvas', { class: 'eqa-glow', 'aria-hidden': 'true' });
   const grid = h('div', { class: 'eqa-grid', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('i', { class: db === 0 ? 'zero' : '', style: `top:${dbToFrac(db) * 100}%` })));
   const scale = h('div', { class: 'eqa-scale', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('span', { style: `top:${dbToFrac(db) * 100}%` }, db === 0 ? '0 dB' : (db > 0 ? '+' : '') + db)));
@@ -96,15 +100,17 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   // --- interaction --------------------------------------------------------------------------------------------------
   if (interactive) bandEls.forEach((b, i) => {
     const at = ev => { const r = field.getBoundingClientRect(); return fracToDb((ev.clientY - r.top) / r.height); };
-    b.addEventListener('pointerdown', ev => { ev.preventDefault(); b.focus({ preventScroll: true }); select(i); b.setPointerCapture?.(ev.pointerId); b._drag = true; set(i, at(ev)); el.classList.add('dragging'); });
+    b.addEventListener('pointerdown', ev => { if (isLocked) return; ev.preventDefault(); b.focus({ preventScroll: true }); select(i); b.setPointerCapture?.(ev.pointerId); b._drag = true; set(i, at(ev)); el.classList.add('dragging'); });
     b.addEventListener('pointermove', ev => { if (b._drag) set(i, at(ev)); });
     const end = () => { b._drag = false; el.classList.remove('dragging'); };
     b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
-    b.addEventListener('wheel', ev => { ev.preventDefault(); select(i); set(i, g[i] + (ev.deltaY < 0 ? EQ_STEP : -EQ_STEP)); }, { passive: false });
+    // wheel fine-adjusts by default; with Lock EQ on it is left alone, so the page scrolls instead (U9)
+    b.addEventListener('wheel', ev => { const v = wheelGain(isLocked, g[i], ev.deltaY); if (v == null) return; ev.preventDefault(); select(i); set(i, v); }, { passive: false });
     b.addEventListener('focus', () => select(i));
     b.addEventListener('blur', () => { if (sel === i && !b._drag) { sel = -1; paintBand(i); paintTip(); } });
     b.addEventListener('keydown', ev => {
       if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') { ev.preventDefault(); const n = bandEls[Math.max(0, Math.min(9, i + (ev.key === 'ArrowRight' ? 1 : -1)))]; n.focus(); return; }
+      if (isLocked) return;
       const v = keyStep(ev.key, g[i]); if (v == null) return; ev.preventDefault(); set(i, v);
     });
   });
@@ -141,10 +147,23 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   /** A still example spectrum (Appearance preview, or before the first live frame). */
   function exampleSpectrum() { for (let b = 0; b < GLOW_BARS; b++) { const t = b / (GLOW_BARS - 1); levels[b] = Math.max(0.08, 0.75 * Math.exp(-((t - 0.28) ** 2) / 0.09) + 0.18 * (1 - t)); } for (let i = 0; i < 10; i++) meter[i] = Math.max(0.1, 0.8 - i * 0.06 + (i % 3) * 0.05); }
   function setGlow(v) { glowLvl = v; drawGlow(); }
+  /** U9: Lock EQ - bands ignore wheel / drag / click / keys and look slightly dimmed with a small lock. */
+  function setLocked(v) {
+    isLocked = !!v; el.classList.toggle('locked', isLocked); lockMark.hidden = !isLocked;
+    bandEls.forEach(b => { if (isLocked) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); if (isLocked && b._drag) { b._drag = false; el.classList.remove('dragging'); } });
+  }
   function startLive(tap) { if (untap || !tap) return; untap = tap(onFrame); }
   function destroy() { untap?.(); untap = null; ro?.disconnect(); }
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => drawGlow()) : null; ro?.observe(canvas);
-  setGains(g); setResponse(null);
+  setGains(g); setResponse(null); if (interactive) setLocked(isLocked);
   if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(drawGlow); }
-  return { el, setGains, setResponse, setGlow, select, startLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
+  return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
+}
+
+/** 0.2.3 U9: the "Lock EQ" checkbox (padlock icon + label), used in the Sound (EQ) dialog header and on the Appearance > EQ preview. */
+export function eqLockBox(checked, onToggle) {
+  const i = h('input', { type: 'checkbox', checked: !!checked, 'data-eqlock': '1', onchange: ev => onToggle(ev.target.checked) });
+  const ic = h('span', { class: 'eqlock-ic', 'aria-hidden': 'true' }); ic.innerHTML = iconSvg('lock');
+  const el = h('label', { class: 'eqlockbox', title: 'Lock EQ: the sliders ignore the mouse wheel, dragging and clicks, so scrolling never changes the sound' }, i, ic, h('span', null, 'Lock EQ'));
+  return { el, input: i, set: v => { i.checked = !!v; } };
 }

@@ -41,7 +41,7 @@ export async function openSettings(S, refresh, nav, section) {
       network: [],
     };
 
-    app?.hide?.(); app = appearancePane({ looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview() });
+    app?.hide?.(); app = appearancePane({ S, looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview() });
     panes.appearance.push(app.el);
 
     // Devices: phone/https, pairing, tokens, delay defaults

@@ -3,21 +3,25 @@
 // differs. Header (speaker + preset), Bass / Treble / Trim, the switches, Spectrum glow and the footer are shared. Changes preview live on the
 // picked speaker; Save asks for a name when it makes a new preset (no name box in the footer).
 import { h, api, toast, dialog, debounce } from './util.js';
-import { eqArea } from './eqview.js';
-import { loadEqPrefs, saveEqPrefs, glowWords, fmtDb } from './eqstyle.js';
+import { eqArea, eqLockBox } from './eqview.js';
+import { loadEqPrefs, saveEqPrefs, glowWords, fmtDb, loadEqLock, saveEqLock } from './eqstyle.js';
 import { spectrumTap } from './viz.js';
 
-const flat = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0), trimDb: 0, preampDb: 0, autoPreamp: true, bypass: false, bass: { gainDb: 0, hz: 100 }, treble: { gainDb: 0, hz: 10000 }, loudness: { enabled: false, refVolume: 80 }, limiter: { enabled: true, ceilingDb: -0.3, releaseMs: 120, lookaheadMs: 0 } });
+/** A flat (neutral) EQ; exported for the Appearance > EQ preview (0.2.3 U10). */
+export const flatEq = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0), trimDb: 0, preampDb: 0, autoPreamp: true, bypass: false, bass: { gainDb: 0, hz: 100 }, treble: { gainDb: 0, hz: 10000 }, loudness: { enabled: false, refVolume: 80 }, limiter: { enabled: true, ceilingDb: -0.3, releaseMs: 120, lookaheadMs: 0 } });
 
 export async function openEq(S, refresh, deviceId) {
   const outputs = S.zones.flatMap(z => z.outputs.map(o => ({ ...o, zone: z.name }))).filter(o => o.connected || o.active);
   if (!outputs.length) return toast('No speaker is connected yet.', true);
   let presets = []; try { presets = await api('/dsp/presets'); } catch (e) { return toast(e.message, true); }
   let dev = deviceId && outputs.find(o => o.deviceId === deviceId) ? deviceId : (outputs.find(o => o.active)?.deviceId ?? outputs[0].deviceId);
-  let cur = flat(), presetId = null, dirty = false, previewing = false, area = null, lastResp = null;
+  let cur = flatEq(), presetId = null, dirty = false, previewing = false, area = null, lastResp = null;
   const body = h('div', { class: 'eqdlg' });
-  const d = dialog('Sound (EQ)', body, [], { cls: 'eqdialog', onClose: async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } refresh && refresh(); } });
+  const d = dialog('Sound (EQ)', body, [], { cls: 'eqdialog', onClose: async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } })); refresh && refresh(); } });
   d.el.querySelector('header .grow')?.append(h('span', { class: 'small dim eqsub' }, 'Changes play live on the speaker you pick.'));
+  // 0.2.3 U9: Lock EQ in the header (remembered on this device): the sliders then ignore the wheel, drag and click
+  const lock = eqLockBox(loadEqLock(), v => { saveEqLock(v); area?.setLocked(v); });
+  d.el.querySelector('header .grow')?.after(lock.el);
 
   const liveTag = h('span', { class: 'eqprev small', hidden: true }, h('i', { 'aria-hidden': 'true' }), 'Previewing live');
   const preGain = h('span', { class: 'eqpregain', hidden: true, title: 'Level drop applied by Auto pre-gain so boosts never clip' });
@@ -29,7 +33,7 @@ export async function openEq(S, refresh, deviceId) {
 
   const outSel = h('select', { 'aria-label': 'Speaker', onchange: async ev => { if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } previewing = false; liveTag.hidden = true; } dev = ev.target.value; await load(); } },
     outputs.map(o => h('option', { value: o.deviceId, selected: o.deviceId === dev }, `${o.zone} — ${o.name}`)));
-  const preSel = h('select', { 'aria-label': 'Preset', onchange: ev => { const p = presets.find(x => String(x.id) === ev.target.value); if (p) { cur = { ...flat(), ...structuredClone(p.json) }; presetId = p.id; dirty = false; paintAll(); sync(); } } });
+  const preSel = h('select', { 'aria-label': 'Preset', onchange: ev => { const p = presets.find(x => String(x.id) === ev.target.value); if (p) { cur = { ...flatEq(), ...structuredClone(p.json) }; presetId = p.id; dirty = false; paintAll(); sync(); } } });
   function paintPreset() {
     preSel.replaceChildren(h('option', { value: '', selected: dirty || presetId == null }, 'Custom'),
       ...presets.map(p => h('option', { value: p.id, selected: !dirty && p.id === presetId }, p.name + (p.source === 'builtin' ? ' (built-in)' : ''))));
@@ -37,7 +41,7 @@ export async function openEq(S, refresh, deviceId) {
   const mainHost = h('div', { class: 'eqmain' });
   function buildArea() {
     area?.destroy();
-    area = eqArea({ style: loadEqPrefs().style, gains: cur.graphicDb, glow: loadEqPrefs().glow, onChange: (i, db) => { cur.graphicDb[i] = db; changed(); } });
+    area = eqArea({ style: loadEqPrefs().style, gains: cur.graphicDb, glow: loadEqPrefs().glow, locked: loadEqLock(), onChange: (i, db) => { cur.graphicDb[i] = db; changed(); } });
     mainHost.replaceChildren(area.el); area.setResponse(lastResp); area.exampleSpectrum?.(); if (loadEqPrefs().glow > 0) area.startLive(spectrumTap);
   }
   // shared lower card: Bass / Treble / Trim, switches, Spectrum glow
@@ -69,7 +73,7 @@ export async function openEq(S, refresh, deviceId) {
   }
   function paintAll() { buildArea(); buildLower(); paintPreset(); }
   const footer = h('div', { class: 'eqfoot' },
-    h('button', { class: 'btn', onclick: () => { cur = flat(); presetId = null; dirty = true; paintAll(); sync(); } }, 'Flat'),
+    h('button', { class: 'btn', onclick: () => { cur = flatEq(); presetId = null; dirty = true; paintAll(); sync(); } }, 'Flat'),
     h('button', { class: 'btn', onclick: async () => { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); previewing = false; liveTag.hidden = true; await load(); toast('Back to the saved sound'); } catch (e) { toast(e.message, true); } } }, 'Revert'),
     h('span', { class: 'grow' }),
     h('button', { class: 'btn primary', onclick: save }, 'Save & use on this speaker'));
@@ -89,6 +93,7 @@ export async function openEq(S, refresh, deviceId) {
       let id; if (ex) { await api(`/dsp/presets/${ex.id}`, { method: 'PUT', body: { name, preset: { ...cur, name } } }); id = ex.id; } else { id = (await api('/dsp/presets', { method: 'POST', body: { name, preset: { ...cur, name } } })).id; }
       await api(`/dsp/assignments/${encodeURIComponent(dev)}`, { method: 'PUT', body: { presetId: id, enabled: true, bypass: cur.bypass } });
       previewing = false; liveTag.hidden = true; presetId = id; dirty = false; cur.name = name; presets = await api('/dsp/presets'); paintPreset(); toast(`Saved “${name}” and using it on this speaker`);
+      window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } }));
     } catch (e) { toast(e.message, true); }
   }
   function askName() {
@@ -102,7 +107,7 @@ export async function openEq(S, refresh, deviceId) {
     });
   }
   async function load() {
-    try { const a = await api(`/dsp/assignments/${encodeURIComponent(dev)}`); const p = a && presets.find(x => x.id === a.presetId); cur = p ? { ...flat(), ...structuredClone(p.json) } : flat(); presetId = p ? p.id : null; } catch { cur = flat(); presetId = null; }
+    try { const a = await api(`/dsp/assignments/${encodeURIComponent(dev)}`); const p = a && presets.find(x => x.id === a.presetId); cur = p ? { ...flatEq(), ...structuredClone(p.json) } : flatEq(); presetId = p ? p.id : null; } catch { cur = flatEq(); presetId = null; }
     dirty = false; lastResp = null; paintAll();
     try { lastResp = await api('/dsp/response', { method: 'POST', body: { preset: cur } }); area?.setResponse(lastResp); preGain.hidden = !lastResp.preGainDb; preGain.textContent = `${fmtDb(lastResp.preGainDb || 0)} dB`; } catch { /* approx curve stays */ }
   }

@@ -58,3 +58,69 @@ test('0.2.3 U4: Settings > Appearance > Display size has no preview pane (the wh
   assert.doesNotMatch(body, /npprev|dsprev|ds-stage|prevHead/);
   assert.match(body, /data-scale': id, onclick: \(\) => \{ applyScale\(id\); draw\(\); \}/);
 });
+
+test('0.2.3 U5 + U8: Theme, Visualizer, EQ and Now Playing previews are pinned (sticky) while the page scrolls, at every Display size', () => {
+  assert.match(src('themes.js'), /class: 'npprev apprev pinprev'/);
+  const ap = src('appearance.js');
+  assert.match(ap, /class: 'npprev vlive pinprev'/);
+  assert.match(ap, /class: 'eqprevbox eqprev-big pinprev'/);
+  assert.match(src('nppreview.js'), /class: 'npprev pinprev', 'data-preview': 'np'/);
+  assert.match(css, /\.appsub \.pinprev\{position:sticky;top:-12px;z-index:4;/);
+  // the pinned preview shrinks with the dialog height (divided by the Display size zoom) so the settings below stay usable
+  for (const sel of ['\\.apprev\\.pinprev \\.ap-app', '\\.vlive\\.pinprev \\.vlive-stage', '\\.eqprevbox\\.pinprev \\.eqa-plot']) assert.match(css, new RegExp(`\\.appsub ${sel}\\{[^}]*45vh / var\\(--z,1\\)`), sel);
+  // nothing between the preview and the dialog body clips it (sticky needs visible overflow on the way up)
+  assert.doesNotMatch(css, /\.(appsub|appsplit|themes-page|settings-sec)\{[^}]*overflow:(hidden|auto)/);
+});
+
+test('0.2.3 U9: Lock EQ - wheel fine-adjusts by default; locked, the wheel is left to the page (scrolls) and nothing changes', async () => {
+  const e = await imp('eqstyle');
+  assert.equal(e.wheelGain(false, 0, -100), 0.5);    // wheel up = +0.5 dB
+  assert.equal(e.wheelGain(false, 0, 100), -0.5);
+  assert.equal(e.wheelGain(false, 12, -100), 12);    // clamped at +12
+  assert.equal(e.wheelGain(false, -12, 53), -12);
+  assert.equal(e.wheelGain(true, 3, -100), null);    // locked: no change, the event is not consumed
+  assert.equal(e.wheelGain(true, 3, 100), null);
+  assert.equal(e.wheelGain(false, 3, 0), null);      // horizontal-only wheel: leave it
+  const v = src('eqview.js');
+  assert.match(v, /b\.addEventListener\('wheel', ev => \{ const v = wheelGain\(isLocked, g\[i\], ev\.deltaY\); if \(v == null\) return; ev\.preventDefault\(\);/);
+  assert.match(v, /b\.addEventListener\('pointerdown', ev => \{ if \(isLocked\) return;/);
+  assert.match(v, /if \(isLocked\) return;\n\s+const v = keyStep/);
+  assert.match(v, /function setLocked\(v\) \{\s*isLocked = !!v; el\.classList\.toggle\('locked', isLocked\); lockMark\.hidden = !isLocked;/);
+  assert.match(v, /export function eqLockBox\(checked, onToggle\)/); assert.match(v, /'Lock EQ'/); assert.match(v, /iconSvg\('lock'\)/);
+  assert.match(css, /\.eqarea\.locked \.eqa-plot,\.eqarea\.locked \.eqchips\{opacity:\.6/);
+});
+
+test('0.2.3 U9: Lock EQ is remembered per device (this browser), off by default; the dialog header has it', async () => {
+  const e = await imp('eqstyle');
+  const mem = new Map(), store = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)) };
+  assert.equal(e.loadEqLock(store), false);
+  assert.equal(e.saveEqLock(true, store), true); assert.equal(mem.get('wavwiz.eqlock.v1'), '1'); assert.equal(e.loadEqLock(store), true);
+  e.saveEqLock(false, store); assert.equal(e.loadEqLock(store), false);
+  assert.equal(e.loadEqLock({ getItem() { throw new Error('private'); } }), false);
+  const q = src('eq.js');
+  assert.match(q, /const lock = eqLockBox\(loadEqLock\(\), v => \{ saveEqLock\(v\); area\?\.setLocked\(v\); \}\);/);
+  assert.match(q, /d\.el\.querySelector\('header \.grow'\)\?\.after\(lock\.el\)/);
+  assert.match(q, /locked: loadEqLock\(\), onChange:/);
+});
+
+test('0.2.3 U10: Appearance > EQ mirrors the real EQ of this device, opens locked every time, unlocking edits the real EQ', async () => {
+  const e = await imp('eqstyle');
+  const zones = [{ id: 1, name: 'Den', outputs: [{ deviceId: 'a', name: 'Out A', connected: true }] }, { id: 2, name: 'Phone', outputs: [{ deviceId: 'p', name: 'Browser', connected: true, active: true }] }, { id: 3, name: 'Off', outputs: [{ deviceId: 'x', connected: false }] }];
+  assert.equal(e.eqTarget(zones, { id: 1 }).deviceId, 'a');       // this device's own speaker first
+  assert.equal(e.eqTarget(zones, null).deviceId, 'p');            // else the active output
+  assert.equal(e.eqTarget(zones, { id: 3 }).deviceId, 'p');       // own speaker offline -> active one
+  assert.equal(e.eqTarget([], null), null);
+  assert.equal(e.ownEqName('Living room'), 'Living room EQ');
+  assert.equal(e.eqSummary({ presetName: 'Rock', preGainDb: -2.5, loudness: true }), 'Preset: Rock · Pre-gain -2.5 dB · Loudness on');
+  assert.equal(e.eqSummary({}), 'Preset: Flat · Pre-gain 0 dB · Loudness off');
+  const ap = src('appearance.js');
+  assert.match(ap, /shown = true; locked = true;\s+\/\/ U10: locked by default every time the page opens/);
+  assert.match(ap, /api\(`\/dsp\/assignments\/\$\{encodeURIComponent\(out\.deviceId\)\}`\)/);
+  assert.match(ap, /const gains = \(\) => real \? \[\.\.\.real\.cur\.graphicDb\] : \[\.\.\.EQ_EXAMPLE\]/);
+  assert.match(ap, /onChange: \(i, db\) => \{ if \(!real \|\| locked\) return;/);
+  assert.match(ap, /api\('\/dsp\/preview', \{ method: 'POST'/);
+  assert.match(ap, /x\.source !== 'builtin' && x\.name === name/);   // never writes over a built-in
+  assert.match(ap, /window\.addEventListener\('wavwiz:eqchanged'/);
+  assert.match(ap, /eqStyleCard\(opts\.S \|\| null\)/); assert.match(src('settings.js'), /appearancePane\(\{ S, /);
+  assert.match(src('eq.js'), /window\.dispatchEvent\(new CustomEvent\('wavwiz:eqchanged'/);
+});

@@ -42,7 +42,7 @@ export function appPreview() {
       col('ap-dev', h('div', { class: 'ap-h' }, 'DEVICES'), ...rows(4).map(r => (r.append(h('i', { class: 'ap-tog' })), r)))),
     h('div', { class: 'ap-list' }, h('div', { class: 'ap-h' }, 'PLAYLIST'), h('div', { class: 'ap-row on' }, h('i', { class: 'ap-ln' })), h('div', { class: 'ap-row' }, h('i', { class: 'ap-ln' }))));
   const cap = h('div', { class: 'small dim ap-cap' }, '');
-  const el = h('div', { class: 'npprev apprev', 'aria-label': 'Live preview of the theme' },
+  const el = h('div', { class: 'npprev apprev pinprev', 'aria-label': 'Live preview of the theme' },   // 0.2.3 U5: pinned while the cards scroll
     h('div', { class: 'npprev-h' }, h('span', { class: 'npprev-live' }, h('i', { 'aria-hidden': 'true' }), 'LIVE PREVIEW'), h('span', { class: 'small dim ap-name' }, ''), h('span', { class: 'grow' }), h('span', { class: 'npprev-ex' }, 'EXAMPLE DATA')),
     h('div', { class: 'ap-stage' }, app), cap);
   const name = el.querySelector('.ap-name');

@@ -58,3 +58,25 @@ export function approxResponse(gains, n = 120) {
 }
 /** Glow wording per style (C says "fill"). */
 export const glowWords = style => style === 'curve' ? ['Spectrum glow', 'Brightness of the live-music fill'] : ['Spectrum glow', 'The faint live-music glow behind the bars'];
+
+// 0.2.3 U9: "Lock EQ". The mouse wheel fine-adjusts a band by default; locked, the bands ignore the wheel (the page scrolls instead), drag,
+// click and keys. Remembered per device (this browser). The Appearance > EQ preview always opens locked (U10) and does not change this.
+export const EQ_LOCK_KEY = 'wavwiz.eqlock.v1';
+export function loadEqLock(store = globalThis.localStorage) { try { return store?.getItem(EQ_LOCK_KEY) === '1'; } catch { return false; } }
+export function saveEqLock(on, store = globalThis.localStorage) { try { store?.setItem(EQ_LOCK_KEY, on ? '1' : '0'); } catch { /* private mode */ } return !!on; }
+/** Mouse wheel over a band: the new gain (one 0.5 dB step per notch, up = louder), or null = leave the event alone so the page scrolls. */
+export function wheelGain(locked, db, deltaY) { if (locked || !deltaY) return null; return snapDb(db + (deltaY < 0 ? EQ_STEP : -EQ_STEP)); }
+/** 0.2.3 U10: the speaker the Appearance > EQ preview mirrors - this device's own speaker when it is one, else the active (or first)
+ *  connected output, like the Sound (EQ) dialog. null = no speaker connected (the preview then shows example values). */
+export function eqTarget(zones = [], mine = null) {
+  const outs = (zones || []).flatMap(z => (z.outputs || []).map(o => ({ ...o, zone: z.name, zoneId: z.id }))).filter(o => o.connected || o.active);
+  return (mine && outs.find(o => o.zoneId === mine.id)) || outs.find(o => o.active) || outs[0] || null;
+}
+/** U10: edits made on the Appearance page are kept in this speaker's own preset (never over a built-in or a shared preset). */
+export const ownEqName = speaker => `${String(speaker || 'This speaker').trim().slice(0, 30)} EQ`;
+/** U10: the one-line summary under the preview: preset, pre-gain, loudness (and Bypass / EQ off when set). */
+export function eqSummary({ presetName, preGainDb = 0, loudness = false, bypass = false, enabled = true } = {}) {
+  const bits = [`Preset: ${presetName || 'Flat'}`, `Pre-gain ${preGainDb ? fmtDb(preGainDb) + ' dB' : '0 dB'}`, `Loudness ${loudness ? 'on' : 'off'}`];
+  if (bypass) bits.push('Bypass on'); if (!enabled) bits.push('EQ off');
+  return bits.join(' · ');
+}

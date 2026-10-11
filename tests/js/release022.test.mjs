@@ -75,7 +75,8 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(ap, /visualizerView\(\{ nested: true \}\)/); assert.match(ap, /new Viz\(stage, \{ engine: p\.engine, preview: true \}\)/);
   assert.match(vp, /export function visualizerView\(\{ nested = false \} = \{\}\)/); assert.match(vp, /fold\('Graphics \(this device\)'/);
   // EQ = fuller page: big try-out preview, other styles, glow 0-100 % (50 % default)
-  assert.match(ap, /interactive: true \}\);   \/\/ try-out only: no onChange, nothing is sent/); assert.match(ap, /'Other styles'/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
+  assert.match(ap, /prev = eqArea\(\{ style: p\.style, gains: gains\(\), glow: p\.glow, interactive: true, locked:/);   // 0.2.3 U10: the real EQ, locked by default
+  assert.match(ap, /'Other styles'/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
   assert.match(ap, /interactive: false/);
   // Now Playing keeps the F9 preview (0.2.3 U4: Display size has no preview any more - see release023)
   assert.match(ap, /preview \? preview\.el : null/);

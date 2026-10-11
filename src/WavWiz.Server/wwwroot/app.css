@@ -1399,3 +1399,25 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .pln-t2:empty,.pln-dot:has(+ .pln-t2:empty){display:none}
 .plnext.none .pln-t1{font-weight:400;color:var(--dim)}
 .plnext.tight .pln-t2,.plnext.tight .pln-dot{display:none}
+/* ===== 0.2.3 U5 + U8: Appearance live previews (Theme, Visualizer, EQ, Now Playing) stay pinned at the top of the page while the settings
+   below scroll, so hovering the last theme card or moving any slider shows the change without scrolling back up. Every Display size:
+   the pinned preview never takes more than about 45% of the dialog's height (it shrinks to fit). ===== */
+.appsub .pinprev{position:sticky;top:-12px;z-index:4;box-shadow:0 8px 14px -8px rgba(0,0,0,.75)}
+.appsub .apprev.pinprev .ap-app{height:clamp(130px,calc(45vh / var(--z,1) - 80px),210px)}
+.appsub .vlive.pinprev .vlive-stage{aspect-ratio:auto;height:clamp(110px,calc(45vh / var(--z,1) - 60px),260px)}
+.appsub .eqprevbox.pinprev .eqa-plot{height:clamp(120px,calc(45vh / var(--z,1) - 130px),260px)}
+.appsub .npprev.pinprev[data-preview=np]{max-height:calc(45vh / var(--z,1));overflow:hidden}
+/* ===== 0.2.3 U9: Lock EQ - checkbox with a padlock (EQ dialog header, Appearance > EQ preview); locked bands look slightly dimmed ===== */
+.eqlockbox{display:inline-flex;align-items:center;gap:6px;flex:none;padding:3px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--ink);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;white-space:nowrap;cursor:pointer}
+.eqlockbox input{margin:0;width:14px;height:14px}
+.eqlockbox:has(input:checked){border-color:color-mix(in srgb,var(--accent2) 70%,var(--line));color:var(--accent2)}
+.eqlockbox:has(input:disabled){opacity:.55;cursor:default}
+.eqlock-ic svg,.eqa-lock svg{width:14px;height:14px;display:block}
+dialog.eqdialog > header .eqlockbox{margin-right:6px}
+.eqa-lock{display:inline-flex;color:var(--accent2)} .eqa-lock[hidden]{display:none}
+.eqarea.locked .eqa-plot,.eqarea.locked .eqchips{opacity:.6;filter:saturate(.75)}
+.eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip{cursor:default}
+/* U10: the real-EQ summary line (preset, pre-gain, loudness) on the Appearance > EQ preview */
+.eqreal-sum{margin:-2px 0 6px;color:var(--ink);font-family:var(--mono);font-size:11px}
+.eqprevbox .npprev-h .ell{min-width:0}
+.npprev-live,.npprev-ex{white-space:nowrap;flex:none}

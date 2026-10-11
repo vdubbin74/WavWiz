@@ -34,7 +34,7 @@ export function fillSample(panel, p = loadNpPrefs()) {
 
 export function npPreview() {
   const stage = h('div', { class: 'npprev-stage' }), label = h('span', { class: 'small dim' });
-  const el = h('div', { class: 'npprev', 'data-preview': 'np', 'aria-label': 'Live preview of the Now Playing panel' },
+  const el = h('div', { class: 'npprev pinprev', 'data-preview': 'np', 'aria-label': 'Live preview of the Now Playing panel' },
     h('div', { class: 'npprev-h' }, h('span', { class: 'npprev-live' }, h('i', { 'aria-hidden': 'true' }), 'LIVE PREVIEW'), label, h('span', { class: 'grow' }), h('span', { class: 'npprev-ex' }, 'EXAMPLE DATA')),
     stage, h('div', { class: 'small dim npprev-foot' }, 'Updates as you pick.'));
   let panel = null;
