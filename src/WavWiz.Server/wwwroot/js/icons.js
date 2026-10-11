@@ -22,6 +22,7 @@ const P = {
   // 0.2.3 U6: the Expand button shows the way the panel travels (bar = the edge it stays on, arrow = where it goes)
   expandL: '<path d="M20 5v14"/><path d="M16 12H4.5"/><path d="M8.5 8l-4 4 4 4"/>',
   expandR: '<path d="M4 5v14"/><path d="M8 12h11.5"/><path d="M15.5 8l4 4-4 4"/>',
+  chevD: '<path d="M6 9l6 6 6-6"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',   // 0.2.3 U9: Lock EQ
   wave: '<path d="M3 12h1.5M6.5 8v8M10 5v14M13.5 9v6M17 7v10M20.5 11v2"/>',
 };

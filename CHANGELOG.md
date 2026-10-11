@@ -29,6 +29,7 @@ Fine-tunes on top of 0.2.2 (which was not published on its own); 0.2.3 includes 
 - **Pinned previews (U5, U8):** the Theme, Visualizer, EQ and Now Playing live previews stay at the top of the page while the settings below scroll, at every Display size (the pinned preview shrinks on short windows).
 - **Expand buttons (U6)** point the way the panel travels: Devices expands to the left and returns to the right; Library is the mirror image.
 - **Devices header (U7):** the DEVICES title sits at the right edge, a true mirror of LIBRARY.
+- **Device cards open into their settings (U12):** the ••• button on each device card is now a themed chevron **Settings** button (it matches the Library / Devices expand arrows). It opens the device's settings (sound check, exact delay, Sound / EQ, connection, Rename / Set as reference / Forget) downward under the card, in place, in both the Standard and Expanded Devices views; the chevron flips, and the button or Esc closes them. Admin-only items stay visible but read-only for other users. Each card remembers being open for the browser session.
 - **Appearance > EQ shows the real EQ (U10):** the preview mirrors this device's speaker (bands, preset, pre-gain, loudness), live, in the chosen style. It opens with Lock EQ checked every time; unchecked, changes play at once and are kept in the speaker's own preset ("<speaker> EQ").
 
 ### Added

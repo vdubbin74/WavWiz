@@ -197,25 +197,51 @@ function zoneEditView(S, ctl, side, g, setEdit, setPick) {
   return side;
 }
 
-/** 0.2.1 F18 + F19: each card has its own settings view (the ••• button flips the card). Calibrate and Test sound moved here off the card face;
- * the old device Details… pop-up is gone - everything it had lives here (sound check, Sound / EQ, delay history, connection, Bluetooth
- * follow) or on the card itself (output + delay), and zone settings live in the zones sidebar's edit view (F7). One card at a time. */
-let settingsFor = null;
-export const cardInSettings = id => settingsFor === id;
-function toggleSettings(S, ctl, z, card, hl) {
-  settingsFor = settingsFor === z.id ? null : z.id;
-  const fresh = expandedCard(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl); card.replaceWith(fresh);
-  (settingsFor === z.id ? fresh.querySelector('.dsback') : fresh.querySelector('.dmore'))?.focus();
+/** 0.2.1 F18 + F19: each card has its own settings - Calibrate and Test sound live there, not on the card face; the old device Details… pop-up is
+ * gone - everything it had lives here (sound check, Sound / EQ, delay history, connection, Bluetooth follow) or on the card itself (output + delay),
+ * and zone settings live in the zones sidebar's edit view (F7).
+ * 0.2.3 U12: the ••• button that flipped the whole card is now a themed chevron "Settings" Expand control (it matches the Library / Devices expand
+ * arrows). It opens the settings downward under the card face, in place, in both the Standard and Expanded views; the chevron flips, and the button
+ * or Esc closes them. Open / closed is remembered per device for this browser session only (sessionStorage). */
+const OPEN_KEY = 'wavwiz.devopen.v1';
+const openSet = (() => { try { return new Set(JSON.parse(sessionStorage.getItem(OPEN_KEY) || '[]')); } catch { return new Set(); } })();
+export const cardInSettings = id => openSet.has(id);
+export function setCardOpen(id, open) {
+  if (open) openSet.add(id); else openSet.delete(id);
+  try { sessionStorage.setItem(OPEN_KEY, JSON.stringify([...openSet])); } catch { /* private mode: this page only */ }
 }
-function cardSettings(S, ctl, z, back) {
+/** The Expand control on each device card / row. */
+export function settingsToggle(name, open, onToggle) {
+  return h('button', { type: 'button', class: 'dexpand' + (open ? ' on' : ''), 'aria-expanded': String(open), 'aria-label': `${open ? 'Hide' : 'Show'} settings for ${name}`,
+    title: open ? 'Hide settings (Esc)' : 'Settings: delay, output, test sound, calibrate, rename…', onclick: ev => { ev.stopPropagation(); onToggle(); } },
+  icon('chevD'), h('span', { class: 'dexp-l' }, 'Settings'));
+}
+/** Re-render one card / row in place after it opened or closed; focus stays on its Expand control. */
+function toggleSettings(z, el, render) {
+  setCardOpen(z.id, !openSet.has(z.id));
+  const fresh = render(); el.replaceWith(fresh); fresh.querySelector('.dexpand')?.focus();
+  return fresh;
+}
+/** A redraw (the list refreshes every few seconds) must not drop keyboard focus from a card's Expand control, or Esc would stop closing it. */
+function keepExpandFocus(scope) {
+  const a = document.activeElement;
+  if (!a?.classList?.contains('dexpand') || !scope.contains(a)) return;
+  const id = a.closest('[data-zone-id]')?.dataset.zoneId;
+  if (id != null) queueMicrotask(() => scope.querySelector(`[data-zone-id="${id}"] .dexpand`)?.focus());
+}
+/** Esc inside an open card closes its settings. */
+function escCloses(el, z, close) {
+  el.addEventListener('keydown', ev => { if (ev.key === 'Escape' && openSet.has(z.id) && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); close(); } });
+  return el;
+}
+function cardSettings(S, ctl, z) {
   const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z), r = z.room;
   const testSound = async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } };
   const sec = (title, ...kids) => h('div', { class: 'dssec' }, h('div', { class: 'dlbl' }, title), ...kids);
   const btn = (label, fn, ok = true, hint = OWN_HINT, cls = 'btn') => ro(h('button', { type: 'button', class: cls, onclick: fn }, label), ok, hint);
   const conn = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' ? 'Network cable' : z.link, z.remoteIp].filter(Boolean).join(' · ');
   const sync = z.syncErrorMs != null ? `Sync error ${z.syncErrorMs.toFixed(1)} ms · buffer ${Math.round(z.bufferMs ?? 0)} ms · re-syncs ${z.hardResyncs ?? 0}` : z.isWeb ? 'A browser cannot measure its own sync error - set the delay by ear.' : 'Sync error shows once something plays.';
-  return h('div', { class: 'dsettings', role: 'group', 'aria-label': `${z.name} settings` },
-    h('div', { class: 'dstop' }, h('button', { type: 'button', class: 'btn dsback', 'aria-label': `Back to ${z.name}`, onclick: back }, '‹ Back'), h('b', { class: 'ell grow', title: z.name }, z.name), h('span', { class: 'small dim' }, 'Settings')),
+  return h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
     sec('SOUND CHECK',
       h('div', { class: 'row wrap dsbtns' },
         btn(z.isWeb ? 'Set delay by ear' : '🎤 Calibrate', () => openCalibration(S, ctl.refreshAll, z.id), tune && z.connected, tune ? 'This device is offline.' : OWN_HINT, 'btn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : '')),
@@ -291,34 +317,43 @@ function outputAndDelay(S, ctl, z) {
 }
 
 function expandedCard(S, ctl, z, hl) {
-  const cls = 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : '');
+  const open = openSet.has(z.id);
+  const cls = 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : '') + (open ? ' dset' : '');
   let card;
-  const flip = () => toggleSettings(S, ctl, z, card, hl);
-  if (settingsFor === z.id) return (card = h('div', { class: cls + ' dset', 'data-room': z.name, 'data-zone-id': z.id }, cardSettings(S, ctl, z, flip)));
+  const flip = () => { card = toggleSettings(z, card, () => expandedCard(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl)); };
   const { vol, pct, mute } = volumeRow(S, ctl, z);
-  const moreBtn = h('button', { class: 'dmore', 'aria-label': `Settings for ${z.name}`, title: 'Settings: calibrate, test sound, EQ, rename…', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); flip(); } }, '•••');
+  const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
   // 0.2.1 F18: no Calibrate / Test sound buttons on the card face - a small status chip opens the card's settings when the delay needs attention
   const chips = [];
-  if (canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
+  if (!open && canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
   if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
-  return (card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
+  card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
     // name gets its own line so it never truncates to "C…" next to the badges and switch
-    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell grow', title: z.name }, z.name), onSwitch(S, ctl, z), moreBtn),
+    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell grow', title: z.name }, z.name), onSwitch(S, ctl, z)),
     h('div', { class: 'dsub' }, ...badges(S, z), h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z))),
     h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'VOLUME'), pct), h('div', { class: 'dvol' }, icon('volume'), vol, mute),
     ...outputAndDelay(S, ctl, z),
     chips.length ? h('div', { class: 'chips' }, chips) : null,
-    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null));
+    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null,
+    h('div', { class: 'dexpbar' }, expBtn),
+    open ? cardSettings(S, ctl, z) : null);
+  return escCloses(card, z, flip);
 }
 
-function standardRow(S, ctl, z, open) {
+function standardRow(S, ctl, z, openDevice) {
+  const open = openSet.has(z.id);
+  let row;
+  const flip = () => { row = toggleSettings(z, row, () => standardRow(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, openDevice)); };
   const { vol, pct, mute } = volumeRow(S, ctl, z);
-  return h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : ''), 'data-device': z.name },
+  const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
+  row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : '') + (open ? ' dset' : ''), 'data-device': z.name, 'data-zone-id': z.id },
     h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }),
-      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls', onclick: () => open(z.id) }, z.name), ...badges(S, z, true),
+      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls', onclick: () => openDevice(z.id) }, z.name), ...badges(S, z, true),
       h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), h('span', { class: 'grow' }), onSwitch(S, ctl, z)),
     outputLine(z),
-    h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute));
+    h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute, expBtn),
+    open ? cardSettings(S, ctl, z) : null);
+  return escCloses(row, z, flip);
 }
 
 const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speaker by itself; for a PC with speakers, install WavWiz Player there (it finds this server by itself).';
@@ -354,8 +389,9 @@ export function devicesPanel(S, ctl) {
     if (!force && removedShown()) force = true;
     if (!force && body.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();   // do not fight the user's finger
     if (!force && body.querySelector('.dmenu')) return later();
+    if (!force && document.activeElement?.closest?.('.dsettings') && document.activeElement.tagName === 'INPUT' && body.contains(document.activeElement)) return later();   // 0.2.3 U12: typing an exact delay in an open card
     if (!force && size === 'expanded' && zedit !== null) return later();          // F19: never redraw a zone's settings under the user's typing
-    clearTimeout(pending); pending = 0;
+    clearTimeout(pending); pending = 0; keepExpandFocus(body);
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
     if (size === 'expanded') {
@@ -393,7 +429,7 @@ export function devicesView(S, ctl) {
     const gone = [...list.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
     if (!gone && root.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();
     if (!gone && root.querySelector('.dmenu')) return later();
-    clearTimeout(pending); pending = 0;
+    clearTimeout(pending); pending = 0; keepExpandFocus(list);
     top.replaceChildren(masterRow(S, ctl), zonesStrip(S, ctl, false));
     list.replaceChildren(...(S.zones.length ? S.zones.map(z => expandedCard(S, ctl, z, false)) : [h('div', { class: 'card' }, h('h3', null, 'No devices yet'), h('p', { class: 'dim' }, EMPTY))]));
     const live = S.zones.some(z => z.enabled && z.connected);

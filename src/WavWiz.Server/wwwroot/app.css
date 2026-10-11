@@ -773,7 +773,6 @@ html.tv *{transition:none!important;animation:none!important}
 .dcard{position:relative;border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;background:var(--panel2);min-width:0}
 .dcard.off{opacity:.7}
 .dcard.hl{border-color:var(--accent2);box-shadow:inset 3px 0 0 var(--accent),0 0 0 1px var(--accent2)}
-.dcard .dmore{background:none;border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:0 6px;cursor:pointer;line-height:20px}
 .dcard .dsel{width:100%} .dcard .dsel.warn{border-color:var(--amber,#F5A524);color:var(--amber,#F5A524)}
 .dcard .dms{color:var(--accent);font-variant-numeric:tabular-nums}
 .dcard input[type=range]{width:100%}
@@ -1205,15 +1204,12 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 /* ---- 0.2.1 F18 + F19: a device card's own settings view (••• flips the card); Calibrate / Test sound live here, no Details pop-up ---- */
 .dcard.dset{border-color:color-mix(in srgb,var(--accent2) 55%,var(--line))}
 .dsettings{display:flex;flex-direction:column;gap:10px;min-width:0}
-.dstop{display:flex;align-items:center;gap:8px;min-width:0}
-.dstop .dsback{height:28px;padding:0 10px;font-size:12px;flex:none}
 .dssec{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
 .dssec .dlbl{margin:0}
 .dsbtns{gap:6px} .dsbtns .btn{height:30px;padding:0 10px;font-size:12px}
 .dssec .latctl{margin:0;gap:6px;flex-wrap:nowrap}
 .dssec .latctl .latlabel,.dssec .latctl .latslider{display:none}   /* the card face has the slider; here you type the exact value */
 .dssec .latctl .latnudge{order:1;min-width:30px;height:30px;padding:0 8px} .dssec .latctl .latbox{order:2;width:76px;height:30px} .dssec .latctl .latnudge:last-of-type{order:3} .dssec .latctl > .small{order:4}
-.dcard .dmore[aria-expanded=true]{color:var(--accent)}
 /* 0.2.2 T4d: round artist tiles fall back to the artist's own album covers (2x2 mosaic or one cover) before the generated portrait */
 .acover .amosaic{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--panel2)}
 .acover .amosaic.one{grid-template-columns:1fr;grid-template-rows:1fr}
@@ -1424,3 +1420,19 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 /* ===== 0.2.3 U6: Expand buttons show which way the panel travels (Devices: left to expand, right to go back; Library: the mirror) ===== */
 .plus.libexp .ic,.plus.devexp .ic{display:inline-flex}
 .plus.libexp svg,.plus.devexp svg{width:15px;height:15px}
+
+/* 0.2.3 U12: the device card's Expand control (was •••) - themed like the Library / Devices expand arrows; the chevron flips when the settings are open below */
+.dexpand{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px 0 6px;flex:none;background:var(--panel2);border:1px solid var(--accent);border-radius:5px;color:var(--accent);font:600 11px var(--font,inherit);letter-spacing:.3px;cursor:pointer}
+.dexpand:hover{background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2)}
+.dexpand:focus-visible{outline:2px solid var(--hl,var(--accent2));outline-offset:1px}
+.dexpand .ic{display:inline-flex} .dexpand svg{width:14px;height:14px;transition:transform .18s ease}
+.dexpand.on svg{transform:rotate(180deg)} .dexpand.on{border-color:var(--accent2);color:var(--accent2)}
+.dexpbar{display:flex;justify-content:flex-end;margin-top:2px}
+.dcard.dset .dsettings,.drow.dset .dsettings{margin-top:6px;animation:dsetin .16s ease-out}
+@keyframes dsetin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.drow .dvol .dexpand{margin-left:4px;padding:0 6px}
+.drow .dvol .dexp-l{display:none}          /* the Standard row is narrow: chevron only, the label is in the tooltip / aria-label */
+.drow.dset{padding-bottom:10px}
+.devpanel .devbody{container:devbody / inline-size}
+@container devbody (min-width:300px){.drow .dvol .dexp-l{display:inline}}
+@media (prefers-reduced-motion:reduce){.dexpand svg{transition:none}.dcard.dset .dsettings,.drow.dset .dsettings{animation:none}}
