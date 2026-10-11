@@ -58,7 +58,7 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 
 - **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
 - **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
-- Each device card has a **Settings** button with an arrow. It opens that device's settings right under the card: **Set delay by ear**, **Test sound**, the exact delay, **Sound / EQ…**, its audio output, connection details, **Rename…**, **Set as reference** and **Forget device…**. Click it again or press **Esc** to close.
+- In the **Expanded** Devices view, each device card has a **Settings** button with an arrow. It opens that device's settings right under the card: **Set delay by ear**, **Test sound**, the exact delay, **Sound / EQ…**, its audio output, connection details, **Rename…**, **Set as reference** and **Forget device…**. Click it again or press **Esc** to close. The normal (Standard) Devices list only has name, status, volume, Mute and on/off: tap a device's name there to open the Expanded view with that device's card highlighted.
 - Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other rooms. On PCs the delay is kept per audio output.
 
 ### Calibrate with your phone

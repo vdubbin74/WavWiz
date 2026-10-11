@@ -100,3 +100,22 @@ test('0.2.3 fix: helpers - reconcile keeps nodes in place, the signature ignores
   assert.equal(d.cardSig(S, z1), d.cardSig(S, z2), 'volume / mute / sync / delay are live values');
   assert.notEqual(d.cardSig(S, z1), d.cardSig(S, { ...z1, name: 'Den' }));
 });
+
+test('0.2.3: Standard rows have no Settings; tapping a device opens Expanded with its card highlighted (even under a zone filter)', () => {
+  localStorage.setItem('wavwiz.devsize', 'standard'); sessionStorage.setItem('wavwiz.devzone', '5');
+  const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2)], groups: [{ id: 5, name: 'Upstairs', deviceIds: [1], members: 1 }] };
+  let p; const c = { ...ctl, setDevSize: (sz, id) => p.setSize(sz, id) };
+  p = d.devicesPanel(S, c); document.body.append(p.el);
+  const rows = p.el.querySelectorAll('.drow');
+  assert.equal(rows.length, 2);
+  for (const r of rows) { assert.equal(r.querySelector('.dexpand'), null, 'no Settings button'); assert.equal(r.querySelector('.dsettings'), null); assert.ok(r.querySelector('.dvol input')); assert.ok(r.querySelector('.mutebtn')); assert.ok(r.querySelector('.sw')); }
+  const r2 = p.el.querySelector('.drow[data-zone-id="2"]');
+  for (let i = 1; i <= 10; i++) { push(S, i); p.draw(); }
+  assert.equal(p.el.querySelector('.drow[data-zone-id="2"]'), r2, 'rows are patched in place too');
+  r2.querySelector('.dname').click();                                     // device 2 is not in the remembered zone filter
+  assert.equal(p.size, 'expanded');
+  const c2 = card(p.el, 2);
+  assert.ok(c2, 'its card is shown'); assert.ok(c2.classList.contains('hl'), 'and highlighted');
+  assert.ok(c2.querySelector('.dexpand'), 'one tap from its Settings');
+  p.el.remove();
+});

@@ -10,7 +10,7 @@ export const WHATS_NEW = [
   ['Your real EQ in Appearance', 'Settings > Appearance > EQ shows this speaker\'s actual EQ in each style. It opens locked, so you can browse styles safely. Uncheck Lock EQ to make changes.'],
   ['Previews stay in view', 'The Theme, Visualizer, EQ and Now Playing previews stay pinned at the top while you scroll, so the last theme cards preview too. Display size has no preview, because the whole app changes as you pick.'],
   ['Revoked devices disappear', 'Revoking a phone or browser in Settings > Devices > Paired devices & tokens now removes its speakers from the Devices list right away, on every open page, and it has to pair again. Forget device works at once too.'],
-  ['Device settings open in place', 'Each device card has a Settings button with an arrow. It opens that device\'s settings right under the card; click it again or press Esc to close.'],
+  ['Device settings open in place', 'In the Expanded Devices view, each device card has a Settings button with an arrow. It opens that device\'s settings right under the card; click it again or press Esc to close. In the normal Devices list, tap a device\'s name to jump to its card.'],
   ['Steady device settings', 'An open device card no longer refreshes while you use it. Typed delays, dropdowns and slider drags stay as they are while live status keeps updating.'],
   ['Tidier side panels', 'The Expand buttons point the way each panel moves, and the Devices title sits at the right edge, mirroring Library.'],
 ];

@@ -201,8 +201,10 @@ function zoneEditView(S, ctl, side, g, setEdit, setPick) {
  * gone - everything it had lives here (sound check, Sound / EQ, delay history, connection, Bluetooth follow) or on the card itself (output + delay),
  * and zone settings live in the zones sidebar's edit view (F7).
  * 0.2.3 U12: the ••• button that flipped the whole card is now a themed chevron "Settings" Expand control (it matches the Library / Devices expand
- * arrows). It opens the settings downward under the card face, in place, in both the Standard and Expanded views; the chevron flips, and the button
- * or Esc closes them. Open / closed is remembered per device for this browser session only (sessionStorage). */
+ * arrows). It opens the settings downward under the card face, in place, on the Expanded cards (and the Devices page); the chevron flips, and the button
+ * or Esc closes them. Open / closed is remembered per device for this browser session only (sessionStorage).
+ * 0.2.3 (later): the Standard rows have no Settings button any more - settings live only on the Expanded cards; tapping a device's name in
+ * Standard opens Expanded with its card highlighted. */
 const OPEN_KEY = 'wavwiz.devopen.v1';
 const openSet = (() => { try { return new Set(JSON.parse(sessionStorage.getItem(OPEN_KEY) || '[]')); } catch { return new Set(); } })();
 export const cardInSettings = id => openSet.has(id);
@@ -450,25 +452,21 @@ function expandedCard(S, ctl, z, hl) {
   return escCloses(card, z, flip);
 }
 
+/** Standard (narrow) row: name, status, volume, Mute and on/off only. 0.2.3: device settings live ONLY on the Expanded cards - tapping the name
+ * opens Expanded with this device's card highlighted (0.2.0), one tap from its Settings button. */
 function standardRow(S, ctl, z, openDevice) {
   z = { ...z };           // this row's own copy: later updates patch it in place
-  const open = openSet.has(z.id);
-  let row;
-  const flip = () => { row = toggleSettings(z, row, () => standardRow(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, openDevice)); };
   const { vol, pct, mute } = volumeRow(S, ctl, z);
-  const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
   const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), state = h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), sw = onSwitch(S, ctl, z);
-  const settings = open ? cardSettings(S, ctl, z) : null;
-  row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : '') + (open ? ' dset' : ''), 'data-device': z.name, 'data-zone-id': z.id },
+  const row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : ''), 'data-device': z.name, 'data-zone-id': z.id },
     h('div', { class: 'dtop' }, dot,
-      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls', onclick: () => openDevice(z.id) }, z.name), ...badges(S, z, true),
+      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name), ...badges(S, z, true),
       state, h('span', { class: 'grow' }), sw),
     outputLine(z),
-    h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute, expBtn),
-    settings);
+    h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute));
   row._sig = cardSig(S, z);
-  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); settings?._patch(z); };   // 0.2.3 fix
-  return escCloses(row, z, flip);
+  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); };   // 0.2.3 fix: patched in place
+  return row;
 }
 
 const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speaker by itself; for a PC with speakers, install WavWiz Player there (it finds this server by itself).';
@@ -514,6 +512,8 @@ export function devicesPanel(S, ctl) {
     if (size === 'expanded') {
       // 0.2.1 F7: master volume keeps the full-width strip; zones move to the ~180 px sidebar on the right (variant B) and filter the cards
       if (zpick !== 'all' && !(S.groups || []).some(g => g.id === zpick)) zpick = 'all';
+      // tapping a device in Standard opens Expanded with its card highlighted: never hide that card behind a zone filter
+      if (hl != null && zpick !== 'all' && !zoneFilter(S.zones, S.groups, zpick).some(z => z.id === hl)) { zpick = 'all'; saveZonePick('all'); }
       const shown = zoneFilter(S.zones, S.groups, zpick);
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main' });
       reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy)]);

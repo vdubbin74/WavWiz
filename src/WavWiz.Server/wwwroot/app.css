@@ -1428,15 +1428,11 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .dexpand .ic{display:inline-flex} .dexpand svg{width:14px;height:14px;transition:transform .18s ease}
 .dexpand.on svg{transform:rotate(180deg)} .dexpand.on{border-color:var(--accent2);color:var(--accent2)}
 .dexpbar{display:flex;justify-content:flex-end;margin-top:2px}
-.dcard.dset .dsettings,.drow.dset .dsettings{margin-top:6px;animation:dsetin .16s ease-out}
+.dcard.dset .dsettings{margin-top:6px;animation:dsetin .16s ease-out}
 @keyframes dsetin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.drow .dvol .dexpand{margin-left:4px;padding:0 6px}
-.drow .dvol .dexp-l{display:none}          /* the Standard row is narrow: chevron only, the label is in the tooltip / aria-label */
-.drow.dset{padding-bottom:10px}
 .devpanel .devbody{container:devbody / inline-size}
-@container devbody (min-width:300px){.drow .dvol .dexp-l{display:inline}}
-@media (prefers-reduced-motion:reduce){.dexpand svg{transition:none}.dcard.dset .dsettings,.drow.dset .dsettings{animation:none}}
+@media (prefers-reduced-motion:reduce){.dexpand svg{transition:none}.dcard.dset .dsettings{animation:none}}
 
 /* 0.2.3 fix: the live chips / warning slot of a device card adds no box of its own; an open card rebuilt in place does not replay the slide-in */
 .dlive{display:contents}
-.dcard.dsnoanim .dsettings,.drow.dsnoanim .dsettings{animation:none}
+.dcard.dsnoanim .dsettings{animation:none}

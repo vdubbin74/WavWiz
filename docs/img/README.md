@@ -5,7 +5,7 @@ Real captures used by the root `README.md`, made with demo libraries (generated 
 | File | Shows |
 | --- | --- |
 | `wavwiz-main.png` | Main window: library, Now Playing (visualizer off, showing the cover), devices and playlist |
-| `wavwiz-device-settings.png` | Device cards, one opened in place with its Settings |
+| `wavwiz-device-settings.png` | Expanded Devices cards, one opened in place with its Settings |
 | `wavwiz-eq-lock.png` | Sound (EQ) window, LED look, with Lock EQ checked |
 | `wavwiz-appearance-theme.png` | Settings > Appearance > Theme with the pinned live preview |
 | `wavwiz-minimized-bar.png` | Minimized Now Playing on one line, with Up next in the Playlist bar |

@@ -189,14 +189,14 @@ test('0.2.3 U11: the panel logic - a removed device is detected even while a sli
   assert.equal(removedShown([], []), false);
 });
 
-test('0.2.3 U12: device cards open their settings with a themed chevron Expand control (was •••), in place, in Standard and Expanded', () => {
+test('0.2.3 U12: device cards open their settings with a themed chevron Expand control (was •••), in place, on the Expanded cards only', () => {
   const d = src('devices.js');
   assert.doesNotMatch(d, /'•••'|class: 'dmore'|dsback|'‹ Back'/, 'the ••• flip and its Back button are gone');
   assert.match(d, /export function settingsToggle\(name, open, onToggle\) \{\n  return h\('button', \{ type: 'button', class: 'dexpand' \+ \(open \? ' on' : ''\), 'aria-expanded': String\(open\)/);
   assert.match(d, /icon\('chevD'\), h\('span', \{ class: 'dexp-l' \}, 'Settings'\)\);/);
   const card = d.slice(d.indexOf('function expandedCard('), d.indexOf('function standardRow('));
   const row = d.slice(d.indexOf('function standardRow('), d.indexOf('const EMPTY = '));
-  for (const [n, f] of [['Expanded', card], ['Standard', row]]) {
+  for (const [n, f] of [['Expanded', card]]) {
     assert.match(f, /settingsToggle\(z\.name, open, flip\)/, n + ' has the Expand control');
     assert.match(f, /settings = open \? cardSettings\(S, ctl, z\) : null/, n + ': settings open below the face');
     assert.match(f, /\n    settings\);\n[\s\S]*\n  return escCloses\(/, n + ': Esc closes');
@@ -215,7 +215,11 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   assert.match(src('icons.js'), /chevD: '<path d="M6 9l6 6 6-6"\/>'/);
   assert.match(css, /\.dexpand\{[^}]*border:1px solid var\(--accent\);border-radius:5px;color:var\(--accent\)/);
   assert.match(css, /\.dexpand\.on svg\{transform:rotate\(180deg\)\}/);
-  assert.match(css, /@container devbody \(min-width:300px\)\{\.drow \.dvol \.dexp-l\{display:inline\}\}/);
+  // the Standard rows keep only name, status, volume, Mute and on/off; tapping the name opens Expanded with that card highlighted
+  assert.doesNotMatch(row, /settingsToggle|cardSettings|escCloses|dexpand/);
+  assert.match(row, /onclick: \(\) => openDevice\(z\.id\)/);
+  assert.match(d, /standardRow\(S, ctl, z, id => ctl\.setDevSize\?\.\('expanded', id\)\)/);
+  assert.doesNotMatch(css, /\.drow[^{]*\.(dexpand|dexp-l|dsettings)|\.drow\.dset/);
 });
 
 test('0.2.3 U12: the open state is remembered per device for the session', async () => {
