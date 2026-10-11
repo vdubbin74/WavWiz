@@ -188,7 +188,7 @@ test('0.2.1 F13: generated covers + portraits are deterministic, unique per albu
   assert.match(art, /export const artistArt = \(name, size = 384\) => name \? `\$\{base\}\/artist\?name=/);
   assert.match(art, /gen\.portrait != null \? genNode\('artist', gen\.portrait\) : genNode\('album', gen\.album, gen\.artist\)/);
   const lib = src('library.js');
-  assert.match(lib, /cover\(artistPhoto\(a\.name, 384\), 'lg rnd', '♪', \{ portrait: a\.name \}\)/);
+  assert.match(lib, /artistCover\(a\.name, a\.artTrackIds, 'lg rnd', 384\)/);      // 0.2.2 T4d: photo, else album covers, else portrait
   assert.match(lib, /h\('div', \{ class: 't2 ell' \}, albumSub\(al\)\)/);
   for (const t of ["'ALBUM'", "'TITLE'", "'TIME'", "'albplay'", "playShuffled(ids)", "{ round: true }", "--dom"]) assert.ok(lib.includes(t.replace(/'albplay'/, 'albplay')), t);
   assert.match(src('ui.js'), /export async function playShuffled\(ids\)/);

@@ -40,13 +40,61 @@ function friendlySender(s) {
 export function cover(src, cls = '', glyph = '♪', gen = null) {
   const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') }, gen ? '' : glyph);
   if (gen) box.append(gen.portrait != null ? genNode('artist', gen.portrait) : genNode('album', gen.album, gen.artist));
-  if (src) {
-    const img = h('img', { src, alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.remove();
+  const load = u => {
+    const img = h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.remove();
     img.onload = () => { if (!img.naturalWidth) { img.remove(); return; } box.classList.add('loaded'); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
     box.append(img);
-  }
+  };
+  if (src) { load(src); if (gen && gen.portrait == null) { box.dataset.src = src; box._wwReload = () => { if (!box.classList.contains('loaded') && !box.querySelector('img')) load(src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now()); }; } }
   return box;
 }
+
+/** 0.2.2 T4d: round artist picture with a fallback chain. 1) the artist photo (online, cached); 2) if there is none, the artist's own album
+ * covers - a 2x2 mosaic when 4 load, else the first one that loads; 3) the generated portrait only when nothing loads at all.
+ * T4b: the element is tagged with the artist name so an "art" push from the server swaps the photo in live (artPushed). */
+export function artistCover(name, ids = [], cls = 'lg rnd', size = 384) {
+  const box = h('div', { class: 'cover acover ' + cls + ' gen', 'data-artist': name || '' });
+  box.append(genNode('artist', name || ''));
+  const done = () => { box.classList.add('loaded'); box.querySelector('.gencover')?.remove(); };
+  const tryAlbums = () => {
+    const list = (ids || []).filter(Boolean).slice(0, 4); if (!list.length || box.querySelector('.amosaic')) return;
+    const m = h('div', { class: 'amosaic', 'aria-hidden': 'true' }); let pending = list.length; const ok = [];
+    const settle = () => {
+      if (--pending > 0) return;
+      if (!ok.length) { m.remove(); return; }                                 // no album art either: the generated portrait stays
+      m.replaceChildren(...(ok.length >= 4 ? ok.slice(0, 4) : [ok[0]])); m.classList.toggle('one', ok.length < 4); m.hidden = false; done();
+    };
+    m.hidden = true;
+    for (const id of list) {
+      const img = h('img', { alt: '', decoding: 'async', src: trackArt(id, ids.length >= 4 ? Math.max(96, size >> 1) : size) });
+      img.onload = () => { if (img.naturalWidth) ok.push(img); settle(); }; img.onerror = settle;
+    }
+    box.append(m);
+  };
+  const photo = (bust) => {
+    const src = artistArt(name, size); if (!src) { tryAlbums(); return; }
+    const img = h('img', { class: 'aphoto', alt: '', loading: 'lazy', decoding: 'async', src: bust ? `${src}&v=${bust}` : src });
+    img.onerror = () => { img.remove(); tryAlbums(); };
+    img.onload = () => { if (!img.naturalWidth) { img.remove(); tryAlbums(); return; } box.querySelector('.aphoto:not(:last-of-type)')?.remove(); box.querySelector('.amosaic')?.remove(); done(); };
+    box.append(img);
+  };
+  box._wwReload = () => photo(Date.now());
+  photo();
+  return box;
+}
+/** 0.2.2 T4b: the server found a picture - swap it into every open tile / row of that artist (album covers reload through their track art). */
+export function artPushed(d) {
+  if (!d) return;
+  if (d.kind === 'artist' && d.artist) {
+    const want = String(d.artist).trim().toLowerCase().replace(/\s+/g, ' ');
+    document.querySelectorAll('.acover[data-artist]').forEach(el => { if (el.dataset.artist.trim().toLowerCase().replace(/\s+/g, ' ') === want && el._wwReload) el._wwReload(); });
+  } else if (d.kind === 'album') {
+    // album covers are fetched by track id, so every cover still showing its generated placeholder is asked once more (debounced: a big library sends many)
+    clearTimeout(albumTimer);
+    albumTimer = setTimeout(() => document.querySelectorAll('.cover.gen:not(.loaded)[data-src]').forEach(el => el._wwReload?.()), 4000);
+  }
+}
+let albumTimer = 0;
 
 /** Best art URL for a now-playing / queue item (radio favicon or track cover). */
 export function itemArtUrl(it, size = 192) {

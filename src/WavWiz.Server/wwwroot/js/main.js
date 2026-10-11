@@ -14,6 +14,7 @@ import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
 import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
+import { artPushed } from './art.js';
 import { loadLibPrefs } from './libsort.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
@@ -244,6 +245,7 @@ function connectWs() {
       else if (m.type === 'library') { refreshStatus(); window.dispatchEvent(new CustomEvent('wavwiz:library')); nowc.drawChecklist(); }
       else if (m.type === 'tick') { if (S.now?.state === 'playing') refreshNow(); if (S.view === 'devices' || wide() || S.view === 'now') refreshZones(); }
       else if (m.type === 'notice') toast(m.data.message, true);
+      else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b
     },
   });
 }

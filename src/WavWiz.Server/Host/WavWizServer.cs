@@ -35,6 +35,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var ca = new Tls.LocalCa(cfg.DataDir);
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
+        s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live
         u.S = s; cond.Engine.FrameTap = s.Viz.OnFrame;
         s.Scenes = new Features.SceneService(db, zones, events);
         s.Schedules = new Features.ScheduleService(db, zones, cond, events);

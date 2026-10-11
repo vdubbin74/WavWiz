@@ -6,7 +6,7 @@ namespace WavWiz.Server.Library;
 public static class TagFlags { public const int Title = 1, Artist = 2, Album = 4, Genre = 8, Year = 16, TrackNo = 32;
     public static List<string> Names(int f) { var l = new List<string>(); if ((f & Title) != 0) l.Add("title"); if ((f & Artist) != 0) l.Add("artist"); if ((f & Album) != 0) l.Add("album"); if ((f & Genre) != 0) l.Add("genre"); if ((f & Year) != 0) l.Add("year"); if ((f & TrackNo) != 0) l.Add("track number"); return l; } }
 
-public sealed record ArtistRow(string Name, int Albums, int Tracks, long ArtTrackId, string? AddedAt = null);   // 0.2.0 item 13: AddedAt for "recently added" sorting
+public sealed record ArtistRow(string Name, int Albums, int Tracks, long ArtTrackId, string? AddedAt = null, long[]? ArtTrackIds = null);   // 0.2.2 T4d: ArtTrackIds = up to 4 album covers (round tile fallback when no photo)   // 0.2.0 item 13: AddedAt for "recently added" sorting
 public sealed record AlbumRow(string Artist, string Album, int? Year, int Tracks, long DurationMs, long ArtTrackId, string AddedAt, string? Genre);
 public sealed record NameCount(string Name, int Tracks, int Albums, long[]? ArtTrackIds = null);   // 0.2.1 F4/F13: up to 4 album covers for the genre / year tiles
 
@@ -18,8 +18,9 @@ public sealed partial class LibraryService
     public List<ArtistRow> Artists(string? q = null, int limit = 5000)
     {
         var where = string.IsNullOrWhiteSpace(q) ? "" : " AND LOWER(album_artist) LIKE $q ESCAPE '\\'";
+        var art = CoverSamples("album_artist", "1=1");      // 0.2.2 T4d: up to 4 albums (embedded art first); the UI keeps only covers that load
         return _db.Query($"SELECT album_artist, COUNT(DISTINCT album), COUNT(*), MIN(id), MAX(added_at) FROM track WHERE missing=0{where} GROUP BY album_artist ORDER BY album_artist COLLATE NOCASE LIMIT {Math.Clamp(limit, 1, 20000)}",
-            r => new ArtistRow(r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.GetInt64(3), r.IsDBNull(4) ? null : r.GetString(4)), string.IsNullOrWhiteSpace(q) ? Array.Empty<(string, object?)>() : new[] { ("$q", (object?)Like(q!)) });
+            r => new ArtistRow(r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.GetInt64(3), r.IsDBNull(4) ? null : r.GetString(4), art.GetValueOrDefault(r.GetString(0))), string.IsNullOrWhiteSpace(q) ? Array.Empty<(string, object?)>() : new[] { ("$q", (object?)Like(q!)) });
     }
 
     /// <summary>Albums, optionally filtered. sort = name | year | recent | artist.</summary>

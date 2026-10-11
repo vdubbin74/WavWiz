@@ -48,6 +48,14 @@ public static class LibraryApi
             c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";
             return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");
         }).Req(Role.View);
+        // 0.2.2 T4e: Settings > Library "Online art" status (found / not found / pending) and "Retry missing photos"
+        g.MapGet("/library/online-art", () => Results.Json(s.Art.Online?.Status())).Req(Role.View);
+        g.MapPost("/library/online-art/retry", () =>
+        {
+            var oa = s.Art.Online; if (oa == null || !oa.Enabled) return Ext.Bad("Online art is off (Settings > Library).");
+            var n = oa.RetryMissing(L.Artists().Select(a => a.Name)); s.Events.Publish("art", new { kind = "retry" });
+            return Results.Json(new { ok = true, queued = n });
+        }).Req(Role.Admin);
         g.MapGet("/art/radio/{id:long}", async (long id, int? size, HttpContext c) =>
         {
             var logo = s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string;

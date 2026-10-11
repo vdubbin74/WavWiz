@@ -1,5 +1,5 @@
 import { h, api, toast, fmtTime } from './util.js';
-import { cover, trackArt, artistArt as artistPhoto } from './art.js';
+import { cover, trackArt, artistCover } from './art.js';
 import { icon } from './icons.js';
 import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist } from './ui.js';
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors } from './libsort.js';
@@ -11,7 +11,7 @@ const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', ye
 
 const folderGlyph = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.innerHTML = '<path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l1.8 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>'; return s; };
 /** 0.2.1 F13: round artist photo (MusicBrainz / Wikidata via the server, cached); a generated portrait until / unless one is found. */
-const artistArt = a => cover(artistPhoto(a.name, 384), 'lg rnd', '♪', { portrait: a.name });
+const artistArt = a => artistCover(a.name, a.artTrackIds, 'lg rnd', 384);      // 0.2.2 T4d: photo, else album covers, else generated portrait
 /** 0.2.1 F13: "Artist · 2021" under album tiles. */
 export const albumSub = al => [al.artist, al.year || null].filter(Boolean).join(' · ');
 /** 0.2.1 F13: album page header color = the cover's dominant color (average of its colorful pixels), applied as --dom. */
@@ -82,7 +82,11 @@ export function libraryView(S, opts = {}) {
     const el = h('li', { class: 'item', onclick: onopen }, cover(art, 'sm' + (rnd ? ' rnd' : ''), glyph, gen), h('div', { class: 't' }, h('div', { class: 't1 ell' }, title), h('div', { class: 't2 ell' }, sub)), extra);
     return ref ? attachItem(S, el, ref, title) : el;
   };
-  const artistRow = a => nameRow(a.name, `${a.albums} album${a.albums === 1 ? '' : 's'} • ${a.tracks} song${a.tracks === 1 ? '' : 's'}`, artistPhoto(a.name, 96), refNode('artist:' + a.name), () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }), '♪', true, null, { portrait: a.name });
+  const artistRow = a => {
+    const el = h('li', { class: 'item', onclick: () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }) }, artistCover(a.name, a.artTrackIds, 'sm rnd', 96),
+      h('div', { class: 't' }, h('div', { class: 't1 ell' }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'} • ${a.tracks} song${a.tracks === 1 ? '' : 's'}`)));
+    return attachItem(S, el, refNode('artist:' + a.name), a.name);
+  };
   const openAlbum = al => push({ title: al.album, kind: 'songs', load: () => tracksPage(al) });
   const albumRow = al => nameRow(al.album, [al.artist, al.year || null, `${al.tracks} song${al.tracks === 1 ? '' : 's'}`].filter(Boolean).join(' • '), trackArt(al.artTrackId, 96), refNode(albumNode(al.artist, al.album)), () => openAlbum(al), '♫', false, heartBtn(S, 'album', albumRef(al.artist, al.album), al.album), { album: al.album, artist: al.artist });
   const playingAlbum = al => { const it = S.now?.item; return !!it && it.album === al.album && (it.albumArtist === al.artist || it.artist === al.artist); };

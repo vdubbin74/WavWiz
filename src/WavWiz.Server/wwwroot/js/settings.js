@@ -82,6 +82,7 @@ export async function openSettings(S, refresh, nav, section) {
       h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } } }, 'Rescan now'),
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
     if (admin) panes.library.push(nasCard());
+    panes.library.push(onlineArtCard(settings, admin));
     panes.library.push(replayGainCard(settings));
     panes.library.push(acoustIdCard(settings));
 
@@ -190,6 +191,38 @@ export async function openSettings(S, refresh, nav, section) {
       h('p', { class: 'small dim' }, key ? 'Key is set — fingerprint lookup is enabled when Chromaprint (fpcalc) is available beside FFmpeg.' : 'No key yet — fingerprint lookup stays off until one is saved.'));
   }
   draw();
+}
+
+/** 0.2.2 T4e: Online art - found / not found / pending counts for artist photos and album covers, "Retry missing photos", the on/off switch
+ * and the sources it uses. The counts refresh every few seconds while the card is open and something is still pending. */
+export function onlineArtCard(settings, admin) {
+  const box = h('div', { class: 'card', id: 'sec-onlineart' }), stat = h('div', { class: 'oastat', 'aria-live': 'polite' });
+  const on = settings['library.onlineArt'] !== false && settings['library.onlineArt'] !== 'false';
+  let timer = 0;
+  const line = (label, k) => h('div', { class: 'setrow' }, h('div', { class: 'grow' }, label),
+    h('span', { class: 'oachip ok', title: 'Found' }, `${k.found} found`), h('span', { class: 'oachip', title: 'Not found on any source' }, `${k.notFound} not found`), h('span', { class: 'oachip pend', title: 'Waiting for a lookup or a retry' }, `${k.pending} pending`));
+  async function load() {
+    clearTimeout(timer);
+    let r; try { r = await api('/library/online-art'); } catch (e) { stat.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
+    if (!r) { stat.replaceChildren(h('p', { class: 'small dim' }, 'Online art is not available on this server.')); return; }
+    stat.replaceChildren(onlineArtSummary(r), line('Artist photos', r.artists), line('Album covers', r.albums));
+    if ((r.artists.pending + r.albums.pending) > 0 && r.enabled && box.isConnected !== false) timer = setTimeout(() => { if (box.isConnected) load(); }, 5000);
+  }
+  box.append(h('h3', null, 'Online art'),
+    h('p', { class: 'dim small' }, 'Looks up missing album covers and artist photos on the internet and keeps them on the server PC. Only artist and album names are sent. An artist with no photo shows their album covers instead.'),
+    admin ? h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Look up covers and photos online'),
+      h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: on, 'aria-label': 'Look up covers and photos online', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'library.onlineArt': ev.target.checked } }); toast('Saved'); load(); } catch (e) { toast(e.message, true); } } }), h('span', { 'aria-hidden': 'true' }))) : null,
+    stat,
+    admin ? h('div', { class: 'row', style: 'margin-top:8px;gap:8px' }, h('button', { class: 'btn', id: 'oa-retry', onclick: async () => { try { const r = await api('/library/online-art/retry', { method: 'POST' }); toast(`Looking again for ${r.queued} artist photo${r.queued === 1 ? '' : 's'}.`); load(); } catch (e) { toast(e.message, true); } } }, 'Retry missing photos')) : null,
+    h('p', { class: 'small dim', style: 'margin-top:8px' }, 'Sources: MusicBrainz, Cover Art Archive, Wikidata and Wikimedia Commons, and TheAudioDB (theaudiodb.com). Pictures belong to their owners.'));
+  load();
+  return box;
+}
+/** The one-line summary above the counts. */
+export function onlineArtSummary(r) {
+  if (!r.enabled) return h('p', { class: 'small dim' }, 'Off. Albums without a picture show a generated cover.');
+  const pend = r.artists.pending + r.albums.pending;
+  return h('p', { class: 'small ' + (pend ? 'amber' : 'okc') }, pend ? `Looking up ${pend} picture${pend === 1 ? '' : 's'}. Tiles update by themselves.` : 'Up to date.');
 }
 
 /** 0.1.3: ReplayGain - even out loudness between songs (server side, every zone). */
