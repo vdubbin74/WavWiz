@@ -14,7 +14,13 @@ export function listTable(S, ctl) {
   // 0.1.1: collapse arrow (slides the panel down to its header strip); View state lives on the desk element, saved per device
   const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse or expand the playlist', 'aria-expanded': 'true', title: 'Collapse / expand the playlist', onclick: () => ctl.toggleList?.() }, '˅');
   const setCollapsed = c => { colBtn.textContent = c ? '˄' : '˅'; colBtn.setAttribute('aria-expanded', String(!c)); };
-  const root = h('section', { class: 'listpanel', 'aria-label': 'Playlist' }, h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, colBtn)), wrap);
+  const head = h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, colBtn));
+  const root = h('section', { class: 'listpanel', 'aria-label': 'Playlist' }, head, wrap);
+  /** 0.2.2 T3: hosts the now-playing song block (collapsed control panel) in the title bar. */
+  const setSongBlock = el => { head.insertBefore(el, meta); };
+  /** Left edge of the right-hand header controls (count, Save, Clear, arrow), for lining up the song block. */
+  const rightEdge = () => Math.min(...[meta, btns, colBtn].map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
+  const leftEdge = () => { const r = document.createRange(); r.selectNodeContents(title); return r.getBoundingClientRect().right; };
 
   function applyWidths() { [...colgroup.children].forEach((c, i) => { c.style.width = widths[i] + 'px'; }); table.style.width = widths.reduce((a, b) => a + b, 0) + 'px'; }
   function layout() { const total = Math.max(320, wrap.clientWidth - 2); widths = fitWidths(total, fracs); applyWidths(); }
@@ -55,5 +61,5 @@ export function listTable(S, ctl) {
     const row = tbody.querySelector('tr.cur'); if (row && !wrap.matches(':hover')) row.scrollIntoView({ block: 'nearest' });
   }
   buildHead();
-  return { el: root, draw, widths: () => widths.slice(), relayout: layout, setCollapsed };
+  return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setSongBlock, leftEdge, rightEdge };
 }

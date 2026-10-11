@@ -134,6 +134,7 @@ async function startMain() {
   const dsz = loadDevSize();
   desk = h('div', { class: 'desk' + (localStorage.getItem('wavwiz.libcollapsed') === '1' ? ' libcollapsed' : '') + (dsz === 'collapsed' ? ' devcollapsed' : dsz === 'expanded' ? ' devexpanded' : '') + (localStorage.getItem('wavwiz.listcollapsed') === '1' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
   listt.setCollapsed?.(desk.classList.contains('listcollapsed'));
+  wireSongBlock();
   tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
@@ -149,6 +150,29 @@ async function startMain() {
 }
 function toggleLib(force) { const c = force ?? !desk.classList.contains('libcollapsed'); desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ } const b = libpanel.querySelector('.plus'); b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); if (!c) libC.reload(); }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
+/** 0.2.2 T3: with the Now Playing panel collapsed, the song block sits in the Playlist title bar, lined up with the control panel column
+ *  (thumbnail at the column's left edge, progress ending at its right edge), never running into PLAYLIST or the right-hand controls. */
+function wireSongBlock() {
+  const sb = nowc.songBlock; if (!sb || !listt.setSongBlock) return;
+  listt.setSongBlock(sb);
+  let raf = 0;
+  const place = () => {
+    raf = 0;
+    const on = nowc.ctlPanel.classList.contains('collapsed');
+    desk.classList.toggle('npcollapsed', on); sb.hidden = !on;
+    if (!on || !desk.isConnected || window.matchMedia('(max-width:900px)').matches) return;
+    const col = nowc.ctlPanel.getBoundingClientRect(), hd = listt.head.getBoundingClientRect();
+    if (!col.width) return;
+    const l = Math.max(col.left, listt.leftEdge() + 14), r = Math.min(col.right, listt.rightEdge() - 14);
+    sb.style.left = Math.round(l - hd.left) + 'px'; sb.style.width = Math.max(0, Math.round(r - l)) + 'px';
+    sb.classList.toggle('tight', r - l < 260);
+  };
+  const later = () => { if (!raf) raf = requestAnimationFrame(place); };
+  const ro = new ResizeObserver(later); ro.observe(nowc.ctlPanel); ro.observe(listt.head); ro.observe(desk);
+  window.addEventListener('resize', later); window.addEventListener('wavwiz:npcollapsed', () => { later(); setTimeout(later, 360); });
+  new MutationObserver(ms => { if (ms.some(m => !sb.contains(m.target))) later(); }).observe(listt.head, { childList: true, subtree: true, characterData: true });
+  later();
+}
 function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); try { localStorage.setItem('wavwiz.listcollapsed', c ? '1' : '0'); } catch { /* ignore */ } listt.setCollapsed?.(c); if (!c) setTimeout(() => listt.relayout?.(), 340); }
 /** 0.2.0 item 27 / 0.2.1 F1: the Devices panel is Collapsed (46 px strip) / Standard / Expanded (card grid over the Now Playing column, with
  * the full-width Now Playing bar). Like the Library: the arrow (and Devices > Devices & zones) collapses / opens it; toggleDev(true/false)

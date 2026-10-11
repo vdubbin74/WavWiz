@@ -1222,3 +1222,59 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .oachip{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);font-size:12px;color:var(--dim)}
 .oachip.ok{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 45%,var(--line))}
 .oachip.pend{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+/* 0.2.2 T3 (final): collapsed control panel = one-line strip with every control; Play/Pause on the exact center line */
+.np-strip{display:none}
+.np-ctlpanel.collapsed .np-ctlnow{display:none}
+.np-ctlpanel.collapsed > .pane-h{position:relative;min-height:44px}
+.np-ctlpanel.collapsed .np-strip{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:8px;position:absolute;inset:0;pointer-events:none;padding:0 46px 0 0;padding-left:46px;text-transform:none;letter-spacing:0;font-weight:400}
+.np-strip > div{display:inline-flex;align-items:center;gap:6px;min-width:0;pointer-events:auto}
+.np-strip-l{justify-self:end} .np-strip-r{justify-self:start} .np-strip-c{justify-self:center}
+.np-strip .tbtn{width:28px;height:28px;flex:none;padding:0;border-radius:50%;color:var(--ink);background:var(--panel2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center}
+.np-strip .tbtn:hover{border-color:var(--accent)}
+.np-strip .tbtn.tog.on{color:var(--accent);border-color:var(--accent)}
+.np-strip .tbtn.tog.on::after{display:none}
+.np-strip .tbtn.play{width:34px;height:34px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 2px var(--accent-soft);animation:none}
+.np-strip .tbtn .ic svg{width:14px;height:14px} .np-strip .tbtn.play .ic svg{width:16px;height:16px}
+.np-strip .np-heartslot{display:inline-flex}
+.np-strip .np-heartslot > *{width:28px;height:28px}
+.np-strip-vol{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.np-strip-vol > .ic svg{width:15px;height:15px;color:var(--accent2)}
+.np-strip-vol input[type=range]{width:clamp(48px,calc(50cqw - 300px),120px);min-width:0}
+.np-strip-vol .volpct{font-size:12px;font-family:var(--mono);color:var(--ink);min-width:2.6em;text-align:right}
+.np-strip .np-vol,.np-strip .np-volbtn{flex:none}
+/* the NOW PLAYING title gives way to the strip when the column is narrow */
+@container npctl (max-width:760px){ .np-strip-vol .volpct{display:none} .np-strip-vol input[type=range]{width:clamp(48px,calc(50cqw - 262px),120px)} }
+@container npctl (max-width:540px){ .np-ctlpanel.collapsed .np-ctltitle{visibility:hidden} }
+@container npctl (max-width:580px){ .np-strip-vol > .ic{display:none} .np-strip > div,.np-strip-vol{gap:4px} .np-ctlpanel.collapsed .np-strip{column-gap:5px;padding-right:40px} .np-strip .tbtn,.np-strip .np-heartslot > *{width:24px;height:24px} .np-strip .tbtn.play{width:30px;height:30px} }
+.np-ctlpanel{container:npctl / inline-size}
+@media (max-width:900px){ .np-ctlpanel.collapsed .np-strip{column-gap:4px} .np-strip-vol{display:none} .np-ctlpanel.collapsed .np-ctltitle{display:none} }
+/* T3: song block in the Playlist title bar (only while the control panel is collapsed); bar grows to ~42px */
+.listpanel > .pane-h{position:relative}
+.plsong{display:none}
+.desk.npcollapsed .listpanel > .pane-h{min-height:42px}
+.desk.npcollapsed .plsong:not([hidden]){display:flex;align-items:center;gap:10px;position:absolute;top:0;bottom:0;min-width:0;text-transform:none;letter-spacing:0;font-weight:400}
+.plsong .ps-art .cover{width:32px;height:32px;border-radius:5px;flex:none}
+.plsong .ps-art{flex:none;display:inline-flex}
+.plsong .ps-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.plsong .ps-titles{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:13px;line-height:1.2}
+.plsong .ps-t1{font-weight:700;color:var(--ink);min-width:0;flex:0 1 auto}
+.plsong .ps-t2{color:var(--accent2);min-width:0;flex:0 1 auto}
+.plsong .ps-t2:empty,.plsong .ps-t2:empty ~ *{display:none}
+.plsong .ps-titles .ps-dot{color:var(--dim)}
+.plsong .ps-t2:empty + .ps-dot,.plsong .ps-dot:has(+ .ps-t2:empty){display:none}
+.plsong .ps-seek{display:flex;align-items:center;gap:8px;font-size:11px;font-family:var(--mono)}
+.plsong .ps-elv{color:var(--accent);font-weight:600;flex:none}
+.plsong .ps-dur{color:var(--dim);flex:none}
+.plsong .prog{flex:1;height:12px;position:relative;cursor:pointer;min-width:30px}
+.plsong .prog .bar{position:absolute;left:0;right:0;top:5px;height:3px;border-radius:2px;background:var(--line);border:0}
+.plsong .prog .fill{position:absolute;left:0;top:5px;height:3px;border-radius:2px;background:var(--accent)}
+.plsong .prog .knob{position:absolute;top:1px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.plsong.tight .ps-t2,.plsong.tight .ps-dot{display:none}
+.desk.listcollapsed .listpanel .pane-h .plsong .ps-elv,.desk.listcollapsed .listpanel .pane-h .plsong .ps-dur{display:inline}
+.desk.npcollapsed.listcollapsed .listpanel .pane-h{min-height:42px}
+@media (max-width:900px){ .desk.npcollapsed .plsong{display:none!important} .desk.npcollapsed .listpanel > .pane-h{min-height:0} }
+/* 0.2.2: hidden mosaic must not cover the portrait while album covers load */
+.acover .amosaic[hidden]{display:none}
+.desk.npcollapsed.listcollapsed{--listh:44px}
+.np-ctlpanel.collapsed > .pane-h > .np-strip{background:none;border:0;box-shadow:none}
+.np-ctlpanel.collapsed > .pane-h > .np-ctltitle,.np-ctlpanel.collapsed > .pane-h > .listcolwrap{position:relative;z-index:1}

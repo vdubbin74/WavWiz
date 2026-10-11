@@ -143,7 +143,7 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
 
 test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song line) and the collapse arrow; no status chips or live dot', () => {
   const n = src('now.js');
-  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, h\('span', \{ class: 'grow' \}\), h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
+  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
   assert.match(n, /h\('div', \{ class: 'np-vol' \}, eqBtn\)\)\)/);
 });
