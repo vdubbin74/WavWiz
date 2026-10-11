@@ -1436,3 +1436,7 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .devpanel .devbody{container:devbody / inline-size}
 @container devbody (min-width:300px){.drow .dvol .dexp-l{display:inline}}
 @media (prefers-reduced-motion:reduce){.dexpand svg{transition:none}.dcard.dset .dsettings,.drow.dset .dsettings{animation:none}}
+
+/* 0.2.3 fix: the live chips / warning slot of a device card adds no box of its own; an open card rebuilt in place does not replay the slide-in */
+.dlive{display:contents}
+.dcard.dsnoanim .dsettings,.drow.dsnoanim .dsettings{animation:none}

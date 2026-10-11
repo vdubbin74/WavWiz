@@ -1,7 +1,7 @@
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
 import { openEq } from './eq.js';
-import { latencyControl } from './latency.js';
+import { latencyControl, clampMs } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
 import { icon, setIcon } from './icons.js';
@@ -220,6 +220,7 @@ export function settingsToggle(name, open, onToggle) {
 function toggleSettings(z, el, render) {
   setCardOpen(z.id, !openSet.has(z.id));
   const fresh = render(); el.replaceWith(fresh); fresh.querySelector('.dexpand')?.focus();
+  flushSoon();          // a redraw that waited for this card applies now
   return fresh;
 }
 /** A redraw (the list refreshes every few seconds) must not drop keyboard focus from a card's Expand control, or Esc would stop closing it. */
@@ -234,34 +235,116 @@ function escCloses(el, z, close) {
   el.addEventListener('keydown', ev => { if (ev.key === 'Escape' && openSet.has(z.id) && !ev.defaultPrevented) { ev.preventDefault(); ev.stopPropagation(); close(); } });
   return el;
 }
+// ---- 0.2.3 fix: an open device card no longer "keeps refreshing" ----
+// The Devices list is redrawn on every status / level / heartbeat push (refreshZones). Until now every redraw rebuilt every card, so an open
+// card's settings were thrown away and re-created every few seconds: the slide-in animation replayed, focus, typed delay values, a slider drag
+// in progress and the scroll spot were lost. Now each card / row carries a signature of what shapes it (name, outputs, rights, open state…);
+// a redraw keeps the SAME element when the signature is unchanged and only patches the live values in it (dot, state, volume, mute, on/off,
+// delay, connection), never touching an input that has focus or sits under the pointer. A card whose shape did change is rebuilt only when the
+// user is not working in it; otherwise the rebuild waits for blur / pointerup / collapse. A removed device still goes at once.
+let dragEl = null;
+const redrawers = new Set();
+const flushSoon = () => setTimeout(() => { for (const f of redrawers) f(); }, 30);
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('pointerdown', ev => { dragEl = ev.target; }, true);
+  const up = () => { if (!dragEl) return; dragEl = null; flushSoon(); };
+  document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
+  document.addEventListener('focusout', flushSoon, true);
+  globalThis.addEventListener?.('blur', up);
+}
+const EDITABLE = /^(INPUT|SELECT|TEXTAREA)$/;
+/** Is the user working inside el right now (focus in a field / slider / dropdown, or a pointer held down in it)? */
+export function userBusyIn(el) {
+  if (!el) return false;
+  const a = document.activeElement;
+  if (a && EDITABLE.test(a.tagName || '') && el.contains(a)) return true;
+  return !!(dragEl && el.contains(dragEl));
+}
+/** May a live value be written into this control (it has no focus and is not being dragged)? */
+const idle = el => !!el && document.activeElement !== el && !(dragEl && el.contains(dragEl));
+/** Put kids into parent in order, keeping every element that is already there in place (a moved node would lose focus / an active drag). */
+export function reconcile(parent, kids) {
+  kids = kids.flat(Infinity).filter(Boolean);
+  const want = new Set(kids);
+  for (const c of [...parent.childNodes]) if (!want.has(c)) c.remove();
+  kids.forEach((k, i) => { const at = parent.childNodes[i]; if (at !== k) parent.insertBefore(k, at || null); });
+}
+/** What shapes a card / row (anything else is a live value that is patched in place). */
+export function cardSig(S, z, hl = false) {
+  return JSON.stringify([z.name, z.playerId, !!z.mine, !!z.reference, !!z.isWeb, thisDevice(S)?.id === z.id, isAdmin(S), canControl(S), canTune(S, z), openSet.has(z.id), !!hl, !!z.connected,
+    z.badge === 'recheck' || z.badge === 'uncalibrated' ? z.badge : '', !!z.outputUnavailable, z.chosenDeviceId ?? null,
+    (z.outputs || []).map(o => [o.endpointDbId, o.deviceId, o.kind, o.name, !!o.connected, !!o.active, !!o.notCalibrated])]);
+}
+/** Keep the old card / row (patched) when it still fits or the user is working in it; else build a new one. busy.v = a rebuild is waiting. */
+function keepCard(old, S, z, hl, build, busy) {
+  if (old && old._sig === cardSig(S, z, hl)) { old._patch?.(z); return old; }
+  if (old && userBusyIn(old)) { old._patch?.(z); busy.v = true; return old; }
+  const el = build();
+  if (old?.classList.contains('dset')) el.classList.add('dsnoanim');      // already open: do not replay the slide-in
+  return el;
+}
+/** Keep a section (master row, zones sidebar) while the user is working in it; else take the fresh one. */
+function keepSection(old, fresh, busy) {
+  if (old && userBusyIn(old)) { busy.v = true; return old; }
+  return fresh;
+}
+const childCards = (parent, cls) => new Map([...parent.children].filter(e => e.classList.contains(cls) && e.dataset.zoneId != null).map(e => [e.dataset.zoneId, e]));
+function patchVolume(z, vol, pct, mute) {
+  if (idle(vol)) { vol.value = String(z.volume); pct.textContent = Math.round(z.volume) + '%'; }
+  mute.classList.toggle('on', !!z.muted); mute.setAttribute('aria-pressed', String(!!z.muted)); mute.setAttribute('aria-label', (z.muted ? 'Unmute ' : 'Mute ') + z.name);
+  mute.title = z.muted ? 'Unmute' : 'Mute'; setIcon(mute, z.muted ? 'mute' : 'volume');
+}
+function patchFace(el, z, dot, state, sw) {
+  el.classList.toggle('off', !z.enabled);
+  dot.className = 'dot ' + dotClass(z); dot.title = stateText(z);
+  state.className = 'dstate small' + (z.muted ? ' err' : ' dim'); state.textContent = stateText(z);
+  sw.classList.toggle('on', !!z.enabled); sw.setAttribute('aria-checked', String(!!z.enabled));
+}
+
 function cardSettings(S, ctl, z) {
   const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z), r = z.room;
   const testSound = async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } };
   const sec = (title, ...kids) => h('div', { class: 'dssec' }, h('div', { class: 'dlbl' }, title), ...kids);
   const btn = (label, fn, ok = true, hint = OWN_HINT, cls = 'btn') => ro(h('button', { type: 'button', class: cls, onclick: fn }, label), ok, hint);
-  const conn = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' ? 'Network cable' : z.link, z.remoteIp].filter(Boolean).join(' · ');
-  const sync = z.syncErrorMs != null ? `Sync error ${z.syncErrorMs.toFixed(1)} ms · buffer ${Math.round(z.bufferMs ?? 0)} ms · re-syncs ${z.hardResyncs ?? 0}` : z.isWeb ? 'A browser cannot measure its own sync error - set the delay by ear.' : 'Sync error shows once something plays.';
-  return h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
+  const delay = cur ? exactDelay(S, ctl, z, cur, tune) : null, conn = connSection(z);
+  const el = h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
     sec('SOUND CHECK',
       h('div', { class: 'row wrap dsbtns' },
         btn(z.isWeb ? 'Set delay by ear' : '🎤 Calibrate', () => openCalibration(S, ctl.refreshAll, z.id), tune && z.connected, tune ? 'This device is offline.' : OWN_HINT, 'btn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : '')),
         btn('🔔 Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.')),
       h('div', { class: 'small dim' }, z.badge === 'recheck' ? 'The delay needs a re-check.' : z.badge === 'uncalibrated' ? 'The delay is not set yet.' : 'Test sound plays a short chime on this device only.')),
-    cur ? sec('DELAY (EXACT)', exactDelay(S, ctl, z, cur, tune)) : null,
+    cur ? sec('DELAY (EXACT)', delay) : null,
     sec('SOUND',
       h('div', { class: 'row wrap dsbtns' },
         btn('Sound / EQ…', () => openEq(S, ctl.refreshAll, cur?.deviceId), tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
         btn('Delay history…', () => delayHistory(S, ctl, z, cur), !!cur, 'No output yet.'),
         cur?.kind === 'bluetooth' ? btn('📌 Follow this speaker', async () => { try { await api('/speakers/profiles/capture', { method: 'POST', body: { deviceId: z.id, name: cur.name, follow: true } }); toast('Saved profile and enabled Follow this speaker'); } catch (e) { toast(e.message, true); } }, tune) : null)),
-    sec('CONNECTION',
-      h('div', { class: 'row wrap' }, r ? h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state) : null, h('span', { class: 'small' }, conn)),
-      h('div', { class: 'small dim' }, sync),
-      r && (r.drops || r.reconnects || r.underrunEvents) ? h('div', { class: 'small dim' }, `Dropped ${r.drops}× · reconnected ${r.reconnects}× · ran dry ${r.underrunEvents}×`) : null),
+    conn,
     sec('DEVICE',
       h('div', { class: 'row wrap dsbtns' },
         btn('Rename…', () => rename(S, ctl, z), admin, ADMIN_HINT),
         btn(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, z.reference ? 'Already the reference speaker' : ADMIN_HINT),
         btn('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'btn danger'))));
+  // 0.2.3 fix: live values are patched in place - the open settings are never rebuilt by a status update
+  el._patch = nz => {
+    const o = chosenOutput(nz);
+    if (delay && o) delay._patch(o);
+    const key = connKey(nz); if (conn._key !== key) { const fresh = connSection(nz); conn.replaceChildren(...fresh.childNodes); conn._key = key; }
+  };
+  return el;
+}
+const connKey = z => JSON.stringify([z.connected, z.link, z.remoteIp, z.syncErrorMs, z.bufferMs, z.hardResyncs, z.isWeb, z.room?.state, z.room?.drops, z.room?.reconnects, z.room?.underrunEvents]);
+/** The CONNECTION section of a card's settings (text only - safe to refresh in place). */
+function connSection(z) {
+  const r = z.room;
+  const conn = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' ? 'Network cable' : z.link, z.remoteIp].filter(Boolean).join(' · ');
+  const sync = z.syncErrorMs != null ? `Sync error ${z.syncErrorMs.toFixed(1)} ms · buffer ${Math.round(z.bufferMs ?? 0)} ms · re-syncs ${z.hardResyncs ?? 0}` : z.isWeb ? 'A browser cannot measure its own sync error - set the delay by ear.' : 'Sync error shows once something plays.';
+  const el = h('div', { class: 'dssec dsconn' }, h('div', { class: 'dlbl' }, 'CONNECTION'),
+    h('div', { class: 'row wrap' }, r ? h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state) : null, h('span', { class: 'small' }, conn)),
+    h('div', { class: 'small dim' }, sync),
+    r && (r.drops || r.reconnects || r.underrunEvents) ? h('div', { class: 'small dim' }, `Dropped ${r.drops}× · reconnected ${r.reconnects}× · ran dry ${r.underrunEvents}×`) : null);
+  el._key = connKey(z);
+  return el;
 }
 /** Slider + ms box for typing an exact delay (0.0.8 item 7; was in the Details pop-up). Live while dragging, saved on release. */
 function exactDelay(S, ctl, z, o, tune) {
@@ -269,7 +352,10 @@ function exactDelay(S, ctl, z, o, tune) {
   const status = h('span', { class: 'small dim latstatus', 'aria-live': 'polite' });
   const lat = latencyControl({ value: o.notCalibrated ? 0 : o.latencyMs, onChange: async (v, final) => { try { await put(v, !final); status.textContent = final ? `Saved ${v} ms` : `${v} ms (live)`; } catch (e) { status.textContent = ''; toast(e.message, true); } } });
   if (!tune) lat.el.querySelectorAll('input').forEach(i => ro(i, false, OWN_HINT));
-  return h('div', null, lat.el, status);
+  const el = h('div', null, lat.el, status);
+  // 0.2.3 fix: the saved delay is shown live, but never under a focused / dragged slider or a box the user is typing in
+  el._patch = no => { const v = clampMs(no.notCalibrated ? 0 : no.latencyMs); if (v !== lat.value && idle(lat.slider) && idle(lat.box)) lat.set(v); };
+  return el;
 }
 async function delayHistory(S, ctl, z, o) {
   if (!o) return;
@@ -312,11 +398,21 @@ function outputAndDelay(S, ctl, z) {
     onchange: ev => put(+ev.target.value, false) });
   async function put(v, live) { if (!cur) return; try { await api(`/outputs/${encodeURIComponent(cur.deviceId)}/latency`, { method: 'PUT', body: { latencyMs: v, playerId: z.playerId, method: 'manual', live } }); if (!live) toast(`Delay ${v} ms saved for ${outputLabel(cur)}`); } catch (e) { toast(e.message, true); } }
   ro(sl, can && !!cur, cur ? hint : 'No output yet.');
-  return [h('div', { class: 'dlbl' }, 'OUTPUT'), outEl,
+  const els = [h('div', { class: 'dlbl' }, 'OUTPUT'), outEl,
     h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'DELAY'), val), sl, h('div', { class: 'dscale small dim' }, h('span', null, '0'), h('span', null, '1000 ms'))];
+  // 0.2.3 fix: live delay values are patched in place (not while the slider / dropdown is in use)
+  els.patch = nz => {
+    const c = chosenOutput(nz);
+    if (c && idle(sl)) { const v = c.notCalibrated ? 0 : Math.round(c.latencyMs); sl.value = String(Math.min(1000, v)); val.textContent = c.notCalibrated ? 'not set' : v + ' ms'; }
+    if (outEl.tagName === 'SELECT' && idle(outEl)) for (const op of outEl.options || outEl.querySelectorAll('option')) {
+      const o = nz.outputs.find(x => String(x.endpointDbId) === op.value); if (o) op.textContent = `${outputLabel(o)} — ${dms(o)}${o.connected || z.outputUnavailable ? '' : ' (unplugged)'}`;
+    }
+  };
+  return els;
 }
 
 function expandedCard(S, ctl, z, hl) {
+  z = { ...z };           // this card's own copy: later updates patch it in place
   const open = openSet.has(z.id);
   const cls = 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : '') + (open ? ' dset' : '');
   let card;
@@ -324,35 +420,54 @@ function expandedCard(S, ctl, z, hl) {
   const { vol, pct, mute } = volumeRow(S, ctl, z);
   const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
   // 0.2.1 F18: no Calibrate / Test sound buttons on the card face - a small status chip opens the card's settings when the delay needs attention
-  const chips = [];
-  if (!open && canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
-  if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
+  const liveBits = () => {
+    const chips = [];
+    if (!open && canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
+    if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
+    return [chips.length ? h('div', { class: 'chips' }, chips) : null,
+      z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null].filter(Boolean);
+  };
+  const liveKey = () => JSON.stringify([z.health === 'starved', z.connected && z.room && z.room.state !== 'ok' && z.room.state !== 'idle' ? [z.room.text, z.room.detail] : null]);
+  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), state = h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), sw = onSwitch(S, ctl, z);
+  const od = outputAndDelay(S, ctl, z), live = h('div', { class: 'dlive' }, liveBits()), settings = open ? cardSettings(S, ctl, z) : null;
+  let lk = liveKey();
   card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
     // name gets its own line so it never truncates to "C…" next to the badges and switch
-    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), h('b', { class: 'dname ell grow', title: z.name }, z.name), onSwitch(S, ctl, z)),
-    h('div', { class: 'dsub' }, ...badges(S, z), h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z))),
+    h('div', { class: 'dtop' }, dot, h('b', { class: 'dname ell grow', title: z.name }, z.name), sw),
+    h('div', { class: 'dsub' }, ...badges(S, z), state),
     h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'VOLUME'), pct), h('div', { class: 'dvol' }, icon('volume'), vol, mute),
-    ...outputAndDelay(S, ctl, z),
-    chips.length ? h('div', { class: 'chips' }, chips) : null,
-    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null,
+    ...od,
+    live,
     h('div', { class: 'dexpbar' }, expBtn),
-    open ? cardSettings(S, ctl, z) : null);
+    settings);
+  card._sig = cardSig(S, z, hl);
+  card._patch = nz => {            // 0.2.3 fix: a status / level / heartbeat update patches this card in place
+    Object.assign(z, nz);
+    patchFace(card, z, dot, state, sw); patchVolume(z, vol, pct, mute); od.patch(z);
+    const k = liveKey(); if (k !== lk) { lk = k; live.replaceChildren(...liveBits()); }
+    settings?._patch(z);
+  };
   return escCloses(card, z, flip);
 }
 
 function standardRow(S, ctl, z, openDevice) {
+  z = { ...z };           // this row's own copy: later updates patch it in place
   const open = openSet.has(z.id);
   let row;
   const flip = () => { row = toggleSettings(z, row, () => standardRow(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, openDevice)); };
   const { vol, pct, mute } = volumeRow(S, ctl, z);
   const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
+  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), state = h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), sw = onSwitch(S, ctl, z);
+  const settings = open ? cardSettings(S, ctl, z) : null;
   row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : '') + (open ? ' dset' : ''), 'data-device': z.name, 'data-zone-id': z.id },
-    h('div', { class: 'dtop' }, h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }),
+    h('div', { class: 'dtop' }, dot,
       h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls', onclick: () => openDevice(z.id) }, z.name), ...badges(S, z, true),
-      h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), h('span', { class: 'grow' }), onSwitch(S, ctl, z)),
+      state, h('span', { class: 'grow' }), sw),
     outputLine(z),
     h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute, expBtn),
-    open ? cardSettings(S, ctl, z) : null);
+    settings);
+  row._sig = cardSig(S, z);
+  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); settings?._patch(z); };   // 0.2.3 fix
   return escCloses(row, z, flip);
 }
 
@@ -382,38 +497,51 @@ export function devicesPanel(S, ctl) {
   };
   // 0.2.3 U11: a skipped redraw used to be dropped, so a device removed (revoked/forgotten) while a slider, menu or zone editor was open stayed on the
   // list until some later change. Now a skipped redraw is retried until it can run - except that a removed device is never kept: it goes at once.
+  // 0.2.3 fix: a redraw no longer rebuilds the list. Cards / rows are kept and patched in place (keepCard); a card the user is working in is never
+  // replaced - its rebuild waits for blur / pointerup / collapse (later + flush). A removed device's card goes at once, the others stay untouched.
   let pending = 0;
   const later = () => { clearTimeout(pending); pending = setTimeout(() => { pending = 0; draw(); }, 700); };
   const removedShown = () => [...body.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
+  redrawers.add(() => { if (pending) { clearTimeout(pending); pending = 0; draw(); } });
+  const kid = (parent, cls) => [...parent.children].find(e => e.classList.contains(cls));
   function draw(force) {
     if (!force && removedShown()) force = true;
-    if (!force && body.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();   // do not fight the user's finger
     if (!force && body.querySelector('.dmenu')) return later();
-    if (!force && document.activeElement?.closest?.('.dsettings') && document.activeElement.tagName === 'INPUT' && body.contains(document.activeElement)) return later();   // 0.2.3 U12: typing an exact delay in an open card
-    if (!force && size === 'expanded' && zedit !== null) return later();          // F19: never redraw a zone's settings under the user's typing
     clearTimeout(pending); pending = 0; keepExpandFocus(body);
+    const busy = { v: false };
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
     if (size === 'expanded') {
       // 0.2.1 F7: master volume keeps the full-width strip; zones move to the ~180 px sidebar on the right (variant B) and filter the cards
       if (zpick !== 'all' && !(S.groups || []).some(g => g.id === zpick)) zpick = 'all';
       const shown = zoneFilter(S.zones, S.groups, zpick);
-      body.replaceChildren(h('div', { class: 'dexp-top' }, masterRow(S, ctl)),
-        h('div', { class: 'dexp-main' },
-          S.zones.length ? (shown.length ? h('div', { class: 'dgrid' }, shown.map(z => expandedCard(S, ctl, z, z.id === hl))) : h('p', { class: 'dim small pad' }, 'No devices in this zone yet. Use ⚙ next to the zone to add some.')) : h('p', { class: 'dim small pad' }, EMPTY),
-          zonesSidebar(S, ctl, zpick, setPick, zedit, setEdit)));
+      const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main' });
+      reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy)]);
+      let content;
+      if (S.zones.length && shown.length) {
+        const grid = kid(emain, 'dgrid') || h('div', { class: 'dgrid' }), old = childCards(grid, 'dcard');
+        reconcile(grid, shown.map(z => keepCard(old.get(String(z.id)), S, z, z.id === hl, () => expandedCard(S, ctl, z, z.id === hl), busy)));
+        content = grid;
+      } else content = S.zones.length ? h('p', { class: 'dim small pad' }, 'No devices in this zone yet. Use ⚙ next to the zone to add some.') : h('p', { class: 'dim small pad' }, EMPTY);
+      // F19: never redraw a zone's settings under the user's typing - the zone editor is kept until it is closed (or a device is removed)
+      const oldSide = kid(emain, 'zside');
+      const side = !force && size === 'expanded' && zedit !== null && oldSide ? oldSide : keepSection(oldSide, zonesSidebar(S, ctl, zpick, setPick, zedit, setEdit), busy);
+      reconcile(emain, [content, side]);
+      reconcile(body, [etop, emain]);
+      if (busy.v) later();
       return;
     }
-    const un = unassigned(S.zones, S.groups || []);
-    body.replaceChildren(masterRow(S, ctl),
-      S.zones.length ? S.zones.map(z => standardRow(S, ctl, z, id => ctl.setDevSize?.('expanded', id))) : h('p', { class: 'dim small pad' }, EMPTY),
+    const un = unassigned(S.zones, S.groups || []), old = childCards(body, 'drow');
+    reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy),
+      S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => standardRow(S, ctl, z, id => ctl.setDevSize?.('expanded', id)), busy)) : h('p', { class: 'dim small pad' }, EMPTY),
       h('div', { class: 'pane-h' }, h('span', null, 'ZONES'), h('span', { class: 'grow' }), ro(h('button', { class: 'plus zbtn', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), isAdmin(S))),
       (S.groups || []).length ? S.groups.map(g => h('div', { class: 'zrow2' + (g.active ? ' active' : ''), 'data-zone': g.name },
         ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), canControl(S), 'Your access is view-only.'),
         g.active ? h('span', { class: 'badge-active' }, 'ACTIVE') : null, h('span', { class: 'small dim' }, `${g.members} device${g.members === 1 ? '' : 's'}`)))
         : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”. An administrator can create one to switch several devices on together.'),
       un.length && (S.groups || []).length ? [h('div', { class: 'pane-h' }, h('span', null, 'UNASSIGNED'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, String(un.length))),
-        un.map(z => h('div', { class: 'urow' }, h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell grow' }, z.name), h('span', { class: 'small dim' }, stateText(z))))] : null);
+        un.map(z => h('div', { class: 'urow' }, h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell grow' }, z.name), h('span', { class: 'small dim' }, stateText(z))))] : null]);
+    if (busy.v) later();
   }
   setSize(size);
   return { el: root, draw, setSize, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
@@ -425,16 +553,19 @@ export function devicesView(S, ctl) {
   root.append(h('h2', { class: 'pagetitle' }, 'Devices & zones'), top, list, foot);
   let pending = 0;      // 0.2.3 U11: same rule as the side panel - retry a skipped redraw, never keep a removed device on screen
   const later = () => { clearTimeout(pending); pending = setTimeout(() => { pending = 0; draw(); }, 700); };
+  redrawers.add(() => { if (pending) { clearTimeout(pending); pending = 0; draw(); } });
   function draw() {
     const gone = [...list.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
-    if (!gone && root.contains(document.activeElement) && (document.activeElement.type === 'range' || document.activeElement.tagName === 'SELECT')) return later();
     if (!gone && root.querySelector('.dmenu')) return later();
     clearTimeout(pending); pending = 0; keepExpandFocus(list);
-    top.replaceChildren(masterRow(S, ctl), zonesStrip(S, ctl, false));
-    list.replaceChildren(...(S.zones.length ? S.zones.map(z => expandedCard(S, ctl, z, false)) : [h('div', { class: 'card' }, h('h3', null, 'No devices yet'), h('p', { class: 'dim' }, EMPTY))]));
+    const busy = { v: false };      // 0.2.3 fix: cards are kept and patched in place, exactly like the side panel
+    reconcile(top, [keepSection(top.children[0], masterRow(S, ctl), busy), zonesStrip(S, ctl, false)]);
+    const old = childCards(list, 'dcard');
+    reconcile(list, S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => expandedCard(S, ctl, z, false), busy)) : [h('div', { class: 'card' }, h('h3', null, 'No devices yet'), h('p', { class: 'dim' }, EMPTY))]);
     const live = S.zones.some(z => z.enabled && z.connected);
     foot.replaceChildren(h('span', { class: 'dot ' + (live ? 'ok' : 'warn') }), live ? 'Synced playback active' : 'No device is switched on and connected', h('span', { class: 'grow' }),
       canControl(S) ? h('button', { class: 'btn', onclick: () => openCalibration(S, ctl.refreshAll) }, '🎤 Calibrate') : null);
+    if (busy.v) later();
   }
   return { el: root, draw };
 }
