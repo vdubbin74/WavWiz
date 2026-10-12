@@ -38,17 +38,16 @@ test('0.2.2 T4e: Settings > Library has the Online art card (counts, switch, Ret
 
 test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expanded -> normal -> collapsed); same labels; accent title', async () => {
   const d = await imp('devices');
-  assert.equal(d.arrowSize('expanded'), 'standard'); assert.equal(d.arrowSize('standard'), 'collapsed'); assert.equal(d.arrowSize('collapsed'), 'standard');
+  assert.equal(d.arrowSize('expanded'), 'collapsed'); assert.equal(d.arrowSize('standard'), 'collapsed');   // 0.3.0 §6 assert.equal(d.arrowSize('collapsed'), 'standard');
   assert.equal(d.expandSize('collapsed'), 'expanded');
   for (const w of ['Library', 'Devices']) {
-    assert.equal(d.arrowLabel(w, 'collapsed'), `Open the ${w} panel`); assert.equal(d.arrowLabel(w, 'standard'), `Collapse the ${w} panel`);
-    assert.equal(d.arrowLabel(w, 'expanded'), 'Back to the normal layout'); assert.equal(d.expandLabel(w, false), `Expand the ${w} panel`);
+    assert.equal(d.arrowLabel(w, 'collapsed'), `Open the ${w} panel`); assert.equal(d.arrowLabel(w, 'standard'), `Fold the ${w} panel to a rail`);
+    assert.equal(d.arrowLabel(w, 'expanded'), `Fold the ${w} panel to a rail`); assert.equal(d.expandLabel(w, false), `Expand the ${w} panel`);
   }
   const s = src('devices.js'), m = src('main.js');
-  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)\)/);   // 0.2.3 U7: title at the right edge
-  assert.match(m, /h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
-  assert.match(m, /if \(force === undefined && exp\) \{ toggleLibExpanded\(false\); return; \}/);
-  assert.match(m, /setDevSize\(arrowSize\(devp\.size\)\)/);
+  // 0.3.0 §6: mirror kept, two controls apart: chevron on the outer edge, expand on the inner edge
+  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\), colBtn\)/);
+  assert.match(m, /h\('div', \{ class: 'pane-h' \}, colBtn, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), expBtn\)/);
   assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);
   assert.doesNotMatch(css, /\.desk\.libexpanded \.libpanel \.pane-h \.plus:not\(\.libexp\)\{display:none\}/);
 });
@@ -57,7 +56,7 @@ test('0.2.2 T8: Menu > Devices > Devices & zones always opens the EXPANDED Devic
   const mn = src('menu.js'), m = src('main.js');
   assert.match(mn, /const devPanel = \(\) => \(desktop && wideNow\(\) && ctl\.toggleDevExpanded \? ctl\.toggleDevExpanded\(true\) : go\('devices'\)\)/);
   assert.match(m, /if \(k === 'devices'\) \{ if \(pageDlg\) \{ pageDlg\.close\(\); pageDlg = null; \} toggleDevExpanded\(true\); return; \}/);
-  assert.match(m, /if \(sz !== 'collapsed' && desk\.classList\.contains\('libexpanded'\)\) toggleLibExpanded\(false\)/);
+  assert.match(m, /function setDevSize\(sz, highlight = null\) \{ devHl = highlight; setPanels\(sz === 'expanded' \? expand\(P6, 'dev', true\)/);   // 0.3.0 §6: one state, never two expanded
 });
 
 test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playing, Display size), one page each with a live preview', async () => {

@@ -24,10 +24,11 @@ import { whenIdle } from './slider.js';
 export const SIZES = ['collapsed', 'standard', 'expanded'];
 /** Arrow: collapsed <-> open (open = Standard). Pure. */
 // 0.2.2 T5: one rule for Library and Devices: the arrow while Expanded first returns to the normal layout; the next press collapses.
-export const arrowSize = s => (s === 'collapsed' || s === 'expanded' ? 'standard' : 'collapsed');
+// 0.3.0 §6: from Expanded the chevron goes straight to the rail (one press, as the icon shows)
+export const arrowSize = s => (s === 'collapsed' ? 'standard' : 'collapsed');
 /** 0.2.2 T5: the same arrow labels for both side panels (which = 'Library' | 'Devices'). Pure. */
 export function arrowLabel(which, state) {
-  return state === 'collapsed' ? `Open the ${which} panel` : state === 'expanded' ? 'Back to the normal layout' : `Collapse the ${which} panel`;
+  return state === 'collapsed' ? `Open the ${which} panel` : `Fold the ${which} panel to a rail`;
 }
 /** 0.2.3 U6: Expand button arrows point the way the panel travels: Devices (right side) grows to the LEFT and goes back to the right;
  *  the Library (left side) is the mirror image. Pure: side = 'left' | 'right'. */
@@ -532,17 +533,20 @@ export function devicesPanel(S, ctl) {
   const setPick = v => { zpick = v; saveZonePick(v); draw(true); };
   const setEdit = v => { zedit = v; draw(true); };
   // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
-  const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Collapse / open the Devices panel', onclick: () => ctl.toggleDev?.() }, '›');
-  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices (Esc returns)', onclick: () => ctl.toggleDevExpanded?.() }, icon(expandIcon('right', false)));
-  const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
+  const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Fold / open the Devices panel ( ] )', onclick: ev => { ev.stopPropagation(); ctl.toggleDev?.(); } }, '›');
+  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices ( Shift+] ; Esc returns)', onclick: ev => { ev.stopPropagation(); ctl.toggleDevExpanded?.(); } }, icon(expandIcon('right', false)));
   const count = h('span', { class: 'small dim devcount' });
   // 0.2.3 U7: the DEVICES title sits at the right edge, the true mirror image of LIBRARY at the left edge of the Library header
-  root.append(h('div', { class: 'pane-h devhead' }, expBtn, colBtn, escHint, h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES')), body);
+  // 0.3.0 §6: two controls kept apart - Expand on the inner edge (becomes "⤡ Esc"), chevron on the outer edge; a 30 px rail with icon + title
+  root.append(h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '◉'), h('span', { class: 'prail-t' }, 'DEVICES')),
+    h('div', { class: 'pane-h devhead' }, expBtn, h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES'), colBtn), body);
+  root.addEventListener('click', ev => { if (size === 'collapsed' && !ev.target.closest('.devcol')) ctl.toggleDev?.(false); });
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;
     colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
     colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
-    setIcon(expBtn, expandIcon('right', s === 'expanded')); expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
+    if (s === 'expanded') expBtn.textContent = '⤡ Esc'; else setIcon(expBtn, expandIcon('right', false)); expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
+    root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';
     expBtn.setAttribute('aria-label', expandLabel('Devices', s === 'expanded'));
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);

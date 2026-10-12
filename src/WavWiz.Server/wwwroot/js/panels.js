@@ -1,0 +1,58 @@
+// WavWiz 0.3.0 §6: Library / Devices panels - states rail · normal · expanded (only one expanded at a time), one storage key,
+// one restore rule, auto-rail when Now Playing would drop under 420 px (not saved). Pure: no DOM here.
+export const PANELS_KEY = 'wavwiz.panels';
+export const RAIL_PX = 30, NP_MIN = 420, GAP = 10;
+const LIBW = vw => Math.min(360, Math.max(230, vw * 0.21)), DEVW = vw => Math.min(380, Math.max(250, vw * 0.22));
+const base = v => (v === 'rail' ? 'rail' : 'normal');
+/** { lib: 'rail'|'normal', dev: 'rail'|'normal', exp: null|'lib'|'dev', list: 'open'|'collapsed', ctl: 'open'|'collapsed' } */
+export function normPanels(p) {
+  p = p && typeof p === 'object' ? p : {};
+  return { lib: base(p.lib), dev: base(p.dev), exp: p.exp === 'lib' || p.exp === 'dev' ? p.exp : null, list: p.list === 'collapsed' ? 'collapsed' : 'open', ctl: p.ctl === 'collapsed' ? 'collapsed' : 'open' };
+}
+/** One key; the 0.2.x keys (wavwiz.libcollapsed, wavwiz.devsize, wavwiz.listcollapsed, wavwiz.npctlcollapsed, libprefs.expanded) move over once. */
+export function loadPanels(store = globalThis.localStorage) {
+  try {
+    const raw = store.getItem(PANELS_KEY); if (raw) return normPanels(JSON.parse(raw));
+    let libExp = false; try { libExp = !!JSON.parse(store.getItem('wavwiz.libprefs.v1') || store.getItem('wavwiz.libprefs') || 'null')?.expanded; } catch { /* ignore */ }
+    const ds = store.getItem('wavwiz.devsize') || (store.getItem('wavwiz.devcollapsed') === '1' ? 'collapsed' : 'standard');
+    const p = normPanels({ lib: store.getItem('wavwiz.libcollapsed') === '1' ? 'rail' : 'normal', dev: ds === 'collapsed' ? 'rail' : 'normal', exp: libExp ? 'lib' : ds === 'expanded' ? 'dev' : null,
+      list: store.getItem('wavwiz.listcollapsed') === '1' ? 'collapsed' : 'open', ctl: store.getItem('wavwiz.npctlcollapsed') === '1' ? 'collapsed' : 'open' });
+    store.setItem(PANELS_KEY, JSON.stringify(p)); return p;
+  } catch { return normPanels(null); }
+}
+export function savePanels(p, store = globalThis.localStorage) { try { store.setItem(PANELS_KEY, JSON.stringify(normPanels(p))); } catch { /* private mode */ } return p; }
+/** What a panel shows right now. */
+export const shown = (p, k) => (p.exp === k ? 'expanded' : p.exp ? 'rail' : p[k]);
+/** Chevron on the outer edge: rail <-> normal; from expanded straight to rail (one press, as the icon shows). */
+export function chevron(p, k) { const s = shown(p, k); if (s === 'expanded') return { ...p, exp: null, [k]: 'rail' }; if (p.exp) return { ...p, exp: k, [k]: p[k] }; return { ...p, [k]: s === 'rail' ? 'normal' : 'rail' }; }
+/** Clicking a rail: opens it; while the other panel is expanded, focus is handed over (that panel becomes the expanded one). */
+export function railClick(p, k) { if (p.exp && p.exp !== k) return { ...p, exp: k }; return { ...p, [k]: 'normal' }; }
+/** Expand button (inner edge): normal -> expanded; while expanded it is "⤡ Esc" and goes back. */
+export function expand(p, k, on = p.exp !== k) { return on ? { ...p, exp: k } : { ...p, exp: p.exp === k ? null : p.exp }; }
+/** Esc: leave expanded; both panels return to exactly what they were. */
+export const esc = p => (p.exp ? { ...p, exp: null } : p);
+/** Chevron glyph: points where the panel will move. */
+export function chevronGlyph(p, k) { const s = shown(p, k), toLeft = k === 'lib' ? s !== 'rail' : s === 'rail'; return toLeft ? '‹' : '›'; }
+export function chevronLabel(p, k) { const name = k === 'lib' ? 'Library' : 'Devices', s = shown(p, k); return s === 'rail' ? `Open the ${name} panel` : `Fold the ${name} panel to a rail`; }
+/** Layout for this width: the saved state, but (temporarily, not saved) the other side folds to a rail when Now Playing would drop under 420 px,
+ *  and an expanded panel falls back to normal for this load when the window is phone-sized. */
+export function effective(p, width, { opened = null } = {}) {
+  const e = { ...p };
+  if (width <= 900) return { ...e, exp: null, auto: false };
+  if (e.exp) return { ...e, auto: false };
+  const lw = e.lib === 'rail' ? RAIL_PX : LIBW(width), dw = e.dev === 'rail' ? RAIL_PX : DEVW(width);
+  const np = width - lw - dw - GAP * 4;
+  if (np >= NP_MIN) return { ...e, auto: false };
+  const fold = opened === 'lib' ? 'dev' : opened === 'dev' ? 'lib' : (e.dev === 'normal' ? 'dev' : 'lib');
+  return { ...e, [fold]: 'rail', auto: fold };
+}
+export const npWidth = (e, width) => (e.exp ? 0 : width - (e.lib === 'rail' ? RAIL_PX : LIBW(width)) - (e.dev === 'rail' ? RAIL_PX : DEVW(width)) - GAP * 4);
+/** Keyboard: [ / ] fold or open, Shift+[ / Shift+] expand, Esc leaves expanded. Returns the new state or null. */
+export function keyAction(p, ev) {
+  const t = ev.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+  if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return null;
+  const k = ev.code === 'BracketLeft' ? 'lib' : ev.code === 'BracketRight' ? 'dev' : null;
+  if (k) return ev.shiftKey ? expand(p, k) : chevron(p, k);
+  if (ev.key === 'Escape' && p.exp) return esc(p);
+  return null;
+}

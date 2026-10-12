@@ -256,7 +256,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .listpanel{padding:0}
 .listpanel .qwrap{flex:1;min-height:0;overflow:auto}
 /* 0.1.1/0.1.2 hotfix: bottom Playlist collapses DOWN to a thin header strip so Now Playing/viz gains height; --listh drives the grid row (incl. short-screen media). */
-.listpanel .qwrap{transition:opacity .25s ease,transform .32s cubic-bezier(.4,0,.2,1),max-height .32s cubic-bezier(.4,0,.2,1);max-height:2000px}
+.listpanel .qwrap{transition:opacity 240ms cubic-bezier(.4,0,.2,1),transform 240ms cubic-bezier(.4,0,.2,1),max-height 240ms cubic-bezier(.4,0,.2,1);max-height:2000px}
 .desk.listcollapsed .listpanel .qwrap{opacity:0;transform:translateY(100%);max-height:0;flex:0 0 0;min-height:0;overflow:hidden;pointer-events:none;border:0;margin:0;padding:0}
 /* 0.2.3 U2: the minimized Playlist keeps its count, Save and Clear at the right (Up next sits centered on the Now Playing column) */
 .desk.listcollapsed .listpanel .pane-h{border-bottom:0;min-height:34px}
@@ -1591,3 +1591,28 @@ body.jb-kiosk #app{visibility:hidden}
 .np-centertoggle{white-space:nowrap}
 .eqspk{font-size:13px}
 .np-stage.eqmode .vbtns{z-index:3}
+/* ---- 0.3.0 §6 panels: rail · normal · expanded. Always 3 grid tracks; one 240 ms timing; no display:none on the big areas ---- */
+@media (min-width:901px){
+  .desk{transition:grid-template-columns 240ms cubic-bezier(.4,0,.2,1),grid-template-rows 240ms cubic-bezier(.4,0,.2,1)}
+  .desk.libcollapsed{--libw:30px} .desk.devcollapsed{--rightw:30px}
+  .desk.libexpanded,.desk.devexpanded{grid-template-columns:var(--libw) minmax(0,1fr) var(--rightw);grid-template-rows:minmax(0,1fr) 64px}
+  .desk.libexpanded{--rightw:30px;--libw:calc(100% - 50px)} .desk.devexpanded{--libw:30px;--rightw:calc(100% - 50px)}
+  .desk.libexpanded .libpanel{grid-area:1/1/2/2} .desk.devexpanded .devpanel,.desk.libexpanded .devpanel{grid-area:1/3/2/4}
+  .desk .nowcol,.desk .listpanel{transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 0s}
+  .desk.libexpanded .nowcol,.desk.devexpanded .nowcol,.desk.libexpanded .listpanel,.desk.devexpanded .listpanel{display:flex;visibility:hidden;opacity:0;pointer-events:none;transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 240ms}
+  .desk .npbar{display:flex;visibility:hidden;opacity:0;pointer-events:none;transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 240ms}
+  .desk.libexpanded .npbar,.desk.devexpanded .npbar{visibility:visible;opacity:1;pointer-events:auto;transition:opacity 240ms cubic-bezier(.4,0,.2,1)}
+  .desk.listcollapsed{--listh:36px}
+  .prail{display:none}
+  .libpanel.israil,.devpanel.israil{cursor:pointer;align-items:center;padding:6px 0}
+  .libpanel.israil:hover,.devpanel.israil:hover{border-color:var(--accent)}
+  .israil .prail{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-height:0;overflow:hidden}
+  .prail-ic{color:var(--accent);font-size:15px}
+  .prail-t{writing-mode:vertical-rl;color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.14em}
+  .israil .pane-h{order:2;margin-top:auto;padding:4px 0!important;border:0;justify-content:center}
+  .israil .pane-h>:not(.pchev):not(.devcol){display:none!important}
+  .libpanel .pane-h{gap:8px} .devpanel .devhead{gap:8px}
+  .plus.pchev,.plus.pexp,.plus.devcol,.plus.devexp{width:auto;min-width:28px;height:28px;padding:0 6px}
+  .desk.libexpanded .libpanel .pane-h .eschint,.desk.devexpanded .devpanel .pane-h .eschint{display:none}
+}
+@media (prefers-reduced-motion:reduce){ .desk,.desk .nowcol,.desk .listpanel,.desk .npbar{transition:none!important} }

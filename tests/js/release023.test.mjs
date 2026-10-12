@@ -133,15 +133,15 @@ test('0.2.3 U6: Expand button arrows point the way the panel travels (Devices le
   assert.equal(d.expandIcon('left', false), 'expandR');    // Library normal: grows to the right
   assert.equal(d.expandIcon('left', true), 'expandL');     // Library expanded: goes back to the left
   const i = src('icons.js'); assert.match(i, /expandL: '<path d="M20 5v14"\/>/); assert.match(i, /expandR: '<path d="M4 5v14"\/>/);
-  assert.match(src('devices.js'), /setIcon\(expBtn, expandIcon\('right', s === 'expanded'\)\)/);
-  assert.match(src('main.js'), /setIcon\(b, expandIcon\('left', on\)\)/);
-  assert.doesNotMatch(src('devices.js') + src('main.js'), /'⤢'|'⤡'/);
+  // 0.3.0 §6: while expanded the same button reads "⤡ Esc"; otherwise the expand arrow points the way the panel travels
+  assert.match(src('devices.js'), /if \(s === 'expanded'\) expBtn\.textContent = '⤡ Esc'; else setIcon\(expBtn, expandIcon\('right', false\)\)/);
+  assert.match(src('main.js'), /if \(ls === 'expanded'\) x\.textContent = '⤡ Esc'; else setIcon\(x, expandIcon\('left', false\)\)/);
 });
 
 test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring LIBRARY at the left edge', () => {
   const s = src('devices.js'), m = src('main.js');
-  assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, colBtn, escHint, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\)\)/);
-  assert.match(m, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), escHint, colBtn, expBtn\)/);
+  assert.match(s, /count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\), colBtn\)/);   // 0.3.0 §6: title near the outer edge, chevron at the very edge
+  assert.match(m, /h\('div', \{ class: 'pane-h' \}, colBtn, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\)/);
   assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);   // same title color
 });
 

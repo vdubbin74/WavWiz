@@ -4,11 +4,12 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, arrowSize, arrowLabel, expandLabel, expandIcon, saveDevSize, loadDevSize } from './devices.js';
+import { devicesView, devicesPanel, expandLabel, expandIcon } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
+import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
 import { isRemote, remoteBanner, setRemote, REMOTE_KEY, syncPlayerRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
@@ -17,7 +18,6 @@ import { liveSocket } from './wsconn.js';
 import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
 import { artPushed } from './art.js';
-import { loadLibPrefs } from './libsort.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
@@ -137,23 +137,29 @@ async function startMain() {
   // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
   window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });
 
-  const libC0 = localStorage.getItem('wavwiz.libcollapsed') === '1';
-  const colBtn = h('button', { class: 'plus libcol', 'aria-label': arrowLabel('Library', libC0 ? 'collapsed' : 'standard'), 'aria-expanded': String(!libC0), title: 'Collapse / open the Library panel', onclick: () => toggleLib() }, libC0 ? '›' : '‹');
-  // 0.2.0 item 16: Expand button top-right of the Library header (the collapse arrow moves one slot left); the same button or Esc returns.
-  const expBtn = h('button', { class: 'plus libexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library (Esc returns)', onclick: () => toggleLibExpanded() }, icon(expandIcon('left', false)));
-  const escHint = h('span', { class: 'eschint small dim', 'aria-hidden': 'true' }, 'Esc');
-  libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, h('div', { class: 'pane-h' }, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), escHint, colBtn, expBtn), h('div', { class: 'libbody' }, libC.el));
+  // 0.3.0 §6: one panel state (rail · normal · expanded), one key, two controls per header kept apart: chevron on the outer edge, expand on the inner edge
+  P6 = loadPanels();
+  const colBtn = h('button', { class: 'plus libcol pchev', 'aria-label': chevronLabel(P6, 'lib'), 'aria-expanded': 'true', title: 'Fold / open the Library panel ( [ )', onclick: ev => { ev.stopPropagation(); setPanels(chevron(P6, 'lib'), 'lib'); } }, '‹');
+  const expBtn = h('button', { class: 'plus libexp pexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library ( Shift+[ ; Esc returns)', onclick: ev => { ev.stopPropagation(); setPanels(expand(P6, 'lib'), 'lib'); } }, icon(expandIcon('left', false)));
+  const libRail = h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '♫'), h('span', { class: 'prail-t' }, 'LIBRARY'));
+  libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, libRail, h('div', { class: 'pane-h' }, colBtn, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), expBtn), h('div', { class: 'libbody' }, libC.el));
+  libpanel.addEventListener('click', ev => { if (libpanel.classList.contains('israil') && !ev.target.closest('button:not(.libpanel)')) setPanels(railClick(P6, 'lib'), 'lib'); });
+  libpanel.addEventListener('dragenter', () => { if (libpanel.classList.contains('israil')) setPanels(railClick(P6, 'lib'), 'lib'); });
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
-  const dsz = loadDevSize();
-  desk = h('div', { class: 'desk' + (localStorage.getItem('wavwiz.libcollapsed') === '1' ? ' libcollapsed' : '') + (dsz === 'collapsed' ? ' devcollapsed' : dsz === 'expanded' ? ' devexpanded' : '') + (localStorage.getItem('wavwiz.listcollapsed') === '1' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
+  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
+  desk.addEventListener('transitionend', ev => { if (ev.target === desk && /grid-template/.test(ev.propertyName)) { nowc.viz?.resize?.(); placeNext(); } });   // §6: the viz resizes once the move has finished
   listt.setCollapsed?.(desk.classList.contains('listcollapsed'));
   wireNextBlock();
   tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
-  window.addEventListener('resize', () => { if (wide() && S.view === 'now') go('library'); });
-  window.addEventListener('keydown', ev => { if (ev.key === 'Escape') { toggleDrawer(false); if (!document.querySelector('dialog[open],.sheet,.dlg')) { if (desk.classList.contains('libexpanded')) toggleLibExpanded(false); else if (desk.classList.contains('devexpanded')) toggleDevExpanded(false); } } });
-  if (loadLibPrefs().expanded && wide()) toggleLibExpanded(true);
+  window.addEventListener('resize', () => { if (wide() && S.view === 'now') go('library'); applyPanels(); });
+  window.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') toggleDrawer(false);
+    if (!wide() || document.querySelector('dialog[open],.sheet,.dlg,.jb')) return;
+    const n = keyAction(P6, ev); if (n) { ev.preventDefault(); setPanels(n, ev.code === 'BracketRight' ? 'dev' : 'lib'); }
+  });
+  applyPanels(true);
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
   drawStatus(); maybeWhatsNew(S);
@@ -168,18 +174,29 @@ async function startMain() {
   if (isRemote()) remoteBanner(true, () => toggleRemote(false)); else installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
-/** Library arrow (0.2.2 T5, same rule as Devices): while Expanded it first returns to the normal layout; otherwise it collapses / opens. */
-function toggleLib(force) {
-  const exp = desk.classList.contains('libexpanded');
-  if (force === undefined && exp) { toggleLibExpanded(false); return; }
-  const c = force ?? !desk.classList.contains('libcollapsed');
-  if (c && exp) toggleLibExpanded(false);
-  desk.classList.toggle('libcollapsed', c); try { localStorage.setItem('wavwiz.libcollapsed', c ? '1' : '0'); } catch { /* ignore */ }
-  paintLibArrow(); if (!c) libC.reload();
-}
-function paintLibArrow() {
-  const c = desk.classList.contains('libcollapsed'), x = desk.classList.contains('libexpanded'), b = libpanel.querySelector('.libcol');
-  b.textContent = c ? '›' : '‹'; b.setAttribute('aria-expanded', String(!c)); b.setAttribute('aria-label', arrowLabel('Library', c ? 'collapsed' : x ? 'expanded' : 'standard'));
+/** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */
+function toggleLib(force) { if (force === true) return setPanels({ ...P6, lib: 'rail', exp: P6.exp === 'lib' ? null : P6.exp }, 'lib'); if (force === false) return setPanels(railClick(P6, 'lib'), 'lib'); setPanels(chevron(P6, 'lib'), 'lib'); }
+function toggleLibExpanded(force) { setPanels(expand(P6, 'lib', force ?? P6.exp !== 'lib'), 'lib'); }
+function toggleDev(force) { if (force === true) return setPanels({ ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); if (force === false) return setPanels(railClick(P6, 'dev'), 'dev'); setPanels(chevron(P6, 'dev'), 'dev'); }
+function toggleDevExpanded(force) { setPanels(expand(P6, 'dev', force ?? P6.exp !== 'dev'), 'dev'); }
+function setDevSize(sz, highlight = null) { devHl = highlight; setPanels(sz === 'expanded' ? expand(P6, 'dev', true) : sz === 'collapsed' ? { ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp } : { ...P6, dev: 'normal', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); }
+let P6 = null, lastOpened = null, devHl = null, libWasExp = false;
+function setPanels(n, opened = null) { P6 = savePanels(normPanels(n)); lastOpened = opened; applyPanels(); }
+/** Paint the layout for this width (auto-rail is applied here only, never saved). */
+function applyPanels(first = false) {
+  if (!desk) return;
+  const e = effective(P6, window.innerWidth, { opened: lastOpened }), ls = shown(e, 'lib'), ds = shown(e, 'dev');
+  desk.classList.toggle('libcollapsed', ls === 'rail'); desk.classList.toggle('libexpanded', ls === 'expanded');
+  desk.classList.toggle('devcollapsed', ds === 'rail'); desk.classList.toggle('devexpanded', ds === 'expanded');
+  desk.classList.toggle('autorail', !!e.auto);
+  libpanel.classList.toggle('israil', ls === 'rail'); libpanel.title = ls === 'rail' ? 'Open the Library panel ( [ )' : '';
+  const b = libpanel.querySelector('.libcol'); b.textContent = chevronGlyph(e, 'lib'); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
+  const x = libpanel.querySelector('.libexp'); if (ls === 'expanded') x.textContent = '⤡ Esc'; else setIcon(x, expandIcon('left', false));
+  x.setAttribute('aria-pressed', String(ls === 'expanded')); x.setAttribute('aria-label', expandLabel('Library', ls === 'expanded'));
+  devp.setSize(ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
+  if ((ls === 'expanded') !== libWasExp || first) { libWasExp = ls === 'expanded'; libC.setExpanded(libWasExp); }
+  if (ls !== 'rail' && !first) libC.reload();
+  if (first) setTimeout(() => nowc.viz?.resize?.(), 0);
 }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
 /** 0.2.3 U2: with the Playlist minimized, its title bar shows "Up next: Title · Artist" centered on the Now Playing column (the line
@@ -208,35 +225,7 @@ function wireNextBlock() {
   new MutationObserver(ms => { if (ms.some(m => !nb.contains(m.target))) later(); }).observe(listt.head, { childList: true, subtree: true, characterData: true });
   later();
 }
-function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); try { localStorage.setItem('wavwiz.listcollapsed', c ? '1' : '0'); } catch { /* ignore */ } listt.setCollapsed?.(c); placeNext(); if (!c) setTimeout(() => listt.relayout?.(), 340); }
-/** 0.2.0 item 27 / 0.2.1 F1: the Devices panel is Collapsed (46 px strip) / Standard / Expanded (card grid over the Now Playing column, with
- * the full-width Now Playing bar). Like the Library: the arrow (and Devices > Devices & zones) collapses / opens it; toggleDev(true/false)
- * forces collapsed / open. The separate Expand button (toggleDevExpanded) switches the wide view; Esc returns. */
-function toggleDev(force) {
-  if (force === true) return setDevSize('collapsed');
-  if (force === false) return setDevSize(devp.size === 'collapsed' ? 'standard' : devp.size);
-  setDevSize(arrowSize(devp.size));
-}
-function toggleDevExpanded(force) {
-  const on = force ?? devp.size !== 'expanded';
-  setDevSize(on ? 'expanded' : (devp.size === 'expanded' ? 'standard' : devp.size));
-}
-function setDevSize(sz, highlight = null) {
-  if (sz !== 'collapsed' && desk.classList.contains('libexpanded')) toggleLibExpanded(false);
-  desk.classList.toggle('devcollapsed', sz === 'collapsed'); desk.classList.toggle('devexpanded', sz === 'expanded');
-  saveDevSize(sz); devp.setSize(sz, highlight); setTimeout(() => nowc.viz?.resize?.(), 340);
-}
-/** 0.2.0 item 16: the Expanded library covers the Library + Now Playing columns and the Playlist row; Devices folds to its 46 px strip and
- * Now Playing becomes the full-width mini bar. Saved per browser; the same button or Esc returns. */
-function toggleLibExpanded(force) {
-  const on = force ?? !desk.classList.contains('libexpanded');
-  if (on && desk.classList.contains('devexpanded')) setDevSize('standard');
-  if (on && desk.classList.contains('libcollapsed')) toggleLib(false);
-  desk.classList.toggle('libexpanded', on);
-  const b = libpanel.querySelector('.libexp'); setIcon(b, expandIcon('left', on)); b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', expandLabel('Library', on)); paintLibArrow();
-  libC.setExpanded(on); setTimeout(() => nowc.viz?.resize?.(), 340);
-}
-
+function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); P6 = savePanels({ ...P6, list: c ? 'collapsed' : 'open' }); listt.setCollapsed?.(c); placeNext(); if (!c) setTimeout(() => listt.relayout?.(), 340); }
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {
   const v = views[k]; if (!v) return;

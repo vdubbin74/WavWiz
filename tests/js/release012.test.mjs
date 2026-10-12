@@ -67,7 +67,7 @@ test('0.1.2 Now Playing viz panel + solid control panel, playlist collapse-down,
   assert.match(n, /shuffle, prev, play, next, repeat/);
   // arrow reuses the Playlist toggle class (plus listcol), persisted per device; collapse grows the viz panel
   assert.match(n, /class: 'plus listcol np-ctlcol'/);
-  assert.match(n, /wavwiz\.npctlcollapsed/);
+  assert.match(n, /loadPanels\(\)\.ctl === 'collapsed'/);   // 0.3.0 §6: one key (wavwiz.panels)
   assert.doesNotMatch(css, /\.np-ctlcol\{|\.np-ctlcol\.plus|\.np-statuscol/, 'no bespoke arrow styling');
   // both NP panels share the exact Library/Devices/Playlist chrome rule; solid, no glass
   assert.match(css, /\.libpanel,\.nowcol,\.devpanel,\.listpanel,\.np-vizpanel,\.np-ctlpanel\{/);

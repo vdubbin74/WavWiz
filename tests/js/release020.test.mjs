@@ -220,7 +220,7 @@ test('0.2.0 items 13-16: sort on every tab + flip + letter strip, remembered per
   assert.ok(m.isLetterSort('albums', 'artist') && !m.isLetterSort('albums', 'year') && !m.isLetterSort('years', 'name'));
   const lib = src('library.js');
   assert.match(lib, /\['favorites', '♥ Favorites'\]/); assert.match(lib, /heartBtn\(S, 'track'/); assert.match(lib, /heartBtn\(S, 'album'/); assert.match(lib, /setExpanded/);
-  const main = src('main.js'); assert.match(main, /function toggleLibExpanded/); assert.match(main, /ev\.key === 'Escape'.*libexpanded/);
+  const main = src('main.js'); assert.match(main, /function toggleLibExpanded/); assert.match(main, /const n = keyAction\(P6, ev\)/);   // 0.3.0 §6: Esc / [ ] go through panels.js
   assert.match(css, /\.desk\.libexpanded\{--rightw:46px/); assert.match(css, /\.desk\.devexpanded \.npbar,\.desk\.libexpanded \.npbar\{display:flex\}/);
   assert.match(src('fav.js'), /Only Control or Admin access can change favorites/);
 });

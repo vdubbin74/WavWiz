@@ -7,6 +7,7 @@ import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js
 import { heartBtn } from './fav.js';
 import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
+import { loadPanels, savePanels } from './panels.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
@@ -85,7 +86,7 @@ export function createNow(S, ctl) {
     h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn)));
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
-  let ctlCollapsed = false; try { ctlCollapsed = localStorage.getItem('wavwiz.npctlcollapsed') === '1'; } catch { /* ignore */ }
+  let ctlCollapsed = loadPanels().ctl === 'collapsed';   // 0.3.0 §6: one key for all panels
   const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }, ctlCollapsed ? '˄' : '˅');
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
   // 0.2.3 U1 (replaces 0.2.2 T3): collapsed = ONE line - thumbnail, title · artist over a progress bar with elapsed / total, then every
@@ -129,7 +130,7 @@ export function createNow(S, ctl) {
     el.classList.toggle('ctlcollapsed', ctlCollapsed);
     ctlColBtn.textContent = ctlCollapsed ? '˄' : '˅';
     ctlColBtn.setAttribute('aria-expanded', String(!ctlCollapsed));
-    try { localStorage.setItem('wavwiz.npctlcollapsed', ctlCollapsed ? '1' : '0'); } catch { /* ignore */ }
+    savePanels({ ...loadPanels(), ctl: ctlCollapsed ? 'collapsed' : 'open' });
     paintCollapsed();
     setTimeout(() => viz?.resize(), 340);
   }
