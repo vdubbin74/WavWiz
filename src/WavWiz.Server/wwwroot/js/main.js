@@ -27,6 +27,7 @@ import { radioFinderView } from './radiofinder.js';
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
+import { whenIdle, installSliderGuard } from './slider.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -108,6 +109,7 @@ const views = {};
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null;
 
 async function startMain() {
+  installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
   const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
@@ -267,8 +269,9 @@ export function go(k, force) {
 const checklistGo = a => go(a);
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
-async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); nowc.draw(); listt.draw(); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
-async function refreshZones() { try { const [z, g] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups)]); S.zones = z; S.groups = g; devv.draw(); devp.draw(); nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
+async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
+async function refreshZones() { try { const [z, g] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups)]); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
+  nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); if ((S.view === 'radio' || S.page === 'radio') && radioTab === 'mine') drawRadio(); } catch (e) { handleErr(e); } }
 function handleErr(e) { if (e instanceof ApiError && e.status === 401) location.reload(); else if (e.status !== 0) toast(e.message, true); }

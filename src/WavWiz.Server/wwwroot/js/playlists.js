@@ -1,4 +1,4 @@
-import { h, api, toast, dialog, fmtTime, fmtDur } from './util.js';
+import { h, api, toast, dialog, fmtTime, fmtDur, ask } from './util.js';
 import { cover, trackArt, isLive } from './art.js';
 import { canControl, dropTarget, sheet, playNow, addToQueue, MIME } from './ui.js';
 
@@ -55,7 +55,7 @@ export function playlistsView(S) {
     if (canControl(S)) dropTarget(tail, async ref => { await act(() => api(`/playlists/${id}/items`, { method: 'POST', body: ref }), 'Added'); drawOne(id); });
     root.replaceChildren(h('div', { class: 'crumbs' }, h('button', { class: 'btn', onclick: drawList }, '‹ Playlists')),
       h('div', { class: 'row wrap' }, h('div', { class: 'grow' }, nm), canControl(S) ? [h('button', { class: 'btn', onclick: () => act(() => api('/playlists/' + id, { method: 'PUT', body: { name: nm.value } }), 'Renamed').then(() => drawOne(id)) }, 'Rename'), h('button', { class: 'btn primary', onclick: () => act(() => api('/stream/play', { method: 'POST', body: { kind: 'playlist', id } })) }, '▶ Play'),
-        h('button', { class: 'btn danger', onclick: async () => { if (confirm(`Delete the playlist “${p.name}”? The songs stay in your library.`)) { await act(() => api('/playlists/' + id, { method: 'DELETE' }), 'Deleted'); drawList(); } } }, 'Delete')] : null),
+        h('button', { class: 'btn danger', onclick: async () => { if (await ask('Delete playlist', `Delete the playlist “${p.name}”? The songs stay in your library.`)) { await act(() => api('/playlists/' + id, { method: 'DELETE' }), 'Deleted'); drawList(); } } }, 'Delete')] : null),
       h('p', { class: 'dim small' }, `${items.length} items${total ? ' • ' + fmtDur(total) : ''}`), items.length ? ul : h('p', { class: 'dim' }, 'Empty. Add songs from the Library.'), tail);
   }
   window.addEventListener('wavwiz:playlists', () => { openId ? drawOne(openId) : drawList(); });

@@ -1,4 +1,4 @@
-import { h, api, toast } from './util.js';
+import { h, api, toast, ask } from './util.js';
 import { vizStats, webgl2Ok, vizPrefs, vizName } from './viz.js';
 import { loadReact } from './vizcore.js';
 
@@ -61,7 +61,7 @@ function receiversCard(S) {
 export function networkCard(S) {
   const box = h('div', { class: 'card', id: 'diag-network' }), out = h('div'), admin = S?.auth?.role === 'admin';
   async function use(addr) {
-    if (!confirm(`Switch WavWiz to ${addr}? It restarts, and players reconnect on their own within a minute.`)) return;
+    if (!(await ask('Switch address', `Switch WavWiz to ${addr}? It restarts, and players reconnect on their own within a minute.`, { ok: 'Switch' }))) return;
     try { const r = await api('/network/bind', { method: 'POST', body: { address: addr } }); toast(r.message); if (r.restarting) out.prepend(h('p', { class: 'warnc' }, r.message, ' ', h('a', { href: r.url }, r.url))); } catch (e) { toast(e.message, true); }
   }
   async function paint(fresh) {

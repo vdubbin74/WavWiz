@@ -5,6 +5,7 @@ import { latencyControl, clampMs } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
 import { icon, setIcon } from './icons.js';
+import { whenIdle } from './slider.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -596,7 +597,7 @@ export function devicesPanel(S, ctl) {
         un.map(z => h('div', { class: 'urow' }, h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell grow' }, z.name), h('span', { class: 'small dim' }, stateText(z))))] : null]);
     if (busy.v) later();
   }
-  setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => draw());
+  setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(draw, draw));
   return { el: root, draw, setSize, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
 }
 
@@ -620,7 +621,7 @@ export function devicesView(S, ctl) {
       canControl(S) ? h('button', { class: 'btn', onclick: () => openCalibration(S, ctl.refreshAll) }, '🎤 Calibrate') : null);
     if (busy.v) later();
   }
-  if (HASWIN) window.addEventListener('wavwiz:devredraw', () => { if (root.isConnected) draw(); });
+  if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(() => { if (root.isConnected) draw(); }, draw));
   return { el: root, draw };
 }
 export { roomPillClass, roomPill };

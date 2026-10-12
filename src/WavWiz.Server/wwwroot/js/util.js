@@ -48,3 +48,19 @@ export function dialog(title, body, buttons = [], opts = {}) {
 }
 
 export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+/** 0.3.0: the app's confirm dialog (replaces window.confirm). Resolves true/false. */
+export function ask(title, text, { ok = 'OK', danger = false, cancel = 'Cancel' } = {}) {
+  return new Promise(res => {
+    let done = false; const fin = v => { if (!done) { done = true; res(v); } };
+    dialog(title, h('p', null, text), [{ text: ok, cls: danger ? 'danger' : 'primary', onclick: () => fin(true) }, { text: cancel, onclick: () => fin(false) }], { cls: 'ask-dlg', onClose: () => fin(false) });
+  });
+}
+
+/** 0.3.0 §7.10: a friendly error: plain sentence + next step + optional Retry; raw detail only under "Details". */
+export function friendlyError(err, { what = 'That didn’t work.', next = 'Check that the WavWiz server is running, then try again.', retry } = {}) {
+  const msg = err && err.status === 0 ? 'WavWiz can’t reach the server.' : what;
+  return h('div', { class: 'ferr', role: 'alert' }, h('p', null, h('b', null, msg), ' ', next),
+    retry ? h('button', { class: 'btn', type: 'button', onclick: retry }, 'Retry') : null,
+    err ? h('details', null, h('summary', null, 'Details'), h('pre', { class: 'small mono' }, String(err.message || err))) : null);
+}

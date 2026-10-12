@@ -172,7 +172,7 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   // the "zones" push redraws every view (side panel, page, strip) from fresh /zones + /groups - nothing cached
   const m = src('main.js');
   assert.match(m, /m\.type === 'zones'\) \{ refreshZones\(\);/);
-  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; devv\.draw\(\); devp\.draw\(\);/);
+  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; (if \(idsChanged\) \{ )?devv\.draw\(\); devp\.draw\(\);/);
   // a browser speaker told "unauthorized" (forgotten / revoked) stops instead of reconnecting straight back onto the list
   const r = src('room.js');
   assert.match(r, /if \(\/\^unauthorized\/i\.test\(b\?\.reason \|\| ''\)\) \{ this\.removed = true; this\.stop\(\)/);

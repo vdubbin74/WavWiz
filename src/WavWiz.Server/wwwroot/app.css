@@ -1507,3 +1507,13 @@ dialog.settings-dlg{width:min(1200px,calc(calc(100vw / var(--z,1)) - 32px))}
 .appstack .apprev.pinprev .ap-app{height:clamp(120px,calc(36vh / var(--z,1) - 60px),240px)}
 .appstack .vlive.pinprev .vlive-stage{height:clamp(100px,calc(34vh / var(--z,1) - 40px),260px)}
 .appstack .eqprevbox.pinprev .eqa-plot{height:clamp(110px,calc(34vh / var(--z,1) - 110px),240px)}
+
+/* ================= 0.3.0 ================= */
+/* §9: device Settings delay slider - wider track, bigger thumb (0-1000 ms on a short track was hard to drag) */
+.dssec .ddelay .latctl .latslider{min-width:200px;height:34px}
+.dssec .latslider::-webkit-slider-runnable-track{height:10px;border-radius:5px}
+.dssec .latslider::-moz-range-track{height:10px;border-radius:5px}
+.dssec .latslider::-webkit-slider-thumb{width:26px;height:26px;margin-top:-8px}
+.dssec .latslider::-moz-range-thumb{width:24px;height:24px}
+/* app confirm + friendly errors */
+.ferr{border-left:3px solid var(--bad,var(--accent));padding:8px 12px;margin:8px 0} .ferr details{margin-top:6px} .ferr pre{white-space:pre-wrap;margin:4px 0 0}

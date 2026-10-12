@@ -1,4 +1,5 @@
 import { h } from './util.js';
+import { throttle } from './slider.js';
 
 /**
  * 0.0.8: per-device delay control. A slider (0-1000 ms in 5 ms steps) kept in sync with the ms box (0-1000 ms since 0.2.0, 1 ms steps)
@@ -9,11 +10,12 @@ export const LAT_MAX_SLIDER = 1000, LAT_STEP = 5, LAT_MAX = 1000;     // 0.2.0: 
 export const clampMs = v => Math.max(0, Math.min(LAT_MAX, Math.round(Number.isFinite(+v) ? +v : 0)));
 
 export function latencyControl({ value = 0, onChange = () => {}, label = 'Delay', liveMs = 220 } = {}) {
-  let cur = clampMs(value), t = 0;
-  const slider = h('input', { type: 'range', class: 'latslider', min: 0, max: LAT_MAX_SLIDER, step: LAT_STEP, value: Math.min(cur, LAT_MAX_SLIDER), 'aria-label': label + ' slider (milliseconds)' });
+  let cur = clampMs(value);
+  const live = throttle(v => onChange(v, false), liveMs);   // 0.3.0 §9: throttled live updates (not debounced), never a re-render
+  const slider = h('input', { type: 'range', class: 'latslider', min: 0, max: LAT_MAX_SLIDER, step: LAT_STEP, 'data-coarse': 50, value: Math.min(cur, LAT_MAX_SLIDER), 'aria-label': label + ' slider (milliseconds)' });
   const box = h('input', { type: 'number', class: 'latbox', min: 0, max: LAT_MAX, step: 1, value: cur, 'aria-label': label + ' in milliseconds' });
   const sync = (from) => { if (from !== 'slider') slider.value = String(Math.min(cur, LAT_MAX_SLIDER)); if (from !== 'box') box.value = String(cur); };
-  const emit = final => { clearTimeout(t); if (final) onChange(cur, true); else t = setTimeout(() => onChange(cur, false), liveMs); };
+  const emit = final => { if (final) onChange(cur, true); else live(cur); };
   const set = (v, from, final) => { cur = clampMs(v); sync(from); emit(final); };
   slider.addEventListener('input', () => set(slider.value, 'slider', false));
   slider.addEventListener('change', () => set(slider.value, 'slider', true));
