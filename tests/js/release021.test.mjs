@@ -248,9 +248,9 @@ test('0.2.1 F18 + F19: Calibrate + Test sound live in each card\'s own settings 
   const face2 = face.slice(face.indexOf('const { vol, pct, mute }'));
   assert.doesNotMatch(face2, /test-sound|openCalibration|'🔔 Test sound'|'Calibrate'/, 'no Calibrate / Test sound on the card face');
   // 0.2.3 U12: the ••• flip became a chevron Expand control that opens the settings below the card face, in place
-  assert.match(face, /open \? cardSettings\(S, ctl, z\) : null/); assert.match(face, /settingsToggle\(z\.name, open, flip\)/); assert.doesNotMatch(d, /•••'|class: 'dmore'/);
+  assert.match(face, /open \? cardSettings\(S, ctl, z\) : null/); assert.match(face, /settingsToggle\(z\.name, open, flip\)/); assert.doesNotMatch(d, /•••'/);   // 0.2.5 (render v2): a 'More ▾' menu inside Settings is back by design
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
-  for (const t of ["'SOUND CHECK'", "'🎤 Calibrate'", "'Set delay by ear'", "'🔔 Test sound'", "'Sound / EQ…'", "'Delay history…'", "'CONNECTION'", "'Rename…'", "'Forget device…'", "'Set as reference'", "exactDelay("]) assert.ok(set.includes(t), t);
+  for (const t of ["'OUTPUT'", "'DELAY'", "'Calibrate'", "'Test sound'", "'Sound / EQ'", "'More ▾'", "'Delay history…'", "connSection(z)", "'Rename…'", "'Forget device…'", "'Set as reference'", "exactDelay(", "measuredNote(cur)"]   /* 0.2.5 Settings per render v2 (by ear lives in Calibrate) */) assert.ok(set.includes(t), t);
   assert.doesNotMatch(d, /openZone|zone\.js|'Details…'/);
   assert.throws(() => src('zone.js'), /ENOENT/, 'the pop-up module is removed');
   assert.match(css, /\.dsettings\{/);

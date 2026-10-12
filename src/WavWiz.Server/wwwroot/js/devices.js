@@ -57,7 +57,49 @@ export const chosenOutput = z => z.outputs.find(o => o.active) || z.outputs.find
 /** Show the output line only when there is a choice (more than one output) or a problem (chosen output gone). */
 export const showOutputLine = z => !!z.outputUnavailable || z.outputs.filter(o => o.connected || o.active).length > 1;
 const dms = o => (o && !o.notCalibrated ? `${Math.round(o.latencyMs)} ms` : 'not set');
-const stateText = z => !z.enabled ? 'Off' : z.muted ? 'Muted' : !z.connected ? 'Offline' : ({ ok: 'Playing', idle: 'Not playing', buffering: 'Buffering', dropped: 'Dropped', reconnecting: 'Reconnecting', offline: 'Offline' }[z.room?.state] || 'Online');
+const stateText = z => !z.enabled ? 'Off' : !z.connected ? 'Offline' : ({ ok: 'Playing', idle: 'Not playing', buffering: 'Buffering', dropped: 'Dropped', reconnecting: 'Reconnecting', offline: 'Offline' }[z.room?.state] || 'Online');
+// ---- 0.2.5 device cards (approved render v2): tags, one status line, mute on the right, one Settings chevron ----
+/** A phone playing as a speaker (a browser zone named after a phone). */
+export const isPhoneZone = z => !!z?.isWeb && /iPhone|iPad|Android|phone|tablet/i.test(z.name || '');
+/** Up to two tags right of the name: OFFLINE, REF, MUTED, NO DELAY, and a phone's SPEAKER role chip (pure). No BROWSER / THIS DEVICE badges. */
+export function cardTags(z) {
+  const t = [], o = chosenOutput(z);
+  if (!z.connected) t.push({ k: 'offline', text: 'OFFLINE', title: 'Not connected right now' });
+  if (z.reference) t.push({ k: 'ref', text: 'REF', title: 'Reference speaker - other delays are measured against this one' });
+  if (z.muted) t.push({ k: 'muted', text: 'MUTED', title: 'Muted - press the round button to unmute' });
+  if (z.connected && !z.reference && o && o.notCalibrated) t.push({ k: 'nodelay', text: 'NO DELAY', title: 'The delay is not set yet: Settings › Delay › Calibrate' });
+  if (isPhoneZone(z)) t.push({ k: 'role', text: 'SPEAKER', title: 'This phone plays music. On the phone: Devices › Phone role to use it as a calibration mic instead' });
+  return t.slice(0, 2);
+}
+const two = n => String(n).padStart(2, '0');
+/** "6:40 PM" today, "Oct 9" before (pure, local time). */
+export function fmtSeen(iso, now = new Date()) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  if (d.toDateString() === now.toDateString()) { const hr = d.getHours() % 12 || 12; return `${hr}:${two(d.getMinutes())} ${d.getHours() < 12 ? 'AM' : 'PM'}`; }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+/** The one status line: playing state · output · delay. Offline: "Last seen 6:40 PM · output · delay". No "Muted", no "Delay not set" (tags say that). */
+export function statusLine(z, me = false) {
+  const o = chosenOutput(z);
+  const st = !z.connected ? (z.lastSeen ? `Last seen ${fmtSeen(z.lastSeen)}` : 'Offline') : !z.enabled ? 'Off' : ({ ok: 'Playing', idle: 'Not playing', buffering: 'Buffering', dropped: 'Dropped', reconnecting: 'Reconnecting', offline: 'Offline' }[z.room?.state] || 'Online');
+  const out = z.outputUnavailable ? 'Output unavailable' : z.isWeb ? (me ? 'this browser' : isPhoneZone(z) ? (z.link === 'wifi' ? 'Wi-Fi' : 'phone') : 'browser') : o ? outputLabel(o) : null;
+  const d = o && !o.notCalibrated ? `${Math.round(o.latencyMs)} ms` : null;
+  return [st, out, d].filter(Boolean).join(' · ');
+}
+const MIC_KIND = { usb: 'a USB mic', interface: 'an audio interface', builtin: 'the PC’s built-in mic', analog: 'a wired mic', bluetooth: 'a Bluetooth mic' };
+/** "Measured with the phone mic · Oct 9", "Measured with a USB mic · Oct 9", "Set by ear · Oct 2", "Set by hand · …" (pure). */
+export function measuredNote(o, now = new Date()) {
+  if (!o) return '';
+  if (o.notCalibrated) return 'Not measured yet. Calibrate measures it.';
+  if (!o.measuredWith) return '';
+  const i = o.measuredWith.indexOf(':'), m = i < 0 ? o.measuredWith : o.measuredWith.slice(0, i), src = i < 0 ? '' : o.measuredWith.slice(i + 1);
+  const how = m === 'manual' ? 'Set by hand' : m === 'ear' ? 'Set by ear' : m === 'loopback' ? 'Measured by loopback'
+    : m === 'mic' ? (src === 'phone' ? 'Measured with the phone mic' : src.startsWith('pc') ? `Measured with ${MIC_KIND[src.split(':')[1]] || 'the PC’s mic'}` : 'Measured with a mic') : 'Set';
+  return o.measuredAt ? `${how} · ${fmtSeen(o.measuredAt, now)}` : how;
+}
+export const deviceIconName = z => z.isWeb ? (isPhoneZone(z) ? 'phone' : 'globe') : 'monitor';
+function tagEls(z) { return cardTags(z).map(t => h('span', { class: 'dtag ' + t.k, title: t.title }, t.text)); }
+
 const dotClass = z => !z.connected ? 'off' : ({ ok: 'ok', idle: 'ok', buffering: 'warn', dropped: 'bad', reconnecting: 'bad' }[z.room?.state] || 'ok');
 export const unassigned = (zones, groups) => { const inG = new Set(groups.flatMap(g => g.deviceIds)); return zones.filter(z => !inG.has(z.id)); };
 /** The master slider shows the loudest speaker that is on (the server scales every on-speaker by the same factor from it). */
@@ -95,11 +137,6 @@ function onSwitch(S, ctl, z) {
   const sw = h('div', { class: 'sw sm' + (z.enabled ? ' on' : ''), role: 'switch', 'aria-checked': String(z.enabled), 'aria-label': `${z.name} on or off`, tabindex: 0, onclick: () => canControl(S) && ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH'), onkeydown: e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.target.click(); } } });
   if (!canControl(S)) { sw.setAttribute('aria-disabled', 'true'); sw.classList.add('ro'); sw.title = 'Your access is view-only.'; }
   return sw;
-}
-function badges(S, z, compact = false) {
-  const me = thisDevice(S);
-  if (compact) return [z.reference ? h('span', { class: 'dbadge ref', title: 'House reference speaker' }, 'REF') : null];   // Standard: this device = accent name; only the reference badge
-  return [z.isWeb ? h('span', { class: 'dbadge' }, 'BROWSER') : null, z === me || (me && z.id === me.id) ? h('span', { class: 'dbadge me' }, 'THIS DEVICE') : null, z.reference ? h('span', { class: 'dbadge ref', title: 'House reference speaker: calibration measures the other speakers against this one' }, 'REFERENCE') : null];
 }
 function outputLine(z) {
   if (!showOutputLine(z)) return null;
@@ -299,52 +336,62 @@ function patchVolume(z, vol, pct, mute) {
 function patchFace(el, z, dot, state, sw) {
   el.classList.toggle('off', !z.enabled);
   dot.className = 'dot ' + dotClass(z); dot.title = stateText(z);
-  state.className = 'dstate small' + (z.muted ? ' err' : ' dim'); state.textContent = stateText(z);
+  if (state) { state.className = 'dstate small dim'; state.textContent = stateText(z); }
   sw.classList.toggle('on', !!z.enabled); sw.setAttribute('aria-checked', String(!!z.enabled));
 }
 
 function cardSettings(S, ctl, z) {
-  const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z), r = z.room;
+  const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z);
   const testSound = async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } };
-  const sec = (title, ...kids) => h('div', { class: 'dssec' }, h('div', { class: 'dlbl' }, title), ...kids);
+  const sec = (title, ...kids) => h('div', { class: 'dssec' }, title ? h('div', { class: 'dlbl' }, title) : null, ...kids);
   const btn = (label, fn, ok = true, hint = OWN_HINT, cls = 'btn') => ro(h('button', { type: 'button', class: cls, onclick: fn }, label), ok, hint);
-  const delay = cur ? exactDelay(S, ctl, z, cur, tune) : null, conn = connSection(z);
+  const out = outputPicker(S, ctl, z), delay = cur ? exactDelay(S, ctl, z, cur, tune) : null, conn = connSection(z);
+  const note = h('div', { class: 'small dim dmeasured' }, measuredNote(cur));
+  const calib = btn('Calibrate', () => openCalibration(S, ctl.refreshAll, z.id), tune && z.connected && !z.reference, z.reference ? 'This is the reference speaker: the others are measured against it.' : tune ? 'This device is offline.' : OWN_HINT,
+    'btn calbtn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : ''));
+  const more = moreMenu(S, ctl, z, cur);
   const el = h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
-    sec('SOUND CHECK',
-      h('div', { class: 'row wrap dsbtns' },
-        btn(z.isWeb ? 'Set delay by ear' : '🎤 Calibrate', () => openCalibration(S, ctl.refreshAll, z.id), tune && z.connected, tune ? 'This device is offline.' : OWN_HINT, 'btn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : '')),
-        btn('🔔 Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.')),
-      h('div', { class: 'small dim' }, z.badge === 'recheck' ? 'The delay needs a re-check.' : z.badge === 'uncalibrated' ? 'The delay is not set yet.' : 'Test sound plays a short chime on this device only.')),
-    cur ? sec('DELAY (EXACT)', delay) : null,
-    sec('SOUND',
-      h('div', { class: 'row wrap dsbtns' },
-        btn('Sound / EQ…', () => openEq(S, ctl.refreshAll, cur?.deviceId), tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
-        btn('Delay history…', () => delayHistory(S, ctl, z, cur), !!cur, 'No output yet.'),
-        cur?.kind === 'bluetooth' ? btn('📌 Follow this speaker', async () => { try { await api('/speakers/profiles/capture', { method: 'POST', body: { deviceId: z.id, name: cur.name, follow: true } }); toast('Saved profile and enabled Follow this speaker'); } catch (e) { toast(e.message, true); } }, tune) : null)),
-    conn,
-    sec('DEVICE',
-      h('div', { class: 'row wrap dsbtns' },
-        btn('Rename…', () => rename(S, ctl, z), admin, ADMIN_HINT),
-        btn(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, z.reference ? 'Already the reference speaker' : ADMIN_HINT),
-        btn('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'btn danger'))));
+    sec('OUTPUT', out.el),
+    cur ? sec('DELAY', h('div', { class: 'ddelay' }, delay, calib), note) : null,
+    h('div', { class: 'dssec' }, h('div', { class: 'row dsbtns' },
+      btn('Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.'),
+      btn('Sound / EQ', () => openEq(S, ctl.refreshAll, cur?.deviceId), tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
+      h('span', { class: 'grow' }), more)),
+    conn);
   // 0.2.3 fix: live values are patched in place - the open settings are never rebuilt by a status update
   el._patch = nz => {
     const o = chosenOutput(nz);
     if (delay && o) delay._patch(o);
+    out.patch(nz); const n = measuredNote(o); if (note.textContent !== n) note.textContent = n;
     const key = connKey(nz); if (conn._key !== key) { const fresh = connSection(nz); conn.replaceChildren(...fresh.childNodes); conn._key = key; }
   };
   return el;
+}
+/** More ▾ - Rename, Set as reference, Delay history, Forget (admin-only items stay visible, read-only, for everyone else). */
+function moreMenu(S, ctl, z, cur) {
+  const admin = isAdmin(S);
+  const wrap = h('div', { class: 'dmore' });
+  const item = (label, fn, ok, hint, cls = '') => { const b = h('button', { type: 'button', role: 'menuitem', class: 'mitem' + (cls ? ' ' + cls : ''), onclick: () => { close(); fn(); } }, label); if (!ok) { b.disabled = true; b.title = hint; b.classList.add('ro'); b.setAttribute('aria-disabled', 'true'); } return b; };
+  const menu = h('div', { class: 'dmenu', role: 'menu', hidden: true },
+    item('Rename…', () => rename(S, ctl, z), admin, ADMIN_HINT),
+    item(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, z.reference ? 'Already the reference speaker' : ADMIN_HINT),
+    item('Delay history…', () => delayHistory(S, ctl, z, cur), !!cur, 'No output yet.'),
+    cur?.kind === 'bluetooth' ? item('Follow this speaker', async () => { try { await api('/speakers/profiles/capture', { method: 'POST', body: { deviceId: z.id, name: cur.name, follow: true } }); toast('Saved profile and enabled Follow this speaker'); } catch (e) { toast(e.message, true); } }, canTune(S, z), OWN_HINT) : null,
+    item('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'danger'));
+  const btn = h('button', { type: 'button', class: 'btn dmorebtn', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); menu.hidden ? open() : close(); } }, 'More ▾');
+  const outside = ev => { if (!wrap.contains(ev.target)) close(); };
+  function open() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); }
+  function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); flushSoon(); }
+  wrap.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !menu.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); btn.focus(); } });
+  wrap.append(btn, menu); return wrap;
 }
 const connKey = z => JSON.stringify([z.connected, z.link, z.remoteIp, z.syncErrorMs, z.bufferMs, z.hardResyncs, z.isWeb, z.room?.state, z.room?.drops, z.room?.reconnects, z.room?.underrunEvents]);
 /** The CONNECTION section of a card's settings (text only - safe to refresh in place). */
 function connSection(z) {
   const r = z.room;
-  const conn = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' ? 'Network cable' : z.link, z.remoteIp].filter(Boolean).join(' · ');
-  const sync = z.syncErrorMs != null ? `Sync error ${z.syncErrorMs.toFixed(1)} ms · buffer ${Math.round(z.bufferMs ?? 0)} ms · re-syncs ${z.hardResyncs ?? 0}` : z.isWeb ? 'A browser cannot measure its own sync error - set the delay by ear.' : 'Sync error shows once something plays.';
-  const el = h('div', { class: 'dssec dsconn' }, h('div', { class: 'dlbl' }, 'CONNECTION'),
-    h('div', { class: 'row wrap' }, r ? h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state) : null, h('span', { class: 'small' }, conn)),
-    h('div', { class: 'small dim' }, sync),
-    r && (r.drops || r.reconnects || r.underrunEvents) ? h('div', { class: 'small dim' }, `Dropped ${r.drops}× · reconnected ${r.reconnects}× · ran dry ${r.underrunEvents}×`) : null);
+  const bits = [z.connected ? 'Connected' : 'Offline', z.link === 'wifi' ? 'Wi-Fi' : z.link === 'wired' || z.link === 'ethernet' ? 'network cable' : z.link, z.remoteIp,
+    z.syncErrorMs != null ? `sync ±${Math.abs(z.syncErrorMs).toFixed(1)} ms` : null, r && (r.drops || r.reconnects || r.underrunEvents) ? `dropped ${r.drops}× · reconnected ${r.reconnects}×` : null].filter(Boolean);
+  const el = h('div', { class: 'dsconn small dim', title: z.isWeb ? 'A browser cannot measure its own sync error - Calibrate or set the delay by ear.' : 'Sync error shows once something plays.' }, bits.join(' · '));
   el._key = connKey(z);
   return el;
 }
@@ -352,7 +399,7 @@ function connSection(z) {
 function exactDelay(S, ctl, z, o, tune) {
   const put = (v, live) => api(`/outputs/${encodeURIComponent(o.deviceId)}/latency`, { method: 'PUT', body: { latencyMs: v, playerId: z.playerId, method: 'manual', live } });
   const status = h('span', { class: 'small dim latstatus', 'aria-live': 'polite' });
-  const lat = latencyControl({ value: o.notCalibrated ? 0 : o.latencyMs, onChange: async (v, final) => { try { await put(v, !final); status.textContent = final ? `Saved ${v} ms` : `${v} ms (live)`; } catch (e) { status.textContent = ''; toast(e.message, true); } } });
+  const lat = latencyControl({ label: `${z.name} delay`, value: o.notCalibrated ? 0 : o.latencyMs, onChange: async (v, final) => { try { await put(v, !final); status.textContent = final ? `Saved ${v} ms` : `${v} ms (live)`; } catch (e) { status.textContent = ''; toast(e.message, true); } } });
   if (!tune) lat.el.querySelectorAll('input').forEach(i => ro(i, false, OWN_HINT));
   const el = h('div', null, lat.el, status);
   // 0.2.3 fix: the saved delay is shown live, but never under a focused / dragged slider or a box the user is typing in
@@ -378,77 +425,57 @@ function forget(ctl, z) {
 }
 
 /** Output dropdown + per-output delay of one device (Expanded card). Editable on your own device, or by an admin on any device. */
-function outputAndDelay(S, ctl, z) {
+function outputPicker(S, ctl, z) {
   const can = canTune(S, z), hint = canControl(S) ? OWN_HINT : 'Your access is view-only.';
   const outs = z.outputs.filter(o => o.connected || o.active || o.deviceId === z.chosenDeviceId);
-  let cur = chosenOutput(z);
-  let outEl;
+  const cur = chosenOutput(z);
+  let el;
   if (z.outputUnavailable) {
-    outEl = h('select', { class: 'dsel warn', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) },
+    el = h('select', { class: 'dsel warn', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) },
       h('option', { value: '', selected: true }, '⚠ Output unavailable'), ...outs.filter(o => o.connected).map(o => h('option', { value: o.endpointDbId }, `${outputLabel(o)} — ${dms(o)}`)));
   } else if (outs.length <= 1) {
-    outEl = h('div', { class: 'small dim dsingle' }, z.isWeb ? 'One output (this browser\'s default)' : cur ? `${outputLabel(cur)} (the only output)` : 'No output reported yet');
+    el = h('div', { class: 'small dim dsingle' }, z.isWeb ? 'This browser’s default output' : cur ? `${outputLabel(cur)} (the only output)` : 'No output reported yet');
   } else {
-    outEl = h('select', { class: 'dsel', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) }, ...outs.map(o => h('option', { value: o.endpointDbId, selected: o === cur, disabled: !o.connected }, `${outputLabel(o)} — ${dms(o)}${o.connected ? '' : ' (unplugged)'}`)));
+    el = h('select', { class: 'dsel', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) }, ...outs.map(o => h('option', { value: o.endpointDbId, selected: o === cur, disabled: !o.connected }, `${outputLabel(o)}${o.connected ? '' : ' (unplugged)'}`)));
   }
-  if (outEl.tagName === 'SELECT') ro(outEl, can, hint);
+  if (el.tagName === 'SELECT') ro(el, can, hint);
   async function pick(id) { if (!id) return; try { await api(`/zones/${z.id}/output`, { method: 'POST', body: { endpointId: +id } }); toast('Output switched - its own delay is back'); ctl.refreshAll(); } catch (e) { toast(e.message, true); ctl.refreshAll(); } }
-  const ms = cur && !cur.notCalibrated ? Math.round(cur.latencyMs) : 0;
-  const val = h('span', { class: 'dms' }, cur && cur.notCalibrated ? 'not set' : ms + ' ms');
-  const sl = h('input', { type: 'range', min: 0, max: 1000, step: 5, value: Math.min(1000, ms), 'aria-label': `${z.name} delay in milliseconds`,
-    oninput: ev => { val.textContent = ev.target.value + ' ms'; clearTimeout(sl._t); sl._t = setTimeout(() => put(+ev.target.value, true), 220); },
-    onchange: ev => put(+ev.target.value, false) });
-  async function put(v, live) { if (!cur) return; try { await api(`/outputs/${encodeURIComponent(cur.deviceId)}/latency`, { method: 'PUT', body: { latencyMs: v, playerId: z.playerId, method: 'manual', live } }); if (!live) toast(`Delay ${v} ms saved for ${outputLabel(cur)}`); } catch (e) { toast(e.message, true); } }
-  ro(sl, can && !!cur, cur ? hint : 'No output yet.');
-  const els = [h('div', { class: 'dlbl' }, 'OUTPUT'), outEl,
-    h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'DELAY'), val), sl, h('div', { class: 'dscale small dim' }, h('span', null, '0'), h('span', null, '1000 ms'))];
-  // 0.2.3 fix: live delay values are patched in place (not while the slider / dropdown is in use)
-  els.patch = nz => {
-    const c = chosenOutput(nz);
-    if (c && idle(sl)) { const v = c.notCalibrated ? 0 : Math.round(c.latencyMs); sl.value = String(Math.min(1000, v)); val.textContent = c.notCalibrated ? 'not set' : v + ' ms'; }
-    if (outEl.tagName === 'SELECT' && idle(outEl)) for (const op of outEl.options || outEl.querySelectorAll('option')) {
-      const o = nz.outputs.find(x => String(x.endpointDbId) === op.value); if (o) op.textContent = `${outputLabel(o)} — ${dms(o)}${o.connected || z.outputUnavailable ? '' : ' (unplugged)'}`;
-    }
-  };
-  return els;
+  return { el, patch: () => {} };
 }
 
 function expandedCard(S, ctl, z, hl) {
   z = { ...z };           // this card's own copy: later updates patch it in place
-  const open = openSet.has(z.id);
-  const cls = 'dcard' + (z.enabled ? '' : ' off') + (hl ? ' hl' : '') + (z.mine ? ' mine' : '') + (open ? ' dset' : '');
+  const open = openSet.has(z.id), me = thisDevice(S)?.id === z.id;
+  const cls = 'dcard' + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl ? ' hl' : '') + (me || z.mine ? ' mine' : '') + (open ? ' dset' : '');
   let card;
   const flip = () => { card = toggleSettings(z, card, () => expandedCard(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl)); };
   const { vol, pct, mute } = volumeRow(S, ctl, z);
   const expBtn = settingsToggle(z.name, open, flip); expBtn.setAttribute('aria-controls', `dset-${z.id}`);
-  // 0.2.1 F18: no Calibrate / Test sound buttons on the card face - a small status chip opens the card's settings when the delay needs attention
-  const liveBits = () => {
-    const chips = [];
-    if (!open && canTune(S, z) && (z.badge === 'recheck' || z.badge === 'uncalibrated')) chips.push(h('button', { class: 'chip warn', title: 'Open this device\'s settings to calibrate', onclick: flip }, z.badge === 'recheck' ? 'Delay needs a re-check' : 'Delay not set'));
-    if (z.health === 'starved') chips.push(h('span', { class: 'chip warn' }, 'Network is slow'));
-    return [chips.length ? h('div', { class: 'chips' }, chips) : null,
-      z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null].filter(Boolean);
-  };
+  const liveBits = () => [z.health === 'starved' ? h('span', { class: 'chip warn' }, 'Network is slow') : null,
+    z.room && z.room.state !== 'ok' && z.room.state !== 'idle' && z.connected ? h('div', { class: 'small', style: 'color:var(--amber)' }, z.room.text + (z.room.detail ? ' - ' + z.room.detail : '')) : null].filter(Boolean);
   const liveKey = () => JSON.stringify([z.health === 'starved', z.connected && z.room && z.room.state !== 'ok' && z.room.state !== 'idle' ? [z.room.text, z.room.detail] : null]);
-  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), state = h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), sw = onSwitch(S, ctl, z);
-  const od = outputAndDelay(S, ctl, z), live = h('div', { class: 'dlive' }, liveBits()), settings = open ? cardSettings(S, ctl, z) : null;
+  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), sw = onSwitch(S, ctl, z);
+  const tags = h('span', { class: 'dtags' }, tagEls(z)), status = h('div', { class: 'dstatus small dim ell' }, statusLine(z, me));
+  const live = h('div', { class: 'dlive' }, liveBits()), settings = open ? cardSettings(S, ctl, z) : null;
   let lk = liveKey();
   card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
-    // name gets its own line so it never truncates to "C…" next to the badges and switch
-    h('div', { class: 'dtop' }, dot, h('b', { class: 'dname ell grow', title: z.name }, z.name), sw),
-    h('div', { class: 'dsub' }, ...badges(S, z), state),
-    h('div', { class: 'dlbl row' }, h('span', { class: 'grow' }, 'VOLUME'), pct), h('div', { class: 'dvol' }, icon('volume'), vol, mute),
-    ...od,
+    h('div', { class: 'dtop' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), h('span', { class: 'dkind', title: z.isWeb ? (isPhoneZone(z) ? 'Phone' : 'Browser') : 'PC with WavWiz Player' }, icon(deviceIconName(z))), tags, h('span', { class: 'grow' }), sw),
+    status,
+    h('div', { class: 'dvol' }, vol, pct, mute),
     live,
-    h('div', { class: 'dexpbar' }, expBtn),
-    settings);
+    settings,
+    h('div', { class: 'dexpbar' }, expBtn));
   card._sig = cardSig(S, z, hl);
   card._patch = nz => {            // 0.2.3 fix: a status / level / heartbeat update patches this card in place
     Object.assign(z, nz);
-    patchFace(card, z, dot, state, sw); patchVolume(z, vol, pct, mute); od.patch(z);
+    patchFace(card, z, dot, null, sw); patchVolume(z, vol, pct, mute);
+    card.classList.toggle('muted', !!z.muted); card.classList.toggle('gone', !z.connected);
+    const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); }
+    const sl = statusLine(z, me); if (status.textContent !== sl) status.textContent = sl;
     const k = liveKey(); if (k !== lk) { lk = k; live.replaceChildren(...liveBits()); }
     settings?._patch(z);
   };
+  tags._k = JSON.stringify(cardTags(z));
   return escCloses(card, z, flip);
 }
 
@@ -458,16 +485,42 @@ function standardRow(S, ctl, z, openDevice) {
   z = { ...z };           // this row's own copy: later updates patch it in place
   const { vol, pct, mute } = volumeRow(S, ctl, z);
   const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), state = h('span', { class: 'dstate small' + (z.muted ? ' err' : ' dim') }, stateText(z)), sw = onSwitch(S, ctl, z);
-  const row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.mine ? ' mine' : ''), 'data-device': z.name, 'data-zone-id': z.id },
+  const tags = h('span', { class: 'dtags' }, tagEls(z)); tags._k = JSON.stringify(cardTags(z));
+  const row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.muted ? ' muted' : '') + (z.mine ? ' mine' : ''), 'data-device': z.name, 'data-zone-id': z.id },
     h('div', { class: 'dtop' }, dot,
-      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name), ...badges(S, z, true),
+      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name), tags,
       state, h('span', { class: 'grow' }), sw),
     outputLine(z),
-    h('div', { class: 'dvol' }, icon('volume'), vol, pct, mute));
+    h('div', { class: 'dvol' }, vol, pct, mute));     // 0.2.5: mute on the right, no speaker icon on the left
   row._sig = cardSig(S, z);
-  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); };   // 0.2.3 fix: patched in place
+  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); row.classList.toggle('muted', !!z.muted); const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); } };   // 0.2.3 fix: patched in place
   return row;
 }
+
+// ---- 0.2.5: the "Calibration mic" line at the top of the list while a phone (or a PC mic run) is connected as a calibration mic ----
+let MICS = [], micsAt = 0, micsBusy = false;
+const micsRedraw = () => { try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } };
+async function loadMics(force) {
+  if (micsBusy || (!force && Date.now() - micsAt < 5000)) return; micsBusy = true;
+  try { const r = await api('/calibration/mics'); const changed = JSON.stringify(r) !== JSON.stringify(MICS); MICS = r || []; micsAt = Date.now(); if (changed) { micsSig++; micsRedraw(); } } catch { /* not signed in yet */ } finally { micsBusy = false; }
+}
+let micsSig = 0;
+const HASWIN = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+if (HASWIN) { for (const ev of ['wavwiz:calmics', 'wavwiz:calphone', 'wavwiz:calrun']) window.addEventListener(ev, () => loadMics(true)); }
+/** "Calibration mic  MIC  Dana's iPhone · connected · ready to measure  [Stop using as mic]" (pure text part tested). */
+export const micLineText = m => `${m.device} · ${m.label}`;
+function micLine(S) {
+  loadMics(false);
+  if (!MICS.length) return null;
+  const can = canControl(S);
+  const el = h('div', { class: 'dmicline', role: 'status' }, MICS.map(m => h('div', { class: 'dmicrow' },
+    h('span', { class: 'dmicic' }, icon('mic')), h('b', null, 'Calibration mic'), h('span', { class: 'dtag mic' }, 'MIC'),
+    h('span', { class: 'ell grow' }, h('span', { class: 'dmicdev' }, m.device), h('span', { class: 'small dim' }, ' · ' + m.label)),
+    m.bluetooth ? h('span', { class: 'dtag nodelay', title: 'Bluetooth mics add their own delay, so results may be off. A wired or USB mic is recommended.' }, 'BLUETOOTH') : null,
+    ro(h('button', { type: 'button', class: 'btn sm', onclick: async () => { try { if (m.kind === 'phone') await api(`/calibration/phone-link/${m.token}/stop`, { method: 'POST', body: {} }); else await api(`/calibration/sessions/${m.sessionId}/end`, { method: 'POST', body: {} }); toast('Stopped using it as a calibration mic'); } catch (e) { toast(e.message, true); } loadMics(true); } }, 'Stop using as mic'), can, 'Your access is view-only.'))));
+  el._sig = micsSig; return el;
+}
+const keepMic = (old, S) => (old && old._sig === micsSig ? old : micLine(S));
 
 const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speaker by itself; for a PC with speakers, install WavWiz Player there (it finds this server by itself).';
 
@@ -504,7 +557,7 @@ export function devicesPanel(S, ctl) {
   const kid = (parent, cls) => [...parent.children].find(e => e.classList.contains(cls));
   function draw(force) {
     if (!force && removedShown()) force = true;
-    if (!force && body.querySelector('.dmenu')) return later();
+    if (!force && body.querySelector('.dmenu:not([hidden])')) return later();
     clearTimeout(pending); pending = 0; keepExpandFocus(body);
     const busy = { v: false };
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
@@ -516,7 +569,7 @@ export function devicesPanel(S, ctl) {
       if (hl != null && zpick !== 'all' && !zoneFilter(S.zones, S.groups, zpick).some(z => z.id === hl)) { zpick = 'all'; saveZonePick('all'); }
       const shown = zoneFilter(S.zones, S.groups, zpick);
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main' });
-      reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy)]);
+      reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
       let content;
       if (S.zones.length && shown.length) {
         const grid = kid(emain, 'dgrid') || h('div', { class: 'dgrid' }), old = childCards(grid, 'dcard');
@@ -532,7 +585,7 @@ export function devicesPanel(S, ctl) {
       return;
     }
     const un = unassigned(S.zones, S.groups || []), old = childCards(body, 'drow');
-    reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy),
+    reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), keepMic(kid(body, 'dmicline'), S),
       S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => standardRow(S, ctl, z, id => ctl.setDevSize?.('expanded', id)), busy)) : h('p', { class: 'dim small pad' }, EMPTY),
       h('div', { class: 'pane-h' }, h('span', null, 'ZONES'), h('span', { class: 'grow' }), ro(h('button', { class: 'plus zbtn', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), isAdmin(S))),
       (S.groups || []).length ? S.groups.map(g => h('div', { class: 'zrow2' + (g.active ? ' active' : ''), 'data-zone': g.name },
@@ -543,7 +596,7 @@ export function devicesPanel(S, ctl) {
         un.map(z => h('div', { class: 'urow' }, h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell grow' }, z.name), h('span', { class: 'small dim' }, stateText(z))))] : null]);
     if (busy.v) later();
   }
-  setSize(size);
+  setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => draw());
   return { el: root, draw, setSize, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
 }
 
@@ -556,10 +609,10 @@ export function devicesView(S, ctl) {
   redrawers.add(() => { if (pending) { clearTimeout(pending); pending = 0; draw(); } });
   function draw() {
     const gone = [...list.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
-    if (!gone && root.querySelector('.dmenu')) return later();
+    if (!gone && root.querySelector('.dmenu:not([hidden])')) return later();
     clearTimeout(pending); pending = 0; keepExpandFocus(list);
     const busy = { v: false };      // 0.2.3 fix: cards are kept and patched in place, exactly like the side panel
-    reconcile(top, [keepSection(top.children[0], masterRow(S, ctl), busy), zonesStrip(S, ctl, false)]);
+    reconcile(top, [keepSection(top.children[0], masterRow(S, ctl), busy), keepMic(top.querySelector('.dmicline'), S), zonesStrip(S, ctl, false)].filter(Boolean));
     const old = childCards(list, 'dcard');
     reconcile(list, S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => expandedCard(S, ctl, z, false), busy)) : [h('div', { class: 'card' }, h('h3', null, 'No devices yet'), h('p', { class: 'dim' }, EMPTY))]);
     const live = S.zones.some(z => z.enabled && z.connected);
@@ -567,6 +620,7 @@ export function devicesView(S, ctl) {
       canControl(S) ? h('button', { class: 'btn', onclick: () => openCalibration(S, ctl.refreshAll) }, '🎤 Calibrate') : null);
     if (busy.v) later();
   }
+  if (HASWIN) window.addEventListener('wavwiz:devredraw', () => { if (root.isConnected) draw(); });
   return { el: root, draw };
 }
 export { roomPillClass, roomPill };

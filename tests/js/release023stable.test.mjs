@@ -39,9 +39,9 @@ test('0.2.3 fix: Expanded panel - an open card, its settings and a typed delay s
   assert.equal(box.value, '137', 'the typed delay is kept');
   assert.equal(card(p.el, 2), other, 'closed cards are kept too');
   // live values were patched in place
-  assert.equal(other.querySelector('.dstate').textContent, 'Muted');
+  assert.ok(other.classList.contains('muted')); assert.equal(other.querySelector('.dtag.muted').textContent, 'MUTED');   // 0.2.5: a MUTED tag (render v2)
   assert.equal(other.querySelector('.dvol input').value, String(S.zones[1].volume));
-  assert.match(set1.querySelector('.dsconn').textContent, /Sync error 2\.5 ms/);
+  assert.match(set1.querySelector('.dsconn').textContent, /sync ±2\.5 ms/);
   p.el.remove();
 });
 

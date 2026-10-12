@@ -162,13 +162,13 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   assert.match(d, /const removedShown = \(\) => \[\.\.\.body\.querySelectorAll\('\[data-zone-id\]'\)\]\.some\(el => !S\.zones\.some\(z => String\(z\.id\) === el\.dataset\.zoneId\)\)/);
   assert.match(d, /if \(!force && removedShown\(\)\) force = true;/);
   const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('export function devicesView'));
-  assert.match(panel, /if \(!force && body\.querySelector\('\.dmenu'\)\) return later\(\);/);
+  assert.match(panel, /if \(!force && body\.querySelector\('\.dmenu:not\(\[hidden\]\)'\)\) return later\(\);/);
   assert.match(panel, /if \(busy\.v\) later\(\);/, 'a card / slider / zone editor kept for the user retries');
   assert.doesNotMatch(panel, /\) return;/);
   // the phone Devices page follows the same rule
   const page = d.slice(d.indexOf('export function devicesView'));
   assert.match(page, /const gone = \[\.\.\.list\.querySelectorAll\('\[data-zone-id\]'\)\]/);
-  assert.match(page, /if \(!gone && root\.querySelector\('\.dmenu'\)\) return later\(\);/);
+  assert.match(page, /if \(!gone && root\.querySelector\('\.dmenu:not\(\[hidden\]\)'\)\) return later\(\);/);
   // the "zones" push redraws every view (side panel, page, strip) from fresh /zones + /groups - nothing cached
   const m = src('main.js');
   assert.match(m, /m\.type === 'zones'\) \{ refreshZones\(\);/);
@@ -190,7 +190,7 @@ test('0.2.3 U11: the panel logic - a removed device is detected even while a sli
 
 test('0.2.3 U12: device cards open their settings with a themed chevron Expand control (was •••), in place, on the Expanded cards only', () => {
   const d = src('devices.js');
-  assert.doesNotMatch(d, /'•••'|class: 'dmore'|dsback|'‹ Back'/, 'the ••• flip and its Back button are gone');
+  assert.doesNotMatch(d, /'•••'|dsback|'‹ Back'/, 'the ••• flip and its Back button are gone');
   assert.match(d, /export function settingsToggle\(name, open, onToggle\) \{\n  return h\('button', \{ type: 'button', class: 'dexpand' \+ \(open \? ' on' : ''\), 'aria-expanded': String\(open\)/);
   assert.match(d, /icon\('chevD'\), h\('span', \{ class: 'dexp-l' \}, 'Settings'\)\);/);
   const card = d.slice(d.indexOf('function expandedCard('), d.indexOf('function standardRow('));
@@ -198,7 +198,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   for (const [n, f] of [['Expanded', card]]) {
     assert.match(f, /settingsToggle\(z\.name, open, flip\)/, n + ' has the Expand control');
     assert.match(f, /settings = open \? cardSettings\(S, ctl, z\) : null/, n + ': settings open below the face');
-    assert.match(f, /\n    settings\);\n[\s\S]*\n  return escCloses\(/, n + ': Esc closes');
+    assert.match(f, /\n    settings,\n    h\('div', \{ class: 'dexpbar' \}, expBtn\)\);\n[\s\S]*\n  return escCloses\(/, n + ': Esc closes');
     assert.match(f, /'aria-controls', `dset-\$\{z\.id\}`/);
   }
   assert.match(d, /id: `dset-\$\{z\.id\}`/);
@@ -208,7 +208,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   assert.match(d, /if \(ev\.key === 'Escape' && openSet\.has\(z\.id\)/);
   // admin-only items stay visible, read-only for others
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
-  assert.match(set, /btn\('Rename…', \(\) => rename\(S, ctl, z\), admin, ADMIN_HINT\)/); assert.match(set, /btn\('Forget device…', \(\) => forget\(ctl, z\), admin, ADMIN_HINT, 'btn danger'\)/);
+  assert.match(set, /item\('Rename…', \(\) => rename\(S, ctl, z\), admin, ADMIN_HINT\)/); assert.match(set, /item\('Forget device…', \(\) => forget\(ctl, z\), admin, ADMIN_HINT, 'danger'\)/);   // 0.2.5: in More ▾
   assert.match(set, /ro\(h\('button'/);
   // themed like the panel expand arrows; the chevron flips; rounded 4-6 px
   assert.match(src('icons.js'), /chevD: '<path d="M6 9l6 6 6-6"\/>'/);

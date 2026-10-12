@@ -1459,3 +1459,37 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .calnow{font-size:16px;font-weight:700;margin:8px 0 4px} .calbar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;margin:6px 0} .calbar>i{display:block;height:100%;width:0;background:var(--hl,var(--accent));transition:width .3s}
 .callog{margin:6px 0 0;padding-left:18px;max-height:8em;overflow:auto}
 .caltbl td.mono{font-variant-numeric:tabular-nums}
+
+/* 0.2.5 device cards (approved render v2): tags right of the name (max 2, tight corners), one status line, volume row with the round Mute on
+   the right, one Settings chevron; Settings = Output, Delay (slider + ms + Calibrate, "Measured with … · date"), Test sound · Sound / EQ · More */
+.dtags{display:inline-flex;gap:4px;flex:none;align-items:center}
+.dtag{font-size:9px;font-weight:800;letter-spacing:.06em;line-height:1;padding:3px 5px;border-radius:3px;border:1px solid var(--line);color:var(--dim);flex:none;white-space:nowrap}
+.dtag.ref{background:var(--hl,var(--accent));border-color:var(--hl,var(--accent));color:var(--accent-ink,#111)}
+.dtag.muted,.dtag.nodelay{border-color:var(--amber);color:var(--amber)}
+.dtag.offline{border-color:color-mix(in srgb,var(--dim) 70%,transparent);color:var(--dim)}
+.dtag.role,.dtag.mic{border-color:var(--accent2);color:var(--accent2)}
+.dkind{display:inline-flex;color:var(--dim);flex:none} .dkind svg{width:14px;height:14px}
+.dcard .dtop .dname{flex:0 1 auto;min-width:0}
+.dcard .dstatus{margin:2px 0 6px 14px;min-height:16px}
+.dcard .dvol{gap:10px} .dcard .dvol .pct{width:36px}
+.dcard.muted .dvol input[type=range],.dcard.muted .dvol .pct,.drow.muted .dvol input[type=range],.drow.muted .dvol .pct{opacity:.42}
+.dcard .mutebtn.on,.drow .mutebtn.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent);color:var(--accent)}
+.dcard.gone .dtop,.dcard.gone .dstatus,.dcard.gone .dvol{opacity:.55} .dcard.gone .dot{background:var(--dim)} .dcard.gone .sw{filter:grayscale(1)}
+.dgrid{align-items:start}
+.dcard .dexpbar{margin-top:6px}
+.dcard .dsettings{margin-top:8px}
+.dcard .dsettings .dssec:first-child{padding-top:0;border-top:0}
+.ddelay{display:flex;align-items:center;gap:8px;min-width:0} .ddelay>div:first-child{flex:1;min-width:0}
+.ddelay .latctl{display:flex;align-items:center;gap:8px;min-width:0}
+.dssec .ddelay .latctl .latslider{display:block;flex:1;min-width:60px;order:1} .dssec .ddelay .latctl .latnudge,.dssec .ddelay .latctl .latlabel{display:none}
+.dssec .ddelay .latctl .latbox{order:2;width:64px;height:30px} .dssec .ddelay .latctl>.small{order:3}
+.ddelay .latstatus{display:none}
+.ddelay .calbtn{height:30px;padding:0 10px;font-size:12px;border-color:var(--accent);color:var(--accent);flex:none} .ddelay .calbtn.primary{color:var(--accent-ink,#fff)}
+.dmeasured{margin-top:2px}
+.dmore{position:relative} .dmore .dmenu{right:0;top:auto;bottom:34px} .dmorebtn{height:30px;padding:0 10px;font-size:12px}
+.dmore .dmenu button.danger{color:var(--red)} .dmore .dmenu button.ro{opacity:.5;cursor:not-allowed}
+.dsconn{padding-top:8px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .dtags{margin-left:2px}
+.dmicline{display:flex;flex-direction:column;gap:4px;border:1px solid color-mix(in srgb,var(--accent2) 55%,var(--line));border-left:3px solid var(--accent2);border-radius:var(--radius);padding:6px 10px;background:var(--panel2);margin:0 0 8px;flex:1 1 100%}
+.dmicrow{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px} .dmicic{color:var(--accent2);display:inline-flex} .dmicic svg{width:15px;height:15px}
+.dmicdev{font-weight:600}

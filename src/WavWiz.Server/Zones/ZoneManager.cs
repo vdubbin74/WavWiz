@@ -7,10 +7,11 @@ using WavWiz.Server.Playback;
 namespace WavWiz.Server.Zones;
 
 public sealed record OutputDto(long EndpointDbId, string DeviceId, string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active,
-    double LatencyMs, string LatencySource, string Label, bool NotCalibrated, bool RecheckDue, string? Reason, double? WinLatencyMs, string? Codec, int? DspPresetId, bool DspBypass);
+    double LatencyMs, string LatencySource, string Label, bool NotCalibrated, bool RecheckDue, string? Reason, double? WinLatencyMs, string? Codec, int? DspPresetId, bool DspBypass,
+    string? MeasuredWith = null, string? MeasuredAt = null);     // 0.2.5: how and when the current delay was set (card note "Measured with … · date")
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
-    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null);
+    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null);
 public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active);
 
 /// <summary>
@@ -226,6 +227,7 @@ public sealed class ZoneManager
         var res = new List<ZoneDto>();
         long reference = ReferenceZoneId;
         var owners = _db.Query("SELECT id,owner_token_id FROM player", r => (Id: r.GetString(0), Owner: r.IsDBNull(1) ? (long?)null : r.GetInt64(1))).ToDictionary(x => x.Id, x => x.Owner);
+        var seen = _db.Query("SELECT id,last_seen_at FROM player WHERE last_seen_at IS NOT NULL", r => (Id: r.GetString(0), At: r.GetString(1))).ToDictionary(x => x.Id, x => x.At);
         var rows = _db.Query("SELECT id,name,player_id,enabled,volume,muted,active_output_device_id,sort FROM zone ORDER BY sort,id",
             r => new ZRow(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetDouble(4), r.GetInt32(5) != 0, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7)));
         var memberships = _db.Query("SELECT device_id,group_id FROM zone_group_member", r => (Dev: r.GetInt64(0), Grp: r.GetInt64(1))).ToLookup(x => x.Dev, x => x.Grp);
@@ -241,7 +243,10 @@ public sealed class ZoneManager
                 var live = s?.Outputs.FirstOrDefault(o => o.EndpointId == e.Ep);
                 var r = Resolve(e.Dev, ParseKind(e.Kind), z.PlayerId, false, live?.Codec, live?.WinLatencyMs);
                 var a = _dsp.AssignmentFor(e.Dev);
-                outs.Add(new OutputDto(e.Id, e.Dev, e.Ep, e.Name, e.Kind, e.Bt, s != null && (live?.Connected ?? false), e.Ep == activeEp, r.LatencyMs, SourceName(r.Source), r.Label, r.NotCalibrated, r.RecheckDue, r.Reason, live?.WinLatencyMs, live?.Codec, (int?)a?.PresetId, a?.Bypass ?? false));
+                var how = r.NotCalibrated ? default : _db.Query("SELECT method,mic_source,measured_at FROM calibration WHERE output_device_id=$d AND is_current=1 AND (player_id=$p OR player_id IS NULL) ORDER BY measured_at DESC LIMIT 1",
+                    q => (M: q.GetString(0), Src: q.IsDBNull(1) ? null : q.GetString(1), At: q.GetString(2)), ("$d", e.Dev), ("$p", z.PlayerId)).FirstOrDefault();
+                outs.Add(new OutputDto(e.Id, e.Dev, e.Ep, e.Name, e.Kind, e.Bt, s != null && (live?.Connected ?? false), e.Ep == activeEp, r.LatencyMs, SourceName(r.Source), r.Label, r.NotCalibrated, r.RecheckDue, r.Reason, live?.WinLatencyMs, live?.Codec, (int?)a?.PresetId, a?.Bypass ?? false,
+                    how.M == null ? null : how.Src == null ? how.M : how.M + ":" + how.Src, how.At));
             }
             var act = outs.FirstOrDefault(o => o.Active);
             string badge, text;
@@ -256,7 +261,7 @@ public sealed class ZoneManager
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlaying, StreamAgeMs), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
-                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null));
+                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId)));
         }
         return res;
     }
