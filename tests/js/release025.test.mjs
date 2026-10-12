@@ -152,3 +152,8 @@ test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; 
   for (const x of ['AudioSession category is not compatible with audio capture', 'mic-only page', 'play-and-record', 'Bluetooth mics add their own delay, so results may be off. A wired or USB mic is recommended.', 'Phone role', 'about 1200 px']) assert.ok(sec.includes(x), x);
   assert.doesNotMatch(sec, /\b[UTF]\d+\b|Unison|colour|behaviour/);
 });
+
+test('device card More menu stays closed until More is tapped (display:flex must not override [hidden])', () => {
+  assert.match(css, /\.dmenu\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(src('devices.js'), /class: 'dmenu'[^\n]*hidden: true|hidden: true[^\n]*class: 'dmenu'/);
+});
