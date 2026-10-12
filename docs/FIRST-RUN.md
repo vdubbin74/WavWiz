@@ -58,16 +58,20 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 
 - **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
 - **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
-- In the **Expanded** Devices view, each device card has a **Settings** button with an arrow. It opens that device's settings right under the card: **Set delay by ear**, **Test sound**, the exact delay, **Sound / EQ…**, its audio output, connection details, **Rename…**, **Set as reference** and **Forget device…**. Click it again or press **Esc** to close. The normal (Standard) Devices list only has name, status, volume, Mute and on/off: tap a device's name there to open the Expanded view with that device's card highlighted.
+- In the **Expanded** Devices view, each card shows the name with up to two tags (**REF** for the reference speaker, **MUTED**, **NO DELAY**, **OFFLINE**, or a phone's **SPEAKER** role), one status line (playing · output · delay), and the volume with a round **Mute** button on the right. Its **Settings** button opens the device's settings right under the card: **Output**, **Delay** (slider, exact ms and **Calibrate**, with "Measured with … · date"), **Test sound**, **Sound / EQ** and **More** (Rename, Set as reference, Delay history, Forget), plus one line of connection details. Controls only an administrator may change stay visible but read-only for everyone else.
 - Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other rooms. On PCs the delay is kept per audio output.
 
-### Calibrate with your phone
+### Calibrate speakers
 
-**Devices → Calibrate speakers…** measures each speaker's delay with a phone microphone. The music pauses while it measures and resumes afterwards, and it waits for you to walk to the next speaker.
+**Devices → Calibrate speakers…** measures each speaker's delay against the reference speaker. The music pauses while it measures and plays again afterwards. There are three ways, in this order:
 
-1. A phone only allows its microphone on a trusted HTTPS page. Once, as admin, open **Settings → Devices → Phone & HTTPS → Set up HTTPS**, then scan the QR code with each phone and follow the steps to install WavWiz's certificate (about two minutes).
-2. In Calibrate speakers, use **Use your phone as the microphone**: scan the QR code (or type the short link) on the phone and follow the numbered steps. The line under it shows when the phone is connected. Links expire after 20 minutes.
-3. A link made by an administrator also signs the phone in and lets it calibrate every speaker; other users can calibrate only their own device.
+1. **Use this PC's microphone (recommended).** Works on any PC running WavWiz Player 0.2.5 with a mic: a USB mic, a headset or audio-interface mic, or the PC's built-in mic. Pick the PC and the mic (WavWiz remembers it), watch the live level, place the PC (or the mic) at your listening spot and press **Start**. A Bluetooth headset mic works too, but it adds its own delay, so WavWiz warns: a wired or USB mic is better. No mic? The card says so and offers **Check again**.
+2. **Use your phone.** Scan the QR code with the phone. The phone opens a **mic-only page**: it never plays music and never joins as a speaker. The first time, the page walks you through installing WavWiz's certificate (a phone only allows its microphone on a trusted HTTPS page; an admin turns HTTPS on once in **Settings → Devices → Phone & HTTPS**). Tap **Start** and allow the microphone; the PC shows "Phone connected", each step and the results. While a phone is connected, Devices shows a **Calibration mic** line at the top with **Stop using as mic**.
+3. **By ear.** No microphone at all: play two speakers together and move a slider until they sound like one.
+
+A link made by an administrator lets the phone calibrate every speaker; other users can calibrate only their own device. Links expire after 20 minutes.
+
+**Phone role.** When you open WavWiz on a phone, it asks once: **Play music here** (the phone becomes a speaker) or **Use as a calibration mic**. Change it any time in **Devices → Phone role…**.
 
 ## 7. Settings and appearance
 
@@ -76,10 +80,10 @@ Menus do things, Settings sets things:
 - **File:** Settings…, Sign in as admin… / Leave admin mode, Sign out
 - **Library:** Browse library (opens the Expanded library), Playlists, Queue, Rescan folders, plus admin tools (Tidy up library, Tag & cover fix…, CD ripper…)
 - **Playback:** Play / Pause, Next, Previous, Internet radio, Sound / EQ…
-- **Devices:** Devices & zones, Scenes, Schedules, Calibrate speakers…, Pair a player…, Away-from-home…
+- **Devices:** Devices & zones, Scenes, Schedules, Calibrate speakers…, Pair a player…, Away-from-home…, Phone role… (on a phone)
 - **Help:** Getting started, Diagnostics, What's new, About WavWiz…
 
-**Settings** has four tabs: **Appearance**, **Devices**, **Library** and **Network**. Appearance has its own sub-pages: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
+**Settings** has four tabs: **Appearance**, **Devices**, **Library** and **Network**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. On a large screen Settings grows to about 1200 px wide, so the previews have room. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
 
 **Lock EQ:** the Sound (EQ) window and **Appearance → EQ** have a **Lock EQ** checkbox. When it is checked, the EQ sliders ignore the mouse wheel, dragging, clicks and keys, so scrolling the page never changes the sound. Each device remembers it (off by default; unlocked, the wheel fine-tunes a slider in 0.5 dB steps). **Appearance → EQ** shows this speaker's real EQ and always opens locked; uncheck it to make changes, which are saved to the speaker's own preset.
 

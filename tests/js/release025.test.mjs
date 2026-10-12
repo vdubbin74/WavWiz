@@ -139,3 +139,16 @@ test('0.2.5 C: Settings - Appearance sections are sub-tabs under the main tabs, 
   assert.match(css, /\.appnav\.subtabs\{flex-direction:row/);
   assert.match(css, /\.appsub \.pinprev\{position:sticky/, 'previews stay pinned');
 });
+
+test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; CHANGELOG has 0.2.5 above 0.2.4 with the iPhone root cause in words', async () => {
+  const a = src('about.js');
+  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.5'/);
+  const i25 = a.indexOf('Calibrate with your PC’s mic'), i24 = a.indexOf('Phone set-up page fixed');
+  assert.ok(i25 > 0 && i24 > i25, '0.2.5 first, 0.2.4 kept');
+  for (const x of ['iPhone calibration fixed', 'Phone: speaker or mic', 'Cleaner device cards', 'Wider Settings']) assert.ok(a.includes(x), x);
+  const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
+  assert.ok(cl.indexOf('## [0.2.5]') > 0 && cl.indexOf('## [0.2.5]') < cl.indexOf('## [0.2.4]'));
+  const sec = cl.slice(cl.indexOf('## [0.2.5]'), cl.indexOf('## [0.2.4]'));
+  for (const x of ['AudioSession category is not compatible with audio capture', 'mic-only page', 'play-and-record', 'Bluetooth mics add their own delay, so results may be off. A wired or USB mic is recommended.', 'Phone role', 'about 1200 px']) assert.ok(sec.includes(x), x);
+  assert.doesNotMatch(sec, /\b[UTF]\d+\b|Unison|colour|behaviour/);
+});

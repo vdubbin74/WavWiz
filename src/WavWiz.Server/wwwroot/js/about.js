@@ -4,6 +4,11 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.2.5';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
+  ['Calibrate with your PC’s mic', 'Calibrate speakers now starts with the microphone on a WavWiz Player PC: a USB or headset mic, or the built-in one. Pick it, check the level, press Start. Bluetooth mics work too, with a warning: they add their own delay.'],
+  ['iPhone calibration fixed', 'Scanning the calibration QR code opens a mic-only page that never plays music, so the iPhone asks for the microphone and measures. It stopped with an "AudioSession" error before.'],
+  ['Phone: speaker or mic', 'A phone asks once whether to play music or be a calibration mic. Change it in Devices > Phone role. While a phone is the mic, Devices shows it at the top with Stop using as mic.'],
+  ['Cleaner device cards', 'Tags next to the name, one status line, Mute on the right, and one Settings button with Output, Delay with Calibrate, Test sound, Sound / EQ and More.'],
+  ['Wider Settings', 'Appearance sections are tabs under the main tabs, so previews use the full width. Settings grows to about 1200 px on large screens.'],
   ['Phone set-up page fixed', 'The phone set-up page works again when WavWiz sends other devices to the secure (HTTPS) address: the logo shows, the steps for your phone appear and Check my phone works.'],
   ['QR code goes straight to calibration', 'Scanning the Calibrate speakers QR code now takes your phone straight on to calibration, with a Continue to secure calibration button right on the page.'],
   ['Install steps when needed', 'If your phone does not trust WavWiz yet, the set-up page shows the download button and the install steps for your phone right away.'],
