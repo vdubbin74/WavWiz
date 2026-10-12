@@ -164,7 +164,7 @@ test('0.0.8 item 7: delay slider 0-1000 ms in 5 ms steps, ms box 0-1000 (0.2.0),
 test('0.0.8 item 13: US English spelling in the UI', () => {
   const brit = /\b(colour|favourite|grey|centre|customis|licence|organis|behaviour|analys(e|ing)|catalogue|cancelled|labelled|normalis)/i;
   for (const f of ['about.js', 'main.js', 'menu.js', 'settings.js', 'themes.js', 'vizpage.js', 'vizcore.js', 'now.js', 'devices.js', 'eq.js', 'calibrate.js', 'calerrors.js', 'radiofinder.js', 'diag.js', 'library.js', 'room.js']) {
-    const m = src(f).match(brit); assert.equal(m, null, `${f}: ${m?.[0]}`);
+    const m = src(f).replace(/aria-labelledby/g, '').match(brit);   // 0.3.0: the DOM attribute name is not UI text assert.equal(m, null, `${f}: ${m?.[0]}`);
   }
   assert.doesNotMatch(css, brit);
 });

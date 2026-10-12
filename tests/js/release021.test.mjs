@@ -109,7 +109,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
-  assert.match(st, /\['appearance', 'Appearance'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n\];/);
+  assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n\];/);   // 0.3.0 §7: General/Playback/Jukebox tabs
   assert.doesNotMatch(st, /'about'|id: 'sec-status'/);
   assert.match(dg, /id: 'sec-status'/);
   assert.match(ap, /const pages = \{ theme, viz, eq: eqs, np, display: disp \}/);   // 0.2.2 T2: one sub-section at a time
