@@ -99,6 +99,9 @@ function setupPhone() {
 function ready(note) {
   state = 'opened';
   const ref = plan.reference, others = (plan.speakers || []).filter(z => !ref || z.id !== ref.id);
+  if (ref && !others.length && !plan.allSpeakers) return show(h('div', { class: 'card' }, h('h2', { text: 'Scan the QR code on the PC' }),
+    h('p', { text: 'This phone is ready to be a calibration mic, but this link has no speakers it may measure (you can only calibrate your own speaker, and this phone is not one).' }),
+    h('p', { text: 'On the WavWiz PC, an administrator opens Devices › Calibrate speakers › Use your phone. Scan that QR code with this phone.' })));
   if (!ref || !others.length) return show(h('div', { class: 'card warn' }, h('h2', { text: 'Nothing to measure yet' }),
     h('p', { text: !ref ? 'No speaker is playing right now. Start WavWiz on your speakers, then reload this page.' : 'Only one speaker is connected. Calibration lines up two or more speakers.' }),
     h('button', { class: 'btn', onclick: () => location.reload() }, 'Reload')));
@@ -130,8 +133,8 @@ async function run() {
     if (!window.isSecureContext) throw new CalError('INSECURE', 'isSecureContext=false at ' + location.protocol);
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new CalError('NO_MEDIA_API', 'getUserMedia missing');
     // 1-3: audio session, microphone FIRST, then the capture-only audio context (all started inside this tap)
-    mark('mic', 'run'); order.push('start-tap');
-    try { mic = await openMicFirst({ nav: navigator, win: window, track: m => { track(m); order.push(m); } }); }
+    mark('mic', 'run'); order('start-tap');
+    try { mic = await openMicFirst({ nav: navigator, win: window, track: m => { track(m); order(m); } }); }
     catch (e) { throw new CalError(e && e.name === 'NoAudioApi' ? 'NO_AUDIO_API' : classifyMicError(e), `${e && e.name}: ${e && e.message}`); }
     if (!mic.stream.getAudioTracks()[0]) throw new CalError('MIC_NONE', 'no audio track');
     if (!mic.rawOk) note('This phone kept some of its sound processing on; the result may be a little less exact.', true);
@@ -151,7 +154,7 @@ async function run() {
     // 5. session (the music pauses on the server side)
     try { const s = await call('/calibration/sessions', { method: 'POST', body: { mode: 'phone', referenceZoneId: plan.reference.id, micSource: 'phone', micProcessing: mic.rawOk ? 'raw' : 'processed', linkToken: code } }); sid = s.id; }
     catch (e) { throw new CalError('SESSION_FAILED', e.message); }
-    order.push('session'); note('Music is paused while calibrating.');
+    order('session'); note('Music is paused while calibrating.');
     const steps = buildPlan(plan); let done = 0, heard = 0, failed = 0;
     mark('heard', 'run');
     for (const r of steps) {
@@ -163,7 +166,7 @@ async function run() {
         try { off = await syncClock(); } catch (e) { if (e instanceof CalError && e.code === 'CLOCK_UNSTABLE') throw new CalError('WIFI_UNSTABLE', e.detail); throw e; }
         rec.start(); await sleep(400);
         let play; try { play = await call(`/calibration/sessions/${sid}/play`, { method: 'POST', body: { kind: r.kind, zoneId: r.zone, distanceM: 0, levelDb: -20 } }); } catch (e) { throw new CalError('SESSION_FAILED', e.message); }
-        order.push('play-requested');
+        order('play-requested');
         const serverNow = () => performance.now() * 1000 + off.offsetUs;
         const until = Date.now() + Math.max(0, (play.atUs - serverNow()) / 1000) + play.patternMs + 1500;
         while (Date.now() < until) { if (canceled || stopped) return; if (hidden) throw new CalError('SCREEN_HIDDEN', 'page hidden during recording'); await sleep(100); }
@@ -194,7 +197,7 @@ async function run() {
     const copy = h('button', { class: 'btn ghost small', onclick: async () => { try { await navigator.clipboard.writeText(detailsText(err, env, { log: log.join('\n') })); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } } }, 'Copy details');
     show(h('div', { class: 'card bad', role: 'alert' }, h('h2', { text: d.title }), h('p', { text: d.why }), h('ul', { class: 'fix' }, d.fix.map(f => h('li', { text: f }))),
       d.link ? h('p', null, h('a', { href: d.link.href, text: d.link.text })) : null,
-      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => ready() }, 'Try again'), copy), h('p', { class: 'small', text: `Code: ${err.code}` })));
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => ready() }, 'Try again'), copy), h('p', { class: 'small', text: `Code: ${err.code}${err.detail && !/^[A-Z_]+$/.test(err.detail) ? ' · ' + err.detail : ''}` })));
   }
 }
 
@@ -240,7 +243,7 @@ async function syncClock() {
   ws.close();
   if (!got.size) throw new CalError('CLOCK_TIMEOUT', '0 of 20 replies');
   if (got.size < 8 || est.samples.length < 8) throw new CalError('CLOCK_UNSTABLE', `${got.size} of 20 replies`);
-  order.push('clock'); return { offsetUs: est.offsetUs, rttMs: est.rttUs / 1000, n: got.size };
+  order('clock'); return { offsetUs: est.offsetUs, rttMs: est.rttUs / 1000, n: got.size };
 }
 
 function results(fin, failed) {

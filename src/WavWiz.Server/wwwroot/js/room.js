@@ -212,15 +212,16 @@ export function installAutoJoin(S, refreshAll) {
 }
 /** 0.2.5: the one-time question on a fresh phone. Nothing joins, plays or records until the user answers. */
 export function askPhoneRole(done) {
-  const pick = r => { setPhoneRole(localStorage, r); try { localStorage.setItem(wantKey, r === 'speaker' ? '1' : '0'); } catch { /* ignore */ } box.remove(); done(r); };
-  const box = h('div', { class: 'phone-role', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'How do you want to use this phone?' },
+  const pick = r => { setPhoneRole(localStorage, r); try { localStorage.setItem(wantKey, r === 'speaker' ? '1' : '0'); } catch { /* ignore */ } try { box.close?.(); } catch { /* ok */ } box.remove(); done(r); };
+  // a modal <dialog> (top layer), so it sits above anything already open such as What's new; Escape does not dismiss it (an answer is needed)
+  const box = h('dialog', { class: 'phone-role', 'aria-label': 'How do you want to use this phone?', oncancel: ev => ev.preventDefault() },
     h('div', { class: 'card' }, h('h2', null, 'How do you want to use this phone?'),
       h('button', { class: 'btn primary big', onclick: () => pick('speaker') }, 'Play music here'),
       h('p', { class: 'small dim' }, 'This phone plays in sync with your other speakers.'),
       h('button', { class: 'btn big', onclick: () => pick('mic') }, 'Use as a calibration mic'),
       h('p', { class: 'small dim' }, 'This phone only listens, to line up your speakers. It never plays music.'),
       h('p', { class: 'small dim' }, 'You can change this later in Devices › Phone role.')));
-  document.body.append(box); return box;
+  document.body.append(box); try { box.showModal(); } catch { box.setAttribute('open', ''); } return box;
 }
 function showMicBanner() {
   if (document.querySelector('.mic-banner')) return;
