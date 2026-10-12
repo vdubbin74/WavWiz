@@ -246,7 +246,7 @@ public static class ZoneApi
         g.MapPost("/calibration/sessions/{id}/finish", (string id) =>
         {
             var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);
-            var (props, msgs) = s.Cal.Finish(sess); sess.Notes.Clear(); sess.Notes.AddRange(msgs); sess.Proposals = props;
+            var (props, msgs) = s.Cal.Finish(sess); sess.Notes.Clear(); sess.Notes.AddRange(msgs); sess.Proposals = props; s.Cal.Report(sess, phase: "done");    // 0.2.5: the PC page watching a phone shows the results
             return Results.Json(new { proposals = props, messages = msgs });
         }).Req(Role.Control);
 

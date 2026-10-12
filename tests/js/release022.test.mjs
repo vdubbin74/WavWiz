@@ -96,14 +96,14 @@ test('0.2.2 T10: "Connected" lives only in the top-right indicator; the status b
 test('0.2.2 T9: Calibrate speakers offers "Use your phone as the microphone" (QR + short link, four steps, live Phone connected / waiting)', async () => {
   globalThis.window ??= globalThis; globalThis.navigator ??= { userAgent: 'node' };
   const c = src('calibrate.js'), m = src('main.js'), t = src('tls-setup.js');
-  assert.match(c, /export const PHONE_STEPS = \['Scan the QR code with your phone\.', 'If asked, install the WavWiz certificate \(one time\)\.', 'Allow the microphone\.', 'Stand at the listening spot and follow the prompts \(music pauses automatically\)\.'\]/);
-  assert.match(c, /h\('h3', null, 'Use your phone as the microphone'\)/);
+  assert.match(c, /export const PHONE_STEPS = \['Scan the QR code with your phone\.', 'If asked, install the WavWiz certificate \(one time\)\. The page shows how\.', 'Tap Start and allow the microphone\.', 'Stand at your listening spot and keep still \(music pauses automatically\)\.'\]/);   // 0.2.5 wording
+  assert.match(c, /h\('h3', null, 'Use your phone'\)/);
   assert.match(c, /src: `\/api\/v1\/calibration\/phone-link\/\$\{link\.token\}\/qr\.svg`/);
   assert.match(c, /window\.addEventListener\('wavwiz:calphone', onPush\)/);
   assert.match(c, /const admin = isAdmin\(S\) \|\| !!opts\.linkAdmin/); assert.match(c, /linkToken: opts\.link/);
   const cal = await imp('calibrate');
   assert.deepEqual(cal.phoneStatusText(null), ['wait', 'Waiting for your phone…']);
-  assert.deepEqual(cal.phoneStatusText({ connected: true, state: 'opened', device: 'iPhone' }), ['ok', 'Phone connected: iPhone - follow the prompts on the phone']);
+  assert.deepEqual(cal.phoneStatusText({ connected: true, state: 'opened', device: 'iPhone' }), ['ok', 'Phone connected: iPhone - tap Start on the phone']);
   assert.deepEqual(cal.phoneStatusText({ connected: false, state: 'left', device: 'iPhone' }), ['wait', 'iPhone left. Waiting for your phone…']);
   assert.equal(cal.phoneStatusText({ expired: true })[0], 'bad');
   assert.match(m, /if \(CAL\.cal \|\| window\.__wwCalRedirect\) \{ location\.replace\('\/calmic\.html\?cal=' \+/);   // 0.2.5: mic-only page, never the main app

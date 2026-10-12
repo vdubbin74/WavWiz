@@ -189,7 +189,7 @@ async function run() {
     if (canceled || stopped) return;
     const err = e instanceof CalError ? e : new CalError('UNKNOWN', String(e && e.message || e));
     track('failed ' + err.code + ' ' + err.detail);
-    if (sid) { call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'failed' } }).catch(() => {}); sid = null; }
+    if (sid) { const id = sid; sid = null; call(`/calibration/sessions/${id}/progress`, { method: 'POST', body: { phase: 'failed', error: describe(err.code, env).title } }).catch(() => {}).finally(() => call(`/calibration/sessions/${id}/end`, { method: 'POST', body: { reason: 'failed' } }).catch(() => {})); }
     const d = describe(err.code, env);
     const copy = h('button', { class: 'btn ghost small', onclick: async () => { try { await navigator.clipboard.writeText(detailsText(err, env, { log: log.join('\n') })); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } } }, 'Copy details');
     show(h('div', { class: 'card bad', role: 'alert' }, h('h2', { text: d.title }), h('p', { text: d.why }), h('ul', { class: 'fix' }, d.fix.map(f => h('li', { text: f }))),

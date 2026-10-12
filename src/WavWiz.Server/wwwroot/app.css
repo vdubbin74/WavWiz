@@ -1443,3 +1443,19 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .phone-role .btn.big{width:100%;padding:14px;font-size:17px}
 .mic-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel,#1b1f23);border:1px solid var(--accent,#FF3C00);border-radius:6px;padding:10px 12px}
 .mic-banner .grow{flex:1;min-width:180px}
+
+/* 0.2.5 Calibrate speakers: three ways in order (this PC's mic, phone, by ear), live level, run progress */
+.calx{display:flex;flex-direction:column;gap:10px;min-width:min(640px,calc(86vw / var(--z,1)))}
+.calx .card{margin:0}
+.calway-h{display:flex;align-items:center;gap:10px;margin-bottom:6px} .calway-h h3{margin:0}
+.calnum{flex:none;width:24px;height:24px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.calpc:not(.none){border-color:var(--hl,var(--accent))} .calpc:not(.none) .calnum{background:var(--hl,var(--accent));color:#fff;border-color:transparent}
+.calpc.none{opacity:.85}
+.tag-rec{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--hl,var(--accent));color:#fff}
+.calmeter-row{gap:10px;align-items:center;margin:4px 0 6px} .calmeter{flex:1;height:10px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.calmeter>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3DDC84,#3DDC84 70%,#FFB300 85%,#FF5A5A);transition:width .12s linear}
+.calbt{border-left:3px solid #FFB300;padding-left:8px}
+.calspk summary{cursor:pointer;font-size:14px} .calspk[open] summary{margin-bottom:8px}
+.calnow{font-size:16px;font-weight:700;margin:8px 0 4px} .calbar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;margin:6px 0} .calbar>i{display:block;height:100%;width:0;background:var(--hl,var(--accent));transition:width .3s}
+.callog{margin:6px 0 0;padding-left:18px;max-height:8em;overflow:auto}
+.caltbl td.mono{font-variant-numeric:tabular-nums}

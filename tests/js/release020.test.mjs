@@ -145,8 +145,8 @@ test('0.2.0 item 9: the panel volume and Mute are this device only; chips are st
 test('0.2.0 item 29: calibration ends its session (music resumes), re-syncs before every recording, walk pause with Wi-Fi meter', async () => {
   const c = src('calibrate.js');
   assert.match(c, /\/calibration\/sessions\/\$\{id\}\/end/); assert.match(c, /cleanup = \(\) => \{[^\n]*endSession\(\)/);
-  assert.match(c, /re-sync the clock before EVERY recording/); assert.match(c, /const o2 = await syncClock\(\)/);
-  assert.match(c, /then tap Continue/); assert.match(c, /Wi-Fi is stable here, start recording/);
+  // 0.2.5: the phone measures on its own mic-only page from the listening spot (no walk pauses); it still re-syncs the clock before every recording
+  const mp = src('calmic.js'); assert.match(mp, /try \{ off = await syncClock\(\); \}/); assert.match(mp, /for \(const r of steps\)/);
   assert.match(c, /mode: 'ear'/); assert.match(c, /max: 1000, step: 1/);
   const ce = await imp('calerrors');
   assert.equal(ce.wifiStability([5, 6, 5, 7, 6, 5]).stable, true); assert.equal(ce.wifiStability([5, 300, 20, 900, 40, 5]).stable, false); assert.equal(ce.wifiStability([5, 5]).stable, false);
