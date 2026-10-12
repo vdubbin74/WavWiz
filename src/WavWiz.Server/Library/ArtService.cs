@@ -17,7 +17,53 @@ public sealed class ArtService
     private static readonly string[] Exts = { ".jpg", ".jpeg", ".png", ".webp" };
     public static readonly int[] Sizes = { 96, 192, 384, 768 };
 
-    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); }
+    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); UpgradeCache(_cache); }
+
+    // ---- 0.3.1 B19: corrupted (magenta/green striped) thumbnails. The decoder used to conceal damaged / unsupported data and the result was cached
+    // forever. Now: sniff the format, decode strictly (any decode error = no picture), normalize to 8-bit RGB with even sizes, re-check the JPEG we
+    // made, and reject striped noise. A rejected picture is "no art": the web UI shows its themed initials tile. The cache is rebuilt once on upgrade.
+    public const int CacheVersion = 2;
+    /// <summary>Clears thumbnails made by older versions (once; a marker file records the version).</summary>
+    public static void UpgradeCache(string dir)
+    {
+        try
+        {
+            var marker = Path.Combine(dir, "cache.version");
+            if (File.Exists(marker) && File.ReadAllText(marker).Trim() == CacheVersion.ToString()) return;
+            foreach (var f in Directory.EnumerateFiles(dir, "*.jpg")) { try { File.Delete(f); } catch { } }
+            File.WriteAllText(marker, CacheVersion.ToString());
+        }
+        catch { }
+    }
+    /// <summary>Image formats we accept (magic bytes): JPEG, PNG, WebP, GIF, BMP. Anything else (a URL stored as a "picture", HTML, junk) is no art.</summary>
+    public static string? Sniff(byte[]? b)
+    {
+        if (b == null || b.Length < 16) return null;
+        if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return "jpeg";
+        if (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return "png";
+        if (b[0] == (byte)'R' && b[1] == (byte)'I' && b[2] == (byte)'F' && b[3] == (byte)'F' && b[8] == (byte)'W' && b[9] == (byte)'E' && b[10] == (byte)'B' && b[11] == (byte)'P') return "webp";
+        if (b[0] == (byte)'G' && b[1] == (byte)'I' && b[2] == (byte)'F') return "gif";
+        if (b[0] == (byte)'B' && b[1] == (byte)'M') return "bmp";
+        return null;
+    }
+    /// <summary>A finished thumbnail: a complete JPEG (SOI ... EOI).</summary>
+    public static bool LooksLikeJpeg(byte[]? j) => j != null && j.Length > 100 && j[0] == 0xFF && j[1] == 0xD8 && j[^2] == 0xFF && j[^1] == 0xD9;
+    /// <summary>Striped-noise check on a small 8-bit RGB sample (w x h): the corruption shows as saturated magenta / green pixels alternating
+    /// from row to row. True = looks corrupted. Conservative: a normal green or purple cover is smooth, so it passes.</summary>
+    public static bool LooksStriped(byte[] rgb, int w, int h)
+    {
+        if (rgb.Length < w * h * 3 || w < 4 || h < 4) return false;
+        int mg = 0; double rowJump = 0;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 3, r = rgb[i], g = rgb[i + 1], bl = rgb[i + 2];
+                if ((g > r + 60 && g > bl + 60) || (r > g + 60 && bl > g + 60)) mg++;
+                if (y > 0) { int k = i - w * 3; rowJump += Math.Abs(r - rgb[k]) + Math.Abs(g - rgb[k + 1]) + Math.Abs(bl - rgb[k + 2]); }
+            }
+        double mgFrac = mg / (double)(w * h), jump = rowJump / ((h - 1) * w * 3.0);
+        return mgFrac > 0.35 && jump > 40;
+    }
 
     public static int SnapSize(int want) => Sizes.FirstOrDefault(s => s >= want) is var x && x > 0 ? x : Sizes[^1];
 
@@ -38,7 +84,7 @@ public sealed class ArtService
 
     private bool HasEmbedded(TrackRow t) => Convert.ToInt32(_lib.Scalar("SELECT has_art FROM track WHERE id=$i", ("$i", t.Id))) != 0;
 
-    private static byte[]? ReadEmbedded(string path)
+    public static byte[]? ReadEmbedded(string path)
     {
         try { using var tf = TagLib.File.Create(path, TagLib.ReadStyle.Average); var pic = tf.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tf.Tag.Pictures.FirstOrDefault(); return pic?.Data.Data; }
         catch { return null; }
@@ -88,7 +134,7 @@ public sealed class ArtService
     {
         size = SnapSize(size);
         var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(srcKey))).ToLowerInvariant();
-        var file = Path.Combine(_cache, $"{hash}-{size}.jpg");
+        var file = Path.Combine(_cache, $"v{CacheVersion}-{hash}-{size}.jpg");
         if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
         if (_none.ContainsKey(hash)) return null;
         await _gate.WaitAsync(ct);
@@ -110,7 +156,7 @@ public sealed class ArtService
         if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme is not ("http" or "https")) return null;
         size = SnapSize(size);
         var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(u.AbsoluteUri))).ToLowerInvariant();
-        var file = Path.Combine(_cache, $"remote-{hash}-{size}.jpg");
+        var file = Path.Combine(_cache, $"remote-v{CacheVersion}-{hash}-{size}.jpg");
         if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
         if (_none.ContainsKey("r:" + hash)) return null;
         await _gate.WaitAsync(ct);
@@ -131,19 +177,34 @@ public sealed class ArtService
         finally { _gate.Release(); }
     }
 
+    public Task<byte[]?> ThumbAsync(byte[] raw, int size, CancellationToken ct = default) => ResizeAsync(raw, size, ct);
     private async Task<byte[]?> ResizeAsync(byte[] raw, int size, CancellationToken ct)
     {
+        if (Sniff(raw) == null) return null;
+        // strict decode (no error concealment), 8-bit RGB first (CMYK/YCCK, 16-bit, palette, alpha), even sizes, then a baseline 4:2:0 JPEG
+        var vf = $"format=rgb24,scale='min({size},iw)':'min({size},ih)':force_original_aspect_ratio=decrease:flags=lanczos,scale='max(2,trunc(iw/2)*2)':'max(2,trunc(ih/2)*2)',format=yuvj420p";
+        var (jpg, err) = await Ffmpeg(raw, new[] { "-v", "error", "-err_detect", "explode", "-xerror", "-i", "pipe:0", "-vf", vf, "-frames:v", "1", "-q:v", "4", "-f", "mjpeg", "pipe:1" }, ct);
+        if (jpg == null || !string.IsNullOrWhiteSpace(err) || !LooksLikeJpeg(jpg)) return null;
+        // validate what we made: it must decode cleanly, and must not be striped noise
+        var (px, err2) = await Ffmpeg(jpg, new[] { "-v", "error", "-err_detect", "explode", "-xerror", "-i", "pipe:0", "-vf", "scale=32:32:flags=area,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "pipe:1" }, ct);
+        if (px == null || px.Length != 32 * 32 * 3 || !string.IsNullOrWhiteSpace(err2) || LooksStriped(px, 32, 32)) return null;
+        return jpg;
+    }
+
+    private async Task<(byte[]? Out, string Err)> Ffmpeg(byte[] input, string[] args, CancellationToken ct)
+    {
         var psi = new ProcessStartInfo(_ffmpeg) { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-        foreach (var a in new[] { "-v", "error", "-i", "pipe:0", "-vf", $"scale='min({size},iw)':'min({size},ih)':force_original_aspect_ratio=decrease:flags=lanczos,format=yuvj420p", "-frames:v", "1", "-q:v", "4", "-f", "mjpeg", "pipe:1" }) psi.ArgumentList.Add(a);
+        foreach (var a in args) psi.ArgumentList.Add(a);
         try
         {
             using var p = Process.Start(psi)!; using var tk = CancellationTokenSource.CreateLinkedTokenSource(ct); tk.CancelAfter(TimeSpan.FromSeconds(20));
             var err = p.StandardError.ReadToEndAsync(tk.Token);
-            var wr = Task.Run(async () => { try { await p.StandardInput.BaseStream.WriteAsync(raw, tk.Token); } catch { } finally { try { p.StandardInput.Close(); } catch { } } });
+            var wr = Task.Run(async () => { try { await p.StandardInput.BaseStream.WriteAsync(input, tk.Token); } catch { } finally { try { p.StandardInput.Close(); } catch { } } });
             using var ms = new MemoryStream(); await p.StandardOutput.BaseStream.CopyToAsync(ms, tk.Token);
             await wr; await p.WaitForExitAsync(tk.Token);
-            return p.ExitCode == 0 && ms.Length > 100 ? ms.ToArray() : null;
+            var e = await err;
+            return p.ExitCode == 0 && ms.Length > 0 ? (ms.ToArray(), e) : (null, e);
         }
-        catch { return null; }
+        catch { return (null, "failed"); }
     }
 }

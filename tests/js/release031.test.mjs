@@ -156,3 +156,11 @@ test('B1: Bluetooth tag only on BT outputs; reconnect / output change hits once;
   assert.match(src('devices.js'), /openCalibration\(S, ctl\.refreshAll, z\.id\)/);
   assert.match(src('calibrate.js'), /A wired speaker makes a steadier reference/);
 });
+
+// ---- B19: no art / rejected art -> the themed initials tile stays
+test('B19: artist tiles keep the generated initials portrait when no picture loads', async () => {
+  const G = await imp('gencover');
+  assert.equal(G.initials('Pink Floyd'), 'PF');
+  assert.match(G.portraitSvg('Enya'), />E</);
+  assert.match(src('art.js'), /the generated portrait stays/);
+});
