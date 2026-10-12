@@ -19,6 +19,8 @@ public sealed class PlayerSettings
     public string Name { get; set; } = Environment.MachineName;
     public string LinkType { get; set; } = "auto";           // auto | ethernet | wifi
     public bool StartWithWindows { get; set; } = true;
+    /// <summary>0.3.0 §2: remote mode - this PC controls playback but plays no audio and is not a speaker (tray checkmark, remembered).</summary>
+    public bool RemoteMode { get; set; }
     /// <summary>0 = Auto (follow Windows), else 100..300 percent (see UiScale).</summary>
     public int UiScale { get; set; } = WavWiz.PlayerCore.UiScale.Auto;
 

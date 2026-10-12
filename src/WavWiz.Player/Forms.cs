@@ -129,7 +129,8 @@ public sealed class WebUiForm : Form
         string? fr = null; bool here = false;
         try { here = !string.IsNullOrWhiteSpace(s.ServerHost) && PairingClient.IsThisMachine(s.ServerHost); } catch { }
         try { var p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WavWiz", "first-run-url.txt"); if (File.Exists(p)) fr = File.ReadAllText(p); } catch { }
-        return UiUrl.Resolve(s.ServerHost, s.HttpPort, here, fr);
+        var u = UiUrl.Resolve(s.ServerHost, s.HttpPort, here, fr);
+        return u.Length == 0 ? u : UiUrl.WithRemote(u, s.RemoteMode);   // 0.3.0 §2: hand the tray choice to the page
     }
 
     public static void OpenInBrowser(string url) { try { if (url.Length > 0) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { } }
@@ -143,6 +144,9 @@ public sealed class WebUiForm : Form
     /// <summary>0.2.5: a screen to open once the page has loaded ("calibrate" = Calibrate speakers), as the address's #fragment.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string? StartScreen { get; set; }
+    /// <summary>0.3.0 §2: reload at a new address (remote mode on/off).</summary>
+    public void Navigate(string url) { try { _url = url; if (_web.CoreWebView2 != null && url.Length > 0) _web.CoreWebView2.Navigate(url); } catch { } }
+
     public void OpenScreen(string screen)
     {
         try { if (_web.CoreWebView2 != null && _url.Length > 0) _web.CoreWebView2.Navigate(UiUrl.WithScreen(_url, screen)); else StartScreen = screen; } catch { }

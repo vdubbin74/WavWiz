@@ -47,4 +47,12 @@ public static class UiUrl
         if (screen is not ("calibrate")) return baseUrl;
         var i = baseUrl.IndexOf('#'); return (i >= 0 ? baseUrl[..i] : baseUrl) + "#" + screen;
     }
+    /// <summary>0.3.0 §2: the tray's Remote mode choice rides to the page as ?remote=1 / ?remote=0 (the page remembers it).</summary>
+    public static string WithRemote(string baseUrl, bool remote)
+    {
+        if (string.IsNullOrEmpty(baseUrl)) return baseUrl;
+        var hash = baseUrl.IndexOf('#'); var tail = hash >= 0 ? baseUrl[hash..] : ""; var u = hash >= 0 ? baseUrl[..hash] : baseUrl;
+        u = System.Text.RegularExpressions.Regex.Replace(u, @"[?&]remote=[01]", "");
+        return u + (u.Contains('?') ? "&" : "?") + "remote=" + (remote ? "1" : "0") + tail;
+    }
 }

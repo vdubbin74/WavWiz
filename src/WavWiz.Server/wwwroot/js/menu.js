@@ -9,6 +9,7 @@ import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
+import { isRemote } from './remotemode.js';
 
 
 function menuActions(S, ctl, desktop = false) {
@@ -52,6 +53,8 @@ function menuActions(S, ctl, desktop = false) {
       'hr',
       ['Internet radio', () => go('radio')],
       ['Sound / EQ…', () => openEq(S, refreshAll)],
+      'hr',
+      ['Start Jukebox…', () => go('jukebox'), () => !admin()],   // 0.3.0 §1 (beta): admin only, read-only for others
     ],
     // 0.2.0 item 2: no "This phone as a device" anywhere - every browser joins as a speaker by itself.
     devices: [
@@ -59,6 +62,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Scenes & Schedules…', () => go('scenes')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
+      ['Use as remote only', () => { ctl.toggleRemote?.(); toast(isRemote() ? 'Remote mode is on. This device plays no sound.' : 'Remote mode is off. This device plays music again.'); }, null, () => isPlayerUa()],      // 0.3.0 §2: the Player has the same choice in its tray menu
       'hr',
       ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
       ['Away-from-home…', () => go('remote'), () => !admin()],

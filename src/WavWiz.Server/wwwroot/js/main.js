@@ -9,7 +9,8 @@ import { listTable } from './listtable.js';
 import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { installAutoJoin, deviceName } from './room.js';
+import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
+import { isRemote, remoteBanner, setRemote, REMOTE_KEY, syncPlayerRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
 import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
@@ -20,8 +21,10 @@ import { loadLibPrefs } from './libsort.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
-import { canControl } from './ui.js';
+import { canControl, thisDevice } from './ui.js';
+import { isPlayerUa } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
+import { startJukebox, jukeboxChip, openKiosk } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
@@ -76,6 +79,11 @@ function renderSetup() {
   app.replaceChildren(topbar(), form);
 }
 
+/** 0.3.0 §2: "Use as remote only" on the connect screen: controls playback, plays nothing here. */
+function remoteChoice() {
+  const cb = h('input', { type: 'checkbox', id: 'remoteonly', checked: isRemote(), onchange: () => { try { localStorage.setItem(REMOTE_KEY, cb.checked ? '1' : '0'); } catch { /* ignore */ } } });
+  return h('label', { class: 'row remote-choice', for: 'remoteonly' }, cb, h('span', null, 'Use as remote only', h('small', { class: 'dim', style: 'display:block' }, 'Control the music from here without playing sound on this device.')));
+}
 function renderLogin() {
   const mode = { v: 'pair' };
   const root = h('div', { class: 'card auth' });
@@ -90,7 +98,7 @@ function renderLogin() {
       mode.v === 'pair'
         ? h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/pair', { method: 'POST', body: { code: code.value, name: name.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
             h('p', { class: 'dim' }, 'On the PC that runs WavWiz open Settings > Players > Pair, and type the 6-digit code here.'),
-            h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), msg, h('button', { class: 'btn primary' }, 'Pair'))
+            h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), remoteChoice(), msg, h('button', { class: 'btn primary' }, 'Pair'))
         : h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/login', { method: 'POST', body: { password: pw.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
             h('div', { class: 'field' }, h('label', { for: 'pw' }, 'Administrator password'), pw), msg, h('button', { class: 'btn primary' }, 'Sign in')));
   };
@@ -122,7 +130,7 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleRemote, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
@@ -150,11 +158,14 @@ async function startMain() {
   await refreshAll();
   drawStatus(); maybeWhatsNew(S);
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
+  api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
+  if (isPlayerUa()) syncPlayerRemote(S, thisDevice(S));   // 0.3.0 §2: the Player tray's Remote mode
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
   const hashCal = () => { if (location.hash === '#calibrate') { history.replaceState(null, '', location.pathname + location.search); if (canControl(S)) openCalibration(S, refreshAll); } };
   hashCal(); window.addEventListener('hashchange', hashCal);
   setInterval(() => nowc.tickPos(), 250);
-  installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
+  // 0.3.0 §2: remote mode (remembered per device) never joins as a speaker
+  if (isRemote()) remoteBanner(true, () => toggleRemote(false)); else installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
 /** Library arrow (0.2.2 T5, same rule as Devices): while Expanded it first returns to the normal layout; otherwise it collapses / opens. */
@@ -238,7 +249,7 @@ async function openAboutInto(el) { const { aboutBody } = await import('./about.j
 
 function buildDrawer() {
   navButtons = [];
-  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
+  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, toggleRemote }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
   return h('div', { class: 'drawer', id: 'drawer', role: 'dialog', 'aria-label': 'Menu' }, h('div', { class: 'scrim', onclick: () => toggleDrawer(false) }), nav);
 }
 function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
@@ -247,6 +258,7 @@ export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
   if (k === 'calibrate') return canControl(S) ? openCalibration(S, refreshAll) : undefined;
+  if (k === 'jukebox') return startJukebox(S);   // 0.3.0 §1 (beta)
   if (k === 'scenes' || k === 'schedules' || k === 'alarms') return openScenesSchedules(S, refreshAll);   // 0.3.0 §5: one window (Settings shell / phone sheet)
   // 0.2.1 F8: Theme and Visualizer live on Settings > Appearance (one home); Radio finder is a tab inside Internet radio
   if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, k === 'themes' ? 'theme' : 'viz');
@@ -269,6 +281,10 @@ export function go(k, force) {
   window.scrollTo(0, 0);
 }
 const checklistGo = a => go(a);
+/** 0.3.0 §2: Devices > Use as remote only (and the connect screens). */
+export function toggleRemote(on = !isRemote()) {
+  return setRemote(S, on, { stopDevice: () => stopPhoneDevice().catch(() => {}), startDevice: () => { unlockAudio(); return startPhoneAsDevice(defaultRoomName()).then(() => refreshAll()).catch(e => toast(e.message, true)); } });
+}
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
 async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
@@ -299,7 +315,8 @@ function connectWs() {
       else if (m.type === 'notice') toast(m.data.message, true);
       else if (m.type === 'schedules' || m.type === 'scenes') window.dispatchEvent(new CustomEvent('wavwiz:schedules'));
       else if (m.type === 'sleep') { sleepChip(S, m.data); window.dispatchEvent(new CustomEvent('wavwiz:sleep', { detail: m.data })); }
-      else if (m.type === 'alarm') showAlarm(S, m.data);   // 0.3.0: alarm banner / full-screen takeover on phones
+      else if (m.type === 'alarm') showAlarm(S, m.data);
+      else if (m.type === 'jukebox') jukeboxChip(S, m.data);   // 0.3.0 §1   // 0.3.0: alarm banner / full-screen takeover on phones
       else if (m.type === 'calphone') window.dispatchEvent(new CustomEvent('wavwiz:calphone', { detail: m.data }));   // 0.2.2 T9
       else if (m.type === 'calrun' || m.type === 'miclevel' || m.type === 'calmics') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.2.5 PC-mic run, live mic level, calibration-mic list
       else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b

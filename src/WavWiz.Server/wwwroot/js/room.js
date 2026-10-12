@@ -5,6 +5,7 @@ import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
 import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
 import { phoneRole, setPhoneRole } from './calmic-core.js';
+import { isRemote, remoteBanner, REMOTE_KEY } from './remotemode.js';
 export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -196,6 +197,7 @@ export function unlockAudio() {
  * already plays through Windows (the server also refuses it). Switched off per browser with "Stop playing on this device". */
 export function installAutoJoin(S, refreshAll) {
   if (isPlayerUa()) return;
+  if (isRemote()) return;          // 0.3.0 §2: a remote never joins as a speaker
   let stored = null; try { stored = localStorage.getItem(wantKey); } catch { /* ignore */ }
   installGestureUnlock();
   const go = () => startPhoneAsDevice(defaultRoomName()).then(() => refreshAll && refreshAll()).catch(e => { showUnlock(e.message); setTimeout(() => { if (!sharedDevice?.running) go(); }, 4000); });
@@ -220,6 +222,8 @@ export function askPhoneRole(done) {
       h('p', { class: 'small dim' }, 'This phone plays in sync with your other speakers.'),
       h('button', { class: 'btn big', onclick: () => pick('mic') }, 'Use as a calibration mic'),
       h('p', { class: 'small dim' }, 'This phone only listens, to line up your speakers. It never plays music.'),
+      h('button', { class: 'btn big', onclick: () => { try { localStorage.setItem(REMOTE_KEY, '1'); localStorage.setItem(wantKey, '0'); } catch { /* ignore */ } try { box.close?.(); } catch { /* ok */ } box.remove(); remoteBanner(true, () => location.reload()); } }, 'Use as remote only'),
+      h('p', { class: 'small dim' }, 'Control the music from this phone. It plays no sound and is not a speaker.'),
       h('p', { class: 'small dim' }, 'You can change this later in Devices › Phone role.')));
   document.body.append(box); try { box.showModal(); } catch { box.setAttribute('open', ''); } return box;
 }

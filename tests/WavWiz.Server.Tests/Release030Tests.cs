@@ -210,4 +210,10 @@ public class Release030Tests
         Assert.Equal(HttpStatusCode.OK, (await ctl.PutAsJsonAsync("/api/v1/zones/42/remote", new { remote = false })).StatusCode);
         Assert.DoesNotContain("42", f.Server.S.Db.Setting("remote.zones"));
     }
+
+    [Theory]
+    [InlineData("http://192.168.1.5:47800/", true, "http://192.168.1.5:47800/?remote=1")]
+    [InlineData("http://192.168.1.5:47800/?remote=1", false, "http://192.168.1.5:47800/?remote=0")]
+    [InlineData("http://h:1/#calibrate", true, "http://h:1/?remote=1#calibrate")]
+    public void Player_hands_remote_mode_to_the_page(string url, bool on, string want) => Assert.Equal(want, WavWiz.PlayerCore.UiUrl.WithRemote(url, on));
 }

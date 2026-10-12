@@ -105,8 +105,8 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.doesNotMatch(m, /'View'|'Theme…'|'Visualizer…'|'Display size'|'Radio finder'|\['Playlist',/);
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Queue', 'Rescan folders', 'Tidy up library', 'Tag & cover fix…', 'CD ripper…']);
-  assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…']);
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
+  assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…', 'Start Jukebox…']);
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Use as remote only', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
   assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n\];/);   // 0.3.0 §7: General/Playback/Jukebox tabs

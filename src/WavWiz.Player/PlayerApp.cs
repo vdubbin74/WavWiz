@@ -81,6 +81,7 @@ internal sealed class PlayerApp : ApplicationContext
                 if (who.Id != null) { _s.ServerId = who.Id; if (who.Name != null) _s.ServerName = who.Name; }
             }
             _s.Save();
+            if (_s.RemoteMode) { Log("remote mode: not playing audio on this PC"); _ui.Post(_ => { _tray.Text = Tip("Remote mode"); BuildMenu(); }, null); if (_showWindow) _ui.Post(_ => OpenUi(), null); return; }   // 0.3.0 §2
             _client = new PlayerClient(new PlayerClientOptions
             {
                 Host = _s.ServerHost, HostProvider = () => _s.ServerHost, AudioPort = _s.AudioPort, PlayerId = _s.PlayerId, Name = _s.Name, LinkType = _s.ResolveLinkType(), Token = () => _secrets.Load("token"),
@@ -94,6 +95,16 @@ internal sealed class PlayerApp : ApplicationContext
             if (_showWindow) _ui.Post(_ => OpenUi(), null);       // 0.2.2 T7: a Start menu / desktop launch opens the window
         }
         catch (Exception e) { Log("start failed: " + e); _tray.ShowBalloonTip(5000, WavWizInfo.DisplayName, "WavWiz Player could not start: " + e.Message, ToolTipIcon.Error); }
+    }
+
+    /// <summary>0.3.0 §2: turn remote mode on (stop the speaker) or off (start it again). The open window is told with ?remote=1/0.</summary>
+    private async Task SetRemoteModeAsync(bool on)
+    {
+        _s.RemoteMode = on; _s.Save(); Log("remote mode " + (on ? "on" : "off"));
+        if (on) { var c = _client; _client = null; try { if (c != null) await c.DisposeAsync(); } catch { } _tray.Text = Tip("Remote mode"); }
+        else if (_client == null) await StartAsync();
+        try { _web?.Navigate(WebUiForm.UiAddress(_s)); } catch { }
+        BuildMenu();
     }
 
     private int _refinding;
@@ -153,7 +164,10 @@ internal sealed class PlayerApp : ApplicationContext
         if (outs.DropDownItems.Count == 0) outs.DropDownItems.Add(new ToolStripMenuItem("No outputs found") { Enabled = false });
         _menu.Items.Add(outs);
         _menu.Items.Add(new ToolStripMenuItem("Server && pairing...", null, (_, _) => Repair()));
-        var auto = new ToolStripMenuItem("Start with Windows") { Checked = _s.StartWithWindows, CheckOnClick = true }; auto.Click += (_, _) => { _s.StartWithWindows = auto.Checked; _s.Save(); ApplyAutostart(); }; _menu.Items.Add(auto);
+        var rm = new ToolStripMenuItem("Remote mode (no sound on this PC)") { Checked = _s.RemoteMode, CheckOnClick = true, ToolTipText = "Control the music from this PC without playing it here. This PC is not a speaker." };
+        rm.Click += (_, _) => _ = SetRemoteModeAsync(rm.Checked);
+        _menu.Items.Add(rm);
+                var auto = new ToolStripMenuItem("Start with Windows") { Checked = _s.StartWithWindows, CheckOnClick = true }; auto.Click += (_, _) => { _s.StartWithWindows = auto.Checked; _s.Save(); ApplyAutostart(); }; _menu.Items.Add(auto);
         _menu.Items.Add(new ToolStripMenuItem("Open log folder", null, (_, _) => { try { System.Diagnostics.Process.Start("explorer.exe", Path.GetDirectoryName(_logPath)!); } catch { } }));
         var sizeMenu = new ToolStripMenuItem("Display size");
         foreach (var c in UiScale.Choices) { var v = c; var it = new ToolStripMenuItem(UiScale.Label(v)) { Checked = UiScale.Normalize(_s.UiScale) == v }; it.Click += (_, _) => SetUiScale(v); sizeMenu.DropDownItems.Add(it); }

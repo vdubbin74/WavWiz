@@ -65,7 +65,7 @@ public static class LibraryApi
         }).Req(Role.View);
     }
 
-    private static async Task<IResult> Cover(HttpContext c, Services s, Library.TrackRow? t, int? size)
+    internal static async Task<IResult> Cover(HttpContext c, Services s, Library.TrackRow? t, int? size)
     {
         byte[]? jpg = t == null ? null : await s.Art.GetAsync(t, size ?? 192, c.RequestAborted);
         c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";

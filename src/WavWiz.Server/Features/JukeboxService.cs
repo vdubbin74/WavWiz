@@ -55,7 +55,17 @@ public sealed class JukeboxService
     private readonly HashSet<string> _votes = new(); private long _voteItem = -1;
 
     public object State() => new { running = Running, locked = Locked, style = Cfg().Style, code = Running ? Code : null };
-    public string Start() { lock (_l) { Running = true; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); } _ev.Publish("jukebox", State()); return Code!; }
+    /// <summary>The host's look (theme colors) so the guest page matches the big screen. Only #RRGGBB values are kept.</summary>
+    public Dictionary<string, string> Theme { get; private set; } = new();
+    public string Start(JsonElement? theme = null)
+    {
+        var t = new Dictionary<string, string>();
+        if (theme is { ValueKind: JsonValueKind.Object } th)
+            foreach (var k in new[] { "accent", "accent2", "hl", "bg", "ink" })
+                if (th.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String && System.Text.RegularExpressions.Regex.IsMatch(v.GetString()!, "^#[0-9a-fA-F]{6}$")) t[k] = v.GetString()!;
+        Theme = t; return StartCore();
+    }
+    private string StartCore() { lock (_l) { Running = true; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); } _ev.Publish("jukebox", State()); return Code!; }
     public void Stop() { lock (_l) { Running = false; Code = null; } _ev.Publish("jukebox", State()); }
     public bool Guest(HttpContext c) => Running && Code != null && CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(c.Request.Headers[Header].ToString() is { Length: > 0 } h ? h : c.Request.Query["j"].ToString()), System.Text.Encoding.UTF8.GetBytes(Code));
     public void SetLocked(bool on) { Locked = on; _ev.Publish("jukebox", State()); }
@@ -131,13 +141,13 @@ public sealed class JukeboxService
     }
 
     /// <summary>Now playing + next songs with requester names (big screen and guest page).</summary>
-    public object Board()
+    public object Board(bool host = false)
     {
         var now = _cond.Now(); var q = _cond.Queue(); var c = Cfg();
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
-        return new { running = Running, locked = Locked, style = c.Style, voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound,
-            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, artUrl = now.Item.ArtUrl, refId = now.Item.RefId, by = Who(now.Item.Id), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
-            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select(x => new { id = x.Id, title = x.Title, artist = x.Artist, by = Who(x.Id) }) };
+        return new { running = Running, locked = Locked, style = c.Style, voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
+            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
+            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) ? r.Guest : null }) };
     }
 
     /// <summary>Auto-fill: when the queue runs dry, add a random allowed song from the chosen playlist (or genre). Called every second.</summary>

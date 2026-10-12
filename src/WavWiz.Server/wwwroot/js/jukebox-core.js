@@ -1,0 +1,44 @@
+// WavWiz 0.3.0 §1 Jukebox (beta): pieces shared by the big screen (kiosk) and the guest phone page. No DOM work at import time.
+export const GUEST_KEY = 'wavwiz.jukebox.guest';
+export const NAME_KEY = 'wavwiz.jukebox.name';
+export const STYLES = [['modern', 'Modern'], ['retro', 'Retro CD']];
+/** A random id that stays on this phone so the per-guest limit and votes follow the person, not the tab. */
+export function guestId(store = globalThis.localStorage, rnd = () => crypto.getRandomValues(new Uint32Array(2))) {
+  try { const old = store?.getItem(GUEST_KEY); if (old && old.length >= 8) return old; } catch { /* private mode */ }
+  const id = 'g-' + [...rnd()].map(n => n.toString(36)).join('-');
+  try { store?.setItem(GUEST_KEY, id); } catch { /* ignore */ }
+  return id;
+}
+/** Group heads, e.g. "Artists (2)". */
+export const groupHead = (label, n) => `${label} (${n})`;
+export const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+export const artistLine = a => plural(a.songs, 'song');
+export const albumLine = a => `${a.artist} · ${plural(a.tracks, 'track')}`;
+/** "Your songs in queue: 1 of 3" */
+export function mineLine(board, gid) {
+  const mine = (board?.next || []).filter(x => x.mine || (x.guest && x.guest === gid)).length;
+  return `Your songs in queue: ${mine} of ${board?.perGuest ?? 3}`;
+}
+/** Selection codes for the Retro CD typewriter strips: A1..A9, B1.. */
+export const selCode = i => String.fromCharCode(65 + Math.floor(i / 9) % 26) + (i % 9 + 1);
+/** Minutes left in "Up next" (rough: 3.5 min per song when lengths are unknown). */
+export const upNextHead = next => `${plural(next.length, 'song')}`;
+/** The kiosk exit gestures: long-press the corner logo, or Ctrl+Shift+J. */
+export const isExitChord = e => e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j');
+/** Keys the kiosk swallows inside WavWiz (the OS keeps Ctrl+Alt+Del and the Windows key: see the setup guide, Windows Assigned Access). */
+export function blockedKey(e) {
+  if (isExitChord(e)) return false;
+  if (e.key === 'Escape' || e.key === 'F11' || e.key === 'F5' || e.key === 'ContextMenu') return true;
+  if (e.altKey && (e.key === 'Tab' || e.key === 'F4' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return true;
+  if (e.ctrlKey && /^[wrnqtlp]$/i.test(e.key)) return true;
+  return false;
+}
+/** Guest API: the session code rides in a header; no sign-in, no cookies. */
+export function guestApi(code, fetchFn = (...a) => fetch(...a)) {
+  return async (path, body) => {
+    const r = await fetchFn('/api/v1/jukebox/guest' + path, { method: body ? 'POST' : 'GET', headers: { 'X-WavWiz-Guest': code, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    let j = null; try { j = await r.json(); } catch { /* empty */ }
+    if (!r.ok) { const e = new Error(j?.error || 'Something went wrong. Try again.'); e.status = r.status; throw e; }
+    return j;
+  };
+}
