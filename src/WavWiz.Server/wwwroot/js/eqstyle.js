@@ -63,7 +63,7 @@ export const glowWords = style => style === 'curve' ? ['Spectrum glow', 'Brightn
 // click and keys. Remembered per device (this browser). The Appearance > EQ preview always opens locked (U10) and does not change this.
 export const EQ_LOCK_KEY = 'wavwiz.eqlock.v1';
 export function loadEqLock(store = globalThis.localStorage) { try { return store?.getItem(EQ_LOCK_KEY) === '1'; } catch { return false; } }
-export function saveEqLock(on, store = globalThis.localStorage) { try { store?.setItem(EQ_LOCK_KEY, on ? '1' : '0'); } catch { /* private mode */ } return !!on; }
+export function saveEqLock(on, store = globalThis.localStorage) { try { store?.setItem(EQ_LOCK_KEY, on ? '1' : '0'); } catch { /* private mode */ } try { globalThis.dispatchEvent?.(new CustomEvent('wavwiz:eqlock', { detail: !!on })); } catch { /* node tests */ } return !!on; }
 /** Mouse wheel over a band: the new gain (one 0.5 dB step per notch, up = louder), or null = leave the event alone so the page scrolls. */
 export function wheelGain(locked, db, deltaY) { if (locked || !deltaY) return null; return snapDb(db + (deltaY < 0 ? EQ_STEP : -EQ_STEP)); }
 /** 0.2.3 U10: the speaker the Appearance > EQ preview mirrors - this device's own speaker when it is one, else the active (or first)

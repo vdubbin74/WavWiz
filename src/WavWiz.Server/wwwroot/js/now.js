@@ -5,6 +5,8 @@ import { icon, setIcon, iconSvg } from './icons.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
 import { heartBtn } from './fav.js';
+import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
+import { kioskOpen } from './jukebox-kiosk.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
@@ -172,8 +174,15 @@ export function createNow(S, ctl) {
     for (const b of [muteBtn, barMute, sMute]) { b.disabled = !can; b.classList.toggle('on', !!z?.muted); b.setAttribute('aria-pressed', String(!!z?.muted)); setIcon(b, z?.muted ? 'mute' : 'volume'); b.title = z?.muted ? 'Unmute this device' : 'Mute this device'; }
   }
 
+  // 0.3.0 §3: EQ is the default center view; the toggle beside Looks switches EQ ⇄ Visualizer (remembered on this device)
+  let center = loadCenter(), eqv = null; const eqHost = h('div', { class: 'np-eqhost' });
+  stage.append(eqHost);
+  function setCenter(m) { center = saveCenter(m); ensureViz(); drawVBtns(); paintStage(); }
+  const centerToggle = () => h('button', { class: 'txt np-centertoggle', 'aria-pressed': String(center === 'viz'), 'aria-label': center === 'eq' ? 'Show the visualizer instead of the EQ' : 'Show the EQ instead of the visualizer', title: center === 'eq' ? 'Show the visualizer' : 'Show the EQ', onclick: () => setCenter(center === 'eq' ? 'viz' : 'eq') }, '⇄ ' + toggleLabel(center));
   function drawVBtns() {
     const p = vizPrefs(); vbtns.replaceChildren();
+    if (center === 'eq') { vbtns.append(h('button', { class: 'txt', 'aria-label': 'Choose the EQ style', title: 'EQ style (LED bars, Studio faders, Spectrum curve)', onclick: () => ctl.go('settings:eqstyle') }, 'Looks'), centerToggle()); return; }
+    vbtns.append(centerToggle());
     vbtns.append(h('button', { 'aria-label': p.on ? 'Turn the visualizer off' : 'Turn the visualizer on', title: p.on ? 'Visualizer on - tap to turn off' : 'Visualizer off - tap to turn on', onclick: () => { p.on = !p.on; saveVizPrefs(p); ensureViz(); drawVBtns(); paintStage(); } }, icon(p.on ? 'sparkle' : 'vizoff')));
     if (p.on && viz?.ok) {
       vbtns.append(h('button', { class: 'txt', 'aria-label': 'Choose the visualizer', title: 'Visualizer looks, colors and energy', onclick: () => ctl.go('visualizer') }, 'Looks'),
@@ -183,7 +192,9 @@ export function createNow(S, ctl) {
   }
   function ensureViz() {
     const p = vizPrefs();
-    if (!p.on) { if (viz) { viz.destroy(); viz = null; } vizState = { audible: false, error: null, preset: '' }; paintStage(); return; }
+    // 0.3.0 §3: the EQ view lives only while shown; the visualizer renders ONLY while selected (no rAF, analyser or GL work when hidden or under the Jukebox screen)
+    if (center === 'eq' && !kioskOpen()) { if (!eqv) eqv = centerEq(S, eqHost); else eqv.refresh(); } else if (eqv) { eqv.destroy(); eqv = null; }
+    if (!p.on || center !== 'viz' || kioskOpen() || document.hidden) { if (viz) { viz.destroy(); viz = null; } vizState = { audible: false, error: null, preset: '' }; paintStage(); return; }
     // Start even when idle so every look can show its calm idle animation.
     if (!viz) {
       viz = new Viz(host, { onStatus: (k, t) => { if (k === 'audible') vizState.audible = t === 'yes'; else if (k === 'error') vizState.error = t; else if (k === 'preset') { vizState.preset = t; drawVBtnsSoon(); } paintStage(); } });
@@ -194,8 +205,8 @@ export function createNow(S, ctl) {
   function paintStage() {
     const p = vizPrefs();
     // Show canvas whenever viz is on and healthy (including idle animation); cover only when viz off.
-    const show = p.on && viz?.ok;
-    stage.classList.toggle('viz', !!show); vname.textContent = vizState.error ? vizState.error : '';
+    const show = center === 'viz' && p.on && viz?.ok;
+    stage.classList.toggle('viz', !!show); stage.classList.toggle('eqmode', center === 'eq'); vname.textContent = vizState.error ? vizState.error : '';
     vname.classList.toggle('bad', !!vizState.error);
   }
   function fullscreen() {
@@ -212,6 +223,8 @@ export function createNow(S, ctl) {
     if (!overlay) return; document.removeEventListener('fullscreenchange', fsc); document.removeEventListener('keydown', esc);
     stage.insertBefore(host, srcChip); overlay.remove(); overlay = null; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* ok */ } viz?.resize(); paintStage();
   }
+  window.addEventListener('wavwiz:kiosk', () => { ensureViz(); paintStage(); });
+  document.addEventListener('visibilitychange', () => { ensureViz(); paintStage(); });
   window.addEventListener('wavwiz:viz', () => { const p = vizPrefs(); if (viz) { viz.setLight(); if (viz.engine !== p.engine) viz.useEngine(p.engine); } ensureViz(); drawVBtns(); paintStage(); });
 
   function draw() {

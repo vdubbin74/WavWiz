@@ -4,21 +4,27 @@
 // picked speaker; Save asks for a name when it makes a new preset (no name box in the footer).
 import { h, api, toast, dialog, debounce } from './util.js';
 import { eqArea, eqLockBox } from './eqview.js';
-import { loadEqPrefs, saveEqPrefs, glowWords, fmtDb, loadEqLock, saveEqLock } from './eqstyle.js';
+import { loadEqPrefs, saveEqPrefs, glowWords, fmtDb, loadEqLock, saveEqLock, eqTarget } from './eqstyle.js';
+import { thisDevice } from './ui.js';
 import { spectrumTap } from './viz.js';
 
 /** A flat (neutral) EQ; exported for the Appearance > EQ preview (0.2.3 U10). */
 export const flatEq = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0), trimDb: 0, preampDb: 0, autoPreamp: true, bypass: false, bass: { gainDb: 0, hz: 100 }, treble: { gainDb: 0, hz: 10000 }, loudness: { enabled: false, refVolume: 80 }, limiter: { enabled: true, ceilingDb: -0.3, releaseMs: 120, lookaheadMs: 0 } });
 
+/** 0.3.0 §3.4: "Sound · Kitchen" */
+export const soundTitle = speaker => (speaker ? `Sound · ${speaker}` : 'Sound (EQ)');
 export async function openEq(S, refresh, deviceId) {
   const outputs = S.zones.flatMap(z => z.outputs.map(o => ({ ...o, zone: z.name }))).filter(o => o.connected || o.active);
   if (!outputs.length) return toast('No speaker is connected yet.', true);
   let presets = []; try { presets = await api('/dsp/presets'); } catch (e) { return toast(e.message, true); }
-  let dev = deviceId && outputs.find(o => o.deviceId === deviceId) ? deviceId : (outputs.find(o => o.active)?.deviceId ?? outputs[0].deviceId);
+  // 0.3.0 §3.4: no picker in the Sound window - it adjusts this device's own speaker (or the one asked for), named in the title
+  const own = eqTarget(S.zones, thisDevice(S));
+  let dev = deviceId && outputs.find(o => o.deviceId === deviceId) ? deviceId : (own?.deviceId ?? outputs.find(o => o.active)?.deviceId ?? outputs[0].deviceId);
+  const devOut = outputs.find(o => o.deviceId === dev);
   let cur = flatEq(), presetId = null, dirty = false, previewing = false, area = null, lastResp = null;
   const body = h('div', { class: 'eqdlg' });
-  const d = dialog('Sound (EQ)', body, [], { cls: 'eqdialog', onClose: async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } })); refresh && refresh(); } });
-  d.el.querySelector('header .grow')?.append(h('span', { class: 'small dim eqsub' }, 'Changes play live on the speaker you pick.'));
+  const d = dialog(soundTitle(devOut?.zone), body, [], { cls: 'eqdialog', onClose: async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } })); refresh && refresh(); } });
+  d.el.querySelector('header .grow')?.append(h('span', { class: 'small dim eqsub' }, 'Changes play live on this speaker.'));
   // 0.2.3 U9: Lock EQ in the header (remembered on this device): the sliders then ignore the wheel, drag and click
   const lock = eqLockBox(loadEqLock(), v => { saveEqLock(v); area?.setLocked(v); });
   d.el.querySelector('header .grow')?.after(lock.el);
@@ -31,8 +37,6 @@ export async function openEq(S, refresh, deviceId) {
   }, 150);
   const changed = () => { if (!dirty) { dirty = true; paintPreset(); } sync(); };
 
-  const outSel = h('select', { 'aria-label': 'Speaker', onchange: async ev => { if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } previewing = false; liveTag.hidden = true; } dev = ev.target.value; await load(); } },
-    outputs.map(o => h('option', { value: o.deviceId, selected: o.deviceId === dev }, `${o.zone} — ${o.name}`)));
   const preSel = h('select', { 'aria-label': 'Preset', onchange: ev => { const p = presets.find(x => String(x.id) === ev.target.value); if (p) { cur = { ...flatEq(), ...structuredClone(p.json) }; presetId = p.id; dirty = false; paintAll(); sync(); } } });
   function paintPreset() {
     preSel.replaceChildren(h('option', { value: '', selected: dirty || presetId == null }, 'Custom'),
@@ -78,7 +82,7 @@ export async function openEq(S, refresh, deviceId) {
     h('span', { class: 'grow' }),
     h('button', { class: 'btn primary', onclick: save }, 'Save & use on this speaker'));
   body.replaceChildren(
-    h('div', { class: 'eqtop' }, h('span', { class: 'eqlbl' }, 'SPEAKER'), outSel, liveTag, h('span', { class: 'grow' }), h('span', { class: 'eqlbl' }, 'PRESET'), preSel),
+    h('div', { class: 'eqtop' }, h('span', { class: 'eqlbl' }, 'SPEAKER'), h('b', { class: 'eqspk' }, devOut ? `${devOut.zone} — ${devOut.name}` : ''), liveTag, h('span', { class: 'grow' }), h('span', { class: 'eqlbl' }, 'PRESET'), preSel),
     mainHost, lower, footer);
   const onStyle = () => { if (d.el.isConnected) { buildArea(); buildLower(); } else window.removeEventListener('wavwiz:eqstyle', onStyle); };
   window.addEventListener('wavwiz:eqstyle', onStyle);
