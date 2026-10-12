@@ -8,6 +8,8 @@ import { heartBtn } from './fav.js';
 import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
 import { loadPanels, savePanels } from './panels.js';
+import { loadEqLock, saveEqLock } from './eqstyle.js';
+import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, resetLooks, stepPct, ovSvg } from './looks.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
  *  [bordered visualizer panel: look name top-left, progress bar along its bottom edge with elapsed (left) / look name (center) / remaining (right)]
@@ -179,18 +181,77 @@ export function createNow(S, ctl) {
   let center = loadCenter(), eqv = null; const eqHost = h('div', { class: 'np-eqhost' });
   stage.append(eqHost);
   function setCenter(m) { center = saveCenter(m); ensureViz(); drawVBtns(); paintStage(); }
-  const centerToggle = () => h('button', { class: 'txt np-centertoggle', 'aria-pressed': String(center === 'viz'), 'aria-label': center === 'eq' ? 'Show the visualizer instead of the EQ' : 'Show the EQ instead of the visualizer', title: center === 'eq' ? 'Show the visualizer' : 'Show the EQ', onclick: () => setCenter(center === 'eq' ? 'viz' : 'eq') }, '⇄ ' + toggleLabel(center));
+  // 0.3.1 B18 (viz-controls-icons): ONE overlay group of 28x28 icon buttons in the stage's top-right corner, muted Lock EQ style, theme
+  // variables only, labels in tooltips + aria-labels. B17: Lock EQ lives in this group, above every glow / visualizer layer.
+  let looksPop = null;
+  const OV_LABEL = { lock: l => (l ? 'Lock EQ (locked) - click to unlock' : 'Lock EQ'), swap: () => (center === 'eq' ? 'Show the visualizer' : 'Show the EQ'), looks: () => 'Looks', full: () => 'Full screen', power: on => (on ? 'Visualizer on - click to turn off' : 'Visualizer off - click to turn on'), popout: () => 'Pop out' };
+  function ovBtn(name, label, on, onclick, iconName = name) {
+    const b = h('button', { type: 'button', class: 'ib ov-' + name + (name === 'swap' ? ' np-centertoggle' : '') + (on ? ' on' : ''), 'aria-label': label, title: label, 'data-ov': name, onclick });
+    if (name === 'lock' || name === 'swap' || name === 'power' || name === 'looks') b.setAttribute('aria-pressed', String(!!on));
+    b.innerHTML = ovSvg(iconName); return b;
+  }
+  function applyLooks() {
+    const l = loadLooks(), f = Math.min(1, l.overlay / 50), x = Math.max(0, (l.overlay - 50) / 50);
+    vbtns.style.setProperty('--ov-rest', String(btnOpacity(l.btn)));
+    stage.style.setProperty('--wz-ovf', f.toFixed(2)); stage.style.setProperty('--wz-ovx', x.toFixed(2));
+  }
+  window.addEventListener('wavwiz:looks', () => { applyLooks(); if (looksPop) paintLooks(); });
   function drawVBtns() {
-    const p = vizPrefs(); vbtns.replaceChildren();
-    if (center === 'eq') { vbtns.append(h('button', { class: 'txt', 'aria-label': 'Choose the EQ style', title: 'EQ style (LED bars, Studio faders, Spectrum curve)', onclick: () => ctl.go('settings:eqstyle') }, 'Looks'), centerToggle()); return; }
-    vbtns.append(centerToggle());
-    vbtns.append(h('button', { 'aria-label': p.on ? 'Turn the visualizer off' : 'Turn the visualizer on', title: p.on ? 'Visualizer on - tap to turn off' : 'Visualizer off - tap to turn on', onclick: () => { p.on = !p.on; saveVizPrefs(p); ensureViz(); drawVBtns(); paintStage(); } }, icon(p.on ? 'sparkle' : 'vizoff')));
-    if (p.on && viz?.ok) {
-      vbtns.append(h('button', { class: 'txt', 'aria-label': 'Choose the visualizer', title: 'Visualizer looks, colors and energy', onclick: () => ctl.go('visualizer') }, 'Looks'),
-        h('button', { 'aria-label': 'Full screen visualizer', title: 'Full screen', onclick: fullscreen }, icon('full')));
-      if (!inDesktopPlayer() && !isPhone()) vbtns.append(h('button', { 'aria-label': 'Open the visualizer in its own window', title: 'Pop out', onclick: () => window.open('/viz.html', 'wavwiz-viz', 'popup,width=960,height=600') }, icon('popout')));
+    const p = vizPrefs(), locked = loadEqLock(), mode = center;
+    const want = overlayButtons(mode, { popout: !inDesktopPlayer() && !isPhone() });
+    const make = {
+      lock: () => ovBtn('lock', OV_LABEL.lock(locked), locked, () => { saveEqLock(!loadEqLock()); drawVBtns(); }, locked ? 'lock' : 'unlock'),
+      swap: () => ovBtn('swap', OV_LABEL.swap(), mode === 'viz', () => { closeLooks(); setCenter(mode === 'eq' ? 'viz' : 'eq'); }),
+      looks: () => ovBtn('looks', OV_LABEL.looks(), !!looksPop, ev => { ev.stopPropagation(); looksPop ? closeLooks() : openLooks(); }),
+      full: () => ovBtn('full', OV_LABEL.full(), false, () => (mode === 'viz' ? fullscreen() : stageFull())),
+      power: () => ovBtn('power', OV_LABEL.power(p.on), p.on, () => { p.on = !p.on; saveVizPrefs(p); ensureViz(); drawVBtns(); paintStage(); }),
+      popout: () => ovBtn('popout', OV_LABEL.popout(), false, () => window.open('/viz.html', 'wavwiz-viz', 'popup,width=960,height=600')),
+    };
+    vbtns.replaceChildren(...want.map(n => make[n]()));
+    vbtns.setAttribute('role', 'toolbar'); vbtns.setAttribute('aria-label', mode === 'eq' ? 'EQ controls' : 'Visualizer controls');
+    vbtns.classList.toggle('solid', !!looksPop); applyLooks();
+  }
+  // full screen in EQ mode = the whole stage (EQ + glow); visualizer mode keeps its own full-screen view
+  function stageFull() { try { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen?.().catch(() => {}); } catch { /* optional */ } }
+  /** The Looks popover: 300 px, --panel, 2 px accent top border; bottom sheet on phones. Closes on outside click / Esc / second click; focus trapped. */
+  function openLooks() {
+    closeLooks(); const ret = document.activeElement;
+    looksPop = h('div', { class: 'looks-pop' + (isPhone() ? ' sheet' : ''), role: 'dialog', 'aria-modal': 'false', 'aria-label': (center === 'eq' ? 'EQ' : 'Visualizer') + ' looks' });
+    looksPop._ret = ret; paintLooks(); stage.append(looksPop); drawVBtns();
+    looksPop.querySelector('input')?.focus();
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0); document.addEventListener('keydown', popKeys, true);
+  }
+  function paintLooks() {
+    const mode = center, eng = vizPrefs().engine, rows = looksRows(mode);
+    const rowEl = ([k, label]) => {
+      const v = getLook(k, eng), out = h('span', { class: 'p mono' }, v + '%');
+      const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: v, class: 'dvol', 'aria-label': label, 'data-look': k, 'data-coarse': 10,
+        oninput: ev => { out.textContent = setLook(k, +ev.target.value, eng) + '%'; } });
+      r.addEventListener('keydown', ev => { if (!['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'].includes(ev.key) || !ev.shiftKey) return; ev.preventDefault(); r.value = stepPct(+r.value, /Up|Right/.test(ev.key) ? 1 : -1, true); r.dispatchEvent(new Event('input')); });
+      return h('label', { class: 'looks-row' }, h('span', null, label), r, out);
+    };
+    const extra = mode === 'viz' ? h('label', { class: 'looks-row looks-sw' }, h('span', null, 'Visualizer'), h('input', { type: 'checkbox', checked: vizPrefs().on, 'aria-label': 'Visualizer on', onchange: ev => { const p = vizPrefs(); p.on = ev.target.checked; saveVizPrefs(p); ensureViz(); drawVBtns(); paintStage(); } }), h('span', { class: 'p' }, '')) : null;
+    looksPop.replaceChildren(h('h4', null, mode === 'eq' ? 'EQ LOOKS' : 'VISUALIZER LOOKS'), ...rows.map(rowEl), extra,
+      h('div', { class: 'looks-ft' }, h('span', { class: 's' }, 'Wheel ±1 · Shift ±10'),
+        h('button', { type: 'button', class: 'btn', onclick: () => { resetLooks(mode, eng); paintLooks(); } }, 'Reset'),
+        h('button', { type: 'button', class: 'btn', onclick: () => { closeLooks(); ctl.go(mode === 'eq' ? 'settings:eqstyle' : 'visualizer'); } }, 'More…')));
+  }
+  const outside = ev => { if (looksPop && !looksPop.contains(ev.target) && !ev.target.closest?.('.ov-looks')) closeLooks(); };
+  function popKeys(ev) {
+    if (!looksPop) return;
+    if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeLooks(true); return; }
+    if (ev.key === 'Tab') {   // focus stays inside the popover
+      const f = [...looksPop.querySelectorAll('input,button')].filter(e => !e.disabled); if (!f.length) return;
+      const i = f.indexOf(document.activeElement); ev.preventDefault();
+      f[(i + (ev.shiftKey ? -1 : 1) + f.length) % f.length].focus();
     }
   }
+  function closeLooks(refocus) {
+    if (!looksPop) return; const ret = looksPop._ret; looksPop.remove(); looksPop = null;
+    document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', popKeys, true);
+    drawVBtns(); if (refocus) (vbtns.querySelector('.ov-looks') || ret)?.focus?.();
+  }
+  window.addEventListener('wavwiz:eqlock', () => drawVBtns());
   function ensureViz() {
     const p = vizPrefs();
     // 0.3.0 §3: the EQ view lives only while shown; the visualizer renders ONLY while selected (no rAF, analyser or GL work when hidden or under the Jukebox screen)

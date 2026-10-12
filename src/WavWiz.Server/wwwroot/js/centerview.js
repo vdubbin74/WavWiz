@@ -58,24 +58,26 @@ export function centerEq(S, host) {
       onChange: (i, db) => { if (!real || loadEqLock() || !ok) return; real.cur.graphicDb[i] = db; previewNow(); saveSoon(); } });
     if (real?.resp) area.setResponse(real.resp);
     if (p.glow > 0) area.startLive?.(spectrumTap);
-    const lock = eqLockBox(locked, v => { saveEqLock(v); area?.setLocked(v || !ok); });
-    if (!ok) { lock.input.disabled = true; lock.el.title = o ? 'Only Control or Admin access can change this speaker’s EQ.' : 'No speaker connected.'; }
+    // 0.3.1 B17: Lock EQ moved into the center panel's overlay button group (now.js); this header keeps a read-only note for non-tuners
+    const note = !ok ? h('span', { class: 'small dim np-eqro', title: o ? 'Only Control or Admin access can change this speaker’s EQ.' : 'No speaker connected.' }, o ? 'Read-only' : '') : null;
     const outs = pickerOutputs(S.zones, thisDevice(S));
     const picker = flag('ui.eqOutputPicker') && isAdmin(S) && outs.length > 1
       ? h('select', { class: 'np-eqpick', 'aria-label': 'Which output this EQ adjusts', onchange: ev => { target = ev.target.value; reload(); } }, outs.map(x => h('option', { value: x.deviceId, selected: x.deviceId === o?.deviceId }, `${x.zone} — ${x.name}`)))
       : null;
-    root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Sound · ${o.zone}` : 'Sound'), picker, h('span', { class: 'grow' }), lock.el),
+    root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Sound · ${o.zone}` : 'Sound'), picker, h('span', { class: 'grow' }), note),
       real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'));
   }
   async function reload() { try { real = await fetchReal(); } catch { real = null; } draw(); }
   const onLock = () => area?.setLocked(loadEqLock() || !can(real?.out));
   const onStyle = () => draw();
+  const onGlow = e => { const v = +e.detail; area?.setGlow(v); if (v > 0) area?.startLive?.(spectrumTap); };
+  window.addEventListener('wavwiz:eqglow', onGlow);
   window.addEventListener('wavwiz:eqstyle', onStyle); window.addEventListener('wavwiz:eqlock', onLock);
   const onEq = e => { if (e.detail?.deviceId && e.detail.deviceId === real?.out?.deviceId && !document.activeElement?.closest?.('.np-eqview')) reload(); };
   window.addEventListener('wavwiz:eqchanged', onEq);
   reload();
   return {
-    destroy() { gone = true; area?.destroy(); area = null; window.removeEventListener('wavwiz:eqstyle', onStyle); window.removeEventListener('wavwiz:eqlock', onLock); window.removeEventListener('wavwiz:eqchanged', onEq); root.remove(); },
+    destroy() { gone = true; area?.destroy(); area = null; window.removeEventListener('wavwiz:eqstyle', onStyle); window.removeEventListener('wavwiz:eqlock', onLock); window.removeEventListener('wavwiz:eqchanged', onEq); window.removeEventListener('wavwiz:eqglow', onGlow); root.remove(); },
     refresh() { const o = out(); if (o?.deviceId !== real?.out?.deviceId) reload(); },
   };
 }

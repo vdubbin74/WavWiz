@@ -51,7 +51,8 @@ test('0.2.1 F3: no VISUALIZER title and no look-name label on the visualizer pan
   const n = src('now.js');
   assert.doesNotMatch(n, /'VISUALIZER'/); assert.doesNotMatch(n, /np-vlabel/); assert.doesNotMatch(n, /vlabel\.textContent/);
   assert.match(n, /const vizPanel = h\('section', \{ class: 'np-vizpanel', 'aria-label': 'Visualizer' \}, stage\);/);
-  assert.match(n, /'Looks'/); assert.match(n, /'Full screen visualizer'/); assert.match(n, /'Open the visualizer in its own window'/);
+  // 0.3.1 B18: the small buttons became one icon group (Looks / Full screen / Pop out are tooltips + aria-labels)
+  assert.match(n, /'Looks'/); assert.match(n, /'Full screen'/); assert.match(n, /'Pop out'/);
 });
 
 test('0.2.1 F4: Expanded Library opens in tiles on every tab (Large), list toggle remembered per tab, the narrow panel keeps its own choice', async () => {

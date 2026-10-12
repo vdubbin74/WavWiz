@@ -5,6 +5,7 @@
 // Detail choice became Quality (Auto / Low / High / Ultra), and a Graphics card holds the post-processing knobs (bloom, streaks, fringing, depth blur).
 import { h, toast } from './util.js';
 import { Viz, vizPrefs, saveVizPrefs } from './viz.js';
+import { loadLooks, saveLooks } from './looks.js';
 import { VIZ_LIST, VIZ_BLURB, vizName, loadSettings, saveSettings, resetSettings, SHARED, FX, loadReact, saveReact, loadPost, savePost, POST, QUALITY_LIST, DEFAULT_REACT } from './vizcore.js';
 
 /** 0.2.2 T2: `nested` = the page inside Settings > Appearance > Visualizer (the Show switch lives in the live preview card above it,
@@ -70,6 +71,13 @@ export function visualizerView({ nested = false } = {}) {
       ...POST.map(([key, label, , hint]) => slider({ label, value: post[key], hint, key, offAtZero: true, onInput: v => set({ [key]: v }) })),
       h('div', { class: 'row wrap', style: 'margin-top:6px' }, h('button', { class: 'btn', onclick: () => { savePost({}); changed(); draw(); } }, 'Reset graphics')));
   }
+  // 0.3.1 B18: the center panel's overlay buttons + overlay layer, shared with the Looks popover (saved on this device)
+  function overlayCard() {
+    const l = loadLooks();
+    return h('div', { class: 'card vizlooks' }, h('h3', null, 'Center panel buttons'),
+      slider({ label: 'Button transparency', value: l.btn, key: 'btn', hint: 'the overlay buttons are fully solid on hover, focus or touch', onInput: v => saveLooks({ ...loadLooks(), btn: v }) }),
+      slider({ label: 'Overlay opacity', value: l.overlay, key: 'overlay', hint: 'strength of the glow / visualizer layer over the cover art', onInput: v => saveLooks({ ...loadLooks(), overlay: v }) }));
+  }
   const fold = (title, sub, card) => { card.querySelector('h3')?.remove(); return h('details', { class: 'vfold' }, h('summary', null, h('b', null, title), h('span', { class: 'small dim' }, sub)), card); };
   function drawControls() { if (ctlHost) ctlHost.replaceChildren(controls(editing)); }
   function draw() {
@@ -88,7 +96,7 @@ export function visualizerView({ nested = false } = {}) {
     ctlHost = h('div', { class: 'vizctl-host' });
     root.replaceChildren(
       h('p', { class: 'dim small' }, 'Tap a look to use it on Now Playing; its settings appear below. Each look follows the theme colors unless you switch it to Custom. Every level runs 0–100% (50% is the default). Settings are saved for each look on this device.'),
-      grid,
+      grid, overlayCard(),
       nested ? null : h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
       nested ? fold('Graphics (this device)', 'Quality: Auto, bloom, streaks, fringing, depth blur', graphicsCard(p)) : graphicsCard(p),
       nested ? fold('Reactivity (all looks)', 'Energy, Sensitivity, Auto-gain', reactCard()) : reactCard(), ctlHost);

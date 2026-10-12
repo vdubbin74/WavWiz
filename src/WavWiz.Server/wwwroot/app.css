@@ -169,9 +169,31 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .stage .vizhost{position:absolute;inset:0;display:none}
 .stage.viz .vizhost{display:block} .stage.viz .stagecover{visibility:hidden}
 .stage canvas.vizcanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.stage .vbtns{position:absolute;right:6px;top:6px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:92%}
-.stage .vbtns button{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;padding:3px 9px;cursor:pointer;min-height:30px}
-.stage .vbtns button.on{color:#ffd54a;border-color:#ffd54a}
+/* 0.3.1 B18 (viz-controls-icons): one overlay group, 28x28 icon buttons, muted Lock EQ style, theme variables only, 3px corners */
+.stage .vbtns{position:absolute;right:8px;top:8px;z-index:6;display:flex;gap:4px;padding:4px;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:3px;opacity:var(--ov-rest,.5);transition:opacity .15s}
+.stage .vbtns:hover,.stage .vbtns:focus-within,.stage .vbtns.solid,.stage .vbtns:active{opacity:1;box-shadow:0 4px 14px color-mix(in srgb,var(--bg) 70%,transparent)}
+@media (hover:none){.stage .vbtns.touched{opacity:1}}
+.stage .vbtns .ib{position:relative;width:28px;height:28px;min-height:28px;min-width:28px;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--dim);cursor:pointer;font:inherit}
+.stage .vbtns .ib svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.stage .vbtns .ib:hover{color:var(--ink);border-color:color-mix(in srgb,var(--ink) 35%,var(--line))}
+/* addendum: active = a stronger accent outline (2px inset ring) that still reads at 50 % transparency; never a filled button */
+.stage .vbtns .ib.on{color:var(--accent-text,var(--accent));border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.looks-pop{position:absolute;right:8px;top:48px;z-index:7;width:300px;max-width:calc(100% - 16px);box-sizing:border-box;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:3px;box-shadow:0 10px 28px color-mix(in srgb,var(--bg) 70%,transparent);padding:10px 12px}
+.looks-pop h4{margin:0 0 6px;font-size:10px;letter-spacing:1.5px;color:var(--dim)}
+.looks-row{display:grid;grid-template-columns:118px 1fr 36px;align-items:center;gap:8px;min-height:30px;font-size:12px}
+.looks-row .p{text-align:right;color:var(--dim)} .looks-row input[type=range]{width:100%;margin:0}
+.looks-sw input{justify-self:start}
+.looks-ft{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:8px;padding-top:8px;align-items:center} .looks-ft .s{color:var(--dim);font-size:11px;flex:1}
+.looks-ft .btn{min-height:26px;height:26px;padding:0 8px;font-size:11.5px;border-radius:3px}
+.looks-pop.sheet{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;border-radius:3px 3px 0 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:60}
+.looks-pop.sheet .looks-row{min-height:40px}
+/* B17: every glow / visualizer / backdrop layer is click-through; controls sit above them */
+.np-stage .stagecover,.np-stage .vname,.eqa-glow,.eqa-grid,.np-stage .vizhost canvas{pointer-events:none}
+.np-stage.eqmode .eqa-glow{opacity:var(--wz-ovf,1)}
+.np-stage.eqmode .stagecover{opacity:calc(.12 + .38 * var(--wz-ovx,0))!important}
+.np-stage.viz .vizhost{opacity:calc(.25 + .75 * var(--wz-ovf,1))}
+.np-stage.viz .stagecover{visibility:visible;opacity:var(--wz-ovx,0)}
+.np-stage .np-eqhost{z-index:2} .np-stage .np-eqhead{padding-right:150px;min-height:30px}
 .stage .vname{position:absolute;left:8px;bottom:6px;font-size:11px;color:rgba(255,255,255,.7);text-shadow:0 1px 2px #000;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 .stage .vname.bad{white-space:normal;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:6px;max-width:none;right:8px;color:#ffb4a8}
 .npinfo{display:flex;gap:12px;align-items:center;min-width:0;flex:none}
@@ -446,7 +468,6 @@ html{overflow-x:hidden;touch-action:manipulation;-ms-touch-action:manipulation}
 .volrow .tbtn.ico{width:38px;height:38px;border-radius:50%;background:var(--panel2);color:var(--dim)}
 .volrow .tbtn.sound{display:inline-flex;gap:6px;align-items:center;color:var(--accent2-text,var(--accent2));border-color:var(--line)}
 .volrow .tbtn.sound .ic svg{width:16px;height:16px}
-.stage .vbtns button .ic svg{width:18px;height:18px}
 .upnext .ico .ic svg,.devchip .di .ic svg{width:18px;height:18px}
 .devchip .di{display:inline-flex;color:var(--accent2-text,var(--accent2))} .devchip.on .di{color:var(--accent-ink)}
 /* item 14: themed range sliders (volume, seek-like sliders) instead of plain white */
@@ -1590,7 +1611,7 @@ body.jb-kiosk #app{visibility:hidden}
 .np-eqpick{min-height:28px;max-width:240px}
 .np-centertoggle{white-space:nowrap}
 .eqspk{font-size:13px}
-.np-stage.eqmode .vbtns{z-index:3}
+.np-stage.eqmode .vbtns{z-index:6}
 /* ---- 0.3.0 §6 panels: rail · normal · expanded. Always 3 grid tracks; one 240 ms timing; no display:none on the big areas ---- */
 @media (min-width:901px){
   .desk{transition:grid-template-columns 240ms cubic-bezier(.4,0,.2,1),grid-template-rows 240ms cubic-bezier(.4,0,.2,1)}
