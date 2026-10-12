@@ -19,7 +19,7 @@ export async function openSettings(S, refresh, nav, section) {
   const body = h('div', { class: 'settings-body' });
   // 0.2.1 F8: theme / viz open Appearance (one page) - the visualizer panel's Looks button unfolds the looks gallery there
   let app = null;
-  const d = dialog('Settings', body, [{ text: 'Close' }], { onClose: () => { app?.hide?.(); refresh?.(); } });
+  const d = dialog('Settings', body, [{ text: 'Close' }], { cls: 'settings-dlg', onClose: () => { app?.hide?.(); refresh?.(); } });   // 0.2.5 C: up to ~1200 px wide
   let active = section === 'players' || section === 'phone' || section === 'devices' ? 'devices'
     : section === 'library' ? 'library'
     : section === 'network' ? 'network'

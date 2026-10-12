@@ -127,3 +127,15 @@ test('0.2.5 B: card layout per render v2 - mute on the right, one Settings chevr
   assert.match(css, /\.dtag\{[^}]*border-radius:3px/); assert.match(css, /\.dtag\.ref\{/); assert.match(css, /\.dcard\.gone /); assert.match(css, /\.dmicline\{/);
   assert.match(src('icons.js'), /mic:/); assert.match(src('icons.js'), /globe:/);
 });
+
+test('0.2.5 C: Settings - Appearance sections are sub-tabs under the main tabs, full width; the dialog widens to ~1200 px', async () => {
+  const ap = src('appearance.js'), st = src('settings.js');
+  assert.match(ap, /h\('nav', \{ class: 'appnav subtabs', 'aria-label': 'Appearance sections' \},/);
+  assert.match(ap, /class: 'appearance appstack' \}, nav, host\)/);
+  assert.doesNotMatch(ap, /appsplit|appnav-h/);
+  const a = await imp('appearance'); assert.deepEqual(a.APP_SUBS.map(x => x[1]), ['Theme', 'Visualizer', 'EQ', 'Now Playing', 'Display size']);
+  assert.match(st, /cls: 'settings-dlg'/);
+  assert.match(css, /dialog\.settings-dlg\{width:min\(1200px,calc\(calc\(100vw \/ var\(--z,1\)\) - 32px\)\)\}/);
+  assert.match(css, /\.appnav\.subtabs\{flex-direction:row/);
+  assert.match(css, /\.appsub \.pinprev\{position:sticky/, 'previews stay pinned');
+});

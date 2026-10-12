@@ -162,14 +162,15 @@ function displaySizeCard() {
 
 export const APP_SUBS = [['theme', 'Theme'], ['viz', 'Visualizer'], ['eq', 'EQ'], ['np', 'Now Playing'], ['display', 'Display size']];
 const SUB_KEY = 'wavwiz.appsub';
-/** The Appearance pane (0.2.2 T2): left sub-nav + one sub-section at a time. `opts.section` opens a sub-section (the visualizer
+/** The Appearance pane (0.2.2 T2; 0.2.5 C: sub-tabs on top): one sub-section at a time. `opts.section` opens a sub-section (the visualizer
  *  panel's Looks button opens Visualizer); otherwise the last one used in this session, else Theme. `opts.preview` builds the F9 strip. */
 export function appearancePane(opts = {}) {
   const theme = themeCard(), viz = vizCard(), np = npStyleCard(opts.preview?.() || null), eqs = eqStyleCard(opts.S || null), disp = displaySizeCard();
   const pages = { theme, viz, eq: eqs, np, display: disp };
   let saved = null; try { saved = sessionStorage.getItem(SUB_KEY); } catch { /* ignore */ }
   let cur = opts.looks ? 'viz' : (pages[opts.section] ? opts.section : (pages[saved] ? saved : 'theme'));
-  const nav = h('nav', { class: 'appnav', 'aria-label': 'Appearance sections' }, h('div', { class: 'appnav-h' }, 'APPEARANCE'),
+  // 0.2.5 C: a row of sub-tabs right under the main Settings tabs (was a left column), so the content uses the full Settings width
+  const nav = h('nav', { class: 'appnav subtabs', 'aria-label': 'Appearance sections' },
     APP_SUBS.map(([id, label]) => h('button', { type: 'button', 'data-sub': id, 'aria-current': String(id === cur), onclick: () => select(id) }, label)));
   const host = h('div', { class: 'appsub' });
   function select(id) {
@@ -182,7 +183,7 @@ export function appearancePane(opts = {}) {
     host.scrollTop = 0;
   }
   select(cur);
-  const el = h('div', { class: 'appearance appsplit' }, nav, host);
+  const el = h('div', { class: 'appearance appstack' }, nav, host);
   /** Stop every live preview (Settings closed or another tab); `resume` restarts the visible one. */
   const hide = () => { viz.hide(); eqs.hide(); };
   const resume = () => { if (cur === 'viz') viz.reload(); else if (cur === 'eq') eqs.reload(); };

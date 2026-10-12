@@ -64,7 +64,7 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   globalThis.localStorage ??= { getItem: () => null, setItem() {} };
   const ap = src('appearance.js'), th = src('themes.js'), vp = src('vizpage.js'), st = src('settings.js');
   assert.match(ap, /export const APP_SUBS = \[\['theme', 'Theme'\], \['viz', 'Visualizer'\], \['eq', 'EQ'\], \['np', 'Now Playing'\], \['display', 'Display size'\]\]/);
-  assert.match(ap, /h\('nav', \{ class: 'appnav', 'aria-label': 'Appearance sections' \}/);
+  assert.match(ap, /h\('nav', \{ class: 'appnav subtabs', 'aria-label': 'Appearance sections' \}/);   // 0.2.5 C: sub-tabs on top
   // Theme = the 0.2.0 Themes page layout (theme cards + Custom colors card) + live app preview that recolors on hover
   assert.match(th, /function previewCard\(id, p, current, onPick, onHover\)/); assert.match(th, /class: 'themegrid'/); assert.match(th, /h\('h3', null, 'Custom colors'\)/);
   assert.match(th, /export function appPreview\(\)/); assert.match(th, /Recolors as you hover or pick/);
@@ -81,7 +81,7 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   // Now Playing keeps the F9 preview (0.2.3 U4: Display size has no preview any more - see release023)
   assert.match(ap, /preview \? preview\.el : null/);
   assert.match(st, /section: APP_SECTION\[section\]/); assert.match(st, /else app\?\.resume\?\.\(\)/);
-  assert.match(css, /\.appsplit\{display:grid;grid-template-columns:150px minmax\(0,1fr\)/);
+  assert.match(css, /\.appstack\{display:flex;flex-direction:column/);   // 0.2.5 C: sub-tabs on top (was a 150 px left column)
   assert.match(css, /\.themecard\{border-radius:6px\}/);
 });
 

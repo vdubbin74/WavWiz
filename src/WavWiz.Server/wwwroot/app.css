@@ -1493,3 +1493,16 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .dmicline{display:flex;flex-direction:column;gap:4px;border:1px solid color-mix(in srgb,var(--accent2) 55%,var(--line));border-left:3px solid var(--accent2);border-radius:var(--radius);padding:6px 10px;background:var(--panel2);margin:0 0 8px;flex:1 1 100%}
 .dmicrow{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px} .dmicic{color:var(--accent2);display:inline-flex} .dmicic svg{width:15px;height:15px}
 .dmicdev{font-weight:600}
+
+/* 0.2.5 C: Settings is wider on a PC (up to ~1200 px) and Appearance uses the full width - its sections are a row of sub-tabs right under the main
+   tabs (was a left column). Pinned previews stay sticky and scale with the height so the controls below stay in view at 1080p and every Display size. */
+dialog.settings-dlg{width:min(1200px,calc(calc(100vw / var(--z,1)) - 32px))}
+.appstack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.appnav.subtabs{flex-direction:row;position:static;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:-6px 0 0;padding:0 0 2px}
+.appnav.subtabs button{border:1px solid var(--line);border-left:1px solid var(--line);border-radius:5px;padding:5px 12px;white-space:nowrap;background:var(--panel2);color:var(--dim)}
+.appnav.subtabs button:hover{color:var(--ink);background:var(--panel2)}
+.appnav.subtabs button.on{background:color-mix(in srgb,var(--hl,var(--accent)) 18%,var(--panel2));border-color:var(--hl,var(--accent));color:var(--ink);font-weight:700}
+.appstack .appsub{min-width:0}
+.appstack .apprev.pinprev .ap-app{height:clamp(120px,calc(36vh / var(--z,1) - 60px),240px)}
+.appstack .vlive.pinprev .vlive-stage{height:clamp(100px,calc(34vh / var(--z,1) - 40px),260px)}
+.appstack .eqprevbox.pinprev .eqa-plot{height:clamp(110px,calc(34vh / var(--z,1) - 110px),240px)}

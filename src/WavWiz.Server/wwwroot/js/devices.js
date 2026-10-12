@@ -380,9 +380,9 @@ function moreMenu(S, ctl, z, cur) {
     item('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'danger'));
   const btn = h('button', { type: 'button', class: 'btn dmorebtn', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); menu.hidden ? open() : close(); } }, 'More ▾');
   const outside = ev => { if (!wrap.contains(ev.target)) close(); };
-  function open() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); }
-  function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); flushSoon(); }
-  wrap.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !menu.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); btn.focus(); } });
+  const esc = ev => { if (ev.key === 'Escape' && !menu.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); btn.focus(); } };
+  function open() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); menu.querySelector('button:not([disabled])')?.focus(); }
+  function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); flushSoon(); }
   wrap.append(btn, menu); return wrap;
 }
 const connKey = z => JSON.stringify([z.connected, z.link, z.remoteIp, z.syncErrorMs, z.bufferMs, z.hardResyncs, z.isWeb, z.room?.state, z.room?.drops, z.room?.reconnects, z.room?.underrunEvents]);

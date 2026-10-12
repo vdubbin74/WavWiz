@@ -29,7 +29,7 @@ async function call(path, { method = 'GET', body, raw } = {}) {
   if (!r.ok) { const e = new Error((j && (j.error || j.message)) || `HTTP ${r.status}`); e.status = r.status; throw e; }
   return j;
 }
-function show(...nodes) { $('loading').hidden = true; const v = $('view'); v.hidden = false; v.replaceChildren(...nodes); }
+function show(...nodes) { $('loading').hidden = true; const v = $('view'); v.hidden = false; v.replaceChildren(...nodes.filter(n => n != null && n !== false)); }
 
 // ------------------------------------------------------------ boot
 async function boot() {
@@ -54,7 +54,7 @@ async function boot() {
 async function hello(st) {
   if (stopped || !code) return;
   try { const r = await call(`/calibration/phone-link/${code}/hello`, { method: 'POST', body: { state: st, device: phoneName(navigator.userAgent, navigator.maxTouchPoints) } }); if (r && r.stop) stopFromPc(); }
-  catch (e) { if (e.status === 404) stopFromPc('This link has expired.'); }
+  catch (e) { if (e.status === 404) stopFromPc('This link has expired.'); else if (e.status === 401) stopFromPc(); }   // a stopped link no longer signs the phone in
 }
 function stopFromPc(msg) {
   if (stopped) return; stopped = true; clearInterval(helloTimer); releaseMic();
