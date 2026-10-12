@@ -46,6 +46,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Schedules.Resolve = q => Api.PlaybackApi.ResolveItems(s, q, out _);      // 0.3.0: alarms play a playlist/album/song/radio
         s.Sleep = new Features.SleepService(zones, cond, events);
         s.Backup = new Features.BackupService(db, events);
+        s.Jukebox = new Features.JukeboxService(db, cond, events);
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
         s.TagFix = new Features.TagFixService(db, lib, s.Art, events, ffmpeg);
@@ -121,14 +122,14 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); FeaturesApi.Map(api, s); HealthApi.Map(api, s);
+        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();
         var addrs = app.Urls; u.HttpUrl = $"http://{cfg.BindAddress}:{PortOf(app, false, cfg)}"; u.HttpsUrl = $"https://{cfg.BindAddress}:{PortOf(app, true, cfg)}";
         if (cfg.HttpPort == 0) cfg.HttpPort = PortOf(app, false, cfg); if (cfg.HttpsPort == 0) cfg.HttpsPort = PortOf(app, true, cfg);      // ephemeral ports (tests): every page and the discovery answer must say the real port
         int nasTick = 0;
-        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } }, null, 1000, 1000);
+        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } try { s.Jukebox.Tick(); } catch (Exception ex) { u._log.Write("jukebox: " + ex.Message); } }, null, 1000, 1000);
         if ((lib.TrackCount() == 0 || lib.NeedsUpgradeScan()) && Convert.ToInt32(db.Scalar("SELECT COUNT(*) FROM library_root")) > 0) SystemApi.StartScan(s);
         u._rescan = new Timer(_ =>
         {

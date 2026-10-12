@@ -246,6 +246,7 @@ function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.
 export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
+  if (k === 'calibrate') return canControl(S) ? openCalibration(S, refreshAll) : undefined;
   if (k === 'scenes' || k === 'schedules' || k === 'alarms') return openScenesSchedules(S, refreshAll);   // 0.3.0 §5: one window (Settings shell / phone sheet)
   // 0.2.1 F8: Theme and Visualizer live on Settings > Appearance (one home); Radio finder is a tab inside Internet radio
   if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, k === 'themes' ? 'theme' : 'viz');

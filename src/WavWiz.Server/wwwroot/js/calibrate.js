@@ -33,6 +33,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the speaker you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other speakers'))); return; }
   const defRef = house?.connected ? house.id : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);
   const st = { ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), level: -20 };
+  api('/settings').then(x => { const v = x?.['calibration.testLevelDb']; if (Number.isFinite(v)) st.level = v; }).catch(() => {});   // 0.3.0 §7.2: default from Settings > Devices > Calibration
   if (presetZoneId && presetZoneId === st.ref) { const other = zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
   if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the house reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
 

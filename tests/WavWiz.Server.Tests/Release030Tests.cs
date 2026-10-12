@@ -162,4 +162,52 @@ public class Release030Tests
         foreach (var k in new[] { "acoustid.apiKey", "nas.share1", "admin.passwordHash", "tls.rootKey", "spotify.token", "x.password" }) Assert.True(BackupService.IsSecretSetting(k), k);
         foreach (var k in new[] { "tls.redirect", "playback.crossfadeSec", "server.name", "jukebox.pinHash", "ui.checklistDismissed" }) Assert.False(BackupService.IsSecretSetting(k), k);
     }
+
+    [Fact]
+    public async Task Jukebox_guest_search_counts_only_allowed_music_limits_and_votes()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var view = f.As(f.Token(Role.View));
+        var inDir = Directory.CreateDirectory(Path.Combine(f.Dir.Path, "music", "in")).FullName; var outDir = Directory.CreateDirectory(Path.Combine(f.Dir.Path, "music", "out")).FullName;
+        for (int i = 1; i <= 3; i++) TestMedia.Tone(Path.Combine(inDir, $"{i}.flac"), 1, 440, $"Song {i}", "The Band", "First", i);
+        TestMedia.Tone(Path.Combine(outDir, "x.flac"), 1, 440, "Hidden Song", "The Band", "Other", 1);
+        await admin.PostAsJsonAsync("/api/v1/library/roots", new { path = Path.Combine(f.Dir.Path, "music") });
+        for (int i = 0; i < 100; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() == 4) break; await Task.Delay(100); }
+        Assert.Equal(HttpStatusCode.Forbidden, (await view.PutAsJsonAsync("/api/v1/jukebox/config", new { perGuest = 2 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/v1/jukebox/config", new { perGuest = 2, votesNeeded = 2, folders = new[] { inDir }, pin = "2468" })).StatusCode);
+        var cfg = await admin.GetJson("/api/v1/jukebox/config"); Assert.True(cfg.GetProperty("hasPin").GetBoolean()); Assert.DoesNotContain("2468", cfg.GetRawText());
+        var anon = new HttpClient { BaseAddress = new Uri(f.Base) };
+        Assert.Equal(HttpStatusCode.Forbidden, (await anon.GetAsync("/api/v1/jukebox/guest/search?q=band")).StatusCode);   // not running
+        var code = (await (await admin.PostAsJsonAsync("/api/v1/jukebox/start", new { })).Json()).GetProperty("code").GetString()!;
+        anon.DefaultRequestHeaders.Add("X-WavWiz-Guest", code);
+        var r = await anon.GetJson("/api/v1/jukebox/guest/search?q=band");
+        Assert.Equal(3, r.GetProperty("artists")[0].GetProperty("songs").GetInt32());
+        Assert.Equal(1, r.GetProperty("albums").GetArrayLength()); Assert.Equal(3, r.GetProperty("albums")[0].GetProperty("tracks").GetInt32());
+        Assert.Equal(3, r.GetProperty("songs").GetArrayLength()); Assert.DoesNotContain("Hidden", r.GetRawText());
+        var ids = r.GetProperty("songs").EnumerateArray().Select(x => x.GetProperty("id").GetInt64()).ToList();
+        var hidden = (await admin.GetJson("/api/v1/library/search?q=hidden"))[0].GetProperty("id").GetInt64();
+        Assert.Equal((HttpStatusCode)409, (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/add", new { guest = "guest-aaaa-1", name = "Sam", trackId = hidden })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/add", new { guest = "guest-aaaa-1", name = "Sam", trackId = ids[0] })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/add", new { guest = "guest-aaaa-1", name = "Sam", trackId = ids[1] })).StatusCode);
+        var third = await anon.PostAsJsonAsync("/api/v1/jukebox/guest/add", new { guest = "guest-aaaa-1", name = "Sam", trackId = ids[2] });
+        Assert.Equal((HttpStatusCode)409, third.StatusCode); Assert.Contains("already have 2", await third.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/add", new { guest = "guest-bbbb-2", name = "Kim", trackId = ids[2] })).StatusCode);
+        var board = await anon.GetJson("/api/v1/jukebox/guest/board"); Assert.Contains("Sam", board.GetRawText());
+        var v1 = await (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/vote", new { guest = "guest-aaaa-1" })).Json(); Assert.False(v1.GetProperty("skipped").GetBoolean());
+        var v1b = await (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/vote", new { guest = "guest-aaaa-1" })).Json(); Assert.Equal(1, v1b.GetProperty("votes").GetInt32());   // one vote per guest
+        var v2 = await (await anon.PostAsJsonAsync("/api/v1/jukebox/guest/vote", new { guest = "guest-bbbb-2" })).Json(); Assert.True(v2.GetProperty("skipped").GetBoolean());
+        var ctl = f.As(f.Token(Role.Control));
+        Assert.Equal((HttpStatusCode)403, (await ctl.PostAsJsonAsync("/api/v1/jukebox/stop", new { pin = "0000" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ctl.PostAsJsonAsync("/api/v1/jukebox/stop", new { pin = "2468" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await anon.GetAsync("/api/v1/jukebox/guest/board")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Remote_mode_hides_the_speaker_card()
+    {
+        await using var f = await ServerFixture.StartAsync(); var ctl = f.As(f.Token(Role.Control));
+        Assert.Equal(HttpStatusCode.OK, (await ctl.PutAsJsonAsync("/api/v1/zones/42/remote", new { remote = true })).StatusCode);
+        Assert.Contains("42", f.Server.S.Db.Setting("remote.zones"));
+        Assert.Equal(HttpStatusCode.OK, (await ctl.PutAsJsonAsync("/api/v1/zones/42/remote", new { remote = false })).StatusCode);
+        Assert.DoesNotContain("42", f.Server.S.Db.Setting("remote.zones"));
+    }
 }

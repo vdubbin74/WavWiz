@@ -1,16 +1,32 @@
-import { h, api, toast, dialog } from './util.js';
+import { h, api, toast, dialog, ask } from './util.js';
+import { adminOnly, ADMIN_HINT } from './ui.js';
+import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
 import { networkCard } from './diag.js';
 import { appearancePane } from './appearance.js';
 import { npPreview } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
-const GROUPS = [
+// 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
+export const GROUPS = [
+  ['general', 'General'],
   ['appearance', 'Appearance'],
+  ['playback', 'Playback'],
   ['devices', 'Devices'],
   ['library', 'Library'],
   ['network', 'Network'],
+  ['jukebox', 'Jukebox'],
 ];
+/** 0.3.0 §7.6: what "Reset this section" puts back (server settings) - local looks are reset in the browser. */
+export const RESET = {
+  general: { 'ui.checklistDismissed': false },
+  appearance: {},
+  playback: { 'playback.crossfadeSec': 0, 'playback.replayGain': 'auto' },
+  devices: { 'bt.defaultLatencyMs': 200, 'wired.defaultLatencyMs': 0, 'tls.redirect': false, 'calibration.testLevelDb': -20 },
+  library: { 'library.onlineArt': true },
+  network: { 'airplay.levelDb': 0, 'spotify.levelDb': 0 },
+  jukebox: { 'jukebox.config': null },
+};
 
 // 0.2.2 T2: deep links into the Appearance sub-sections
 const APP_SECTION = { theme: 'theme', themes: 'theme', viz: 'viz', visualizer: 'viz', eq: 'eq', eqstyle: 'eq', np: 'np', npstyle: 'np', display: 'display' };
@@ -20,10 +36,16 @@ export async function openSettings(S, refresh, nav, section) {
   // 0.2.1 F8: theme / viz open Appearance (one page) - the visualizer panel's Looks button unfolds the looks gallery there
   let app = null;
   const d = dialog('Settings', body, [{ text: 'Close' }], { cls: 'settings-dlg', onClose: () => { app?.hide?.(); refresh?.(); } });   // 0.2.5 C: up to ~1200 px wide
-  let active = section === 'players' || section === 'phone' || section === 'devices' ? 'devices'
+  let active = section === 'players' || section === 'phone' || section === 'devices' || section === 'calibration' ? 'devices'
     : section === 'library' ? 'library'
     : section === 'network' ? 'network'
+    : section === 'playback' ? 'playback'
+    : section === 'general' || section === 'backup' ? 'general'
+    : section === 'jukebox' ? 'jukebox'
     : 'appearance';
+  let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
+  const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
+  d.el.querySelector('header .grow').after(search.el);
   const focusSec = section === 'players' ? 'sec-players' : null;
 
   const draw = async () => {
@@ -34,44 +56,49 @@ export async function openSettings(S, refresh, nav, section) {
       if (admin) tokens = await api('/tokens');
     } catch (e) { body.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
 
-    const panes = {
-      appearance: [],
-      devices: [],
-      library: [],
-      network: [],
-    };
+    const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [] };
+    const cal = [], players = [];
 
     app?.hide?.(); app = appearancePane({ S, looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview() });
     panes.appearance.push(app.el);
 
     // Devices: phone/https, pairing, tokens, delay defaults
 
-    panes.devices.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
-      h('p', { class: 'dim small' }, 'A phone only allows its microphone (speaker calibration) and reliable sound when it plays as a speaker on a trusted HTTPS page. WavWiz makes its own small certificate that is valid only for this PC\'s address. Install it once on each phone.'),
+    cal.push(...calibrationExtras(S, settings, { admin, put: putSettings, go: k => { d.close(); nav?.(k); } }));
+    cal.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
+      learn('A phone only allows its microphone on a trusted HTTPS page. Install the WavWiz certificate once on each phone.', 'WavWiz makes its own small certificate that is valid only for this PC\'s address. A phone that plays as a speaker also gets more reliable sound on HTTPS.'),
       st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'HTTPS is on.'),
         h('div', { class: 'row wrap', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: '/tls/qr.svg?to=setup', alt: 'QR code for the phone set-up page', width: 200, height: 200 })),
           h('div', { class: 'grow' }, h('p', null, h('b', null, 'On the phone: '), 'point the camera at the code and tap the link. It shows the steps (about two minutes) and checks they worked.'),
             h('p', { class: 'small' }, 'No camera? Open ', h('a', { href: '/tls/setup', target: '_blank', rel: 'noopener' }, 'the set-up page'), ' on the phone by typing its address.'),
             h('p', { class: 'small mono dim' }, 'Certificate fingerprint (SHA-256): ' + st.tls.rootSha256))),
         admin ? h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Certificate refreshed. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Refresh certificate (after an address change)')) : null)
-        : admin ? h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up HTTPS') : h('p', { class: 'dim' }, 'Ask the administrator to set it up.'),
-      admin ? h('label', { class: 'row', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: settings['tls.redirect'] === true, onchange: ev => putSettings({ 'tls.redirect': ev.target.checked }) }), 'Send web browsers on other devices to the secure (HTTPS) address. (WavWiz Player on your PCs is never redirected.)') : null));
+        : h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up HTTPS')), admin ? null : adminTag()),
+      // 0.3.0 §7.2: the redirect option lives under Advanced, with a warning. Default stays off.
+      h('details', { class: 'advanced', id: 'sec-redirect' }, h('summary', { class: 'small' }, 'Advanced'),
+        h('p', { class: 'warn-t small', role: 'note' }, 'Turning this on can stop phones and calibration from loading. Leave off unless you know you need it.'),
+        h('label', { class: 'row', style: 'margin-top:8px' }, adminOnly(S, h('input', { type: 'checkbox', checked: settings['tls.redirect'] === true, onchange: ev => putSettings({ 'tls.redirect': ev.target.checked }) })), 'Send web browsers on other devices to the secure (HTTPS) address. (WavWiz Player on your PCs is never redirected.)', admin ? null : adminTag()))));
 
-    if (admin) {
+    {
       const out = h('div', { class: 'mono accent', style: 'font-size:32px;letter-spacing:6px', 'aria-live': 'polite' });
-      panes.devices.push(h('div', { class: 'card', id: 'sec-players' }, h('h3', null, 'Pair a phone or a PC player'),
-        h('p', { class: 'dim small' }, 'Press the button, then type the 6-digit code on the phone, or in WavWiz Player on another PC. The player finds this server by itself - the code is all it needs. The code works once and expires in a few minutes.'),
-        h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/pairing/code', { method: 'POST' }); out.textContent = r.code; } catch (e) { toast(e.message, true); } } }, 'Show a pairing code'), out));
-      panes.devices.push(h('div', { class: 'card' }, h('h3', null, 'Paired devices & tokens'),
+      players.push(h('div', { class: 'card', id: 'sec-players' }, h('h3', null, 'Pair a phone or a PC player ', admin ? null : adminTag()),
+        learn('Show a code, then type it on the phone or in WavWiz Player on another PC.', 'The player finds this server by itself - the code is all it needs. The code works once and expires in a few minutes.'),
+        adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/pairing/code', { method: 'POST' }); out.textContent = r.code; } catch (e) { toast(e.message, true); } } }, 'Show a pairing code')), out));
+      players.push(!admin ? h('div', { class: 'card', id: 'sec-tokens' }, h('h3', null, 'Paired devices & tokens ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can see and revoke paired devices.'), h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn' }, 'Create API token…')))) : h('div', { class: 'card', id: 'sec-tokens' }, h('h3', null, 'Paired devices & tokens'),
         tokens.filter(t => !t.revoked).length ? h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['Name', 'Role', 'Last used', ''].map(x => h('th', null, x)))), h('tbody', null, tokens.filter(t => !t.revoked).map(t =>
           h('tr', null, h('td', null, t.name), h('td', null, t.role), h('td', null, t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : 'never'),
             h('td', null, h('button', { class: 'btn danger', onclick: () => revokeToken(t) }, 'Revoke')))))) : h('p', { class: 'dim' }, 'None.'),
         h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: makeToken }, 'Create API token…'))));
-      const num = (key, label, def) => { const i = h('input', { type: 'number', min: 0, max: 1000, value: settings[key] ?? def, style: 'width:90px', onchange: () => putSettings({ [key]: +i.value }) }); return h('label', { class: 'row' }, h('span', { style: 'min-width:260px' }, label), i, 'ms'); };
-      panes.devices.push(h('div', { class: 'card' }, h('h3', null, 'Delay defaults'),
-        h('p', { class: 'dim small' }, 'Used until a speaker is calibrated. Those speakers are shown as “not calibrated”.'),
+      const num = (key, label, def) => { const i = adminOnly(S, h('input', { type: 'number', min: 0, max: 1000, value: settings[key] ?? def, style: 'width:90px', onchange: () => putSettings({ [key]: +i.value }, i) })); return h('label', { class: 'row' }, h('span', { style: 'min-width:260px' }, label), i, 'ms'); };
+      cal.push(h('div', { class: 'card', id: 'sec-delaydefaults' }, h('h3', null, 'Delay defaults ', admin ? null : adminTag()),
+        h('p', { class: 'dim small' }, 'Used until a speaker is calibrated (shown as “not calibrated”).'),
         num('bt.defaultLatencyMs', 'Bluetooth speaker (typical)', 200), num('wired.defaultLatencyMs', 'Wired / HDMI / built-in', 0)));
     }
+
+    panes.general.push(backupCard(S, { admin, done: () => draw() }));
+    panes.jukebox.push(jukeboxPane(S, settings, { admin, put: putSettings }));
+    panes.devices.push(h('nav', { class: 'appnav subtabs devsub', role: 'tablist', 'aria-label': 'Devices sections' }, [['players', 'Players & access'], ['calibration', 'Calibration']].map(([k, t]) => h('button', { type: 'button', role: 'tab', 'data-sub': k, 'aria-selected': String(devSub === k), class: devSub === k ? 'on' : '', onclick: () => { devSub = k; paint(); } }, t))),
+      h('div', { class: 'devsubsec', 'data-sub': 'players' }, ...players), h('div', { class: 'devsubsec', 'data-sub': 'calibration' }, ...cal));
 
     // Library - 0.2.1 F8: the "Library view" card sits on top
     panes.library.push(libViewCard());
@@ -79,13 +106,13 @@ export async function openSettings(S, refresh, nav, section) {
     panes.library.push(h('div', { class: 'card', id: 'sec-library' }, h('h3', null, 'Music folders'),
       h('p', { class: 'dim small' }, 'Folders are read from the server PC (a local drive or a network share the WavWiz service can read). Files are never modified.'),
       roots.map(r => h('div', { class: 'row', style: 'margin:4px 0' }, h('div', { class: 'grow' }, h('span', { class: 'mono' }, r.path), h('div', { class: 'small ' + (r.lastError ? 'err' : 'dim') }, r.lastError ? r.lastError : `${r.tracks} tracks`)),
-        admin ? h('button', { class: 'btn danger', onclick: async () => { try { await api(`/library/roots/${r.id}`, { method: 'DELETE' }); draw(); } catch (e) { toast(e.message, true); } } }, 'Remove') : null)),
+        adminOnly(S, h('button', { class: 'btn danger', onclick: async () => { if (!(await ask('Remove folder', `Stop using ${r.path}? The files are not touched.`, { ok: 'Remove', danger: true }))) return; try { await api(`/library/roots/${r.id}`, { method: 'DELETE' }); draw(); } catch (e) { toast(e.message, true); } } }, 'Remove')))),
       admin ? h('div', { class: 'row', style: 'margin-top:8px' }, pathIn, h('button', { class: 'btn primary', onclick: async () => { try { await api('/library/roots', { method: 'POST', body: { path: pathIn.value } }); toast('Folder added. Scanning…'); draw(); } catch (e) { toast(e.message, true); } } }, 'Add')) : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } } }, 'Rescan now'),
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
-    if (admin) panes.library.push(nasCard());
+    panes.library.push(admin ? nasCard() : h('div', { class: 'card', id: 'sec-nas' }, h('h3', null, 'Network share logins (NAS) ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add share logins.')));
     panes.library.push(onlineArtCard(settings, admin));
-    panes.library.push(replayGainCard(settings));
+    panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings));
     panes.library.push(acoustIdCard(settings));
 
     // Network
@@ -136,14 +163,20 @@ export async function openSettings(S, refresh, nav, section) {
           } }, 'Reset on this PC'))));
     }
 
-    const navEl = h('div', { class: 'settings-nav', role: 'tablist' }, GROUPS.map(([id, label]) =>
-      h('button', { class: active === id ? 'on' : '', 'data-g': id, onclick: () => { active = id; paint(); } }, label)));
-    const sections = GROUPS.map(([id]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id }, ...panes[id]));
+    const navEl = h('div', { class: 'settings-nav', role: 'tablist', 'aria-label': 'Settings sections' }, GROUPS.map(([id, label]) =>
+      h('button', { class: active === id ? 'on' : '', role: 'tab', id: 'stab-' + id, 'aria-controls': 'ssec-' + id, 'aria-selected': String(active === id), 'data-g': id, onclick: () => { active = id; paint(); } }, label)));
+    navEl.addEventListener('keydown', ev => { if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return; const i = GROUPS.findIndex(g => g[0] === active), n = (i + (ev.key === 'ArrowRight' ? 1 : -1) + GROUPS.length) % GROUPS.length; active = GROUPS[n][0]; paint(); navEl.children[n].focus(); });
+    const sections = GROUPS.map(([id, label]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id, id: 'ssec-' + id, role: 'tabpanel', 'aria-labelledby': 'stab-' + id },
+      resetBar(S, label, { admin, server: RESET[id], local: id === 'appearance' ? THEME_RESET_KEYS : null, done: () => { if (id === 'appearance') location.reload(); else draw(); } }), ...panes[id]));
     body.replaceChildren(navEl, ...sections);
+    body._paint = paint; search.reindex();
     if (focusSec) requestAnimationFrame(() => body.querySelector('#' + focusSec)?.scrollIntoView({ block: 'start' }));
 
+    paint();
     function paint() {
-      navEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.g === active));
+      navEl.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.g === active); b.setAttribute('aria-selected', String(b.dataset.g === active)); b.tabIndex = b.dataset.g === active ? 0 : -1; });
+      body.querySelectorAll('.devsub button').forEach(b => { b.classList.toggle('on', b.dataset.sub === devSub); b.setAttribute('aria-selected', String(b.dataset.sub === devSub)); });
+      body.querySelectorAll('.devsubsec').forEach(x => { x.hidden = x.dataset.sub !== devSub; });
       body.querySelectorAll('.settings-sec').forEach(s => s.classList.toggle('on', s.dataset.g === active));
       if (active !== 'appearance') app?.hide?.(); else app?.resume?.();     // live visualizer previews run only while Appearance is shown
     }
@@ -156,9 +189,10 @@ export async function openSettings(S, refresh, nav, section) {
       h('label', { class: 'row' }, rm, 'Also remove its WavWiz Player from the device list')),
     [{ text: 'Revoke', cls: 'danger', onclick: async () => { try { await api(`/tokens/${t.id}${rm.checked ? '?removeFromList=1' : ''}`, { method: 'DELETE' }); toast('Revoked'); } catch (e) { toast(e.message, true); return false; } draw(); } }, { text: 'Cancel' }]);
   }
-  async function putSettings(o) { try { await api('/settings', { method: 'PUT', body: o }); toast('Saved'); } catch (e) { toast(e.message, true); } }
+  // 0.3.0 §7.4: an inline "Saved ✓" beside the changed control; toasts only for errors
+  async function putSettings(o, el = document.activeElement) { try { await api('/settings', { method: 'PUT', body: o }); savedMark(el); } catch (e) { toast('Not saved. ' + e.message, true); } }
   async function makeToken() {
-    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant' }), role = h('select', null, ['view', 'control', 'admin'].map(r => h('option', { value: r }, r)));
+    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant' }), role = h('select', { 'aria-label': 'Access' }, ROLE_NAMES.map(([r, t, d]) => h('option', { value: r, title: d }, `${t} - ${d}`)));
     const out = h('div', { class: 'mono small', style: 'word-break:break-all' });
     dialog('Create API token', [h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out],
       [{ text: 'Create', cls: 'primary', keep: true, onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } return false; } }, { text: 'Done', onclick: () => { draw(); } }]);
@@ -228,11 +262,23 @@ export function onlineArtSummary(r) {
   return h('p', { class: 'small ' + (pend ? 'amber' : 'okc') }, pend ? `Looking up ${pend} picture${pend === 1 ? '' : 's'}. Tiles update by themselves.` : 'Up to date.');
 }
 
+/** 0.3.0 §4: crossfade 0-12 s, 0 (off) by default. Never between consecutive songs of the same album (gapless stays). */
+function crossfadeCard(settings, admin) {
+  const v0 = typeof settings['playback.crossfadeSec'] === 'number' ? settings['playback.crossfadeSec'] : 0;
+  const out = h('span', { class: 'mono', style: 'min-width:4em' }, v0 ? `${v0} s` : 'Off');
+  const r = h('input', { type: 'range', min: 0, max: 12, step: 1, 'data-coarse': 3, value: v0, class: 'grow', id: 'xfade', 'aria-label': 'Crossfade in seconds', disabled: !admin, title: admin ? '' : ADMIN_HINT,
+    oninput: ev => { out.textContent = +ev.target.value ? `${ev.target.value} s` : 'Off'; },
+    onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.crossfadeSec': +ev.target.value } }); savedMark(ev.target); } catch (e) { toast('Not saved. ' + e.message, true); } } });
+  return h('div', { class: 'card', id: 'sec-crossfade' }, h('h3', null, 'Crossfade ', admin ? null : adminTag()),
+    learn('Blends the end of a song into the next one. Off (0 s) by default.', 'Songs of the same album that play in order stay gapless and are never crossfaded. All speakers stay in sync: the fade happens before the music is sent.'),
+    h('div', { class: 'row' }, r, out));
+}
+
 /** 0.1.3: ReplayGain - even out loudness between songs (server side, every zone). */
 function replayGainCard(settings) {
   const cur = typeof settings['playback.replayGain'] === 'string' ? settings['playback.replayGain'] : 'auto';
   const opts = [['auto', 'Automatic - album levels when an album plays in order, song levels otherwise'], ['track', 'Song - every song at the same loudness'], ['album', 'Album - keep the loud and quiet songs of an album as mastered'], ['off', 'Off - play files exactly as they are']];
-  const sel = h('select', { 'aria-label': 'Volume leveling', id: 'rg-mode', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.replayGain': ev.target.value } }); toast('Volume leveling saved - it applies from the next song.'); } catch (e) { toast(e.message, true); } } },
+  const sel = h('select', { 'aria-label': 'Volume leveling', id: 'rg-mode', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.replayGain': ev.target.value } }); savedMark(ev.target); } catch (e) { toast(e.message, true); } } },
     opts.map(([v, t]) => h('option', { value: v, selected: v === cur }, t)));
   return h('div', { class: 'card', id: 'sec-replaygain' }, h('h3', null, 'Volume leveling (ReplayGain)'),
     h('p', { class: 'dim small' }, 'Uses the ReplayGain or R128 loudness tags in your files (taggers such as foobar2000 or MusicBrainz Picard add them). Songs without tags play unchanged. It never makes a song clip.'),

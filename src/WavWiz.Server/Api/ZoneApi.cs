@@ -7,7 +7,7 @@ public static class ZoneApi
     public static void Map(RouteGroupBuilder g, Services s)
     {
         // 0.2.0: each device says whether it is the caller's own ("mine": this browser's speaker, or the Player on the same PC) and which is the house reference
-        g.MapGet("/zones", (HttpContext c) => Results.Json(s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress))).Req(Role.View);
+        g.MapGet("/zones", (HttpContext c, int? all) => { var rm = JukeboxApi.RemoteZones(s); var zs = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress); return Results.Json(all == 1 || rm.Count == 0 ? zs : zs.Where(z => !rm.Contains(z.Id)).ToList()); }).Req(Role.View);   // 0.3.0 §2: a remote-only device is no speaker card
 
         g.MapPatch("/zones/{id:long}", async (long id, HttpContext c) =>
         {

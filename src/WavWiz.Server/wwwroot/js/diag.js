@@ -149,10 +149,12 @@ export async function gettingStartedBody(S, go, { close } = {}) {
     step(1, item('library'), 'Pick a music folder', [folderBtn], admin ? null : 'An administrator adds music folders (File > Sign in as admin…).'),
     step(2, item('speaker'), 'Check that a speaker shows up in Devices', [h('button', { class: 'btn', onclick: () => goClose('devices') }, 'Open Devices')]),
     step(3, item('test'), 'Play a test song or a test sound', [testBtn, h('button', { class: 'btn', disabled: !control, onclick: () => goClose('library') }, 'Pick a song')], control ? null : 'Your access is view-only, so you can browse but not play.'),
+    // 0.3.0 §7.9: calibrate (the PC microphone first; a phone works too)
+    step(4, item('calibrate'), 'Calibrate your speakers', [h('button', { class: 'btn', disabled: !control, onclick: () => goClose('calibrate') }, 'Calibrate (PC microphone first)')], control ? 'Lines up the delay of every speaker. A USB or built-in PC microphone works best.' : 'Your access is view-only, so you can browse but not calibrate.'),
   ];
-  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test'].includes(i.id));
+  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test', 'calibrate'].includes(i.id));
   const body = h('div', { class: 'gs' },
-    h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'Three quick steps and WavWiz is playing in sync on your speakers.'),
+    h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'A few quick steps and WavWiz is playing in sync on your speakers.'),
     steps,
     rest.length ? h('details', { open: c.done }, h('summary', { class: 'small' }, 'More (optional)'), rest.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''),
       h('div', { class: 'grow' }, h('b', null, i.title), h('div', { class: 'small dim' }, i.detail), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => goClose(i.action) }, 'Do this') : null)))) : null,
