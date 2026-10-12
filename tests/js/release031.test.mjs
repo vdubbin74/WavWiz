@@ -122,3 +122,7 @@ test('B16: Small 75 %, Default 100 % (default), Large 125 % (max); earlier saved
   assert.equal(U.migrateScale('xlarge'), 'large', 'capped at the new maximum'); assert.equal(U.migrateScale('junk'), 'compact');
   assert.ok(Math.max(...U.SCALES.map(s => s[2])) <= 1.25);
 });
+test('B2: center-panel EQ scales to the stage - no fixed plot height, no scroll container, desktop dialog unchanged', () => {
+  assert.match(css, /\.np-eqhost\{overflow:hidden;/); assert.match(css, /\.np-eqview \.eqa-plot\{flex:1 1 auto;height:auto!important;min-height:0\}/);
+  assert.match(css, /\.eqa-plot\{position:relative;height:300px;/, 'the Sound (EQ) dialog keeps its size');
+});

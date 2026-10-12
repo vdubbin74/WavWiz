@@ -1699,3 +1699,17 @@ body.jb-kiosk #app{visibility:hidden}
 .dsm-body i{display:block;height:calc(4px * var(--mz));background:var(--line);border-radius:2px}
 .dsm-art{height:calc(26px * var(--mz));background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:2px}
 @media (max-width:900px){ .pgrid{grid-template-columns:repeat(2,minmax(0,1fr))!important} }
+/* ===== 0.3.1 B2: the center-panel EQ scales to the stage (iPhone portrait / landscape): no fixed sizes, no scroll bars ===== */
+.np-eqhost{overflow:hidden;padding:8px 10px 10px;box-sizing:border-box}
+.np-eqview{min-width:0;min-height:0}
+.np-eqview>.eqarea{flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+.np-eqview .eqa-plot{flex:1 1 auto;height:auto!important;min-height:0}
+.np-eqview .eqchips{flex:none;flex-wrap:wrap;overflow:hidden}
+@media (max-width:900px),(max-height:520px){
+  .np-eqview{gap:4px} .np-eqview .eqarea{padding:4px 6px 6px} .np-eqview .eqa-h .small{display:none}
+  .np-eqview .eqa-plot{padding:18px 0 18px 28px} .np-eqview .eqarea[data-eqstyle=curve] .eqa-plot{padding:8px 0 16px 28px}
+  .np-eqview .eqa-scale{width:26px;top:18px;bottom:18px} .np-eqview .eqa-scale span{font-size:9px}
+  .np-eqview .eqb-val{font-size:9px;width:auto!important;padding:1px 2px!important} .np-eqview .eqb-hz{font-size:9px}
+  .np-stage .np-eqhead{padding-right:136px;min-height:28px} .np-eqname{font-size:12px}
+  .np-eqview .eqchip{font-size:9px;padding:2px 1px} .np-eqview .eqchip span{display:none}
+}
