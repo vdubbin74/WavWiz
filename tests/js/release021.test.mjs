@@ -106,7 +106,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Queue', 'Rescan folders', 'Tidy up library', 'Tag & cover fix…', 'CD ripper…']);
   assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…']);
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes', 'Schedules', 'Calibrate speakers…', 'Pair a player…', 'Away-from-home…']);
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes', 'Schedules', 'Calibrate speakers…', 'Phone role…', 'Pair a player…', 'Away-from-home…']);
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
   assert.match(st, /\['appearance', 'Appearance'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n\];/);

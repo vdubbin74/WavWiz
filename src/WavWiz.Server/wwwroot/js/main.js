@@ -37,15 +37,11 @@ const VERSION_LABEL = () => `BETA ${S.auth?.appVersion ?? ''}`.trim();
 const wide = () => !matchMedia('(max-width:900px)').matches;
 
 // ---------------------------------------------------------------- boot
-// 0.2.2 T9: the phone arrives from the PC's "Use your phone as the microphone" QR code with ?cal=CODE (and ?pair=CODE from an administrator's link)
+// 0.2.2 T9 / 0.2.5: a phone arriving with ?cal=CODE (the PC's calibration QR code) is sent to the mic-only page /calmic.html (see calredirect.js)
 const CAL = (() => { try { const q = new URLSearchParams(location.search), cal = q.get('cal') || '', pair = q.get('pair') || ''; return { cal: /^[A-Za-z0-9]{6}$/.test(cal) ? cal : null, pair: /^[0-9]{6}$/.test(pair) ? pair : null }; } catch { return { cal: null, pair: null }; } })();
-function stripCalParams(keepCal) { try { const u = new URL(location.href); if (!keepCal) u.searchParams.delete('cal'); u.searchParams.delete('pair'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch { /* ignore */ } }
 async function boot() {
+  if (CAL.cal || window.__wwCalRedirect) { location.replace('/calmic.html?cal=' + (CAL.cal || '')); return; }   // 0.2.5: calibration links go to the mic-only page; never join here
   try { S.auth = await api('/auth/state'); } catch (e) { return fatal(e.message); }
-  if (CAL.pair) {       // sign the phone in with the link's one-time pairing code, then forget the code
-    if (!S.auth.authenticated && !S.auth.setupRequired) { try { await api('/auth/pair', { method: 'POST', body: { code: CAL.pair, name: deviceName() } }); S.auth = await api('/auth/state'); } catch (e) { toast(e.message, true); } }
-    stripCalParams(true);
-  }
   document.title = `WavWiz BETA ${S.auth.appVersion}`;
   if (S.auth.setupRequired) return renderSetup();
   if (!S.auth.authenticated) return renderLogin();
@@ -151,23 +147,13 @@ async function startMain() {
   if (loadLibPrefs().expanded && wide()) toggleLibExpanded(true);
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
-  drawStatus(); if (CAL.cal) startPhoneCal(CAL.cal); else maybeWhatsNew(S);
+  drawStatus(); maybeWhatsNew(S);
+  // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
+  const hashCal = () => { if (location.hash === '#calibrate') { history.replaceState(null, '', location.pathname + location.search); if (canControl(S)) openCalibration(S, refreshAll); } };
+  hashCal(); window.addEventListener('hashchange', hashCal);
   setInterval(() => nowc.tickPos(), 250);
   installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
-}
-/** 0.2.2 T9: this phone is the microphone for the PC's Calibrate speakers page: say hello (the PC shows "Phone connected"), open the wizard
- *  here, keep a light heartbeat with the wizard's phase, and say goodbye when it closes. */
-async function startPhoneCal(token) {
-  stripCalParams(false);
-  const device = deviceName(), hello = state => api(`/calibration/phone-link/${token}/hello`, { method: 'POST', body: { state, device } });
-  let info; try { info = await hello('opened'); } catch (e) { toast(e.message, true); return; }
-  let phase = 'opened', closed = false;
-  const beat = setInterval(() => { if (!closed) hello(phase).catch(() => {}); }, 5000);
-  const bye = () => { if (closed) return; closed = true; clearInterval(beat); hello('left').catch(() => {}); };
-  window.addEventListener('pagehide', bye, { once: true });
-  if (!info.https) toast('This page is not secure (HTTPS), so the microphone may be blocked. Open the QR code again after installing the certificate.', true);
-  openCalibration(S, refreshAll, null, { link: token, linkAdmin: !!info.byAdmin, onPhase: p => { phase = p; hello(p).catch(() => {}); }, onClose: bye });
 }
 /** Library arrow (0.2.2 T5, same rule as Devices): while Expanded it first returns to the normal layout; otherwise it collapses / opens. */
 function toggleLib(force) {
@@ -307,6 +293,7 @@ function connectWs() {
       else if (m.type === 'tick') { if (S.now?.state === 'playing') refreshNow(); if (S.view === 'devices' || wide() || S.view === 'now') refreshZones(); }
       else if (m.type === 'notice') toast(m.data.message, true);
       else if (m.type === 'calphone') window.dispatchEvent(new CustomEvent('wavwiz:calphone', { detail: m.data }));   // 0.2.2 T9
+      else if (m.type === 'calrun' || m.type === 'miclevel' || m.type === 'calmics') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.2.5 PC-mic run, live mic level, calibration-mic list
       else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b
     },
   });

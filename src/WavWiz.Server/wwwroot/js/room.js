@@ -4,6 +4,7 @@ import { OffsetEstimator, pairClocks, ctxTimeFor, FrameScheduler, roomHealth, vo
 import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
 import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
+import { phoneRole, setPhoneRole } from './calmic-core.js';
 export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -197,9 +198,40 @@ export function installAutoJoin(S, refreshAll) {
   if (isPlayerUa()) return;
   let stored = null; try { stored = localStorage.getItem(wantKey); } catch { /* ignore */ }
   installGestureUnlock();
-  if (!wantsAutoJoin(stored)) return;
   const go = () => startPhoneAsDevice(defaultRoomName()).then(() => refreshAll && refreshAll()).catch(e => { showUnlock(e.message); setTimeout(() => { if (!sharedDevice?.running) go(); }, 4000); });
+  // 0.2.5 phone role: a phone is either a speaker or a calibration mic. Asked once (fresh phones only), remembered, switchable in Devices > Phone role.
+  if (isPhoneUa()) {
+    let q = null; try { q = new URLSearchParams(location.search).get('role'); } catch { /* ignore */ }
+    if (q === 'speaker' || q === 'mic') { setPhoneRole(localStorage, q); if (q === 'speaker') { try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ } stored = '1'; } }
+    const role = phoneRole(localStorage);
+    if (role === 'mic') { showMicBanner(); return; }                 // a calibration mic never joins as a speaker
+    if (role == null && stored == null) { askPhoneRole(r => { if (r === 'speaker') { unlockAudio(); go(); } else location.href = '/calmic.html'; }); return; }
+  }
+  if (!wantsAutoJoin(stored)) return;
   setTimeout(go, 150);
+}
+/** 0.2.5: the one-time question on a fresh phone. Nothing joins, plays or records until the user answers. */
+export function askPhoneRole(done) {
+  const pick = r => { setPhoneRole(localStorage, r); try { localStorage.setItem(wantKey, r === 'speaker' ? '1' : '0'); } catch { /* ignore */ } box.remove(); done(r); };
+  const box = h('div', { class: 'phone-role', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'How do you want to use this phone?' },
+    h('div', { class: 'card' }, h('h2', null, 'How do you want to use this phone?'),
+      h('button', { class: 'btn primary big', onclick: () => pick('speaker') }, 'Play music here'),
+      h('p', { class: 'small dim' }, 'This phone plays in sync with your other speakers.'),
+      h('button', { class: 'btn big', onclick: () => pick('mic') }, 'Use as a calibration mic'),
+      h('p', { class: 'small dim' }, 'This phone only listens, to line up your speakers. It never plays music.'),
+      h('p', { class: 'small dim' }, 'You can change this later in Devices › Phone role.')));
+  document.body.append(box); return box;
+}
+function showMicBanner() {
+  if (document.querySelector('.mic-banner')) return;
+  const bar = h('div', { class: 'mic-banner', role: 'status' }, h('span', { class: 'grow' }, 'This phone is set as a calibration mic, so it does not play music.'),
+    h('a', { class: 'btn primary', href: '/calmic.html' }, 'Open calibration mic'),
+    h('button', { class: 'btn', onclick: () => { setPhoneRole(localStorage, 'speaker'); bar.remove(); unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => toast(e.message, true)); } }, 'Play music here'));
+  document.body.append(bar);
+}
+/** Devices > Phone role… (phones only): switch between speaker and calibration mic. */
+export function changePhoneRole() {
+  askPhoneRole(async r => { if (r === 'mic') { await stopPhoneDevice(); location.href = '/calmic.html'; } else { unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => toast(e.message, true)); } });
 }
 function installGestureUnlock() {
   if (gestureInstalled) return; gestureInstalled = true;

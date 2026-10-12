@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>WavWiz · Calibration mic</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/tls.css">
+<link rel="stylesheet" href="/calmic.css">
+<!-- 0.2.5: this page is ONLY a microphone. It never joins as a speaker and never plays or creates audio before the microphone is open. -->
+<script type="module" src="/js/calmic.js"></script>
+</head>
+<body>
+<main id="app" data-mode="loading">
+  <header><img src="/assets/logo-64.png" width="44" height="44" alt=""><div><h1>Calibration mic</h1><small id="sub">This phone listens. It never plays music.</small></div></header>
+  <noscript><div class="card bad">This page needs JavaScript.</div></noscript>
+  <section id="loading" class="card"><span class="spin"></span> Loading…</section>
+  <section id="view" hidden></section>
+</main>
+</body>
+</html>

@@ -1,0 +1,16 @@
+/* WavWiz 0.2.5 phone calibration mic page (on top of tls.css) */
+.btn{border-radius:6px} .btn.big{display:block;width:100%;padding:16px 20px;font-size:19px;text-align:center}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)} .btn.small{padding:9px 14px;font-size:15px}
+.btn[disabled]{opacity:.45;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .grow{flex:1}
+.checks{list-style:none;margin:0;padding:0} .checks li{padding:5px 0 5px 30px;position:relative;color:var(--dim)}
+.checks li::before{content:"";position:absolute;left:4px;top:9px;width:14px;height:14px;border-radius:50%;border:2px solid var(--line)}
+.checks li.run{color:var(--ink)} .checks li.run::before{border-color:var(--accent);border-top-color:transparent;animation:sp 1s linear infinite}
+.checks li.ok{color:var(--ink)} .checks li.ok::before{content:"\2713";border:0;background:#2b9a55;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;width:18px;height:18px;left:2px;top:7px}
+.checks li.bad{color:#ff8a80} .checks li.bad::before{border-color:#c0392b;background:#c0392b}
+.bar{height:10px;border-radius:5px;background:#0d1013;overflow:hidden;margin:10px 0} .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.now{font-size:19px;font-weight:700;margin:6px 0 2px} .accent{color:var(--accent)}
+table.res{width:100%;border-collapse:collapse;font-size:15px} table.res td,table.res th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left} table.res th{color:var(--dim);font-weight:600;font-size:13px}
+.mono{font-variant-numeric:tabular-nums} .warn-t{color:#ffb300} .err-t{color:#ff8a80}
+ul.fix{padding-left:20px;margin:6px 0} .notes{font-size:14px;color:var(--dim);max-height:9em;overflow:auto;margin:6px 0 0;padding-left:18px}
+.spk{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .spk span{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:14px}

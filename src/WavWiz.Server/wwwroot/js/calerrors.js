@@ -19,6 +19,7 @@ export function classifyMicError(e) {
   if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'MIC_NONE';
   if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'MIC_BUSY';
   if (n === 'OverconstrainedError' || n === 'ConstraintNotSatisfiedError') return 'MIC_CONSTRAINT';
+  if (n === 'InvalidStateError' || /AudioSession/i.test(e && e.message || '')) return 'MIC_AUDIOSESSION';   // 0.2.5: iOS refused capture because the page had already started playback
   if (n === 'SecurityError') return 'INSECURE';
   if (n === 'TypeError') return 'NO_MEDIA_API';
   return 'MIC_UNKNOWN';
@@ -33,6 +34,7 @@ const T = {
   MIC_BUSY: () => ({ title: 'The microphone is busy', why: 'Another app (a call, voice chat, recorder or another browser tab) is using the microphone.', fix: ['Close the other app or tab that uses the microphone, hang up any call.', 'Then try again.'] }),
   MIC_CONSTRAINT: () => ({ title: 'The microphone does not support the settings WavWiz asked for', why: 'WavWiz asked for an unprocessed microphone signal; this microphone could not provide it.', fix: ['Try again - WavWiz will retry with the phone\'s default settings (result may be less exact).', 'If it keeps failing, use "By ear".'] }),
   MIC_UNKNOWN: () => ({ title: 'The microphone could not be started', why: 'The phone gave an unexpected error when opening the microphone.', fix: ['Reload the page and try again.', 'Tap "Copy details" and keep them if you ask for help.'] }),
+  MIC_AUDIOSESSION: env => ({ title: 'The phone is still set up to play sound, not to record', why: 'iOS refuses the microphone when this page (or another tab) has already started playing audio. This calibration page never plays anything, so this usually means another WavWiz tab is open as a speaker.', fix: [env.ios ? 'Close other WavWiz tabs in Safari (and stop any music playing on this phone).' : 'Close other WavWiz tabs and stop any music playing on this phone.', 'Reload this page and tap Start again.'] }),
   MIC_SILENT: env => ({ title: 'The microphone heard nothing at all', why: 'The microphone worked but delivered pure silence - it is probably muted or another input (like a Bluetooth headset) was selected.', fix: [env.ios ? 'Disconnect Bluetooth headphones, and make sure no other app is holding the microphone.' : 'Disconnect Bluetooth headsets and check the microphone is not muted.', 'Hold the phone near a speaker and try again.'] }),
   CTX_SUSPENDED: env => ({ title: 'The phone would not start its audio engine', why: 'The audio system stayed "suspended". Phones only start audio right after you tap something.', fix: ['Tap "Try again" (the tap itself starts the audio).', env.ios ? 'Check the ring/silent switch and volume; turn Low Power Mode off for the measurement.' : 'Check the media volume is not zero.'] }),
   NO_AUDIO_API: () => ({ title: 'This browser has no Web Audio support', why: 'The browser does not provide the audio engine WavWiz needs.', fix: ['Use a current Safari, Chrome or Edge.', 'Or use "By ear".'] }),

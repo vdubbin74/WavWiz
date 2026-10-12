@@ -106,8 +106,8 @@ test('0.2.2 T9: Calibrate speakers offers "Use your phone as the microphone" (QR
   assert.deepEqual(cal.phoneStatusText({ connected: true, state: 'opened', device: 'iPhone' }), ['ok', 'Phone connected: iPhone - follow the prompts on the phone']);
   assert.deepEqual(cal.phoneStatusText({ connected: false, state: 'left', device: 'iPhone' }), ['wait', 'iPhone left. Waiting for your phone…']);
   assert.equal(cal.phoneStatusText({ expired: true })[0], 'bad');
-  assert.match(m, /if \(CAL\.cal\) startPhoneCal\(CAL\.cal\); else maybeWhatsNew\(S\)/);
-  assert.match(m, /api\('\/auth\/pair', \{ method: 'POST', body: \{ code: CAL\.pair, name: deviceName\(\) \} \}\)/);
+  assert.match(m, /if \(CAL\.cal \|\| window\.__wwCalRedirect\) \{ location\.replace\('\/calmic\.html\?cal=' \+/);   // 0.2.5: mic-only page, never the main app
+  assert.doesNotMatch(m, /CAL\.pair/);   // 0.2.5: calibration links no longer sign the phone in
   assert.match(m, /m\.type === 'calphone'/);
   assert.match(t, /setTimeout\(\(\) => location\.replace\(secureHome\(\)\), 900\)/);
   assert.match(css, /\.pm-status \.dot\.ok\{/);

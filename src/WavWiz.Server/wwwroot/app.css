@@ -1436,3 +1436,10 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 /* 0.2.3 fix: the live chips / warning slot of a device card adds no box of its own; an open card rebuilt in place does not replay the slide-in */
 .dlive{display:contents}
 .dcard.dsnoanim .dsettings{animation:none}
+
+/* 0.2.5 phone role: one-time choice + the "calibration mic" banner */
+.phone-role{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.phone-role .card{max-width:420px;width:100%;display:flex;flex-direction:column;gap:6px}
+.phone-role .btn.big{width:100%;padding:14px;font-size:17px}
+.mic-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel,#1b1f23);border:1px solid var(--accent,#FF3C00);border-radius:6px;padding:10px 12px}
+.mic-banner .grow{flex:1;min-width:180px}

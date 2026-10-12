@@ -7,6 +7,8 @@ import { openEq } from './eq.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
+import { changePhoneRole } from './room.js';
+import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 
 
 function menuActions(S, ctl, desktop = false) {
@@ -57,6 +59,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Scenes', () => go('scenes')],
       ['Schedules', () => go('schedules')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
+      ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
       'hr',
       ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
       ['Away-from-home…', () => go('remote'), () => !admin()],

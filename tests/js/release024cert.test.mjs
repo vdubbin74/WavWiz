@@ -20,7 +20,7 @@ test('0.2.4: a phone that trusted an earlier certificate is told to install the 
 
 test('0.2.4: What\'s new and CHANGELOG name the 0.2.4 fixes in words (no internal codes)', () => {
   const a = readFileSync(`${process.env.JS_DIR}/about.js`, 'utf8');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.4'/);
+  assert.match(a, /WHATS_NEW_VERSION = '0\.2\.[4-9]'/);
   for (const x of ['Phone set-up page fixed', 'QR code goes straight to calibration', 'Install steps when needed', 'Certificate says WavWiz']) assert.ok(a.includes(x), x);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.4\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.4]') < cl.indexOf('## [0.2.3]'));
