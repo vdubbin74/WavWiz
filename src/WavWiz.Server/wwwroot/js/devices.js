@@ -74,11 +74,37 @@ export const isPhoneZone = z => !!z?.isWeb && /iPhone|iPad|Android|phone|tablet/
 export function cardTags(z) {
   const t = [], o = chosenOutput(z);
   if (!z.connected) t.push({ k: 'offline', text: 'OFFLINE', title: 'Not connected right now' });
+  if (isBluetooth(z)) t.push({ k: 'bt', text: 'BLUETOOTH', title: 'Bluetooth output: its delay can change when it reconnects. A wired speaker makes a steadier reference.' });   // 0.3.1 B1
   if (z.reference) t.push({ k: 'ref', text: 'REF', title: 'Reference speaker - other delays are measured against this one' });
   if (z.muted) t.push({ k: 'muted', text: 'MUTED', title: 'Muted - press the round button to unmute' });
   if (z.connected && !z.reference && o && o.notCalibrated) t.push({ k: 'nodelay', text: 'NO DELAY', title: 'The delay is not set yet: Settings › Delay › Calibrate' });
   if (isPhoneZone(z)) t.push({ k: 'role', text: 'SPEAKER', title: 'This phone plays music. On the phone: Devices › Phone role to use it as a calibration mic instead' });
   return t.slice(0, 2);
+}
+// ---- 0.3.1 B1: Bluetooth outputs - a tag on the row, and a one-time "Bluetooth reconnected - recalibrate?" hint when one reconnects or the output changes
+export function isBluetooth(z) { const o = z && chosenOutput(z); return !!(o && o.kind === 'bluetooth'); }
+/** Pure: compares the last seen state with now. A hit = a Bluetooth output that came back (offline -> online) or became the output. First sight never hits. */
+export function btReconnects(seen, zones) {
+  const next = new Map(), hits = [];
+  for (const z of zones || []) {
+    const o = chosenOutput(z), bt = !!(o && o.kind === 'bluetooth'), on = bt && !!z.connected && o.connected !== false;
+    const cur = { bt, on, dev: o?.deviceId ?? null }; next.set(z.id, cur);
+    const was = seen && seen.get(z.id);
+    if (was && bt && on && (!was.on || was.dev !== cur.dev)) hits.push(z.id);
+  }
+  return { next, hits };
+}
+const btState = { seen: null, pending: new Map() };
+export function btHint(S, ctl) {
+  const { next, hits } = btReconnects(btState.seen, S.zones); btState.seen = next;
+  for (const id of hits) btState.pending.set(id, true);
+  for (const id of [...btState.pending.keys()]) if (!next.get(id)?.on) btState.pending.delete(id);
+  const zs = [...btState.pending.keys()].map(id => S.zones.find(z => z.id === id)).filter(Boolean);
+  if (!zs.length) return null;
+  return h('div', { class: 'dbthint', role: 'status', 'data-k': zs.map(z => z.id).join(',') }, zs.map(z => h('div', { class: 'row' },
+    h('span', { class: 'grow small' }, h('b', null, z.name), ': Bluetooth reconnected - recalibrate?'),
+    ro(h('button', { class: 'btn sm', onclick: () => { btState.pending.delete(z.id); openCalibration(S, ctl.refreshAll, z.id); ctl.redraw?.(); } }, 'Recalibrate'), canTune(S, z), OWN_HINT),
+    h('button', { class: 'btn sm ghost', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { btState.pending.delete(z.id); ev.target.closest('.row').remove(); } }, '✕'))));
 }
 const two = n => String(n).padStart(2, '0');
 /** "6:40 PM" today, "Oct 9" before (pure, local time). */
@@ -618,7 +644,7 @@ export function devicesPanel(S, ctl) {
       if (hl != null && zpick !== 'all' && !zoneFilter(S.zones, S.groups, zpick).some(z => z.id === hl)) { zpick = 'all'; saveZonePick('all'); }
       const shown = zoneFilter(S.zones, S.groups, zpick);
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main' });
-      reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
+      reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
       let content;
       if (S.zones.length && shown.length) {
         const grid = kid(emain, 'dgrid') || h('div', { class: 'dgrid' }), old = childCards(grid, 'dcard');
@@ -634,7 +660,7 @@ export function devicesPanel(S, ctl) {
       return;
     }
     const un = unassigned(S.zones, S.groups || []), old = childCards(body, 'drow');
-    reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), keepMic(kid(body, 'dmicline'), S),
+    reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S),
       S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => standardRow(S, ctl, z, id => ctl.setDevSize?.('expanded', id)), busy)) : h('p', { class: 'dim small pad' }, EMPTY),
       h('div', { class: 'pane-h' }, h('span', null, 'ZONES'), h('span', { class: 'grow' }), ro(h('button', { class: 'plus zbtn', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), isAdmin(S))),
       (S.groups || []).length ? S.groups.map(g => h('div', { class: 'zrow2' + (g.active ? ' active' : ''), 'data-zone': g.name },

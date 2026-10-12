@@ -1714,5 +1714,9 @@ body.jb-kiosk #app{visibility:hidden}
   .np-eqview .eqchip{font-size:9px;padding:2px 1px} .np-eqview .eqchip span{display:none}
 }
 /* 0.3.1 B3: guided calibration stop */
-.calguide{border:1px solid var(--accent,#d9a441);border-radius:3px;padding:12px;margin:10px 0}
+.calguide{border:1px solid var(--accent);border-radius:3px;padding:12px;margin:10px 0}
 .calguide .calspk{font-size:1.25em;font-weight:600;margin:2px 0 4px}
+/* 0.3.1 B1: Bluetooth tag + reconnect hint */
+.dtag.bt{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.dbthint{border:1px solid var(--accent);border-radius:3px;padding:6px 8px;margin:6px 0;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.dbthint .row{gap:6px;align-items:center}

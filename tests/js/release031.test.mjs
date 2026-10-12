@@ -140,3 +140,19 @@ test('B3 pages wire Ready / Skip / Retry and the countdown', () => {
   for (const s of [cal, ph]) { assert.match(s, /'Ready'/); assert.match(s, /'Skip'/); assert.match(s, /'Retry'/); assert.match(s, /\/retry/); assert.match(s, /countdown/); }
   assert.match(ph, /waitReady\(g, gi\) === 'skip'/);
 });
+
+// ---- B1 Bluetooth
+test('B1: Bluetooth tag only on BT outputs; reconnect / output change hits once; first sight and wired never hit', async () => {
+  const D = await imp('devices');
+  const z = (id, kind, connected = true, dev = 'd' + id) => ({ id, name: 'Z' + id, connected, outputs: [{ deviceId: dev, kind, active: true, connected }] });
+  assert.ok(D.cardTags(z(1, 'bluetooth')).some(t => t.text === 'BLUETOOTH'));
+  assert.ok(!D.cardTags(z(2, 'analog')).some(t => t.text === 'BLUETOOTH'));
+  let r = D.btReconnects(null, [z(1, 'bluetooth'), z(2, 'analog')]); assert.deepEqual(r.hits, []);
+  r = D.btReconnects(r.next, [z(1, 'bluetooth', false), z(2, 'analog', false)]); assert.deepEqual(r.hits, []);
+  r = D.btReconnects(r.next, [z(1, 'bluetooth'), z(2, 'analog')]); assert.deepEqual(r.hits, [1]);
+  r = D.btReconnects(r.next, [z(1, 'bluetooth'), z(2, 'analog')]); assert.deepEqual(r.hits, []);           // once
+  r = D.btReconnects(r.next, [z(1, 'bluetooth', true, 'other'), z(2, 'analog')]); assert.deepEqual(r.hits, [1]);   // output changed
+  assert.match(src('devices.js'), /Bluetooth reconnected - recalibrate\?/);
+  assert.match(src('devices.js'), /openCalibration\(S, ctl\.refreshAll, z\.id\)/);
+  assert.match(src('calibrate.js'), /A wired speaker makes a steadier reference/);
+});

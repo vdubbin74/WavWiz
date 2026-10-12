@@ -40,11 +40,12 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
 
   function speakersBox() {
     const refZ = zones.find(z => z.id === st.ref);
-    const refSel = h('select', { 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : ''))));
+    const refSel = h('select', { 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : '') + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));
     if (!admin) { refSel.disabled = true; refSel.title = 'Only an administrator can change the reference speaker.'; }
     const names = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref).map(z => z.name);
     return h('details', { class: 'card calspk' }, h('summary', null, h('b', null, 'Speakers: '), `reference ${refZ?.name ?? '?'} · measures ${names.length ? names.join(', ') : 'nothing yet'}`),
-      h('div', { class: 'field' }, h('label', null, 'Reference speaker (left as it is)'), refSel),
+      h('div', { class: 'field' }, h('label', null, 'Reference speaker (left as it is)'), refSel,
+        refZ && refZ.outputs.find(o => o.active)?.kind === 'bluetooth' ? h('p', { class: 'small amber calbtref' }, 'This reference plays over Bluetooth, whose delay can change when it reconnects. A wired speaker makes a steadier reference.') : null),
       h('div', { class: 'field' }, h('label', null, 'Speakers to calibrate'), zones.filter(z => z.id !== st.ref).map(z => { const own = admin || z.id === mine?.id; return h('label', { class: 'row' + (own ? '' : ' ro'), title: own ? '' : 'Only an administrator can calibrate other speakers.' }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), disabled: !own, onchange: ev => { ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id); } }), z.name, h('span', { class: 'small dim' }, z.outputs.find(o => o.active)?.label ?? '')); }),
         admin ? null : h('p', { class: 'small dim' }, 'You can calibrate the speaker you are using; the result is saved only to it.')),
       h('div', { class: 'field' }, h('label', null, 'Test sound level'), h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' })));
