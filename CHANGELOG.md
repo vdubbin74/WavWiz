@@ -18,7 +18,9 @@ Replaces 0.2.4, which was a test build and was not published; its fixes are list
 
 ### Fixed
 
-- **Calibrating with an iPhone works:** on a real iPhone, 0.2.4 stopped with "InvalidStateError: AudioSession category is not compatible with audio capture" and never asked for the microphone. The calibration QR code opened the normal WavWiz page, which joined the phone as a speaker first; that set the phone's audio session to playback-only and started audio, so iOS refused the microphone. The QR code now opens a separate **mic-only page** that never joins as a speaker and never plays: on the Start tap it sets the audio session to play-and-record, asks for the microphone first, and only then starts a record-only audio engine.
+- **iPhone calibration no longer joins as a speaker:** on a real iPhone, 0.2.4 stopped with "InvalidStateError: AudioSession category is not compatible with audio capture" and never asked for the microphone. The calibration QR code opened the normal WavWiz page, which joined the phone as a speaker first; that set the phone's audio session to playback-only and started audio, so iOS refused the microphone. The QR code now opens a separate **mic-only page** that never joins as a speaker and never plays: on the Start tap it sets the audio session to play-and-record, asks for the microphone first, and only then starts a record-only audio engine.
+
+> **Still in testing:** phone-mic calibration on an iPhone may not show the microphone permission prompt yet. For now, calibrating with the PC's microphone (WavWiz Player) is recommended; a fix for the phone prompt is coming in a later update.
 
 ### Added
 
@@ -28,7 +30,7 @@ Replaces 0.2.4, which was a test build and was not published; its fixes are list
 
 ### Changed
 
-- **Device cards (Expanded):** tags right of the name (REF, MUTED, NO DELAY, OFFLINE, SPEAKER; at most two), one status line (playing · output · delay), volume row with the round Mute on the right, and one Settings button. Settings: Output, Delay (slider, exact ms and Calibrate, with "Measured with … · date"), Test sound, Sound / EQ and More (Rename, Set as reference, Delay history, Forget), and the connection on one line. Offline devices are greyed and show when they were last seen. Admin-only controls stay visible, read-only.
+- **Device cards (Expanded):** tags right of the name (REF, MUTED, NO DELAY, OFFLINE, SPEAKER; at most two), one status line (playing · output · delay), volume row with the round Mute on the right, and one Settings button. Settings: Output, Delay (slider, exact ms and Calibrate, with "Measured with … · date"), Test sound, Sound / EQ and More (Rename, Set as reference, Delay history, Forget), and the connection on one line. Offline devices are grayed and show when they were last seen. Admin-only controls stay visible, read-only.
 - **Settings is wider on a PC:** Appearance's sections (Theme, Visualizer, EQ, Now Playing, Display size) are sub-tabs under the main tabs, so the content uses the full width; the dialog grows to about 1200 px on large screens; pinned previews stay and scale to fit.
 
 ## [0.2.4] - 2026-10-11 (beta, test build, not published)
