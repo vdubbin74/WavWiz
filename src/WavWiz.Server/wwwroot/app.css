@@ -1616,3 +1616,5 @@ body.jb-kiosk #app{visibility:hidden}
   .desk.libexpanded .libpanel .pane-h .eschint,.desk.devexpanded .devpanel .pane-h .eschint{display:none}
 }
 @media (prefers-reduced-motion:reduce){ .desk,.desk .nowcol,.desk .listpanel,.desk .npbar{transition:none!important} }
+/* 0.3.0 §7.11: one visible focus ring on every control (keyboard only) */
+:focus-visible{outline:2px solid var(--accent) !important;outline-offset:2px}

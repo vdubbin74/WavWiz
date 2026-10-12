@@ -44,5 +44,5 @@ test('§8: no hard-coded hex/rgb colors in the 0.3.0 CSS and UI modules (theme f
 });
 test('§7.11: a visible focus ring on every control', () => {
   const css = readFileSync(join(root, 'app.css'), 'utf8');
-  assert.match(css, /:focus-visible\{outline:2px solid var\(--accent\);outline-offset:2px\}/);
+  assert.match(css, /\n:focus-visible\{outline:2px solid var\(--accent\) !important;outline-offset:2px\}/);
 });
