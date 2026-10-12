@@ -243,6 +243,22 @@ public static class ZoneApi
             return Results.Json(res);
         }).Req(Role.Control);
 
+        // 0.3.1 B3: guided calibration - Ready / Skip for the waiting speaker, Retry one speaker
+        g.MapPost("/calibration/sessions/{id}/guide", async (string id, HttpContext c) =>
+        {
+            var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);
+            if (CalPhoneApi.LinkOf(c) is { } ml && sess.LinkToken != ml.Token) return Ext.Bad("not this phone's calibration", 403);
+            var b = await c.Request.Body(); var err = s.Cal.Guide(sess, b.Str("action") ?? "", b.Long("zoneId"));
+            return err != null ? Ext.Bad(err, 409) : Results.Json(new { ok = true });
+        }).Req(Role.Control);
+        g.MapPost("/calibration/sessions/{id}/retry", async (string id, HttpContext c) =>
+        {
+            var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);
+            if (CalPhoneApi.LinkOf(c) is { } ml && sess.LinkToken != ml.Token) return Ext.Bad("not this phone's calibration", 403);
+            var b = await c.Request.Body(); var err = s.Cal.Retry(sess, b.Long("zoneId") ?? 0);
+            return err != null ? Ext.Bad(err, 409) : Results.Json(new { ok = true });
+        }).Req(Role.Control);
+
         g.MapPost("/calibration/sessions/{id}/finish", (string id) =>
         {
             var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);

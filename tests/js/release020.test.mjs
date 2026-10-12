@@ -146,7 +146,7 @@ test('0.2.0 item 29: calibration ends its session (music resumes), re-syncs befo
   const c = src('calibrate.js');
   assert.match(c, /\/calibration\/sessions\/\$\{id\}\/end/); assert.match(c, /cleanup = \(\) => \{[^\n]*endSession\(\)/);
   // 0.2.5: the phone measures on its own mic-only page from the listening spot (no walk pauses); it still re-syncs the clock before every recording
-  const mp = src('calmic.js'); assert.match(mp, /try \{ off = await syncClock\(\); \}/); assert.match(mp, /for \(const r of steps\)/);
+  const mp = src('calmic.js'); assert.match(mp, /try \{ off = await syncClock\(\); \}/); assert.match(mp, /for \(const r of (steps|g\.steps)\)/ /* 0.3.1 B3: grouped per speaker */);
   assert.match(c, /mode: 'ear'/); assert.match(c, /max: 1000, step: 1/);
   const ce = await imp('calerrors');
   assert.equal(ce.wifiStability([5, 6, 5, 7, 6, 5]).stable, true); assert.equal(ce.wifiStability([5, 300, 20, 900, 40, 5]).stable, false); assert.equal(ce.wifiStability([5, 5]).stable, false);

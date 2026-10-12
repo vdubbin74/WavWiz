@@ -82,3 +82,21 @@ export function phoneName(ua = '', touch = 0) {
 export const ROLE_KEY = 'wavwiz.phoneRole';
 export function phoneRole(store) { try { const v = store.getItem(ROLE_KEY); return v === 'speaker' || v === 'mic' ? v : null; } catch { return null; } }
 export function setPhoneRole(store, v) { try { if (v === 'speaker' || v === 'mic') store.setItem(ROLE_KEY, v); else store.removeItem(ROLE_KEY); } catch { /* private mode */ } }
+
+// ---- 0.3.1 B3: guided calibration. One stop per speaker visit (reference, each speaker, the reference again); nothing plays until Ready.
+export const COUNTDOWN_KEY = 'wavwiz.cal.countdown', COUNTDOWN_S = 5;
+export function guideGroups(steps) {
+  const out = [];
+  for (const st of steps || []) {
+    const last = out[out.length - 1];
+    if (last && last.zone === st.zone && last.kind === st.kind) { last.steps.push(st); continue; }
+    const name = String(st.label || '').replace(/ \(.*$/, '').replace(/ again$/, '');
+    out.push({ zone: st.zone, kind: st.kind, name, steps: [st], canSkip: st.kind === 'dev' });
+  }
+  return out;
+}
+export function guideText(name) { return `Walk to ${name}, hold the mic about 3 ft in front of it, then tap Ready`; }
+export function guideStep(i, n) { return `Step ${i + 1} of ${n}`; }
+export function countdownOn(store) { try { return store.getItem(COUNTDOWN_KEY) === '1'; } catch { return false; } }
+export function setCountdown(store, on) { try { store.setItem(COUNTDOWN_KEY, on ? '1' : '0'); } catch { /* private mode */ } }
+export function skipNote(name) { return `Skipped ${name}: its delay is unchanged`; }

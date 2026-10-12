@@ -1,6 +1,7 @@
 import { h, api, toast, dialog } from './util.js';
 import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
+import { guideGroups, guideText, countdownOn, setCountdown, COUNTDOWN_S } from './calmic-core.js';
 
 // Calibrate speakers (0.2.5: calibration that just works). One screen, three ways, in this order:
 //   1. Use this PC's microphone - the WavWiz Player on a Windows PC records with its own microphone (WASAPI, no browser, no HTTPS, no prompt);
@@ -78,21 +79,41 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   function showRun(id, { title, warn, phone }) {
     let timer = 0, gone = false;
     const head = h('h3', null, title), label = h('div', { class: 'calnow', 'aria-live': 'polite' }, 'Starting…'), bar = h('div', { class: 'calbar' }, h('i')), steps = h('div', { class: 'small dim' });
-    const logEl = h('ul', { class: 'small dim callog' });
+    const logEl = h('ul', { class: 'small dim callog' }), guide = h('div', { class: 'calguide', hidden: true });
+    let promptKey = '', cdTimer = 0;
     const cancel = h('button', { class: 'btn', onclick: () => { endSession(); stop(); intro(); } }, 'Cancel');
-    body.replaceChildren(h('div', { class: 'card calrun' }, head, warn ? h('p', { class: 'small amber' }, warn) : null, label, bar, steps, logEl, h('div', { class: 'row' }, h('span', { class: 'grow' }), cancel)));
+    body.replaceChildren(h('div', { class: 'card calrun' }, head, warn ? h('p', { class: 'small amber' }, warn) : null, label, guide, bar, steps, logEl, h('div', { class: 'row' }, h('span', { class: 'grow' }), cancel)));
     const paint = p => {
       if (gone) return;
       if (p.step && p.steps) { bar.firstChild.style.width = `${Math.round(p.step / p.steps * 100)}%`; steps.textContent = `Step ${p.step} of ${p.steps}`; }
       if (p.label) label.textContent = p.label;
       if (p.log) logEl.replaceChildren(...p.log.slice(-6).map(t => h('li', null, t)));
+      paintGuide(p);
       if (p.phase === 'failed') { stop(); failed(p.error || 'The measurement failed.'); return; }
       if (p.proposals && (p.phase === 'done' || phone)) { stop(); results(id, p.proposals, p.messages || [], phone); }
     };
     const poll = async () => { clearTimeout(timer); if (gone) return; try { paint(await api(`/calibration/sessions/${id}`)); } catch (e) { if (e.status === 404) { stop(); if (phone) { body.replaceChildren(h('div', { class: 'card' }, h('h3', null, 'Finished on the phone'), h('p', null, 'The phone saved, canceled or stopped the calibration. Check the phone for details.'), h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn primary', onclick: () => d.close() }, 'Close')))); refresh && refresh(); } else intro(); return; } } timer = setTimeout(poll, 1000); };
     const onRun = ev => { if (ev.detail?.id === id) poll(); };
     window.addEventListener('wavwiz:calrun', onRun);
-    function stop() { gone = true; clearTimeout(timer); window.removeEventListener('wavwiz:calrun', onRun); }
+    // 0.3.1 B3: the guided stop - "Step X of N", the speaker, where to stand; Ready / Skip and an optional 5 s countdown
+    function paintGuide(p) {
+      const pr = p.phase === 'waiting' ? p.prompt : null;
+      if (!pr) { guide.hidden = true; promptKey = ''; clearInterval(cdTimer); return; }
+      const key = `${pr.step}:${pr.zoneId}`; if (key === promptKey) return; promptKey = key; clearInterval(cdTimer);
+      const send = async action => { clearInterval(cdTimer); guide.querySelectorAll('button').forEach(b => { b.disabled = true; }); try { await api(`/calibration/sessions/${id}/guide`, { method: 'POST', body: { action, zoneId: pr.zoneId } }); } catch (e) { toast(e.message, true); } poll(); };
+      const readyBtn = h('button', { class: 'btn primary calready', onclick: () => send('ready') }, 'Ready');
+      const cd = h('input', { type: 'checkbox', checked: countdownOn(localStorage), onchange: ev => setCountdown(localStorage, ev.target.checked) });
+      guide.replaceChildren(h('div', { class: 'small dim calstep' }, `Step ${pr.step} of ${pr.steps}`), h('div', { class: 'calspk' }, pr.name), h('p', null, pr.text),
+        h('div', { class: 'row wrap' }, readyBtn, pr.canSkip ? h('button', { class: 'btn calskip', onclick: () => send('skip') }, 'Skip') : null, h('span', { class: 'grow' }),
+          h('label', { class: 'small' }, cd, ` ${COUNTDOWN_S} s countdown after Ready`)));
+      readyBtn.onclick = () => {
+        if (!cd.checked) { send('ready'); return; }
+        let n = COUNTDOWN_S; readyBtn.disabled = true; readyBtn.textContent = `Starting in ${n}…`;
+        cdTimer = setInterval(() => { n--; if (n <= 0) { send('ready'); } else readyBtn.textContent = `Starting in ${n}…`; }, 1000);
+      };
+      guide.hidden = false; readyBtn.focus?.();
+    }
+    function stop() { gone = true; clearTimeout(timer); clearInterval(cdTimer); window.removeEventListener('wavwiz:calrun', onRun); }
     function failed(msg) {
       endSession();
       body.replaceChildren(h('div', { class: 'card', role: 'alert', style: 'border-color:#8a2b26' }, h('h3', { class: 'err' }, 'Calibration did not finish'), h('p', null, msg),
@@ -106,9 +127,10 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     sessionId = sid;
     const checks = new Map(props.map(p => [p.zoneId, p.commit]));
     body.replaceChildren(h('div', { class: 'card' }, h('h3', null, 'Results'),
-      props.length ? h('table', { class: 'tbl caltbl' }, h('thead', null, h('tr', null, ['Save', 'Speaker', 'Measured delay', 'Confidence', 'Note'].map(x => h('th', null, x)))), h('tbody', null, props.map(p =>
+      props.length ? h('table', { class: 'tbl caltbl' }, h('thead', null, h('tr', null, ['Save', 'Speaker', 'Measured delay', 'Confidence', 'Note', ''].map(x => h('th', null, x)))), h('tbody', null, props.map(p =>
         h('tr', null, h('td', null, h('input', { type: 'checkbox', checked: p.commit, disabled: !p.commit, 'aria-label': 'Save ' + p.zoneName, onchange: ev => checks.set(p.zoneId, ev.target.checked) })), h('td', null, p.zoneName), h('td', { class: 'amber mono' }, `${Math.round(p.proposedLatencyMs)} ms`),
-          h('td', null, `${Math.round(p.confidence * 100)}%`), h('td', { style: 'white-space:normal' }, p.warning ?? '')))))
+          h('td', null, `${Math.round(p.confidence * 100)}%`), h('td', { style: 'white-space:normal' }, p.warning ?? ''),
+          h('td', null, phone || p.isReference ? null : h('button', { class: 'btn small calretry', title: `Measure ${p.zoneName} again`, onclick: async () => { try { await api(`/calibration/sessions/${sid}/retry`, { method: 'POST', body: { zoneId: p.zoneId } }); showRun(sid, { title: `Measuring ${p.zoneName} again` }); } catch (e) { toast(e.message, true); } } }, 'Retry'))))))
         : h('p', { class: 'err' }, 'Nothing could be measured.'),
       messages.length ? h('ul', { class: 'small amber' }, messages.map(m => h('li', null, m))) : null,
       phone ? h('p', { class: 'small dim' }, 'You can also save on the phone.') : null,

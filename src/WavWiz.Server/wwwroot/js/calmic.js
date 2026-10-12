@@ -2,7 +2,7 @@
 // Order is the whole point (see calmic-core.js): nothing here joins as a speaker, opens /ws/room, creates an AudioContext or plays a sound before
 // the microphone is open. The Start tap sets the audio session to play-and-record, asks for the microphone, and only then creates a capture-only
 // AudioContext. The speakers play the test sounds; this phone only listens and uploads what it heard.
-import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine } from './calmic-core.js';
+import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine, guideGroups, guideText, guideStep, countdownOn, setCountdown, skipNote, COUNTDOWN_S } from './calmic-core.js';
 import { CalError, environment, classifyMicError, describe, detailsText, rms } from './calerrors.js';
 import { OffsetEstimator, pairClocks } from './roomsched.js';
 
@@ -168,9 +168,26 @@ async function run(started) {
     catch (e) { throw new CalError('SESSION_FAILED', e.message); }
     order('session'); note('Music is paused while calibrating.');
     const steps = buildPlan(plan); let done = 0, heard = 0, failed = 0;
+    const groups = guideGroups(steps), skipped = [];
     mark('heard', 'run');
-    for (const r of steps) {
-      if (canceled || stopped) return;
+    // 0.3.1 B3: guided - a stop before each speaker; nothing plays until Ready (optional 5 s countdown); speakers can be skipped
+    const waitReady = (g, gi) => new Promise(res => {
+      now.textContent = `${guideStep(gi, groups.length)}: ${g.name}`; sub.textContent = guideText(g.name);
+      const cd = h('input', { type: 'checkbox', checked: countdownOn(localStorage), onchange: ev => setCountdown(localStorage, ev.target.checked) });
+      const go = h('button', { class: 'btn big' }, 'Ready');
+      const skip = g.canSkip ? h('button', { class: 'btn ghost' }, 'Skip') : null;
+      const box = h('div', { class: 'guide' }, h('div', { class: 'row' }, go, skip), h('label', { class: 'small' }, cd, ` ${COUNTDOWN_S} s countdown after Ready`));
+      sub.after(box);
+      const done_ = v => { box.remove(); res(v); };
+      if (skip) skip.onclick = () => done_('skip');
+      go.onclick = () => {
+        if (!cd.checked) { done_('ready'); return; }
+        let n = COUNTDOWN_S; go.disabled = true; if (skip) skip.disabled = true; go.textContent = `Starting in ${n}…`;
+        const t = setInterval(() => { n--; if (n <= 0 || canceled || stopped) { clearInterval(t); done_('ready'); } else go.textContent = `Starting in ${n}…`; }, 1000);
+      };
+    });
+    const measure = async r => {
+      if (canceled || stopped) return null;
       now.textContent = `Listening to ${r.label}`; sub.textContent = `Step ${done + 1} of ${steps.length}`;
       call(`/calibration/sessions/${sid}/progress`, { method: 'POST', body: { step: done + 1, steps: steps.length, label: r.label } }).catch(() => {});
       let res;
@@ -181,7 +198,7 @@ async function run(started) {
         order('play-requested');
         const serverNow = () => performance.now() * 1000 + off.offsetUs;
         const until = Date.now() + Math.max(0, (play.atUs - serverNow()) / 1000) + play.patternMs + 1500;
-        while (Date.now() < until) { if (canceled || stopped) return; if (hidden) throw new CalError('SCREEN_HIDDEN', 'page hidden during recording'); await sleep(100); }
+        while (Date.now() < until) { if (canceled || stopped) return null; if (hidden) throw new CalError('SCREEN_HIDDEN', 'page hidden during recording'); await sleep(100); }
         const got = await rec.stop();
         if (!got.total || rms(got.samples) < 1e-5) throw new CalError('MIC_SILENT', 'rms=' + rms(got.samples));
         const q = new URLSearchParams({ zoneId: String(r.zone), kind: r.kind, rate: String(mic.ctx.sampleRate), startServerUs: (got.startPerfMs * 1000 + off.offsetUs).toFixed(0) });
@@ -190,15 +207,39 @@ async function run(started) {
         if (e instanceof CalError && ['SCREEN_HIDDEN', 'MIC_SILENT', 'SESSION_FAILED', 'WIFI_UNSTABLE', 'CLOCK_TIMEOUT', 'CLOCK_WS_FAILED', 'UPLOAD_FAILED'].includes(e.code)) throw e;
         res = { ok: false, note: e.message };
       }
-      done++; bar.firstChild.style.width = `${done / steps.length * 100}%`;
-      if (res.ok) heard++; else { failed++; note(`${r.label}: ${res.note}`, true); }
-      await sleep(300);
+      return res;
+    };
+    for (let gi = 0; gi < groups.length; gi++) {
+      const g = groups[gi]; if (canceled || stopped) return;
+      if (await waitReady(g, gi) === 'skip') {
+        skipped.push(g.name); call(`/calibration/sessions/${sid}/guide`, { method: 'POST', body: { action: 'skip', zoneId: g.zone } }).catch(() => {});
+        note(skipNote(g.name)); done += g.steps.length; bar.firstChild.style.width = `${done / steps.length * 100}%`; continue;
+      }
+      for (const r of g.steps) {
+        const res = await measure(r); if (!res) return;
+        done++; bar.firstChild.style.width = `${done / steps.length * 100}%`;
+        if (res.ok) heard++; else { failed++; note(`${r.label}: ${res.note}`, true); }
+        await sleep(300);
+      }
     }
-    releaseMic(); document.removeEventListener('visibilitychange', onVis);
     if (!heard) throw new CalError('NOT_HEARD', `${steps.length} test sounds, none heard`);
     mark('heard', 'ok', `${heard} of ${steps.length}`); now.textContent = 'Working out the delays…'; sub.textContent = '';
+    // the mic stays open on the results so Retry can measure one speaker again; it is released on Save, Redo or leaving the page
+    const retry = async zone => {
+      const g = groups.find(x => x.zone === zone && x.kind === 'dev'); if (!g) return;
+      show(h('div', { class: 'card' }, now, sub, bar, checks, notes));
+      try {
+        await call(`/calibration/sessions/${sid}/retry`, { method: 'POST', body: { zoneId: zone } });
+        const i = skipped.indexOf(g.name); if (i >= 0) skipped.splice(i, 1);
+        if (await waitReady(g, groups.indexOf(g)) !== 'skip') { done = 0; for (const r of g.steps) { const res = await measure(r); if (!res) return; await sleep(300); } }
+        else { skipped.push(g.name); await call(`/calibration/sessions/${sid}/guide`, { method: 'POST', body: { action: 'skip', zoneId: zone } }).catch(() => {}); }
+        now.textContent = 'Working out the delays…'; sub.textContent = '';
+        results(await call(`/calibration/sessions/${sid}/finish`, { method: 'POST' }), 0, retry);
+      } catch (e) { note(String(e && e.message || e), true); results(await call(`/calibration/sessions/${sid}/finish`, { method: 'POST' }).catch(() => ({})), 0, retry); }
+    };
     const fin = await call(`/calibration/sessions/${sid}/finish`, { method: 'POST' });
-    state = 'done'; hello(state); results(fin, failed);
+    document.removeEventListener('visibilitychange', onVis);
+    state = 'done'; hello(state); results(fin, failed, retry);
   } catch (e) {
     document.removeEventListener('visibilitychange', onVis); if (!mic && started) started.promise.then(st => st.getTracks().forEach(t => t.stop()), () => {}); releaseMic(); hidden = false;
     if (canceled || stopped) return;
@@ -260,26 +301,27 @@ async function syncClock() {
   order('clock'); return { offsetUs: est.offsetUs, rttMs: est.rttUs / 1000, n: got.size };
 }
 
-function results(fin, failed) {
+function results(fin, failed, retry) {
   const props = fin.proposals || []; const pick = new Map(props.map(p => [p.zoneId, p.commit]));
   const save = h('button', { class: 'btn big', disabled: !props.some(p => p.commit) }, 'Save all');
   save.addEventListener('click', async () => {
     save.disabled = true;
     try { const r = await call(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...pick].filter(([, v]) => v).map(([k]) => k) } }); sid = null;
-      show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' })));
+      releaseMic(); show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' })));
       state = 'left'; hello(state); clearInterval(helloTimer);
     } catch (e) { save.disabled = false; save.textContent = 'Save all (try again)'; save.title = e.message; lastErr = e; const dg = $('diag'); if (dg) dg.textContent = diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: e }); }
   });
   show(h('div', { class: 'card' }, h('h2', { text: 'Results' }),
-    props.length ? h('table', { class: 'res' }, h('thead', null, h('tr', null, ['', 'Speaker', 'Delay', 'Confidence'].map(t => h('th', { text: t })))),
+    props.length ? h('table', { class: 'res' }, h('thead', null, h('tr', null, ['', 'Speaker', 'Delay', 'Confidence', ''].map(t => h('th', { text: t })))),
       h('tbody', null, props.map(p => h('tr', null,
         h('td', null, h('input', { type: 'checkbox', checked: p.commit, disabled: !p.commit, 'aria-label': 'Save ' + p.zoneName, onchange: ev => pick.set(p.zoneId, ev.target.checked) })),
         h('td', null, p.zoneName, p.warning ? h('div', { class: 'small warn-t', text: p.warning }) : null),
-        h('td', { class: 'mono accent', text: `${Math.round(p.proposedLatencyMs)} ms` }), h('td', { class: 'mono', text: `${Math.round(p.confidence * 100)}%` })))))
+        h('td', { class: 'mono accent', text: `${Math.round(p.proposedLatencyMs)} ms` }), h('td', { class: 'mono', text: `${Math.round(p.confidence * 100)}%` }),
+        h('td', null, retry ? h('button', { class: 'btn ghost small retry', onclick: () => retry(p.zoneId) }, 'Retry') : null)))))
       : h('p', { class: 'err-t', text: 'Nothing could be measured.' }),
     (fin.messages || []).length ? h('ul', { class: 'notes' }, fin.messages.map(m => h('li', { text: m }))) : null,
     failed ? h('p', { class: 'small', text: `${failed} test sound(s) were not heard. Moving closer, turning the speaker up or a quieter room usually helps.` }) : null,
-    h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: async () => { if (sid) { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'redo' } }).catch(() => {}); sid = null; } ready(); } }, 'Redo'), h('span', { class: 'grow' })), save));
+    h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: async () => { releaseMic(); if (sid) { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'redo' } }).catch(() => {}); sid = null; } ready(); } }, 'Redo'), h('span', { class: 'grow' })), save));
 }
 
 window.addEventListener('pagehide', () => { if (code && !stopped) { try { fetch(`/api/v1/calibration/phone-link/${code}/hello`, { method: 'POST', keepalive: true, headers: { 'X-WavWiz-Cal': code, 'Content-Type': 'application/json' }, body: JSON.stringify({ state: 'left' }) }); } catch { /* best effort */ } } });

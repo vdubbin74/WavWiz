@@ -1713,3 +1713,6 @@ body.jb-kiosk #app{visibility:hidden}
   .np-stage .np-eqhead{padding-right:136px;min-height:28px} .np-eqname{font-size:12px}
   .np-eqview .eqchip{font-size:9px;padding:2px 1px} .np-eqview .eqchip span{display:none}
 }
+/* 0.3.1 B3: guided calibration stop */
+.calguide{border:1px solid var(--accent,#d9a441);border-radius:3px;padding:12px;margin:10px 0}
+.calguide .calspk{font-size:1.25em;font-weight:600;margin:2px 0 4px}

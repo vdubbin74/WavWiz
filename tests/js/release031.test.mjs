@@ -126,3 +126,17 @@ test('B2: center-panel EQ scales to the stage - no fixed plot height, no scroll 
   assert.match(css, /\.np-eqhost\{overflow:hidden;/); assert.match(css, /\.np-eqview \.eqa-plot\{flex:1 1 auto;height:auto!important;min-height:0\}/);
   assert.match(css, /\.eqa-plot\{position:relative;height:300px;/, 'the Sound (EQ) dialog keeps its size');
 });
+
+// ---- B3 guided calibration
+test('B3 guided groups: reference, each speaker, reference again; only speakers skippable', async () => {
+  const { guideGroups, guideText, buildPlan, skipNote } = await imp('calmic-core');
+  const g = guideGroups(buildPlan({ reference: { id: 1, name: 'Den' }, speakers: [{ id: 1, name: 'Den' }, { id: 2, name: 'Kitchen' }, { id: 3, name: 'Patio' }] }));
+  assert.deepEqual(g.map(x => [x.name, x.kind, x.steps.length, x.canSkip]), [['Den', 'ref', 3, false], ['Kitchen', 'dev', 3, true], ['Patio', 'dev', 3, true], ['Den', 'ref-end', 1, false]]);
+  assert.equal(guideText('Kitchen'), 'Walk to Kitchen, hold the mic about 3 ft in front of it, then tap Ready');
+  assert.match(skipNote('Patio'), /Skipped Patio: its delay is unchanged/);
+});
+test('B3 pages wire Ready / Skip / Retry and the countdown', () => {
+  const cal = src('calibrate.js'), ph = src('calmic.js');
+  for (const s of [cal, ph]) { assert.match(s, /'Ready'/); assert.match(s, /'Skip'/); assert.match(s, /'Retry'/); assert.match(s, /\/retry/); assert.match(s, /countdown/); }
+  assert.match(ph, /waitReady\(g, gi\) === 'skip'/);
+});

@@ -54,6 +54,60 @@ public class Release025CalibrationTests
 
     // ---------------------------------------------------------------- PC-mic end to end (real server + Players, fake capture device)
     [Fact]
+    public async Task B3_guided_run_waits_for_Ready_skip_keeps_delay_retry_measures_one_speaker()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));
+        await using var a = await FakePc.StartAsync(f, "pc-ref", "Living Room", hiddenMs: 15);
+        await using var b = await FakePc.StartAsync(f, "pc-dev", "Kitchen", hiddenMs: 52);
+        var micDev = new SynthMicProvider();
+        const double micInputDelayMs = 9;    // the mic's own input delay: unknown, must cancel out
+        micDev.Synth = (_, startUs, n) => { var rec = new float[n]; a.MixInto(rec, startUs, micInputDelayMs); b.MixInto(rec, startUs, micInputDelayMs); var rnd = new Random(3); for (int i = 0; i < n; i++) rec[i] += (float)(rnd.NextDouble() - 0.5) * 0.01f; return rec; };
+        await using var m = await FakePc.StartAsync(f, "pc-mic", "Office PC", mics: micDev);
+        await a.WaitConnected(); await b.WaitConnected(); await m.WaitConnected();
+        await WaitUntil(() => f.Server.S.Zones.Zones().Count == 3 && f.Server.S.Audio.Get("pc-mic")?.Mics.Length == 1, what: "zones + mic list");
+        var zones = f.Server.S.Zones.Zones(); long refId = zones.First(z => z.PlayerId == "pc-ref").Id, devId = zones.First(z => z.PlayerId == "pc-dev").Id;
+
+        var pcs = await admin.GetJson("/api/v1/calibration/pc-mics");
+        var pc = pcs.GetProperty("pcs").EnumerateArray().Single(p => p.GetProperty("playerId").GetString() == "pc-mic");
+        Assert.Equal("mic-usb-1", pc.GetProperty("selected").GetString()); Assert.False(pc.GetProperty("mics")[0].GetProperty("bluetooth").GetBoolean());
+        Assert.Equal("USB mic", pc.GetProperty("mics")[0].GetProperty("label").GetString());
+
+        var r = await admin.PostAsJsonAsync("/api/v1/calibration/sessions", new { mode = "pc-mic", referenceZoneId = refId, micPlayerId = "pc-mic", micId = "mic-usb-1", zoneIds = new[] { devId }, runs = 1 });
+        var sess = await r.Json(); Assert.True(r.IsSuccessStatusCode, sess.ToString()); string sid = sess.GetProperty("id").GetString()!;
+        JsonElement st = default; string Phase() { st = admin.GetJson($"/api/v1/calibration/sessions/{sid}").Result; return st.GetProperty("phase").GetString()!; }
+        async Task Answer(string action, int code = 200) { var g = await admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{sid}/guide", new { action }); Assert.Equal(code, (int)g.StatusCode); }
+        await WaitUntil(() => Phase() == "waiting", 20000, "first prompt");
+        var pr = st.GetProperty("prompt"); Assert.Equal(1, pr.GetProperty("step").GetInt32()); Assert.Equal(3, pr.GetProperty("steps").GetInt32());
+        Assert.Equal(refId, pr.GetProperty("zoneId").GetInt64()); Assert.False(pr.GetProperty("canSkip").GetBoolean());
+        Assert.Equal("Walk to Living Room, hold the mic about 3 ft in front of it, then tap Ready", pr.GetProperty("text").GetString());
+        await Task.Delay(500); Assert.Equal(0, micDev.Recordings);                       // nothing plays or records until Ready
+        await Answer("skip", 409);                                                       // the reference cannot be skipped
+        await Answer("ready");
+        await WaitUntil(() => Phase() == "waiting" && st.GetProperty("prompt").GetProperty("zoneId").GetInt64() == devId, 30000, "Kitchen prompt");
+        Assert.True(st.GetProperty("prompt").GetProperty("canSkip").GetBoolean()); int before = micDev.Recordings;
+        await Answer("skip");
+        await WaitUntil(() => Phase() == "waiting" && st.GetProperty("prompt").GetProperty("step").GetInt32() == 3, 30000, "reference again");
+        Assert.Equal(before, micDev.Recordings);                                         // skipped: Kitchen not measured
+        await Answer("ready");
+        await WaitUntil(() => Phase() is "done" or "failed", 30000, "done");
+        Assert.Equal("done", st.GetProperty("phase").GetString());
+        Assert.DoesNotContain(st.GetProperty("proposals").EnumerateArray(), p => p.GetProperty("zoneId").GetInt64() == devId);
+        Assert.Contains(st.GetProperty("messages").EnumerateArray(), m => m.GetString() == "Skipped Kitchen: its delay is unchanged");
+        Assert.Contains(st.GetProperty("skipped").EnumerateArray(), z => z.GetInt64() == devId);
+        // Retry only Kitchen: one prompt, one recording, then a proposal for it
+        var rt = await admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{sid}/retry", new { zoneId = devId }); Assert.True(rt.IsSuccessStatusCode, await rt.Content.ReadAsStringAsync());
+        Assert.Equal(409, (int)(await admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{sid}/retry", new { zoneId = refId })).StatusCode);
+        await WaitUntil(() => Phase() == "waiting", 20000, "retry prompt"); Assert.Equal(devId, st.GetProperty("prompt").GetProperty("zoneId").GetInt64());
+        before = micDev.Recordings; await Answer("ready");
+        await WaitUntil(() => Phase() is "done" or "failed" && st.GetProperty("proposals").ValueKind == JsonValueKind.Array, 30000, "retry done");
+        Assert.Equal(before + 1, micDev.Recordings);
+        var prop = st.GetProperty("proposals").EnumerateArray().Single(p => p.GetProperty("zoneId").GetInt64() == devId);
+        Assert.InRange(prop.GetProperty("proposedLatencyMs").GetDouble(), 52 - 15 - 2.5, 52 - 15 + 2.5);
+        Assert.DoesNotContain(st.GetProperty("messages").EnumerateArray(), m => m.GetString()!.StartsWith("Skipped"));
+        await admin.PostAsync($"/api/v1/calibration/sessions/{sid}/end", null);
+    }
+
+    [Fact]
     public async Task Pc_mic_calibration_end_to_end_measures_hidden_delays_with_a_USB_mic_and_saves_them()
     {
         await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));
@@ -78,7 +132,8 @@ public class Release025CalibrationTests
         var mics = await admin.GetJson("/api/v1/calibration/mics");      // the Devices "Calibration mic" line
         Assert.Contains(mics.EnumerateArray(), x => x.GetProperty("kind").GetString() == "pc" && x.GetProperty("device").GetString()!.Contains("USB Microphone"));
         JsonElement st = default;
-        await WaitUntil(() => { st = admin.GetJson($"/api/v1/calibration/sessions/{sid}").Result; return st.GetProperty("phase").GetString() is "done" or "failed" or "canceled"; }, 60000, "PC-mic run");
+        // 0.3.1 B3: the run is guided now - answer Ready at each speaker
+        await WaitUntil(() => { st = admin.GetJson($"/api/v1/calibration/sessions/{sid}").Result; if (st.GetProperty("phase").GetString() == "waiting") admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{sid}/guide", new { action = "ready" }).Wait(); return st.GetProperty("phase").GetString() is "done" or "failed" or "canceled"; }, 60000, "PC-mic run");
         Assert.Equal("done", st.GetProperty("phase").GetString());
         Assert.Equal(3, micDev.Recordings);            // reference, Kitchen, reference again - recorded natively on the mic PC
         var prop = st.GetProperty("proposals").EnumerateArray().Single(p => p.GetProperty("zoneId").GetInt64() == devId);

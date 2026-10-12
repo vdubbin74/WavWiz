@@ -15,3 +15,4 @@ table.res{width:100%;border-collapse:collapse;font-size:15px} table.res td,table
 ul.fix{padding-left:20px;margin:6px 0} .notes{font-size:14px;color:var(--dim);max-height:9em;overflow:auto;margin:6px 0 0;padding-left:18px}
 .spk{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .spk span{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:14px}
 .deny{font-weight:700;border-left:3px solid var(--accent);padding:6px 10px;margin:8px 0} .diag{opacity:.75;margin-top:12px;word-break:break-word;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.guide{margin:12px 0}.guide .row{gap:10px}

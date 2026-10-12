@@ -35,7 +35,17 @@ public sealed class CalSession
     public string? MicPlayerId, MicId, MicName, LinkToken, MicDevice;
     public bool MicBluetooth;
     public readonly CancellationTokenSource Cancel = new();
+    // ---- 0.3.1 B3: guided calibration - before each speaker the run waits for "Ready" (no test sound until then); Skip leaves a speaker's delay
+    // unchanged (noted in the summary); Retry re-measures only that speaker. A phone runs its own guided loop and reports skips / retries here.
+    public bool Guided = true;
+    public readonly HashSet<long> Skipped = new();
+    public TaskCompletionSource<string>? Gate;
+    public GuidePrompt? Prompt;
+    public List<PlanStep>? Plan; public double LevelDb = -20;
 }
+
+/// <summary>0.3.1 B3: what the page shows while the run waits: "Step X of N", the speaker, the instruction.</summary>
+public sealed record GuidePrompt(int Step, int Steps, long ZoneId, string Name, string Kind, string Text, bool CanSkip);
 
 /// <summary>
 /// Phone-mic calibration (spec 8). The server schedules a chirp pattern at a DAC time T on a chosen player, the phone records, the server finds the pattern
@@ -81,7 +91,8 @@ public sealed class CalibrationService
     public object Progress(CalSession s)
     {
         lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(),
-            proposals = s.Proposals, messages = s.Phase == "done" ? s.Notes.ToList() : null, micName = s.MicName, micBluetooth = s.MicBluetooth, micDevice = s.MicDevice, referenceZoneId = s.ReferenceZoneId };
+            proposals = s.Proposals, messages = s.Phase == "done" ? s.Notes.ToList() : null, guided = s.Guided, skipped = s.Skipped.ToList(),
+            prompt = s.Phase == "waiting" && s.Prompt is { } gp ? new { step = gp.Step, steps = gp.Steps, zoneId = gp.ZoneId, name = gp.Name, kind = gp.Kind, text = gp.Text, canSkip = gp.CanSkip } : null, micName = s.MicName, micBluetooth = s.MicBluetooth, micDevice = s.MicDevice, referenceZoneId = s.ReferenceZoneId };
     }
     private void Push(CalSession s) { _ev.Publish("calrun", new { id = s.Id, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, mode = s.Mode, linkToken = s.LinkToken }); }
     public void Report(CalSession s, string? phase = null, int? step = null, int? steps = null, string? label = null, string? log = null, string? error = null)
@@ -95,41 +106,117 @@ public sealed class CalibrationService
     /// with the microphone to record that window natively; the same detector and the same reference-relative math as the phone, so the mic's own input
     /// delay cancels. Music stays paused for the whole run (and resumes when the session ends); a step that is not heard well is tried once more.
     /// </summary>
-    public async Task RunPcMic(CalSession s, List<PlanStep> plan, double levelDb)
+    public async Task RunPcMic(CalSession s, List<PlanStep> plan, double levelDb, bool retry = false)
     {
         var broker = Mics ?? throw new InvalidOperationException("no microphone broker");
-        Report(s, phase: "running", step: 0, steps: plan.Count, label: "Starting", log: $"Listening with {s.MicName}{(s.MicBluetooth ? " (Bluetooth - results may be off)" : "")}");
+        lock (s.L) { if (!retry) { s.Plan = plan; s.LevelDb = levelDb; } }
+        Report(s, phase: "running", step: 0, steps: plan.Count, label: "Starting", log: retry ? "Measuring again" : $"Listening with {s.MicName}{(s.MicBluetooth ? " (Bluetooth - results may be off)" : "")}");
         int heard = 0, refHeard = 0; var ct = s.Cancel.Token;
+        var groups = GuideGroups(plan);
         try
         {
-            for (int i = 0; i < plan.Count; i++)
+            int i = 0;
+            for (int gi = 0; gi < groups.Count; gi++)
             {
-                var st = plan[i]; if (ct.IsCancellationRequested || s.Ended) return;
-                Report(s, step: i, label: st.Label);
-                RunResult? res = null;
-                for (int attempt = 0; attempt < 2 && !ct.IsCancellationRequested; attempt++)
+                var grp = groups[gi]; if (ct.IsCancellationRequested || s.Ended) return;
+                // B3: wait for Ready (or Skip) before any test sound of this speaker
+                if (s.Guided)
                 {
-                    var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
-                    var (at, err) = Play(s, st.ZoneId, st.Kind, 0, levelDb);
-                    if (err != null) { res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, err); break; }
-                    long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
-                    var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, st.Label, _clock.NowUs, ct);
-                    if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
-                    res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
-                    if (res.Ok && res.Confidence >= 0.4) break;
-                    if (attempt == 0) Report(s, log: $"{st.Label}: {(res.Ok ? "not clear enough" : res.Note)} - trying again");
-                    await Task.Delay(400, ct);
+                    var answer = await WaitReady(s, new GuidePrompt(gi + 1, groups.Count, grp.ZoneId, grp.Name, grp.Kind, GuideText(grp.Name), grp.Kind == "dev"), ct);
+                    if (answer == "skip" && grp.Kind == "dev")
+                    {
+                        lock (s.L) s.Skipped.Add(grp.ZoneId);
+                        Report(s, phase: "running", step: i += grp.Steps.Count, log: $"{grp.Name}: skipped (delay unchanged)"); continue;
+                    }
+                    Report(s, phase: "running");
                 }
-                if (res is { Ok: true }) { heard++; if (st.Kind == "ref") refHeard++; Report(s, step: i + 1, log: $"{st.Label}: heard it ({res.Confidence * 100:0}% sure)"); }
-                else Report(s, step: i + 1, log: $"{st.Label}: {res?.Note ?? "not heard"}");
-                await Task.Delay(300, ct);
+                foreach (var st in grp.Steps)
+                {
+                    if (ct.IsCancellationRequested || s.Ended) return;
+                    Report(s, step: i, label: st.Label);
+                    RunResult? res = null;
+                    for (int attempt = 0; attempt < 2 && !ct.IsCancellationRequested; attempt++)
+                    {
+                        var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
+                        var (at, err) = Play(s, st.ZoneId, st.Kind, 0, levelDb);
+                        if (err != null) { res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, err); break; }
+                        long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
+                        var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, st.Label, _clock.NowUs, ct);
+                        if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
+                        res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
+                        if (res.Ok && res.Confidence >= 0.4) break;
+                        if (attempt == 0) Report(s, log: $"{st.Label}: {(res.Ok ? "not clear enough" : res.Note)} - trying again");
+                        await Task.Delay(400, ct);
+                    }
+                    i++;
+                    if (res is { Ok: true }) { heard++; if (st.Kind == "ref") refHeard++; Report(s, step: i, log: $"{st.Label}: heard it ({res.Confidence * 100:0}% sure)"); }
+                    else Report(s, step: i, log: $"{st.Label}: {res?.Note ?? "not heard"}");
+                    await Task.Delay(300, ct);
+                }
             }
-            if (refHeard == 0) { Report(s, phase: "failed", error: "The reference speaker was not heard. Turn it up, move the microphone closer to the listening spot, or check that the right mic is chosen."); return; }
+            if (!retry && refHeard == 0) { Report(s, phase: "failed", error: "The reference speaker was not heard. Turn it up, move the microphone closer to the listening spot, or check that the right mic is chosen."); return; }
             var (props, msgs) = Finish(s); lock (s.L) { s.Proposals = props; s.Notes.Clear(); s.Notes.AddRange(msgs); }
             Report(s, phase: "done", step: plan.Count, label: $"Measured {props.Count} speaker(s)", log: $"{heard} of {plan.Count} test sounds heard");
         }
         catch (OperationCanceledException) { Report(s, phase: "canceled", label: "Canceled"); }
         catch (Exception e) { Report(s, phase: "failed", error: e.Message, log: "stopped: " + e.Message); }
+    }
+
+    /// <summary>0.3.1 B3: one group per speaker visit: consecutive plan steps on the same speaker and kind (reference, each speaker, the reference again).</summary>
+    public static List<(long ZoneId, string Name, string Kind, List<PlanStep> Steps)> GuideGroups(List<PlanStep> plan)
+    {
+        var groups = new List<(long, string, string, List<PlanStep>)>();
+        foreach (var st in plan)
+        {
+            if (groups.Count > 0 && groups[^1].Item1 == st.ZoneId && groups[^1].Item3 == st.Kind) { groups[^1].Item4.Add(st); continue; }
+            var name = st.Label; var cut = name.IndexOf(" (", StringComparison.Ordinal); if (cut > 0) name = name[..cut]; if (name.EndsWith(" again", StringComparison.Ordinal)) name = name[..^6];
+            groups.Add((st.ZoneId, name, st.Kind, new List<PlanStep> { st }));
+        }
+        return groups;
+    }
+    public static string GuideText(string name) => $"Walk to {name}, hold the mic about 3 ft in front of it, then tap Ready";
+
+    /// <summary>B3: park the run until the page answers "ready" or "skip" (POST .../guide). No test sound plays while waiting.</summary>
+    private async Task<string> WaitReady(CalSession s, GuidePrompt prompt, CancellationToken ct)
+    {
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (s.L) { s.Gate = tcs; s.Prompt = prompt; }
+        Report(s, phase: "waiting", step: s.Step, label: $"Step {prompt.Step} of {prompt.Steps}: {prompt.Name}");
+        using var reg = ct.Register(() => tcs.TrySetCanceled());
+        try { return await tcs.Task; } finally { lock (s.L) { if (s.Gate == tcs) s.Gate = null; s.Prompt = null; } }
+    }
+    /// <summary>B3: the page's answer to the waiting prompt. Phone runs (no server gate) report a skip so the summary lists it.</summary>
+    public string? Guide(CalSession s, string action, long? zoneId)
+    {
+        if (action is not ("ready" or "skip")) return "action must be ready or skip";
+        TaskCompletionSource<string>? g; GuidePrompt? p; lock (s.L) { g = s.Gate; p = s.Prompt; }
+        if (g != null)
+        {
+            if (action == "skip" && p is { CanSkip: false }) return "the reference speaker cannot be skipped";
+            g.TrySetResult(action); return null;
+        }
+        if (action == "skip" && zoneId is long z) { if (z == s.ReferenceZoneId) return "the reference speaker cannot be skipped"; lock (s.L) s.Skipped.Add(z); Push(s); return null; }
+        return action == "ready" ? null : "nothing is waiting";
+    }
+    /// <summary>B3: Retry one speaker - forget only its measurements; a PC-mic run measures it again (with its Ready prompt), a phone re-runs it itself.</summary>
+    public string? Retry(CalSession s, long zoneId)
+    {
+        if (zoneId == s.ReferenceZoneId) return "retry measures one speaker - the reference is measured with every run";
+        if (s.OnlyZoneId != null && zoneId != s.OnlyZoneId) return "you can only measure your own speaker";
+        List<PlanStep>? plan;
+        lock (s.L)
+        {
+            if (s.Phase is "running" or "waiting") return "wait until the current measurement has finished";
+            s.Runs.RemoveAll(r => r.Zone == zoneId && r.Kind == "dev"); s.Skipped.Remove(zoneId); s.Proposals = null;
+            plan = s.Plan?.Where(p => p.ZoneId == zoneId && p.Kind == "dev").ToList();
+        }
+        if (s.Mode == "pc-mic")
+        {
+            if (plan is not { Count: > 0 }) return "that speaker was not part of this calibration";
+            _ = Task.Run(() => RunPcMic(s, plan, s.LevelDb, retry: true));
+        }
+        else Report(s, phase: "running", label: "Measuring again");
+        return null;
     }
 
     public (CalSession? S, string? Error) Start(string mode, long referenceZoneId, string? micSource, string? micProcessing, long? onlyZoneId = null)
@@ -259,6 +346,9 @@ public sealed class CalibrationService
             }
         }
 
+        // 0.3.1 B3: skipped speakers keep their delay; say so in the summary
+        long[] skipped; lock (s.L) skipped = s.Skipped.ToArray();
+        foreach (var z in skipped) msgs.Add($"Skipped {_zones.Zone(z)?.Name ?? "a speaker"}: its delay is unchanged");
         // absolute = reference's applied delay + offset; if anything would go below 0, shift the whole house up (the reference included) so the earliest speaker is 0
         double shift = Math.Max(0, -(raw.Select(r => refLatency + r.Offset).Append(refLatency).Min()));
         if (shift > 0.5) msgs.Add($"some speakers sound EARLIER than the reference, so every speaker (including the reference) gets +{shift:0} ms to keep them aligned");
