@@ -1641,3 +1641,20 @@ body.jb-kiosk #app{visibility:hidden}
 @media (prefers-reduced-motion:reduce){ .desk,.desk .nowcol,.desk .listpanel,.desk .npbar{transition:none!important} }
 /* 0.3.0 §7.11: one visible focus ring on every control (keyboard only) */
 :focus-visible{outline:2px solid var(--accent) !important;outline-offset:2px}
+/* ===== 0.3.1 B7/B8: master volume = the device bar (.dvol: slider, % readout, Mute-button slot), Mute all on its own line ===== */
+.dmaster .dvol-master{gap:8px} .dmaster .dvol-master .pct{width:38px}
+.dvol-slot{visibility:hidden;pointer-events:none}
+.dmaster-mute{display:flex;justify-content:flex-start;margin-top:6px}
+.dmaster-mute .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;white-space:nowrap;border-radius:3px}
+.dmaster-mute .mutealls .ic svg{width:16px;height:16px}
+.dmaster-mute .mutealls.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.dexp-top .dmaster{flex-wrap:wrap} .dexp-top .dmaster .dvol-master{gap:10px} .dexp-top .dmaster .dvol-master .pct{width:36px} .dexp-top .dmaster-mute{flex-basis:100%}
+/* ===== 0.3.1 B9: compact Scenes & Schedules (Devices panel, under Zones) - styling per scenes-schedules.png ===== */
+.dss{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.dss-h{display:flex;align-items:center;gap:8px}
+.dss-next{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:3px;background:var(--panel2);font-size:12.5px;min-width:0}
+.dss-cd{color:var(--accent-text,var(--accent));font-variant-numeric:tabular-nums}
+.dss-skip{min-height:24px;height:24px;padding:0 8px;border-radius:3px;font-size:11.5px}
+.dss-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dss-run{border-radius:3px;font-size:12px;min-height:26px;padding:2px 10px}
+.dss-none{margin:0}

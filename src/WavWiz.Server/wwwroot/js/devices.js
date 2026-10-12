@@ -157,7 +157,11 @@ function masterRow(S, ctl) {
   const sl = h('input', { type: 'range', min: 0, max: 100, value: lvl, 'aria-label': 'Master volume', title: 'Raises or lowers every speaker that is on by the same factor (keeps the balance between rooms; never un-mutes)',
     oninput: ev => { pct.textContent = ev.target.value + '%'; clearTimeout(sl._t); sl._t = setTimeout(() => ctl.act('/zones/master', { set: +ev.target.value }), 120); } });
   ro(sl, canControl(S), 'Your access is view-only.');
-  return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER VOLUME'), h('div', { class: 'dvol' }, icon('volume'), sl, pct, muteAllButton(S, ctl)));
+  // 0.3.1 B7: the same track / thumb / length / % position as every device row (.dvol: slider, %, then a slot the width of a row's round Mute
+  // button) so the bars line up; B8: Mute all on its own line below, so it never shortens the master bar.
+  return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER VOLUME'),
+    h('div', { class: 'dvol dvol-master' }, sl, pct, h('span', { class: 'mutebtn dvol-slot', 'aria-hidden': 'true' })),
+    h('div', { class: 'dmaster-mute' }, muteAllButton(S, ctl)));
 }
 /** 0.2.1 F17: every device muted? (drives the Mute all / Unmute all button) */
 export const allMuted = zones => (zones || []).length > 0 && zones.every(z => z.muted);
@@ -170,6 +174,43 @@ function muteAllButton(S, ctl) {
   const paint = m => { b.classList.toggle('on', m); b.setAttribute('aria-pressed', String(m)); b.replaceChildren(icon(m ? 'mute' : 'volume'), h('span', null, m ? 'Unmute all' : 'Mute all')); };
   paint(on); ro(b, canControl(S), 'Your access is view-only.');
   return b;
+}
+// ---- 0.3.1 B9: compact Scenes & Schedules under Zones - next event + countdown + Skip, one-tap scene Run chips, Open, + (admins only).
+// No inline editing; the full window does that. The next-event countdown is shown only here (Now Playing shows no next-event status).
+let ssCache = { at: 0, scenes: [], rows: [], now: null }, ssEl = null, ssIv = 0;
+async function loadSS(force) {
+  if (!force && Date.now() - ssCache.at < 30000) return ssCache;
+  try { const [scenes, rows, ck] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock').catch(() => ({}))]); ssCache = { at: Date.now(), scenes, rows, now: ck.now || null, nowAt: Date.now() }; }
+  catch { ssCache.at = Date.now(); }
+  return ssCache;
+}
+/** The next enabled schedule with a run time (soonest first). Pure. */
+export function nextEvent(rows) { return (rows || []).filter(r => r.enabled && r.nextRunAt).sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0] || null; }
+/** "in 2 h 5 m" / "in 7 m" / "now". Pure. */
+export function ssCountdown(iso, nowMs) { const ms = new Date(iso) - nowMs; if (!(ms > 0)) return 'now'; const m = Math.round(ms / 60000), hh = Math.floor(m / 60); return hh ? `in ${hh} h ${m % 60} m` : `in ${m} m`; }
+function ssCompact(S, ctl) {
+  const admin = isAdmin(S), can = canControl(S);
+  if (!ssEl) ssEl = h('section', { class: 'dss', 'aria-label': 'Scenes and schedules' });
+  const el = ssEl;
+  const open = () => ctl.go?.('scenes');
+  const paint = d => {
+    const nx = nextEvent(d.rows), skew = d.now ? new Date(d.now) - d.nowAt : 0;
+    const cd = nx ? h('span', { class: 'dss-cd', 'data-at': nx.nextRunAt }, ssCountdown(nx.nextRunAt, Date.now() + skew)) : null;
+    el.replaceChildren(
+      h('div', { class: 'pane-h dss-h' }, h('span', null, 'SCENES & SCHEDULES'), h('span', { class: 'grow' }),
+        h('button', { type: 'button', class: 'linkbtn dss-open', title: 'Open Scenes & Schedules', onclick: open }, 'Open'),
+        admin ? h('button', { type: 'button', class: 'plus zbtn dss-add', 'aria-label': 'New scene or schedule', title: 'New scene or schedule (opens the full window)', onclick: open }, '+') : null),
+      nx ? h('div', { class: 'dss-next' }, h('span', { 'aria-hidden': 'true' }, nx.alarm ? '⏰' : '🗓'), h('span', { class: 'ell grow' }, h('b', null, nx.name), ' ', cd),
+        ro(h('button', { type: 'button', class: 'btn sm dss-skip', title: `Skip the next “${nx.name}”`, onclick: async () => { try { const x = await api(`/schedules/${nx.id}/skip`, { method: 'POST' }); toast(x.skipped ? `Skipping the next “${nx.name}”` : `“${nx.name}” runs as planned`); paint(await loadSS(true)); } catch (e) { toast(e.message, true); } } }, 'Skip'), can, 'Your access is view-only.'))
+        : h('p', { class: 'small dim dss-none' }, 'Nothing scheduled.'),
+      d.scenes.length ? h('div', { class: 'dss-chips' }, d.scenes.map(sc => ro(h('button', { type: 'button', class: 'chip dss-run', 'data-scene': sc.id, title: `Run the scene “${sc.name}”`,
+        onclick: async () => { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`Scene “${sc.name}” applied`); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } }, '▶ ' + sc.name), can, 'Your access is view-only.'))) : null);
+  };
+  if (ssCache.at) paint(ssCache);
+  loadSS().then(d => { if (d.at) paint(d); });
+  if (!ssIv) ssIv = setInterval(() => { const el = ssEl; if (!el) return; const c = el.querySelector('.dss-cd'); if (c) c.textContent = ssCountdown(c.dataset.at, Date.now() + (ssCache.now ? new Date(ssCache.now) - ssCache.nowAt : 0)); }, 30000);
+  ssIv?.unref?.();   // node tests: never keep the process alive
+  return el;
 }
 function zonesStrip(S, ctl, compact) {
   const admin = isAdmin(S), can = canControl(S);
@@ -220,11 +261,8 @@ function zonesSidebar(S, ctl, pick, setPick, edit, setEdit) {
       r.append(h('span', { class: 'zsedit', role: 'button', tabindex: 0, 'aria-label': `Zone settings for ${g.name}`, title: 'Zone settings', onclick: ev => { ev.stopPropagation(); setEdit(g.id); }, onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); setEdit(g.id); } } }, '⚙'));
       return r; }));
   const add = ro(h('button', { class: 'plus zbtn zadd', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), admin);
-  const scenes = h('div', { class: 'zscenes' });
-  loadScenes().then(list => scenes.replaceChildren(...(list.length ? [h('div', { class: 'zshead' }, h('span', { class: 'dlbl' }, 'SCENES'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, 'optional')),
-    h('div', { class: 'zschips' }, list.map(sc => ro(h('button', { type: 'button', class: 'chip zscene', title: `Apply the scene “${sc.name}”`, onclick: async () => { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`Scene “${sc.name}” applied`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, '▶ ' + sc.name), can, 'Your access is view-only.')))] : [])));
   side.append(h('div', { class: 'zshead' }, h('span', { class: 'dlbl' }, 'ZONES'), h('span', { class: 'grow' }), add), list,
-    groups.length ? null : h('p', { class: 'small dim zsempty' }, 'Zones are optional groups, like “Downstairs”.'), scenes);
+    groups.length ? null : h('p', { class: 'small dim zsempty' }, 'Zones are optional groups, like “Downstairs”.'), ssCompact(S, ctl));   // 0.3.1 B9
   return side;
 }
 /** F19: one zone's settings inside the sidebar (replaces the old pop-ups): name, devices, play in this zone only, remove. Admin edits; others read. */
@@ -603,6 +641,7 @@ export function devicesPanel(S, ctl) {
         ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), canControl(S), 'Your access is view-only.'),
         g.active ? h('span', { class: 'badge-active' }, 'ACTIVE') : null, h('span', { class: 'small dim' }, `${g.members} device${g.members === 1 ? '' : 's'}`)))
         : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”. An administrator can create one to switch several devices on together.'),
+      ssCompact(S, ctl),   // 0.3.1 B9
       un.length && (S.groups || []).length ? [h('div', { class: 'pane-h' }, h('span', null, 'UNASSIGNED'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, String(un.length))),
         un.map(z => h('div', { class: 'urow' }, h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell grow' }, z.name), h('span', { class: 'small dim' }, stateText(z))))] : null]);
     if (busy.v) later();

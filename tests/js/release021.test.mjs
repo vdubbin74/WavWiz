@@ -232,7 +232,7 @@ test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on
 
 test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays separate)', async () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol' \}, icon\('volume'\), sl, pct, muteAllButton\(S, ctl\)\)/);
+  assert.match(d, /h\('div', \{ class: 'dmaster-mute' \}, muteAllButton\(S, ctl\)\)/);   // 0.3.1 B8: own line below the master bar
   assert.match(d, /ctl\.act\('\/zones\/mute-all', \{ muted: want \}\)/);
   assert.match(d, /m \? 'Unmute all' : 'Mute all'/);
   assert.match(d, /function muteButton\(S, ctl, z\)/, 'each device keeps its own Mute');

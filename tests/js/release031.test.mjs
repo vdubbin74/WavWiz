@@ -72,3 +72,22 @@ test('B5: both rails put the chevron at the top and center icon + vertical title
   assert.match(css, /\.israil \.pane-h\{order:0;margin:0/); assert.match(css, /\.israil \.prail\{order:1;justify-content:center\}/);
   assert.doesNotMatch(css, /\.israil \.pane-h\{order:2;margin-top:auto/);
 });
+test('B7/B8: master bar uses the device-row structure (slider, %, Mute slot) and Mute all is on its own line', () => {
+  const d = src('devices.js');
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, h\('span', \{ class: 'mutebtn dvol-slot', 'aria-hidden': 'true' \}\)\)/);
+  assert.match(d, /h\('div', \{ class: 'dmaster-mute' \}, muteAllButton\(S, ctl\)\)/);
+  assert.match(d, /h\('div', \{ class: 'dvol' \}, vol, pct, mute\)/, 'device rows: slider, %, round mute');
+  assert.match(css, /\.dvol-slot\{visibility:hidden/);
+});
+test('B9: compact Scenes & Schedules: next event + countdown + Skip, Run chips, Open, + for admins only', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem() {} };
+  const D = await imp('devices');
+  const rows = [{ id: 1, enabled: true, nextRunAt: '2026-10-13T07:00:00Z' }, { id: 2, enabled: true, nextRunAt: '2026-10-12T23:00:00Z' }, { id: 3, enabled: false, nextRunAt: '2026-10-12T20:00:00Z' }];
+  assert.equal(D.nextEvent(rows).id, 2); assert.equal(D.nextEvent([]), null);
+  const now = Date.parse('2026-10-12T21:00:00Z');
+  assert.equal(D.ssCountdown('2026-10-12T23:05:00Z', now), 'in 2 h 5 m'); assert.equal(D.ssCountdown('2026-10-12T21:07:00Z', now), 'in 7 m'); assert.equal(D.ssCountdown('2026-10-12T20:00:00Z', now), 'now');
+  const d = src('devices.js');
+  assert.match(d, /admin \? h\('button', \{ type: 'button', class: 'plus zbtn dss-add'/, '+ only rendered for admins');
+  assert.match(d, /\/schedules\/\$\{nx\.id\}\/skip/); assert.match(d, /\/scenes\/\$\{sc\.id\}\/apply/); assert.match(d, /'Open'/);
+  assert.doesNotMatch(src('now.js'), /nextRunAt|countdown\(/, 'rule 6: Now Playing shows no next-event countdown');
+});
