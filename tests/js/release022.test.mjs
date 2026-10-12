@@ -48,7 +48,7 @@ test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expa
   // 0.3.0 §6: mirror kept, two controls apart: chevron on the outer edge, expand on the inner edge
   assert.match(s, /h\('div', \{ class: 'pane-h devhead' \}, expBtn, h\('span', \{ class: 'grow devtitle' \}\), count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\), colBtn\)/);
   assert.match(m, /h\('div', \{ class: 'pane-h' \}, colBtn, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\), h\('span', \{ class: 'grow' \}\), expBtn\)/);
-  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);
+  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent-text,var\(--accent\)\)\}/);
   assert.doesNotMatch(css, /\.desk\.libexpanded \.libpanel \.pane-h \.plus:not\(\.libexp\)\{display:none\}/);
 });
 

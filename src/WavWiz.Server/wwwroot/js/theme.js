@@ -28,7 +28,14 @@ export function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n
 export function rgbToHex([r, g, b]) { return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('').toUpperCase(); }
 export function luminance(hex) { const c = hexToRgb(hex).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
 export function mix(a, b, t) { const x = hexToRgb(a), y = hexToRgb(b); return rgbToHex(x.map((v, i) => v + (y[i] - v) * t)); }
-export const readableOn = hex => { const l = luminance(hex); return (l + 0.05) / (luminance('#111111') + 0.05) >= (1.05) / (l + 0.05) ? '#111111' : '#FFFFFF'; };
+export const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+/** Text color for a fill. 0.3.0 §7.11: at least 4.5:1 - near-black / white first, pure black when needed; a brand theme passes its own palette. */
+export const readableOn = (hex, palette = null) => {
+  const c = palette || ['#111111', '#FFFFFF', '#000000'];
+  return c.find(x => contrast(hex, x) >= 4.5) || c.reduce((a, b) => (contrast(hex, b) > contrast(hex, a) ? b : a));
+};
+/** 0.3.0 §7.11: a color used as TEXT moved toward the ink (a tint) until it reads at 4.5:1 on every surface. */
+export function textOn(color, ink, surfaces) { for (let t = 0; t <= 1.0001; t += 0.04) { const c = t ? mix(color, ink, t) : color; if (surfaces.every(sf => contrast(c, sf) >= 4.5)) return c; } return ink; }
 
 /** Default text color for a background (light bg → dark ink). */
 export function defaultInk(bg) { return luminance(bg) > 0.35 ? '#1A1D20' : '#E8EDF0'; }
@@ -60,10 +67,15 @@ export function derive(t) {
   const light = luminance(bg) > 0.35, toward = light ? '#000000' : '#ffffff';
   const [r, g, b] = hexToRgb(accent);
   const hl = isHex(t.hl) ? t.hl : accent;         // 0.2.1 F14: no Highlight = Main (the 0.2.0 look)
+  const panel = mix(bg, toward, light ? 0.03 : 0.045), panel2 = mix(bg, toward, light ? 0.07 : 0.095), surf = [bg, panel, panel2];
+  // 0.3.0 §7.11: secondary text stays as quiet as before but never under 4.5:1; Pepecoin text/fill pairs come from its brand kit only
+  let dim = mix(ink, bg, 0.42); for (let k = 0.42; k > 0 && !surf.every(sf => contrast(dim, sf) >= 4.5); k -= 0.02) dim = mix(ink, bg, Math.max(0, k));
+  const pal = t.preset === 'pepecoin' || t.brand ? [bg, '#FFFFFF', ink] : null;
   return {
-    '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl), '--bg': bg,
-    '--panel': mix(bg, toward, light ? 0.03 : 0.045), '--panel2': mix(bg, toward, light ? 0.07 : 0.095), '--line': mix(bg, toward, light ? 0.18 : 0.2),
-    '--ink': ink, '--dim': mix(ink, bg, 0.42), '--accent-ink': readableOn(accent), '--accent-soft': `rgba(${r},${g},${b},.16)`,
+    '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl, pal), '--bg': bg,
+    '--panel': panel, '--panel2': panel2, '--line': mix(bg, toward, light ? 0.18 : 0.2),
+    '--ink': ink, '--dim': dim, '--accent-ink': readableOn(accent, pal), '--accent-soft': `rgba(${r},${g},${b},.16)`,
+    '--accent-text': textOn(accent, ink, surf), '--accent2-text': textOn(accent2, ink, surf), '--hl-text': textOn(hl, ink, surf),
   };
 }
 

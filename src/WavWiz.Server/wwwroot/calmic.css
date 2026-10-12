@@ -9,7 +9,7 @@
 .checks li.ok{color:var(--ink)} .checks li.ok::before{content:"\2713";border:0;background:#2b9a55;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;width:18px;height:18px;left:2px;top:7px}
 .checks li.bad{color:#ff8a80} .checks li.bad::before{border-color:#c0392b;background:#c0392b}
 .bar{height:10px;border-radius:5px;background:#0d1013;overflow:hidden;margin:10px 0} .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
-.now{font-size:19px;font-weight:700;margin:6px 0 2px} .accent{color:var(--accent)}
+.now{font-size:19px;font-weight:700;margin:6px 0 2px} .accent{color:var(--accent-text,var(--accent))}
 table.res{width:100%;border-collapse:collapse;font-size:15px} table.res td,table.res th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left} table.res th{color:var(--dim);font-weight:600;font-size:13px}
 .mono{font-variant-numeric:tabular-nums} .warn-t{color:#ffb300} .err-t{color:#ff8a80}
 ul.fix{padding-left:20px;margin:6px 0} .notes{font-size:14px;color:var(--dim);max-height:9em;overflow:auto;margin:6px 0 0;padding-left:18px}

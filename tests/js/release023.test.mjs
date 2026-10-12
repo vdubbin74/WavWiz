@@ -142,7 +142,7 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
   const s = src('devices.js'), m = src('main.js');
   assert.match(s, /count, h\('span', \{ class: 'devtitle' \}, 'DEVICES'\), colBtn\)/);   // 0.3.0 §6: title near the outer edge, chevron at the very edge
   assert.match(m, /h\('div', \{ class: 'pane-h' \}, colBtn, h\('span', \{ class: 'libtitle' \}, 'LIBRARY'\)/);
-  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent\)\}/);   // same title color
+  assert.match(css, /\.devpanel \.devhead > \.devtitle:not\(\.grow\),\.libpanel \.pane-h > \.libtitle\{color:var\(--accent-text,var\(--accent\)\)\}/);   // same title color
 });
 
 test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
@@ -212,7 +212,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   assert.match(set, /ro\(h\('button'/);
   // themed like the panel expand arrows; the chevron flips; rounded 4-6 px
   assert.match(src('icons.js'), /chevD: '<path d="M6 9l6 6 6-6"\/>'/);
-  assert.match(css, /\.dexpand\{[^}]*border:1px solid var\(--accent\);border-radius:5px;color:var\(--accent\)/);
+  assert.match(css, /\.dexpand\{[^}]*border:1px solid var\(--accent\);border-radius:5px;color:var\(--accent-text,var\(--accent\)\)/);
   assert.match(css, /\.dexpand\.on svg\{transform:rotate\(180deg\)\}/);
   // the Standard rows keep only name, status, volume, Mute and on/off; tapping the name opens Expanded with that card highlighted
   assert.doesNotMatch(row, /settingsToggle|cardSettings|escCloses|dexpand/);

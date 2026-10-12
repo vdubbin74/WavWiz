@@ -61,7 +61,7 @@ test('§6: at most 2 buttons per header, 3 grid tracks always, 240 ms timing, no
   assert.match(css, /\.desk\{transition:grid-template-columns 240ms cubic-bezier\(\.4,0,\.2,1\)/);
   assert.match(css, /\.desk\.libexpanded \.nowcol,\.desk\.devexpanded \.nowcol,\.desk\.libexpanded \.listpanel,\.desk\.devexpanded \.listpanel\{display:flex;visibility:hidden;opacity:0/);
   assert.match(m, /desk\.addEventListener\('transitionend', ev => \{ if \(ev\.target === desk && \/grid-template\/\.test\(ev\.propertyName\)\) \{ nowc\.viz\?\.resize\?\.\(\)/);
-  assert.match(css, /\.prail-t\{writing-mode:vertical-rl;color:var\(--accent\)/); assert.match(css, /\.libpanel\.israil:hover,\.devpanel\.israil:hover\{border-color:var\(--accent\)\}/);
+  assert.match(css, /\.prail-t\{writing-mode:vertical-rl;color:var\(--accent-text,var\(--accent\)\)/); assert.match(css, /\.libpanel\.israil:hover,\.devpanel\.israil:hover\{border-color:var\(--accent\)\}/);
   assert.match(m, /'aria-expanded': 'true'/); assert.match(m, /'aria-pressed': 'false'/);
   assert.match(src('menu.js'), /ctl\.toggleDevExpanded\(true\)/, 'Devices & zones opens Devices expanded');
 });
