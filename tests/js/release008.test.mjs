@@ -154,7 +154,7 @@ test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop me
 
 // ---- item 7: delay slider
 test('0.0.8 item 7: delay slider 0-1000 ms in 5 ms steps, ms box 0-1000 (0.2.0), clamp', () => {
-  assert.equal(lat.LAT_MAX_SLIDER, 1000); assert.equal(lat.LAT_STEP, 5); assert.equal(lat.LAT_MAX, 1000);
+  assert.equal(lat.LAT_MAX_SLIDER, 1000); assert.equal(lat.LAT_STEP, 1);   // 0.3.1 S1: 1 ms steps (wheel fine-tune) assert.equal(lat.LAT_MAX, 1000);
   assert.equal(lat.clampMs(-5), 0); assert.equal(lat.clampMs(2500), 1000); assert.equal(lat.clampMs('12.6'), 13); assert.equal(lat.clampMs('x'), 0);
   const z = src('devices.js'); assert.match(z, /latencyControl/); assert.match(z, /live/);   // 0.2.1 F19: the Details pop-up is gone; the card's settings view has it
   assert.match(css, /\.latslider::-webkit-slider-thumb\{[^}]*width:32px/, 'big thumb on touch screens');

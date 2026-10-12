@@ -1720,3 +1720,9 @@ body.jb-kiosk #app{visibility:hidden}
 .dtag.bt{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
 .dbthint{border:1px solid var(--accent);border-radius:3px;padding:6px 8px;margin:6px 0;background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .dbthint .row{gap:6px;align-items:center}
+
+/* 0.3.1 S1: bigger delay-slider handle and hit target */
+@media (pointer:fine){.latslider{height:36px}
+.latslider::-webkit-slider-thumb{width:26px;height:26px;margin-top:-10px}
+.latslider::-moz-range-thumb{width:24px;height:24px}}
+.latslider{touch-action:none}

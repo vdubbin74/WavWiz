@@ -1,18 +1,20 @@
 import { h } from './util.js';
-import { throttle } from './slider.js';
+import { throttle, isDragging } from './slider.js';
 
 /**
  * 0.0.8: per-device delay control. A slider (0-1000 ms in 5 ms steps) kept in sync with the ms box (0-1000 ms since 0.2.0, 1 ms steps)
  * and -/+ buttons for 1 ms fine-tuning. Changes apply live while you drag (debounced) and once more when you let go.
  * onChange(ms, final) - final is true on release / typed value / button press.
  */
-export const LAT_MAX_SLIDER = 1000, LAT_STEP = 5, LAT_MAX = 1000;     // 0.2.0: the UI range is 0-1000 ms everywhere (the API still accepts up to 2000)
+// 0.3.1 S1: 1 ms slider steps so the mouse wheel fine-tunes by 1 ms (Shift = 10 ms, data-coarse) through the shared slider guard, which also
+// saves (change) after the wheel stops. Outside updates never move the slider while it is dragged or the box is being typed in.
+export const LAT_MAX_SLIDER = 1000, LAT_STEP = 1, LAT_COARSE = 10, LAT_MAX = 1000;     // 0.2.0: the UI range is 0-1000 ms everywhere (the API still accepts up to 2000)
 export const clampMs = v => Math.max(0, Math.min(LAT_MAX, Math.round(Number.isFinite(+v) ? +v : 0)));
 
 export function latencyControl({ value = 0, onChange = () => {}, label = 'Delay', liveMs = 220 } = {}) {
   let cur = clampMs(value);
   const live = throttle(v => onChange(v, false), liveMs);   // 0.3.0 §9: throttled live updates (not debounced), never a re-render
-  const slider = h('input', { type: 'range', class: 'latslider', min: 0, max: LAT_MAX_SLIDER, step: LAT_STEP, 'data-coarse': 50, value: Math.min(cur, LAT_MAX_SLIDER), 'aria-label': label + ' slider (milliseconds)' });
+  const slider = h('input', { type: 'range', class: 'latslider', min: 0, max: LAT_MAX_SLIDER, step: LAT_STEP, 'data-coarse': LAT_COARSE, title: 'Drag, or use the mouse wheel: 1 ms (Shift: 10 ms)', value: Math.min(cur, LAT_MAX_SLIDER), 'aria-label': label + ' slider (milliseconds)' });
   const box = h('input', { type: 'number', class: 'latbox', min: 0, max: LAT_MAX, step: 1, value: cur, 'aria-label': label + ' in milliseconds' });
   const sync = (from) => { if (from !== 'slider') slider.value = String(Math.min(cur, LAT_MAX_SLIDER)); if (from !== 'box') box.value = String(cur); };
   const emit = final => { if (final) onChange(cur, true); else live(cur); };
@@ -23,5 +25,5 @@ export function latencyControl({ value = 0, onChange = () => {}, label = 'Delay'
   box.addEventListener('change', () => set(box.value, null, true));
   const nudge = d => h('button', { class: 'btn latnudge', type: 'button', 'aria-label': (d < 0 ? 'Decrease' : 'Increase') + ' delay by 1 ms', title: (d < 0 ? '-' : '+') + '1 ms', onclick: () => set(cur + d, null, true) }, d < 0 ? '−' : '+');
   const el = h('div', { class: 'latctl' }, h('span', { class: 'latlabel' }, label), nudge(-1), slider, nudge(1), box, h('span', { class: 'small dim' }, 'ms'));
-  return { el, slider, box, get value() { return cur; }, set: v => { cur = clampMs(v); sync(null); } };
+  return { el, slider, box, get value() { return cur; }, set: v => { if (isDragging(slider) || (globalThis.document && document.activeElement === box)) return false; cur = clampMs(v); sync(null); return true; } };
 }

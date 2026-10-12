@@ -164,3 +164,13 @@ test('B19: artist tiles keep the generated initials portrait when no picture loa
   assert.match(G.portraitSvg('Enya'), />E</);
   assert.match(src('art.js'), /the generated portrait stays/);
 });
+
+// ---- S1 delay slider
+test('S1: delay slider - 1 ms wheel step, Shift 10 ms, saves on change; outside updates wait while dragging', async () => {
+  const S = await imp('slider'), L = await imp('latency');
+  assert.equal(L.LAT_STEP, 1); assert.equal(L.LAT_COARSE, 10);
+  assert.equal(S.wheelValue({ value: 40, min: 0, max: 1000, step: L.LAT_STEP, coarse: L.LAT_COARSE }, -1, false), 41);
+  assert.equal(S.wheelValue({ value: 40, min: 0, max: 1000, step: L.LAT_STEP, coarse: L.LAT_COARSE }, 1, true), 30);
+  const ls = src('latency.js'); assert.match(ls, /isDragging\(slider\)/); assert.match(ls, /'change', \(\) => set\(slider\.value, 'slider', true\)/);
+  assert.match(css, /@media \(pointer:fine\)\{\.latslider\{height:36px\}\s*\.latslider::-webkit-slider-thumb\{width:26px;height:26px/);
+});
