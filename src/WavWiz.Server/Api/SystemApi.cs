@@ -10,7 +10,7 @@ public static class SystemApi
     private static readonly Dictionary<string, (double Min, double Max)> NumericSettings = new()
     {
         ["bt.defaultLatencyMs"] = (0, 1000), ["wired.defaultLatencyMs"] = (0, 1000), ["calibration.recheckDays"] = (1, 365), ["calibration.winLatencyChangeMs"] = (1, 500), ["library.rescanHours"] = (0, 168),
-        ["airplay.levelDb"] = (0, 6), ["spotify.levelDb"] = (0, 6),
+        ["airplay.levelDb"] = (0, 6), ["spotify.levelDb"] = (0, 6), ["playback.crossfadeSec"] = (0, 12),
     };
     private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt" };
     private static readonly HashSet<string> StringSettings = new() { "server.name", "acoustid.apiKey" };

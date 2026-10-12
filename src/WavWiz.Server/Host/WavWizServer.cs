@@ -43,6 +43,8 @@ public sealed class WavWizServer : IAsyncDisposable
         u.S = s; cond.Engine.FrameTap = s.Viz.OnFrame;
         s.Scenes = new Features.SceneService(db, zones, events);
         s.Schedules = new Features.ScheduleService(db, zones, cond, events);
+        s.Schedules.Resolve = q => Api.PlaybackApi.ResolveItems(s, q, out _);      // 0.3.0: alarms play a playlist/album/song/radio
+        s.Sleep = new Features.SleepService(zones, cond, events);
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
         s.TagFix = new Features.TagFixService(db, lib, s.Art, events, ffmpeg);
@@ -125,7 +127,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var addrs = app.Urls; u.HttpUrl = $"http://{cfg.BindAddress}:{PortOf(app, false, cfg)}"; u.HttpsUrl = $"https://{cfg.BindAddress}:{PortOf(app, true, cfg)}";
         if (cfg.HttpPort == 0) cfg.HttpPort = PortOf(app, false, cfg); if (cfg.HttpsPort == 0) cfg.HttpsPort = PortOf(app, true, cfg);      // ephemeral ports (tests): every page and the discovery answer must say the real port
         int nasTick = 0;
-        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } }, null, 1000, 1000);
+        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } }, null, 1000, 1000);
         if ((lib.TrackCount() == 0 || lib.NeedsUpgradeScan()) && Convert.ToInt32(db.Scalar("SELECT COUNT(*) FROM library_root")) > 0) SystemApi.StartScan(s);
         u._rescan = new Timer(_ =>
         {

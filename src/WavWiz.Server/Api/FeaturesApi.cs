@@ -28,7 +28,13 @@ public static class FeaturesApi
         }).Req(Role.Admin);
         g.MapPost("/scenes/capture", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Scenes.Capture(b.Str("name"), b.Long("id")); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
         g.MapPut("/scenes/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Scenes.Update(id, b.Str("name"), b.Str("icon"), ParseMembers(b)); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Admin);
-        g.MapDelete("/scenes/{id:long}", (long id) => { s.Scenes.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapDelete("/scenes/{id:long}", (long id, bool? force) =>
+        {   // 0.3.0: a scene used by schedules is not deleted silently (409 + their names) unless forced
+            var users = s.Schedules.UsingScene(id);
+            if (users.Count > 0 && force != true) return Results.Json(new { error = "This scene is used by: " + string.Join(", ", users) + ".", schedules = users }, statusCode: 409);
+            s.Scenes.Delete(id); return Results.Json(new { ok = true });
+        }).Req(Role.Admin);
+        g.MapGet("/scenes/active", () => Results.Json(new { activeSceneId = s.Scenes.ActiveSceneId() })).Req(Role.View);
         g.MapPost("/scenes/{id:long}/apply", (long id) => { var err = s.Scenes.Apply(id); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true }); }).Req(Role.Control);
 
         // ---- B4 schedules ----
@@ -36,6 +42,15 @@ public static class FeaturesApi
         g.MapPost("/schedules", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Schedules.Create(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
         g.MapPut("/schedules/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Schedules.Update(id, b); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapDelete("/schedules/{id:long}", (long id) => { s.Schedules.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        // ---- 0.3.0 alarms + sleep timer ----
+        g.MapGet("/schedules/clock", () => Results.Json(s.Schedules.ClockDto())).Req(Role.View);
+        g.MapPost("/schedules/{id:long}/run", (long id, double? testFadeSec) => { var err = s.Schedules.RunNow(id, testFadeSec); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapPost("/schedules/{id:long}/skip", (long id) => { var (sk, err) = s.Schedules.Skip(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, skipped = sk }); }).Req(Role.Control);
+        g.MapGet("/alarm", () => Results.Json(new { alarm = s.Schedules.Active == null ? null : s.Schedules.AlarmState() })).Req(Role.View);
+        g.MapPost("/alarm/snooze", () => { var err = s.Schedules.Snooze(); return err != null ? Ext.Bad(err, 409) : Results.Json(s.Schedules.AlarmState()); }).Req(Role.Control);
+        g.MapPost("/alarm/stop", () => { var err = s.Schedules.StopAlarm(); return err != null ? Ext.Bad(err, 409) : Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapGet("/sleep", () => Results.Json(s.Sleep.State())).Req(Role.View);
+        g.MapPost("/sleep", async (HttpContext c) => { var b = await c.Request.Body(); var err = s.Sleep.Set(b.Str("mode"), b.Num("minutes"), b.LongList("zoneIds")); return err != null ? Ext.Bad(err) : Results.Json(s.Sleep.State()); }).Req(Role.Control);
 
         // ---- B6 radio finder ----
         g.MapGet("/radio/finder/search", async (string? name, string? tag, string? country, int? limit) =>

@@ -11,7 +11,7 @@ public static class PlaybackApi
         return new { items = q.Select((x, i) => new { id = x.Id, index = i, kind = x.Kind, title = x.Title, artist = x.Artist, album = x.Album, genre = x.Genre, year = x.Year, durationMs = x.DurationMs, refId = x.RefId, artUrl = x.ArtUrl }), index = now.Index };
     }
 
-    private static List<QueueItem> ResolveItems(Services s, JsonElement b, out string? error)
+    public static List<QueueItem> ResolveItems(Services s, JsonElement b, out string? error)
     {
         error = null; var kind = b.Str("kind") ?? "tracks";
         switch (kind)

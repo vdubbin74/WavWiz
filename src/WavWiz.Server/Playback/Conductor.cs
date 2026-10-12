@@ -110,6 +110,8 @@ public sealed class Conductor : IDisposable
 
     /// <summary>Tests can swap the tag reader.</summary>
     public Func<string, TrackTags> TagReader { get; set; } = Loudness.Read;
+    /// <summary>0.3.0: Settings > Playback > Crossfade, 0-12 s, 0 (off) by default.</summary>
+    public int CrossfadeMsSetting() { try { return double.TryParse(_db.Setting("playback.crossfadeSec"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? (int)Math.Round(Math.Clamp(v, 0, 12) * 1000) : 0; } catch { return 0; } }
     public string ReplayGainMode() { try { return Loudness.NormMode(_db.Setting("playback.replayGain")); } catch { return Loudness.DefaultMode; } }
     /// <summary>Auto mode uses album gain when the queue is playing this album in order (a neighbour is from the same album, shuffle off).</summary>
     private bool AlbumContextNoLock(QueueItem it)
@@ -203,7 +205,7 @@ public sealed class Conductor : IDisposable
         if (_queue.Count == 0) { Engine.Stop(0); _state = PlayState.Stopped; Bump(); return; }
         index = Math.Clamp(index, 0, _queue.Count - 1);
         _index = index; _liveTitle = null; _notice = null;
-        _source = new QueueSource(_queue, index, startMs, _repeat, Open);
+        _source = new QueueSource(_queue, index, startMs, _repeat, Open) { CrossfadeMs = CrossfadeMsSetting };
         _source.ItemFailed += (it, err) => { _notice = $"Skipped \"{it.Title}\": {err}"; _events.Publish("notice", new { message = _notice }); };
         Engine.Play(_source, LeadMs * 1000L);
         _state = PlayState.Playing; _pausedMs = startMs;

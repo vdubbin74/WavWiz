@@ -89,6 +89,12 @@ public sealed class Db
         ALTER TABLE player ADD COLUMN owner_token_id INTEGER;
         CREATE TABLE favorite(kind TEXT NOT NULL, ref TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(kind, ref));
         """,
+        // v6 (0.3.0): alarms - once-only date, "skip next", last result.
+        """
+        ALTER TABLE schedule ADD COLUMN once_date TEXT;
+        ALTER TABLE schedule ADD COLUMN skip_until TEXT;
+        ALTER TABLE schedule ADD COLUMN last_result TEXT;
+        """,
     };
 
     public SqliteConnection Open()

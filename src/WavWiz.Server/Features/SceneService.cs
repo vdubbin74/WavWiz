@@ -10,8 +10,21 @@ public sealed class SceneService
     private readonly EventHub _ev;
     public SceneService(Db db, Zones.ZoneManager zones, EventHub ev) { _db = db; _zones = zones; _ev = ev; }
 
-    public object List() => _db.Query("SELECT id,name,icon,created_at,updated_at FROM scene ORDER BY name COLLATE NOCASE",
-        r => new { id = r.GetInt64(0), name = r.GetString(1), icon = r.IsDBNull(2) ? null : r.GetString(2), createdAt = r.GetString(3), updatedAt = r.GetString(4),
+    /// <summary>0.3.0: the scene whose members match the current setup (on/off and volume within 1), or null.</summary>
+    public long? ActiveSceneId()
+    {
+        var zones = _zones.Zones().ToDictionary(z => z.Id);
+        foreach (var id in _db.Query("SELECT id FROM scene ORDER BY id", r => r.GetInt64(0)))
+        {
+            var ms = _db.Query("SELECT device_id,volume,enabled FROM scene_member WHERE scene_id=$s", m => (m.GetInt64(0), m.GetDouble(1), m.GetInt32(2) != 0), ("$s", id));
+            if (ms.Count > 0 && ms.All(m => zones.TryGetValue(m.Item1, out var z) && z.Enabled == m.Item3 && (!m.Item3 || Math.Abs(z.Volume - m.Item2) <= 1))) return id;
+        }
+        return null;
+    }
+
+    public object List() { var act = ActiveSceneId(); return ListRows(act); }
+    private object ListRows(long? act) => _db.Query("SELECT id,name,icon,created_at,updated_at FROM scene ORDER BY name COLLATE NOCASE",
+        r => new { active = r.GetInt64(0) == act, id = r.GetInt64(0), name = r.GetString(1), icon = r.IsDBNull(2) ? null : r.GetString(2), createdAt = r.GetString(3), updatedAt = r.GetString(4),
             members = _db.Query("SELECT device_id,volume,enabled FROM scene_member WHERE scene_id=$s", m => new { deviceId = m.GetInt64(0), volume = m.GetDouble(1), enabled = m.GetInt32(2) != 0 }, ("$s", r.GetInt64(0))) });
 
     public (long Id, string? Err) Create(string? name, string? icon, IEnumerable<(long DeviceId, double Volume, bool Enabled)>? members)
