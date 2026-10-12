@@ -12,7 +12,7 @@
 
 WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on your PCs, phones, and tablets. Phones play from the browser, with no app to install. No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
 
-> **Public beta.** Expect rough edges and frequent updates. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
+> **Public beta.** Expect rough edges and frequent updates. Phone-mic calibration on an iPhone is still in testing; calibrating with the PC's microphone is recommended. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
 **Download:** [latest release for Windows](https://github.com/vdubbin74/WavWiz/releases/latest) · **Website:** [wavwiz.com](https://wavwiz.com) · **Repo:** [github.com/vdubbin74/WavWiz](https://github.com/vdubbin74/WavWiz)
 
@@ -61,9 +61,13 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 - **Optional Spotify Connect** — Off by default. Turn it on in Settings → Network; WavWiz appears in Spotify’s device list and streams to every room. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
 - **Library** — Big cover tiles, album pages, artists, genres, and folders, with sorting and a letter strip on every tab, favorites (hearts), playlists, queue, internet radio, and optional CD ripping. Missing covers and artist photos are looked up online (MusicBrainz, Cover Art Archive, Wikidata / Wikimedia Commons, TheAudioDB; can be switched off), and anything still missing gets a generated cover in your theme colors. Missing tags/covers can be suggested from MusicBrainz (nothing is written until you approve it). Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
 - **Now Playing** — Four control panel styles (Classic, Center, Stack, Horizon) with adjustable panel effects. Minimized, the whole panel fits on one line in your style and theme, and the minimized Playlist shows what's up next.
-- **10-band EQ per speaker** — Three looks (LED bars, Studio faders, Spectrum curve), pre-gain, loudness and limiter. **Lock EQ** keeps the mouse wheel and stray clicks from changing it.
+- **10-band EQ per speaker** — Shown live in the middle of Now Playing by default (one toggle switches to the visualizer). Three looks (LED bars, Studio faders, Spectrum curve), pre-gain, loudness and limiter. **Lock EQ** keeps the mouse wheel and stray clicks from changing it.
 - **Visualizers** — Eight original looks (Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Spectrum, VU meters, Graphic EQ), each with its own 0–100% effect controls (50% default), a Quality setting (Auto / Low / High / Ultra), and GPU post effects.
 - **Themes** — Ten presets plus Custom colors (Background, Main, Second, Highlight, Text). Settings → Appearance has live, pinned previews for Theme, Visualizer, EQ, and Now Playing.
+- **Jukebox mode (beta)** — A locked party screen: guests scan a QR code and add songs from their phone (no app, no sign-in), within the rules you set (allowed music, songs per guest, vote to skip, auto-fill). Modern and Retro CD styles. Only the host PIN exits; for a fully locked public PC use Windows Assigned Access.
+- **Remote mode** — Use any phone, browser or PC as a remote that plays no sound and is not a speaker.
+- **Alarms (beta), sleep timer, crossfade** — One Scenes & Schedules window: alarms with fade-in, snooze and skip, a sleep timer with fade-out, and optional crossfade (off by default; never inside an album).
+- **Backup and restore** — One file with settings, playlists, scenes, alarms, EQ presets and device names; no passwords or certificates in it.
 - **Admin mode** — File → Sign in as admin… unlocks house settings on any paired device without signing out; admin-only items are read-only (never hidden) for everyone else.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.
 

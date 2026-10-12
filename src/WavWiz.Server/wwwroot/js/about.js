@@ -4,6 +4,16 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.3.0';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
+  ['Jukebox mode (beta)', 'Playback > Start Jukebox… turns a PC into a locked party screen. Guests scan the QR code and add songs from their phone, no app or sign-in. Only the host PIN gets out.'],
+  ['Remote mode', 'Use a phone, browser or PC as a remote only: it controls the music but plays no sound and is not a speaker. Devices > Use as remote only, or the tray menu on a Player PC.'],
+  ['Alarms (beta), sleep timer, crossfade', 'Scenes & Schedules is one window. Wake up to a playlist with a fade-in, snooze or skip the next alarm, fall asleep with a timer, and crossfade songs (Settings > Playback, off by default).'],
+  ['EQ in the middle', 'Now Playing shows the live EQ by default. The toggle next to Looks switches to the visualizer, remembered on this device.'],
+  ['Backup and restore', 'Settings > General > Backup saves your settings, playlists, scenes, alarms, EQ presets and device names in one file, with a preview before restoring.'],
+  ['Easier Settings', 'Search in the header, Saved ✓ next to each change, Reset this section, and a Calibration tab under Devices.'],
+  ['Tidier panels', 'Library and Devices fold to a slim rail or expand, with one arrow and one Expand button each. Keys: [ and ], Shift to expand, Esc to return.'],
+  ['Steadier sliders', 'Sliders no longer jump back while you drag, and the mouse wheel fine-tunes every slider (Shift for bigger steps).'],
+  ['iPhone mic page', 'The calibration mic page asks for the microphone straight from the Allow microphone tap and explains how to allow it if it was blocked. Still in testing on iPhone: the PC mic is recommended.'],
+  // 0.2.5 (kept below the 0.3.0 items)
   ['Calibrate with your PC’s mic', 'Calibrate speakers now starts with the microphone on a WavWiz Player PC: a USB or headset mic, or the built-in one. Pick it, check the level, press Start. Bluetooth mics work too, with a warning: they add their own delay.'],
   ['iPhone calibration fixed', 'Scanning the calibration QR code opens a mic-only page that never plays music, so the iPhone asks for the microphone and measures. It stopped with an "AudioSession" error before.'],
   ['Phone: speaker or mic', 'A phone asks once whether to play music or be a calibration mic. Change it in Devices > Phone role. While a phone is the mic, Devices shows it at the top with Stop using as mic.'],

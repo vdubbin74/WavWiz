@@ -12,6 +12,32 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.0] - 2026-10-12 (beta)
+
+### Added
+
+- **Jukebox mode (beta):** Playback → Start Jukebox… (admin) turns a PC into a locked party screen: big cover art and Now Playing, the next songs with who asked for them, a QR code to join, and the visualizer behind. Guests scan the code and add songs from their phone with no app and no sign-in; search is grouped into Artists, Albums and Songs and only counts the music you allow. Rules in Settings → Jukebox: allowed folders and playlists, songs per guest (3 by default), vote to skip, an optional explicit filter (songs with "explicit" in the title or album), artist cooldown and auto-fill when the queue runs dry. Two styles: Modern and Retro CD. Esc, Alt+Tab and right-click do nothing on the Jukebox screen; only the host PIN gets out (hold the corner logo or press Ctrl+Shift+J). Windows itself can still be reached with Ctrl+Alt+Del or the Windows key: for a fully locked public PC, use Windows Assigned Access. The host keeps full control from the "Jukebox on" chip: pin next, remove, ban, lock the queue.
+- **Remote mode:** use a phone, browser or PC as a remote only. It controls playback but plays no sound and is not a speaker card, and a banner in the Highlight color says so. Choose it on the connect screen, in Devices → Use as remote only, or with the **Remote mode** checkmark in the WavWiz Player tray menu. The choice is remembered.
+- **Alarms (beta), sleep timer and crossfade:** Scenes & Schedules is one window with a server clock, a Next up strip, scene cards and a list of schedules and alarms sorted by next run. Alarms can play a playlist, song or radio station with a fade-in, on chosen days or once, with Snooze, Stop and Skip next. The sleep timer (15 to 90 minutes, end of song, end of album or custom) fades out over 30 seconds and shows a countdown on Now Playing. Crossfade (Settings → Playback, 0–12 s) is off by default and never crossfades between tracks of the same album.
+- **EQ in the middle:** the center panel shows the live EQ by default (once, also after updating). The toggle next to Looks switches between EQ and Visualizer and is remembered on each device. The Sound window title names the speaker ("Sound · Kitchen").
+- **Backup and restore:** Settings → General → Backup exports one .wavwizbackup file with your settings, playlists, scenes, schedules and alarms, EQ presets and device names and delays. Import shows what will change before anything is replaced. Certificates, private keys and passwords are never in the file.
+- **Settings:** a search box in the header, an inline "Saved ✓" next to what you changed, a **Reset this section** button on every section, shorter help with **Learn more**, and friendly role names (View, Control, Admin). Calibration has its own sub-tab under Devices. The HTTPS redirect option moved under Advanced with a warning.
+- **Mouse wheel on every slider:** one step per notch, Shift for bigger steps; Lock EQ is respected.
+
+### Changed
+
+- **Library and Devices panels:** each side panel folds to a slim rail with its icon and name, opens normally or expands. One arrow on the outer edge, one Expand button on the inner edge (it reads "⤡ Esc" while expanded), smooth 240 ms moves, and Now Playing keeps at least 420 px. Keys: `[` and `]` fold or open, Shift+`[` / Shift+`]` expand, Esc returns. Devices → Devices & zones opens Devices expanded.
+- **Getting started** has a new step, "Calibrate your speakers".
+- **Contrast:** text is at least 4.5:1 on all ten themes, with a visible focus ring on every control. Pepecoin uses only its brand colors.
+- **Confirmations and errors** use the app's own dialogs (no browser pop-ups) with a plain sentence and a next step.
+
+### Fixed
+
+- **Sliders no longer jump back while you drag them** when other devices change things at the same time (most noticeable on the delay slider).
+- **iPhone calibration mic page:** the microphone is now requested directly from the **Allow microphone** tap. If access is blocked, the page says how to allow it ("Settings > Safari > Microphone"), and it always shows the error and whether the page is secure, for bug reports. Opened over plain http, the page moves to the secure address or shows the setup step.
+
+> **Still in testing:** phone-mic calibration on an iPhone. Calibrating with the PC's microphone (WavWiz Player) is recommended until a real iPhone passes.
+
 ## [0.2.5] - 2026-10-11 (beta)
 
 Replaces 0.2.4, which was a test build and was not published; its fixes are listed under [0.2.4] below and are all included in 0.2.5.

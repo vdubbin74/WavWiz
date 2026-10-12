@@ -66,7 +66,7 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 **Devices → Calibrate speakers…** measures each speaker's delay against the reference speaker. The music pauses while it measures and plays again afterwards. There are three ways, in this order:
 
 1. **Use this PC's microphone (recommended).** Works on any PC running WavWiz Player 0.2.5 with a mic: a USB mic, a headset or audio-interface mic, or the PC's built-in mic. Pick the PC and the mic (WavWiz remembers it), watch the live level, place the PC (or the mic) at your listening spot and press **Start**. A Bluetooth headset mic works too, but it adds its own delay, so WavWiz warns: a wired or USB mic is better. No mic? The card says so and offers **Check again**.
-2. **Use your phone.** Scan the QR code with the phone. The phone opens a **mic-only page**: it never plays music and never joins as a speaker. The first time, the page walks you through installing WavWiz's certificate (a phone only allows its microphone on a trusted HTTPS page; an admin turns HTTPS on once in **Settings → Devices → Phone & HTTPS**). Tap **Start** and allow the microphone; the PC shows "Phone connected", each step and the results. While a phone is connected, Devices shows a **Calibration mic** line at the top with **Stop using as mic**.
+2. **Use your phone (still in testing on iPhone).** Scan the QR code with the phone. The phone opens a **mic-only page**: it never plays music and never joins as a speaker. The first time, the page walks you through installing WavWiz's certificate (a phone only allows its microphone on a trusted HTTPS page; an admin turns HTTPS on once in **Settings → Devices → Phone & HTTPS**). Tap **Start** and allow the microphone; the PC shows "Phone connected", each step and the results. While a phone is connected, Devices shows a **Calibration mic** line at the top with **Stop using as mic**.
 3. **By ear.** No microphone at all: play two speakers together and move a slider until they sound like one.
 
 A link made by an administrator lets the phone calibrate every speaker; other users can calibrate only their own device. Links expire after 20 minutes.
@@ -79,13 +79,29 @@ Menus do things, Settings sets things:
 
 - **File:** Settings…, Sign in as admin… / Leave admin mode, Sign out
 - **Library:** Browse library (opens the Expanded library), Playlists, Queue, Rescan folders, plus admin tools (Tidy up library, Tag & cover fix…, CD ripper…)
-- **Playback:** Play / Pause, Next, Previous, Internet radio, Sound / EQ…
-- **Devices:** Devices & zones, Scenes, Schedules, Calibrate speakers…, Pair a player…, Away-from-home…, Phone role… (on a phone)
+- **Playback:** Play / Pause, Next, Previous, Internet radio, Sound / EQ…, Start Jukebox… (admin)
+- **Devices:** Devices & zones, Scenes & Schedules…, Calibrate speakers…, Phone role… (on a phone), Use as remote only, Pair a player…, Away-from-home…
 - **Help:** Getting started, Diagnostics, What's new, About WavWiz…
 
-**Settings** has four tabs: **Appearance**, **Devices**, **Library** and **Network**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. On a large screen Settings grows to about 1200 px wide, so the previews have room. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
+**Settings** has seven tabs: **General** (including Backup), **Appearance**, **Playback** (crossfade), **Devices** (sub-tabs **Players & access** and **Calibration**), **Library**, **Network** and **Jukebox**. Use the search box in the header to jump to an option. Changes save right away (a **Saved ✓** appears next to them); every section has **Reset this section**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. On a large screen Settings grows to about 1200 px wide, so the previews have room. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
 
 **Lock EQ:** the Sound (EQ) window and **Appearance → EQ** have a **Lock EQ** checkbox. When it is checked, the EQ sliders ignore the mouse wheel, dragging, clicks and keys, so scrolling the page never changes the sound. Each device remembers it (off by default; unlocked, the wheel fine-tunes a slider in 0.5 dB steps). **Appearance → EQ** shows this speaker's real EQ and always opens locked; uncheck it to make changes, which are saved to the speaker's own preset.
+
+### Remote mode
+
+Want a phone or PC to control the music without playing it? Choose **Use as remote only** on the connect screen, in **Devices → Use as remote only**, or tick **Remote mode** in the WavWiz Player tray menu. A gold banner shows while it is on.
+
+### Jukebox (beta)
+
+**Playback → Start Jukebox…** (admin) asks for a host PIN (4–8 digits) and opens the locked big screen. Guests scan the QR code to add songs. Leave with the PIN: hold the WavWiz logo in the corner or press **Ctrl+Shift+J**. The Jukebox screen blocks Esc, Alt+Tab and right-click inside WavWiz, but Windows keys such as Ctrl+Alt+Del still work. For a public PC that must stay locked, set it up with **Windows Assigned Access** (kiosk mode) and run WavWiz Player as the kiosk app.
+
+### Alarms, sleep timer and crossfade
+
+**Devices → Scenes & Schedules…** holds scenes, schedules and alarms (beta) in one window, with the server's clock in the header and a **Sleep timer** button. Crossfade is in **Settings → Playback** (0–12 s, off by default).
+
+### Backup
+
+**Settings → General → Backup** (admin) exports a .wavwizbackup file and imports one with a preview. Passwords, certificates and private keys are never included; set those again after restoring on a new PC.
 
 ## 8. AirPlay tip (VPN / isolation)
 
