@@ -4,6 +4,14 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.3.1';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
+  // 0.3.1 fix pass (only what shipped)
+  ['Guided calibration', 'Before each speaker: Step X of N, where to stand, then Ready (with an optional 5 s countdown). Skip keeps a speaker as it is; Retry measures just that speaker again. On the PC mic and the phone.'],
+  ['Bluetooth speakers', 'Bluetooth outputs are tagged in Devices. When one reconnects, a hint offers Recalibrate. A wired speaker makes the best reference.'],
+  ['Cleaner overlay controls', 'The center panel has one small icon group: Lock EQ, EQ/Visualizer, Looks and Full screen. Looks holds glow, intensity, speed, button transparency and overlay opacity. Lock EQ is always clickable.'],
+  ['Settings that fit', 'A fixed-size Settings window on PC with no stray scroll bars, Reset this section beside the sub-tabs, live preview grids for themes, the visualizer, EQ and Now Playing styles, and Small, Default and Large display sizes.'],
+  ['Devices panel fixes', 'Expand and Collapse use standard icons and labels, the folded rail lines up, master volume matches the device bars, Mute all has its own line, and a compact Scenes & Schedules section shows what runs next.'],
+  ['Fixes', 'The EQ fits iPhone screens without scroll bars, artist pictures are no longer striped (bad pictures show initials instead), and the delay slider no longer sticks; the mouse wheel fine-tunes it by 1 ms (Shift: 10 ms).'],
+  // 0.3.0
   ['Jukebox mode (beta)', 'Playback > Start Jukebox… turns a PC into a locked party screen. Guests scan the QR code and add songs from their phone, no app or sign-in. Only the host PIN gets out.'],
   ['Remote mode', 'Use a phone, browser or PC as a remote only: it controls the music but plays no sound and is not a speaker. Devices > Use as remote only, or the tray menu on a Player PC.'],
   ['Alarms (beta), sleep timer, crossfade', 'Scenes & Schedules is one window. Wake up to a playlist with a fade-in, snooze or skip the next alarm, fall asleep with a timer, and crossfade songs (Settings > Playback, off by default).'],

@@ -12,6 +12,29 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.1] - 2026-10-12 (beta)
+
+### Added
+
+- **Guided calibration:** before each speaker the calibration shows "Step X of N", the speaker's name and "Walk to <speaker>, hold the mic about 3 ft in front of it, then tap Ready". No test sound plays until Ready; an optional 5-second countdown can be turned on. Skip leaves a speaker's delay unchanged and says so in the summary; Retry measures only that speaker again. Works with the PC mic and the phone mic page.
+- **Bluetooth outputs:** a Bluetooth tag on the device row, and a one-time "Bluetooth reconnected - recalibrate?" hint with Recalibrate when a Bluetooth output reconnects or changes. Calibration recommends a wired reference speaker.
+- **Compact Scenes & Schedules** in the Devices panel: the next event with a countdown and Skip, Run buttons for scenes, and Open.
+
+### Changed
+
+- **Center-panel overlay controls:** one compact icon group (Lock EQ, EQ/Visualizer, Looks, Full screen; plus power and pop-out on the visualizer) with tooltips and a clear active outline. Looks is a popover (a bottom sheet on phones) with glow, intensity, speed, button transparency and overlay opacity, Reset and More…. Effects default to 50%.
+- **Settings (PC):** a fixed-size window with the content scrolling inside, no scroll bar on the main tabs, and Reset this section beside the sub-tabs instead of on top of them.
+- **Appearance:** themes, visualizer, EQ style and Now Playing style use the same live preview grid; Display size is Small, Default and Large (Medium and Extra large are kept or mapped to Large).
+- **Devices panel:** standard Expand and Collapse icons, a label that goes back to "Expand", a lined-up folded rail, master volume that matches the device bars, and Mute all on its own line.
+- **Delay slider:** a bigger handle, 1 ms steps, and the mouse wheel fine-tunes by 1 ms (Shift: 10 ms) and saves.
+
+### Fixed
+
+- Lock EQ could not be clicked under the glow and visualizer layers.
+- The center EQ had scroll bars and was cut off on iPhone.
+- Artist and album pictures could show magenta/green striped noise. Pictures are now decoded strictly and checked; a bad picture shows the artist's initials instead. The picture cache is rebuilt once after updating.
+- The delay slider could stick or jump while the server sent updates.
+
 ## [0.3.0] - 2026-10-12 (beta)
 
 ### Added
