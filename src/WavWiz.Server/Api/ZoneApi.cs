@@ -122,9 +122,18 @@ public static class ZoneApi
         g.MapPost("/calibration/sessions", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); long refId = b.Long("referenceZoneId") ?? 0; long? only = null;
-            // 0.2.2 T9: a phone that came in through an administrator's "use your phone as the microphone" link calibrates like the administrator
-            bool viaAdminLink = CalPhoneApi.Valid(b.Str("linkToken"), DateTimeOffset.UtcNow) is { ByAdmin: true };
-            if (!IsAdmin(c) && !viaAdminLink)
+            var mode = b.Str("mode") ?? "phone";
+            // 0.2.5: the phone's mic-only page comes with the QR code's one-time link code (no sign-in): an admin's link calibrates like the admin,
+            // a regular user's link only that user's own speaker. 0.2.2 T9: a signed-in phone may still name the link in the body.
+            var link = CalPhoneApi.LinkOf(c) ?? CalPhoneApi.Valid(b.Str("linkToken"), DateTimeOffset.UtcNow);
+            if (CalPhoneApi.LinkOf(c) is { } ml && mode is not ("phone" or "same-recording")) return Ext.Bad("a phone calibration link can only be used for a phone measurement", 403);
+            bool viaAdminLink = link is { ByAdmin: true };
+            if (CalPhoneApi.LinkOf(c) is { ByAdmin: false } own)
+            {
+                if (own.OwnerZoneId == null) return Ext.Bad("This QR code was made by someone without a speaker of their own, so there is nothing it may calibrate. Ask an administrator to make the QR code.", 409);
+                long house = s.Zones.ReferenceZoneId; if (house != 0) refId = house; only = own.OwnerZoneId;
+            }
+            else if (!IsAdmin(c) && !viaAdminLink)
             {
                 // item 28/30 (Wiz B): a regular user calibrates ONLY their own device, against the house reference; the result saves only to their device
                 var mine = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(z => z.Mine);
@@ -134,9 +143,71 @@ public static class ZoneApi
                 if (house != 0) refId = house;
                 only = mine.Id;
             }
-            var (sess, err) = s.Cal.Start(b.Str("mode") ?? "phone", refId, b.Str("micSource"), b.Str("micProcessing"), only);
-            return sess == null ? Ext.Bad(err!, err!.Contains("offline") ? 409 : 400) : Results.Json(new { id = sess.Id, mode = sess.Mode, secure = c.Request.IsHttps, referenceZoneId = sess.ReferenceZoneId, onlyZoneId = sess.OnlyZoneId });
+            // 0.2.5 PC-mic: which Player PC listens, with which mic; a regular user may only use the mic of the PC they are on
+            Net.PlayerSession? micPc = null; WavWiz.Core.Protocol.MicInfo? mic = null;
+            if (mode == "pc-mic")
+            {
+                var pid = b.Str("micPlayerId") ?? ""; micPc = s.Audio.Get(pid);
+                if (micPc == null || micPc.IsWeb) return Ext.Bad("That PC is not connected. Start WavWiz Player on the PC with the microphone.", 409);
+                if (!IsAdmin(c) && !Zones.ZoneManager.IsMine(micPc.Id, null, micPc, c.Who(), c.Connection.RemoteIpAddress)) return Ext.Bad(AdminOnly("use the microphone of another PC"), 403);
+                mic = micPc.Mics.FirstOrDefault(m => m.Id == b.Str("micId")) ?? (micPc.Mics.Length == 0 ? null : WavWiz.Core.Calibration.MicKinds.Choose(micPc.Mics, b.Str("micId")));
+                if (mic == null) return Ext.Bad("No microphone found on this PC. Plug in a USB or headset mic (or use your phone instead).", 409);
+            }
+            var (sess, err) = s.Cal.Start(mode, refId, mode == "pc-mic" ? "pc" : b.Str("micSource"), mode == "pc-mic" ? "raw" : b.Str("micProcessing"), only);
+            if (sess == null) return Ext.Bad(err!, err!.Contains("offline") ? 409 : 400);
+            if (link != null && CalPhoneApi.LinkOf(c) != null) { sess.LinkToken = link.Token; sess.MicDevice = link.Device; link.SessionId = sess.Id; s.Events.Publish("calmics"); }
+            if (micPc != null && mic != null)
+            {
+                sess.MicPlayerId = micPc.Id; sess.MicId = mic.Id; sess.MicName = mic.Name; sess.MicBluetooth = mic.Bluetooth; sess.MicSource = "pc:" + mic.Kind;
+                s.Db.SetSetting("calibration.pcMic." + micPc.Id, System.Text.Json.JsonSerializer.Serialize(mic.Id));       // remembered for next time
+                var all = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).Where(z => z.Connected && z.Outputs.Any(o => o.Active)).ToList();
+                var want = b.LongList("zoneIds");
+                var picked = all.Where(z => z.Id != sess.ReferenceZoneId && (only == null ? (want == null || want.Contains(z.Id)) : z.Id == only)).Select(z => (z.Id, z.Name)).ToList();
+                if (picked.Count == 0) { s.Cal.End(sess, "nothing to measure"); return Ext.Bad("Choose at least one speaker to calibrate (the reference speaker is the one the others are measured against).", 400); }
+                var refName = s.Zones.Zone(sess.ReferenceZoneId)?.Name ?? "Reference";
+                var plan = Calibration.CalPlan.Build(sess.ReferenceZoneId, refName, picked, (int)Math.Clamp(b.Long("runs") ?? 3, 1, 3));
+                s.Events.Publish("calmics");
+                _ = Task.Run(() => s.Cal.RunPcMic(sess, plan, Math.Clamp(b.Num("levelDb") ?? -20, -40, -6)));
+            }
+            return Results.Json(new { id = sess.Id, mode = sess.Mode, secure = c.Request.IsHttps, referenceZoneId = sess.ReferenceZoneId, onlyZoneId = sess.OnlyZoneId, micName = sess.MicName, micBluetooth = sess.MicBluetooth, bluetoothWarning = sess.MicBluetooth ? WavWiz.Core.Calibration.MicKinds.BluetoothWarning : null });
         }).Req(Role.Control);
+
+        // 0.2.5: live progress of a measurement (the PC-mic run, or a phone reporting its own steps) and, when done, the results
+        g.MapGet("/calibration/sessions/{id}", (string id) => { var sess = s.Cal.Get(id); return sess == null ? Ext.Bad("session expired - start again", 404) : Results.Json(s.Cal.Progress(sess)); }).Req(Role.View);
+        g.MapPost("/calibration/sessions/{id}/progress", async (string id, HttpContext c) =>
+        {
+            var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);
+            var b = await c.Request.Body(); var lg = b.Str("log"); if (lg is { Length: > 200 }) lg = lg[..200];
+            var ph = b.Str("phase"); if (ph is not (null or "running" or "failed")) ph = null;
+            s.Cal.Report(sess, phase: ph, step: (int?)b.Long("step"), steps: (int?)b.Long("steps"), label: b.Str("label") is { } l ? (l.Length > 80 ? l[..80] : l) : null, log: lg, error: ph == "failed" ? b.Str("error") : null);
+            return Results.Json(new { ok = true });
+        }).Req(Role.Control);
+
+        // 0.2.5 PC-mic: the Player PCs with microphones (a regular user sees only the PC they are on), each with the remembered mic and a Bluetooth flag
+        g.MapGet("/calibration/pc-mics", (HttpContext c) =>
+        {
+            bool admin = IsAdmin(c);
+            var zs = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress);
+            var list = s.Audio.Sessions.Where(p => !p.IsWeb && !p.Dead).Select(p => new { p, z = zs.FirstOrDefault(z => z.PlayerId == p.Id), mine = Zones.ZoneManager.IsMine(p.Id, null, p, c.Who(), c.Connection.RemoteIpAddress) })
+                .Where(x => admin || x.mine).Select(x =>
+                {
+                    var rem = s.Db.Setting("calibration.pcMic." + x.p.Id) is string j ? System.Text.Json.JsonSerializer.Deserialize<string>(j) : null;
+                    var pick = WavWiz.Core.Calibration.MicKinds.Choose(x.p.Mics, rem);
+                    return new { playerId = x.p.Id, name = x.z?.Name ?? x.p.Hello.Name, zoneId = x.z?.Id, mine = x.mine, supportsMic = Version.TryParse(new string(x.p.Hello.AppVersion.TakeWhile(ch => char.IsDigit(ch) || ch == '.').ToArray()), out var v) && v >= new Version(0, 2, 5),
+                        mics = x.p.Mics.Select(m => new { id = m.Id, name = m.Name, kind = m.Kind, bluetooth = m.Bluetooth, isDefault = m.Default, label = WavWiz.Core.Calibration.MicKinds.Describe(m) }), selected = pick?.Id };
+                }).OrderByDescending(x => x.mine).ToList();
+            return Results.Json(new { pcs = list, bluetoothWarning = WavWiz.Core.Calibration.MicKinds.BluetoothWarning });
+        }).Req(Role.View);
+        g.MapPost("/calibration/pc-mics/level", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); var p = s.Audio.Get(b.Str("playerId") ?? ""); if (p == null || p.IsWeb) return Ext.Bad("That PC is not connected.", 409);
+            if (!IsAdmin(c) && !Zones.ZoneManager.IsMine(p.Id, null, p, c.Who(), c.Connection.RemoteIpAddress)) return Ext.Bad(AdminOnly("use the microphone of another PC"), 403);
+            var mic = b.Str("micId"); if (mic == null || !p.Mics.Any(m => m.Id == mic)) return Ext.Bad("That microphone is not connected.", 409);
+            s.Cal.Mics!.Level(p, mic, b.Bool("on") ?? true);
+            if (b.Bool("remember") == true) s.Db.SetSetting("calibration.pcMic." + p.Id, System.Text.Json.JsonSerializer.Serialize(mic));
+            return Results.Json(new { ok = true });
+        }).Req(Role.Control);
+        g.MapPost("/calibration/pc-mics/refresh", async (HttpContext c) => { var b = await c.Request.Body(); if (s.Audio.Get(b.Str("playerId") ?? "") is { IsWeb: false } p) s.Cal.Mics!.RefreshList(p); return Results.Json(new { ok = true }); }).Req(Role.Control);
 
         g.MapPost("/calibration/sessions/{id}/play", async (string id, HttpContext c) =>
         {
@@ -189,9 +260,10 @@ public static class ZoneApi
         }).Req(Role.Control);
 
         // 0.2.0 item 29: end (finish, cancel or failure) - resumes the music if calibration paused it
-        g.MapPost("/calibration/sessions/{id}/end", (string id) =>
+        g.MapPost("/calibration/sessions/{id}/end", (string id, HttpContext c) =>
         {
             var sess = s.Cal.Get(id); if (sess == null) return Results.Json(new { ok = true, resumed = false });
+            if (CalPhoneApi.LinkOf(c) is { } ml && sess.LinkToken != ml.Token) return Ext.Bad("not this phone's calibration", 403);
             return Results.Json(new { ok = true, resumed = s.Cal.End(sess, "ended") });
         }).Req(Role.Control);
 

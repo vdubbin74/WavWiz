@@ -9,7 +9,7 @@ namespace WavWiz.Player;
 internal sealed class PlayerApp : ApplicationContext
 {
     private readonly PlayerSettings _s; private readonly DpapiSecretStore _secrets = new(); private readonly StopwatchClock _clock = new();
-    private readonly WasapiOutputProvider _outputs; private PlayerClient? _client; private readonly NotifyIcon _tray; private readonly ContextMenuStrip _menu = new();
+    private readonly WasapiOutputProvider _outputs; private readonly WasapiMicProvider _mics; private PlayerClient? _client; private readonly NotifyIcon _tray; private readonly ContextMenuStrip _menu = new();
     private readonly CancellationTokenSource _cts = new(); private WebUiForm? _web; private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new SynchronizationContext();
     private readonly string _logPath = Path.Combine(PlayerSettings.Dir, "logs", "player.log");
 
@@ -23,6 +23,7 @@ internal sealed class PlayerApp : ApplicationContext
         _showWindow = showWindow;
         _s = PlayerSettings.Load(); Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
         _outputs = new WasapiOutputProvider(_clock);
+        _mics = new WasapiMicProvider(_clock);        // 0.2.5 PC-mic calibration (native WASAPI capture)
         _tray = new NotifyIcon { Icon = MakeIcon(), Text = Tip("Starting"), ContextMenuStrip = _menu, Visible = true };
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) OpenUi(); };
         _menu.Opening += (_, _) => BuildMenu();
@@ -83,7 +84,7 @@ internal sealed class PlayerApp : ApplicationContext
             _client = new PlayerClient(new PlayerClientOptions
             {
                 Host = _s.ServerHost, HostProvider = () => _s.ServerHost, AudioPort = _s.AudioPort, PlayerId = _s.PlayerId, Name = _s.Name, LinkType = _s.ResolveLinkType(), Token = () => _secrets.Load("token"),
-                Clock = _clock, Outputs = _outputs, CacheFile = Path.Combine(PlayerSettings.Dir, "zone-cache.json"),
+                Clock = _clock, Outputs = _outputs, Mics = _mics, CacheFile = Path.Combine(PlayerSettings.Dir, "zone-cache.json"),
             });
             _client.Log += Log;
             _client.StateChanged += st => _ui.Post(_ => OnState(st), null);
@@ -139,6 +140,7 @@ internal sealed class PlayerApp : ApplicationContext
         if (st is { Connected: true }) _menu.Items.Add(new ToolStripMenuItem(st.NotCalibrated ? $"Delay: ~{st.LatencyMs:0} ms - NOT calibrated" : $"Delay: +{st.LatencyMs:0} ms ({st.LatencySource})") { Enabled = false });
         _menu.Items.Add(new ToolStripSeparator());
         var open = new ToolStripMenuItem("Open player...", null, (_, _) => OpenUi()) { Font = new Font(SystemFonts.MenuFont!, FontStyle.Bold), ToolTipText = "Opens WavWiz (sign in as Player or Administrator)" }; _menu.Items.Add(open);
+        _menu.Items.Add(new ToolStripMenuItem("Calibrate speakers...", null, (_, _) => OpenUi("calibrate")) { ToolTipText = "Measure every speaker's delay with this PC's microphone (or your phone)" });
         _menu.Items.Add(new ToolStripMenuItem("Open in my web browser", null, (_, _) => WebUiForm.OpenInBrowser(WebUiForm.UiAddress(_s))));
         var outs = new ToolStripMenuItem("Output (speaker on this PC)");
         if (_client != null)
@@ -175,17 +177,19 @@ internal sealed class PlayerApp : ApplicationContext
         Application.Restart();
     }
 
-    private void OpenUi()
+    /// <param name="screen">0.2.5: "calibrate" opens the Calibrate speakers screen (tray "Calibrate speakers...").</param>
+    private void OpenUi(string? screen = null)
     {
         if (_exiting) return;
         if (_web is { IsDisposed: false })
         {
+            if (screen != null) _web.OpenScreen(screen);
             if (!_web.Visible) _web.Show();
             if (_web.WindowState == FormWindowState.Minimized) _web.WindowState = FormWindowState.Normal;
             // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
             _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
         }
-        _web = new WebUiForm(_s); _web.Show(); _web.Activate();
+        _web = new WebUiForm(_s) { StartScreen = screen }; _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()

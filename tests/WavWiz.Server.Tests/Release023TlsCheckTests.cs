@@ -92,7 +92,7 @@ public class TlsCheckPageTests
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Contains("no-store", r.Headers.CacheControl!.ToString());
         var html = await r.Content.ReadAsStringAsync();
-        var want = $"https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=ABC234&amp;pair=123456";
+        var want = $"https://127.0.0.1:{f.Cfg.HttpsPort}/calmic.html?cal=ABC234";       // 0.2.5: the mic-only page; no pairing code is passed on
         Assert.Contains($"<a class=btn id=calgoLink href='{want}'>Continue to secure calibration</a>", html);
         Assert.Equal(CalPhoneApi_SecureUrl(f, "ABC234", "123456"), WebUtility.HtmlDecode(want));
         Assert.Contains("Certificate Trust Settings. Then come back and tap the button again.", html);
@@ -100,7 +100,7 @@ public class TlsCheckPageTests
         Assert.True(html.IndexOf("id=calgoLink", StringComparison.Ordinal) < html.IndexOf("Download profile", StringComparison.Ordinal));
         // without a pairing code the link carries only cal=
         var h2 = await (await phone.GetAsync(page + "?cal=abc234")).Content.ReadAsStringAsync();
-        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=abc234'>", h2);
+        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/calmic.html?cal=abc234'>", h2);
     }
 
     private static string CalPhoneApi_SecureUrl(ServerFixture f, string cal, string? pair) => Api.CalPhoneApi.SecureUrl("127.0.0.1", f.Cfg.HttpsPort, cal, pair);
@@ -131,7 +131,7 @@ public class TlsCheckPageTests
         var (f, phone) = await Phone(false);
         await using var _ = f; using var __ = phone;
         var html = await (await phone.GetAsync("/tls/check?cal=ABC234&pair=" + pair)).Content.ReadAsStringAsync();
-        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/?cal=ABC234'>", html);
+        Assert.Contains($"href='https://127.0.0.1:{f.Cfg.HttpsPort}/calmic.html?cal=ABC234'>", html);
         Assert.DoesNotContain("pair=", html); Assert.DoesNotContain("'><b>", html);
     }
 

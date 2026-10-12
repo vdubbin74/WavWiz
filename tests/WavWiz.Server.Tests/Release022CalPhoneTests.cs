@@ -15,7 +15,7 @@ public class Release022CalPhoneTests
         Assert.Same(l, CalPhoneApi.Valid(l.Token.ToLowerInvariant(), now));
         Assert.Null(CalPhoneApi.Valid(l.Token, now + CalPhoneApi.Life + TimeSpan.FromSeconds(1)));
         Assert.Null(CalPhoneApi.Valid("../../x", now)); Assert.Null(CalPhoneApi.Valid(null, now));
-        Assert.Equal("https://10.0.0.5:8443/?cal=ABCDEF&pair=123456", CalPhoneApi.SecureUrl("10.0.0.5", 8443, "ABCDEF", "123456"));
+        Assert.Equal("https://10.0.0.5:8443/calmic.html?cal=ABCDEF", CalPhoneApi.SecureUrl("10.0.0.5", 8443, "ABCDEF", "123456"));      // 0.2.5: mic-only page, no pairing code
     }
 
     [Fact]
@@ -33,19 +33,17 @@ public class Release022CalPhoneTests
         Assert.Equal(HttpStatusCode.Forbidden, (await view.PostAsJsonAsync("/api/v1/calibration/phone-link", new { })).StatusCode);
         var link = await (await admin.PostAsJsonAsync("/api/v1/calibration/phone-link", new { })).Json();
         var tok = link.GetProperty("token").GetString()!;
-        Assert.True(link.GetProperty("signsIn").GetBoolean());
+        Assert.False(link.GetProperty("signsIn").GetBoolean()); Assert.True(link.GetProperty("allSpeakers").GetBoolean());      // 0.2.5: no sign-in needed any more
         Assert.EndsWith("/c/" + tok, link.GetProperty("shortUrl").GetString());
         var st = await admin.GetJson($"/api/v1/calibration/phone-link/{tok}");
         Assert.Equal("waiting", st.GetProperty("state").GetString()); Assert.False(st.GetProperty("connected").GetBoolean());
         var qr = await admin.GetAsync($"/api/v1/calibration/phone-link/{tok}/qr.svg"); qr.EnsureSuccessStatusCode();
         Assert.Contains("<svg", await qr.Content.ReadAsStringAsync());
 
-        // the short link: no sign-in needed; an admin's link carries a fresh pairing code that really signs a phone in
+        // the short link: no sign-in needed. 0.2.5: no pairing code either - the mic-only page is authorized by the link code itself (see Release025CalibrationTests)
         using var anon = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(f.Base) };
         var r = await anon.GetAsync($"/c/{tok}"); Assert.Equal(HttpStatusCode.Redirect, r.StatusCode);
-        var loc = r.Headers.Location!.ToString(); Assert.Contains("cal=" + tok, loc);
-        var pair = System.Text.RegularExpressions.Regex.Match(loc, "pair=([0-9]{6})").Groups[1].Value; Assert.Equal(6, pair.Length);
-        var paired = await anon.PostAsJsonAsync("/api/v1/auth/pair", new { code = pair, name = "iPhone" }); paired.EnsureSuccessStatusCode();
+        var loc = r.Headers.Location!.ToString(); Assert.Contains("cal=" + tok, loc); Assert.DoesNotContain("pair=", loc);
         Assert.Equal(HttpStatusCode.NotFound, (await anon.GetAsync("/c/ZZZZZZ")).StatusCode);
 
         // the phone says hello: the PC sees "connected", and a "calphone" event is pushed

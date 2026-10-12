@@ -19,6 +19,8 @@ public sealed class PlayerClientOptions
     public Func<string?> Token { get; init; } = () => null;
     public IMonotonicClock Clock { get; init; } = new StopwatchClock();
     public required IOutputProvider Outputs { get; init; }
+    /// <summary>0.2.5: this PC's microphones for PC-mic calibration (none when null).</summary>
+    public IMicProvider? Mics { get; init; }
     public string? CacheFile { get; init; }
     /// <summary>When set, asked for the server address before every connection attempt (so a changed address found by discovery is used at once).</summary>
     public Func<string>? HostProvider { get; init; }
@@ -67,7 +69,12 @@ public sealed class PlayerClient : IAsyncDisposable
         _o = o; _engine = new PlaybackEngine(_clock); _engine.SetProcessor(_dsp);
         _state = new PlayerState(false, "Starting", null, 0, "none", false, false, 100, false, true, "", null);
         LoadCache();
+        _mic = new MicResponder(o.Mics ?? new NoMicProvider(), _clock, SendCalAsync, Say);
     }
+    private readonly MicResponder _mic;
+    /// <summary>0.2.5: this PC's microphones (sent to the server with the outputs).</summary>
+    public IReadOnlyList<MicInfo> ListMics() => _mic.SafeList();
+    private Task SendCalAsync(CalResult r) { var tcp = _tcp; if (tcp == null || !tcp.Connected) return Task.CompletedTask; return SafeSend(tcp, Wire.EncodeJson(MsgType.CalResult, 0, r)); }
 
     private void Say(string m) { Log?.Invoke(m); }
     private static long NowMs => Environment.TickCount64;
@@ -264,6 +271,7 @@ public sealed class PlayerClient : IAsyncDisposable
 
     private void HandleCal(CalCmd c)
     {
+        if (MicResponder.Handles(c.Action)) { _mic.Handle(c); return; }       // 0.2.5 PC-mic calibration
         if (c.Action == "test-tone")
         {
             _engine.PlayTestSignal(WavWiz.Core.Playback.TestTone.Generate(c.LevelDb), c.AtUs);
@@ -287,13 +295,17 @@ public sealed class PlayerClient : IAsyncDisposable
     public Task SendOutputsAsync(string reason)
     {
         var tcp = _tcp; if (tcp == null || !tcp.Connected) return Task.CompletedTask;
-        var msg = Wire.EncodeJson(MsgType.Outputs, 0, new OutputsMsg(ListOutputs().ToArray(), reason));
+        var msg = Wire.EncodeJson(MsgType.Outputs, 0, new OutputsMsg(ListOutputs().ToArray(), reason, _mic.SafeList()));
         return SafeSend(tcp, msg);
     }
 
-    private static async Task SafeSend(TcpClient tcp, byte[] msg)
+    // 0.2.5: one writer at a time - a microphone recording goes out in large parts and must never interleave with a status message
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private async Task SafeSend(TcpClient tcp, byte[] msg)
     {
+        await _sendLock.WaitAsync();
         try { var s = tcp.GetStream(); await FrameIO.WriteAsync(s, msg, CancellationToken.None); } catch { /* the read loop notices a dead connection */ }
+        finally { _sendLock.Release(); }
     }
 
     private async Task StatusLoopAsync(NetworkStream net, CancellationToken ct)
@@ -311,7 +323,8 @@ public sealed class PlayerClient : IAsyncDisposable
                 Publish(x => x with { UnderrunEvents = _engine.UnderrunEvents, Health = "buffering" });
             }
             else if (_state.Health == "buffering" && _engine.BufferMs > 1000) Publish(x => x with { Health = "ok" });
-            await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.PlayerStatus, 0, s), ct);
+            await _sendLock.WaitAsync(ct);
+            try { await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.PlayerStatus, 0, s), ct); } finally { _sendLock.Release(); }
         }
     }
 
@@ -364,7 +377,7 @@ public sealed class PlayerClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _calRestore?.Cancel();
+        _calRestore?.Cancel(); _mic.Dispose();
         lock (_gate) { _sink?.Dispose(); _sink = null; }
         await Task.CompletedTask;
     }

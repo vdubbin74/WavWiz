@@ -140,6 +140,14 @@ public sealed class WebUiForm : Form
         Size = new Size(w, h); Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2);
     }
 
+    /// <summary>0.2.5: a screen to open once the page has loaded ("calibrate" = Calibrate speakers), as the address's #fragment.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public string? StartScreen { get; set; }
+    public void OpenScreen(string screen)
+    {
+        try { if (_web.CoreWebView2 != null && _url.Length > 0) _web.CoreWebView2.Navigate(UiUrl.WithScreen(_url, screen)); else StartScreen = screen; } catch { }
+    }
+
     /// <summary>Applies the UI-size setting to the page (WebView2 draws at the monitor scale by itself; this is the extra zoom).</summary>
     public void ApplyZoom() { try { if (_web.CoreWebView2 != null) _web.ZoomFactor = UiScale.WebZoom(_set.UiScale); } catch { } }
 
@@ -178,7 +186,7 @@ public sealed class WebUiForm : Form
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
-            cw.Navigate(_url);
+            cw.Navigate(StartScreen != null ? UiUrl.WithScreen(_url, StartScreen) : _url);
         }
         catch (Exception)
         {

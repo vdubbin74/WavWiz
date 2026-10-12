@@ -21,6 +21,8 @@ public sealed class PlayerSession : IStreamSubscriber
     public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
     public volatile PlayerStatus? Status; public DateTime StatusAt = DateTime.MinValue;
     public volatile OutputInfo[] Outputs = Array.Empty<OutputInfo>();
+    /// <summary>0.2.5: this player's microphones (PC-mic calibration); empty for web speakers and 0.2.4-and-older players.</summary>
+    public volatile MicInfo[] Mics = Array.Empty<MicInfo>();
     public volatile bool Dead;
     public bool IsWeb { get; init; }
     /// <summary>0.2.0: the browser session (api_token id) that opened this web speaker; null for Windows players.</summary>
@@ -149,7 +151,7 @@ public sealed class AudioHost : IAsyncDisposable
                     switch (mh.Type)
                     {
                         case MsgType.PlayerStatus: { var st = Wire.DecodeJson<PlayerStatus>(mp); if (st != null) { sess.Status = st; sess.StatusAt = DateTime.UtcNow; OnStatus?.Invoke(sess, st); } break; }
-                        case MsgType.Outputs: { var o = Wire.DecodeJson<OutputsMsg>(mp); if (o != null) { sess.Outputs = o.Outputs; OnOutputs?.Invoke(sess, o); } break; }
+                        case MsgType.Outputs: { var o = Wire.DecodeJson<OutputsMsg>(mp); if (o != null) { sess.Outputs = o.Outputs; if (o.Mics != null) sess.Mics = o.Mics; OnOutputs?.Invoke(sess, o); } break; }
                         case MsgType.CalResult: { var r = Wire.DecodeJson<CalResult>(mp); if (r != null) OnCalResult?.Invoke(sess, r); break; }
                         case MsgType.Bye: endReason = "the player said goodbye (closed or switched off)"; return;
                     }

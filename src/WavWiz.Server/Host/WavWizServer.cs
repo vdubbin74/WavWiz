@@ -32,6 +32,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var dsp = new Dsp.DspService(db);
         var zones = new Zones.ZoneManager(db, audio, cond, events, dsp) { Log = u._log.Write };
         var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events, cond);
+        cal.Mics = new Calibration.PcMicBroker(events); audio.OnCalResult = cal.Mics.OnCalResult;      // 0.2.5 PC-mic calibration
         var ca = new Tls.LocalCa(cfg.DataDir);
         // 0.2.4: unison-root-ca.crt -> wavwiz-root-ca.crt; a root that still says "Unison" (0.0.1/0.0.2 betas) is replaced by a WavWiz one (phones re-trust it)
         try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
@@ -149,6 +150,9 @@ public sealed class WavWizServer : IAsyncDisposable
         if (h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) token = h[7..].Trim();
         else if (c.Request.Cookies.TryGetValue("unison_session", out var ck)) { token = ck; cookie = true; }
         var info = s.Auth.Validate(token);
+        // 0.2.5: the phone's mic-only calibration page has no sign-in; the QR code's one-time link code authorizes calibration calls only
+        // (header X-WavWiz-Cal, or ?cal= on the clock WebSocket) - never the rest of the app. It is not a cookie, so no cross-site write can carry it.
+        if (info == null && Api.CalPhoneApi.LinkIdentity(c) is { } calWho) { c.Items["auth"] = calWho; return false; }
         if (info == null && c.WebSockets.IsWebSocketRequest && c.Request.Query["ticket"].ToString() is { Length: > 0 } tk && s.Auth.RedeemWsTicket(tk) is { } ti)
         { c.Items["auth"] = ti; return true; }      // ticket came from a cookie-authenticated fetch: the same Origin rule applies
         if (info != null) c.Items["auth"] = info;

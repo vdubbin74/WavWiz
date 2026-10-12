@@ -14,7 +14,7 @@ public sealed class FakePc : IAsyncDisposable
     private readonly List<(long Us, float[] Mono)> _blocks = new(); private readonly object _l = new();
     public string Id = ""; public float MaxPeak;
 
-    public static async Task<FakePc> StartAsync(ServerFixture f, string id, string name, double hiddenMs = 0, string kind = "other", string? bt = null)
+    public static async Task<FakePc> StartAsync(ServerFixture f, string id, string name, double hiddenMs = 0, string kind = "other", string? bt = null, IMicProvider? mics = null)
     {
         var pc = new FakePc { HiddenMs = hiddenMs, Id = id };
         pc.Outputs.Outputs.Clear(); pc.Outputs.Outputs.Add(new OutputInfo("ep-" + id, name + " speakers", kind, bt, true, true));
@@ -26,7 +26,7 @@ public sealed class FakePc : IAsyncDisposable
         };
         var r = await f.Http.PostAsJsonAsync("/api/v1/auth/pair-player", new { playerId = id, name }); r.EnsureSuccessStatusCode();
         var tok = (await r.Json()).GetProperty("token").GetString()!;
-        pc.Client = new PlayerClient(new PlayerClientOptions { Host = "127.0.0.1", AudioPort = f.Server.S.Audio.Port, PlayerId = id, Name = name, LinkType = "ethernet", Token = () => tok, Outputs = pc.Outputs });
+        pc.Client = new PlayerClient(new PlayerClientOptions { Host = "127.0.0.1", AudioPort = f.Server.S.Audio.Port, PlayerId = id, Name = name, LinkType = "ethernet", Token = () => tok, Outputs = pc.Outputs, Mics = mics });
         pc._run = Task.Run(() => pc.Client.RunAsync(pc._cts.Token));
         return pc;
     }

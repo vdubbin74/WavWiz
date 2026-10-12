@@ -41,4 +41,10 @@ public static class UiUrl
         if (t.Scheme is not ("http" or "https") || !t.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase)) return false;
         return t.Port == b.Port || httpsPort > 0 && t.Scheme == "https" && t.Port == httpsPort;
     }
+    /// <summary>0.2.5: the page address with a screen to open (#calibrate). Only known screen names; anything else returns the address unchanged.</summary>
+    public static string WithScreen(string baseUrl, string screen)
+    {
+        if (screen is not ("calibrate")) return baseUrl;
+        var i = baseUrl.IndexOf('#'); return (i >= 0 ? baseUrl[..i] : baseUrl) + "#" + screen;
+    }
 }

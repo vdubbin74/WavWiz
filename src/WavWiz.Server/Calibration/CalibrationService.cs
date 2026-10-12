@@ -13,7 +13,7 @@ public sealed class CalSession
 {
     public string Id = Guid.NewGuid().ToString("N")[..16];
     public DateTime Created = DateTime.UtcNow;
-    public string Mode = "phone";               // phone | same-recording | ear (0.2.0: the by-ear helper also opens a session so music is paused)
+    public string Mode = "phone";               // phone | same-recording | ear | pc-mic (0.2.0: the by-ear helper also opens a session so music is paused)
     /// <summary>0.2.0 item 29: music was playing when calibration started (or someone pressed Play mid-session): resume it when the session ends.</summary>
     public bool ResumeAfter;
     public bool Ended;
@@ -27,6 +27,14 @@ public sealed class CalSession
     public long RunSeq;
     public List<Proposal>? Proposals;
     public readonly object L = new();
+    // ---- 0.2.5: live progress (PC-mic runs on the server; a phone mic run reports through the same fields) ----
+    public string Phase = "ready";              // ready | running | done | failed | canceled
+    public int Step, Steps; public string? Label, Error;
+    public readonly List<string> Log = new();
+    /// <summary>The "Calibration mic" this session listens with: the Player PC + mic for pc-mic, the phone link for a phone.</summary>
+    public string? MicPlayerId, MicId, MicName, LinkToken, MicDevice;
+    public bool MicBluetooth;
+    public readonly CancellationTokenSource Cancel = new();
 }
 
 /// <summary>
@@ -58,17 +66,75 @@ public sealed class CalibrationService
     public bool End(CalSession s, string why = "ended")
     {
         bool resume;
-        lock (s.L) { if (s.Ended) return false; s.Ended = true; resume = s.ResumeAfter; s.ResumeAfter = false; }
+        lock (s.L) { if (s.Ended) return false; s.Ended = true; resume = s.ResumeAfter; s.ResumeAfter = false; if (s.Phase is "running" or "ready") s.Phase = "canceled"; }
+        try { s.Cancel.Cancel(); } catch { }
         _sessions.TryRemove(s.Id, out _);
+        if (s.MicPlayerId != null || s.LinkToken != null) _ev.Publish("calmics");
         if (resume && _cond != null && _cond.State == Playback.PlayState.Paused) _cond.Resume();
         return resume;
     }
 
     public int OpenSessions => _sessions.Count(x => !x.Value.Ended);
+    public IReadOnlyList<CalSession> Open => _sessions.Values.Where(x => !x.Ended).ToList();
+    public PcMicBroker? Mics { get; set; }
+
+    public object Progress(CalSession s)
+    {
+        lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(),
+            proposals = s.Proposals, messages = s.Phase == "done" ? s.Notes.ToList() : null, micName = s.MicName, micBluetooth = s.MicBluetooth, micDevice = s.MicDevice, referenceZoneId = s.ReferenceZoneId };
+    }
+    private void Push(CalSession s) { _ev.Publish("calrun", new { id = s.Id, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, mode = s.Mode, linkToken = s.LinkToken }); }
+    public void Report(CalSession s, string? phase = null, int? step = null, int? steps = null, string? label = null, string? log = null, string? error = null)
+    {
+        lock (s.L) { if (phase != null) s.Phase = phase; if (step != null) s.Step = step.Value; if (steps != null) s.Steps = steps.Value; if (label != null) s.Label = label; if (log != null) s.Log.Add(log); if (error != null) s.Error = error; }
+        Push(s);
+    }
+
+    /// <summary>
+    /// 0.2.5 PC-mic calibration (the main way). Runs on the server: for each step it schedules the chirp pattern on one speaker and asks the Player PC
+    /// with the microphone to record that window natively; the same detector and the same reference-relative math as the phone, so the mic's own input
+    /// delay cancels. Music stays paused for the whole run (and resumes when the session ends); a step that is not heard well is tried once more.
+    /// </summary>
+    public async Task RunPcMic(CalSession s, List<PlanStep> plan, double levelDb)
+    {
+        var broker = Mics ?? throw new InvalidOperationException("no microphone broker");
+        Report(s, phase: "running", step: 0, steps: plan.Count, label: "Starting", log: $"Listening with {s.MicName}{(s.MicBluetooth ? " (Bluetooth - results may be off)" : "")}");
+        int heard = 0, refHeard = 0; var ct = s.Cancel.Token;
+        try
+        {
+            for (int i = 0; i < plan.Count; i++)
+            {
+                var st = plan[i]; if (ct.IsCancellationRequested || s.Ended) return;
+                Report(s, step: i, label: st.Label);
+                RunResult? res = null;
+                for (int attempt = 0; attempt < 2 && !ct.IsCancellationRequested; attempt++)
+                {
+                    var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
+                    var (at, err) = Play(s, st.ZoneId, st.Kind, 0, levelDb);
+                    if (err != null) { res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, err); break; }
+                    long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
+                    var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, st.Label, _clock.NowUs, ct);
+                    if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
+                    res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
+                    if (res.Ok && res.Confidence >= 0.4) break;
+                    if (attempt == 0) Report(s, log: $"{st.Label}: {(res.Ok ? "not clear enough" : res.Note)} - trying again");
+                    await Task.Delay(400, ct);
+                }
+                if (res is { Ok: true }) { heard++; if (st.Kind == "ref") refHeard++; Report(s, step: i + 1, log: $"{st.Label}: heard it ({res.Confidence * 100:0}% sure)"); }
+                else Report(s, step: i + 1, log: $"{st.Label}: {res?.Note ?? "not heard"}");
+                await Task.Delay(300, ct);
+            }
+            if (refHeard == 0) { Report(s, phase: "failed", error: "The reference speaker was not heard. Turn it up, move the microphone closer to the listening spot, or check that the right mic is chosen."); return; }
+            var (props, msgs) = Finish(s); lock (s.L) { s.Proposals = props; s.Notes.Clear(); s.Notes.AddRange(msgs); }
+            Report(s, phase: "done", step: plan.Count, label: $"Measured {props.Count} speaker(s)", log: $"{heard} of {plan.Count} test sounds heard");
+        }
+        catch (OperationCanceledException) { Report(s, phase: "canceled", label: "Canceled"); }
+        catch (Exception e) { Report(s, phase: "failed", error: e.Message, log: "stopped: " + e.Message); }
+    }
 
     public (CalSession? S, string? Error) Start(string mode, long referenceZoneId, string? micSource, string? micProcessing, long? onlyZoneId = null)
     {
-        if (mode is not ("phone" or "same-recording" or "ear")) return (null, "mode must be phone, same-recording or ear");
+        if (mode is not ("phone" or "same-recording" or "ear" or "pc-mic")) return (null, "mode must be pc-mic, phone, same-recording or ear");
         if (referenceZoneId == 0) referenceZoneId = _zones.ReferenceZoneId;
         var z = _zones.Zone(referenceZoneId);
         if (z == null) return (null, referenceZoneId == 0 ? "choose a reference speaker first" : "reference zone not found");

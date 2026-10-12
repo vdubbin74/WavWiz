@@ -161,9 +161,18 @@ public sealed record PlayerStatus(double BufferMs, double ClockOffsetUs, double 
 public sealed record Bye(string Reason);
 /// <summary>kind = hdmi|spdif|bluetooth|analog|usb|other.</summary>
 public sealed record OutputInfo(string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active, double? WinLatencyMs = null, string? Codec = null, string? ContainerId = null);
-public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null);
+/// <summary>0.2.5: Mics = this PC's capture endpoints (null from 0.2.4 and older players).</summary>
+public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null, MicInfo[]? Mics = null);
+/// <summary>0.2.5: a microphone (WASAPI capture endpoint) on a Player PC. kind = usb|analog|builtin|interface|bluetooth|other; Bluetooth mics are allowed but flagged
+/// (Windows switches a Bluetooth headset to its hands-free mode, which adds its own unknown delay).</summary>
+public sealed record MicInfo(string Id, string Name, string Kind, bool Bluetooth, bool Default = false);
 /// <summary>Full DSP parameters or bypass for an output device (spec 11.7). Preset is the DspPreset JSON.</summary>
 public sealed record DspConfig(string OutputDeviceId, long Revision, bool Bypass, System.Text.Json.JsonElement? Preset, bool Preview = false);
-/// <summary>action = play-pattern: play the calibration chirp pattern on the active output at server time AtUs (saved offset 0, EQ bypassed).</summary>
-public sealed record CalCmd(string Action, string SessionId, long AtUs, double LevelDb = -20, string? Label = null);
-public sealed record CalResult(string SessionId, string Status, string? Note);
+/// <summary>action = play-pattern: play the calibration chirp pattern on the active output at server time AtUs (saved offset 0, EQ bypassed).
+/// 0.2.5 PC-mic calibration (older players ignore these actions): mic-list (answer with the mics), mic-record (record MicId from server time AtUs
+/// to ToUs and send it back as mic-data parts tagged Req), mic-level (live input meter for MicId; LevelDb > 0 = on, else off; stops by itself after 60 s).</summary>
+public sealed record CalCmd(string Action, string SessionId, long AtUs, double LevelDb = -20, string? Label = null, string? MicId = null, long ToUs = 0, string? Req = null);
+/// <summary>0.2.5 adds the PC-mic replies: Status mic-list (Mics), mic-level (PeakDb), mic-data (Req, Part of Parts, StartServerUs of the recording's first sample,
+/// Rate, Pcm16 = base64 little-endian 16-bit mono), mic-error (Req, Note).</summary>
+public sealed record CalResult(string SessionId, string Status, string? Note, string? Req = null, int Part = 0, int Parts = 0, long StartServerUs = 0, int Rate = 0,
+    string? Pcm16 = null, MicInfo[]? Mics = null, double? PeakDb = null, string? MicId = null);
