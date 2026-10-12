@@ -1517,3 +1517,58 @@ dialog.settings-dlg{width:min(1200px,calc(calc(100vw / var(--z,1)) - 32px))}
 .dssec .latslider::-moz-range-thumb{width:24px;height:24px}
 /* app confirm + friendly errors */
 .ferr{border-left:3px solid var(--bad,var(--accent));padding:8px 12px;margin:8px 0} .ferr details{margin-top:6px} .ferr pre{white-space:pre-wrap;margin:4px 0 0}
+/* §5 Scenes & Schedules (Settings dialog shell; app tokens only) */
+dialog.ss-dlg>.body{padding:12px 14px}
+dialog.ss-dlg header .ss-clock{font-weight:400;margin-right:6px}
+.ss-next{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;background:var(--panel2)}
+.ss-seg{display:none}
+.ss-cols{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;align-items:start}
+.ss-col{border:1px solid var(--line);border-radius:3px;background:var(--panel2);min-width:0}
+.ss-ch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ss-t{font-weight:700;color:var(--accent);letter-spacing:.5px;font-size:12px}
+.ss-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px 12px}
+.ss-card{margin:0;padding:10px} .ss-card.on{border-color:var(--accent2)}
+.ss-n{display:flex;align-items:center;gap:6px}
+.ss-dots{display:flex;gap:3px;margin:6px 0} .ss-dots i{width:14px;height:5px;border-radius:1px;background:var(--accent2)} .ss-dots i.o{background:var(--line)}
+.ss-a{gap:6px;margin-top:8px;position:relative}
+.ss-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line);position:relative} .ss-row.off{opacity:.6}
+.ss-grp{padding:6px 12px;letter-spacing:.5px}
+.ss-tm{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;min-width:74px}
+.ss-mid{min-width:0} .ss-when{text-align:right;min-width:120px} .ss-days{font-family:ui-monospace,monospace;letter-spacing:2px;color:var(--dim)} .ss-days b{color:var(--ink)}
+.tag{font-weight:700;font-size:10px;letter-spacing:.6px;padding:2px 5px;border-radius:3px;border:1px solid var(--line);color:var(--dim);vertical-align:middle}
+.tag.al{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)} .tag.c{color:var(--accent2);border-color:var(--accent2)} .tag.admintag{color:var(--accent);border-color:var(--accent)}
+.ss-foot{padding:10px 12px;border-top:1px solid var(--line)}
+.ss-menu{position:absolute;z-index:30;right:0;top:100%;display:flex;flex-direction:column;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px}
+.ss-menu button{background:none;border:0;color:var(--ink);text-align:left;padding:8px 10px;border-radius:3px;cursor:pointer;min-height:28px} .ss-menu button:hover,.ss-menu button:focus-visible{background:var(--accent-soft)} .ss-menu button:disabled{opacity:.45;cursor:not-allowed}
+.btn.iconsq{min-width:28px;padding:3px 8px}
+.ss-fab{display:none}
+.ss-what{flex-wrap:wrap} .ss-what button{min-height:28px}
+.ss-daygrid{display:flex;gap:6px;margin:6px 0} .ss-day{min-width:40px;min-height:28px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--dim);cursor:pointer}
+.ss-day.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.ss-chips .chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.ss-sentence{padding:8px 10px;border:1px dashed var(--line);border-radius:3px;margin-top:10px}
+.ss-mem{gap:8px;margin:4px 0}
+.ss-savebar{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.ss-sleep .btn{min-width:96px}
+.alarm-banner{position:fixed;z-index:200;left:50%;top:64px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--panel);border:1px solid var(--accent);border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.alarm-banner .alarm-time{font-size:22px;font-weight:700} .alarm-btns{display:flex;gap:8px}
+.alarm-take{position:fixed;inset:0;z-index:300;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px 20px calc(24px + env(safe-area-inset-bottom))}
+.alarm-take .alarm-time{font-size:64px;font-weight:800} .alarm-take .alarm-name{font-size:22px;font-weight:700}
+.alarm-take .alarm-btns{flex-direction:column;width:100%;max-width:420px;margin-top:auto} .alarm-take .alarm-btns .btn{min-height:72px;font-size:20px;width:100%}
+.sleepchip{margin-left:8px;font-size:12px}
+/* phone: full-screen sheet, segment switch, 44 px targets, FAB, sticky save bar */
+@media (max-width:899px){
+  dialog.ss-dlg{width:calc(100vw / var(--z,1));max-width:calc(100vw / var(--z,1));height:calc(100dvh / var(--z,1));max-height:calc(100dvh / var(--z,1));margin:0;border:0;border-radius:0}
+  dialog.ss-dlg>footer{display:none} dialog.ss-dlg.ss-edit>.ss-savebar{position:sticky;bottom:0;background:var(--panel);padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  dialog.ss-dlg.ss-edit>.ss-savebar .btn{min-height:48px;flex:1}
+  dialog.ss-dlg header .ss-clock{display:none}
+  .ss-seg{display:flex;margin-bottom:10px} .ss-seg button{flex:1;min-height:44px}
+  .ss-cols{grid-template-columns:1fr} .ss-cols[data-seg="scenes"] [data-col="schedules"],.ss-cols[data-seg="schedules"] [data-col="scenes"]{display:none}
+  .ss-cards{grid-template-columns:1fr} .ss-a .btn{min-height:44px} .ss-a .btn.primary{flex:1}
+  .ss-dlg .btn,.ss-dlg .iconbtn,.ss-day,.ss-what button,.ss-menu button,.ss-next .btn{min-height:44px} .ss-next .btn{flex:1}
+  .ss-next{flex-wrap:wrap} .ss-row{flex-wrap:wrap} .ss-when{text-align:left}
+  .ss-sw{width:50px;height:30px} .ss-sw span::after{width:24px;height:24px} .ss-sw input:checked+span::after{transform:translateX(20px)}
+  .ss-daygrid{display:grid;grid-template-columns:repeat(7,1fr)} .ss-day{min-width:0;min-height:44px}
+  .ss-fab{display:block;position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:3px;font-size:28px;z-index:40}
+  .ss-fabmenu{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));top:auto}
+}

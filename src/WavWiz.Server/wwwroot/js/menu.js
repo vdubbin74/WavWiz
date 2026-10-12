@@ -56,8 +56,7 @@ function menuActions(S, ctl, desktop = false) {
     // 0.2.0 item 2: no "This phone as a device" anywhere - every browser joins as a speaker by itself.
     devices: [
       ['Devices & zones', devPanel],
-      ['Scenes', () => go('scenes')],
-      ['Schedules', () => go('schedules')],
+      ['Scenes & Schedules…', () => go('scenes')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
       'hr',

@@ -30,3 +30,24 @@ test('0.3.0 §9: delay slider sends throttled live updates (not a 220 ms debounc
   assert.match(src('latency.js'), /throttle\(/); assert.doesNotMatch(src('latency.js'), /setTimeout\(\(\) => onChange/);
   assert.match(src('main.js'), /installSliderGuard\(document\)/); assert.match(src('main.js'), /whenIdle\(\(\) => \{ devv\.draw\(\); devp\.draw\(\); \}/);
 });
+
+test('0.3.0 §5: schedule helpers - plain labels, Save needs a day, summaries, times', async () => {
+  const m = await imp('scenesched');
+  assert.equal(m.canSave('', ''), false); assert.equal(m.canSave('', '2026-10-20'), true); assert.equal(m.canSave('06', ''), true);
+  assert.ok(!Object.values(m.LABELS).some(l => /_/.test(l)));
+  assert.equal(m.summary({ action: 'all_off' }), 'All off · everything stops and speakers turn off');
+  assert.equal(m.summary({ action: 'play', payload: { source: 'playlist', name: 'Morning Mix', fadeMin: 5, deviceIds: [1, 2] } }, { zones: [{ id: 1, name: 'Kitchen' }, { id: 2, name: 'Bedroom' }] }), 'Play playlist: Morning Mix · Kitchen + Bedroom · fade 5 min');
+  assert.equal(m.summary({ action: 'scene', payload: { sceneId: 3 } }, { scenes: [{ id: 3, name: 'Night' }] }), 'Apply scene: Night');
+  assert.match(m.fmtHm('18:05', 'en-US'), /6:05\s?PM/); assert.match(m.fmtHm('18:05', 'de-DE'), /18:05/);
+  assert.match(m.whenLabel('2026-10-13T06:30:00', '2026-10-12T23:50:00', 'en-US'), /^Tomorrow 6:30/);
+  assert.equal(m.countdown('2026-10-13T06:30:00', '2026-10-12T23:50:00'), 'in 6 h 40 m');
+  assert.deepEqual(m.SLEEP.map(x => x[1]), ['Off', '15 min', '30 min', '45 min', '60 min', '90 min', 'End of song', 'End of album', 'Custom…']);
+});
+test('0.3.0 §5: one menu entry, delete always confirms, edit actions gated by isAdmin, same dialog shell as Settings', () => {
+  const m = src('menu.js'); assert.match(m, /'Scenes & Schedules…'/); assert.doesNotMatch(m, /\['Schedules'/);
+  const s = src('scenesched.js');
+  assert.match(s, /cls: 'settings-dlg ss-dlg/); assert.match(s, /const admin = isAdmin\(S\)/);
+  for (const fn of ['delScene', 'del(r)']) assert.ok(s.includes(fn));
+  assert.match(s, /async function delScene\(sc\) \{\n\s+if \(!\(await ask\(/); assert.match(s, /async function del\(r\) \{ if \(!\(await ask\(/);
+  assert.match(s, /\['Edit', \(\) => edit\(r\), !admin\]/); assert.match(s, /e\.status !== 409/);
+});
