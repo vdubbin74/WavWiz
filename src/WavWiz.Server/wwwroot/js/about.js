@@ -1,7 +1,7 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.5';
+export const WHATS_NEW_VERSION = '0.3.0';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
   ['Calibrate with your PC’s mic', 'Calibrate speakers now starts with the microphone on a WavWiz Player PC: a USB or headset mic, or the built-in one. Pick it, check the level, press Start. Bluetooth mics work too, with a warning: they add their own delay.'],

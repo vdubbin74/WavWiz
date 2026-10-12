@@ -8,19 +8,35 @@
 // (3) creates a capture-only AudioContext (an AudioWorklet with no outputs; nothing is ever connected to the speakers).
 
 /** Opens the microphone the iOS-safe way. deps: { nav, win, track(msg) }. Returns { stream, ctx, rawOk, steps }. Throws the browser error as is. */
-export async function openMicFirst({ nav, win, track = () => {} }) {
+export async function openMicFirst({ nav, win, track = () => {}, started = null }) {
   const steps = [];
   const log = m => { steps.push(m); track(m); };
-  // 1. iOS 16.4+/17: tell Safari this page records. Must happen before getUserMedia and before any AudioContext exists.
-  try { if (nav.audioSession) { nav.audioSession.type = 'play-and-record'; log('audioSession=' + nav.audioSession.type); } else log('audioSession=n/a'); } catch (e) { log('audioSession failed: ' + (e && e.message)); }
-  // 2. the microphone FIRST (still inside the tap, so iOS shows its prompt)
+  if (started) return finishMic({ nav, win, log, steps, started });
+  return finishMic({ nav, win, log, steps, started: requestMicSync({ nav, track: log }) });
+}
+
+/** 0.3.0 (section 10): the SYNCHRONOUS part, called directly in the "Allow microphone" tap handler with no await before it, so iOS keeps the
+ * user gesture and shows its prompt: (1) audioSession = play-and-record, (2) getUserMedia. Returns { promise, rawAsked } without awaiting. */
+export function requestMicSync({ nav, track = () => {} }) {
+  try { if (nav.audioSession) { nav.audioSession.type = 'play-and-record'; track('audioSession=' + nav.audioSession.type); } else track('audioSession=n/a'); } catch (e) { track('audioSession failed: ' + (e && e.message)); }
   const raw = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } };
+  track('getUserMedia');
+  let promise;
+  try { promise = nav.mediaDevices.getUserMedia(raw); } catch (e) { promise = Promise.reject(e); }
+  return { promise, raw };
+}
+
+async function finishMic({ nav, win, log, steps, started }) {
   let stream, rawAsked = true;
-  try { log('getUserMedia'); stream = await nav.mediaDevices.getUserMedia(raw); }
+  try { stream = await started.promise; }
   catch (e) {
     if (e && (e.name === 'OverconstrainedError' || e.name === 'ConstraintNotSatisfiedError')) { rawAsked = false; log('getUserMedia (default settings)'); stream = await nav.mediaDevices.getUserMedia({ audio: true }); }
     else throw e;
   }
+  return afterStream({ win, log, steps, stream, rawAsked });
+}
+
+async function afterStream({ win, log, steps, stream, rawAsked }) {
   const trk = stream.getAudioTracks()[0]; const set = trk && trk.getSettings ? trk.getSettings() : {};
   const rawOk = rawAsked && set.echoCancellation === false && set.noiseSuppression === false && set.autoGainControl === false;
   // 3. only now an AudioContext - for recording only. It is never connected to anything that makes sound.
@@ -44,6 +60,12 @@ export function buildPlan(plan, runs = 3) {
 export function calCode(search) { try { const c = new URLSearchParams(search).get('cal') || ''; return /^[A-Za-z0-9]{6}$/.test(c) ? c.toUpperCase() : null; } catch { return null; } }
 
 /** What the page shows before Start: needs-https | setup-phone (untrusted, inline certificate steps) | no-code | ready. */
+/** 0.3.0: the denied help line (spec section 10, exact text). */
+export const DENIED_HELP = 'Microphone blocked. On iPhone go to Settings > Safari > Microphone, set to Ask or Allow, then reload.';
+export const DENIED_HELP_AA = 'Or in Safari tap aA > Website Settings > Microphone > Allow.';
+/** 0.3.0: the on-screen diagnostics line for user reports. */
+export function diagLine({ secure, protocol, err }) { return `isSecureContext: ${secure ? 'true' : 'false'} · ${protocol}${err ? ` · ${err.name || 'Error'}: ${err.message || ''}` : ''}`; }
+
 export function pageMode({ protocol, httpsEnabled, code, signedIn }) {
   if (!code && !signedIn) return 'no-code';
   if (protocol !== 'https:') return httpsEnabled ? 'setup-phone' : 'needs-https';

@@ -2,7 +2,7 @@
 // Order is the whole point (see calmic-core.js): nothing here joins as a speaker, opens /ws/room, creates an AudioContext or plays a sound before
 // the microphone is open. The Start tap sets the audio session to play-and-record, asks for the microphone, and only then creates a capture-only
 // AudioContext. The speakers play the test sounds; this phone only listens and uploads what it heard.
-import { openMicFirst, buildPlan, calCode, pageMode, phoneName } from './calmic-core.js';
+import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine } from './calmic-core.js';
 import { CalError, environment, classifyMicError, describe, detailsText, rms } from './calerrors.js';
 import { OffsetEstimator, pairClocks } from './roomsched.js';
 
@@ -29,7 +29,9 @@ async function call(path, { method = 'GET', body, raw } = {}) {
   if (!r.ok) { const e = new Error((j && (j.error || j.message)) || `HTTP ${r.status}`); e.status = r.status; throw e; }
   return j;
 }
-function show(...nodes) { $('loading').hidden = true; const v = $('view'); v.hidden = false; v.replaceChildren(...nodes.filter(n => n != null && n !== false)); }
+let lastErr = null;
+function diag() { return h('p', { class: 'small mono diag', id: 'diag', 'aria-live': 'polite', text: diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: lastErr }) }); }
+function show(...nodes) { nodes.push(diag()); $('loading').hidden = true; const v = $('view'); v.hidden = false; v.replaceChildren(...nodes.filter(n => n != null && n !== false)); }
 
 // ------------------------------------------------------------ boot
 async function boot() {
@@ -47,7 +49,8 @@ async function boot() {
   if (mode === 'setup-phone') return setupPhone();
   if (mode === 'needs-https') return show(h('div', { class: 'card warn' }, h('h2', { text: 'Secure connection needed' }),
     h('p', { text: 'Phones only allow the microphone on a secure (https) page. Secure connections are switched off on this WavWiz server.' }),
-    h('p', { class: 'small', text: 'An admin can switch them on in Settings › Phone & HTTPS on the PC. Or use “Use this PC’s microphone” or “By ear” on the PC.' })));
+    h('p', { class: 'small', text: 'An admin can switch them on in Settings › Calibration › Phone & HTTPS on the PC. Or use “Use this PC’s microphone” (recommended) or “By ear” on the PC.' }),
+    h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => location.reload() }, 'Retry'))));
   ready();
 }
 
@@ -105,17 +108,26 @@ function ready(note) {
   if (!ref || !others.length) return show(h('div', { class: 'card warn' }, h('h2', { text: 'Nothing to measure yet' }),
     h('p', { text: !ref ? 'No speaker is playing right now. Start WavWiz on your speakers, then reload this page.' : 'Only one speaker is connected. Calibration lines up two or more speakers.' }),
     h('button', { class: 'btn', onclick: () => location.reload() }, 'Reload')));
-  const start = h('button', { class: 'btn big', id: 'start', onclick: () => run() }, 'Start');
+  // 0.3.0 section 10: getUserMedia is called DIRECTLY in this tap handler, before any await, with the audio session set in the same handler.
+  const start = h('button', { class: 'btn big', id: 'start', type: 'button' }, 'Allow microphone');
+  start.addEventListener('click', () => {
+    if (stopped) return;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return run(null);
+    order('start-tap');
+    const started = requestMicSync({ nav: navigator, track: m => { track(m); order(m); } });
+    started.promise.catch(() => {});   // handled in run()
+    run(started);
+  });
   show(note ? h('div', { class: 'card warn' }, note) : null,
     h('div', { class: 'card' }, h('h2', { text: 'Stand where you usually listen' }),
       h('ul', { class: 'fix' }, h('li', { text: 'Hold the phone at ear height and keep still.' }), h('li', { text: 'Keep the room quiet. Music pauses while WavWiz measures.' }), h('li', { text: 'Keep this page open. The screen stays on.' })),
       h('p', { class: 'small', text: `Reference: ${ref.name}. Measures:` }), h('div', { class: 'spk' }, others.map(z => h('span', { text: z.name }))),
-      h('p', { class: 'small', text: 'Tap Start, then allow the microphone.' }), start));
+      h('p', { class: 'small', text: 'Tap Allow microphone, then tap Allow when the phone asks.' }), start));
 }
 
 // ------------------------------------------------------------ measure
 const CHECKS = [['mic', 'Microphone allowed'], ['clock', 'Clock synced with the server'], ['heard', 'Test sounds heard']];
-async function run() {
+async function run(started) {
   if (stopped) return;
   const env2 = environment();
   const checks = h('ul', { class: 'checks' }, CHECKS.map(([k, t]) => h('li', { 'data-k': k, text: t })));
@@ -133,9 +145,9 @@ async function run() {
     if (!window.isSecureContext) throw new CalError('INSECURE', 'isSecureContext=false at ' + location.protocol);
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new CalError('NO_MEDIA_API', 'getUserMedia missing');
     // 1-3: audio session, microphone FIRST, then the capture-only audio context (all started inside this tap)
-    mark('mic', 'run'); order('start-tap');
-    try { mic = await openMicFirst({ nav: navigator, win: window, track: m => { track(m); order(m); } }); }
-    catch (e) { throw new CalError(e && e.name === 'NoAudioApi' ? 'NO_AUDIO_API' : classifyMicError(e), `${e && e.name}: ${e && e.message}`); }
+    mark('mic', 'run');
+    try { mic = await openMicFirst({ nav: navigator, win: window, started, track: m => { track(m); order(m); } }); lastErr = null; }
+    catch (e) { lastErr = e; throw new CalError(e && e.name === 'NoAudioApi' ? 'NO_AUDIO_API' : classifyMicError(e), `${e && e.name}: ${e && e.message}`); }
     if (!mic.stream.getAudioTracks()[0]) throw new CalError('MIC_NONE', 'no audio track');
     if (!mic.rawOk) note('This phone kept some of its sound processing on; the result may be a little less exact.', true);
     if (mic.ctx.state !== 'running') {   // some phones need a second tap to start the (recording-only) audio engine
@@ -188,14 +200,16 @@ async function run() {
     const fin = await call(`/calibration/sessions/${sid}/finish`, { method: 'POST' });
     state = 'done'; hello(state); results(fin, failed);
   } catch (e) {
-    document.removeEventListener('visibilitychange', onVis); releaseMic(); hidden = false;
+    document.removeEventListener('visibilitychange', onVis); if (!mic && started) started.promise.then(st => st.getTracks().forEach(t => t.stop()), () => {}); releaseMic(); hidden = false;
     if (canceled || stopped) return;
     const err = e instanceof CalError ? e : new CalError('UNKNOWN', String(e && e.message || e));
     track('failed ' + err.code + ' ' + err.detail);
     if (sid) { const id = sid; sid = null; call(`/calibration/sessions/${id}/progress`, { method: 'POST', body: { phase: 'failed', error: describe(err.code, env).title } }).catch(() => {}).finally(() => call(`/calibration/sessions/${id}/end`, { method: 'POST', body: { reason: 'failed' } }).catch(() => {})); }
     const d = describe(err.code, env);
+    if (!lastErr) lastErr = { name: err.code, message: err.detail || '' };
+    const denied = err.code === 'MIC_DENIED' ? h('p', { class: 'deny', role: 'note' }, DENIED_HELP, h('br'), DENIED_HELP_AA) : null;
     const copy = h('button', { class: 'btn ghost small', onclick: async () => { try { await navigator.clipboard.writeText(detailsText(err, env, { log: log.join('\n') })); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } } }, 'Copy details');
-    show(h('div', { class: 'card bad', role: 'alert' }, h('h2', { text: d.title }), h('p', { text: d.why }), h('ul', { class: 'fix' }, d.fix.map(f => h('li', { text: f }))),
+    show(h('div', { class: 'card bad', role: 'alert' }, h('h2', { text: d.title }), denied, h('p', { text: d.why }), h('ul', { class: 'fix' }, d.fix.map(f => h('li', { text: f }))),
       d.link ? h('p', null, h('a', { href: d.link.href, text: d.link.text })) : null,
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => ready() }, 'Try again'), copy), h('p', { class: 'small', text: `Code: ${err.code}${err.detail && !/^[A-Z_]+$/.test(err.detail) ? ' · ' + err.detail : ''}` })));
   }
@@ -254,7 +268,7 @@ function results(fin, failed) {
     try { const r = await call(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...pick].filter(([, v]) => v).map(([k]) => k) } }); sid = null;
       show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' })));
       state = 'left'; hello(state); clearInterval(helloTimer);
-    } catch (e) { save.disabled = false; save.textContent = 'Save all (try again)'; alert(e.message); }
+    } catch (e) { save.disabled = false; save.textContent = 'Save all (try again)'; save.title = e.message; lastErr = e; const dg = $('diag'); if (dg) dg.textContent = diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: e }); }
   });
   show(h('div', { class: 'card' }, h('h2', { text: 'Results' }),
     props.length ? h('table', { class: 'res' }, h('thead', null, h('tr', null, ['', 'Speaker', 'Delay', 'Confidence'].map(t => h('th', { text: t })))),
