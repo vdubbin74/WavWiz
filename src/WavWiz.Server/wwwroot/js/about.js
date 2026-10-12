@@ -1,7 +1,7 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.2.4';
+export const WHATS_NEW_VERSION = '0.2.5';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
   ['Phone set-up page fixed', 'The phone set-up page works again when WavWiz sends other devices to the secure (HTTPS) address: the logo shows, the steps for your phone appear and Check my phone works.'],
