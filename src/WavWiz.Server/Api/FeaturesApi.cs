@@ -42,6 +42,10 @@ public static class FeaturesApi
         g.MapPost("/schedules", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.Schedules.Create(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
         g.MapPut("/schedules/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Schedules.Update(id, b); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapDelete("/schedules/{id:long}", (long id) => { s.Schedules.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        // ---- 0.3.0 §7.1 backup and restore (admin only) ----
+        g.MapGet("/backup", () => Results.File(s.Backup.Export(WavWiz.Core.WavWizInfo.Version), "application/octet-stream", $"WavWiz-{DateTime.Now:yyyy-MM-dd}.wavwizbackup")).Req(Role.Admin);
+        g.MapPost("/backup/preview", async (HttpContext c) => { var p = Features.BackupService.Read(await ReadAll(c)); return p.Error != null ? Ext.Bad(p.Error) : Results.Json(s.Backup.Preview(p.Root)); }).Req(Role.Admin);
+        g.MapPost("/backup/import", async (HttpContext c) => { var p = Features.BackupService.Read(await ReadAll(c)); if (p.Error != null) return Ext.Bad(p.Error); var (n, miss) = s.Backup.Import(p.Root); return Results.Json(new { ok = true, rows = n, songsNotInLibrary = miss }); }).Req(Role.Admin);
         // ---- 0.3.0 alarms + sleep timer ----
         g.MapGet("/schedules/clock", () => Results.Json(s.Schedules.ClockDto())).Req(Role.View);
         g.MapPost("/schedules/{id:long}/run", (long id, double? testFadeSec) => { var err = s.Schedules.RunNow(id, testFadeSec); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true }); }).Req(Role.Control);
@@ -114,4 +118,5 @@ public static class FeaturesApi
         }
         return list;
     }
+    private static async Task<byte[]> ReadAll(HttpContext c) { using var ms = new MemoryStream(); await c.Request.Body.CopyToAsync(ms); if (ms.Length > 50_000_000) throw new BadHttpRequestException("too big"); return ms.ToArray(); }
 }

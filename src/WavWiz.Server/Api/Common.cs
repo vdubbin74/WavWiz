@@ -17,6 +17,7 @@ public sealed class Services
     public Features.SceneService Scenes = null!;
     public Features.ScheduleService Schedules = null!;
     public Features.SleepService Sleep = null!;
+    public Features.BackupService Backup = null!;
     public Features.SpeakerFollowService Speakers = null!;
     public Features.RadioFinderService RadioFinder = null!;
     public Features.TagFixService TagFix = null!;

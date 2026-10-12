@@ -124,4 +124,42 @@ public class Release030Tests
         Assert.Equal("again?", db.Scalar("SELECT last_result FROM schedule WHERE id=$i", ("$i", id)));
         Assert.Equal(0L, Convert.ToInt64(db.Scalar("SELECT enabled FROM schedule WHERE id=$i", ("$i", id))));
     }
+
+    [Fact]
+    public async Task Backup_round_trip_on_a_clean_install_and_no_secrets()
+    {
+        byte[] file;
+        await using (var a = await ServerFixture.StartAsync())
+        {
+            var adm = a.As(a.Token(Role.Admin));
+            await adm.PutAsJsonAsync("/api/v1/settings", new Dictionary<string, object> { ["playback.crossfadeSec"] = 6, ["acoustid.apiKey"] = "SECRET-KEY-123", ["server.name"] = "Den" });
+            await adm.PostAsJsonAsync("/api/v1/scenes", new { name = "Party", icon = "🎉", members = Array.Empty<object>() });
+            await adm.PostAsJsonAsync("/api/v1/schedules", new { name = "Wake", time = "06:30", days = "12345", action = "stop" });
+            await adm.PostAsJsonAsync("/api/v1/radio", new { name = "KEXP", url = "https://kexp.example/stream" });
+            Assert.Equal(HttpStatusCode.Forbidden, (await a.As(a.Token(Role.Control)).GetAsync("/api/v1/backup")).StatusCode);
+            var r = await adm.GetAsync("/api/v1/backup"); Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            file = await r.Content.ReadAsByteArrayAsync();
+        }
+        using (var zip = new System.IO.Compression.ZipArchive(new MemoryStream(file)))
+        {
+            var json = new StreamReader(zip.GetEntry("backup.json")!.Open()).ReadToEnd();
+            Assert.DoesNotContain("SECRET-KEY-123", json); Assert.DoesNotContain("token_hash", json); Assert.DoesNotContain("BEGIN", json); Assert.DoesNotContain("admin.", json);
+            Assert.Contains("Party", json);
+        }
+        await using var b = await ServerFixture.StartAsync();
+        var badm = b.As(b.Token(Role.Admin));
+        var pv = await (await badm.PostAsync("/api/v1/backup/preview", new ByteArrayContent(file))).Json();
+        Assert.Contains(pv.GetProperty("sections").EnumerateArray(), x => x.GetProperty("table").GetString() == "scene" && x.GetProperty("incoming").GetInt32() == 1 && x.GetProperty("current").GetInt32() == 0);
+        Assert.Equal(HttpStatusCode.BadRequest, (await badm.PostAsync("/api/v1/backup/import", new ByteArrayContent(new byte[] { 1, 2, 3 }))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await badm.PostAsync("/api/v1/backup/import", new ByteArrayContent(file))).StatusCode);
+        var scenes = await badm.GetJson("/api/v1/scenes"); Assert.Contains(scenes.EnumerateArray(), x => x.GetProperty("name").GetString() == "Party");
+        var sch = await badm.GetJson("/api/v1/schedules"); Assert.Contains(sch.EnumerateArray(), x => x.GetProperty("name").GetString() == "Wake");
+        var st = await badm.GetJson("/api/v1/settings"); Assert.Equal(6, st.GetProperty("playback.crossfadeSec").GetDouble()); Assert.False(st.TryGetProperty("acoustid.apiKey", out _));
+        var radio = await badm.GetJson("/api/v1/radio"); Assert.Contains(radio.EnumerateArray(), x => x.GetProperty("name").GetString() == "KEXP");
+    }
+    [Fact] public void Secret_settings_are_never_backed_up()
+    {
+        foreach (var k in new[] { "acoustid.apiKey", "nas.share1", "admin.passwordHash", "tls.rootKey", "spotify.token", "x.password" }) Assert.True(BackupService.IsSecretSetting(k), k);
+        foreach (var k in new[] { "tls.redirect", "playback.crossfadeSec", "server.name", "jukebox.pinHash", "ui.checklistDismissed" }) Assert.False(BackupService.IsSecretSetting(k), k);
+    }
 }
