@@ -65,7 +65,7 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(ap, /export const APP_SUBS = \[\['theme', 'Theme'\], \['viz', 'Visualizer'\], \['eq', 'EQ'\], \['np', 'Now Playing'\], \['display', 'Display size'\]\]/);
   assert.match(ap, /h\('nav', \{ class: 'appnav subtabs', 'aria-label': 'Appearance sections' \}/);   // 0.2.5 C: sub-tabs on top
   // Theme = the 0.2.0 Themes page layout (theme cards + Custom colors card) + live app preview that recolors on hover
-  assert.match(th, /function previewCard\(id, p, current, onPick, onHover\)/); assert.match(th, /class: 'themegrid'/); assert.match(th, /h\('h3', null, 'Custom colors'\)/);
+  assert.match(th, /function previewCard\(id, p, current, onPick, onHover\)/); assert.match(th, /class: 'themegrid pgrid pgrid-theme'/); assert.match(th, /h\('h3', null, 'Custom colors'\)/);
   assert.match(th, /export function appPreview\(\)/); assert.match(th, /Recolors as you hover or pick/);
   for (const l of ['Background', 'Main', 'Second', 'Highlight', 'Text']) assert.match(th, new RegExp(`picker\\('[a-z0-9]+', '${l}'`));
   assert.match(th, /Object\.entries\(PRESETS\)\.map\(\(\[id, p\]\) => previewCard/, 'F15 order = PRESETS order');
@@ -75,10 +75,10 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(vp, /export function visualizerView\(\{ nested = false \} = \{\}\)/); assert.match(vp, /fold\('Graphics \(this device\)'/);
   // EQ = fuller page: big try-out preview, other styles, glow 0-100 % (50 % default)
   assert.match(ap, /prev = eqArea\(\{ style: p\.style, gains: gains\(\), glow: p\.glow, interactive: true, locked:/);   // 0.2.3 U10: the real EQ, locked by default
-  assert.match(ap, /'Other styles'/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
+  assert.match(ap, /gridEl\('eq', 'EQ style', cards\)/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
   assert.match(ap, /interactive: false/);
   // Now Playing keeps the F9 preview (0.2.3 U4: Display size has no preview any more - see release023)
-  assert.match(ap, /preview \? preview\.el : null/);
+  assert.match(ap, /gridEl\('np', 'Now Playing style', cards\)/);   // 0.3.1 B14: live style grid replaces the single preview
   assert.match(st, /section: APP_SECTION\[section\]/); assert.match(st, /else app\?\.resume\?\.\(\)/);
   assert.match(css, /\.appstack\{display:flex;flex-direction:column/);   // 0.2.5 C: sub-tabs on top (was a 150 px left column)
   assert.match(css, /\.themecard\{border-radius:6px\}/);

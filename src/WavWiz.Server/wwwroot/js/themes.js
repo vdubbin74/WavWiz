@@ -72,9 +72,11 @@ export function themeCard() {
       applyTheme(n); saveTheme(n); fire(); prev.update();
       box.querySelectorAll('.themecard.on').forEach(c => { c.classList.remove('on'); c.setAttribute('aria-pressed', 'false'); c.querySelector('.tp-check')?.remove(); });
     } }), label);
-    box.replaceChildren(prev.el,
+    // 0.3.1 B15: grid first (5 per row, all 10 themes in 2 rows, above the fold); the large preview and the custom colors follow below
+    box.replaceChildren(
       h('p', { class: 'dim small' }, 'Tap a theme to use it on this phone or PC. Midnight Neon is the default. Custom themes use five colors: Background, Main, Second, Highlight and Text. Visualizers follow the theme unless you give a look its own colors.'),
-      h('div', { class: 'themegrid', role: 'group', 'aria-label': 'Theme' }, Object.entries(PRESETS).map(([id, p]) => previewCard(id, p, t.preset === id, pick, prev.hover))),
+      h('div', { class: 'themegrid pgrid pgrid-theme', role: 'group', 'aria-label': 'Theme', style: '--pg-cols:5;--pg-max:200px' }, Object.entries(PRESETS).map(([id, p]) => previewCard(id, p, t.preset === id, pick, prev.hover))),
+      prev.el,
       t.preset === 'pepecoin' ? pepeNote() : null,
       h('div', { class: 'card tcustomcard' }, h('h3', null, 'Custom colors'),
         h('div', { class: 'row wrap' }, picker('bg', 'Background', t.bg), picker('accent', 'Main', t.accent), picker('accent2', 'Second', isHex(t.accent2) ? t.accent2 : derive(t)['--accent2']), picker('hl', 'Highlight', derive(t)['--hl']), picker('ink', 'Text', inkVal)),

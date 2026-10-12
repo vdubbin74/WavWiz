@@ -91,3 +91,34 @@ test('B9: compact Scenes & Schedules: next event + countdown + Skip, Run chips, 
   assert.match(d, /\/schedules\/\$\{nx\.id\}\/skip/); assert.match(d, /\/scenes\/\$\{sc\.id\}\/apply/); assert.match(d, /'Open'/);
   assert.doesNotMatch(src('now.js'), /nextRunAt|countdown\(/, 'rule 6: Now Playing shows no next-event countdown');
 });
+test('B10/B11/B12: Settings shell - reset in a fixed slot of the sub-tab bar, pinned tab menu, fixed size, content scrolls inside', () => {
+  const st = src('settings.js');
+  assert.match(st, /for \(const sec of sections\) placeReset\(sec\);/); assert.match(st, /h\('div', \{ class: 'settings-scroll' \}, \.\.\.sections\)/);
+  assert.match(st, /row\.append\(sub, h\('span', \{ class: 'subbar-slot' \}, btn\)\)/);
+  assert.match(css, /\.subbar>\.subtabs\{flex:1 1 auto;min-width:0;margin:0!important\}/); assert.match(css, /\.subbar-slot\{flex:none/);
+  assert.match(css, /dialog\.settings-dlg\{width:min\(1200px,calc\(calc\(100vw \/ var\(--z,1\)\) - 32px\)\);height:min\(860px/);
+  assert.match(css, /\.settings-scroll\{flex:1;min-height:0;overflow-y:auto/);
+  assert.match(css, /\.settings-body>\.settings-nav\{flex:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden/, 'no vertical scroll bar on the tabs');
+  assert.doesNotMatch(css, /\.appnav\.subtabs\{[^}]*margin:-6px/, 'no negative margin pulling the sub-tabs under the reset bar');
+});
+test('B13-B16: one Appearance grid - per-row counts, 16:10 cards up to 170 px, 12 px gaps, check + theme border; live previews pause off screen', async () => {
+  const G = await imp('pgrid');
+  assert.deepEqual(G.GRID_COLS, { theme: 5, viz: 4, eq: 3, np: 2, display: 3 });
+  assert.equal(G.CARD_MAX_H, 170); assert.equal(G.GRID_GAP, 12); assert.equal(G.CARD_RATIO, 1.6);
+  const c = rule('.pgcard'); assert.match(c, /aspect-ratio:16\/10;max-height:170px/); assert.match(c, /border-radius:3px/);
+  assert.match(rule('.pgcard.on'), /border-color:var\(--accent\)/); assert.match(css, /\.pgcard\.on \.pg-check\{display:grid\}/);
+  assert.match(css, /\.pgrid\{display:grid;[^}]*gap:12px/);
+  const ap = src('appearance.js'), vp = src('vizpage.js');
+  assert.match(ap, /stopLive = whileVisible\(cards/); assert.match(ap, /stopNp = whileVisible\(cards/); assert.match(vp, /stopVis = whileVisible\(list/);
+  assert.match(ap, /interactive: false \}\), \{ id \}\)\);/, 'EQ previews are display-only');
+  // a hidden card stops its live preview, a visible one starts it
+  let shown = 0, hidden = 0; const stop = G.whileVisible([{}, {}], () => shown++, () => hidden++); assert.equal(shown, 2); stop(); assert.equal(hidden, 2);
+});
+test('B16: Small 75 %, Default 100 % (default), Large 125 % (max); earlier saved choices are kept', async () => {
+  const U = await imp('uiscale');
+  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['small', 0.75], ['compact', 1], ['large', 1.25]]);
+  assert.equal(U.migrateScale('compact'), 'compact'); assert.equal(U.migrateScale('large'), 'large'); assert.equal(U.migrateScale('small'), 'small');
+  assert.equal(U.migrateScale('medium'), 'medium'); assert.equal(U.scaleFactor('medium'), 1.12, 'kept until another size is picked');
+  assert.equal(U.migrateScale('xlarge'), 'large', 'capped at the new maximum'); assert.equal(U.migrateScale('junk'), 'compact');
+  assert.ok(Math.max(...U.SCALES.map(s => s[2])) <= 1.25);
+});

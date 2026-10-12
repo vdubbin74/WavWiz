@@ -6,6 +6,7 @@
 import { h, toast } from './util.js';
 import { Viz, vizPrefs, saveVizPrefs } from './viz.js';
 import { loadLooks, saveLooks } from './looks.js';
+import { gridEl, pgCard, whileVisible } from './pgrid.js';
 import { VIZ_LIST, VIZ_BLURB, vizName, loadSettings, saveSettings, resetSettings, SHARED, FX, loadReact, saveReact, loadPost, savePost, POST, QUALITY_LIST, DEFAULT_REACT } from './vizcore.js';
 
 /** 0.2.2 T2: `nested` = the page inside Settings > Appearance > Visualizer (the Show switch lives in the live preview card above it,
@@ -17,12 +18,13 @@ export function visualizerView({ nested = false } = {}) {
     const p = vizPrefs(), was = p.engine; p.engine = k; p.on = true; saveVizPrefs(p); window.dispatchEvent(new CustomEvent('wavwiz:viz'));
     editing = k; markCards(); drawControls(); if (was !== k) toast(vizName(k) + ' is now the visualizer');
   }
-  function stopPreviews() { previews.forEach(v => v.destroy()); previews = []; }
+  let stopVis = null;
+  function stopPreviews() { stopVis?.(); stopVis = null; previews.forEach(v => v.destroy()); previews = []; }
   function markCards() {
     const p = vizPrefs();
     for (const [k, c] of Object.entries(cards)) {
       const active = p.on && p.engine === k; c.classList.toggle('on', active); c.classList.toggle('edit', editing === k);
-      c.setAttribute('aria-label', `${vizName(k)}${active ? ' (active)' : ''}`); c.setAttribute('aria-pressed', String(active));
+      c.setAttribute('aria-label', `${vizName(k)}${active ? ' (active)' : ''}`); c.setAttribute('aria-checked', String(active));
       c.querySelector('.badge-active')?.classList.toggle('hidden', !active);
     }
   }
@@ -83,21 +85,21 @@ export function visualizerView({ nested = false } = {}) {
   function draw() {
     stopPreviews(); cards = {};
     const p = vizPrefs(); editing = editing || p.engine;
-    const grid = h('div', { class: 'vizgrid' });
-    for (const [k] of VIZ_LIST) {
+    // 0.3.1 B15: the shared Appearance grid - 4 per row, 16:10 cards; each live preview runs only while its card is on screen
+    const list = VIZ_LIST.map(([k]) => {
       const host = h('div', { class: 'vp-host' });
-      const card = h('div', { class: 'vizcard', 'data-viz': k, role: 'button', tabindex: 0,
-        onclick: () => setActive(k), onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setActive(k); } } },
-        host, h('div', { class: 'vp-meta' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, vizName(k)), h('span', { class: 'badge-active hidden' }, 'ACTIVE')),
-          h('div', { class: 'small dim' }, VIZ_BLURB[k])));
-      cards[k] = card; grid.append(card);
-      const v = new Viz(host, { engine: k, preview: true }); previews.push(v); requestAnimationFrame(() => v.start());
-    }
+      const card = pgCard({ id: k, name: vizName(k), sub: VIZ_BLURB[k], on: p.on && p.engine === k, onSelect: setActive, preview: host, attrs: { 'data-viz': k } });
+      card.classList.add('vizcard'); card.append(h('span', { class: 'badge-active hidden' }, 'ACTIVE')); card._host = host; card._k = k;
+      cards[k] = card; return card;
+    });
+    const grid = gridEl('viz', 'Visualizer', list); grid.classList.add('vizgrid');
+    stopVis?.(); stopVis = whileVisible(list, c => { const v = new Viz(c._host, { engine: c._k, preview: true }); c._viz = v; previews.push(v); requestAnimationFrame(() => { if (c._viz === v) v.start(); }); },
+      c => { c._viz?.destroy(); previews = previews.filter(x => x !== c._viz); c._viz = null; c._host.replaceChildren(); });
     ctlHost = h('div', { class: 'vizctl-host' });
     root.replaceChildren(
       h('p', { class: 'dim small' }, 'Tap a look to use it on Now Playing; its settings appear below. Each look follows the theme colors unless you switch it to Custom. Every level runs 0–100% (50% is the default). Settings are saved for each look on this device.'),
       grid, overlayCard(),
-      nested ? null : h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
+      h('div', { class: 'card' }, h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: p.on, 'data-vizshow': '1', onchange: ev => { const x = vizPrefs(); x.on = ev.target.checked; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); markCards(); } }), 'Show the visualizer on Now Playing')),
       nested ? fold('Graphics (this device)', 'Quality: Auto, bloom, streaks, fringing, depth blur', graphicsCard(p)) : graphicsCard(p),
       nested ? fold('Reactivity (all looks)', 'Energy, Sensitivity, Auto-gain', reactCard()) : reactCard(), ctlHost);
     markCards(); drawControls();

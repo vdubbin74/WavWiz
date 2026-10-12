@@ -117,7 +117,7 @@ test('0.0.8 item 12: no Adjust button on the Visualizer page', () => {
 
 // ---- item 9: display size zooms the whole UI
 test('0.0.8 item 9: Display size factors and the CSS zoom rule; viewport units compensate the zoom', () => {
-  assert.deepEqual(ui.SCALES.map(s => s[2]), [0.9, 1, 1.12, 1.25, 1.5]);
+  assert.deepEqual(ui.SCALES.map(s => s[2]), [0.75, 1, 1.25]);   // 0.3.1 B16
   assert.equal(ui.scaleFactor('large'), 1.25); assert.equal(ui.scaleFactor('nope'), 1);
   assert.match(css, /html\{zoom:var\(--z,1\)\}/);
   const raw = css.replace(/\d+(\.\d+)?d?v[hw] \/ var\(--z,1\)/g, '').match(/\d+(\.\d+)?d?v[hw]\b/g) || [];

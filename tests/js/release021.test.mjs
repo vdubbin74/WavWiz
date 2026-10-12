@@ -126,7 +126,7 @@ test('0.2.1 F9: Appearance shows a live preview built from the real panel (clone
   assert.match(pv, /setAttribute\('inert', ''\)/);
   assert.match(pv, /addEventListener\('wavwiz:theme', onTheme\); window\.addEventListener\('wavwiz:npstyle', onTheme\)/);
   assert.match(st, /preview: \(\) => npPreview\(\)/);
-  assert.match(ap, /preview\?\.update\(\)/);
+  assert.match(ap, /thumbs\.forEach\(t => t\.update\(\)\)/);   // 0.3.1 B14: every style card is a live clone
   assert.match(css, /\.npprev-stage>\.np-ctlpanel\{position:absolute;left:0;top:0;transform-origin:0 0/);
 });
 

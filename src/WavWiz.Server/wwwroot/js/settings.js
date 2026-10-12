@@ -3,7 +3,7 @@ import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
 import { networkCard } from './diag.js';
 import { appearancePane } from './appearance.js';
-import { npPreview } from './nppreview.js';
+import { npPreview, npStyleThumb } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
@@ -59,7 +59,7 @@ export async function openSettings(S, refresh, nav, section) {
     const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [] };
     const cal = [], players = [];
 
-    app?.hide?.(); app = appearancePane({ S, looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview() });
+    app?.hide?.(); app = appearancePane({ S, looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview(), npThumb: npStyleThumb });
     panes.appearance.push(app.el);
 
     // Devices: phone/https, pairing, tokens, delay defaults
@@ -168,7 +168,10 @@ export async function openSettings(S, refresh, nav, section) {
     navEl.addEventListener('keydown', ev => { if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return; const i = GROUPS.findIndex(g => g[0] === active), n = (i + (ev.key === 'ArrowRight' ? 1 : -1) + GROUPS.length) % GROUPS.length; active = GROUPS[n][0]; paint(); navEl.children[n].focus(); });
     const sections = GROUPS.map(([id, label]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id, id: 'ssec-' + id, role: 'tabpanel', 'aria-labelledby': 'stab-' + id },
       resetBar(S, label, { admin, server: RESET[id], local: id === 'appearance' ? THEME_RESET_KEYS : null, done: () => { if (id === 'appearance') location.reload(); else draw(); } }), ...panes[id]));
-    body.replaceChildren(navEl, ...sections);
+    // 0.3.1 B10: "Reset this section" gets a fixed slot - the right end of the sub-tab bar where a section has sub-tabs, else its own row
+    for (const sec of sections) placeReset(sec);
+    // 0.3.1 B12: one fixed-size shell - the tab menu stays pinned, only the content area below it scrolls
+    body.replaceChildren(navEl, h('div', { class: 'settings-scroll' }, ...sections));
     body._paint = paint; search.reindex();
     if (focusSec) requestAnimationFrame(() => body.querySelector('#' + focusSec)?.scrollIntoView({ block: 'start' }));
 
@@ -182,6 +185,13 @@ export async function openSettings(S, refresh, nav, section) {
     }
   };
 
+  /** B10: move the section's reset bar into a flex row with its sub-tab bar (the tabs take the free space and scroll sideways; the button never overlaps). */
+  function placeReset(sec) {
+    const bar = sec.querySelector(':scope > .secbar'), sub = sec.querySelector('.subtabs');
+    if (!bar || !sub) return;
+    const btn = bar.querySelector('.resetsec'); if (!btn) return;
+    const row = h('div', { class: 'subbar' }); sub.replaceWith(row); row.append(sub, h('span', { class: 'subbar-slot' }, btn)); bar.remove();
+  }
   function revokeToken(t) {
     const rm = h('input', { type: 'checkbox', checked: true, id: 'rev-rm' });
     dialog(`Revoke “${t.name}”?`, h('div', null, h('p', null, 'This device is signed out at once and can no longer control WavWiz or play music. A player that is still running will say “not paired” and offer to pair again.'),

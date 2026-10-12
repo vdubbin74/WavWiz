@@ -1520,7 +1520,7 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
    tabs (was a left column). Pinned previews stay sticky and scale with the height so the controls below stay in view at 1080p and every Display size. */
 dialog.settings-dlg{width:min(1200px,calc(calc(100vw / var(--z,1)) - 32px))}
 .appstack{display:flex;flex-direction:column;gap:12px;min-width:0}
-.appnav.subtabs{flex-direction:row;position:static;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:-6px 0 0;padding:0 0 2px}
+.appnav.subtabs{flex-direction:row;position:static;gap:4px;flex-wrap:nowrap;overflow-x:auto;margin:0 0 12px;padding:0 0 2px}
 .appnav.subtabs button{border:1px solid var(--line);border-left:1px solid var(--line);border-radius:5px;padding:5px 12px;white-space:nowrap;background:var(--panel2);color:var(--dim)}
 .appnav.subtabs button:hover{color:var(--ink);background:var(--panel2)}
 .appnav.subtabs button.on{background:color-mix(in srgb,var(--hl,var(--accent)) 18%,var(--panel2));border-color:var(--hl,var(--accent));color:var(--ink);font-weight:700}
@@ -1658,3 +1658,44 @@ body.jb-kiosk #app{visibility:hidden}
 .dss-chips{display:flex;flex-wrap:wrap;gap:6px}
 .dss-run{border-radius:3px;font-size:12px;min-height:26px;padding:2px 10px}
 .dss-none{margin:0}
+/* ===== 0.3.1 B10/B11/B12: Settings shell (PC). Fixed size for every tab (up to 1200 px wide, set height), pinned tab menu, content scrolls inside ===== */
+.secbar{display:flex;align-items:center;min-height:30px;margin:0 0 8px}
+.subbar{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 12px}
+.subbar>.subtabs{flex:1 1 auto;min-width:0;margin:0!important}
+.subbar-slot{flex:none;display:flex;align-items:center}
+.appnav.subtabs{margin:0 0 12px}
+.settings-nav{overflow-y:hidden;flex:none}
+@media (min-width:901px){
+  dialog.settings-dlg{width:min(1200px,calc(calc(100vw / var(--z,1)) - 32px));height:min(860px,calc(calc(100vh / var(--z,1)) - 32px));max-height:none}
+  dialog.settings-dlg>.body{overflow:hidden;display:flex;flex-direction:column;padding-bottom:0}
+  dialog.settings-dlg:not(.ss-dlg)>.body>.settings-body{display:flex;flex-direction:column;flex:1;min-height:0}
+  dialog.ss-dlg>.body{overflow:auto}
+  .settings-body>.settings-nav{flex:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding-bottom:1px;margin-bottom:12px;scrollbar-width:thin}
+  .settings-body>.settings-nav button{flex:none;padding:8px 11px;margin-bottom:0}
+  .settings-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 4px 14px 0;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+}
+/* ===== 0.3.1 B13-B16: one Appearance preview grid - 16:10 cards (max ~170 px tall), 12 px gaps, theme border + check when selected ===== */
+.pgrid{display:grid;grid-template-columns:repeat(var(--pg-cols,3),minmax(0,var(--pg-max,272px)));gap:12px;justify-content:start;margin:10px 0 14px}
+.pgcard{position:relative;display:flex;flex-direction:column;aspect-ratio:16/10;max-height:170px;min-width:0;box-sizing:border-box;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--ink);overflow:hidden;cursor:pointer;text-align:left}
+.pgcard:hover{border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
+.pgcard.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.pg-prev{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--bg);pointer-events:none}
+.pg-meta{display:flex;align-items:baseline;gap:6px;padding:4px 8px;min-width:0;font-size:12px;border-top:1px solid var(--line);background:var(--panel2)}
+.pg-meta b{flex:none;max-width:100%} .pg-meta .small{min-width:0;flex:1}
+.pg-check{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:3px;display:none;place-items:center;font-size:12px;font-weight:800;background:var(--accent);color:var(--accent-ink,var(--bg))}
+.pgcard.on .pg-check{display:grid}
+.pgrid .vp-host{position:absolute;inset:0} .pgrid .vizcard .badge-active{display:none}
+.pgrid-eq .pg-prev .eqarea{zoom:.36;height:calc(100% / .36)} .pgrid-eq .pg-prev{background:var(--panel)}
+.npthumb{position:absolute;inset:0;overflow:hidden} .npthumb>*{position:absolute;left:0;top:0;pointer-events:none}
+.appsub .pgrid-theme{grid-template-columns:repeat(5,minmax(0,200px));gap:12px}
+.pgrid-theme .themecard{aspect-ratio:16/10;max-height:170px;border-radius:3px;padding:6px;gap:4px;min-width:0;overflow:hidden}
+.pgrid-theme .tp-mini{height:auto;flex:1;min-height:0;border-radius:3px}
+.pgrid-theme .themecard.on{box-shadow:inset 0 0 0 1px var(--accent)}
+.appsub .pgrid.vizgrid{grid-template-columns:repeat(4,minmax(0,270px));gap:12px} .appsub .pgrid .vizcard{border-radius:3px}
+.dsmock{position:absolute;inset:8px;display:flex;flex-direction:column;gap:calc(4px * var(--mz));border:1px solid var(--line);border-radius:3px;background:var(--bg);overflow:hidden}
+.dsm-top{display:flex;gap:calc(4px * var(--mz));padding:calc(4px * var(--mz));background:var(--panel)} .dsm-top i{width:calc(18px * var(--mz));height:calc(5px * var(--mz));background:var(--line);border-radius:2px}
+.dsm-body{flex:1;display:grid;grid-template-columns:1fr 2fr 1fr;gap:calc(4px * var(--mz));padding:0 calc(4px * var(--mz)) calc(4px * var(--mz))}
+.dsm-body>div{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:calc(3px * var(--mz));display:flex;flex-direction:column;gap:calc(3px * var(--mz));overflow:hidden}
+.dsm-body i{display:block;height:calc(4px * var(--mz));background:var(--line);border-radius:2px}
+.dsm-art{height:calc(26px * var(--mz));background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:2px}
+@media (max-width:900px){ .pgrid{grid-template-columns:repeat(2,minmax(0,1fr))!important} }

@@ -10,13 +10,14 @@ import { loadTheme, PRESETS } from './theme.js';
 export const PREVIEW_SAMPLE = Object.freeze({ title: 'Glass Harbor', artist: 'Lumen', elapsed: '0:14', remain: '-3:06', total: '3:20', frac: 0.07, track: 'TRACK 03' });
 const W = 760;      // the panel is laid out at a typical desktop width, then scaled to the card
 
-export function fillSample(panel, p = loadNpPrefs()) {
+export function fillSample(panel, p = loadNpPrefs(), { keepSong = false } = {}) {
   const S0 = PREVIEW_SAMPLE, q = sel => panel.querySelectorAll(sel), set = (sel, t) => q(sel).forEach(e => { e.textContent = t; });
   panel.removeAttribute('id'); q('[id]').forEach(e => e.removeAttribute('id'));
   panel.classList.remove('collapsed'); panel.classList.add('playing', 'npprev-panel');
   for (const [id] of NP_STYLES) panel.classList.toggle('pn-' + id, p.style === id);
   for (const [k, v] of Object.entries(npVars(p))) panel.style.setProperty(k, v);
   panel.dataset.style = p.style;
+  if (keepSong) { panel.style.setProperty('--npprev', '1'); return panel; }   // 0.3.1 B14: the clone already shows the playing song
   set('.np-tabletitles .t1', S0.title); set('.np-tabletitles .t2', S0.artist); set('.np-ctlnow', '');
   set('.np-elv,.pn-pel,.pn-cval', S0.elapsed); set('.np-rev,.pn-lrev', S0.remain); set('.pn-pdur', S0.total); set('.pn-trk', S0.track);
   set('.volpct', '60%'); q('input[type=range]').forEach(r => { r.value = 60; r.disabled = false; });
@@ -56,4 +57,19 @@ export function npPreview() {
   window.addEventListener('wavwiz:theme', onTheme); window.addEventListener('wavwiz:npstyle', onTheme);
   update();
   return { el, update };
+}
+
+/** 0.3.1 B14: one style as a small live card preview - the real panel cloned with the playing song (example song when nothing plays),
+ *  scaled to the card. update() re-clones (called about once a second while the card is on screen). */
+export function npStyleThumb(styleId, playing = () => false) {
+  const stage = h('div', { class: 'npthumb' }); let panel = null;
+  const fit = () => { if (!panel) return; const w = Math.max(W, panel.scrollWidth), sw = stage.clientWidth || 260, sh = stage.clientHeight || 150, s = Math.min(sw / w, sh / Math.max(1, panel.offsetHeight)); panel.style.width = w + 'px'; panel.style.transform = `scale(${s})`; };
+  function update() {
+    const tpl = npPanelTemplate(); if (!tpl) { stage.replaceChildren(); panel = null; return; }
+    panel = fillSample(tpl.cloneNode(true), { ...loadNpPrefs(), style: styleId }, { keepSong: playing() });
+    panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); panel.style.width = W + 'px'; panel.style.transformOrigin = '0 0';
+    stage.replaceChildren(panel); requestAnimationFrame(fit);
+  }
+  update();
+  return { el: stage, update };
 }

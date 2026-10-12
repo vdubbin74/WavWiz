@@ -153,11 +153,12 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
     bandEls.forEach(b => { if (isLocked) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); if (isLocked && b._drag) { b._drag = false; el.classList.remove('dragging'); } });
   }
   function startLive(tap) { if (untap || !tap) return; untap = tap(onFrame); }
+  function stopLive() { untap?.(); untap = null; }   // 0.3.1 B15: off-screen previews stop listening
   function destroy() { untap?.(); untap = null; ro?.disconnect(); }
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => drawGlow()) : null; ro?.observe(canvas);
   setGains(g); setResponse(null); if (interactive) setLocked(isLocked);
   if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(drawGlow); }
-  return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
+  return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, stopLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
 }
 
 /** 0.2.3 U9: the "Lock EQ" checkbox (padlock icon + label), used in the Sound (EQ) dialog header and on the Appearance > EQ preview. */

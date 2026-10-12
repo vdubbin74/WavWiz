@@ -56,14 +56,14 @@ test('0.2.3 U3: the one-line bar wears the selected panel style (all four) in th
 test('0.2.3 U4: Settings > Appearance > Display size has no preview pane (the whole app already changes live)', () => {
   const ap = src('appearance.js'), body = ap.split('function displaySizeCard() {')[1].split('\n}\n')[0];
   assert.doesNotMatch(body, /npprev|dsprev|ds-stage|prevHead/);
-  assert.match(body, /data-scale': id, onclick: \(\) => \{ applyScale\(id\); draw\(\); \}/);
+  assert.match(body, /'data-scale': id \}, onSelect: v => \{ applyScale\(v\); draw\(\); \}/);   // 0.3.1 B16: card picker (mini mockups)
 });
 
 test('0.2.3 U5 + U8: Theme, Visualizer, EQ and Now Playing previews are pinned (sticky) while the page scrolls, at every Display size', () => {
   assert.match(src('themes.js'), /class: 'npprev apprev pinprev'/);
   const ap = src('appearance.js');
   assert.match(ap, /class: 'npprev vlive pinprev'/);
-  assert.match(ap, /class: 'eqprevbox eqprev-big pinprev'/);
+  assert.match(ap, /class: 'eqprevbox eqprev-big'/);   // 0.3.1 B13: the live grid comes first; the editor below is no longer pinned
   assert.match(src('nppreview.js'), /class: 'npprev pinprev', 'data-preview': 'np'/);
   assert.match(css, /\.appsub \.pinprev\{position:sticky;top:-12px;z-index:4;/);
   // the pinned preview shrinks with the dialog height (divided by the Display size zoom) so the settings below stay usable
