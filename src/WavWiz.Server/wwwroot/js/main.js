@@ -4,7 +4,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, expandLabel, expandIcon } from './devices.js';
+import { devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
@@ -140,7 +140,7 @@ async function startMain() {
   // 0.3.0 §6: one panel state (rail · normal · expanded), one key, two controls per header kept apart: chevron on the outer edge, expand on the inner edge
   P6 = loadPanels();
   const colBtn = h('button', { class: 'plus libcol pchev', 'aria-label': chevronLabel(P6, 'lib'), 'aria-expanded': 'true', title: 'Fold / open the Library panel ( [ )', onclick: ev => { ev.stopPropagation(); setPanels(chevron(P6, 'lib'), 'lib'); } }, '‹');
-  const expBtn = h('button', { class: 'plus libexp pexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expanded library ( Shift+[ ; Esc returns)', onclick: ev => { ev.stopPropagation(); setPanels(expand(P6, 'lib'), 'lib'); } }, icon(expandIcon('left', false)));
+  const expBtn = h('button', { class: 'plus libexp pexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expand', onclick: ev => { ev.stopPropagation(); setPanels(expand(P6, 'lib'), 'lib'); } }, icon(expandIcon('left', false)));
   const libRail = h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '♫'), h('span', { class: 'prail-t' }, 'LIBRARY'));
   libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, libRail, h('div', { class: 'pane-h' }, colBtn, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), expBtn), h('div', { class: 'libbody' }, libC.el));
   libpanel.addEventListener('click', ev => { if (libpanel.classList.contains('israil') && !ev.target.closest('button:not(.libpanel)')) setPanels(railClick(P6, 'lib'), 'lib'); });
@@ -191,8 +191,7 @@ function applyPanels(first = false) {
   desk.classList.toggle('autorail', !!e.auto);
   libpanel.classList.toggle('israil', ls === 'rail'); libpanel.title = ls === 'rail' ? 'Open the Library panel ( [ )' : '';
   const b = libpanel.querySelector('.libcol'); b.textContent = chevronGlyph(e, 'lib'); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
-  const x = libpanel.querySelector('.libexp'); if (ls === 'expanded') x.textContent = '⤡ Esc'; else setIcon(x, expandIcon('left', false));
-  x.setAttribute('aria-pressed', String(ls === 'expanded')); x.setAttribute('aria-label', expandLabel('Library', ls === 'expanded'));
+  paintExpandBtn(libpanel.querySelector('.libexp'), 'Library', ls === 'expanded');   // 0.3.1 B4/B6
   devp.setSize(ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
   if ((ls === 'expanded') !== libWasExp || first) { libWasExp = ls === 'expanded'; libC.setExpanded(libWasExp); }
   if (ls !== 'rail' && !first) libC.reload();

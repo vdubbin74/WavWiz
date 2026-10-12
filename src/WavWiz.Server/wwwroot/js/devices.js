@@ -4,7 +4,7 @@ import { openEq } from './eq.js';
 import { latencyControl, clampMs } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
-import { icon, setIcon } from './icons.js';
+import { icon, setIcon, iconSvg } from './icons.js';
 import { whenIdle } from './slider.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
@@ -32,8 +32,15 @@ export function arrowLabel(which, state) {
 }
 /** 0.2.3 U6: Expand button arrows point the way the panel travels: Devices (right side) grows to the LEFT and goes back to the right;
  *  the Library (left side) is the mirror image. Pure: side = 'left' | 'right'. */
-export const expandIcon = (side, expanded) => ((side === 'right') !== !!expanded ? 'expandL' : 'expandR');
-export const expandLabel = (which, on) => (on ? 'Back to the normal layout' : `Expand the ${which} panel`);
+// 0.3.1 B6: standard icons on both panels - outward arrows to expand, inward arrows while expanded; labels "Expand" / "Collapse (Esc)"
+export const expandIcon = (side, expanded) => (expanded ? 'collapseIn' : 'expandOut');
+export const expandLabel = (which, on) => (on ? 'Collapse (Esc)' : 'Expand');
+/** 0.3.1 B4: paint the Expand button for every exit path (Esc, button, chevron, [ ] keys, other rail). Always rewrites the icon:
+ *  0.3.0's setIcon() skipped the redraw when the button's remembered icon name had not changed although "⤡ Esc" text had replaced it. */
+export function paintExpandBtn(btn, which, expanded) {
+  const name = expandIcon(null, expanded); btn.dataset.icon = name; btn.innerHTML = iconSvg(name);
+  btn.setAttribute('aria-pressed', String(!!expanded)); btn.setAttribute('aria-label', expandLabel(which, expanded)); btn.title = expandLabel(which, expanded);
+}
 /** Expand button: Expanded <-> Standard (also opens a collapsed panel straight into Expanded). Pure. */
 export const expandSize = s => (s === 'expanded' ? 'standard' : 'expanded');
 const SIZE_KEY = 'wavwiz.devsize';
@@ -534,7 +541,7 @@ export function devicesPanel(S, ctl) {
   const setEdit = v => { zedit = v; draw(true); };
   // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
   const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Fold / open the Devices panel ( ] )', onclick: ev => { ev.stopPropagation(); ctl.toggleDev?.(); } }, '›');
-  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expanded devices ( Shift+] ; Esc returns)', onclick: ev => { ev.stopPropagation(); ctl.toggleDevExpanded?.(); } }, icon(expandIcon('right', false)));
+  const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expand', onclick: ev => { ev.stopPropagation(); ctl.toggleDevExpanded?.(); } }, icon(expandIcon('right', false)));
   const count = h('span', { class: 'small dim devcount' });
   // 0.2.3 U7: the DEVICES title sits at the right edge, the true mirror image of LIBRARY at the left edge of the Library header
   // 0.3.0 §6: two controls kept apart - Expand on the inner edge (becomes "⤡ Esc"), chevron on the outer edge; a 30 px rail with icon + title
@@ -545,9 +552,8 @@ export function devicesPanel(S, ctl) {
     size = s; hl = highlight;
     colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
     colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
-    if (s === 'expanded') expBtn.textContent = '⤡ Esc'; else setIcon(expBtn, expandIcon('right', false)); expBtn.setAttribute('aria-pressed', String(s === 'expanded'));
+    paintExpandBtn(expBtn, 'Devices', s === 'expanded');
     root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';
-    expBtn.setAttribute('aria-label', expandLabel('Devices', s === 'expanded'));
     root.classList.toggle('expanded', s === 'expanded'); draw(true);
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };

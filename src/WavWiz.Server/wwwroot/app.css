@@ -1630,7 +1630,9 @@ body.jb-kiosk #app{visibility:hidden}
   .israil .prail{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-height:0;overflow:hidden}
   .prail-ic{color:var(--accent-text,var(--accent));font-size:15px}
   .prail-t{writing-mode:vertical-rl;color:var(--accent-text,var(--accent));font-weight:700;font-size:11px;letter-spacing:.14em}
-  .israil .pane-h{order:2;margin-top:auto;padding:4px 0!important;border:0;justify-content:center}
+  /* 0.3.1 B5: chevron at the TOP of both rails (where the normal header is); icon + vertical title centered below, identical on both sides */
+  .israil .pane-h{order:0;margin:0;padding:0 0 4px!important;border:0;justify-content:center;flex:none;width:100%}
+  .israil .prail{order:1;justify-content:center}
   .israil .pane-h>:not(.pchev):not(.devcol){display:none!important}
   .libpanel .pane-h{gap:8px} .devpanel .devhead{gap:8px}
   .plus.pchev,.plus.pexp,.plus.devcol,.plus.devexp{width:auto;min-width:28px;height:28px;padding:0 6px}

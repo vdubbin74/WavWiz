@@ -42,7 +42,7 @@ test('0.2.2 T5: Devices header is a true mirror of Library; one arrow rule (Expa
   assert.equal(d.expandSize('collapsed'), 'expanded');
   for (const w of ['Library', 'Devices']) {
     assert.equal(d.arrowLabel(w, 'collapsed'), `Open the ${w} panel`); assert.equal(d.arrowLabel(w, 'standard'), `Fold the ${w} panel to a rail`);
-    assert.equal(d.arrowLabel(w, 'expanded'), `Fold the ${w} panel to a rail`); assert.equal(d.expandLabel(w, false), `Expand the ${w} panel`);
+    assert.equal(d.arrowLabel(w, 'expanded'), `Fold the ${w} panel to a rail`); assert.equal(d.expandLabel(w, false), 'Expand'); assert.equal(d.expandLabel(w, true), 'Collapse (Esc)');   // 0.3.1 B6
   }
   const s = src('devices.js'), m = src('main.js');
   // 0.3.0 §6: mirror kept, two controls apart: chevron on the outer edge, expand on the inner edge

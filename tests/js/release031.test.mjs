@@ -52,3 +52,23 @@ test('B18: Looks values are shared with Settings (EQ glow, the look\'s Intensity
   assert.match(src('vizpage.js'), /'Button transparency'/);
   delete globalThis.localStorage;
 });
+test('B4/B6: every exit path repaints the Expand button (always rewrites the icon); labels Expand / Collapse (Esc)', async () => {
+  const D = await imp('devices'); const I = await imp('icons');
+  assert.ok(I.ICON_NAMES.includes('expandOut') && I.ICON_NAMES.includes('collapseIn'));
+  const btn = { dataset: { icon: 'expandOut' }, innerHTML: '', attrs: {}, title: '', setAttribute(k, v) { this.attrs[k] = v; } };
+  D.paintExpandBtn(btn, 'Library', true); assert.equal(btn.dataset.icon, 'collapseIn'); assert.equal(btn.attrs['aria-label'], 'Collapse (Esc)'); assert.equal(btn.attrs['aria-pressed'], 'true');
+  btn.innerHTML = '⤡ Esc';   // the 0.3.0 bug: text replaced the icon while the remembered name stayed the same
+  D.paintExpandBtn(btn, 'Library', false); assert.match(btn.innerHTML, /<svg/); assert.equal(btn.attrs['aria-label'], 'Expand'); assert.equal(btn.title, 'Expand');
+  assert.doesNotMatch(src('main.js') + src('devices.js'), /⤡ Esc'/);
+  // the panel model: every exit path leaves exp = null so applyPanels repaints "Expand"
+  const P = await imp('panels'); const n = P.normPanels({});
+  for (const k of ['lib', 'dev']) {
+    const e = P.expand(n, k);
+    assert.equal(P.esc(e).exp, null, 'Esc'); assert.equal(P.expand(e, k).exp, null, 'button'); assert.equal(P.chevron(e, k).exp, null, 'chevron');
+    assert.equal(P.keyAction(e, { code: k === 'lib' ? 'BracketLeft' : 'BracketRight', target: {} }).exp, null, '[ ] key');
+  }
+});
+test('B5: both rails put the chevron at the top and center icon + vertical title the same way', () => {
+  assert.match(css, /\.israil \.pane-h\{order:0;margin:0/); assert.match(css, /\.israil \.prail\{order:1;justify-content:center\}/);
+  assert.doesNotMatch(css, /\.israil \.pane-h\{order:2;margin-top:auto/);
+});
