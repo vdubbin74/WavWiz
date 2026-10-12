@@ -112,6 +112,6 @@ test('0.0.7 transport: SVG icon set, no emoji transport glyphs; themed zone Add'
 });
 
 test('0.0.7 version strings', () => {
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.(0\.[7-9]|[12]\.\d)'/);   // 0.0.8 bumps it
+  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.(0\.[7-9]|[123]\.\d)'/);   // 0.0.8 bumps it
   assert.doesNotMatch(src('about.js'), /butterchurn/);
 });
