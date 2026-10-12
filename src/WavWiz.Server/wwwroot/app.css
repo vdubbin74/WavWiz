@@ -1644,6 +1644,7 @@ body.jb-kiosk #app{visibility:hidden}
 /* ===== 0.3.1 B7/B8: master volume = the device bar (.dvol: slider, % readout, Mute-button slot), Mute all on its own line ===== */
 .dmaster .dvol-master{gap:8px} .dmaster .dvol-master .pct{width:38px}
 .dvol-slot{visibility:hidden;pointer-events:none}
+.devbody > .dmaster .dvol-master{padding:0 2px}   /* 0.3.1 B7: same inset as the device rows, so the bars line up exactly */
 .dmaster-mute{display:flex;justify-content:flex-start;margin-top:6px}
 .dmaster-mute .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;white-space:nowrap;border-radius:3px}
 .dmaster-mute .mutealls .ic svg{width:16px;height:16px}
@@ -1726,3 +1727,8 @@ body.jb-kiosk #app{visibility:hidden}
 .latslider::-webkit-slider-thumb{width:26px;height:26px;margin-top:-10px}
 .latslider::-moz-range-thumb{width:24px;height:24px}}
 .latslider{touch-action:none}
+.dssec .ddelay .latctl .latslider{height:40px}   /* S1: the Device Settings delay slider: bigger handle and hit target */
+.dssec .latslider::-webkit-slider-thumb{width:30px;height:30px;margin-top:-10px}
+.dssec .latslider::-moz-range-thumb{width:28px;height:28px}
+@media (pointer:coarse){.dssec .ddelay .latctl .latslider{height:48px} .dssec .latslider::-webkit-slider-thumb{width:34px;height:34px;margin-top:-12px}}
+.np-stage:not(.eqmode) .vizhost{pointer-events:none}   /* 0.3.1 B17: the visualizer layer never takes clicks */

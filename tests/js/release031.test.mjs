@@ -172,5 +172,5 @@ test('S1: delay slider - 1 ms wheel step, Shift 10 ms, saves on change; outside 
   assert.equal(S.wheelValue({ value: 40, min: 0, max: 1000, step: L.LAT_STEP, coarse: L.LAT_COARSE }, -1, false), 41);
   assert.equal(S.wheelValue({ value: 40, min: 0, max: 1000, step: L.LAT_STEP, coarse: L.LAT_COARSE }, 1, true), 30);
   const ls = src('latency.js'); assert.match(ls, /isDragging\(slider\)/); assert.match(ls, /'change', \(\) => set\(slider\.value, 'slider', true\)/);
-  assert.match(css, /@media \(pointer:fine\)\{\.latslider\{height:36px\}\s*\.latslider::-webkit-slider-thumb\{width:26px;height:26px/);
+  assert.match(css, /\.dssec \.ddelay \.latctl \.latslider\{height:40px\}/); assert.match(css, /@media \(pointer:fine\)\{\.latslider\{height:36px\}\s*\.latslider::-webkit-slider-thumb\{width:26px;height:26px/);
 });
