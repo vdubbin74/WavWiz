@@ -1867,3 +1867,29 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .pgrid-np .npthumb{overflow:hidden;contain:paint}
 .pgrid-np .npthumb>.np-ctlpanel{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;max-height:none;max-width:none}
 .pgrid-np .pg-prev{overflow:hidden}
+/* G3 (FINAL): Settings v2 - an unboxed list per section (settings-e1-style.png / settings-e1-jukebox.png), E1 colors:
+   primary (--accent) = on-state controls, main-action outlines, header underline; secondary (--accent2) = group headings, 2 px left line, links;
+   highlight (--hl) = selected tab / sub-tab, Admin tags, focus outline. Off-toggle knob = theme dim text. Groups stack full width (no masonry). */
+dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
+.settings-dlg .settings-nav{gap:22px;padding:0 2px}
+.settings-dlg .settings-nav button{padding:11px 0;font-weight:500;color:var(--dim)}
+.settings-dlg .settings-nav button.on{color:var(--hl,var(--accent));border-bottom-color:var(--hl,var(--accent));font-weight:600}
+.settings-dlg .subtabs button.on,.settings-dlg .subtabs button[aria-current=page]{color:var(--hl,var(--accent))!important;border-color:var(--hl,var(--accent))!important;background:color-mix(in srgb,var(--hl,var(--accent)) 12%,transparent)!important}
+.settings-dlg .admintag{color:var(--hl,var(--accent));border:1px solid color-mix(in srgb,var(--hl,var(--accent)) 45%,transparent);background:none;font-size:9px;letter-spacing:1px;border-radius:3px;padding:0 4px}
+.settings-dlg :is(input,select,textarea,button,a,[tabindex]):focus-visible{outline:2px solid var(--hl,var(--accent));outline-offset:1px;box-shadow:0 0 0 3px color-mix(in srgb,var(--hl,var(--accent)) 25%,transparent)}
+.settings-dlg .switch input:focus-visible+span{outline:2px solid var(--hl,var(--accent))}
+.settings-dlg .switch span::after{background:var(--dim)}
+.settings-dlg .switch input:checked+span{background:var(--accent);border-color:var(--accent)}
+.settings-dlg a:not(.btn),.settings-dlg .linkbtn{color:var(--accent2-text,var(--accent2))}
+.settings-dlg .btn.primary,.settings-dlg a.btn.primary{background:none;border-color:color-mix(in srgb,var(--accent) 60%,transparent);color:var(--accent-text,var(--accent))}
+.settings-dlg :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent)}
+@media (min-width:901px){
+  .settings-sec.on:not([data-g=appearance]),.settings-sec:not([data-g=appearance]) .devsubsec:not([hidden]){display:block!important}
+  .settings-sec:not([data-g=appearance])>*,.settings-sec:not([data-g=appearance]) .devsubsec>*{grid-row-end:auto!important}
+  .settings-sec:not([data-g=appearance]) .card,.settings-dlg .settings-sec .card{background:transparent!important;border:0!important;box-shadow:none!important;border-left:2px solid color-mix(in srgb,var(--accent2) 70%,transparent)!important;border-radius:0!important;padding:10px 0 6px 14px!important;margin:14px 0 0!important;column-gap:48px!important}
+  .settings-sec:not([data-g=appearance]) .card+.card{position:relative}
+  .settings-sec:not([data-g=appearance]) .card+.card::before{content:"";position:absolute;left:-2px;right:0;top:-8px;height:1px;background:var(--line)}
+  .settings-sec:not([data-g=appearance]) .card>h3{color:var(--accent2-text,var(--accent2))!important;font-weight:800;letter-spacing:1.6px;margin-bottom:4px!important}
+  .settings-sec:not([data-g=appearance]) .card>.setrow,.settings-sec:not([data-g=appearance]) .card>label.row,.settings-sec:not([data-g=appearance]) .card>.field{min-height:40px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);padding:4px 0}
+}
+.settings-dlg .appnav.subtabs button{border-radius:3px}
