@@ -1965,3 +1965,6 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .qtable tr.dragging{opacity:.45}
 .qins{position:absolute;left:0;right:0;height:2px;background:var(--hl,var(--accent));box-shadow:0 0 6px var(--hl,var(--accent));pointer-events:none;z-index:2}
 .qins[hidden]{display:none}
+/* G3 Pepecoin: brand-kit colors only - no contrast-shifted text variants in Settings (secondary #208241 headings/links, highlight #C07A4E) */
+:root[data-theme=pepecoin] .settings-dlg .card>h3,:root[data-theme=pepecoin] .settings-dlg a:not(.btn),:root[data-theme=pepecoin] .settings-dlg .linkbtn{color:var(--accent2)!important}
+:root[data-theme=pepecoin] .settings-dlg .btn.primary{color:var(--accent)}
