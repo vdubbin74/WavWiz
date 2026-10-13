@@ -8,31 +8,31 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
-## 0.3.4 (beta)
-- H1 Installable web app: apple-touch-icon and iOS/Android home-screen meta, manifest (name WavWiz, id/scope "/", description, 192 and maskable icons), versioned network-first service worker (never caches /api or WebSockets; a new version replaces the old worker and cache).
-- H2 Playlist number column keeps a minimum width; numbers 10 and up no longer wrap.
-- H3 Gradient volume slider style is the two-color theme gradient again (Flat unchanged); the fill follows every volume slider.
-- H4 / H4b Jukebox: Modern fixed, Retro CD rebuilt (guest page and big screen), the chosen style is applied everywhere; Settings > Jukebox shows preview cards. New GET /api/v1/jukebox/guest/picks.
-- H5 Album search results add the album (artist/name/tracks shape).
-- H6 / H7 Guest search no longer loses focus or drops letters; Add button styling fixed.
-- H8 / H8b Now Playing bar docks in its own row under expanded Library/Devices; speaker switches in their own column; output names shown.
-- H9 Scenes & Schedules heading colors match Zones and Speakers.
-
-## 0.3.3 (beta)
-- G1 Settings and other center popups take the live center column width as their maximum (measured, updated on resize, panel changes and Display size).
-- G2 / G2b Now Playing picker: one style per row at full width; each preview is laid out at the real panel width and scaled down to fit.
-- G3 Settings v2: unboxed list layout with theme colors (primary, secondary, highlight); Pepecoin uses brand-kit colors only.
-- G4 Mini player: icon-only master mute, window transparency (default opaque, minimum 30 %, solid on hover, remembered), text that fits.
-- G5 Expanded Playlist slides Now Playing up to the top of the center column; the EQ / visualizer stop rendering while covered.
-- G6-G10 Devices: bars reach the %, zone cards look like device cards, "Speakers" wording, slim standard panel, E1 expanded view (Zones | Speakers | Scenes & Schedules) with an Unassigned subgroup and + Add to zone.
-- G11 Volume slider style: Gradient (theme) or Flat, in Settings > Appearance.
-- G12 Playlist drag and drop: reorder (multi-select, insertion line, auto-scroll, Ctrl+Z) and drop from the Library at a position (server: /queue/add accepts "at").
-- G13 Jukebox Start / Stop dialogs fixed (object-form dialog buttons; validation keeps the dialog open; non-admins get a message).
-- G14 Spectrum glow slider no longer sticks (no save / dialog rebuild on every input).
-
 ## [Unreleased]
 
 Nothing yet.
+
+## [0.3.4] - 2026-10-13 (beta)
+- Installable web app: home-screen icon and iOS/Android home-screen support, a full web app manifest (192 px and maskable icons), and a versioned service worker that never caches the API or live connections; a new version replaces the old one.
+- Playlist numbers 10 and up no longer wrap.
+- The Gradient volume slider style is the two-color theme gradient again (Flat unchanged), and the fill follows every volume slider.
+- Jukebox: Modern style fixed, Retro CD rebuilt (guest page and big screen), the chosen style applies everywhere, and Settings > Jukebox shows style preview cards. New GET /api/v1/jukebox/guest/picks.
+- Adding an album from Jukebox search results works again.
+- Jukebox guest search no longer loses focus or drops letters while typing; Add button styling fixed.
+- The Now Playing bar docks in its own row under the expanded Library and Devices panels; speaker switches sit in their own column and output names show.
+- Scenes & Schedules heading colors match Zones and Speakers.
+
+## [0.3.3] - 2026-10-13 (beta)
+- Settings and other center popups fit the live center column width (updated on resize, panel changes and Display size).
+- Now Playing style picker: one style per row at full width, each preview laid out at the real panel width and scaled to fit.
+- Settings redesign: unboxed list layout in theme colors; the Pepecoin theme uses brand-kit colors only.
+- Mini player: icon-only master mute, window transparency (opaque by default, minimum 30 %, solid on hover, remembered), and text that fits.
+- Expanding the Playlist slides Now Playing to the top of the center column; the EQ and visualizer pause while covered.
+- Devices: volume bars reach the %, zone cards match device cards, "Speakers" wording, a slimmer standard panel, and a new expanded view (Zones | Speakers | Scenes & Schedules) with an Unassigned group and + Add to zone.
+- Volume slider style: Gradient (theme) or Flat, in Settings > Appearance.
+- Playlist drag and drop: reorder (multi-select, insertion line, auto-scroll, Ctrl+Z) and drop from the Library at a position (the server's /queue/add accepts "at").
+- Jukebox Start and Stop dialogs fixed (validation keeps the dialog open; non-admins get a message).
+- The Spectrum glow slider no longer sticks while dragging.
 
 ## [0.3.2] - 2026-10-12 (beta)
 
