@@ -189,9 +189,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .looks-pop.sheet .looks-row{min-height:40px}
 /* B17: every glow / visualizer / backdrop layer is click-through; controls sit above them */
 .np-stage .stagecover,.np-stage .vname,.eqa-glow,.eqa-grid,.np-stage .vizhost canvas{pointer-events:none}
-.np-stage.eqmode .eqa-glow{opacity:var(--wz-ovf,1)}
 .np-stage.eqmode .stagecover{opacity:calc(.12 + .38 * var(--wz-ovx,0))!important}
-.np-stage.viz .vizhost{opacity:calc(.25 + .75 * var(--wz-ovf,1))}
 .np-stage.viz .stagecover{visibility:visible;opacity:var(--wz-ovx,0)}
 .np-stage .np-eqhost{z-index:2} .np-stage .np-eqhead{padding-right:150px;min-height:30px}
 .stage .vname{position:absolute;left:8px;bottom:6px;font-size:11px;color:rgba(255,255,255,.7);text-shadow:0 1px 2px #000;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
@@ -1433,7 +1431,6 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .eqlock-ic svg,.eqa-lock svg{width:14px;height:14px;display:block}
 dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .eqa-lock{display:inline-flex;color:var(--accent2-text,var(--accent2))} .eqa-lock[hidden]{display:none}
-.eqarea.locked .eqa-plot,.eqarea.locked .eqchips{opacity:.6;filter:saturate(.75)}
 .eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip{cursor:default}
 /* U10: the real-EQ summary line (preset, pre-gain, loudness) on the Appearance > EQ preview */
 .eqreal-sum{margin:-2px 0 6px;color:var(--ink);font-family:var(--mono);font-size:11px}
@@ -1808,3 +1805,57 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .infoi:hover,.infoi[aria-expanded=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .btn.primary.muted-btn,.settings-sec .btn.primary{background:none;border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .settings-sec .btn.danger{background:none;border-color:var(--red,#e5484d);color:var(--red,#e5484d)}
+
+/* ===== 0.3.2 F12: Now Playing picker - 2 per row (~543px), real panel at true size, height fits the panel, subtle accent outline ===== */
+.appsub .pgrid-np,.pgrid-np{grid-template-columns:repeat(2,minmax(0,543px))}
+.pgrid-np .pgcard{aspect-ratio:auto;max-height:none}
+.pgrid-np .pg-prev{flex:none}
+.pgrid-np .npthumb{position:relative;inset:auto;width:100%}
+.pgrid-np .pgcard.on{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+.pgrid-np .npthumb .pn-center .np-tablemain{grid-template-columns:auto minmax(0,1fr)}
+.pgrid-np .npthumb .pn-center .pn-art{grid-row:1 / span 2}
+
+/* 0.3.2 F16 (pass 2): the card columns stack independently (2 px rows, cards span their height - see settings.js masonry()), one dim line per card */
+@media (min-width:901px){
+  .settings-sec.on:not([data-g=appearance]),.settings-sec:not([data-g=appearance]) .devsubsec:not([hidden]){grid-auto-rows:2px;row-gap:0;column-gap:12px;align-items:start}
+  .settings-sec:not([data-g=appearance])>*,.settings-sec:not([data-g=appearance]) .devsubsec>*{margin-bottom:12px!important}
+  .settings-sec:not([data-g=appearance])>:not(.card){margin-bottom:12px}
+  .settings-sec:not([data-g=appearance]) .card>p.dim.small:first-of-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .settings-sec:not([data-g=appearance]) .card .setrow .small.dim,.settings-sec:not([data-g=appearance]) .card .setrow .dim.small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .settings-sec:not([data-g=appearance]) .card.naslist .row.wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .settings-sec:not([data-g=appearance]) .card.naslist .row.wrap>*{width:auto;min-width:0;margin:0}
+}
+@media (min-width:901px){
+  .settings-sec:not([data-g=appearance])>*,.settings-sec:not([data-g=appearance]) .devsubsec>*{margin-bottom:10px!important}
+  .settings-dlg .settings-scroll{padding-bottom:2px}
+  .settings-sec:not([data-g=appearance]) .card .setrow select{max-width:140px;min-width:0}
+  .settings-sec:not([data-g=appearance]) .card .setrow>:first-child{min-width:5.5em}
+}
+
+/* 0.3.2 F17: zone card text lines up with device card text (same padding, a status dot like devices, members line under the name) */
+.zcard,.devpanel.expanded .zcard{padding:10px}
+.zcard .zc-top{display:flex;align-items:center;gap:8px;min-width:0}
+.zcard .zc-mem{margin:2px 0 6px 16px}
+.zcard .zc-top .zname{margin-left:2px}
+
+/* 0.3.2 F18: max-volume lock */
+.vlock{display:inline-grid;place-items:center;width:14px;height:14px;flex:none;color:var(--amber,#ffb300)} .vlock svg{width:12px;height:12px}
+.vcap .vcap-v{min-width:3em;text-align:right} .vcap-lock{border-radius:3px} .vcap-lock svg{width:12px;height:12px;vertical-align:-1px} .vcap-lock.on{border-color:var(--amber,#ffb300);color:var(--amber,#ffb300)}
+
+/* 0.3.2 F20: Button transparency applies ONLY to the top-right overlay button group (EQ and visualizer); solid on hover, focus and while a popover is open.
+   The EQ and visualizer always render at full opacity (Overlay opacity only moves the cover overlay). */
+.np-stage .vizhost,.np-stage .vizhost canvas,.np-stage .eqarea,.np-stage .eqa-plot,.np-stage .eqa-glow{opacity:1!important;filter:none}
+.stage .vbtns{opacity:var(--ov-rest,.5)!important}
+.stage .vbtns:hover,.stage .vbtns:focus-within,.stage .vbtns.solid,.stage .vbtns:active{opacity:1!important}
+/* 0.3.2 F19: a locked EQ looks exactly like an unlocked one - only the lock button shows it (danger red; Pepecoin copper) */
+.eqarea.locked .eqa-plot,.eqarea.locked .eqchips{opacity:1;filter:none}
+.eqarea.locked .eqa-lock{display:none!important}
+.eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip,.eqarea.locked .eqa-plot{cursor:not-allowed}
+:root{--lock-red:var(--red,#e5484d)} :root[data-theme=pepecoin]{--lock-red:#C07A4E}
+.stage .vbtns .ib.ov-lock.on{color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));box-shadow:none;background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
+.eqlockbox:has(input:checked){color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
+/* 0.3.2 F21: status tags on their own row directly under the volume bar, starting at the name's left edge */
+.dtagrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px;min-width:0;padding-left:var(--tagx,16px)}
+.dtagrow:not(:has(.dtag,.dkind svg,.dstate:not(:empty))){display:none}
+.dtagrow .dtags{display:contents} .dtagrow .dkind{display:inline-grid;place-items:center;opacity:.7} .dtagrow .dkind svg{width:13px;height:13px}
+.zcard .ztagrow{--tagx:18px}

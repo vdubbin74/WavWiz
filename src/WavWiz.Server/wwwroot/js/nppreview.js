@@ -47,7 +47,7 @@ export function npPreview() {
     const tpl = npPanelTemplate();
     if (!tpl) { stage.replaceChildren(h('p', { class: 'small dim' }, 'The preview appears once the player has loaded.')); panel = null; return; }
     panel = fillSample(tpl.cloneNode(true), p);
-    panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); panel.style.width = W + 'px';
+    panel.querySelectorAll('.vizhost,.viz,canvas.viz,.np-viz').forEach(e => e.remove()); panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); panel.style.width = W + 'px';
     stage.replaceChildren(panel);
     requestAnimationFrame(fit);
   }
@@ -63,7 +63,8 @@ export function npPreview() {
  *  scaled to the card. update() re-clones (called about once a second while the card is on screen). */
 export function npStyleThumb(styleId, playing = () => false) {
   const stage = h('div', { class: 'npthumb' }); let panel = null;
-  const fit = () => { if (!panel) return; const w = Math.max(W, panel.scrollWidth), sw = stage.clientWidth || 260, sh = stage.clientHeight || 150, s = Math.min(sw / w, sh / Math.max(1, panel.offsetHeight)); panel.style.width = w + 'px'; panel.style.transform = `scale(${s})`; };
+  // 0.3.2 F12: true size (never scaled up), the card height follows the panel - no fixed aspect, no visualizer
+  const fit = () => { if (!panel) return; const sw = stage.clientWidth || 543, w = Math.min(W, Math.max(sw, 1)), s = Math.min(1, sw / w); panel.style.width = w + 'px'; panel.style.transform = s < 1 ? `scale(${s})` : ''; stage.style.height = Math.ceil(panel.offsetHeight * s) + 'px'; };
   function update() {
     const tpl = npPanelTemplate(); if (!tpl) { stage.replaceChildren(); panel = null; return; }
     panel = fillSample(tpl.cloneNode(true), { ...loadNpPrefs(), style: styleId }, { keepSong: playing() });

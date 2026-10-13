@@ -149,7 +149,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   function setGlow(v) { glowLvl = v; drawGlow(); }
   /** U9: Lock EQ - bands ignore wheel / drag / click / keys and look slightly dimmed with a small lock. */
   function setLocked(v) {
-    isLocked = !!v; el.classList.toggle('locked', isLocked); lockMark.hidden = !isLocked;
+    isLocked = !!v; el.classList.toggle('locked', isLocked); lockMark.hidden = true; if (isLocked) el.title = 'EQ locked'; else el.removeAttribute('title');   // 0.3.2 F19: no dimming, no mark on the EQ itself
     bandEls.forEach(b => { if (isLocked) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled'); if (isLocked && b._drag) { b._drag = false; el.classList.remove('dragging'); } });
   }
   function startLive(tap) { if (untap || !tap) return; untap = tap(onFrame); }

@@ -166,6 +166,7 @@ function volumeRow(S, ctl, z) {
   const pct = h('span', { class: 'pct' }, Math.round(z.volume) + '%');
   const vol = h('input', { type: 'range', min: 0, max: 100, value: z.volume, 'aria-label': `${z.name} volume`, oninput: ev => { pct.textContent = ev.target.value + '%'; clearTimeout(vol._t); vol._t = setTimeout(() => ctl.act(`/zones/${z.id}`, { volume: +ev.target.value }, 'PATCH'), 100); } });
   ro(vol, canControl(S), 'Your access is view-only.');
+  if (z.volLocked) { const lk = h('span', { class: 'vlock', title: `Max volume locked at ${Math.round(z.volCap ?? 100)}%`, 'aria-label': `Max volume locked at ${Math.round(z.volCap ?? 100)}%` }, icon('lock')); queueMicrotask(() => pct.parentNode ? pct.before(lk) : vol.parentNode && vol.after(lk)); }   // 0.3.2 F18 padlock by the bar
   return { vol, pct, mute: muteButton(S, ctl, z) };
 }
 function onSwitch(S, ctl, z) {
@@ -217,12 +218,13 @@ function zoneCard(S, ctl, g, { edit = null } = {}) {
   const mute = h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, title: muted ? 'Unmute this zone' : 'Mute every speaker in this zone',
     onclick: () => { const m = !zoneMuted(S.zones, g); for (const z of ms) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); } }, icon(muted ? 'mute' : 'volume'));
   mute.dataset.icon = muted ? 'mute' : 'volume'; ro(mute, can, 'Your access is view-only.');
-  const head = h('div', { class: 'zc-top' },
+  const zdot = h('span', { class: 'dot zdot ' + (ms.some(z => z.connected) ? 'ok' : 'off'), title: `${ms.filter(z => z.connected).length} of ${ms.length} online` });   // 0.3.2 F17: same dot as a device card, so the zone name lines up with device names
+  const head = h('div', { class: 'zc-top' }, zdot,
     ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), can, 'Your access is view-only.'),
-    g.active ? h('span', { class: 'dtag zplaying' }, 'PLAYING') : null, muted ? h('span', { class: 'dtag zmuted' }, 'MUTED') : null,
     h('span', { class: 'grow' }), edit ? ro(h('button', { class: 'zbtn zedit', 'aria-label': `Edit zone ${g.name}`, title: 'Edit zone', onclick: () => edit(g.id) }, '✎'), isAdmin(S)) : null);
+  const ztags = (g.active || muted) ? h('div', { class: 'dtagrow ztagrow' }, g.active ? h('span', { class: 'dtag zplaying' }, 'PLAYING') : null, muted ? h('span', { class: 'dtag zmuted' }, 'MUTED') : null) : null;   // 0.3.2 F21
   const card = h('div', { class: 'zcard' + (g.active ? ' active' : '') + (muted ? ' muted' : ''), 'data-zone': g.name, 'data-group-id': g.id },
-    head, h('div', { class: 'zc-mem small dim ell' }, ms.length ? ms.map(z => z.name).join(' · ') : 'No devices yet'), h('div', { class: 'dvol' }, vol, pct, mute));
+    head, h('div', { class: 'zc-mem small dim ell' }, ms.length ? ms.map(z => z.name).join(' · ') : 'No devices yet'), h('div', { class: 'dvol' }, vol, pct, mute), ztags);
   return card;
 }
 function zonesHead(S, ctl) {
@@ -441,6 +443,15 @@ function patchFace(el, z, dot, state, sw) {
   sw.classList.toggle('on', !!z.enabled); sw.setAttribute('aria-checked', String(!!z.enabled));
 }
 
+/** 0.3.2 F18: the room's max-volume cap + lock (admin-only to change; the server enforces it for every volume source). */
+function volCapControl(S, ctl, z, admin) {
+  const cap = z.volCap ?? 100, out = h('span', { class: 'small mono vcap-v' }, Math.round(cap) + '%');
+  const r = ro(h('input', { type: 'range', min: 0, max: 100, step: 1, value: cap, class: 'grow', 'aria-label': `${z.name} max volume`,
+    oninput: ev => { out.textContent = ev.target.value + '%'; }, onchange: ev => ctl.act(`/zones/${z.id}/volcap`, { cap: +ev.target.value }, 'PUT') }), admin, 'Only an admin can change the max volume.');
+  const lk = ro(h('button', { type: 'button', class: 'btn sm vcap-lock' + (z.volLocked ? ' on' : ''), 'aria-pressed': String(!!z.volLocked), title: z.volLocked ? 'Unlock: the room can go above the cap again' : 'Lock: nothing can raise this room above the cap',
+    onclick: () => ctl.act(`/zones/${z.id}/volcap`, { cap: +r.value, locked: !z.volLocked }, 'PUT') }, icon('lock'), z.volLocked ? ' Locked' : ' Lock'), admin, 'Only an admin can change the max volume.');
+  return h('div', { class: 'row vcap', style: 'gap:8px;align-items:center' }, r, out, lk);
+}
 function cardSettings(S, ctl, z) {
   const admin = isAdmin(S), tune = canTune(S, z), can = canControl(S), cur = chosenOutput(z);
   const testSound = async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } };
@@ -453,6 +464,7 @@ function cardSettings(S, ctl, z) {
   const more = moreMenu(S, ctl, z, cur);
   const el = h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
     sec('OUTPUT', out.el),
+    sec('MAX VOLUME', volCapControl(S, ctl, z, admin)),
     cur ? sec('DELAY', h('div', { class: 'ddelay' }, delay, calib), note) : null,
     h('div', { class: 'dssec' }, h('div', { class: 'row dsbtns' },
       btn('Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.'),
@@ -560,9 +572,10 @@ function expandedCard(S, ctl, z, hl) {
   const live = h('div', { class: 'dlive' }, liveBits()), settings = open ? cardSettings(S, ctl, z) : null;
   let lk = liveKey();
   card = h('div', { class: cls, 'data-room': z.name, 'data-zone-id': z.id },
-    h('div', { class: 'dtop' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), h('span', { class: 'dkind', title: z.isWeb ? (isPhoneZone(z) ? 'Phone' : 'Browser') : 'PC with WavWiz Player' }, icon(deviceIconName(z))), tags, h('span', { class: 'grow' }), sw),
+    h('div', { class: 'dtop' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), h('span', { class: 'dkind', title: z.isWeb ? (isPhoneZone(z) ? 'Phone' : 'Browser') : 'PC with WavWiz Player' }, icon(deviceIconName(z))), h('span', { class: 'grow' }), sw),
     status,
     h('div', { class: 'dvol' }, vol, pct, mute),
+    h('div', { class: 'dtagrow' }, tags),   // 0.3.2 F21: tags on their own row under the volume bar
     live,
     settings,
     h('div', { class: 'dexpbar' }, expBtn));
@@ -589,10 +602,11 @@ function standardRow(S, ctl, z, openDevice) {
   const tags = h('span', { class: 'dtags' }, tagEls(z)); tags._k = JSON.stringify(cardTags(z));
   const row = h('div', { class: 'drow' + (z.enabled ? '' : ' off') + (z.muted ? ' muted' : '') + (z.mine ? ' mine' : ''), 'data-device': z.name, 'data-zone-id': z.id },
     h('div', { class: 'dtop' }, dot,
-      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name), tags,
-      state, h('span', { class: 'grow' }), sw),
+      h('button', { class: 'dname ell', title: (z.mine ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name),
+      h('span', { class: 'grow' }), sw),
     outputLine(z),
-    h('div', { class: 'dvol' }, vol, pct, mute));     // 0.2.5: mute on the right, no speaker icon on the left
+    h('div', { class: 'dvol' }, vol, pct, mute),
+    h('div', { class: 'dtagrow' }, tags, state));   // 0.3.2 F21     // 0.2.5: mute on the right, no speaker icon on the left
   row._sig = cardSig(S, z);
   row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, state, sw); patchVolume(z, vol, pct, mute); row.classList.toggle('muted', !!z.muted); const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); } };   // 0.2.3 fix: patched in place
   return row;

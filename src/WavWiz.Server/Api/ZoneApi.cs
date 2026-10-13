@@ -26,6 +26,7 @@ public static class ZoneApi
         g.MapPost("/zones/{id:long}/test-sound", (long id) => { var err = s.Zones.TestSound(id); if (err == null) PlaybackApi.MarkFirstSound(s); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 409) : Results.Json(new { ok = true }); }).Req(Role.Control);
 
         // 0.2.0 item 10: skips speakers that are off, never changes mute, keeps the balance (see ZoneManager.Master). Body: {delta} | {scale} | {set}.
+        g.MapPut("/zones/{id:long}/volcap", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Zones.SetVolCap(id, b.Num("cap"), b.Bool("locked")); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, cap = s.Zones.VolCapOf(id) }); }).Req(Role.Admin);   // 0.3.2 F18: admin-only
         g.MapPost("/zones/master", async (HttpContext c) => { var b = await c.Request.Body(); s.Zones.Master(b.Num("delta"), b.Num("scale"), b.Num("set")); return Results.Json(s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress)); }).Req(Role.Control);
         // 0.2.1 F17: Mute all / Unmute all from the master strip. Body: {muted: true|false}. Unmute all restores only what Mute all muted.
         g.MapPost("/zones/mute-all", async (HttpContext c) => { var b = await c.Request.Body(); var on = b.Bool("muted") ?? true; var n = s.Zones.MuteAll(on); return Results.Json(new { ok = true, changed = n, zones = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress) }); }).Req(Role.Control);

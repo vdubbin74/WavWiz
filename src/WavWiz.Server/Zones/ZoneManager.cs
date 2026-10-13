@@ -11,12 +11,19 @@ public sealed record OutputDto(long EndpointDbId, string DeviceId, string Endpoi
     string? MeasuredWith = null, string? MeasuredAt = null);     // 0.2.5: how and when the current delay was set (card note "Measured with … · date")
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
-    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null);
+    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null, double? VolCap = null, bool VolLocked = false);
 public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false);
 
 /// <summary>0.3.2 F4: zone volume math (pure). The zone level = the average of its speakers. Moving the zone slider shifts every member by the
 /// same amount from its "virtual" level (which may sit above 100 or below 0), and the real level is that clamped to 0-100 - so clamping at an end
 /// never loses the offsets: coming back restores the original balance.</summary>
+/// <summary>0.3.2 F18: per-room max-volume cap. Locked: nothing can raise the room above Cap; lowering is always allowed. Pure.</summary>
+public sealed record VolumeCap(double? Cap, bool Locked)
+{
+    public static readonly VolumeCap None = new(null, false);
+    public static double Apply(double v, VolumeCap c) => c.Locked && c.Cap is double cap && v > cap ? cap : v;
+}
+
 public static class ZoneVolume
 {
     public static double Level(IReadOnlyList<double> actual) => actual.Count == 0 ? 0 : Math.Round(actual.Average(), 2);
@@ -279,7 +286,7 @@ public sealed class ZoneManager
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlaying, StreamAgeMs), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
-                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId)));
+                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
         }
         return res;
     }
@@ -287,11 +294,22 @@ public sealed class ZoneManager
     public ZoneDto? Zone(long id) => Zones().FirstOrDefault(z => z.Id == id);
 
     // ---------------- user actions ----------------
+    /// <summary>0.3.2 F18: the room's max-volume cap (setting "volcap.{id}"), persisted across restarts.</summary>
+    public VolumeCap VolCapOf(long id) { var j = _db.Setting("volcap." + id); if (j == null) return VolumeCap.None; try { return System.Text.Json.JsonSerializer.Deserialize<VolumeCap>(j) ?? VolumeCap.None; } catch { return VolumeCap.None; } }
+    public string? SetVolCap(long id, double? cap, bool? locked)
+    {
+        var z = ZoneRow(id); if (z == null) return "zone not found";
+        var cur = VolCapOf(id); var c = cap ?? cur.Cap ?? 100; if (!double.IsFinite(c) || c < 0 || c > 100) return "cap must be 0-100";
+        var n = new VolumeCap(Math.Round(c, 1), locked ?? cur.Locked);
+        _db.SetSetting("volcap." + id, System.Text.Json.JsonSerializer.Serialize(n));
+        if (n.Locked && z.Volume > c) return Patch(id, null, c, null, null);   // locking above the cap brings the room down to it
+        _ev.Publish("zones"); return null;
+    }
     public string? Patch(long id, string? name, double? volume, bool? muted, bool? enabled)
     {
         var z = ZoneRow(id); if (z == null) return "zone not found";
         if (name != null) { name = name.Trim(); if (name.Length is 0 or > 60) return "name must be 1-60 characters"; _db.Exec("UPDATE zone SET name=$n WHERE id=$i", ("$n", name), ("$i", id)); }
-        if (volume != null) { if (!double.IsFinite(volume.Value)) return "volume must be a number"; _db.Exec("UPDATE zone SET volume=$v WHERE id=$i", ("$v", Math.Clamp(volume.Value, 0, 100)), ("$i", id)); }
+        if (volume != null) { if (!double.IsFinite(volume.Value)) return "volume must be a number"; _db.Exec("UPDATE zone SET volume=$v WHERE id=$i", ("$v", VolumeCap.Apply(Math.Clamp(volume.Value, 0, 100), VolCapOf(id))), ("$i", id)); }   // 0.3.2 F18: every volume write (master, zone, scenes, schedules, alarms, mini player, API) passes the room cap
         if (muted != null) _db.Exec("UPDATE zone SET muted=$m WHERE id=$i", ("$m", muted.Value ? 1 : 0), ("$i", id));
         if (enabled != null) _db.Exec("UPDATE zone SET enabled=$e WHERE id=$i", ("$e", enabled.Value ? 1 : 0), ("$i", id));
         var s = _host.Get(z.PlayerId);

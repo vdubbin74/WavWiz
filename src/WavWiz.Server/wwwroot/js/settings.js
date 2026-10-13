@@ -8,6 +8,14 @@ import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from 
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
+/** 0.3.2 F16: the two card columns stack on their own (like settings-cards.png): every card spans as many 2 px grid rows as it is tall,
+ *  so a short card never leaves a gap beside a tall one. Re-measured whenever a card changes size (tab switch, help opened, list grew). */
+function masonry(sections) {
+  if (typeof ResizeObserver !== 'function') return;
+  const fit = c => { if (!c.isConnected || !c.offsetParent || !c.parentElement?.matches('.settings-sec,.devsubsec')) return; c.style.gridRowEnd = ''; const hgt = c.getBoundingClientRect().height; if (hgt > 0) c.style.gridRowEnd = 'span ' + Math.ceil((hgt + 10) / 2); };
+  const ro = new ResizeObserver(es => es.forEach(e => fit(e.target)));
+  for (const sec of sections) sec.querySelectorAll?.(':scope > *, :scope > .devsubsec > *').forEach(c => ro.observe(c));
+}
 export const GROUPS = [
   ['general', 'General'],
   ['appearance', 'Appearance'],
@@ -171,7 +179,7 @@ export async function openSettings(S, refresh, nav, section) {
     // 0.3.1 B10: "Reset this section" gets a fixed slot - the right end of the sub-tab bar where a section has sub-tabs, else its own row
     for (const sec of sections) placeReset(sec);
     // 0.3.1 B12: one fixed-size shell - the tab menu stays pinned, only the content area below it scrolls
-    body.replaceChildren(navEl, h('div', { class: 'settings-scroll' }, ...sections));
+    body.replaceChildren(navEl, h('div', { class: 'settings-scroll' }, ...sections)); masonry(sections);
     body._paint = paint; search.reindex();
     if (focusSec) requestAnimationFrame(() => body.querySelector('#' + focusSec)?.scrollIntoView({ block: 'start' }));
 

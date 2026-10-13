@@ -1,37 +1,19 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.1';
+export const WHATS_NEW_VERSION = '0.3.2';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
-  // 0.3.1 fix pass (only what shipped)
-  ['Guided calibration', 'Before each speaker: Step X of N, where to stand, then Ready (with an optional 5 s countdown). Skip keeps a speaker as it is; Retry measures just that speaker again. On the PC mic and the phone.'],
-  ['Bluetooth speakers', 'Bluetooth outputs are tagged in Devices. When one reconnects, a hint offers Recalibrate. A wired speaker makes the best reference.'],
-  ['Cleaner overlay controls', 'The center panel has one small icon group: Lock EQ, EQ/Visualizer, Looks and Full screen. Looks holds glow, intensity, speed, button transparency and overlay opacity. Lock EQ is always clickable.'],
-  ['Settings that fit', 'A fixed-size Settings window on PC with no stray scroll bars, Reset this section beside the sub-tabs, live preview grids for themes, the visualizer, EQ and Now Playing styles, and Small, Default and Large display sizes.'],
-  ['Devices panel fixes', 'Expand and Collapse use standard icons and labels, the folded rail lines up, master volume matches the device bars, Mute all has its own line, and a compact Scenes & Schedules section shows what runs next.'],
-  ['Fixes', 'The EQ fits iPhone screens without scroll bars, artist pictures are no longer striped (bad pictures show initials instead), and the delay slider no longer sticks; the mouse wheel fine-tunes it by 1 ms (Shift: 10 ms).'],
-  // 0.3.0
-  ['Jukebox mode (beta)', 'Playback > Start Jukebox… turns a PC into a locked party screen. Guests scan the QR code and add songs from their phone, no app or sign-in. Only the host PIN gets out.'],
+  // 0.3.2 (only what shipped)
+  ['Album art fixed', 'Covers show correctly again instead of scrambled or missing tiles. Old cached covers are cleared once after the update.'],
+  ['Zones as cards', 'Zones now look like device cards, with their members, one volume bar and a mute button. Moving a zone keeps each speaker\'s offset. A muted zone shows an amber icon.'],
+  ['Expanded Devices', 'Three columns of device cards, then Zones and Scenes & Schedules in the fourth column, all cards the same width.'],
+  ['Playlist', 'The playlist sits under Now Playing at the center width. ˄ expands it upward, ˅ folds it back.'],
+  ['Settings', 'Settings and other windows match the center panel width. Library and Network use two columns of cards with (i) help.'],
+  ['Now Playing styles', 'The picker shows each style at its real size, two per row.'],
   ['Mini player', 'A small movable window with only the playback controls: cover, title, seek, previous / play / next, mute and volume. Pin it to keep it on top. Devices > Mini player, or the tray menu on a Player PC.'],
-  ['Alarms (beta), sleep timer, crossfade', 'Scenes & Schedules is one window. Wake up to a playlist with a fade-in, snooze or skip the next alarm, fall asleep with a timer, and crossfade songs (Settings > Playback, off by default).'],
-  ['EQ in the middle', 'Now Playing shows the live EQ by default. The toggle next to Looks switches to the visualizer, remembered on this device.'],
-  ['Backup and restore', 'Settings > General > Backup saves your settings, playlists, scenes, alarms, EQ presets and device names in one file, with a preview before restoring.'],
-  ['Easier Settings', 'Search in the header, Saved ✓ next to each change, Reset this section, and a Calibration tab under Devices.'],
-  ['Tidier panels', 'Library and Devices fold to a slim rail or expand, with one arrow and one Expand button each. Keys: [ and ], Shift to expand, Esc to return.'],
-  ['Steadier sliders', 'Sliders no longer jump back while you drag, and the mouse wheel fine-tunes every slider (Shift for bigger steps).'],
-  ['iPhone mic page', 'The calibration mic page asks for the microphone straight from the Allow microphone tap and explains how to allow it if it was blocked. Still in testing on iPhone: the PC mic is recommended.'],
-  // 0.2.5 (kept below the 0.3.0 items)
-  ['Calibrate with your PC’s mic', 'Calibrate speakers now starts with the microphone on a WavWiz Player PC: a USB or headset mic, or the built-in one. Pick it, check the level, press Start. Bluetooth mics work too, with a warning: they add their own delay.'],
-  ['iPhone calibration fixed', 'Scanning the calibration QR code opens a mic-only page that never plays music, so the iPhone asks for the microphone and measures. It stopped with an "AudioSession" error before.'],
-  ['Phone: speaker or mic', 'A phone asks once whether to play music or be a calibration mic. Change it in Devices > Phone role. While a phone is the mic, Devices shows it at the top with Stop using as mic.'],
-  ['Cleaner device cards', 'Tags next to the name, one status line, Mute on the right, and one Settings button with Output, Delay with Calibrate, Test sound, Sound / EQ and More.'],
-  ['Wider Settings', 'Appearance sections are tabs under the main tabs, so previews use the full width. Settings grows to about 1200 px on large screens.'],
-  ['Phone set-up page fixed', 'The phone set-up page works again when WavWiz sends other devices to the secure (HTTPS) address: the logo shows, the steps for your phone appear and Check my phone works.'],
-  ['QR code goes straight to calibration', 'Scanning the Calibrate speakers QR code now takes your phone straight on to calibration, with a Continue to secure calibration button right on the page.'],
-  ['Install steps when needed', 'If your phone does not trust WavWiz yet, the set-up page shows the download button and the install steps for your phone right away.'],
-  ['Song title on phones', 'On a phone, Now Playing shows the song title and artist again, in every control panel style.'],
-  ['Certificate says WavWiz', 'The security certificate and the phone profile are now named WavWiz everywhere. If your server still had an older certificate, it gets a new one: install and trust it on each phone once (open the set-up page from the QR code in Settings > Phone & HTTPS).'],
+  ['Fixes', 'No more echo when the phone or PC is used as a speaker and toggled quickly. The window no longer goes black after snapping. The Library rail mirrors the Devices rail.'],
+
 ];
 
 const CREDITS = [
