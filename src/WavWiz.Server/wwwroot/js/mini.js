@@ -1,3 +1,4 @@
+import './sliderstyle.js';   // 0.3.3 G11
 // WavWiz 0.3.2 F3: the mini player - replaces Remote mode. A small movable window with only the Now Playing controls: art, title / artist,
 // seek, prev / play / next, mute, volume, pin (always on top, Player only), open the full app, close. Slim size (300x48) when the window is short.
 // It never joins as a speaker (F2: opening or closing it never adds a second stream). In WavWiz Player it talks to its window over

@@ -3,6 +3,7 @@
 // changes. Theme and Visualizer are the 0.2.0 dedicated-page layouts again. Everything is saved on this device only.
 import { h, api, toast, debounce } from './util.js';
 import { SCALES, loadScale, applyScale, scaleFactor } from './uiscale.js';
+import { SLIDER_STYLES, loadSlider, applySlider } from './sliderstyle.js';
 import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap } from './viz.js';
 import { VIZ_BLURB, vizName } from './vizcore.js';
@@ -145,7 +146,8 @@ function eqStyleCard(S) {
       grid,
       h('label', { class: 'row', style: 'gap:10px;margin-top:12px' }, h('span', { style: 'min-width:8.5em' }, h('div', null, gl), h('div', { class: 'small dim' }, gh + '. 50% default, 100% max.')),
         h('input', { type: 'range', min: 0, max: 100, step: 1, value: p.glow, class: 'grow', 'aria-label': gl, 'data-eqglow': '1',
-          oninput: ev => { const v = +ev.target.value; glowOut.textContent = v + '%'; saveEqPrefs({ ...loadEqPrefs(), glow: v }); prev.setGlow?.(v); others.forEach(o => o.setGlow?.(v)); if (v > 0) prev.startLive?.(spectrumTap); } }), glowOut),
+          oninput: ev => { const v = +ev.target.value; glowOut.textContent = v + '%'; prev.setGlow?.(v); others.forEach(o => o.setGlow?.(v)); if (!(ev.target._lg > 0) && v > 0) prev.startLive?.(spectrumTap); ev.target._lg = v; },   // 0.3.3 G14: no save / re-render mid-drag
+          onchange: ev => { const v = +ev.target.value; saveEqPrefs({ ...loadEqPrefs(), glow: v }); try { window.dispatchEvent(new CustomEvent('wavwiz:eqglow', { detail: v })); } catch { /* ok */ } } }), glowOut),
       h('div', { class: 'sec', style: 'margin-top:12px' }, 'Edit this speaker’s EQ'),
       h('div', { class: 'eqprevbox eqprev-big', 'aria-label': 'This speaker\'s EQ in the chosen style' },
         h('div', { class: 'npprev-h' }, h('span', { class: 'small dim ell' }, name), h('span', { class: 'grow' }), lock.el, h('span', { class: 'npprev-ex' }, real ? 'YOUR EQ' : 'EXAMPLE DATA')),
@@ -169,7 +171,11 @@ function displaySizeCard() {
     box.replaceChildren(h('h3', null, 'Display size'),
       h('p', { class: 'dim small' }, 'Makes the web UI larger or smaller on this phone or PC only. The whole app changes as you pick.'),
       gridEl('display', 'Display size', cards),
-      h('p', { class: 'small dim', style: 'margin-top:8px' }, SCALES.some(([id]) => id === cur) ? `Now ${Math.round(z * 100)}%.` : `Now ${Math.round(z * 100)}% (your earlier choice). Pick a size above to change it.`));
+      h('p', { class: 'small dim', style: 'margin-top:8px' }, SCALES.some(([id]) => id === cur) ? `Now ${Math.round(z * 100)}%.` : `Now ${Math.round(z * 100)}% (your earlier choice). Pick a size above to change it.`),
+      // 0.3.3 G11: volume slider style (this phone or PC only)
+      h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Volume slider style'), h('div', { class: 'small dim' }, 'Gradient uses your theme’s main, second and highlight colors. Flat uses the main color. Default: Gradient.')),
+        h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Volume slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },
+          h('span', { class: 'slsw ' + id, 'aria-hidden': 'true' }), nm)))));
   }
   draw();
   return { el: box, reload: draw };

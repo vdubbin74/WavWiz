@@ -1948,3 +1948,12 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .zaddmenu{position:absolute;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:4px;display:flex;flex-direction:column;min-width:160px}
 .zaddmenu button{background:none;border:0;color:var(--ink);text-align:left;padding:6px 10px;cursor:pointer;border-radius:3px} .zaddmenu button:hover,.zaddmenu button:focus-visible{background:var(--accent-soft)}
 .e1 .srow .saddzone{position:relative}
+/* G11 (revised): volume slider style - Gradient (theme primary -> secondary -> highlight, default) or Flat (primary); every volume bar */
+:root{--voltrack:linear-gradient(90deg,var(--accent),var(--accent2),var(--hl,var(--accent2)))}
+:root[data-slider=flat]{--voltrack:var(--accent)}
+:is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]::-webkit-slider-runnable-track{background:var(--voltrack)!important;opacity:1}
+:is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]::-moz-range-track{background:var(--voltrack)!important}
+:is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]::-moz-range-progress{background:transparent}
+.sliderstyle{display:flex;align-items:center;gap:16px;margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+.slsw{display:inline-block;width:28px;height:5px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.slsw.gradient{background:linear-gradient(90deg,var(--accent),var(--accent2),var(--hl,var(--accent2)))} .slsw.flat{background:var(--accent)}

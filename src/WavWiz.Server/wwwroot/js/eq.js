@@ -70,7 +70,11 @@ export async function openEq(S, refresh, deviceId) {
       sw('Bypass', 'Hear the speaker without EQ', () => cur.bypass, v => { cur.bypass = v; })];
     const st = loadEqPrefs(), [gl, gh] = glowWords(st.style);
     const gOut = h('b', { class: 'mono' }, st.glow + '%');
-    const glowR = h('input', { type: 'range', min: 0, max: 100, step: 1, value: st.glow, 'aria-label': gl, 'data-eqglow': '1', oninput: ev => { const v = +ev.target.value; gOut.textContent = v + '%'; saveEqPrefs({ ...loadEqPrefs(), glow: v }); area?.setGlow(v); if (v > 0) area?.startLive(spectrumTap); } });
+    const glowR = h('input', { type: 'range', min: 0, max: 100, step: 1, value: st.glow, 'aria-label': gl, 'data-eqglow': '1', oninput: ev => { const v = +ev.target.value; gOut.textContent = v + '%'; area?.setGlow(v); if (glowWasOff(lastGlow, v)) area?.startLive(spectrumTap); lastGlow = v; },
+      // 0.3.3 G14: saving fired 'wavwiz:eqstyle' on every input, which rebuilt this dialog (buildArea + buildLower) and replaced the slider under the
+      // pointer - the drag stuck. Now dragging only moves the label and the glow; the value is saved once on change; Live starts only on 0 -> >0.
+      onchange: ev => { const v = +ev.target.value; saveEqPrefs({ ...loadEqPrefs(), glow: v }); try { window.dispatchEvent(new CustomEvent('wavwiz:eqglow', { detail: v })); } catch { /* ok */ } } });
+    let lastGlow = st.glow;
     ctl = [bass, treble, trim, ...sws];
     lower.replaceChildren(h('div', { class: 'eqknobs' }, bass.el, treble.el, trim.el), h('div', { class: 'eqsws' }, sws.map(s => s.el)),
       h('div', { class: 'eqglowrow' }, h('b', null, gl), h('span', { class: 'small dim' }, gh), h('span', { class: 'grow' }), glowR, gOut));
@@ -84,7 +88,8 @@ export async function openEq(S, refresh, deviceId) {
   body.replaceChildren(
     h('div', { class: 'eqtop' }, h('span', { class: 'eqlbl' }, 'SPEAKER'), h('b', { class: 'eqspk' }, devOut ? `${devOut.zone} — ${devOut.name}` : ''), liveTag, h('span', { class: 'grow' }), h('span', { class: 'eqlbl' }, 'PRESET'), preSel),
     mainHost, lower, footer);
-  const onStyle = () => { if (d.el.isConnected) { buildArea(); buildLower(); } else window.removeEventListener('wavwiz:eqstyle', onStyle); };
+  let builtStyle = loadEqPrefs().style;   // 0.3.3 G14: rebuild only when the EQ style itself changed (never for a glow save, never mid-drag)
+  const onStyle = () => { if (!d.el.isConnected) return window.removeEventListener('wavwiz:eqstyle', onStyle); const s2 = loadEqPrefs().style; if (s2 === builtStyle || userDragging(d.el)) return; builtStyle = s2; buildArea(); buildLower(); };
   window.addEventListener('wavwiz:eqstyle', onStyle);
 
   /** Saving a changed built-in or new sound asks for a name; an own preset that is selected is saved over. */
@@ -117,3 +122,8 @@ export async function openEq(S, refresh, deviceId) {
   }
   load();
 }
+
+/** 0.3.3 G14: the live spectrum starts only when the glow goes from 0 to above 0. Pure. */
+export const glowWasOff = (prev, v) => !(prev > 0) && v > 0;
+/** 0.3.3 G14: a slider in el is being dragged / focused (no re-render under it). */
+const userDragging = el => { const a = typeof document !== 'undefined' ? document.activeElement : null; return !!(a && el.contains(a) && a.matches?.('input[type=range]')); };
