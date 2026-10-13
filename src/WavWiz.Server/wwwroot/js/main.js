@@ -1,4 +1,5 @@
 import './sliderstyle.js';   // 0.3.3 G11
+import './pwa.js';   // 0.3.4 H1
 import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { openSettings } from './settings.js';
