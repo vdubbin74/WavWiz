@@ -173,7 +173,7 @@ function displaySizeCard() {
       gridEl('display', 'Display size', cards),
       h('p', { class: 'small dim', style: 'margin-top:8px' }, SCALES.some(([id]) => id === cur) ? `Now ${Math.round(z * 100)}%.` : `Now ${Math.round(z * 100)}% (your earlier choice). Pick a size above to change it.`),
       // 0.3.3 G11: volume slider style (this phone or PC only)
-      h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Volume slider style'), h('div', { class: 'small dim' }, 'Gradient uses your theme’s main, second and highlight colors. Flat uses the main color. Default: Gradient.')),
+      h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Volume slider style'), h('div', { class: 'small dim' }, 'Gradient blends your theme’s main and second colors. Flat uses the main color. Default: Gradient.')),
         h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Volume slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },
           h('span', { class: 'slsw ' + id, 'aria-hidden': 'true' }), nm)))));
   }

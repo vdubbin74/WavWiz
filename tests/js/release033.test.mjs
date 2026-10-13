@@ -59,7 +59,7 @@ test('G6-G10: Speakers wording, output line, groups, highlight, zone on, slim ro
 test('G11: volume slider style - Gradient (default, theme colors) or Flat (primary), everywhere', async () => {
   const st = new Map(), store = { getItem: k => st.get(k) ?? null, setItem: (k, v) => st.set(k, v) };
   const s = await imp('sliderstyle'); assert.equal(s.loadSlider(store), 'gradient'); s.applySlider('flat', store); assert.equal(s.loadSlider(store), 'flat'); s.applySlider('nope', store); assert.equal(s.loadSlider(store), 'gradient');
-  assert.match(s.sliderTrack('gradient'), /var\(--accent\),var\(--accent2\),var\(--hl/); assert.equal(s.sliderTrack('flat'), 'var(--accent)');
+  assert.equal(s.sliderTrack('gradient'), 'linear-gradient(90deg,var(--accent),var(--accent2))'); assert.equal(s.sliderTrack('flat'), 'var(--accent)'); // 0.3.4 H3: back to two colors
   assert.match(css, /:root\[data-slider=flat\]\{--voltrack:var\(--accent\)\}/); assert.match(css, /:is\(\.dvol,\.mp-vol,\.np-volrow,\.dmaster\)/);
   assert.match(src('appearance.js'), /'Volume slider style'/); assert.match(src('mini.js'), /import '\.\/sliderstyle\.js'/);
 });
