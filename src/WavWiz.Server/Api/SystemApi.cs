@@ -18,7 +18,7 @@ public static class SystemApi
 
     public static object StatusDto(Services s) => new
     {
-        appVersion = WavWizInfo.Version, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
+        appVersion = WavWizInfo.Version, artCv = Library.ArtService.UrlVersion, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
         uptimeSec = (long)(DateTime.UtcNow - s.Started).TotalSeconds, bind = s.Cfg.BindAddress,
         ports = new { http = s.Cfg.HttpPort, https = s.Cfg.HttpsPort, audio = s.Audio.Port, clock = s.Clock.Port },
         ffmpeg = new { ok = File.Exists(s.FfmpegPath) || s.FfmpegPath == "ffmpeg", path = s.FfmpegPath },

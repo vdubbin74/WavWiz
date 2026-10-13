@@ -155,6 +155,25 @@ public sealed class WebUiForm : Form
     /// <summary>Applies the UI-size setting to the page (WebView2 draws at the monitor scale by itself; this is the extra zoom).</summary>
     public void ApplyZoom() { try { if (_web.CoreWebView2 != null) _web.ZoomFactor = UiScale.WebZoom(_set.UiScale); } catch { } }
 
+    /// <summary>0.3.2 F10: the first run after a version change empties the WebView2 HTTP cache (0.3.0 cached scrambled covers for 7 days).
+    /// Cookies / sign-in and local storage (theme, panels) are kept.</summary>
+    internal static bool VersionChanged(string folder, string version)
+    {
+        var marker = Path.Combine(folder, "wavwiz-cache.version");
+        try { if (File.Exists(marker) && File.ReadAllText(marker).Trim() == version) return false; } catch { }
+        return true;
+    }
+    private static async Task ClearCacheOnVersionChange(CoreWebView2 cw, string folder)
+    {
+        if (!VersionChanged(folder, WavWizInfo.Version)) return;
+        try
+        {
+            await cw.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache | CoreWebView2BrowsingDataKinds.CacheStorage | CoreWebView2BrowsingDataKinds.ServiceWorkers);
+            Directory.CreateDirectory(folder); File.WriteAllText(Path.Combine(folder, "wavwiz-cache.version"), WavWizInfo.Version);
+        }
+        catch { }
+    }
+
     private async Task InitAsync()
     {
         _url = UiAddress(_set);
@@ -190,6 +209,7 @@ public sealed class WebUiForm : Form
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
+            await ClearCacheOnVersionChange(cw, folder);
             cw.Navigate(StartScreen != null ? UiUrl.WithScreen(_url, StartScreen) : _url);
         }
         catch (Exception)

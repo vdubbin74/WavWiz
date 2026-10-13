@@ -45,8 +45,7 @@ public static class LibraryApi
         g.MapGet("/art/artist", async (string name, int? size, HttpContext c) =>
         {
             byte[]? jpg = await s.Art.ArtistAsync(name, size ?? 384, c.RequestAborted);
-            c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";
-            return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");
+            return Send(c, jpg, 120);
         }).Req(Role.View);
         // 0.2.2 T4e: Settings > Library "Online art" status (found / not found / pending) and "Retry missing photos"
         g.MapGet("/library/online-art", () => Results.Json(s.Art.Online?.Status())).Req(Role.View);
@@ -60,15 +59,25 @@ public static class LibraryApi
         {
             var logo = s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string;
             byte[]? jpg = await s.Art.GetRemoteAsync(logo, size ?? 192, c.RequestAborted);
-            c.Response.Headers.CacheControl = jpg == null ? "private, max-age=300" : "private, max-age=86400";
-            return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");
+            return Send(c, jpg, 300);
         }).Req(Role.View);
+    }
+
+    /// <summary>0.3.2 F10: pictures carry an ETag (content hash + art version). With the versioned URL (&amp;cv=) they may be cached for a week;
+    /// without it (old pages, kiosk) the browser must revalidate (no-cache), so a stale picture from an older build is never shown.</summary>
+    public static IResult Send(HttpContext c, byte[]? jpg, int noneSec)
+    {
+        if (jpg == null) { c.Response.Headers.CacheControl = $"private, max-age={noneSec}"; return Results.StatusCode(204); }
+        var tag = "\"" + Library.ArtService.UrlVersion + "-" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(jpg))[..16] + "\"";
+        c.Response.Headers.ETag = tag;
+        c.Response.Headers.CacheControl = c.Request.Query["cv"] == Library.ArtService.UrlVersion ? "private, max-age=604800" : "private, no-cache";
+        if (c.Request.Headers.IfNoneMatch.ToString() == tag) return Results.StatusCode(304);
+        return Results.File(jpg, "image/jpeg");
     }
 
     internal static async Task<IResult> Cover(HttpContext c, Services s, Library.TrackRow? t, int? size)
     {
         byte[]? jpg = t == null ? null : await s.Art.GetAsync(t, size ?? 192, c.RequestAborted);
-        c.Response.Headers.CacheControl = jpg == null ? "private, max-age=120" : "private, max-age=604800";
-        return jpg == null ? Results.StatusCode(204) : Results.File(jpg, "image/jpeg");   // 204 = no cover: not an error, so browsers do not log one for every song without art
+        return Send(c, jpg, 120);   // 204 = no cover: not an error, so browsers do not log one for every song without art
     }
 }

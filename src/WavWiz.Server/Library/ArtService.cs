@@ -17,23 +17,39 @@ public sealed class ArtService
     private static readonly string[] Exts = { ".jpg", ".jpeg", ".png", ".webp" };
     public static readonly int[] Sizes = { 96, 192, 384, 768 };
 
-    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); UpgradeCache(_cache); }
+    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); if (UpgradeCache(_cache)) _none.Clear(); }
 
     // ---- 0.3.1 B19: corrupted (magenta/green striped) thumbnails. The decoder used to conceal damaged / unsupported data and the result was cached
     // forever. Now: sniff the format, decode strictly (any decode error = no picture), normalize to 8-bit RGB with even sizes, re-check the JPEG we
     // made, and reject striped noise. A rejected picture is "no art": the web UI shows its themed initials tile. The cache is rebuilt once on upgrade.
-    public const int CacheVersion = 2;
+    public const int CacheVersion = 3;   // 0.3.2 F10/F11: 3 = rebuilt after the 0.3.1 validator rejected every picture
+    /// <summary>0.3.2 F10: art URL version sent to the web UI (&amp;cv=) so pictures the browser / WebView2 cached from older builds are never reused.</summary>
+    public static string UrlVersion => CacheVersion + "." + WavWiz.Core.WavWizInfo.Version;
+    /// <summary>0.3.2 F11: validator problems (could not check a thumbnail; the thumbnail is kept). Newest last, max 50.</summary>
+    public static readonly ConcurrentQueue<string> ValidatorLog = new();
+    /// <summary>0.3.2 F11: test hook - replaces the thumbnail check (throwing = a validator failure).</summary>
+    public Func<byte[], bool>? ValidatorOverride { get; set; }
+    /// <summary>0.3.2 F10: forget every "no picture" answer (on upgrade and when asked).</summary>
+    public void ClearNegative() => _none.Clear();
+    public int NegativeCount => _none.Count;
+    static void LogValidator(string msg)
+    {
+        ValidatorLog.Enqueue(DateTime.Now.ToString("s") + " art validator: " + msg); while (ValidatorLog.Count > 50) ValidatorLog.TryDequeue(out _);
+        try { Console.Error.WriteLine("[art] validator: " + msg); } catch { }
+    }
     /// <summary>Clears thumbnails made by older versions (once; a marker file records the version).</summary>
-    public static void UpgradeCache(string dir)
+    /// <summary>0.3.2 F10: also removes "none" marker files and returns true when it upgraded, so the in-memory negative cache is cleared too.</summary>
+    public static bool UpgradeCache(string dir)
     {
         try
         {
             var marker = Path.Combine(dir, "cache.version");
-            if (File.Exists(marker) && File.ReadAllText(marker).Trim() == CacheVersion.ToString()) return;
-            foreach (var f in Directory.EnumerateFiles(dir, "*.jpg")) { try { File.Delete(f); } catch { } }
+            if (File.Exists(marker) && File.ReadAllText(marker).Trim() == CacheVersion.ToString()) return false;
+            foreach (var pat in new[] { "*.jpg", "*.none", "*.neg" }) foreach (var f in Directory.EnumerateFiles(dir, pat)) { try { File.Delete(f); } catch { } }
             File.WriteAllText(marker, CacheVersion.ToString());
+            return true;
         }
-        catch { }
+        catch { return false; }
     }
     /// <summary>Image formats we accept (magic bytes): JPEG, PNG, WebP, GIF, BMP. Anything else (a URL stored as a "picture", HTML, junk) is no art.</summary>
     public static string? Sniff(byte[]? b)
@@ -177,17 +193,29 @@ public sealed class ArtService
         finally { _gate.Release(); }
     }
 
+    /// <summary>0.3.2 F10/F11: swscale flags that are correct on the shipped ffmpeg build.</summary>
+    public const string Sws = "lanczos+bitexact+accurate_rnd+full_chroma_int";
     public Task<byte[]?> ThumbAsync(byte[] raw, int size, CancellationToken ct = default) => ResizeAsync(raw, size, ct);
     private async Task<byte[]?> ResizeAsync(byte[] raw, int size, CancellationToken ct)
     {
         if (Sniff(raw) == null) return null;
         // strict decode (no error concealment), 8-bit RGB first (CMYK/YCCK, 16-bit, palette, alpha), even sizes, then a baseline 4:2:0 JPEG
-        var vf = $"format=rgb24,scale='min({size},iw)':'min({size},ih)':force_original_aspect_ratio=decrease:flags=lanczos,scale='max(2,trunc(iw/2)*2)':'max(2,trunc(ih/2)*2)',format=yuvj420p";
-        var (jpg, err) = await Ffmpeg(raw, new[] { "-v", "error", "-err_detect", "explode", "-xerror", "-i", "pipe:0", "-vf", vf, "-frames:v", "1", "-q:v", "4", "-f", "mjpeg", "pipe:1" }, ct);
+        // 0.3.2 F10/F11: the shipped LGPL ffmpeg (no x86 asm) produces magenta/green garbage on swscale's fast paths - the real cause of the
+        // 0.3.0 scrambled covers. Every scale / pixel-format step therefore uses the bit-exact C path (Sws), incl. the auto-inserted converters.
+        var vf = $"format=rgb24,scale='min({size},iw)':'min({size},ih)':force_original_aspect_ratio=decrease:flags={Sws},scale='max(2,trunc(iw/2)*2)':'max(2,trunc(ih/2)*2)':flags={Sws},format=yuvj420p";
+        var (jpg, err) = await Ffmpeg(raw, new[] { "-v", "error", "-err_detect", "explode", "-xerror", "-i", "pipe:0", "-sws_flags", Sws, "-vf", vf, "-frames:v", "1", "-q:v", "4", "-f", "mjpeg", "pipe:1" }, ct);
         if (jpg == null || !string.IsNullOrWhiteSpace(err) || !LooksLikeJpeg(jpg)) return null;
-        // validate what we made: it must decode cleanly, and must not be striped noise
-        var (px, err2) = await Ffmpeg(jpg, new[] { "-v", "error", "-err_detect", "explode", "-xerror", "-i", "pipe:0", "-vf", "scale=32:32:flags=area,format=rgb24", "-frames:v", "1", "-f", "rawvideo", "pipe:1" }, ct);
-        if (px == null || px.Length != 32 * 32 * 3 || !string.IsNullOrWhiteSpace(err2) || LooksStriped(px, 32, 32)) return null;
+        // 0.3.2 F10/F11: validate what we made WITHOUT a second ffmpeg run (the shipped LGPL ffmpeg has no rawvideo muxer, so 0.3.1 rejected
+        // every picture). Our managed reader takes the 8x8 block averages of the JPEG. Only a confirmed striped picture is rejected; if the check
+        // itself fails, the thumbnail is kept and the problem is logged.
+        try
+        {
+            bool bad;
+            if (ValidatorOverride != null) bad = !ValidatorOverride(jpg);
+            else { var (px, w, h) = JpegDc.Decode(jpg); bad = LooksStriped(px, w, h); }
+            if (bad) return null;
+        }
+        catch (Exception e) { LogValidator($"could not check a {jpg.Length}-byte thumbnail ({e.GetType().Name}: {e.Message}); kept it"); }
         return jpg;
     }
 

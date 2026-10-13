@@ -17,7 +17,7 @@ import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
 import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
-import { artPushed } from './art.js';
+import { artPushed, setArtCv } from './art.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
@@ -45,6 +45,7 @@ const CAL = (() => { try { const q = new URLSearchParams(location.search), cal =
 async function boot() {
   if (CAL.cal || window.__wwCalRedirect) { location.replace('/calmic.html?cal=' + (CAL.cal || '')); return; }   // 0.2.5: calibration links go to the mic-only page; never join here
   try { S.auth = await api('/auth/state'); } catch (e) { return fatal(e.message); }
+  setArtCv(S.auth.artCv);   // 0.3.2 F10
   document.title = `WavWiz BETA ${S.auth.appVersion}`;
   if (S.auth.setupRequired) return renderSetup();
   if (!S.auth.authenticated) return renderLogin();

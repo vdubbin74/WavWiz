@@ -16,7 +16,7 @@ public static class AuthApi
             var w = c.Who();
             return Results.Json(new
             {
-                appVersion = WavWizInfo.Version, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
+                appVersion = WavWizInfo.Version, artCv = Library.ArtService.UrlVersion, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
                 setupRequired = s.Auth.SetupRequired, thisMachine = AuthService.IsThisMachine(c.Connection.RemoteIpAddress),
                 authenticated = w != null && w.Role != Role.Player, role = w?.Role.ToString().ToLowerInvariant(), name = w?.Name,
                 elevated = w?.Elevated ?? false, baseRole = w == null ? null : (w.Elevated ? w.BaseRole : w.Role).ToString().ToLowerInvariant(),

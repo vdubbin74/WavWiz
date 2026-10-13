@@ -2,11 +2,16 @@ import { h } from './util.js';
 import { genNode } from './gencover.js';
 
 const base = '/api/v1/art';
-export const trackArt = (id, size = 192) => id ? `${base}/track/${id}?size=${size}` : null;
-export const albumArt = (artist, album, size = 192) => `${base}/album?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&size=${size}`;
+/** 0.3.2 F10: art URL version from the server (auth state artCv). A new build = new URLs, so pictures cached by older builds are never reused. */
+let cv = '';
+export const setArtCv = v => { cv = v ? String(v) : ''; };
+export const artCv = () => cv;
+const cvq = () => cv ? `&cv=${encodeURIComponent(cv)}` : '';
+export const trackArt = (id, size = 192) => id ? `${base}/track/${id}?size=${size}${cvq()}` : null;
+export const albumArt = (artist, album, size = 192) => `${base}/album?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&size=${size}${cvq()}`;
 /** 0.2.1 F13: artist photo (server: MusicBrainz / Wikidata, cached). 204 = none -> the generated portrait stays. */
-export const artistArt = (name, size = 384) => name ? `${base}/artist?name=${encodeURIComponent(name)}&size=${size}` : null;
-export const radioArt = (id, size = 192) => id ? `${base}/radio/${id}?size=${size}` : null;
+export const artistArt = (name, size = 384) => name ? `${base}/artist?name=${encodeURIComponent(name)}&size=${size}${cvq()}` : null;
+export const radioArt = (id, size = 192) => id ? `${base}/radio/${id}?size=${size}${cvq()}` : null;
 
 /** 0.1.1: live sources. radio = internet station; airplay / spotify = a phone sending to the house (title/artist/artwork from the sender). */
 export const isReceiver = it => !!it && (it.kind === 'airplay' || it.kind === 'spotify');
