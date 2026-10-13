@@ -1,27 +1,34 @@
-/* WavWiz 0.3.2 F3: mini player (420x72 main, 300x48 slim). Theme colors come from the device theme (theme.js), like every other window. */
+/* WavWiz 0.3.2 F3 / 0.3.3 G4: mini player (420x72 main, 300x48 slim). Theme colors come from the device theme (theme.js), like every other window.
+   0.3.3: master mute (round, like the device cards) next to the transport, window transparency (Opacity button swaps the bottom slider),
+   small slider knobs and a text block that keeps title / seek / artist apart. */
 html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);color:var(--ink)}
-.mp{box-sizing:border-box;height:100vh;display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel);user-select:none}
-.mp .mp-art{width:58px;height:58px;flex:none;border-radius:3px;object-fit:cover;background:var(--panel2);cursor:grab}
-.mp .mp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:grab}
-.mp .mp-t{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mp .mp-a{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mp .mp-seek{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums}
-.mp .mp-seek input{flex:1;min-width:30px;height:12px;accent-color:var(--accent)}
-.mp .mp-tr{display:flex;gap:4px;flex:none}
-.mp .mp-b{width:26px;height:26px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer}
+.mp{box-sizing:border-box;height:100vh;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 7px;border:1px solid var(--line);border-radius:3px;background:var(--panel);user-select:none;transition:opacity .15s}
+.mp .mp-art{width:56px;height:56px;flex:none;border-radius:3px;object-fit:cover;background:var(--panel2);cursor:grab}
+.mp .mp-txt{flex:1;min-width:0;display:grid;grid-template-rows:auto auto auto;align-content:center;row-gap:3px;cursor:grab;height:58px}
+.mp .mp-t{font-weight:700;font-size:var(--mp-tfs,13px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mp .mp-a{font-size:var(--mp-afs,11px);line-height:1.15;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;order:3}
+.mp .mp-seek{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums;order:2;min-width:0}
+.mp input[type=range]{min-height:0;height:12px;margin:0;padding:0;flex:1;min-width:24px}
+.mp input[type=range]::-webkit-slider-runnable-track{height:4px}
+.mp input[type=range]::-webkit-slider-thumb{width:10px;height:10px;margin-top:-3px;border-width:1px;box-shadow:none}
+.mp input[type=range]::-moz-range-thumb{width:9px;height:9px;border-width:1px;box-shadow:none}
+.mp .mp-ctl{display:flex;flex-direction:column;gap:5px;flex:none;width:112px}
+.mp .mp-tr{display:flex;gap:4px;align-items:center;justify-content:space-between}
+.mp .mp-b{width:24px;height:24px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer;font-size:12px;line-height:1}
 .mp .mp-b:hover{border-color:var(--accent)}
-.mp .mp-b .ico-svg{width:14px;height:14px}
+.mp .mp-b .ico-svg,.mp .mutebtn .ico-svg{width:13px;height:13px}
 .mp .mp-b.play{color:var(--accent-text,var(--accent));border-color:var(--accent)}
 .mp .mp-b.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
-.mp .mp-vol{display:flex;align-items:center;gap:4px;flex:none}
-.mp .mp-vol input{width:52px;accent-color:var(--accent2,var(--accent))}
-.mp .mutebtn{width:26px;height:26px}
+.mp .mp-vol{display:flex;align-items:center;height:20px}
+.mp .mp-vol input[hidden]{display:none}
+.mp .mutebtn{width:24px;height:24px;border-radius:50%}
 .mp .mutebtn.on{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
-.mp .mp-side{display:flex;flex-direction:column;gap:4px;flex:none}
-.mp .mp-x{background:none;border:0;color:var(--dim);font-size:16px;cursor:pointer;padding:0 2px}
-.mp .mp-x:hover{color:var(--ink)}
-/* slim 300x48: art, title, seek, prev/play/next, expand, close */
+.mp .mp-side{display:grid;grid-template-columns:24px 24px;gap:4px;flex:none}
+.mp .mp-x{color:var(--dim)} .mp .mp-x:hover{color:var(--ink)}
+/* slim 300x48: art, title, prev/play/next + mute, expand, close */
 .mp.slim{padding:4px 6px;gap:6px}
 .mp.slim .mp-art{width:38px;height:38px}
-.mp.slim .mp-a,.mp.slim .mp-vol,.mp.slim .mp-pin,.mp.slim .mp-seek span{display:none}
-.mp.slim .mp-side{flex-direction:row}
+.mp.slim .mp-txt{height:38px}
+.mp.slim .mp-a,.mp.slim .mp-vol,.mp.slim .mp-pin,.mp.slim .mp-op,.mp.slim .mp-seek span{display:none}
+.mp.slim .mp-ctl{width:auto}
+.mp.slim .mp-side{grid-template-columns:24px 24px}

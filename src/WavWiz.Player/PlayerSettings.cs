@@ -26,6 +26,8 @@ public sealed class PlayerSettings
     public int? MiniY { get; set; }
     public bool MiniPinned { get; set; }
     public bool MiniSlim { get; set; }
+    /// <summary>0.3.3 G4b: mini player window opacity 0.3..1 (1 = opaque, the default).</summary>
+    public double MiniOpacity { get; set; } = 1.0;
     /// <summary>0 = Auto (follow Windows), else 100..300 percent (see UiScale).</summary>
     public int UiScale { get; set; } = WavWiz.PlayerCore.UiScale.Auto;
 

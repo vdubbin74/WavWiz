@@ -21,6 +21,9 @@ public static class MiniPlayer
     /// <summary>Parked at the top of the desktop, centered.</summary>
     public static (int X, int Y) Park((int X, int Y, int W, int H) work, int w) => (work.X + Math.Max(0, (work.W - w) / 2), work.Y + 8);
     /// <summary>Snap to the top edge when dropped within 24 px of it ("parks at top of desktop").</summary>
+    /// <summary>0.3.3 G4b: window opacity is kept between 0.3 and 1 (NaN / out of range -> 1 = opaque).</summary>
+    public const double MinOpacity = 0.3;
+    public static double ClampOpacity(double v) => double.IsFinite(v) && v > 0 ? Math.Clamp(v, MinOpacity, 1.0) : 1.0;
     public static int SnapTop((int X, int Y, int W, int H) work, int y) => Math.Abs(y - work.Y) <= 24 ? work.Y : y;
 }
 

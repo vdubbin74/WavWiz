@@ -286,7 +286,7 @@ public sealed class MiniPlayerForm : Form
     public MiniPlayerForm(PlayerSettings s, Action openFull)
     {
         _set = s; _openFull = openFull; Text = "WavWiz mini player"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = true; StartPosition = FormStartPosition.Manual;
-        AutoScaleMode = AutoScaleMode.Dpi; TopMost = s.MiniPinned; BackColor = Color.FromArgb(11, 13, 18);
+        AutoScaleMode = AutoScaleMode.Dpi; TopMost = s.MiniPinned; Opacity = MiniPlayer.ClampOpacity(s.MiniOpacity); BackColor = Color.FromArgb(11, 13, 18);
         try { using var st = typeof(MiniPlayerForm).Assembly.GetManifestResourceStream("wavwiz.ico"); if (st != null) Icon = new Icon(st); } catch { }
         Controls.Add(_web);
         double k = DeviceDpi / 96.0; int w = (int)Math.Round((s.MiniSlim ? MiniPlayer.SlimWidth : MiniPlayer.Width) * k), h = (int)Math.Round((s.MiniSlim ? MiniPlayer.SlimHeight : MiniPlayer.Height) * k);
@@ -325,7 +325,8 @@ public sealed class MiniPlayerForm : Form
             {
                 case "drag": ReleaseCapture(); SendMessage(Handle, 0xA1 /* WM_NCLBUTTONDOWN */, (IntPtr)2 /* HTCAPTION */, IntPtr.Zero); Remember(); break;
                 case "pin": TopMost = r.TryGetProperty("on", out var on) && on.GetBoolean(); _set.MiniPinned = TopMost; _set.Save(); break;
-                case "ready": if (r.TryGetProperty("pinned", out var p)) { TopMost = p.GetBoolean() || _set.MiniPinned; } break;
+                case "ready": if (r.TryGetProperty("pinned", out var p)) { TopMost = p.GetBoolean() || _set.MiniPinned; } if (r.TryGetProperty("opacity", out var o0) && o0.TryGetDouble(out var ov0)) { _set.MiniOpacity = MiniPlayer.ClampOpacity(ov0); _set.Save(); } break;
+                case "opacity": if (r.TryGetProperty("value", out var o) && o.TryGetDouble(out var ov)) { var v = MiniPlayer.ClampOpacity(ov); Opacity = v; if (v < 1) { _set.MiniOpacity = v; _set.Save(); } } break;   // 0.3.3 G4b (1.0 while hovered is not saved)
                 case "full": _openFull(); break;
                 case "close": Close(); break;
             }
