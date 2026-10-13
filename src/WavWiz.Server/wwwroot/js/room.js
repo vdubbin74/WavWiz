@@ -1,3 +1,4 @@
+import { speakerRegistry } from './speakerreg.js';
 import { h, api, toast, dialog } from './util.js';
 import { MSG, FrameParser, encodeJson, decodeJson, decodeAudio, decodeEpoch } from './wire.js';
 import { OffsetEstimator, pairClocks, ctxTimeFor, FrameScheduler, roomHealth, volumeToGain } from './roomsched.js';
@@ -5,7 +6,7 @@ import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
 import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
 import { phoneRole, setPhoneRole } from './calmic-core.js';
-import { isRemote, remoteBanner, REMOTE_KEY } from './remotemode.js';
+import { isRemote } from './remotemode.js';
 export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -197,7 +198,7 @@ export function unlockAudio() {
  * already plays through Windows (the server also refuses it). Switched off per browser with "Stop playing on this device". */
 export function installAutoJoin(S, refreshAll) {
   if (isPlayerUa()) return;
-  if (isRemote()) return;          // 0.3.0 §2: a remote never joins as a speaker
+  if (isRemote()) return;          // 0.3.2 F3: always false now (Remote mode retired; a remembered choice is cleared at boot)
   let stored = null; try { stored = localStorage.getItem(wantKey); } catch { /* ignore */ }
   installGestureUnlock();
   const go = () => startPhoneAsDevice(defaultRoomName()).then(() => refreshAll && refreshAll()).catch(e => { showUnlock(e.message); setTimeout(() => { if (!sharedDevice?.running) go(); }, 4000); });
@@ -222,8 +223,6 @@ export function askPhoneRole(done) {
       h('p', { class: 'small dim' }, 'This phone plays in sync with your other speakers.'),
       h('button', { class: 'btn big', onclick: () => pick('mic') }, 'Use as a calibration mic'),
       h('p', { class: 'small dim' }, 'This phone only listens, to line up your speakers. It never plays music.'),
-      h('button', { class: 'btn big', onclick: () => { try { localStorage.setItem(REMOTE_KEY, '1'); localStorage.setItem(wantKey, '0'); } catch { /* ignore */ } try { box.close?.(); } catch { /* ok */ } box.remove(); remoteBanner(true, () => location.reload()); } }, 'Use as remote only'),
-      h('p', { class: 'small dim' }, 'Control the music from this phone. It plays no sound and is not a speaker.'),
       h('p', { class: 'small dim' }, 'You can change this later in Devices › Phone role.')));
   document.body.append(box); try { box.showModal(); } catch { box.setAttribute('open', ''); } return box;
 }
@@ -252,20 +251,16 @@ function showUnlock(detail) {
 }
 function hideUnlock() { unlockOverlay?.remove(); unlockOverlay = null; }
 
+// 0.3.2 F2: one queue, one live speaker (see speakerreg.js) - no orphan stream after Remote mode / mini player toggles
+const speakers = speakerRegistry(name => new PhoneRoom({ name: name || defaultRoomName(), onState: st => { try { window.dispatchEvent(new CustomEvent('wavwiz:phone', { detail: st })); } catch { /* ignore */ } } }));
+export const speakerCount = () => speakers.liveCount;
 export async function startPhoneAsDevice(name) {
-  if (sharedDevice?.running) return sharedDevice;
-  if (starting) return starting;
-  const dev = new PhoneRoom({ name: name || defaultRoomName(), onState: st => { try { window.dispatchEvent(new CustomEvent('wavwiz:phone', { detail: st })); } catch { /* ignore */ } } });
-  starting = (async () => {
-    try {
-      sharedDevice = dev; await dev.start();
-      try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ }
-      if (dev.audioReady) hideUnlock(); else showUnlock();
-      return dev;
-    } catch (e) { try { await dev.stop(); } catch { /* ok */ } if (sharedDevice === dev) sharedDevice = null; throw e; }
-    finally { starting = null; }
-  })();
-  return starting;
+  if (sharedDevice?.running && speakers.liveCount <= 1) return sharedDevice;
+  const dev = await speakers.start(name);
+  sharedDevice = dev;
+  try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ }
+  if (dev.audioReady) hideUnlock(); else showUnlock();
+  return dev;
 }
-export async function stopPhoneDevice() { const d = sharedDevice; sharedDevice = null; hideUnlock(); try { localStorage.setItem(wantKey, '0'); } catch { /* ignore */ } await d?.stop(); }
+export async function stopPhoneDevice() { sharedDevice = null; hideUnlock(); try { localStorage.setItem(wantKey, '0'); } catch { /* ignore */ } await speakers.stop(); }
 export const installPhoneAutoJoin = installAutoJoin;   // 0.1.x name

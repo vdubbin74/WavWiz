@@ -1732,3 +1732,47 @@ body.jb-kiosk #app{visibility:hidden}
 .dssec .latslider::-moz-range-thumb{width:28px;height:28px}
 @media (pointer:coarse){.dssec .ddelay .latctl .latslider{height:48px} .dssec .latslider::-webkit-slider-thumb{width:34px;height:34px;margin-top:-12px}}
 .np-stage:not(.eqmode) .vizhost{pointer-events:none}   /* 0.3.1 B17: the visualizer layer never takes clicks */
+/* ===================== 0.3.2 ===================== */
+/* F1: collapsed LIBRARY rail reads bottom-to-top (mirror of DEVICES); music icon above the word, group centered */
+.libpanel .prail-t{transform:rotate(180deg)}
+.libpanel.israil .prail{justify-content:center}
+/* F5 / F4: one mute button everywhere - round, same size, amber when muted (devices, master, zones) */
+.devpanel .mutebtn.on,#p-zones .mutebtn.on,.dcard .mutebtn.on,.drow .mutebtn.on,.zcard .mutebtn.on,.dvol-master .mutebtn.on{background:color-mix(in srgb,var(--amber) 16%,transparent);border-color:var(--amber);color:var(--amber)}
+.dvol-master .mastermute{visibility:visible;pointer-events:auto}
+/* F6: sections (Master / Devices / Zones / Scenes & Schedules) separated by ~12px and a thin subtle divider */
+.devpanel .devbody .pane-h.dsec-h,.devpanel .devbody .dss>.pane-h{margin:12px -10px 6px;padding:8px 12px 4px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);color:var(--accent-text,var(--accent));font-weight:700;letter-spacing:.1em;font-size:11px}
+.devpanel .devbody .dss{margin-top:0}
+/* F4: zone cards */
+.zlist{display:flex;flex-direction:column;gap:8px}
+.zcard{border:1px solid var(--line);border-radius:3px;background:var(--panel2);padding:10px 12px;min-width:0}
+.zcard.active{border-color:var(--accent2,var(--accent))}
+.zc-top{display:flex;align-items:center;gap:8px;min-width:0}
+.zcard .zname{background:none;border:0;padding:0;color:var(--accent-text,var(--accent));font-weight:700;font-size:13px;cursor:pointer;min-width:0;text-align:left}
+.zcard .zc-mem{margin:2px 0 6px}
+.dtag.zplaying{border-color:var(--accent2,var(--accent));color:var(--accent2-text,var(--accent2,var(--accent)))}
+.dtag.zmuted{border-color:var(--amber);color:var(--amber)}
+.zadd-new{height:24px;min-height:24px;padding:0 8px;font-size:11.5px;border-radius:3px}
+/* F7: panel headers - LIBRARY / DEVICES title at the left (aligned with the section titles), arrows grouped on the right */
+.libpanel:not(.israil) .pane-h,.devpanel:not(.israil) .devhead{padding-left:12px}
+.libpanel:not(.israil) .pane-h .libtitle{order:0} .libpanel:not(.israil) .pane-h .grow{order:1} .libpanel:not(.israil) .pane-h .libexp{order:2;margin-left:0} .libpanel:not(.israil) .pane-h .libcol{order:3}
+.devpanel:not(.israil) .devhead>.devtitle:not(.grow){order:0} .devpanel:not(.israil) .devhead .devcount{order:1} .devpanel:not(.israil) .devhead>.grow{order:2} .devpanel:not(.israil) .devhead .devexp{order:3;margin-right:0} .devpanel:not(.israil) .devhead .devcol{order:4}
+/* F17 (final): expanded Devices - 4 equal columns; devices = columns 1-3 (subgrid), column 4 = Zones then Scenes & Schedules */
+.devpanel.expanded .dexp-main{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:24px;row-gap:10px;align-items:start}
+.devpanel.expanded .dexp-main>.dcol{grid-column:1/4;display:grid;grid-template-columns:subgrid;row-gap:10px;min-width:0}
+.devpanel.expanded .dcol>.pane-h,.devpanel.expanded .dcol>p{grid-column:1/-1}
+.devpanel.expanded .dcol>.dgrid{grid-column:1/-1;display:grid;grid-template-columns:subgrid;gap:10px 24px}
+.devpanel.expanded .dexp-main>.zcol{grid-column:4/5;min-width:0;position:relative;display:flex;flex-direction:column;gap:8px}
+.devpanel.expanded .zcol::before{content:'';position:absolute;left:-12px;top:0;bottom:0;border-left:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.devpanel.expanded .zcol-div{border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);margin:6px 0}
+.devpanel.expanded .dcol>.pane-h.dsec-h,.devpanel.expanded .zcol>.pane-h.dsec-h,.devpanel.expanded .zcol .dss>.pane-h{margin:0;padding:4px 0;border-top:0}
+.devpanel.expanded .zcard{padding:10px 12px}
+/* F13: side panels full height; the Playlist sits under Now Playing in the center column only, and expands straight up over the EQ / visualizer */
+@media (min-width:901px){
+  .libpanel{grid-area:1/1/3/2} .devpanel{grid-area:1/3/3/4} .listpanel{grid-area:2/2/3/3}
+  .desk.listexpanded{grid-template-rows:minmax(0,1fr) auto}
+  .desk.listexpanded .listpanel{grid-area:1/2/2/3}
+  .desk.listexpanded .nowcol{grid-area:2/2/3/3}
+  .desk.listexpanded .nowcol .np-vizpanel,.desk.listexpanded .nowcol .np-stage{display:none}
+  .desk.libexpanded .libpanel,.desk.devexpanded .libpanel,.desk.libexpanded .devpanel,.desk.devexpanded .devpanel{grid-row:1/2}
+  .listpanel .listup[hidden],.listpanel .listcol[hidden]{display:none}
+}

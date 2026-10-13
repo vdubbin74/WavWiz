@@ -118,7 +118,9 @@ public sealed class WebUiForm : Form
         Controls.Add(_web);
         // size = a 1280x820 (96 dpi) design scaled for THIS monitor, never larger than its work area (a 4K TV at 250 % is only 1536x864 CSS pixels)
         Load += async (_, _) => { FitToScreen(); await InitAsync(); };
-        DpiChanged += (_, _) => ApplyZoom();
+        DpiChanged += (_, _) => { ApplyZoom(); SyncWebView(); };
+        // 0.3.2 F14: snapped / maximized / restored / moved across monitors -> re-lay out the WebView2 so it never goes black
+        Resize += (_, _) => SyncWebView(); Move += (_, _) => SyncWebView(); ResizeEnd += (_, _) => SyncWebView();
         _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) ShowProblem("WavWiz did not answer in time.", "The window waited 20 seconds for " + _url + "."); };
         FormClosed += (_, _) => { _watch.Dispose(); };
     }
@@ -130,7 +132,7 @@ public sealed class WebUiForm : Form
         try { here = !string.IsNullOrWhiteSpace(s.ServerHost) && PairingClient.IsThisMachine(s.ServerHost); } catch { }
         try { var p = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WavWiz", "first-run-url.txt"); if (File.Exists(p)) fr = File.ReadAllText(p); } catch { }
         var u = UiUrl.Resolve(s.ServerHost, s.HttpPort, here, fr);
-        return u.Length == 0 ? u : UiUrl.WithRemote(u, s.RemoteMode);   // 0.3.0 §2: hand the tray choice to the page
+        return u.Length == 0 ? u : UiUrl.WithRemote(u, false);   // 0.3.2 F3: Remote mode is gone; ?remote=0 also clears a remembered 0.3.x choice in the page
     }
 
     public static void OpenInBrowser(string url) { try { if (url.Length > 0) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { } }
@@ -144,6 +146,8 @@ public sealed class WebUiForm : Form
     /// <summary>0.2.5: a screen to open once the page has loaded ("calibrate" = Calibrate speakers), as the address's #fragment.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string? StartScreen { get; set; }
+    /// <summary>0.3.2 F3: the page asked for the mini player.</summary>
+    public event Action? MiniRequested;
     /// <summary>0.3.0 §2: reload at a new address (remote mode on/off).</summary>
     public void Navigate(string url) { try { _url = url; if (_web.CoreWebView2 != null && url.Length > 0) _web.CoreWebView2.Navigate(url); } catch { } }
 
@@ -203,10 +207,12 @@ public sealed class WebUiForm : Form
             {
                 // the page's renderer or the GPU process died (graphics driver reset): reload once or twice, then explain instead of leaving a gray window
                 if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited) { BeginInvoke(() => { OpenInBrowser(_url); Close(); }); return; }
+                if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.GpuProcessExited) { BeginInvoke(SyncWebView); return; }   // 0.3.2 F14: WebView2 restarts its GPU process; re-lay out the surface
                 if (_retries++ < 2) { try { BeginInvoke(() => cw.Navigate(_url)); } catch { } }
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
+            cw.WebMessageReceived += (_, e) => { try { if (e.WebMessageAsJson.Contains("\"mini\"")) MiniRequested?.Invoke(); } catch { } };   // 0.3.2 F3: Devices > Mini player
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -231,6 +237,34 @@ public sealed class WebUiForm : Form
         try { cw.NavigateToString(html); } catch { }
     }
 
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        if (WebViewSync.Needs(m.Msg)) SyncWebView();
+    }
+    /// <summary>0.3.2 F14: bounds = the client area, then tell WebView2 its parent moved (DPI / monitor change) and repaint.</summary>
+    internal void SyncWebView()
+    {
+        try
+        {
+            if (_web.IsDisposed || WindowState == FormWindowState.Minimized) return;
+            if (_web.Bounds != ClientRectangle) _web.Bounds = ClientRectangle;
+            NotifyParentMoved(_web);
+            _web.Invalidate(); _web.Update();
+        }
+        catch { }
+    }
+    /// <summary>The WinForms control keeps its CoreWebView2Controller private; NotifyParentWindowPositionChanged lives there.</summary>
+    internal static void NotifyParentMoved(WebView2 w)
+    {
+        try
+        {
+            var p = typeof(WebView2).GetProperty("CoreWebView2Controller", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (p?.GetValue(w) is CoreWebView2Controller c) { c.NotifyParentWindowPositionChanged(); if (!c.IsVisible) c.IsVisible = true; }
+        }
+        catch { }
+    }
+
     private void SetFull(bool on)
     {
         if (on == _full) return; _full = on;
@@ -240,6 +274,66 @@ public sealed class WebUiForm : Form
 }
 
 /// <summary>About WavWiz Player: version, credits, privacy in one line, and the license files. A plain visible dialog (no hidden windows).</summary>
+/// <summary>0.3.2 F3: the mini player - a small borderless window (420x72, slim 300x48) with /mini.html. Movable by the art / empty space,
+/// parks at the top of the desktop, pin = always on top, remembers where it was. It plays nothing itself (the Player's one speaker stream
+/// keeps playing; opening or closing it never adds or removes a stream - F2).</summary>
+public sealed class MiniPlayerForm : Form
+{
+    private readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(11, 13, 18) };
+    private readonly PlayerSettings _set; private readonly Action _openFull;
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ReleaseCapture();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
+    public MiniPlayerForm(PlayerSettings s, Action openFull)
+    {
+        _set = s; _openFull = openFull; Text = "WavWiz mini player"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = true; StartPosition = FormStartPosition.Manual;
+        AutoScaleMode = AutoScaleMode.Dpi; TopMost = s.MiniPinned; BackColor = Color.FromArgb(11, 13, 18);
+        try { using var st = typeof(MiniPlayerForm).Assembly.GetManifestResourceStream("wavwiz.ico"); if (st != null) Icon = new Icon(st); } catch { }
+        Controls.Add(_web);
+        double k = DeviceDpi / 96.0; int w = (int)Math.Round((s.MiniSlim ? MiniPlayer.SlimWidth : MiniPlayer.Width) * k), h = (int)Math.Round((s.MiniSlim ? MiniPlayer.SlimHeight : MiniPlayer.Height) * k);
+        var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+        var (x, y) = MiniPlayer.Place((wa.X, wa.Y, wa.Width, wa.Height), w, h, s.MiniX, s.MiniY, Screen.AllScreens.Select(sc => (sc.WorkingArea.X, sc.WorkingArea.Y, sc.WorkingArea.Width, sc.WorkingArea.Height)));
+        Bounds = new Rectangle(x, y, w, h);
+        Load += async (_, _) => await InitAsync();
+        ResizeEnd += (_, _) => Remember(); Move += (_, _) => WebUiForm.NotifyParentMoved(_web);
+        FormClosing += (_, _) => Remember();
+    }
+    private void Remember()
+    {
+        var wa = Screen.FromControl(this).WorkingArea; var y = MiniPlayer.SnapTop((wa.X, wa.Y, wa.Width, wa.Height), Top); if (y != Top) Top = y;
+        _set.MiniX = Left; _set.MiniY = Top; _set.Save();
+    }
+    private async Task InitAsync()
+    {
+        try
+        {
+            var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(PlayerSettings.Dir, "webview"));
+            await _web.EnsureCoreWebView2Async(env);
+            var cw = _web.CoreWebView2;
+            cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version + " WavWizMini";
+            cw.Settings.AreDefaultContextMenusEnabled = false; cw.Settings.IsStatusBarEnabled = false;
+            cw.WebMessageReceived += (_, e) => OnMessage(e.WebMessageAsJson);
+            cw.Navigate(MiniPlayer.Url(WebUiForm.UiAddress(_set)));
+        }
+        catch { Close(); }
+    }
+    private void OnMessage(string json)
+    {
+        try
+        {
+            using var d = System.Text.Json.JsonDocument.Parse(json); var r = d.RootElement; var cmd = r.TryGetProperty("cmd", out var c) ? c.GetString() : null;
+            switch (cmd)
+            {
+                case "drag": ReleaseCapture(); SendMessage(Handle, 0xA1 /* WM_NCLBUTTONDOWN */, (IntPtr)2 /* HTCAPTION */, IntPtr.Zero); Remember(); break;
+                case "pin": TopMost = r.TryGetProperty("on", out var on) && on.GetBoolean(); _set.MiniPinned = TopMost; _set.Save(); break;
+                case "ready": if (r.TryGetProperty("pinned", out var p)) { TopMost = p.GetBoolean() || _set.MiniPinned; } break;
+                case "full": _openFull(); break;
+                case "close": Close(); break;
+            }
+        }
+        catch { }
+    }
+}
+
 public sealed class AboutForm : Form
 {
     public AboutForm(PlayerSettings s)

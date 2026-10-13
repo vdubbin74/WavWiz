@@ -183,23 +183,51 @@ function masterRow(S, ctl) {
   const sl = h('input', { type: 'range', min: 0, max: 100, value: lvl, 'aria-label': 'Master volume', title: 'Raises or lowers every speaker that is on by the same factor (keeps the balance between rooms; never un-mutes)',
     oninput: ev => { pct.textContent = ev.target.value + '%'; clearTimeout(sl._t); sl._t = setTimeout(() => ctl.act('/zones/master', { set: +ev.target.value }), 120); } });
   ro(sl, canControl(S), 'Your access is view-only.');
-  // 0.3.1 B7: the same track / thumb / length / % position as every device row (.dvol: slider, %, then a slot the width of a row's round Mute
-  // button) so the bars line up; B8: Mute all on its own line below, so it never shortens the master bar.
+  // 0.3.1 B7: the same track / thumb / length / % position as every device row (.dvol: slider, %, round Mute button) so the bars line up.
+  // 0.3.2 F5 (supersedes B8): the slot right of the master bar is the same round mute icon button as the device rows; it mutes everything.
   return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER VOLUME'),
-    h('div', { class: 'dvol dvol-master' }, sl, pct, h('span', { class: 'mutebtn dvol-slot', 'aria-hidden': 'true' })),
-    h('div', { class: 'dmaster-mute' }, muteAllButton(S, ctl)));
+    h('div', { class: 'dvol dvol-master' }, sl, pct, masterMuteButton(S, ctl)));
 }
-/** 0.2.1 F17: every device muted? (drives the Mute all / Unmute all button) */
+/** 0.2.1 F17: every device muted? (drives the master mute button) */
 export const allMuted = zones => (zones || []).length > 0 && zones.every(z => z.muted);
-/** 0.2.1 F17: Mute all on the master strip. Mutes every device; Unmute all brings back only the ones it muted (the server remembers),
- * so a device muted on its own stays muted - per-device Mute stays separate. */
-function muteAllButton(S, ctl) {
-  const on = allMuted(S.zones);
-  const b = h('button', { type: 'button', class: 'btn mutealls' + (on ? ' on' : ''), 'aria-pressed': String(on), title: on ? 'Un-mute the devices that Mute all muted' : 'Mute every device (each device keeps its own Mute too)',
-    onclick: () => { const want = !allMuted(S.zones); for (const z of S.zones || []) if (want) z.muted = true; ctl.act('/zones/mute-all', { muted: want }); paint(want); } });
-  const paint = m => { b.classList.toggle('on', m); b.setAttribute('aria-pressed', String(m)); b.replaceChildren(icon(m ? 'mute' : 'volume'), h('span', null, m ? 'Unmute all' : 'Mute all')); };
-  paint(on); ro(b, canControl(S), 'Your access is view-only.');
-  return b;
+/** 0.3.2 F5: master mute = a round icon button identical to a device's Mute (amber when muted). Mutes every device; un-muting brings back only
+ * the ones it muted (the server remembers), so a device muted on its own stays muted. */
+function masterMuteButton(S, ctl) {
+  const b = h('button', { type: 'button', class: 'mutebtn mastermute' });
+  const paint = m => { b.classList.toggle('on', m); b.setAttribute('aria-pressed', String(m)); b.setAttribute('aria-label', m ? 'Unmute every device' : 'Mute every device'); b.title = m ? 'Unmute everything' : 'Mute everything'; setIcon(b, m ? 'mute' : 'volume'); };
+  b.onclick = () => { const want = !allMuted(S.zones); for (const z of S.zones || []) if (want) z.muted = true; ctl.act('/zones/mute-all', { muted: want }); paint(want); };
+  b.append(icon('volume')); b.dataset.icon = 'volume'; paint(allMuted(S.zones));
+  return ro(b, canControl(S), 'Your access is view-only.');
+}
+// ---- 0.3.2 F4: zone cards - name (accent), PLAYING / amber MUTED tag, members line, then the device bar (.dvol: slider, %, round mute) ----
+/** Members of a zone (device rows), in the zone's order. Pure. */
+export const zoneMembers = (zones, g) => (zones || []).filter(z => (g.deviceIds || []).includes(z.id));
+/** Zone level = the average of its speakers (rounded). Pure. */
+export const zoneLevel = (zones, g) => { const ms = zoneMembers(zones, g); return ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0; };
+/** Zone muted = every member muted. Pure. */
+export const zoneMuted = (zones, g) => { const ms = zoneMembers(zones, g); return ms.length > 0 && ms.every(z => z.muted); };
+/** The client mirror of the server's offset-keeping move (ZoneVolume.Shift): virtual levels shift, real = clamped. Pure. */
+export function zoneShift(virt, target) { const t = Math.max(0, Math.min(100, target)), d = virt.length ? t - virt.reduce((a, v) => a + v, 0) / virt.length : 0; const nv = virt.map(v => v + d); return { virt: nv, real: nv.map(v => Math.max(0, Math.min(100, v))) }; }
+function zoneCard(S, ctl, g, { edit = null } = {}) {
+  const can = canControl(S), ms = zoneMembers(S.zones, g), lvl = zoneLevel(S.zones, g), muted = zoneMuted(S.zones, g);
+  const pct = h('span', { class: 'pct' }, lvl + '%');
+  const vol = h('input', { type: 'range', min: 0, max: 100, value: lvl, 'aria-label': `${g.name} zone volume`, title: 'Moves every speaker in this zone together (keeps their balance)',
+    oninput: ev => { pct.textContent = ev.target.value + '%'; clearTimeout(vol._t); vol._t = setTimeout(() => ctl.act(`/groups/${g.id}/volume`, { set: +ev.target.value }), 100); } });
+  ro(vol, can, 'Your access is view-only.');
+  const mute = h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, title: muted ? 'Unmute this zone' : 'Mute every speaker in this zone',
+    onclick: () => { const m = !zoneMuted(S.zones, g); for (const z of ms) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); } }, icon(muted ? 'mute' : 'volume'));
+  mute.dataset.icon = muted ? 'mute' : 'volume'; ro(mute, can, 'Your access is view-only.');
+  const head = h('div', { class: 'zc-top' },
+    ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), can, 'Your access is view-only.'),
+    g.active ? h('span', { class: 'dtag zplaying' }, 'PLAYING') : null, muted ? h('span', { class: 'dtag zmuted' }, 'MUTED') : null,
+    h('span', { class: 'grow' }), edit ? ro(h('button', { class: 'zbtn zedit', 'aria-label': `Edit zone ${g.name}`, title: 'Edit zone', onclick: () => edit(g.id) }, '✎'), isAdmin(S)) : null);
+  const card = h('div', { class: 'zcard' + (g.active ? ' active' : '') + (muted ? ' muted' : ''), 'data-zone': g.name, 'data-group-id': g.id },
+    head, h('div', { class: 'zc-mem small dim ell' }, ms.length ? ms.map(z => z.name).join(' · ') : 'No devices yet'), h('div', { class: 'dvol' }, vol, pct, mute));
+  return card;
+}
+function zonesHead(S, ctl) {
+  return h('div', { class: 'pane-h dsec-h zones-h' }, h('span', null, 'ZONES'), h('span', { class: 'grow' }),
+    ro(h('button', { class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+ New zone'), isAdmin(S)));
 }
 // ---- 0.3.1 B9: compact Scenes & Schedules under Zones - next event + countdown + Skip, one-tap scene Run chips, Open, + (admins only).
 // No inline editing; the full window does that. The next-event countdown is shown only here (Now Playing shows no next-event status).
@@ -642,30 +670,39 @@ export function devicesPanel(S, ctl) {
       if (zpick !== 'all' && !(S.groups || []).some(g => g.id === zpick)) zpick = 'all';
       // tapping a device in Standard opens Expanded with its card highlighted: never hide that card behind a zone filter
       if (hl != null && zpick !== 'all' && !zoneFilter(S.zones, S.groups, zpick).some(z => z.id === hl)) { zpick = 'all'; saveZonePick('all'); }
-      const shown = zoneFilter(S.zones, S.groups, zpick);
+      const shown = S.zones;   // 0.3.2 F17: zones are cards in column 4 now (no sidebar filter)
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main' });
       reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
       let content;
       if (S.zones.length && shown.length) {
-        const grid = kid(emain, 'dgrid') || h('div', { class: 'dgrid' }), old = childCards(grid, 'dcard');
+        const ocol = kid(emain, 'dcol'), grid = (ocol && kid(ocol, 'dgrid')) || h('div', { class: 'dgrid' }), old = childCards(grid, 'dcard');
         reconcile(grid, shown.map(z => keepCard(old.get(String(z.id)), S, z, z.id === hl, () => expandedCard(S, ctl, z, z.id === hl), busy)));
         content = grid;
       } else content = S.zones.length ? h('p', { class: 'dim small pad' }, 'No devices in this zone yet. Use ⚙ next to the zone to add some.') : h('p', { class: 'dim small pad' }, EMPTY);
       // F19: never redraw a zone's settings under the user's typing - the zone editor is kept until it is closed (or a device is removed)
-      const oldSide = kid(emain, 'zside');
-      const side = !force && size === 'expanded' && zedit !== null && oldSide ? oldSide : keepSection(oldSide, zonesSidebar(S, ctl, zpick, setPick, zedit, setEdit), busy);
-      reconcile(emain, [content, side]);
+      // 0.3.2 F17 (final): 4 equal columns under the master row - device cards in columns 1-3 (subgrid, same tracks), column 4 = Zones then
+      // Scenes & Schedules, a thin vertical divider between. Zone cards take exactly one track, so they are as wide as a device card.
+      const oldSide = kid(emain, 'zcol');
+      const zcol = !force && zedit !== null && oldSide ? oldSide : keepSection(oldSide, (() => {
+        const c = h('div', { class: 'zcol' });
+        if (zedit !== null) { c.append(zoneEditView(S, ctl, h('div', { class: 'zside' }), (S.groups || []).find(g => g.id === zedit) || null, setEdit, setPick)); return c; }
+        c.append(zonesHead(S, ctl), (S.groups || []).length ? h('div', { class: 'zlist' }, S.groups.map(g => zoneCard(S, ctl, g, { edit: setEdit }))) : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”.'),
+          h('div', { class: 'zcol-div', role: 'separator' }), ssCompact(S, ctl));
+        return c;
+      })(), busy);
+      const devcol = kid(emain, 'dcol') || h('div', { class: 'dcol' });
+      reconcile(devcol, [h('div', { class: 'pane-h dsec-h devs-h' }, h('span', null, 'DEVICES'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, `${S.zones.filter(z => z.connected).length} online`)), content]);
+      reconcile(emain, [devcol, zcol]);
       reconcile(body, [etop, emain]);
       if (busy.v) later();
       return;
     }
     const un = unassigned(S.zones, S.groups || []), old = childCards(body, 'drow');
     reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S),
+      h('div', { class: 'pane-h dsec-h devs-h' }, h('span', null, 'DEVICES'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, `${S.zones.filter(z => z.connected).length} online`)),   // 0.3.2 F6
       S.zones.length ? S.zones.map(z => keepCard(old.get(String(z.id)), S, z, false, () => standardRow(S, ctl, z, id => ctl.setDevSize?.('expanded', id)), busy)) : h('p', { class: 'dim small pad' }, EMPTY),
-      h('div', { class: 'pane-h' }, h('span', null, 'ZONES'), h('span', { class: 'grow' }), ro(h('button', { class: 'plus zbtn', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), isAdmin(S))),
-      (S.groups || []).length ? S.groups.map(g => h('div', { class: 'zrow2' + (g.active ? ' active' : ''), 'data-zone': g.name },
-        ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), canControl(S), 'Your access is view-only.'),
-        g.active ? h('span', { class: 'badge-active' }, 'ACTIVE') : null, h('span', { class: 'small dim' }, `${g.members} device${g.members === 1 ? '' : 's'}`)))
+      zonesHead(S, ctl),      // 0.3.2 F4: zone cards with volume + mute
+      (S.groups || []).length ? keepSection(kid(body, 'zlist'), h('div', { class: 'zlist' }, S.groups.map(g => zoneCard(S, ctl, g))), busy)
         : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”. An administrator can create one to switch several devices on together.'),
       ssCompact(S, ctl),   // 0.3.1 B9
       un.length && (S.groups || []).length ? [h('div', { class: 'pane-h' }, h('span', null, 'UNASSIGNED'), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, String(un.length))),

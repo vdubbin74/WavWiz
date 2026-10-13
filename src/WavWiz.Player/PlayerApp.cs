@@ -81,7 +81,8 @@ internal sealed class PlayerApp : ApplicationContext
                 if (who.Id != null) { _s.ServerId = who.Id; if (who.Name != null) _s.ServerName = who.Name; }
             }
             _s.Save();
-            if (_s.RemoteMode) { Log("remote mode: not playing audio on this PC"); _ui.Post(_ => { _tray.Text = Tip("Remote mode"); BuildMenu(); }, null); if (_showWindow) _ui.Post(_ => OpenUi(), null); return; }   // 0.3.0 §2
+            if (_s.RemoteMode) { _s.RemoteMode = false; _s.Save(); Log("remote mode retired in 0.3.2 (mini player replaces it): this PC plays again"); }
+            if (_client != null) { Log("player already running - not starting a second stream"); return; }   // 0.3.2 F2: one stream per output
             _client = new PlayerClient(new PlayerClientOptions
             {
                 Host = _s.ServerHost, HostProvider = () => _s.ServerHost, AudioPort = _s.AudioPort, PlayerId = _s.PlayerId, Name = _s.Name, LinkType = _s.ResolveLinkType(), Token = () => _secrets.Load("token"),
@@ -97,14 +98,13 @@ internal sealed class PlayerApp : ApplicationContext
         catch (Exception e) { Log("start failed: " + e); _tray.ShowBalloonTip(5000, WavWizInfo.DisplayName, "WavWiz Player could not start: " + e.Message, ToolTipIcon.Error); }
     }
 
-    /// <summary>0.3.0 §2: turn remote mode on (stop the speaker) or off (start it again). The open window is told with ?remote=1/0.</summary>
-    private async Task SetRemoteModeAsync(bool on)
+    private MiniPlayerForm? _mini;
+    /// <summary>0.3.2 F3: the mini player (replaces Remote mode). It never touches the speaker stream (F2).</summary>
+    private void OpenMini()
     {
-        _s.RemoteMode = on; _s.Save(); Log("remote mode " + (on ? "on" : "off"));
-        if (on) { var c = _client; _client = null; try { if (c != null) await c.DisposeAsync(); } catch { } _tray.Text = Tip("Remote mode"); }
-        else if (_client == null) await StartAsync();
-        try { _web?.Navigate(WebUiForm.UiAddress(_s)); } catch { }
-        BuildMenu();
+        if (_exiting) return;
+        if (_mini is { IsDisposed: false }) { _mini.Show(); _mini.Activate(); return; }
+        _mini = new MiniPlayerForm(_s, () => OpenUi()); _mini.FormClosed += (_, _) => _mini = null; _mini.Show();
     }
 
     private int _refinding;
@@ -164,9 +164,7 @@ internal sealed class PlayerApp : ApplicationContext
         if (outs.DropDownItems.Count == 0) outs.DropDownItems.Add(new ToolStripMenuItem("No outputs found") { Enabled = false });
         _menu.Items.Add(outs);
         _menu.Items.Add(new ToolStripMenuItem("Server && pairing...", null, (_, _) => Repair()));
-        var rm = new ToolStripMenuItem("Remote mode (no sound on this PC)") { Checked = _s.RemoteMode, CheckOnClick = true, ToolTipText = "Control the music from this PC without playing it here. This PC is not a speaker." };
-        rm.Click += (_, _) => _ = SetRemoteModeAsync(rm.Checked);
-        _menu.Items.Add(rm);
+        _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
                 var auto = new ToolStripMenuItem("Start with Windows") { Checked = _s.StartWithWindows, CheckOnClick = true }; auto.Click += (_, _) => { _s.StartWithWindows = auto.Checked; _s.Save(); ApplyAutostart(); }; _menu.Items.Add(auto);
         _menu.Items.Add(new ToolStripMenuItem("Open log folder", null, (_, _) => { try { System.Diagnostics.Process.Start("explorer.exe", Path.GetDirectoryName(_logPath)!); } catch { } }));
         var sizeMenu = new ToolStripMenuItem("Display size");
@@ -203,7 +201,7 @@ internal sealed class PlayerApp : ApplicationContext
             // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
             _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
         }
-        _web = new WebUiForm(_s) { StartScreen = screen }; _web.Show(); _web.Activate();
+        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(), null); _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()
@@ -219,7 +217,7 @@ internal sealed class PlayerApp : ApplicationContext
     }
 
     private bool _exiting;
-    private void ExitApp() { if (_exiting) return; _exiting = true; try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
+    private void ExitApp() { if (_exiting) return; _exiting = true; try { _mini?.Close(); } catch { } try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
 
     /// <summary>The final WavWiz logo (embedded multi-size .ico); Windows picks the size that fits the tray.</summary>
     private static Icon MakeIcon()

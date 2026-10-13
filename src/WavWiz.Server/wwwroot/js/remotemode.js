@@ -3,7 +3,17 @@ import { h, api, toast } from './util.js';
 import { webRoomId } from './ui.js';
 export const REMOTE_KEY = 'wavwiz.remoteMode';
 /** ?remote=1 / ?remote=0 (the Player hands its tray choice over this way) wins and is remembered. */
-export function isRemote(store = globalThis.localStorage, search = globalThis.location?.search || '') {
+/** 0.3.2 F3: Remote mode is retired (the mini player replaces it). isRemote() is always false; retireRemote() clears a remembered 0.3.x
+ *  choice once and brings the device's speaker card back on the server. */
+export function isRemote() { return false; }
+export async function retireRemote(store = globalThis.localStorage) {
+  let was = null, zid = null; try { was = store?.getItem(REMOTE_KEY); zid = store?.getItem(REMOTE_KEY + '.zone'); } catch { /* ignore */ }
+  if (was == null && zid == null) return false;
+  try { store.removeItem(REMOTE_KEY); store.removeItem(REMOTE_KEY + '.zone'); } catch { /* ignore */ }
+  if (zid && !Number.isNaN(Number(zid))) { try { await api(`/zones/${Number(zid)}/remote`, { method: 'PUT', body: { remote: false } }); } catch { /* view-only */ } }
+  return was === '1';
+}
+export function wasRemote(store = globalThis.localStorage, search = globalThis.location?.search || '') {
   let q = null; try { q = new URLSearchParams(search).get('remote'); } catch { /* ignore */ }
   if (q === '1' || q === '0') { try { store?.setItem(REMOTE_KEY, q); } catch { /* ignore */ } return q === '1'; }
   try { return store?.getItem(REMOTE_KEY) === '1'; } catch { return false; }

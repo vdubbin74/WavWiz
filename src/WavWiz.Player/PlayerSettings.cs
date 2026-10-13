@@ -20,7 +20,12 @@ public sealed class PlayerSettings
     public string LinkType { get; set; } = "auto";           // auto | ethernet | wifi
     public bool StartWithWindows { get; set; } = true;
     /// <summary>0.3.0 §2: remote mode - this PC controls playback but plays no audio and is not a speaker (tray checkmark, remembered).</summary>
-    public bool RemoteMode { get; set; }
+    public bool RemoteMode { get; set; }        // 0.3.2 F3: retired (the mini player replaced it); a saved "true" is switched off on start
+    /// <summary>0.3.2 F3: mini player window - last position (physical px), pin (always on top), slim size.</summary>
+    public int? MiniX { get; set; }
+    public int? MiniY { get; set; }
+    public bool MiniPinned { get; set; }
+    public bool MiniSlim { get; set; }
     /// <summary>0 = Auto (follow Windows), else 100..300 percent (see UiScale).</summary>
     public int UiScale { get; set; } = WavWiz.PlayerCore.UiScale.Auto;
 

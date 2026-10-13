@@ -61,6 +61,9 @@ public static class ZoneApi
             return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Zones.Groups().First(x => x.Id == id));
         }).Req(Role.Admin);
         g.MapDelete("/groups/{id:long}", (long id) => { var err = s.Zones.DeleteGroup(id); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        // 0.3.2 F4: zone volume (keeps the members' offsets) and zone mute. Control, like device volume / mute.
+        g.MapPost("/groups/{id:long}/volume", async (long id, HttpContext c) => { var b = await c.Request.Body(); var (lvl, err) = s.Zones.GroupVolume(id, b.Num("set") ?? double.NaN); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, level = lvl, groups = s.Zones.Groups() }); }).Req(Role.Control);
+        g.MapPost("/groups/{id:long}/mute", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Zones.GroupMute(id, b.Bool("muted") ?? true); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, groups = s.Zones.Groups() }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/activate", (long id) => { var err = s.Zones.ActivateGroup(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Zones.Groups()); }).Req(Role.Control);
 
         // ---- manual / by-ear delay ----

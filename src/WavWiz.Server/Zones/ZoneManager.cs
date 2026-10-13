@@ -12,7 +12,25 @@ public sealed record OutputDto(long EndpointDbId, string DeviceId, string Endpoi
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
     bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null);
-public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active);
+public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false);
+
+/// <summary>0.3.2 F4: zone volume math (pure). The zone level = the average of its speakers. Moving the zone slider shifts every member by the
+/// same amount from its "virtual" level (which may sit above 100 or below 0), and the real level is that clamped to 0-100 - so clamping at an end
+/// never loses the offsets: coming back restores the original balance.</summary>
+public static class ZoneVolume
+{
+    public static double Level(IReadOnlyList<double> actual) => actual.Count == 0 ? 0 : Math.Round(actual.Average(), 2);
+    /// <summary>The virtual levels are still valid when every member's real level equals its clamped virtual level (nobody moved a speaker on its own).</summary>
+    public static bool Valid(IReadOnlyList<double>? virt, IReadOnlyList<double> actual) => virt != null && virt.Count == actual.Count && virt.Zip(actual).All(p => Math.Abs(Math.Clamp(p.First, 0, 100) - p.Second) < 0.02);
+    /// <summary>New virtual levels for slider value <paramref name="target"/>: the average of the virtual levels lands on target.</summary>
+    public static double[] Shift(IReadOnlyList<double> virt, double target)
+    {
+        if (virt.Count == 0) return Array.Empty<double>();
+        target = Math.Clamp(target, 0, 100); var d = target - virt.Average();
+        return virt.Select(v => Math.Round(v + d, 2)).ToArray();
+    }
+    public static double[] Real(IReadOnlyList<double> virt) => virt.Select(v => Math.Round(Math.Clamp(v, 0, 100), 2)).ToArray();
+}
 
 /// <summary>
 /// 1 player = 1 zone for the beta (spec 12). Keeps the zone rows, resolves each output's delay through <see cref="CalibrationLookup"/> and pushes
@@ -399,9 +417,33 @@ public sealed class ZoneManager
             int online = ids.Count(i => _host.Get(devs[i].Player) != null), on = ids.Count(i => devs[i].On);
             // ACTIVE = exactly this group's devices are switched on (every other device is off)
             bool active = ids.Count > 0 && on == ids.Count && devs.Values.Count(d => d.On) == ids.Count;
-            res.Add(new ZoneGroupDto(g.Id, g.Name, ids, ids.Count, online, on, active));
+            var vols = _db.Query("SELECT id,volume,muted FROM zone", r => (Id: r.GetInt64(0), V: r.GetDouble(1), M: r.GetInt32(2) != 0)).Where(x => ids.Contains(x.Id)).ToList();
+            res.Add(new ZoneGroupDto(g.Id, g.Name, ids, ids.Count, online, on, active, ZoneVolume.Level(vols.Select(x => x.V).ToList()), vols.Count > 0 && vols.All(x => x.M)));
         }
         return res;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (long[] Ids, double[] Virt)> _zoneVirt = new();
+    /// <summary>0.3.2 F4: the zone slider. Moves every member keeping their offsets (see <see cref="ZoneVolume"/>). Returns the new zone level.</summary>
+    public (double? Level, string? Err) GroupVolume(long groupId, double target)
+    {
+        if (!double.IsFinite(target)) return (null, "volume must be a number");
+        var g = Groups().FirstOrDefault(x => x.Id == groupId); if (g == null) return (null, "zone not found");
+        var ids = g.DeviceIds.ToArray(); if (ids.Length == 0) return (0, null);
+        var vol = _db.Query("SELECT id,volume FROM zone", r => (Id: r.GetInt64(0), V: r.GetDouble(1))).ToDictionary(x => x.Id, x => x.V);
+        var actual = ids.Select(i => vol[i]).ToList();
+        var virt = _zoneVirt.TryGetValue(groupId, out var m) && m.Ids.SequenceEqual(ids) && ZoneVolume.Valid(m.Virt, actual) ? m.Virt : actual.ToArray();
+        var nv = ZoneVolume.Shift(virt, target); var real = ZoneVolume.Real(nv);
+        _zoneVirt[groupId] = (ids, nv);
+        for (int i = 0; i < ids.Length; i++) if (Math.Abs(real[i] - actual[i]) > 0.001) Patch(ids[i], null, real[i], null, null);
+        return (ZoneVolume.Level(real), null);
+    }
+    /// <summary>0.3.2 F4: zone mute = every member muted / un-muted.</summary>
+    public string? GroupMute(long groupId, bool muted)
+    {
+        var g = Groups().FirstOrDefault(x => x.Id == groupId); if (g == null) return "zone not found";
+        foreach (var id in g.DeviceIds) Patch(id, null, null, muted, null);
+        return null;
     }
 
     private static string? CheckName(ref string? name)

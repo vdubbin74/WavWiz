@@ -9,7 +9,6 @@ import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
-import { isRemote } from './remotemode.js';
 
 
 function menuActions(S, ctl, desktop = false) {
@@ -62,7 +61,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Scenes & Schedules…', () => go('scenes')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
-      ['Use as remote only', () => { ctl.toggleRemote?.(); toast(isRemote() ? 'Remote mode is on. This device plays no sound.' : 'Remote mode is off. This device plays music again.'); }, null, () => isPlayerUa()],      // 0.3.0 §2: the Player has the same choice in its tray menu
+      ['Mini player', () => ctl.openMini?.()],      // 0.3.2 F3: replaces Remote mode
       'hr',
       ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
       ['Away-from-home…', () => go('remote'), () => !admin()],

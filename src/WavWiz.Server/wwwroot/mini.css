@@ -1,0 +1,27 @@
+/* WavWiz 0.3.2 F3: mini player (420x72 main, 300x48 slim). Theme colors come from the device theme (theme.js), like every other window. */
+html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);color:var(--ink)}
+.mp{box-sizing:border-box;height:100vh;display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel);user-select:none}
+.mp .mp-art{width:58px;height:58px;flex:none;border-radius:3px;object-fit:cover;background:var(--panel2);cursor:grab}
+.mp .mp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:grab}
+.mp .mp-t{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp .mp-a{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp .mp-seek{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.mp .mp-seek input{flex:1;min-width:30px;height:12px;accent-color:var(--accent)}
+.mp .mp-tr{display:flex;gap:4px;flex:none}
+.mp .mp-b{width:26px;height:26px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer}
+.mp .mp-b:hover{border-color:var(--accent)}
+.mp .mp-b .ico-svg{width:14px;height:14px}
+.mp .mp-b.play{color:var(--accent-text,var(--accent));border-color:var(--accent)}
+.mp .mp-b.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.mp .mp-vol{display:flex;align-items:center;gap:4px;flex:none}
+.mp .mp-vol input{width:52px;accent-color:var(--accent2,var(--accent))}
+.mp .mutebtn{width:26px;height:26px}
+.mp .mutebtn.on{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
+.mp .mp-side{display:flex;flex-direction:column;gap:4px;flex:none}
+.mp .mp-x{background:none;border:0;color:var(--dim);font-size:16px;cursor:pointer;padding:0 2px}
+.mp .mp-x:hover{color:var(--ink)}
+/* slim 300x48: art, title, seek, prev/play/next, expand, close */
+.mp.slim{padding:4px 6px;gap:6px}
+.mp.slim .mp-art{width:38px;height:38px}
+.mp.slim .mp-a,.mp.slim .mp-vol,.mp.slim .mp-pin,.mp.slim .mp-seek span{display:none}
+.mp.slim .mp-side{flex-direction:row}

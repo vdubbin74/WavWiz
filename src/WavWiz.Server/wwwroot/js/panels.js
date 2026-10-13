@@ -7,7 +7,7 @@ const base = v => (v === 'rail' ? 'rail' : 'normal');
 /** { lib: 'rail'|'normal', dev: 'rail'|'normal', exp: null|'lib'|'dev', list: 'open'|'collapsed', ctl: 'open'|'collapsed' } */
 export function normPanels(p) {
   p = p && typeof p === 'object' ? p : {};
-  return { lib: base(p.lib), dev: base(p.dev), exp: p.exp === 'lib' || p.exp === 'dev' ? p.exp : null, list: p.list === 'collapsed' ? 'collapsed' : 'open', ctl: p.ctl === 'collapsed' ? 'collapsed' : 'open' };
+  return { lib: base(p.lib), dev: base(p.dev), exp: p.exp === 'lib' || p.exp === 'dev' ? p.exp : null, list: p.list === 'collapsed' ? 'collapsed' : p.list === 'expanded' ? 'expanded' : 'open', ctl: p.ctl === 'collapsed' ? 'collapsed' : 'open' };
 }
 /** One key; the 0.2.x keys (wavwiz.libcollapsed, wavwiz.devsize, wavwiz.listcollapsed, wavwiz.npctlcollapsed, libprefs.expanded) move over once. */
 export function loadPanels(store = globalThis.localStorage) {
@@ -56,3 +56,9 @@ export function keyAction(p, ev) {
   if (ev.key === 'Escape' && p.exp) return esc(p);
   return null;
 }
+/** 0.3.2 F13/F15: the Playlist has three heights - collapsed (header strip) · open (today's --listh) · expanded (rises over the EQ / visualizer,
+ *  Now Playing stays below). Up = expand one step, down = collapse one step. */
+export const LIST_STEPS = ['collapsed', 'open', 'expanded'];
+export function listStep(p, dir) { const i = LIST_STEPS.indexOf(normPanels(p).list), j = Math.max(0, Math.min(2, i + (dir === 'up' ? 1 : -1))); return { ...p, list: LIST_STEPS[j] }; }
+/** Which arrows the Playlist header shows: up while it can grow, down while it can shrink. */
+export const listArrows = list => ({ up: list !== 'expanded', down: list !== 'collapsed' });

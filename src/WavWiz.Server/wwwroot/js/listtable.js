@@ -12,14 +12,17 @@ export function listTable(S, ctl) {
   const table = h('table', { class: 'qtable', 'aria-label': 'Play queue' }, colgroup, h('thead', null, thead), tbody);
   const wrap = h('div', { class: 'qwrap' }, table);
   // 0.1.1: collapse arrow (slides the panel down to its header strip); View state lives on the desk element, saved per device
-  const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse or expand the playlist', 'aria-expanded': 'true', title: 'Collapse / expand the playlist', onclick: () => ctl.toggleList?.() }, '˅');
-  const setCollapsed = c => { colBtn.textContent = c ? '˄' : '˅'; colBtn.setAttribute('aria-expanded', String(!c)); };
-  const head = h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, colBtn));
+  // 0.3.2 F15: up arrow = expand (grow upward), down arrow = collapse; each only while that move is possible
+  const upBtn = h('button', { class: 'plus listup', 'aria-label': 'Expand the playlist upward', title: 'Expand the playlist', onclick: () => ctl.listStep?.('up') }, '˄');
+  const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse the playlist', 'aria-expanded': 'true', title: 'Collapse the playlist', onclick: () => ctl.listStep ? ctl.listStep('down') : ctl.toggleList?.() }, '˅');
+  const setState = st => { const a = { up: st !== 'expanded', down: st !== 'collapsed' }; upBtn.hidden = !a.up; colBtn.hidden = !a.down; colBtn.setAttribute('aria-expanded', String(st !== 'collapsed')); };
+  const setCollapsed = c => setState(c === true ? 'collapsed' : c === false ? 'open' : c);
+  const head = h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Playlist' }, head, wrap);
   /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
   const setNextBlock = el => { head.insertBefore(el, meta); };
   /** Left edge of the right-hand header controls (count, Save, Clear, arrow), for keeping the Up next line clear of them. */
-  const rightEdge = () => Math.min(...[meta, btns, colBtn].map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
+  const rightEdge = () => Math.min(...[meta, btns, upBtn, colBtn].map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
   const leftEdge = () => { const r = document.createRange(); r.selectNodeContents(title); return r.getBoundingClientRect().right; };
 
   function applyWidths() { [...colgroup.children].forEach((c, i) => { c.style.width = widths[i] + 'px'; }); table.style.width = widths.reduce((a, b) => a + b, 0) + 'px'; }
@@ -61,5 +64,5 @@ export function listTable(S, ctl) {
     const row = tbody.querySelector('tr.cur'); if (row && !wrap.matches(':hover')) row.scrollIntoView({ block: 'nearest' });
   }
   buildHead();
-  return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setNextBlock, leftEdge, rightEdge };
+  return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setState, setNextBlock, leftEdge, rightEdge };
 }

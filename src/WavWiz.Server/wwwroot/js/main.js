@@ -9,9 +9,9 @@ import { listTable } from './listtable.js';
 import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction } from './panels.js';
+import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction, listStep } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
-import { isRemote, remoteBanner, setRemote, REMOTE_KEY, syncPlayerRemote } from './remotemode.js';
+import { retireRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
 import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
@@ -80,11 +80,6 @@ function renderSetup() {
   app.replaceChildren(topbar(), form);
 }
 
-/** 0.3.0 §2: "Use as remote only" on the connect screen: controls playback, plays nothing here. */
-function remoteChoice() {
-  const cb = h('input', { type: 'checkbox', id: 'remoteonly', checked: isRemote(), onchange: () => { try { localStorage.setItem(REMOTE_KEY, cb.checked ? '1' : '0'); } catch { /* ignore */ } } });
-  return h('label', { class: 'row remote-choice', for: 'remoteonly' }, cb, h('span', null, 'Use as remote only', h('small', { class: 'dim', style: 'display:block' }, 'Control the music from here without playing sound on this device.')));
-}
 function renderLogin() {
   const mode = { v: 'pair' };
   const root = h('div', { class: 'card auth' });
@@ -99,7 +94,7 @@ function renderLogin() {
       mode.v === 'pair'
         ? h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/pair', { method: 'POST', body: { code: code.value, name: name.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
             h('p', { class: 'dim' }, 'On the PC that runs WavWiz open Settings > Players > Pair, and type the 6-digit code here.'),
-            h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), remoteChoice(), msg, h('button', { class: 'btn primary' }, 'Pair'))
+            h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), msg, h('button', { class: 'btn primary' }, 'Pair'))
         : h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/login', { method: 'POST', body: { password: pw.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
             h('div', { class: 'field' }, h('label', { for: 'pw' }, 'Administrator password'), pw), msg, h('button', { class: 'btn primary' }, 'Sign in')));
   };
@@ -120,7 +115,7 @@ async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = { el: h('div', { id: 'p-radio' }), reload: drawRadio };
@@ -131,7 +126,7 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, toggleRemote, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
@@ -147,9 +142,9 @@ async function startMain() {
   libpanel.addEventListener('click', ev => { if (libpanel.classList.contains('israil') && !ev.target.closest('button:not(.libpanel)')) setPanels(railClick(P6, 'lib'), 'lib'); });
   libpanel.addEventListener('dragenter', () => { if (libpanel.classList.contains('israil')) setPanels(railClick(P6, 'lib'), 'lib'); });
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
-  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
+  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : P6.list === 'expanded' ? ' listexpanded' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
   desk.addEventListener('transitionend', ev => { if (ev.target === desk && /grid-template/.test(ev.propertyName)) { nowc.viz?.resize?.(); placeNext(); } });   // §6: the viz resizes once the move has finished
-  listt.setCollapsed?.(desk.classList.contains('listcollapsed'));
+  listt.setCollapsed?.(P6.list);
   wireNextBlock();
   tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
   drawerEl = buildDrawer();
@@ -166,13 +161,13 @@ async function startMain() {
   drawStatus(); maybeWhatsNew(S);
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
   api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
-  if (isPlayerUa()) syncPlayerRemote(S, thisDevice(S));   // 0.3.0 §2: the Player tray's Remote mode
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
   const hashCal = () => { if (location.hash === '#calibrate') { history.replaceState(null, '', location.pathname + location.search); if (canControl(S)) openCalibration(S, refreshAll); } };
   hashCal(); window.addEventListener('hashchange', hashCal);
   setInterval(() => nowc.tickPos(), 250);
   // 0.3.0 §2: remote mode (remembered per device) never joins as a speaker
-  if (isRemote()) remoteBanner(true, () => toggleRemote(false)); else installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker
+  await retireRemote();      // 0.3.2 F3: Remote mode is gone - a remembered choice is cleared once and the speaker card comes back
+  installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
 /** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */
@@ -225,7 +220,10 @@ function wireNextBlock() {
   new MutationObserver(ms => { if (ms.some(m => !nb.contains(m.target))) later(); }).observe(listt.head, { childList: true, subtree: true, characterData: true });
   later();
 }
-function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); desk.classList.toggle('listcollapsed', c); P6 = savePanels({ ...P6, list: c ? 'collapsed' : 'open' }); listt.setCollapsed?.(c); placeNext(); if (!c) setTimeout(() => listt.relayout?.(), 340); }
+function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); setList(c ? 'collapsed' : 'open'); }
+/** 0.3.2 F13: collapsed · open · expanded (rises over the EQ / visualizer at center-column width; Now Playing stays visible below). */
+function setList(st) { desk.classList.toggle('listcollapsed', st === 'collapsed'); desk.classList.toggle('listexpanded', st === 'expanded'); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
+function listStepUi(dir) { setList(listStep(P6, dir).list); }
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {
   const v = views[k]; if (!v) return;
@@ -238,7 +236,7 @@ async function openAboutInto(el) { const { aboutBody } = await import('./about.j
 
 function buildDrawer() {
   navButtons = [];
-  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, toggleRemote }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
+  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, openMini }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
   return h('div', { class: 'drawer', id: 'drawer', role: 'dialog', 'aria-label': 'Menu' }, h('div', { class: 'scrim', onclick: () => toggleDrawer(false) }), nav);
 }
 function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
@@ -270,9 +268,11 @@ export function go(k, force) {
   window.scrollTo(0, 0);
 }
 const checklistGo = a => go(a);
-/** 0.3.0 §2: Devices > Use as remote only (and the connect screens). */
-export function toggleRemote(on = !isRemote()) {
-  return setRemote(S, on, { stopDevice: () => stopPhoneDevice().catch(() => {}), startDevice: () => { unlockAudio(); return startPhoneAsDevice(defaultRoomName()).then(() => refreshAll()).catch(e => toast(e.message, true)); } });
+/** 0.3.2 F3: the mini player (replaces Remote mode). In a browser it is a small popup window; WavWiz Player has its own (tray > Mini player).
+ *  It never joins as a speaker, so opening or closing it never changes the streams (F2). */
+export function openMini() {
+  try { window.chrome?.webview?.postMessage({ cmd: 'mini' }); if (window.chrome?.webview) return; } catch { /* not the Player */ }
+  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=72');
 }
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }

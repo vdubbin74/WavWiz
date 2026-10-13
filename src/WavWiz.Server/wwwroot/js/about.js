@@ -13,7 +13,7 @@ export const WHATS_NEW = [
   ['Fixes', 'The EQ fits iPhone screens without scroll bars, artist pictures are no longer striped (bad pictures show initials instead), and the delay slider no longer sticks; the mouse wheel fine-tunes it by 1 ms (Shift: 10 ms).'],
   // 0.3.0
   ['Jukebox mode (beta)', 'Playback > Start Jukebox… turns a PC into a locked party screen. Guests scan the QR code and add songs from their phone, no app or sign-in. Only the host PIN gets out.'],
-  ['Remote mode', 'Use a phone, browser or PC as a remote only: it controls the music but plays no sound and is not a speaker. Devices > Use as remote only, or the tray menu on a Player PC.'],
+  ['Mini player', 'A small movable window with only the playback controls: cover, title, seek, previous / play / next, mute and volume. Pin it to keep it on top. Devices > Mini player, or the tray menu on a Player PC.'],
   ['Alarms (beta), sleep timer, crossfade', 'Scenes & Schedules is one window. Wake up to a playlist with a fade-in, snooze or skip the next alarm, fall asleep with a timer, and crossfade songs (Settings > Playback, off by default).'],
   ['EQ in the middle', 'Now Playing shows the live EQ by default. The toggle next to Looks switches to the visualizer, remembered on this device.'],
   ['Backup and restore', 'Settings > General > Backup saves your settings, playlists, scenes, alarms, EQ presets and device names in one file, with a preview before restoring.'],
