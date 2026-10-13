@@ -108,7 +108,7 @@ if (want('g11')) await step('g11', async () => {
   await setPanels(p, NORMAL); await home(); await openSet('appearance', 'Display size'); await shot(p, 'slider-style-setting');
   const tr = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--voltrack').trim());
   const g = await tr(); await p.locator('.sliderstyle button[data-slider=flat]').click(); await p.waitForTimeout(300); const f = await tr();
-  const acc = await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()); ok('G11 Gradient (default) from theme colors, Flat = primary', /gradient/.test(g) && f === acc, JSON.stringify({ g, f, acc }));
+  const acc = await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()); ok('G11 Gradient (default) from theme colors, Flat = primary (0.3.4: one-color gradient)', /gradient/.test(g) && (f === acc || f.replace(/\s/g, '') === `linear-gradient(${acc},${acc})`), JSON.stringify({ g, f, acc }));
   await closeDlg(p); await clean(); await shot(p, 'devices-flat-slider'); await p.evaluate(() => { localStorage.setItem('wavwiz.sliderstyle', 'gradient'); document.documentElement.dataset.slider = 'gradient'; });
 });
 
