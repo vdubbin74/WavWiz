@@ -122,7 +122,7 @@ test('0.2.0 items 10 + 26 + 27 + 28 + 30: three Devices sizes, master on top, mu
   assert.equal(d.chosenOutput({ outputs: [o('a', { connected: false }), o('bb')], chosenDeviceId: 'a' }).deviceId, 'a');   // never silently the other one
   assert.equal(d.masterLevel([{ enabled: true, volume: 40 }, { enabled: true, volume: 70 }, { enabled: false, volume: 100 }]), 70);   // off speakers skipped
   const s = src('devices.js');
-  assert.match(s, /MASTER VOLUME/); assert.match(s, /'\/zones\/master', \{ set:/); assert.match(s, /mutebtn/);
+  assert.match(s, /'MASTER', h\('span', \{ class: 'mvword' \}, ' VOLUME'\)/);   // 0.3.3 G10: one-line "MASTER" in the slim panel assert.match(s, /'\/zones\/master', \{ set:/); assert.match(s, /mutebtn/);
   assert.match(s, /latencyControl\(\{ label: `\$\{z\.name\} delay`/); /* 0.2.5: the delay slider moved into Settings (approved render v2) */ assert.match(s, /Output unavailable/); assert.match(s, /'\/calibration\/reference', \{ method: 'PUT'/);
   assert.match(s, /k: 'ref', text: 'REF'/); /* 0.2.5 tag (render v2) */ assert.match(s, /Set as reference/); assert.match(s, /canTune\(S, z\)/); assert.match(s, /Forget device…/); assert.match(s, /Rename…/);
   assert.doesNotMatch(s, /can \? h\('button'/, 'no control is hidden because of the role');

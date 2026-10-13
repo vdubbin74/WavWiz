@@ -87,6 +87,6 @@ test('F3: Mini player replaces Remote mode; F10/F11: versioned art URLs; F16: (i
   assert.match(src('menu.js'), /\['Mini player'/); assert.match(src('mini.js'), /send\(/);
   const art = await imp('art'); art.setArtCv('3.0.3.2'); assert.match(art.itemArtUrl({ kind: 'track', trackId: 5, refId: 5, id: 5 }) || '', /cv=3\.0\.3\.2/);
   assert.match(src('settingsui.js'), /class: 'infoi'|infoi/);
-  const a = await imp('about'); assert.equal(a.WHATS_NEW_VERSION, '0.3.2'); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
+  const a = await imp('about'); assert.equal(a.WHATS_NEW_VERSION, '0.3.3'); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
   assert.ok(!a.WHATS_NEW.some(([t]) => t === 'Remote mode'), 'retired feature not advertised');
 });

@@ -89,7 +89,7 @@ test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view nev
   // 0.3.2 F17: the zone sidebar became column 4 of expanded Devices (zone cards, then Scenes & Schedules); the editor still opens in place
   assert.match(d, /dexp-main/); assert.match(d, /class: 'zcol'|'zcol'/);
   assert.match(d, /zedit !== null && oldSide \? oldSide :/);   // 0.2.3 fix kept: the zone editor is never redrawn under typing
-  assert.match(css, /\.devpanel\.expanded \.dexp-main\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css, /\.devpanel\.expanded \.dexp-main\.e1\{display:grid!important;grid-template-columns:340px minmax\(0,1fr\) 330px/);   // 0.3.3 G9: E1 replaces F17's 4 columns
   const body = d.slice(d.indexOf('export function zoneFilter'));
   const fnSrc = body.slice(0, body.indexOf('\n}\n') + 2).replace('export ', '');
   const zoneFilter = new Function(fnSrc + '; return zoneFilter;')();

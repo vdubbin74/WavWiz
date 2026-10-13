@@ -1,5 +1,8 @@
 import { h, fmtDur, fmtTime } from './util.js';
-import { canControl } from './ui.js';
+import { canControl, MIME } from './ui.js';
+import { api, toast } from './util.js';
+import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
+const QMIME = 'application/x-wavwiz-qrows';
 import { resizeCol, fitWidths, toFracs, loadFracs, saveFracs, MIN_COL } from './cols.js';
 
 const HEAD = ['#', 'TITLE', 'ARTIST', 'ALBUM', 'GENRE', 'TIME'];
@@ -55,14 +58,57 @@ export function listTable(S, ctl) {
     meta.textContent = S.queue.length ? `${S.queue.length} track${S.queue.length === 1 ? '' : 's'} • ${fmtDur(total)}` : '';
     btns.replaceChildren(can && S.queue.length ? [h('button', { class: 'btn sm', onclick: () => ctl.saveQueue() }, 'Save as playlist'), h('button', { class: 'btn sm', onclick: () => ctl.act('/queue/clear') }, 'Clear')] : null);
     if (!S.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: 6 }, 'The playlist is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
+    if (dragging) return;   // never redraw under a drag
+    sel = sel.filter(i => i < S.queue.length);
     tbody.replaceChildren(...S.queue.map((q, i) => {
       const isCur = i === cur && playing;
-      return h('tr', { class: isCur ? 'cur' : '', 'data-i': i, onclick: () => can && ctl.act('/stream/jump', { index: i }) },
-        h('td', { class: 'num' }, isCur ? '▶' : i + 1), h('td', { class: 'ell', title: q.title }, q.title), h('td', { class: 'ell', title: q.artist || '' }, q.artist || ''), h('td', { class: 'ell', title: q.album || '' }, q.album || ''),
+      // 0.3.3 G12: grip + drag to reorder (Ctrl / Shift click selects several), plain click still plays that row
+      const tr = h('tr', { class: (isCur ? 'cur' : '') + (sel.includes(i) ? ' sel' : ''), 'data-i': i, draggable: can ? 'true' : 'false', 'aria-selected': String(sel.includes(i)),
+        onclick: ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { sel = nextSelection(sel, i, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, anchor); if (!ev.shiftKey) anchor = i; draw(); return; } sel = [i]; anchor = i; can && ctl.act('/stream/jump', { index: i }); } });
+      if (can) tr.addEventListener('dragstart', ev => { if (!sel.includes(i)) { sel = [i]; anchor = i; } dragging = sel.slice(); ev.dataTransfer.setData(QMIME, JSON.stringify(dragging)); ev.dataTransfer.setData('text/plain', q.title); ev.dataTransfer.effectAllowed = 'move'; tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('dragging', dragging.includes(+r.dataset.i))); });
+      tr.addEventListener('dragend', () => { dragging = null; clearIns(); stopScroll(); tbody.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); setTimeout(draw, 0); });
+      tr.append(
+        h('td', { class: 'num' }, can ? h('span', { class: 'qgrip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '⋮⋮') : null, isCur ? '▶' : i + 1), h('td', { class: 'ell', title: q.title }, q.title), h('td', { class: 'ell', title: q.artist || '' }, q.artist || ''), h('td', { class: 'ell', title: q.album || '' }, q.album || ''),
         h('td', { class: 'ell' }, q.genre || ''), h('td', { class: 'dur' }, q.durationMs ? fmtTime(q.durationMs) : '', can ? h('button', { class: 'rm', 'aria-label': `Remove ${q.title} from the queue`, title: 'Remove', onclick: ev => { ev.stopPropagation(); ctl.act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null));
+      return tr;
     }));
     const row = tbody.querySelector('tr.cur'); if (row && !wrap.matches(':hover')) row.scrollIntoView({ block: 'nearest' });
   }
+  // ---- 0.3.3 G12: drop handling (reorder rows, or songs / albums / folders from the Library at the line), auto-scroll, Ctrl+Z undo ----
+  let sel = [], anchor = null, dragging = null, undo = null, scrollT = 0, scrollV = 0; const insLine = h('div', { class: 'qins', hidden: true });
+  wrap.append(insLine);
+  const rowBoxes = () => [...tbody.querySelectorAll('tr[data-i]')].map(r => r.getBoundingClientRect());
+  const clearIns = () => { insLine.hidden = true; };
+  const stopScroll = () => { cancelAnimationFrame(scrollT); scrollT = 0; scrollV = 0; };
+  const tick = () => { if (!scrollV) { scrollT = 0; return; } wrap.scrollTop += scrollV; scrollT = requestAnimationFrame(tick); };
+  const accepts = ev => canControl(S) && (ev.dataTransfer?.types?.includes(QMIME) || ev.dataTransfer?.types?.includes(MIME));
+  wrap.addEventListener('dragover', ev => {
+    if (!accepts(ev)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = ev.dataTransfer.types.includes(QMIME) ? 'move' : 'copy';
+    const boxes = rowBoxes(), t = dropIndex(boxes, ev.clientY), wr = wrap.getBoundingClientRect();
+    const y = boxes.length ? (t < boxes.length ? boxes[t].top : boxes[boxes.length - 1].bottom) : wr.top + 24;
+    insLine.hidden = false; insLine.style.top = (y - wr.top + wrap.scrollTop - 1) + 'px'; insLine.dataset.at = String(t);
+    scrollV = edgeScroll(ev.clientY, wr.top, wr.bottom); if (scrollV && !scrollT) scrollT = requestAnimationFrame(tick);
+  });
+  wrap.addEventListener('dragleave', ev => { if (!wrap.contains(ev.relatedTarget)) { clearIns(); stopScroll(); } });
+  wrap.addEventListener('drop', async ev => {
+    if (!accepts(ev)) return; ev.preventDefault(); stopScroll();
+    const t = dropIndex(rowBoxes(), ev.clientY); clearIns();
+    const rows = ev.dataTransfer.getData(QMIME), ref = ev.dataTransfer.getData(MIME);
+    try {
+      if (rows) await moveRows(JSON.parse(rows), t);
+      else if (ref) { await api('/queue/add', { method: 'POST', body: { ...JSON.parse(ref), at: t } }); toast('Added to the playlist'); ctl.refreshAll?.(); }
+    } catch (e) { toast(e.message, true); ctl.refreshAll?.(); }
+  });
+  /** Reorder: the selected rows go to insertion point t as one block; remembered for Ctrl+Z. */
+  async function moveRows(selIdx, t) {
+    const n = S.queue.length, order = reorder(n, selIdx, t), ids = [...Array(n).keys()], mv = movesFor(ids, order);
+    if (!mv.length) return;
+    for (const m of mv) await api('/queue/move', { method: 'POST', body: m });
+    undo = order; const p = order.indexOf(selIdx.slice().sort((a, b) => a - b)[0]); sel = selIdx.map((_, k) => p + k); anchor = p;
+    ctl.refreshAll?.();
+  }
+  async function doUndo() { const back = undoMoves(undo); undo = null; try { for (const m of back) await api('/queue/move', { method: 'POST', body: m }); toast('Reorder undone'); } catch (e) { toast(e.message, true); } ctl.refreshAll?.(); }
+  if (typeof document !== 'undefined') document.addEventListener('keydown', ev => { if (undo && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z' && !document.querySelector('dialog[open]') && !ev.target.closest?.('input,textarea,select,[contenteditable]')) { ev.preventDefault(); doUndo(); } });   // Ctrl+Z undoes the last reorder
   buildHead();
   return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setState, setNextBlock, leftEdge, rightEdge };
 }

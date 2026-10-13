@@ -8,6 +8,18 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## 0.3.3 (beta)
+- G1 Settings and other center popups take the live center column width as their maximum (measured, updated on resize, panel changes and Display size).
+- G2 / G2b Now Playing picker: one style per row at full width; each preview is laid out at the real panel width and scaled down to fit.
+- G3 Settings v2: unboxed list layout with theme colors (primary, secondary, highlight); Pepecoin uses brand-kit colors only.
+- G4 Mini player: icon-only master mute, window transparency (default opaque, minimum 30 %, solid on hover, remembered), text that fits.
+- G5 Expanded Playlist slides Now Playing up to the top of the center column; the EQ / visualizer stop rendering while covered.
+- G6-G10 Devices: bars reach the %, zone cards look like device cards, "Speakers" wording, slim standard panel, E1 expanded view (Zones | Speakers | Scenes & Schedules) with an Unassigned subgroup and + Add to zone.
+- G11 Volume slider style: Gradient (theme) or Flat, in Settings > Appearance.
+- G12 Playlist drag and drop: reorder (multi-select, insertion line, auto-scroll, Ctrl+Z) and drop from the Library at a position (server: /queue/add accepts "at").
+- G13 Jukebox Start / Stop dialogs fixed (object-form dialog buttons; validation keeps the dialog open; non-admins get a message).
+- G14 Spectrum glow slider no longer sticks (no save / dialog rebuild on every input).
+
 ## [Unreleased]
 
 Nothing yet.

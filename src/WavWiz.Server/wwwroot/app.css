@@ -1957,3 +1957,11 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .sliderstyle{display:flex;align-items:center;gap:16px;margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
 .slsw{display:inline-block;width:28px;height:5px;border-radius:3px;margin-right:6px;vertical-align:middle}
 .slsw.gradient{background:linear-gradient(90deg,var(--accent),var(--accent2),var(--hl,var(--accent2)))} .slsw.flat{background:var(--accent)}
+/* G12: playlist drag and drop - grip, selected rows, insertion line */
+.qwrap{position:relative}
+.qtable td.num .qgrip{display:inline-block;width:10px;margin-right:4px;color:var(--dim);cursor:grab;opacity:0;letter-spacing:-2px}
+.qtable tr:hover td.num .qgrip,.qtable tr.sel td.num .qgrip{opacity:1}
+.qtable tr.sel td{background:color-mix(in srgb,var(--hl,var(--accent)) 12%,transparent)}
+.qtable tr.dragging{opacity:.45}
+.qins{position:absolute;left:0;right:0;height:2px;background:var(--hl,var(--accent));box-shadow:0 0 6px var(--hl,var(--accent));pointer-events:none;z-index:2}
+.qins[hidden]{display:none}

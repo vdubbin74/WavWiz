@@ -21,7 +21,7 @@ test('0.3.0 §3.1: a 0.2.5 profile with the visualizer selected opens on EQ once
 });
 test('0.3.0 §3.3: the visualizer is created only while selected and destroyed when hidden / under the Jukebox screen', () => {
   const n = src('now.js');
-  assert.match(n, /if \(!p\.on \|\| center !== 'viz' \|\| kioskOpen\(\) \|\| document\.hidden\) \{ if \(viz\) \{ viz\.destroy\(\); viz = null; \}/);
+  assert.match(n, /if \(!p\.on \|\| center !== 'viz' \|\| kioskOpen\(\) \|\| document\.hidden \|\| covered\) \{ if \(viz\) \{ viz\.destroy\(\); viz = null; \}/);   // 0.3.3 G5: also while the expanded Playlist covers it
   assert.match(n, /document\.addEventListener\('visibilitychange', \(\) => \{ ensureViz\(\)/);
   assert.match(n, /else if \(eqv\) \{ eqv\.destroy\(\); eqv = null; \}/, 'the EQ view (and its spectrum tap) goes away too');
   assert.match(n, /np-centertoggle/);

@@ -212,7 +212,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   // the Standard rows keep only name, status, volume, Mute and on/off; tapping the name opens Expanded with that card highlighted
   assert.doesNotMatch(row, /settingsToggle|cardSettings|escCloses|dexpand/);
   assert.match(row, /onclick: \(\) => openDevice\(z\.id\)/);
-  assert.match(d, /standardRow\(S, ctl, z, id => ctl\.setDevSize\?\.\('expanded', id\)\)/);
+  assert.match(d, /(?:standardRow|slimRow)\(S, ctl, z, id => ctl\.setDevSize\?\.\('expanded', id\)\)/);   // 0.3.3 G10: slimRow wraps standardRow
   assert.doesNotMatch(css, /\.drow[^{]*\.(dexpand|dexp-l|dsettings)|\.drow\.dset/);
 });
 

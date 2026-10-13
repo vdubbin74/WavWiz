@@ -82,7 +82,8 @@ public static class PlaybackApi
         g.MapPost("/queue/add", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); var items = ResolveItems(s, b, out var err); if (err != null) return Ext.Bad(err);
-            s.Conductor.Add(items, b.Bool("next") == true); return Results.Json(new { ok = true, added = items.Count });
+            if (b.Long("at") is long at) s.Conductor.Insert(items, (int)at); else s.Conductor.Add(items, b.Bool("next") == true);   // 0.3.3 G12: drop position
+            return Results.Json(new { ok = true, added = items.Count });
         }).Req(Role.Control);
 
         g.MapDelete("/queue/{index:int}", (int index) => s.Conductor.Remove(index) ? Results.Json(new { ok = true }) : Ext.Bad("no such queue position", 404)).Req(Role.Control);

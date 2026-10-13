@@ -350,6 +350,18 @@ public sealed class Conductor : IDisposable
         }
     }
 
+    /// <summary>0.3.3 G12: insert at a queue position (drag from the Library to the drop line). at &lt; 0 or past the end appends.</summary>
+    public void Insert(IEnumerable<QueueItem> items, int at)
+    {
+        lock (_l)
+        {
+            var list = items.Select(WithId).ToList(); if (list.Count == 0) return;
+            CurrentIndexNoLock(); var old = new List<QueueItem>(_queue);
+            if (at < 0 || at > _queue.Count) at = _queue.Count;
+            _queue.InsertRange(at, list); _unshuffled = null; Remap(old, _index);
+            Bump(); _events.Publish("queue", null);
+        }
+    }
     public bool Move(int from, int to)
     {
         lock (_l)

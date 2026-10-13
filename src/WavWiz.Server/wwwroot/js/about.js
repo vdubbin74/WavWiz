@@ -4,6 +4,15 @@ import { wordmark } from './brand.js';
 export const WHATS_NEW_VERSION = '0.3.3';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
+  // 0.3.3 (only what shipped)
+  ['Jukebox starts again', 'Playback > Start Jukebox… works again: the Start and Stop buttons were blank and did nothing in 0.3.2.'],
+  ['New Settings look', 'Settings is a clean list per section in your theme colors, and never wider than the center panel.'],
+  ['Devices', 'The Devices panel is slimmer, so more speakers fit. Expanded shows Zones, Speakers (one line each, with the output name) and Scenes & Schedules side by side. Speakers that are not in a zone get + Add to zone.'],
+  ['Volume slider style', 'Settings > Appearance > Display size: Gradient (from your theme colors, the default) or Flat.'],
+  ['Playlist drag and drop', 'Drag songs to reorder them (Ctrl / Shift to pick several, Ctrl+Z undoes), or drag songs, albums and folders from the Library to the spot you want.'],
+  ['Now Playing and the Playlist', 'Expanding the Playlist slides Now Playing up with it. The Now Playing picker shows each style full width and to scale.'],
+  ['Mini player', 'A mute button, a window transparency control (solid again when you point at it) and text that fits.'],
+  ['Fixes', 'The Spectrum glow slider no longer sticks while you drag it.'],
   // 0.3.2 (only what shipped)
   ['Album art fixed', 'Covers show correctly again instead of scrambled or missing tiles. Old cached covers are cleared once after the update.'],
   ['Zones as cards', 'Zones now look like device cards, with their members, one volume bar and a mute button. Moving a zone keeps each speaker\'s offset. A muted zone shows an amber icon.'],

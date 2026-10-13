@@ -413,7 +413,7 @@ export function reconcile(parent, kids) {
 }
 /** What shapes a card / row (anything else is a live value that is patched in place). */
 export function cardSig(S, z, hl = false) {
-  return JSON.stringify([z.name, z.playerId, !!z.mine, !!z.reference, !!z.isWeb, thisDevice(S)?.id === z.id, isAdmin(S), canControl(S), canTune(S, z), openSet.has(z.id), !!hl, !!z.connected,
+  return JSON.stringify([z.name, z.playerId, !!z.mine, !!z.reference, !!z.isWeb, thisDevice(S)?.id === z.id, isAdmin(S), canControl(S), canTune(S, z), openSet.has(z.id), typeof hl === 'string' ? hl : !!hl, !!z.connected,
     z.badge === 'recheck' || z.badge === 'uncalibrated' ? z.badge : '', !!z.outputUnavailable, z.chosenDeviceId ?? null,
     (z.outputs || []).map(o => [o.endpointDbId, o.deviceId, o.kind, o.name, !!o.connected, !!o.active, !!o.notCalibrated])]);
 }
@@ -640,89 +640,6 @@ const keepMic = (old, S) => (old && old._sig === micsSig ? old : micLine(S));
 const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speaker by itself; for a PC with speakers, install WavWiz Player there (it finds this server by itself).';
 
 /** Right-hand panel of the desktop layout in three sizes. ctl.setDevSize(size, highlightZoneId) switches size. */
-// ---- 0.3.3 G6-G11: Speakers wording, slim standard rows, E1 expanded view ----
-/** G8: the inner section is "Speakers" (the panel title stays "Devices"). Pure. */
-export const SPEAKERS_LABEL = 'Speakers', UNASSIGNED_LABEL = 'Unassigned';
-/** G9: "TYPE · Windows FriendlyName" for a speaker row's dim output line (pure). */
-export function outputTypeLine(z) {
-  if (z?.outputUnavailable) return '⚠ Output unavailable';
-  const o = z && chosenOutput(z); if (!o) return '';
-  const T = { hdmi: 'HDMI', spdif: 'OPTICAL', analog: 'WIRED', wired: 'WIRED', bluetooth: 'BLUETOOTH', usb: 'USB', other: 'OUTPUT' }[o.kind] || 'OUTPUT';
-  return (o.name || '').trim() ? `${T} · ${o.name.trim()}` : T;
-}
-/** G9/G10: speakers split into zoned (in at least one zone) and unassigned; with no zones at all every speaker is "zoned". Pure. */
-export function speakerGroups(zones, groups) {
-  const zs = zones || [], gs = groups || [];
-  if (!gs.length) return { zoned: zs, unassigned: [] };
-  const un = new Set(unassigned(zs, gs).map(z => z.id));
-  return { zoned: zs.filter(z => !un.has(z.id)), unassigned: zs.filter(z => un.has(z.id)) };
-}
-/** G9: which speaker ids a selected zone highlights (null = none selected / All). Pure. */
-export const zoneHighlight = (groups, pick) => { if (pick == null || pick === 'all') return null; const g = (groups || []).find(x => x.id === pick); return g ? new Set(g.deviceIds || []) : null; };
-/** G7: a zone is "on" while any of its speakers is switched on. Pure. */
-export const zoneOn = (zones, g) => zoneMembers(zones, g).some(z => z.enabled);
-function zoneSwitch(S, ctl, g) {
-  const on = zoneOn(S.zones, g), ms = zoneMembers(S.zones, g);
-  const sw = h('div', { class: 'sw sm' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(on), 'aria-label': `Zone ${g.name} on or off`, tabindex: 0, title: 'Switch every speaker in this zone on or off',
-    onclick: ev => { ev.stopPropagation(); if (!canControl(S)) return; const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } },
-    onkeydown: e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.target.click(); } } });
-  if (!canControl(S)) { sw.setAttribute('aria-disabled', 'true'); sw.classList.add('ro'); sw.title = 'Your access is view-only.'; }
-  return sw;
-}
-/** G7: a zone card with exactly the device-card look - dot / name / on-off top line, full-width bar + % + mute, tags row under the bar. */
-function zoneCard2(S, ctl, g, { pick = null, onPick = null, slim = false } = {}) {
-  const card = zoneCard(S, ctl, g);
-  const ms = zoneMembers(S.zones, g), muted = zoneMuted(S.zones, g);
-  const top = card.querySelector('.zc-top'); top.classList.add('dtop'); top.querySelector('.zname')?.classList.add('dname');
-  top.append(zoneSwitch(S, ctl, g));
-  card.querySelector('.zc-mem')?.remove();
-  const tags = [h('span', { class: 'dtag zone' }, 'ZONE'), slim ? null : h('span', { class: 'dtag' }, `${ms.length} SPEAKER${ms.length === 1 ? '' : 'S'}`), g.active ? h('span', { class: 'dtag zplaying' }, 'PLAYING') : null, muted ? h('span', { class: 'dtag zmuted' }, 'MUTED') : null].filter(Boolean);
-  card.querySelector('.ztagrow')?.remove();
-  const tr = h('div', { class: 'dtagrow ztagrow' }, tags);
-  if (slim) top.querySelector('.grow')?.after(h('span', { class: 'dtags slimtags' }, tags)); else card.append(tr);
-  card.classList.add('dlike'); card.title = ms.length ? ms.map(z => z.name).join(' · ') : 'No speakers yet';
-  if (onPick) { card.classList.toggle('picked', pick === g.id); card.setAttribute('aria-pressed', String(pick === g.id)); card.addEventListener('click', ev => { if (ev.target.closest('button,input,[role=switch]')) return; onPick(pick === g.id ? 'all' : g.id); }); }
-  return card;
-}
-/** G10: slim standard row (~56 px): line 1 dot, name, small tags, switch; line 2 full-width bar to the %, mute. Output name in the tooltip. */
-function slimRow(S, ctl, z, openDevice) {
-  const row = standardRow(S, ctl, z, openDevice);
-  row.classList.add('slim');
-  row.querySelector('.doutline')?.remove();
-  const tags = row.querySelector('.dtags'), sw = row.querySelector('.dtop .sw');
-  if (tags && sw) { tags.classList.add('slimtags'); sw.before(tags); }
-  row.querySelector('.dtagrow')?.remove();
-  const ol = outputTypeLine(z); row.title = ol ? `${z.name} - ${ol}` : z.name;
-  return row;
-}
-/** G9: one-line speaker row in the E1 expanded view: dot, name, dim output line (ellipsis + tooltip), bar to %, mute, tags, on/off, settings. */
-function speakerRow(S, ctl, z, hl, { dim = false, groups = [], addable = false } = {}) {
-  z = { ...z };
-  const open = openSet.has(z.id), me = thisDevice(S)?.id === z.id;
-  let row;
-  const flip = () => { row = toggleSettings(z, row, () => speakerRow(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl, { dim, groups, addable })); };
-  const { vol, pct, mute } = volumeRow(S, ctl, z);
-  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), sw = onSwitch(S, ctl, z);
-  const tags = h('span', { class: 'dtags' }, tagEls(z)); tags._k = JSON.stringify(cardTags(z));
-  const ol = outputTypeLine(z), oparts = ol.split(' · ');
-  const out = h('span', { class: 'sout ell' + (z.outputUnavailable ? ' warn' : ''), title: ol || 'No output' }, oparts.length > 1 ? [h('b', { class: 'skind' }, oparts[0]), ' · ' + oparts.slice(1).join(' · ')] : ol);
-  const expBtn = settingsToggle(z.name, open, flip);
-  const add = addable ? ro(h('button', { type: 'button', class: 'btn sm saddzone', title: 'Add this speaker to a zone', onclick: ev => { ev.stopPropagation(); addToZoneMenu(S, ctl, z, ev.currentTarget, groups); } }, '+ Add to zone'), isAdmin(S)) : null;
-  row = h('div', { class: 'dcard srow' + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl ? ' hl' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : ''), 'data-room': z.name, 'data-zone-id': z.id },
-    h('div', { class: 'sline' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), out, h('div', { class: 'dvol' }, vol, pct, mute), h('span', { class: 'stags' }, tags), add || h('span', { class: 'saddslot' }), sw, expBtn),
-    open ? cardSettings(S, ctl, z) : null);
-  row._sig = cardSig(S, z, hl) + (dim ? 'd' : '') + (addable ? 'a' : '') + (groups.length);
-  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, null, sw); patchVolume(z, vol, pct, mute); row.classList.toggle('muted', !!z.muted); row.classList.toggle('gone', !z.connected); const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); } };
-  return escCloses(row, z, flip);
-}
-function addToZoneMenu(S, ctl, z, anchor, groups) {
-  document.querySelector('.zaddmenu')?.remove();
-  const m = h('div', { class: 'dmenu zaddmenu', role: 'menu' }, (groups || []).length ? groups.map(g => h('button', { type: 'button', role: 'menuitem', onclick: async () => { m.remove(); try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: [...new Set([...(g.deviceIds || []), z.id])] } }); toast(`${z.name} added to ${g.name}`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, g.name))
-    : h('p', { class: 'small dim pad' }, 'No zones yet.'), h('button', { type: 'button', role: 'menuitem', onclick: () => { m.remove(); editZone(S, null, ctl.refreshAll); } }, '+ New zone…'));
-  anchor.after(m); m.querySelector('button')?.focus();
-  const off = ev => { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; setTimeout(() => document.addEventListener('pointerdown', off, true), 0);
-  m.addEventListener('keydown', ev => { if (ev.key === 'Escape') { m.remove(); anchor.focus(); } });
-}
 export function devicesPanel(S, ctl) {
   const root = h('section', { class: 'devpanel', 'aria-label': 'Devices and zones' }), body = h('div', { class: 'devbody' });
   let size = loadDevSize(), hl = null, zpick = loadZonePick(), zedit = null;
@@ -772,21 +689,21 @@ export function devicesPanel(S, ctl) {
       emain.classList.add('e1');
       reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
       const groups = S.groups || [], hset = zoneHighlight(groups, zpick), pg = groups.find(g => g.id === zpick);
-      const oldZ = kid(emain, 'zcol');
-      const zcol = !force && zedit !== null && oldZ ? oldZ : keepSection(oldZ, (() => {
+      const oldSide = kid(emain, 'zcol');
+      const zcol = !force && zedit !== null && oldSide ? oldSide : keepSection(oldSide, (() => {
         const c = h('div', { class: 'zcol ecol' });
         if (zedit !== null) { c.append(zoneEditView(S, ctl, h('div', { class: 'zside' }), groups.find(g => g.id === zedit) || null, setEdit, setPick)); return c; }
         const all = h('button', { type: 'button', class: 'zall' + (hset ? '' : ' on'), 'aria-pressed': String(!hset), onclick: () => setPick('all') }, h('b', null, 'All'), h('span', { class: 'small dim' }, `${S.zones.length} speaker${S.zones.length === 1 ? '' : 's'}`));
         c.append(h('div', { class: 'pane-h dsec-h zones-h' }, h('span', null, 'ZONES'), h('span', { class: 'small dim' }, String(groups.length)), h('span', { class: 'grow' }),
           ro(h('button', { class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: () => editZone(S, null, ctl.refreshAll) }, '+'), isAdmin(S))), all,
-          groups.length ? h('div', { class: 'zlist' }, groups.map(g => { const zc = zoneCard2(S, ctl, g, { pick: zpick, onPick: setPick }); zc.querySelector('.zc-top .grow')?.after(ro(h('button', { class: 'zbtn zedit', 'aria-label': `Edit zone ${g.name}`, title: 'Edit zone', onclick: ev => { ev.stopPropagation(); setEdit(g.id); } }, '✎'), isAdmin(S))); return zc; }))
+          groups.length ? h('div', { class: 'zlist' }, groups.map(g => { const zc = zoneCard2(S, ctl, g, { pick: zpick, onPick: setPick }); ((g0, b) => g0 ? g0.parentNode.insertBefore(b, g0.nextSibling) : null)(zc.querySelector('.zc-top .grow'), ro(h('button', { class: 'zbtn zedit', 'aria-label': `Edit zone ${g.name}`, title: 'Edit zone', onclick: ev => { ev.stopPropagation(); setEdit(g.id); } }, '✎'), isAdmin(S))); return zc; }))
             : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”.'));
         return c;
       })(), busy);
       const scol = kid(emain, 'scol') || h('div', { class: 'scol ecol' });
       const { zoned, unassigned: un } = speakerGroups(S.zones, groups);
       const oldS = new Map([...scol.querySelectorAll('.srow')].map(e => [e.dataset.zoneId, e]));
-      const mk = (z, addable) => keepCard(oldS.get(String(z.id)), S, z, z.id === hl, () => speakerRow(S, ctl, z, z.id === hl, { dim: !!hset && !hset.has(z.id), groups, addable }), busy);
+      const mk = (z, addable) => keepCard(oldS.get(String(z.id)), S, z, rowKey(z.id === hl, !!hset && !hset.has(z.id), addable, groups.length), () => speakerRow(S, ctl, z, z.id === hl, { dim: !!hset && !hset.has(z.id), groups, addable }), busy);
       const head = h('div', { class: 'pane-h dsec-h devs-h' }, h('span', null, SPEAKERS_LABEL.toUpperCase()), h('span', { class: 'small dim' }, `${S.zones.length}${pg ? ' · ' + pg.name.toUpperCase() + ' HIGHLIGHTED' : ''}`), h('span', { class: 'grow' }),
         pg ? h('button', { class: 'btn sm', onclick: () => setPick('all') }, 'Show all') : h('span', { class: 'small dim' }, `${S.zones.filter(z => z.connected).length} online`));
       const cols = h('div', { class: 'scolhead', 'aria-hidden': 'true' }, h('span'), h('span', null, 'NAME'), h('span', null, 'OUTPUT'), h('span', null, 'VOLUME'), h('span', null, 'TAGS'));
@@ -844,3 +761,90 @@ export function devicesView(S, ctl) {
   return { el: root, draw };
 }
 export { roomPillClass, roomPill };
+
+// ---- 0.3.3 G6-G11: Speakers wording, slim standard rows, E1 expanded view ----
+/** G8: the inner section is "Speakers" (the panel title stays "Devices"). Pure. */
+export const SPEAKERS_LABEL = 'Speakers', UNASSIGNED_LABEL = 'Unassigned';
+/** G9: "TYPE · Windows FriendlyName" for a speaker row's dim output line (pure). */
+export function outputTypeLine(z) {
+  if (z?.outputUnavailable) return '⚠ Output unavailable';
+  const o = z && chosenOutput(z); if (!o) return '';
+  const T = { hdmi: 'HDMI', spdif: 'OPTICAL', analog: 'WIRED', wired: 'WIRED', bluetooth: 'BLUETOOTH', usb: 'USB', other: 'OUTPUT' }[o.kind] || 'OUTPUT';
+  return (o.name || '').trim() ? `${T} · ${o.name.trim()}` : T;
+}
+/** G9/G10: speakers split into zoned (in at least one zone) and unassigned; with no zones at all every speaker is "zoned". Pure. */
+export function speakerGroups(zones, groups) {
+  const zs = zones || [], gs = groups || [];
+  if (!gs.length) return { zoned: zs, unassigned: [] };
+  const un = new Set(unassigned(zs, gs).map(z => z.id));
+  return { zoned: zs.filter(z => !un.has(z.id)), unassigned: zs.filter(z => un.has(z.id)) };
+}
+/** G9: which speaker ids a selected zone highlights (null = none selected / All). Pure. */
+export const zoneHighlight = (groups, pick) => { if (pick == null || pick === 'all') return null; const g = (groups || []).find(x => x.id === pick); return g ? new Set(g.deviceIds || []) : null; };
+/** G7: a zone is "on" while any of its speakers is switched on. Pure. */
+export const zoneOn = (zones, g) => zoneMembers(zones, g).some(z => z.enabled);
+function zoneSwitch(S, ctl, g) {
+  const on = zoneOn(S.zones, g), ms = zoneMembers(S.zones, g);
+  const sw = h('div', { class: 'sw sm' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(on), 'aria-label': `Zone ${g.name} on or off`, tabindex: 0, title: 'Switch every speaker in this zone on or off',
+    onclick: ev => { ev.stopPropagation(); if (!canControl(S)) return; const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } },
+    onkeydown: e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.target.click(); } } });
+  if (!canControl(S)) { sw.setAttribute('aria-disabled', 'true'); sw.classList.add('ro'); sw.title = 'Your access is view-only.'; }
+  return sw;
+}
+/** G7: a zone card with exactly the device-card look - dot / name / on-off top line, full-width bar + % + mute, tags row under the bar. */
+function zoneCard2(S, ctl, g, { pick = null, onPick = null, slim = false } = {}) {
+  const card = zoneCard(S, ctl, g);
+  const ms = zoneMembers(S.zones, g), muted = zoneMuted(S.zones, g);
+  const top = card.querySelector('.zc-top'); top.classList.add('dtop'); top.querySelector('.zname')?.classList.add('dname');
+  top.append(zoneSwitch(S, ctl, g));
+  card.querySelector('.zc-mem')?.remove();
+  const tags = [h('span', { class: 'dtag zone' }, 'ZONE'), slim ? null : h('span', { class: 'dtag' }, `${ms.length} SPEAKER${ms.length === 1 ? '' : 'S'}`), g.active ? h('span', { class: 'dtag zplaying' }, 'PLAYING') : null, muted ? h('span', { class: 'dtag zmuted' }, 'MUTED') : null].filter(Boolean);
+  card.querySelector('.ztagrow')?.remove();
+  const tr = h('div', { class: 'dtagrow ztagrow' }, tags);
+  if (slim) { const g0 = top.querySelector('.grow'); top.insertBefore(h('span', { class: 'dtags slimtags' }, tags), g0 ? g0.nextSibling : null); } else card.append(tr);
+  card.classList.add('dlike'); card.title = ms.length ? ms.map(z => z.name).join(' · ') : 'No speakers yet';
+  if (onPick) { card.classList.toggle('picked', pick === g.id); card.setAttribute('aria-pressed', String(pick === g.id)); card.addEventListener('click', ev => { if (ev.target.closest('button,input,[role=switch]')) return; onPick(pick === g.id ? 'all' : g.id); }); }
+  return card;
+}
+/** G10: slim standard row (~56 px): line 1 dot, name, small tags, switch; line 2 full-width bar to the %, mute. Output name in the tooltip. */
+function slimRow(S, ctl, z, openDevice) {
+  const row = standardRow(S, ctl, z, openDevice);
+  row.classList.add('slim');
+  row.querySelector('.doutline')?.remove();
+  const tags = row.querySelector('.dtags'), sw = row.querySelector('.dtop .sw');
+  if (tags && sw) { tags.classList.add('slimtags'); sw.parentNode.insertBefore(tags, sw); }
+  row.querySelector('.dtagrow')?.remove();
+  const ol = outputTypeLine(z); row.title = ol ? `${z.name} - ${ol}` : z.name;
+  return row;
+}
+/** G9: one-line speaker row in the E1 expanded view: dot, name, dim output line (ellipsis + tooltip), bar to %, mute, tags, on/off, settings. */
+function speakerRow(S, ctl, z, hl, { dim = false, groups = [], addable = false } = {}) {
+  z = { ...z };
+  const open = openSet.has(z.id), me = thisDevice(S)?.id === z.id;
+  let row;
+  const flip = () => { row = toggleSettings(z, row, () => speakerRow(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, hl, { dim, groups, addable })); };
+  const { vol, pct, mute } = volumeRow(S, ctl, z);
+  const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) }), sw = onSwitch(S, ctl, z);
+  const tags = h('span', { class: 'dtags' }, tagEls(z)); tags._k = JSON.stringify(cardTags(z));
+  const ol = outputTypeLine(z), oparts = ol.split(' · ');
+  const out = h('span', { class: 'sout ell' + (z.outputUnavailable ? ' warn' : ''), title: ol || 'No output' }, oparts.length > 1 ? [h('b', { class: 'skind' }, oparts[0]), ' · ' + oparts.slice(1).join(' · ')] : ol);
+  const expBtn = settingsToggle(z.name, open, flip), settings = open ? cardSettings(S, ctl, z) : null;
+  const add = addable ? ro(h('button', { type: 'button', class: 'btn sm saddzone', title: 'Add this speaker to a zone', onclick: ev => { ev.stopPropagation(); addToZoneMenu(S, ctl, z, ev.currentTarget, groups); } }, '+ Add to zone'), isAdmin(S)) : null;
+  row = h('div', { class: 'dcard srow' + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl ? ' hl' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : ''), 'data-room': z.name, 'data-zone-id': z.id },
+    h('div', { class: 'sline' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), out, h('div', { class: 'dvol' }, vol, pct, mute), h('span', { class: 'stags' }, tags), add || h('span', { class: 'saddslot' }), sw, expBtn),
+    settings);
+  row._sig = cardSig(S, z, rowKey(hl, dim, addable, groups.length));
+  row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, null, sw); patchVolume(z, vol, pct, mute); row.classList.toggle('muted', !!z.muted); row.classList.toggle('gone', !z.connected); const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); } settings?._patch?.(z); };
+  return escCloses(row, z, flip);
+}
+function addToZoneMenu(S, ctl, z, anchor, groups) {
+  document.querySelector('.zaddmenu')?.remove();
+  const m = h('div', { class: 'dmenu zaddmenu', role: 'menu' }, (groups || []).length ? groups.map(g => h('button', { type: 'button', role: 'menuitem', onclick: async () => { m.remove(); try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: [...new Set([...(g.deviceIds || []), z.id])] } }); toast(`${z.name} added to ${g.name}`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, g.name))
+    : h('p', { class: 'small dim pad' }, 'No zones yet.'), h('button', { type: 'button', role: 'menuitem', onclick: () => { m.remove(); editZone(S, null, ctl.refreshAll); } }, '+ New zone…'));
+  anchor.after(m); m.querySelector('button')?.focus();
+  const off = ev => { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; setTimeout(() => document.addEventListener('pointerdown', off, true), 0);
+  m.addEventListener('keydown', ev => { if (ev.key === 'Escape') { m.remove(); anchor.focus(); } });
+}
+
+/** 0.3.3 G9: what besides the device shapes an E1 speaker row (highlight, dimmed by a zone pick, Add to zone) - part of its signature. */
+export const rowKey = (hl, dim, addable, ng) => `${hl ? 1 : 0}|${dim ? 1 : 0}|${addable ? 1 : 0}|${ng}`;
