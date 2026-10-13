@@ -33,6 +33,8 @@ test('§8: Pepecoin uses only the brand kit colors (tints of them allowed)', asy
 test('§8: no hard-coded hex/rgb colors in the 0.3.0 CSS and UI modules (theme files excepted)', () => {
   const strip = s => s.replace(/\/\*[^]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const NEW_CSS = ['jukebox.css'];
+  // 0.3.4 H4: the Retro CD palette file holds custom properties only (it is a fixed design, like a theme file)
+  assert.match(readFileSync(join(root, 'jukebox-palette.css'), 'utf8').replace(/\/\*[^]*?\*\//g, '').trim(), /^:root\{(--jr-c\d+:[^;{}]+;?)+\}$/);
   for (const f of NEW_CSS) assert.doesNotMatch(strip(readFileSync(join(root, f), 'utf8')), /#[0-9a-f]{3,8}\b|rgba?\(/i, f);
   // app.css: everything added in 0.3.0 sits after the "0.3.0" markers; those blocks use theme variables only
   const css = readFileSync(join(root, 'app.css'), 'utf8'); const i = css.indexOf('0.3.0'); assert.ok(i > 0);

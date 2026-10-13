@@ -8,6 +8,16 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## 0.3.4 (beta)
+- H1 Installable web app: apple-touch-icon and iOS/Android home-screen meta, manifest (name WavWiz, id/scope "/", description, 192 and maskable icons), versioned network-first service worker (never caches /api or WebSockets; a new version replaces the old worker and cache).
+- H2 Playlist number column keeps a minimum width; numbers 10 and up no longer wrap.
+- H3 Gradient volume slider style is the two-color theme gradient again (Flat unchanged); the fill follows every volume slider.
+- H4 / H4b Jukebox: Modern fixed, Retro CD rebuilt (guest page and big screen), the chosen style is applied everywhere; Settings > Jukebox shows preview cards. New GET /api/v1/jukebox/guest/picks.
+- H5 Album search results add the album (artist/name/tracks shape).
+- H6 / H7 Guest search no longer loses focus or drops letters; Add button styling fixed.
+- H8 / H8b Now Playing bar docks in its own row under expanded Library/Devices; speaker switches in their own column; output names shown.
+- H9 Scenes & Schedules heading colors match Zones and Speakers.
+
 ## 0.3.3 (beta)
 - G1 Settings and other center popups take the live center column width as their maximum (measured, updated on resize, panel changes and Display size).
 - G2 / G2b Now Playing picker: one style per row at full width; each preview is laid out at the real panel width and scaled down to fit.

@@ -4,7 +4,7 @@
 // the server can't be reached. The API (/api/...), WebSockets, audio, art and the jukebox/calibration/TLS pages are never cached.
 const VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const CACHE = 'wavwiz-shell-' + VERSION;
-const SHELL = ['/', '/index.html', '/app.css', '/jukebox.css', '/manifest.webmanifest', '/assets/logo-192.png'];
+const SHELL = ['/', '/index.html', '/app.css', '/jukebox-palette.css', '/jukebox.css', '/manifest.webmanifest', '/assets/logo-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).catch(() => {}).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('wavwiz-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 /** Pure: may this request be answered from / stored in the shell cache? */

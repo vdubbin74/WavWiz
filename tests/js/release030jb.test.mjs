@@ -35,7 +35,8 @@ test('0.3.0 §1: guest page needs no sign-in and uses only the session code; sty
   assert.match(core, /'X-WavWiz-Guest': code/); assert.doesNotMatch(g, /from '\.\/util\.js'/, 'no app api() (no token)');
   const css = readFileSync(join(js, '../jukebox.css'), 'utf8');
   assert.doesNotMatch(css.replace(/\/\*[^]*?\*\//g, ''), /#[0-9a-f]{3,8}\b|rgba?\(/i, 'no fixed colors');
-  assert.match(css, /\.retro \.jb-cover\{[^}]*animation:jb-spin/); assert.match(css, /\.jb-tubes i\{[^}]*var\(--beat/);
+  // 0.3.4 H4: Retro CD was rebuilt - the spinning disc and the beat-driven tube bubbles live in the .jbr stage now (fixed palette in jukebox-palette.css)
+  assert.match(css, /\.jbr-mini\.spin\{animation:jb-spin/); assert.match(css, /\.jbr-bubbles\{animation:[^;]*var\(--beat/);
 });
 test('0.3.2 F3: Remote mode is retired - isRemote() is always false, the old setting is cleared once, Mini player replaces the menu item', async () => {
   const r = await imp('remotemode');

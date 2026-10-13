@@ -38,7 +38,7 @@ const clean = () => p.evaluate(() => { document.querySelectorAll('.phone-unlock'
 await step('smoke', async () => {
   await home(); await clean(); await shot(p, 'smoke-desktop');
   ok('smoke: app loads without script errors', errs.length === 0, errs.slice(0, 3).join(' | '));
-  const v = await api('/status'); ok('smoke: server reports 0.3.3', JSON.stringify(v).includes('0.3.3'), String(v.version || ''));
+  const v = await api('/status'); ok('smoke: server reports the build version', JSON.stringify(v).includes(process.env.WW_EXPECT_VERSION || '0.3.4'), String(v.version || ''));
 });
 
 if (want('g1')) await step('g1', async () => {

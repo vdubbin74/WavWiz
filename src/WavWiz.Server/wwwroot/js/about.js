@@ -1,9 +1,16 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.3';
+export const WHATS_NEW_VERSION = '0.3.4';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
+  // 0.3.4 (only what shipped)
+  ['Install on your phone', 'Add WavWiz to your home screen (Share > Add to Home Screen on iPhone): it opens full screen with the WavWiz icon. Over https it also loads faster and always picks up a new version.'],
+  ['Jukebox styles', 'Modern and Retro CD now look the way they should, and the style you pick is the one guests and the big screen get. Settings > Jukebox shows a preview of each style.'],
+  ['Jukebox search and adding', 'Guest search keeps your typing (whole words, not one letter at a time), and adding a song or a whole album works.'],
+  ['Volume sliders', 'Gradient is back to the two-color blend of your theme. Flat stays.'],
+  ['Devices', 'Expanded Devices and Library no longer slide under the Now Playing bar, the speaker switches line up in their own column, and output names show again.'],
+  ['Fixes', 'Playlist numbers from 10 up are no longer cut off. Scenes & Schedules headings match Zones and Speakers.'],
   // 0.3.3 (only what shipped)
   ['Jukebox starts again', 'Playback > Start Jukebox… works again: the Start and Stop buttons were blank and did nothing in 0.3.2.'],
   ['New Settings look', 'Settings is a clean list per section in your theme colors, and never wider than the center panel.'],
