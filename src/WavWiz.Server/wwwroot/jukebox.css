@@ -42,7 +42,7 @@
 .jbg .jb-search:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
 .jb-thumb{width:40px;height:40px;border-radius:var(--radius);object-fit:cover;background:var(--panel2);flex:none}
 .jbg .jb-add{min-width:64px}
-.jbg .jb-foot .jb-mine{border:1px solid var(--hl);border-radius:var(--radius);padding:8px 12px;flex:1}
+.jbg .jb-foot .jb-mine{border:1px solid var(--hl);border-radius:var(--radius);padding:8px 10px;flex:1;min-width:0;white-space:nowrap;font-size:14px}  /* 0.3.4: one line on a phone, as in the approved render */
 .jb-chk{font-weight:700}
 
 /* ---- guest phone, Retro CD (maroon page, cream typewriter strips C1-C5, red ADD, "Your picks") ---- */
@@ -222,7 +222,7 @@
 .jbpm-times{display:flex;justify-content:space-between;font:12px ui-monospace,monospace;margin-top:6px}
 .jbpm-by{margin-top:8px;font-size:15px;font-weight:700;color:var(--hl-text,var(--hl))}
 .jbpm-big{margin-top:14px;height:60px;border-radius:3px;background:var(--accent);color:var(--accent-ink);font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.jbpm-next{left:482px;top:74px;width:514px;border:1px solid var(--line);border-radius:3px;background:color-mix(in srgb,var(--panel) 70%,transparent);padding:10px 16px;box-sizing:border-box}
+.jbpm-next{left:446px;top:74px;width:514px;border:1px solid var(--line);border-radius:3px;background:color-mix(in srgb,var(--panel) 70%,transparent);padding:10px 16px;box-sizing:border-box}
 .jbpm-nh{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.14em;color:var(--dim);margin-bottom:8px} .jbpm-nh span+span{letter-spacing:0}
 .jbpm-row{display:flex;gap:14px;align-items:center;padding:6px 0;border-top:1px solid var(--line)} .jbpm-row .n{width:16px;color:var(--dim);font-weight:700;text-align:center}
 .jbpm-row i{width:44px;height:44px;border-radius:3px;flex:none} .jbpm-row b{display:block;font-size:16px} .jbpm-row small{display:block;color:var(--dim);font-size:13px} .jbpm-row small span{color:var(--hl-text,var(--hl));font-weight:700}
