@@ -74,10 +74,8 @@ test('B5: both rails put the chevron at the top and center icon + vertical title
 });
 test('B7/B8: master bar uses the device-row structure (slider, %, Mute slot) and Mute all is on its own line', () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, h\('span', \{ class: 'mutebtn dvol-slot', 'aria-hidden': 'true' \}\)\)/);
-  assert.match(d, /h\('div', \{ class: 'dmaster-mute' \}, muteAllButton\(S, ctl\)\)/);
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: the slot now holds the round master mute
   assert.match(d, /h\('div', \{ class: 'dvol' \}, vol, pct, mute\)/, 'device rows: slider, %, round mute');
-  assert.match(css, /\.dvol-slot\{visibility:hidden/);
 });
 test('B9: compact Scenes & Schedules: next event + countdown + Skip, Run chips, Open, + for admins only', async () => {
   globalThis.localStorage ??= { getItem: () => null, setItem() {} };

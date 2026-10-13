@@ -37,11 +37,9 @@ test('0.3.0 §1: guest page needs no sign-in and uses only the session code; sty
   assert.doesNotMatch(css.replace(/\/\*[^]*?\*\//g, ''), /#[0-9a-f]{3,8}\b|rgba?\(/i, 'no fixed colors');
   assert.match(css, /\.retro \.jb-cover\{[^}]*animation:jb-spin/); assert.match(css, /\.jb-tubes i\{[^}]*var\(--beat/);
 });
-test('0.3.0 §2: remote mode is remembered, ?remote=1/0 wins, autojoin is skipped, banner uses the Highlight color', async () => {
+test('0.3.2 F3: Remote mode is retired - isRemote() is always false, the old setting is cleared once, Mini player replaces the menu item', async () => {
   const r = await imp('remotemode');
-  const s = mem(); assert.equal(r.isRemote(s, ''), false); assert.equal(r.isRemote(s, '?remote=1'), true); assert.equal(r.isRemote(s, ''), true); assert.equal(r.isRemote(s, '?remote=0'), false);
-  assert.match(src('room.js'), /if \(isRemote\(\)\) return;\s+\/\/ 0\.3\.0 §2/);
-  assert.match(src('main.js'), /if \(isRemote\(\)\) remoteBanner\(true/);
-  const css = readFileSync(join(js, '../app.css'), 'utf8'); assert.match(css, /\.remote-banner\{[^}]*background:var\(--hl\);color:var\(--hl-ink\)/);
-  assert.match(src('main.js'), /'Use as remote only'/); assert.match(src('room.js'), /'Use as remote only'/);
+  const s = mem(); assert.equal(r.isRemote(s, ''), false); assert.equal(r.isRemote(s, '?remote=1'), false);
+  assert.match(src('main.js'), /await retireRemote\(\)/); assert.doesNotMatch(src('main.js'), /'Use as remote only'/); assert.doesNotMatch(src('room.js'), /'Use as remote only'/);
+  assert.match(src('menu.js'), /'Mini player'/);
 });

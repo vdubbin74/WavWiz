@@ -1804,14 +1804,14 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .infoi{display:inline-grid;place-items:center;width:15px;height:15px;padding:0;border-radius:50%;border:1px solid var(--line);background:none;color:var(--dim);font:italic 700 10px/1 Georgia,serif;cursor:help;vertical-align:1px}
 .infoi:hover,.infoi[aria-expanded=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .btn.primary.muted-btn,.settings-sec .btn.primary{background:none;border-color:var(--accent);color:var(--accent-text,var(--accent))}
-.settings-sec .btn.danger{background:none;border-color:var(--red,#e5484d);color:var(--red,#e5484d)}
+.settings-sec .btn.danger{background:none;border-color:var(--red);color:var(--red)}
 
 /* ===== 0.3.2 F12: Now Playing picker - 2 per row (~543px), real panel at true size, height fits the panel, subtle accent outline ===== */
 .appsub .pgrid-np,.pgrid-np{grid-template-columns:repeat(2,minmax(0,543px))}
-.pgrid-np .pgcard{aspect-ratio:auto;max-height:none}
+.pgrid-np>[role=radio]{aspect-ratio:auto;max-height:none}
 .pgrid-np .pg-prev{flex:none}
 .pgrid-np .npthumb{position:relative;inset:auto;width:100%}
-.pgrid-np .pgcard.on{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+.pgrid-np>[role=radio][aria-checked=true]{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
 .pgrid-np .npthumb .pn-center .np-tablemain{grid-template-columns:auto minmax(0,1fr)}
 .pgrid-np .npthumb .pn-center .pn-art{grid-row:1 / span 2}
 
@@ -1839,19 +1839,18 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .zcard .zc-top .zname{margin-left:2px}
 
 /* 0.3.2 F18: max-volume lock */
-.vlock{display:inline-grid;place-items:center;width:14px;height:14px;flex:none;color:var(--amber,#ffb300)} .vlock svg{width:12px;height:12px}
-.vcap .vcap-v{min-width:3em;text-align:right} .vcap-lock{border-radius:3px} .vcap-lock svg{width:12px;height:12px;vertical-align:-1px} .vcap-lock.on{border-color:var(--amber,#ffb300);color:var(--amber,#ffb300)}
+.vlock{display:inline-grid;place-items:center;width:14px;height:14px;flex:none;color:var(--amber)} .vlock svg{width:12px;height:12px}
+.vcap .vcap-v{min-width:3em;text-align:right} .vcap-lock{border-radius:3px} .vcap-lock svg{width:12px;height:12px;vertical-align:-1px} .vcap-lock.on{border-color:var(--amber);color:var(--amber)}
 
 /* 0.3.2 F20: Button transparency applies ONLY to the top-right overlay button group (EQ and visualizer); solid on hover, focus and while a popover is open.
    The EQ and visualizer always render at full opacity (Overlay opacity only moves the cover overlay). */
 .np-stage .vizhost,.np-stage .vizhost canvas,.np-stage .eqarea,.np-stage .eqa-plot,.np-stage .eqa-glow{opacity:1!important;filter:none}
-.stage .vbtns{opacity:var(--ov-rest,.5)!important}
-.stage .vbtns:hover,.stage .vbtns:focus-within,.stage .vbtns.solid,.stage .vbtns:active{opacity:1!important}
+.stage>.vbtns{opacity:var(--ov-rest,.5)!important}
+.stage>.vbtns:hover,.stage>.vbtns:focus-within,.stage>.vbtns.solid,.stage>.vbtns:active{opacity:1!important}
 /* 0.3.2 F19: a locked EQ looks exactly like an unlocked one - only the lock button shows it (danger red; Pepecoin copper) */
 .eqarea.locked .eqa-plot,.eqarea.locked .eqchips{opacity:1;filter:none}
 .eqarea.locked .eqa-lock{display:none!important}
 .eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip,.eqarea.locked .eqa-plot{cursor:not-allowed}
-:root{--lock-red:var(--red,#e5484d)} :root[data-theme=pepecoin]{--lock-red:#C07A4E}
 .stage .vbtns .ib.ov-lock.on{color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));box-shadow:none;background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
 .eqlockbox:has(input:checked){color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
 /* 0.3.2 F21: status tags on their own row directly under the volume bar, starting at the name's left edge */

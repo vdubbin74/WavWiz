@@ -72,6 +72,7 @@ export function derive(t) {
   let dim = mix(ink, bg, 0.42); for (let k = 0.42; k > 0 && !surf.every(sf => contrast(dim, sf) >= 4.5); k -= 0.02) dim = mix(ink, bg, Math.max(0, k));
   const pal = t.preset === 'pepecoin' || t.brand ? [bg, '#FFFFFF', ink] : null;
   return {
+    '--lock-red': t.preset === 'pepecoin' ? '#C07A4E' : 'var(--red)',   // 0.3.2 F19: Lock EQ on = the theme's danger red; Pepecoin uses its copper
     '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl, pal), '--bg': bg,
     '--panel': panel, '--panel2': panel2, '--line': mix(bg, toward, light ? 0.18 : 0.2),
     '--ink': ink, '--dim': dim, '--accent-ink': readableOn(accent, pal), '--accent-soft': `rgba(${r},${g},${b},.16)`,

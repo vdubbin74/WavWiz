@@ -33,7 +33,7 @@ test('0.2.3 U2: minimized Playlist shows "Up next: Title · Artist" centered on 
   assert.match(l, /const setNextBlock = el => \{ head\.insertBefore\(el, meta\); \}/);
   assert.match(m, /const on = desk\.classList\.contains\('listcollapsed'\)/);
   assert.match(m, /const c = col\.left \+ col\.width \/ 2, room = Math\.min\(c - \(listt\.leftEdge\(\) \+ 16\), listt\.rightEdge\(\) - 16 - c\)/);
-  assert.match(m, /listt\.setCollapsed\?\.\(c\); placeNext\(\);/);
+  assert.match(m, /listt\.setCollapsed\?\.\(st\); placeNext\(\);/);   // 0.3.2 F13: state = collapsed / open / expanded
   assert.match(css, /\.desk\.listcollapsed \.plnext:not\(\[hidden\]\)\{display:flex;[^}]*transform:translateX\(-50%\)/);
   assert.doesNotMatch(css, /\.desk\.listcollapsed \.listpanel \.pane-h \.small,\.desk\.listcollapsed \.listpanel \.pane-h \.row:not\(\.listcolwrap\)\{display:none\}/);
 });
@@ -85,9 +85,9 @@ test('0.2.3 U9: Lock EQ - wheel fine-adjusts by default; locked, the wheel is le
   assert.match(v, /b\.addEventListener\('wheel', ev => \{ const v = wheelGain\(isLocked, g\[i\], ev\.deltaY\); if \(v == null\) return; ev\.preventDefault\(\);/);
   assert.match(v, /b\.addEventListener\('pointerdown', ev => \{ if \(isLocked\) return;/);
   assert.match(v, /if \(isLocked\) return;\n\s+const v = keyStep/);
-  assert.match(v, /function setLocked\(v\) \{\s*isLocked = !!v; el\.classList\.toggle\('locked', isLocked\); lockMark\.hidden = !isLocked;/);
+  assert.match(v, /function setLocked\(v\) \{\s*isLocked = !!v; el\.classList\.toggle\('locked', isLocked\); lockMark\.hidden = true; if \(isLocked\) el\.title = 'EQ locked'/);   // 0.3.2 F19: no mark / dimming on the EQ itself
   assert.match(v, /export function eqLockBox\(checked, onToggle\)/); assert.match(v, /'Lock EQ'/); assert.match(v, /iconSvg\('lock'\)/);
-  assert.match(css, /\.eqarea\.locked \.eqa-plot,\.eqarea\.locked \.eqchips\{opacity:\.6/);
+  assert.match(css, /\.eqarea\.locked \.eqa-plot,\.eqarea\.locked \.eqchips\{opacity:1;filter:none\}/);   // 0.3.2 F19: never dimmed
 });
 
 test('0.2.3 U9: Lock EQ is remembered per device (this browser), off by default; the dialog header has it', async () => {

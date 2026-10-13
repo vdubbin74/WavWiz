@@ -86,10 +86,10 @@ test('0.2.1 F6: Windows-style menu bar - click opens, hover switches while a men
 test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view never redrawn under typing', async () => {
   const d = src('devices.js');
   assert.match(d, /export function zoneFilter/); assert.match(d, /export function zoneState/);
-  assert.match(d, /zonesSidebar\(/); assert.match(d, /'All devices'/); assert.match(d, /dexp-main/);
-  assert.match(d, /size === 'expanded' && zedit !== null && oldSide \? oldSide :/);   // 0.2.3 fix: the zone editor is kept as is (was: whole redraw skipped)
-  assert.match(css, /\.dexp-main\{display:grid;grid-template-columns:minmax\(0,1fr\) 184px/);
-  assert.match(css, /\.zsrow\.on::before/);
+  // 0.3.2 F17: the zone sidebar became column 4 of expanded Devices (zone cards, then Scenes & Schedules); the editor still opens in place
+  assert.match(d, /dexp-main/); assert.match(d, /class: 'zcol'|'zcol'/);
+  assert.match(d, /zedit !== null && oldSide \? oldSide :/);   // 0.2.3 fix kept: the zone editor is never redrawn under typing
+  assert.match(css, /\.devpanel\.expanded \.dexp-main\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   const body = d.slice(d.indexOf('export function zoneFilter'));
   const fnSrc = body.slice(0, body.indexOf('\n}\n') + 2).replace('export ', '');
   const zoneFilter = new Function(fnSrc + '; return zoneFilter;')();
@@ -106,7 +106,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Queue', 'Rescan folders', 'Tidy up library', 'Tag & cover fix…', 'CD ripper…']);
   assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…', 'Start Jukebox…']);
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Use as remote only', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
   assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n\];/);   // 0.3.0 §7: General/Playback/Jukebox tabs
@@ -232,9 +232,9 @@ test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on
 
 test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays separate)', async () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dmaster-mute' \}, muteAllButton\(S, ctl\)\)/);   // 0.3.1 B8: own line below the master bar
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: one round mute in the master row's mute column
   assert.match(d, /ctl\.act\('\/zones\/mute-all', \{ muted: want \}\)/);
-  assert.match(d, /m \? 'Unmute all' : 'Mute all'/);
+  assert.match(d, /m \? 'Unmute every device' : 'Mute every device'/);
   assert.match(d, /function muteButton\(S, ctl, z\)/, 'each device keeps its own Mute');
   const body = d.slice(d.indexOf('export const allMuted'), d.indexOf('\n', d.indexOf('export const allMuted')));
   const allMuted = new Function('return ' + body.replace('export const allMuted = ', ''))();

@@ -87,9 +87,13 @@ Menus do things, Settings sets things:
 
 **Lock EQ:** the Sound (EQ) window and **Appearance → EQ** have a **Lock EQ** checkbox. When it is checked, the EQ sliders ignore the mouse wheel, dragging, clicks and keys, so scrolling the page never changes the sound. Each device remembers it (off by default; unlocked, the wheel fine-tunes a slider in 0.5 dB steps). **Appearance → EQ** shows this speaker's real EQ and always opens locked; uncheck it to make changes, which are saved to the speaker's own preset.
 
-### Remote mode
+### Mini player
 
-Want a phone or PC to control the music without playing it? Choose **Use as remote only** on the connect screen, in **Devices → Use as remote only**, or tick **Remote mode** in the WavWiz Player tray menu. A gold banner shows while it is on.
+Want just the playback controls in a small window? Choose **Devices → Mini player** or **Mini player** in the WavWiz Player tray menu. It shows the cover, title, a seek bar, previous / play / next, mute and volume. Drag it anywhere (drop it near the top edge and it parks there), pin it to keep it on top of other windows, make it slim, or go back to the full window. It remembers where you left it. Remote mode is gone: a phone or PC that should only control the music simply doesn't turn on its speaker.
+
+### Max-volume lock
+
+An admin can give any device a **max volume** in its Settings and lock it. While it is locked, nothing raises that room above the cap: not the master volume, a zone, a scene, schedule or alarm, the mini player or the API. Turning it down always works. A small padlock shows by the room's volume bar.
 
 ### Jukebox (beta)
 

@@ -12,6 +12,36 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.2] - 2026-10-12 (beta)
+
+### Fixed
+
+- **Album art:** covers were scrambled (magenta / green tiles) or missing after 0.3.0. The bundled ffmpeg's fast scaler produced garbage colors, and the 0.3.1 check that was meant to catch it relied on a part ffmpeg doesn't include, so it threw out every cover. Covers are now scaled bit-exact and checked by WavWiz itself; old cached covers are cleared once, and the app's cache is refreshed after an update.
+- **Echo** when the phone or PC speaker was switched on and off quickly: only one speaker stream can exist per device now.
+- **Black window** after snapping, maximizing or moving WavWiz Player to a screen with a different scale.
+- The saved panel layout (folded Library, expanded Devices) is kept when the app starts.
+
+### Added
+
+- **Mini player** window (replaces Remote mode): cover, title, seek, previous / play / next, mute, volume, pin on top, slim size.
+- **Zone cards** with members, one volume bar (keeps each speaker's offset) and a zone mute; a muted zone shows an amber icon.
+- **Max-volume lock** per device (admin): nothing can raise a locked room above its cap; turning it down always works. Padlock by the volume bar.
+
+### Changed
+
+- **Expanded Devices:** three columns of device cards, then Zones and Scenes & Schedules in a fourth column; every card the same width.
+- Status tags (REF, MUTED, OFFLINE, NO DELAY, Bluetooth…) sit on their own line under the volume bar.
+- **Playlist** sits under Now Playing at the center width; ˄ expands it upward, ˅ folds it.
+- Settings and other windows are as wide as the center panel. Library and Network use two columns of cards with (i) help.
+- Now Playing styles are previewed at their real size, two per row.
+- A locked EQ is no longer dimmed; the Lock button turns red (copper on Pepecoin).
+- **Button transparency** now affects only the overlay buttons; the EQ and visualizer always draw at full strength.
+- The collapsed Library rail mirrors the Devices rail. Round master mute.
+
+### Removed
+
+- **Remote mode** ("Use as remote only"). Use the Mini player, or just leave the speaker off.
+
 ## [0.3.1] - 2026-10-12 (beta)
 
 ### Added
