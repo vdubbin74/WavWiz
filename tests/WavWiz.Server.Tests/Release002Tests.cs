@@ -392,7 +392,8 @@ public class ArtAndEndpointsTests
         var emb = await a.GetAsync($"/api/v1/art/track/{Id("Emb")}?size=96"); Assert.Equal(HttpStatusCode.OK, emb.StatusCode); Assert.Equal("image/jpeg", emb.Content.Headers.ContentType!.MediaType);
         var b96 = await emb.Content.ReadAsByteArrayAsync(); Assert.True(b96.Length > 200 && b96[0] == 0xFF && b96[1] == 0xD8);
         var b384 = await a.GetByteArrayAsync($"/api/v1/art/track/{Id("Emb")}?size=384"); Assert.True(b384.Length >= b96.Length);
-        Assert.Contains("max-age", emb.Headers.CacheControl!.ToString());
+        Assert.Contains("no-cache", emb.Headers.CacheControl!.ToString());   // 0.3.2 F11: an unversioned URL is revalidated (ETag)
+        var vers = await a.GetAsync($"/api/v1/art/track/{Id("Emb")}?size=96&cv={WavWiz.Server.Library.ArtService.UrlVersion}"); Assert.Contains("max-age", vers.Headers.CacheControl!.ToString());
         Assert.True(Directory.Exists(Path.Combine(f.Dir.Path, "artcache")) && Directory.GetFiles(Path.Combine(f.Dir.Path, "artcache"), "*", SearchOption.AllDirectories).Length >= 2, "resized covers are cached on disk");
         Assert.Equal(HttpStatusCode.OK, (await a.GetAsync($"/api/v1/art/track/{Id("Fol")}?size=192")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await a.GetAsync("/api/v1/art/album?artist=A2&album=Folder&size=192")).StatusCode);

@@ -187,11 +187,12 @@ if (want('remote')) await step('remote', async () => {
 
 if (want('f18')) await step('f18', async () => {
   const zl = await api('/zones?all=1'); const z = (Array.isArray(zl) ? zl : zl.zones).find(x => x.connected) || (Array.isArray(zl) ? zl : zl.zones)[0];
-  await api(`/zones/${z.id}`, 'PATCH', { volume: 30 }); await api(`/zones/${z.id}/volcap`, 'PUT', { cap: 40, locked: true });
-  await api('/zones/master', 'POST', { set: 100 }); const v1 = (await api('/zones?all=1')).find(x => x.id === z.id).volume;
+  for (const o of await api('/zones?all=1')) await api(`/zones/${o.id}`, 'PATCH', { volume: 30 });   // room is the loudest, so master 100 would scale it far past the cap
+  await api(`/zones/${z.id}`, 'PATCH', { volume: 40 }); await api(`/zones/${z.id}/volcap`, 'PUT', { cap: 40, locked: true });
+  await api('/zones/master', 'POST', { set: 100 }); const all1 = await api('/zones?all=1'), v1 = all1.find(x => x.id === z.id).volume, other = all1.find(x => x.id !== z.id && x.enabled)?.volume;
   await api(`/zones/${z.id}`, 'PATCH', { volume: 80 }); const v2 = (await api('/zones?all=1')).find(x => x.id === z.id).volume;
   await api(`/zones/${z.id}`, 'PATCH', { volume: 20 }); const v3 = (await api('/zones?all=1')).find(x => x.id === z.id).volume;
-  ok('F18 cap 40 locked: master 100 -> 40, request 80 -> 40, lowering to 20 works', v1 === 40 && v2 === 40 && v3 === 20, JSON.stringify({ v1, v2, v3 }));
+  ok('F18 cap 40 locked: master 100 -> 40, request 80 -> 40, lowering to 20 works', v1 === 40 && other > 30 && v2 === 40 && v3 === 20, JSON.stringify({ v1, other, v2, v3 }));
   for (const t of THEMES) {
     await setPanels(p, NORMAL); await home(); await setTheme(p, t); await p.waitForTimeout(300);
     const r = await p.evaluate(id => { const c = document.querySelector(`.devpanel [data-zone-id="${id}"]`); const l = c?.querySelector('.vlock'); const v = c?.querySelector('.dvol'); if (!l || !v) return null; const a = l.getBoundingClientRect(), b = v.getBoundingClientRect(); return { inBar: a.top >= b.top - 2 && a.bottom <= b.bottom + 2, color: getComputedStyle(l).color, w: a.width | 0 }; }, z.id);
