@@ -263,18 +263,29 @@ export function openScheduleEditor(S, r, kind, data, done) {
   return dd;
 }
 
-/** Sleep timer picker (header button and Now Playing chip). */
-export function openSleep(S, done) {
+/** Sleep timer picker. 0.3.5 J8/J9 #7: a small menu of times under the Now Playing Sleep button (no window). */
+export function openSleep(S, done, anchor = null) {
+  document.querySelector('.sleepmenu')?.remove();
+  anchor = anchor || document.querySelector('.npsleep:not([hidden])') || document.getElementById('sleepchip');
   const zones = S.zones || []; const zoneSel = h('select', { 'aria-label': 'Which speakers' }, h('option', { value: '' }, 'All speakers'), zones.map(z => h('option', { value: z.id }, z.name)));
-  const custom = h('input', { type: 'number', min: 1, max: 1440, value: 20, 'aria-label': 'Minutes', style: 'width:80px', hidden: true });
+  const custom = h('input', { type: 'number', min: 1, max: 1440, value: 20, 'aria-label': 'Minutes', style: 'width:72px', hidden: true, onkeydown: ev => { if (ev.key === 'Enter') set('custom'); } });
+  const close = () => { menu.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); };
+  const out = ev => { if (!menu.contains(ev.target) && ev.target !== anchor && !anchor?.contains?.(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') close(); };
   const set = async v => {
     const body = { zoneIds: zoneSel.value ? [+zoneSel.value] : [] };
     if (v === 'off' || v === 'song' || v === 'album') body.mode = v; else body.minutes = v === 'custom' ? +custom.value : v;
-    try { await api('/sleep', { method: 'POST', body }); dlg.close(); done?.(); } catch (e) { toast(e.message, true); }
+    try { const st = await api('/sleep', { method: 'POST', body }); close(); sleepChip(S, st); done?.(); } catch (e) { toast(e.message, true); }
   };
-  const dlg = dialog('Sleep timer', [h('p', { class: 'small dim' }, 'Music fades out over the last 30 seconds, then stops.'), h('div', { class: 'field' }, h('label', null, 'Speakers'), zoneSel),
-    h('div', { class: 'row wrap ss-sleep' }, SLEEP.map(([v, t]) => h('button', { class: 'btn', type: 'button', onclick: () => { if (v === 'custom') { if (custom.hidden) { custom.hidden = false; custom.focus(); return; } } set(v); } }, t)), custom)], [{ text: 'Close' }], { cls: 'ss-sleepdlg' });
-  return dlg;
+  const menu = h('div', { class: 'sleepmenu mpanel', role: 'menu', 'aria-label': 'Sleep timer' },
+    h('div', { class: 'small dim sm-h' }, 'Sleep timer · fades out over the last 30 s'), zoneSel,
+    ...SLEEP.map(([v, t]) => h('button', { type: 'button', role: 'menuitem', 'data-sleep': String(v), onclick: () => { if (v === 'custom' && custom.hidden) { custom.hidden = false; custom.focus(); return; } set(v); } }, t)), custom);
+  document.body.append(menu);
+  const z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1, r = anchor?.getBoundingClientRect?.(), mr = menu.getBoundingClientRect();
+  const vw = innerWidth / z, vh = innerHeight / z;
+  const x = r ? r.left / z : vw / 2 - mr.width / 2, y = r ? (r.top / z - mr.height - 6 > 4 ? r.top / z - mr.height - 6 : r.bottom / z + 6) : vh / 2 - mr.height / 2;
+  menu.style.left = Math.max(4, Math.min(x, vw - mr.width - 4)) + 'px'; menu.style.top = Math.max(4, Math.min(y, vh - mr.height - 4)) + 'px';
+  setTimeout(() => { document.addEventListener('pointerdown', out, true); document.addEventListener('keydown', esc, true); }, 0);
+  return { el: menu, close };
 }
 
 /** Full-screen alarm takeover (every phone) / banner on Now Playing (desktop). Control and up can Snooze / Stop. */
@@ -294,7 +305,12 @@ export function showAlarm(S, a) {
 /** Small countdown chip on Now Playing while the sleep timer runs. */
 export function sleepChip(S, st) {
   let c = document.getElementById('sleepchip');
-  if (!st || st.mode === 'off') { c?.remove(); return; }
+  if ((!st || st.mode === 'off') && !document.querySelector('.npsleep')) { c?.remove(); return; }
+  // 0.3.5 J8: the permanent Now Playing Sleep buttons show the countdown too
+  document.querySelectorAll('.npsleep').forEach(b => { b.classList.toggle('on', !!st && st.mode !== 'off'); b._st = st; });
+  if (!st || st.mode === 'off') { document.querySelectorAll('.npsleep').forEach(b => { clearInterval(b._iv); b.textContent = 'Sleep'; }); }
+  else document.querySelectorAll('.npsleep').forEach(b => { const end = Date.now() + st.remainingSec * 1000; clearInterval(b._iv); const tick = () => { const s2 = Math.max(0, Math.round((end - Date.now()) / 1000)); b.textContent = st.mode === 'song' && !st.remainingSec ? 'Sleep: song' : s2 > 90 ? `Sleep ${Math.ceil(s2 / 60)} min` : `Sleep ${s2} s`; if (!s2) clearInterval(b._iv); }; tick(); b._iv = setInterval(tick, 1000); });
+  if (document.querySelector('.npsleep')) { c?.remove(); return; }
   if (!c) { c = h('button', { id: 'sleepchip', class: 'chip sleepchip', type: 'button', onclick: () => openSleep(S) }); (document.querySelector('.np-title,.nowtop,#now') || document.body).append(c); }
   const end = Date.now() + st.remainingSec * 1000; c._end = end; c.textContent = `☾ ${Math.ceil(st.remainingSec / 60)} min`;
   clearInterval(c._iv); c._iv = setInterval(() => { const s = Math.max(0, Math.round((c._end - Date.now()) / 1000)); c.textContent = s > 90 ? `☾ ${Math.ceil(s / 60)} min` : `☾ ${s} s`; if (!s) clearInterval(c._iv); }, 1000);

@@ -40,6 +40,8 @@ export async function startJukebox(S) {
 
 /** Host top bar chip: "Jukebox on" + quick controls + Stop. */
 export function jukeboxChip(S, st) {
+  jbRunning = !!st?.running;
+  try { window.chrome?.webview?.postMessage({ cmd: 'jukebox', running: jbRunning }); } catch { /* not the Player */ }   // 0.3.5 J15: tray Start / Stop
   let c = document.getElementById('jbchip');
   if (!st?.running) { c?.remove(); if (kiosk) closeKiosk(); return; }
   if (!c) { c = h('button', { id: 'jbchip', class: 'chip jbchip', type: 'button', onclick: () => hostControls(S) }); (document.querySelector('.topbar .grow') || document.body).after(c); }
@@ -60,6 +62,14 @@ async function hostControls(S) {
     { text: 'Stop Jukebox', cls: 'danger', keep: true, onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); d.close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } },
     { text: 'Close' },
   ]);
+}
+let jbRunning = false;
+export const jukeboxRunning = () => jbRunning;
+/** 0.3.5 J15: tray "Stop Jukebox..." - the usual confirm, then stop (admin; others are told to sign in). */
+export async function askStopJukebox(S) {
+  if (!isAdmin(S)) { toast('Only an administrator can stop Jukebox from here. Use the host PIN on the big screen, or sign in as admin.', true); return; }
+  if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return;
+  try { await stopWithPin(S); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); }
 }
 async function stopWithPin(S, pin) { await api('/jukebox/stop', { method: 'POST', body: { pin: pin || '' } }); }
 

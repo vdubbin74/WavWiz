@@ -2031,3 +2031,9 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .pldrop .pl-h{padding:4px 10px}
 .pldrop .pl-new{display:flex;gap:6px;padding:4px 6px}.pldrop .pl-new[hidden]{display:none}.pldrop .pl-new input{flex:1;min-width:0}
 .qsave{gap:6px}.qsave-in{width:180px}
+/* J8: Sleep timer menu (Now Playing) */
+.sleepmenu{position:fixed;z-index:300;display:flex;flex-direction:column;gap:2px;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:6px;box-shadow:0 10px 26px rgba(0,0,0,.45)}
+.sleepmenu>button{background:none;border:0;color:var(--ink);text-align:left;padding:6px 10px;border-radius:3px;cursor:pointer}
+.sleepmenu>button:hover,.sleepmenu>button:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.sleepmenu select{margin:4px 0}.sleepmenu .sm-h{padding:2px 4px 4px}
+.npsleep.on{border-color:var(--accent);color:var(--accent)}

@@ -1,4 +1,5 @@
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
+import { openSleep } from './scenesched.js';   // 0.3.5 J8
 import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg } from './icons.js';
@@ -42,6 +43,8 @@ export function createNow(S, ctl) {
   const mkVol = () => { const r = h('input', { type: 'range', min: 0, max: 100, value: 0, class: 'myvol', 'aria-label': 'Volume of this device', oninput: ev => { syncVol(+ev.target.value, r); clearTimeout(r._t); r._t = setTimeout(() => setMyVol(+ev.target.value), 120); } }); return r; };
   const toggleMute = () => { const z = me(); if (!z || !canControl(S)) return; z.muted = !z.muted; act(`/zones/${z.id}`, { muted: z.muted }, 'PATCH'); drawMine(); };
   const mkMute = () => h('button', { class: 'tbtn tog mutebtn', 'aria-label': 'Mute this device', 'aria-pressed': 'false', title: 'Mute this device', onclick: toggleMute }, icon('volume'));
+  // 0.3.5 J8: the Sleep timer's permanent home - a Sleep button in Now Playing (small menu of times; shows the countdown while it runs)
+  function mkSleep() { const b = h('button', { class: 'btn sm npsleep', type: 'button', 'aria-haspopup': 'menu', title: 'Sleep timer', onclick: () => { if (!canControl(S)) return toast('Your access is view-only.'); openSleep(S, null, b); } }, 'Sleep'); return b; }
   const vol = mkVol(), muteBtn = mkMute();
   const volPct = h('span', { class: 'volpct small dim' }, '');
   const genre = h('div', { class: 'np-genre' }, h('span', { class: 'np-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')), t3line);
@@ -85,7 +88,7 @@ export function createNow(S, ctl) {
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
-    h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn)));
+    h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn), mkSleep()));
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
   let ctlCollapsed = loadPanels().ctl === 'collapsed';   // 0.3.0 §6: one key for all panels
@@ -167,7 +170,7 @@ export function createNow(S, ctl) {
     barCover, h('div', { class: 'npb-titles' }, barT1, barT2), barHeart,
     h('div', { class: 'transport npb-x', role: 'group', 'aria-label': 'Transport' }, h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), barPlay, h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'))),
     h('div', { class: 'npb-seek' }, barElv, barProg, barRev),
-    h('div', { class: 'npb-vol' }, icon('volume'), barVol, barPct, barMute, barEq));
+    h('div', { class: 'npb-vol' }, mkSleep(), icon('volume'), barVol, barPct, barMute, barEq));
   function syncVol(v, from) { for (const r of [vol, barVol, sVol]) if (r !== from && document.activeElement !== r) r.value = v; volPct.textContent = barPct.textContent = sPct.textContent = Math.round(v) + '%'; }
   /** This device's volume / mute on the panel, the mini bar and the header tag. */
   function drawMine() {
@@ -392,7 +395,10 @@ export function createNow(S, ctl) {
   window.addEventListener('wavwiz:checklist', drawChecklist);
   drawVBtns();
   queueMicrotask(paintCollapsed);
-  return { el, mini, npbar, nextBlock, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
+  /** 0.3.5: Playback > Sound / EQ shows the EQ in the center panel; Playback > Sleep timer opens the Sleep menu. */
+  function showCenter(m) { setCenter(m); stage.scrollIntoView?.({ block: 'nearest' }); }
+  function openSleepMenu() { const b = [...document.querySelectorAll('.npsleep')].find(x => x.getClientRects().length) || null; openSleep(S, null, b); }
+  return { el, mini, npbar, nextBlock, showCenter, openSleep: openSleepMenu, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
 }
 
 /** 0.3.3 G5: true while the expanded Playlist (with Now Playing slid up) covers the EQ / visualizer. */

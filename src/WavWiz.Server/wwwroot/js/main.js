@@ -26,7 +26,7 @@ import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
 import { canControl, thisDevice } from './ui.js';
 import { isPlayerUa } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
-import { startJukebox, jukeboxChip, openKiosk } from './jukebox-kiosk.js';
+import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
 import { tagsView } from './tags.js';
@@ -173,7 +173,13 @@ async function startMain() {
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
   api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
-  const hashCal = () => { if (location.hash === '#calibrate') { history.replaceState(null, '', location.pathname + location.search); if (canControl(S)) openCalibration(S, refreshAll); } };
+  const hashCal = () => {
+    const hs = location.hash; if (!['#calibrate', '#jukebox', '#jukebox-stop'].includes(hs)) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (hs === '#calibrate') { if (canControl(S)) openCalibration(S, refreshAll); }
+    else if (hs === '#jukebox-stop' || (hs === '#jukebox' && jukeboxRunning())) askStopJukebox(S);   // 0.3.5 J15: tray Stop Jukebox...
+    else startJukebox(S);                                                                           // 0.3.5 J15: tray Start Jukebox...
+  };
   hashCal(); window.addEventListener('hashchange', hashCal);
   setInterval(() => nowc.tickPos(), 250);
   // 0.3.0 §2: remote mode (remembered per device) never joins as a speaker
