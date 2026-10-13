@@ -54,12 +54,16 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 - **Phones and browsers:** open the server's address on the same Wi-Fi and complete pairing if prompted. Every browser that opens WavWiz joins as a speaker by itself, with a readable name such as "Chrome on Windows". Sound on iPhone often needs a first tap to unlock audio.
 - **Removing a device:** **Settings → Devices → Paired devices & tokens → Revoke** (or **Forget device…** in a device card's settings) removes it from the Devices list on every open page right away; it has to pair again to come back.
 
+### Add WavWiz to your home screen
+
+On an iPhone or iPad, open WavWiz in Safari, tap **Share** and choose **Add to Home Screen**. On Android, open it in Chrome and choose **Add to Home screen** (or **Install app**) from the menu; Chrome may only offer **Install app** over HTTPS. WavWiz then opens full screen with its own icon.
+
 ## 6. Devices, zones and delay
 
 - **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
 - **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
 - In the **Expanded** Devices view, each card shows the name with up to two tags (**REF** for the reference speaker, **MUTED**, **NO DELAY**, **OFFLINE**, or a phone's **SPEAKER** role), one status line (playing · output · delay), and the volume with a round **Mute** button on the right. Its **Settings** button opens the device's settings right under the card: **Output**, **Delay** (slider, exact ms and **Calibrate**, with "Measured with … · date"), **Test sound**, **Sound / EQ** and **More** (Rename, Set as reference, Delay history, Forget), plus one line of connection details. Controls only an administrator may change stay visible but read-only for everyone else.
-- Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other rooms. On PCs the delay is kept per audio output.
+- Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other devices. On PCs the delay is kept per audio output.
 
 ### Calibrate speakers
 
@@ -93,11 +97,11 @@ Want just the playback controls in a small window? Choose **Devices → Mini pla
 
 ### Max-volume lock
 
-An admin can give any device a **max volume** in its Settings and lock it. While it is locked, nothing raises that room above the cap: not the master volume, a zone, a scene, schedule or alarm, the mini player or the API. Turning it down always works. A small padlock shows by the room's volume bar.
+An admin can give any device a **max volume** in its Settings and lock it. While it is locked, nothing raises that device above the cap: not the master volume, a zone, a scene, schedule or alarm, the mini player or the API. Turning it down always works. A small padlock shows by the device's volume bar.
 
 ### Jukebox (beta)
 
-**Playback → Start Jukebox…** (admin) asks for a host PIN (4–8 digits) and opens the locked big screen. Guests scan the QR code to add songs. Leave with the PIN: hold the WavWiz logo in the corner or press **Ctrl+Shift+J**. The Jukebox screen blocks Esc, Alt+Tab and right-click inside WavWiz, but Windows keys such as Ctrl+Alt+Del still work. For a public PC that must stay locked, set it up with **Windows Assigned Access** (kiosk mode) and run WavWiz Player as the kiosk app.
+**Playback → Start Jukebox…** (admin) asks for a host PIN (4–8 digits) and opens the locked big screen. Guests scan the QR code to add songs. Leave with the PIN: hold the WavWiz logo in the corner or press **Ctrl+Shift+J**. The Jukebox screen blocks Esc, Alt+Tab and right-click inside WavWiz, but Windows keys such as Ctrl+Alt+Del still work. For a public PC that must stay locked, set it up with **Windows Assigned Access** (kiosk mode) and run WavWiz Player as the kiosk app. Running the Jukebox big screen in a smart-TV browser is still in testing.
 
 ### Alarms, sleep timer and crossfade
 
