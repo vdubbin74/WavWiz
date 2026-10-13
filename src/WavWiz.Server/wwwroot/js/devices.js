@@ -706,7 +706,7 @@ export function devicesPanel(S, ctl) {
       const mk = (z, addable) => keepCard(oldS.get(String(z.id)), S, z, rowKey(z.id === hl, !!hset && !hset.has(z.id), addable, groups.length), () => speakerRow(S, ctl, z, z.id === hl, { dim: !!hset && !hset.has(z.id), groups, addable }), busy);
       const head = h('div', { class: 'pane-h dsec-h devs-h' }, h('span', null, SPEAKERS_LABEL.toUpperCase()), h('span', { class: 'small dim' }, `${S.zones.length}${pg ? ' · ' + pg.name.toUpperCase() + ' HIGHLIGHTED' : ''}`), h('span', { class: 'grow' }),
         pg ? h('button', { class: 'btn sm', onclick: () => setPick('all') }, 'Show all') : h('span', { class: 'small dim' }, `${S.zones.filter(z => z.connected).length} online`));
-      const cols = h('div', { class: 'scolhead', 'aria-hidden': 'true' }, h('span'), h('span', null, 'NAME'), h('span', null, 'OUTPUT'), h('span', null, 'VOLUME'), h('span', null, 'TAGS'));
+      const cols = h('div', { class: 'scolhead', 'aria-hidden': 'true' }, h('span', { class: 'ch-dot' }), h('span', { class: 'ch-name' }, 'NAME'), h('span', { class: 'ch-out' }, 'OUTPUT'), h('span', { class: 'ch-vol' }, 'VOLUME'), h('span', { class: 'ch-tags' }, 'TAGS'));
       const list = kid(scol, 'slist') || h('div', { class: 'slist' }), ulist = kid(scol, 'ulist') || h('div', { class: 'ulist' });
       reconcile(list, zoned.map(z => mk(z, false))); reconcile(ulist, un.map(z => mk(z, true)));
       reconcile(scol, [head, S.zones.length ? cols : null, S.zones.length ? list : h('p', { class: 'dim small pad' }, EMPTY),
@@ -831,7 +831,7 @@ function speakerRow(S, ctl, z, hl, { dim = false, groups = [], addable = false }
   const expBtn = settingsToggle(z.name, open, flip), settings = open ? cardSettings(S, ctl, z) : null;
   const add = addable ? ro(h('button', { type: 'button', class: 'btn sm saddzone', title: 'Add this speaker to a zone', onclick: ev => { ev.stopPropagation(); addToZoneMenu(S, ctl, z, ev.currentTarget, groups); } }, '+ Add to zone'), isAdmin(S)) : null;
   row = h('div', { class: 'dcard srow' + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl ? ' hl' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : ''), 'data-room': z.name, 'data-zone-id': z.id },
-    h('div', { class: 'sline' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), out, h('div', { class: 'dvol' }, vol, pct, mute), h('span', { class: 'stags' }, tags), add || h('span', { class: 'saddslot' }), sw, expBtn),
+    h('div', { class: 'sline' }, dot, h('b', { class: 'dname ell', title: (me ? 'This device. ' : '') + z.name }, z.name), out, h('div', { class: 'dvol' }, vol, pct, mute), h('span', { class: 'stags' }, tags), add || h('span', { class: 'saddslot' }), expBtn, sw),   // 0.3.4 H8: settings ⌄ then the switch, as in the approved render
     settings);
   row._sig = cardSig(S, z, rowKey(hl, dim, addable, groups.length));
   row._patch = nz => { Object.assign(z, nz); patchFace(row, z, dot, null, sw); patchVolume(z, vol, pct, mute); row.classList.toggle('muted', !!z.muted); row.classList.toggle('gone', !z.connected); const t = JSON.stringify(cardTags(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls(z)); } settings?._patch?.(z); };

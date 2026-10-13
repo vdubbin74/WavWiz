@@ -1969,3 +1969,30 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 /* G3 Pepecoin: brand-kit colors only - no contrast-shifted text variants in Settings (secondary #208241 headings/links, highlight #C07A4E) */
 :root[data-theme=pepecoin] .settings-dlg .card>h3,:root[data-theme=pepecoin] .settings-dlg a:not(.btn),:root[data-theme=pepecoin] .settings-dlg .linkbtn{color:var(--accent2)!important}
 :root[data-theme=pepecoin] .settings-dlg .btn.primary{color:var(--accent)}
+/* ---- 0.3.4 H8/H8b: Now Playing bar docks in its own row below an expanded Library or Devices, whatever the Playlist state.
+   The hidden Now Playing column and Playlist move into row 1 (under the expanded panel), so row 2 holds only the bar and can never grow. ---- */
+@media (min-width:901px){
+  .desk.libexpanded,.desk.devexpanded,.desk.libexpanded.listexpanded,.desk.devexpanded.listexpanded{grid-template-rows:minmax(0,1fr) auto!important}
+  .desk:is(.libexpanded,.devexpanded) :is(.nowcol,.listpanel){grid-area:1/2/2/3!important}
+  .desk:is(.libexpanded,.devexpanded) .npbar{grid-area:2/1/3/4!important;min-height:64px;box-sizing:border-box;position:relative;z-index:2}
+  .desk:is(.libexpanded,.devexpanded) :is(.libpanel,.devpanel){grid-row:1/2!important;min-height:0;overflow:hidden}
+}
+/* ---- 0.3.4 H9: every Devices section heading (Speakers, Unassigned, Zones, Scenes & Schedules; standard + expanded) uses the same theme heading color ---- */
+.devpanel .devbody :is(.pane-h.dsec-h,.dss>.pane-h,.slimsub)>span:first-child{color:var(--accent2-text,var(--accent2))!important}
+:root[data-theme=pepecoin] .devpanel .devbody :is(.pane-h.dsec-h,.dss>.pane-h,.slimsub)>span:first-child{color:var(--accent2)!important}
+/* ---- 0.3.4 H8: expanded Devices speaker rows - every row and the header share one deterministic grid, so the switch and ⌄ stay inside the row,
+   the output name always shows, and nothing spills into the Scenes column. Side columns shrink a little on smaller windows; under 700 px the row wraps to two lines. ---- */
+.devpanel.expanded .dexp-main.e1{grid-template-columns:clamp(220px,22%,340px) minmax(0,1fr) clamp(220px,21%,330px)!important;column-gap:14px}
+.e1 .scol{container-type:inline-size;min-width:0}
+.e1 .scolhead,.e1 .srow .sline{grid-template-columns:10px minmax(100px,1fr) minmax(70px,1.3fr) minmax(110px,150px) minmax(130px,1fr) 96px 30px 36px!important;column-gap:8px;
+  grid-template-areas:"dot name out vol tags add exp sw"}
+.e1 .srow .sline>.dot,.e1 .scolhead>.ch-dot{grid-area:dot} .e1 .srow .sline>.dname,.e1 .scolhead>.ch-name{grid-area:name;min-width:0}
+.e1 .srow .sline>.sout,.e1 .scolhead>.ch-out{grid-area:out;min-width:0} .e1 .srow .sline>.dvol,.e1 .scolhead>.ch-vol{grid-area:vol;min-width:0}
+.e1 .srow .sline>.stags,.e1 .scolhead>.ch-tags{grid-area:tags;min-width:0} .e1 .srow .sline>:is(.saddzone,.saddslot){grid-area:add;justify-self:end;max-width:100%}
+.e1 .srow .sline>.dexpand{grid-area:exp} .e1 .srow .sline>.sw{grid-area:sw;justify-self:end}
+.e1 .srow .sline{overflow:hidden}
+@container (max-width:700px){
+  .e1 .scolhead{display:none!important}
+  .e1 .srow .sline{grid-template-columns:10px minmax(60px,1fr) minmax(0,1.2fr) auto 30px 36px!important;grid-template-areas:"dot name out add exp sw" ". vol vol tags tags tags";row-gap:4px}
+  .e1 .srow .sline>.stags{justify-content:flex-end}
+}

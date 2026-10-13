@@ -22,5 +22,12 @@ export const VOL_SEL = ':is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]
 export function syncFills(root = document) { for (const el of root.querySelectorAll(VOL_SEL)) { const v = fillPct(el).toFixed(1) + '%'; if (el.style.getPropertyValue('--v') !== v) el.style.setProperty('--v', v); } }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('input', ev => { const t = ev.target; if (t?.matches?.(VOL_SEL)) t.style.setProperty('--v', fillPct(t).toFixed(1) + '%'); }, true);
-  try { setInterval(() => syncFills(), 250); } catch { /* no timers */ }
+  const one = el => { if (el?.matches?.(VOL_SEL)) { const v = fillPct(el).toFixed(1) + '%'; if (el.style.getPropertyValue('--v') !== v) el.style.setProperty('--v', v); } };
+  // values set by code (server pushes, re-renders): hook the value property of range inputs, catch new bars as they are added, plus a slow safety sweep
+  try {
+    const P = globalThis.HTMLInputElement?.prototype, d = P && Object.getOwnPropertyDescriptor(P, 'value');
+    if (d?.set && !P.__wwFill) { P.__wwFill = 1; Object.defineProperty(P, 'value', { ...d, set(v) { d.set.call(this, v); if (this.type === 'range') one(this); } }); }
+  } catch { /* locked-down prototype */ }
+  try { new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { one(n); if (n.firstElementChild) syncFills(n); } }).observe(document.documentElement, { childList: true, subtree: true }); } catch { /* old */ }
+  try { setInterval(() => syncFills(), 500); } catch { /* no timers */ }
 }
