@@ -1,12 +1,15 @@
 // Pure helpers for the playlist table's resizable columns (unit-tested with node).
 export const MIN_COL = 44;
+/** 0.3.4 H2: the # column never gets narrower than this, so 3-digit numbers plus the drag grip stay on one line. */
+export const NUM_MIN = 64;
 export const DEFAULT_FRACS = [0.05, 0.30, 0.21, 0.21, 0.13, 0.10];     // #, title, artist, album, genre, time
 export const COL_KEY = 'wavwiz.cols.v1';
 
 /** Drag the divider right of column i by dx px: column i grows/shrinks and column i+1 gives/takes the same, so the total never changes. Both stay >= min. */
 export function resizeCol(widths, i, dx, min = MIN_COL) {
   const w = widths.slice(); if (i < 0 || i >= w.length - 1) return w;
-  const lo = min - w[i], hi = w[i + 1] - min;                 // allowed range of dx
+  const mn = k => (k === 0 ? Math.max(min, NUM_MIN) : min);
+  const lo = mn(i) - w[i], hi = w[i + 1] - mn(i + 1);                 // allowed range of dx
   const d = Math.max(lo, Math.min(hi, dx)); if (!(hi >= lo)) return w;
   w[i] += d; w[i + 1] -= d; return w;
 }
@@ -15,6 +18,7 @@ export function fitWidths(total, fracs = DEFAULT_FRACS, min = MIN_COL) {
   const sum = fracs.reduce((a, b) => a + b, 0) || 1; let w = fracs.map(f => Math.max(min, Math.floor(total * f / sum)));
   let over = w.reduce((a, b) => a + b, 0) - total;
   for (let i = 1; over !== 0 && i < 200; i++) { const k = i % w.length; if (over > 0 && w[k] > min) { w[k]--; over--; } else if (over < 0) { w[k]++; over++; } }
+  if (w.length > 1 && w[0] < NUM_MIN) { const d = Math.min(NUM_MIN - w[0], Math.max(0, w[1] - min)); w[0] += d; w[1] -= d; }
   return w;
 }
 export const toFracs = widths => { const t = widths.reduce((a, b) => a + b, 0) || 1; return widths.map(x => x / t); };

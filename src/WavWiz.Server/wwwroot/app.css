@@ -288,7 +288,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .qtable th .grip::after{content:"";position:absolute;left:auto;right:4px;top:20%;bottom:20%;width:1px;background:var(--line)}
 .qtable th .grip:hover::after,.qtable th .grip.on::after,.qtable th .grip:focus::after{background:var(--accent);width:2px;right:3px}
 .qtable td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
-.qtable td.num,.qtable th.num{text-align:right} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono);position:relative}
+.qtable td.num,.qtable th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono);position:relative}
 .qtable tr:hover td{background:var(--accent-soft)} .qtable tr.cur td{background:var(--accent-soft);color:var(--ink);font-weight:700;box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
 .qtable tr.cur td.num{color:var(--accent-text,var(--accent))}
 .qtable td.empty,.qtable tr.empty td{color:var(--dim);cursor:default;white-space:normal}
