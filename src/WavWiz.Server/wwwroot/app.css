@@ -1996,3 +1996,12 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .e1 .srow .sline{grid-template-columns:10px minmax(60px,1fr) minmax(0,1.2fr) auto 30px 36px!important;grid-template-areas:"dot name out add exp sw" ". vol vol tags tags tags";row-gap:4px}
   .e1 .srow .sline>.stags{justify-content:flex-end}
 }
+/* ---- 0.3.4 (test pass): phones - Settings fills the screen width (it was 32 px narrower and pinned left, pushing the close × off-screen) and the
+   header search shrinks to fit so the title and × always show ---- */
+@media (max-width:900px){
+  dialog.settings-dlg{width:calc(100vw / var(--z,1))!important;max-width:calc(100vw / var(--z,1))!important;box-sizing:border-box}
+  dialog.settings-dlg>header .setsearch-w{flex:1 1 auto;width:auto;min-width:0}
+  dialog.settings-dlg>header .setsearch-w .setsearch{flex:1 1 auto;width:auto;min-width:0}
+  dialog.settings-dlg>header .setsearch-w .setsearch-n{display:none}
+  dialog.settings-dlg>header .iconbtn{flex:none}
+}
