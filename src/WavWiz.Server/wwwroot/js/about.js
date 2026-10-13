@@ -1,7 +1,7 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.2';
+export const WHATS_NEW_VERSION = '0.3.3';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 export const WHATS_NEW = [
   // 0.3.2 (only what shipped)
