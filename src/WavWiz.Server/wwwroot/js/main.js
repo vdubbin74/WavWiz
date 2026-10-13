@@ -227,7 +227,17 @@ function wireNextBlock() {
 }
 function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); setList(c ? 'collapsed' : 'open'); }
 /** 0.3.2 F13: collapsed · open · expanded (rises over the EQ / visualizer at center-column width; Now Playing stays visible below). */
-function setList(st) { desk.classList.toggle('listcollapsed', st === 'collapsed'); desk.classList.toggle('listexpanded', st === 'expanded'); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
+// 0.3.3 G5: expanding the Playlist slides Now Playing up with it to the top of the center column (covering the EQ / visualizer, which stop
+// rendering while covered); collapsing reverses it. Both move with the Playlist's timing (FLIP: measure, switch, animate from the old spot).
+export const LIST_ANIM = { ms: 320, ease: 'cubic-bezier(.4,0,.2,1)' };
+function flipList(change) {
+  const els = [nowc.el, listt.el].filter(Boolean), before = els.map(e => e.getBoundingClientRect().top);
+  change();
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  els.forEach((e, i) => { const dy = before[i] - e.getBoundingClientRect().top; if (Math.abs(dy) < 1 || !e.animate) return; e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: LIST_ANIM.ms, easing: LIST_ANIM.ease }); });
+}
+function setList(st) { const was = desk.classList.contains('listexpanded'); flipList(() => { desk.classList.toggle('listcollapsed', st === 'collapsed'); desk.classList.toggle('listexpanded', st === 'expanded'); });
+  if (was !== (st === 'expanded')) window.dispatchEvent(new CustomEvent('wavwiz:listcover', { detail: { covered: st === 'expanded' } })); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
 function listStepUi(dir) { setList(listStep(P6, dir).list); }
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {

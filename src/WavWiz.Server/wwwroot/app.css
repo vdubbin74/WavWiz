@@ -1893,3 +1893,10 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .settings-sec:not([data-g=appearance]) .card>.setrow,.settings-sec:not([data-g=appearance]) .card>label.row,.settings-sec:not([data-g=appearance]) .card>.field{min-height:40px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);padding:4px 0}
 }
 .settings-dlg .appnav.subtabs button{border-radius:3px}
+/* G5: expanded Playlist - Now Playing slides up to the top of the center column, the Playlist fills the rest below it; EQ / visualizer hidden */
+@media (min-width:901px){
+  .desk.listexpanded{grid-template-rows:auto minmax(0,1fr)}
+  .desk.listexpanded .nowcol{grid-area:1/2/2/3;align-self:start}
+  .desk.listexpanded .listpanel{grid-area:2/2/3/3}
+  .desk.listexpanded .libpanel{grid-area:1/1/3/2} .desk.listexpanded .devpanel{grid-area:1/3/3/4}
+}

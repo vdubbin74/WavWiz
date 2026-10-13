@@ -255,8 +255,9 @@ export function createNow(S, ctl) {
   function ensureViz() {
     const p = vizPrefs();
     // 0.3.0 §3: the EQ view lives only while shown; the visualizer renders ONLY while selected (no rAF, analyser or GL work when hidden or under the Jukebox screen)
-    if (center === 'eq' && !kioskOpen()) { if (!eqv) eqv = centerEq(S, eqHost); else eqv.refresh(); } else if (eqv) { eqv.destroy(); eqv = null; }
-    if (!p.on || center !== 'viz' || kioskOpen() || document.hidden) { if (viz) { viz.destroy(); viz = null; } vizState = { audible: false, error: null, preset: '' }; paintStage(); return; }
+    const covered = listCovers();   // 0.3.3 G5: Now Playing slid up over the EQ / visualizer - nothing renders underneath
+    if (center === 'eq' && !kioskOpen() && !covered) { if (!eqv) eqv = centerEq(S, eqHost); else eqv.refresh(); } else if (eqv) { eqv.destroy(); eqv = null; }
+    if (!p.on || center !== 'viz' || kioskOpen() || document.hidden || covered) { if (viz) { viz.destroy(); viz = null; } vizState = { audible: false, error: null, preset: '' }; paintStage(); return; }
     // Start even when idle so every look can show its calm idle animation.
     if (!viz) {
       viz = new Viz(host, { onStatus: (k, t) => { if (k === 'audible') vizState.audible = t === 'yes'; else if (k === 'error') vizState.error = t; else if (k === 'preset') { vizState.preset = t; drawVBtnsSoon(); } paintStage(); } });
@@ -286,6 +287,7 @@ export function createNow(S, ctl) {
     stage.insertBefore(host, srcChip); overlay.remove(); overlay = null; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* ok */ } viz?.resize(); paintStage();
   }
   window.addEventListener('wavwiz:kiosk', () => { ensureViz(); paintStage(); });
+  window.addEventListener('wavwiz:listcover', () => { ensureViz(); paintStage(); });
   document.addEventListener('visibilitychange', () => { ensureViz(); paintStage(); });
   window.addEventListener('wavwiz:viz', () => { const p = vizPrefs(); if (viz) { viz.setLight(); if (viz.engine !== p.engine) viz.useEngine(p.engine); } ensureViz(); drawVBtns(); paintStage(); });
 
@@ -392,3 +394,6 @@ export function createNow(S, ctl) {
   queueMicrotask(paintCollapsed);
   return { el, mini, npbar, nextBlock, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
 }
+
+/** 0.3.3 G5: true while the expanded Playlist (with Now Playing slid up) covers the EQ / visualizer. */
+export const listCovers = () => typeof document !== 'undefined' && !!document.getElementById('desk')?.classList.contains('listexpanded') && (typeof matchMedia !== 'function' || matchMedia('(min-width:901px)').matches);
