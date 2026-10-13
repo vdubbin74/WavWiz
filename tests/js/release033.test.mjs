@@ -60,7 +60,7 @@ test('G11: volume slider style - Gradient (default, theme colors) or Flat (prima
   const st = new Map(), store = { getItem: k => st.get(k) ?? null, setItem: (k, v) => st.set(k, v) };
   const s = await imp('sliderstyle'); assert.equal(s.loadSlider(store), 'gradient'); s.applySlider('flat', store); assert.equal(s.loadSlider(store), 'flat'); s.applySlider('nope', store); assert.equal(s.loadSlider(store), 'gradient');
   assert.equal(s.sliderTrack('gradient'), 'linear-gradient(90deg,var(--accent),var(--accent2))'); assert.equal(s.sliderTrack('flat'), 'var(--accent)'); // 0.3.4 H3: back to two colors
-  assert.match(css, /:root\[data-slider=flat\]\{--voltrack:var\(--accent\)\}/); assert.match(css, /:is\(\.dvol,\.mp-vol,\.np-volrow,\.dmaster\)/);
+  assert.match(css, /:root\[data-slider=flat\]\{--voltrack:linear-gradient\(var\(--accent\),var\(--accent\)\)\}/);   // 0.3.4: a bare color in a non-final background layer is invalid (Flat drew no track) assert.match(css, /:is\(\.dvol,\.mp-vol,\.np-volrow,\.dmaster\)/);
   assert.match(src('appearance.js'), /'Volume slider style'/); assert.match(src('mini.js'), /import '\.\/sliderstyle\.js'/);
 });
 test('G12: reorder (multi-select block), server moves, undo, insertion index, auto-scroll, selection', async () => {

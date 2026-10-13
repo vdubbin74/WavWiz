@@ -1950,7 +1950,7 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .e1 .srow .saddzone{position:relative}
 /* G11 / 0.3.4 H3: volume slider style - Gradient (theme primary -> secondary, the v0.3.2 two-color look; default) or Flat (primary); every volume bar */
 :root{--voltrack:linear-gradient(90deg,var(--accent),var(--accent2))}
-:root[data-slider=flat]{--voltrack:var(--accent)}
+:root[data-slider=flat]{--voltrack:linear-gradient(var(--accent),var(--accent))}   /* a background layer that is not the last one must be an image, so Flat is a one-color gradient */
 /* 0.3.4 H3: the style fills only up to the value (--v, kept in sync by sliderstyle.js); the rest of the track is the plain line color */
 :is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]::-webkit-slider-runnable-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2))!important;opacity:1}
 :is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]::-moz-range-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2))!important}
