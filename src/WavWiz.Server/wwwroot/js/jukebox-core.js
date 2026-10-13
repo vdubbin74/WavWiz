@@ -13,7 +13,15 @@ export function guestId(store = globalThis.localStorage, rnd = () => crypto.getR
 export const groupHead = (label, n) => `${label} (${n})`;
 export const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 export const artistLine = a => plural(a.songs, 'song');
+/** 0.3.4 H5: the server sends albums as { artist, name, tracks }; older builds used { artist, album }. One reader for both. */
+export const albumName = a => (a ? (a.album ?? a.name ?? '') : '');
 export const albumLine = a => `${a.artist} · ${plural(a.tracks, 'track')}`;
+/** "Your songs in queue: 1 of 3" (Modern) / "Your picks: 1 of 3" (Retro CD). */
+export function minePicks(board, gid) { return (board?.next || []).filter(x => x.mine || (x.guest && x.guest === gid)).length; }
+/** Retro CD selection number for the LED readout ("SEL 107"). */
+export const selNo = trackId => 100 + (Math.abs(Number(trackId) || 0) % 900);
+/** Up next total, e.g. "5 songs · 19 min" (durations when known, else ~3.5 min a song). */
+export function upNextLine(next) { const n = (next || []).length; if (!n) return plural(0, 'song'); const ms = next.reduce((a, x) => a + (x.durationMs > 0 ? x.durationMs : 210000), 0); return `${plural(n, 'song')} · ${Math.max(1, Math.round(ms / 60000))} min`; }
 /** "Your songs in queue: 1 of 3" */
 export function mineLine(board, gid) {
   const mine = (board?.next || []).filter(x => x.mine || (x.guest && x.guest === gid)).length;

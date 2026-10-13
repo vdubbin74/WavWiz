@@ -1,12 +1,15 @@
 // WavWiz 0.3.0 §1 Jukebox (beta): Playback > Start Jukebox…, the host "Jukebox on" chip and the locked big screen (kiosk).
-import { h, api, toast, dialog, ask, fmtTime } from './util.js';
+import { h, api, toast, dialog, ask } from './util.js';
 import { isAdmin, canControl } from './ui.js';
 import { loadTheme } from './theme.js';
-import { blockedKey, isExitChord, guestApi, selCode, plural } from './jukebox-core.js';
+import { blockedKey, isExitChord, guestApi, plural, albumName, selNo, upNextLine } from './jukebox-core.js';
+import { RETRO_SVG } from './jukebox-retro.js';
 import { renderResults } from './jukebox-view.js';
 import { Viz } from './viz.js';
 
 let kiosk = null;
+/** m:ss like the approved renders (1:46 / 4:12). */
+const mss = ms => { const t = Math.max(0, Math.floor((ms || 0) / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 export const kioskOpen = () => !!kiosk;
 
 /** Playback > Start Jukebox… (admin only). A host PIN is required so the big screen can be left. */
@@ -81,7 +84,7 @@ export function openKiosk(S) {
   if (kiosk) return;
   const root = h('div', { class: 'jb', role: 'application', 'aria-label': 'WavWiz Jukebox' });
   const bg = h('div', { class: 'jb-bg', 'aria-hidden': 'true' });
-  let code = null, board = null, viz = null, iv = 0, pinOpen = false;
+  let code = null, board = null, viz = null, iv = 0, pinOpen = false, picks = [], picksAt = 0, joinUrl = '';
   const block = e => {
     const pad = root.querySelector('.jb-dlg')?._pad;
     if (isExitChord(e)) { e.preventDefault(); askExit(); return; }
@@ -95,53 +98,90 @@ export function openKiosk(S) {
     try { await api('/jukebox/unlock', { method: 'POST', body: { pin } }); closeKiosk(); }
     catch { toast('That PIN isn’t right.', true); }
   }
-  const logo = h('button', { class: 'jb-logo', type: 'button', 'aria-label': 'Host: hold to exit' }, h('b', null, 'WavWiz'), h('br'), 'Hold for host');
+  const logo = h('button', { class: 'jb-logo', type: 'button', 'aria-label': 'Host: hold to exit' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'), 'Hold for host');
   let lp = 0; logo.addEventListener('pointerdown', () => { lp = setTimeout(askExit, 1200); }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, () => clearTimeout(lp)));
   async function openSearch() {
     if (!code) return;
     const call = guestApi(code);
-    const inp = h('input', { class: 'jb-in', type: 'search', placeholder: 'Search songs, artists, albums', 'aria-label': 'Search' });
-    const out = h('div');
-    const songRow = s => { const b = h('button', { class: 'btn primary jb-add', onclick: async () => { b.disabled = true; try { await call('/add', { guest: 'kiosk-screen', name: 'Big screen', trackId: s.id }); b.textContent = '✓ In'; b.classList.add('in'); } catch (e) { b.disabled = false; toast(e.message, true); } } }, 'Add'); return h('div', { class: 'jb-row' }, h('div', { class: 'jb-t' }, h('b', null, s.title), h('small', null, s.artist)), b); };
-    const list = (title, songs) => out.replaceChildren(h('button', { class: 'btn', onclick: run }, '‹ Back'), h('h2', { class: 'jb-gh' }, title), ...songs.map(songRow));
-    async function run() { const q = inp.value.trim(); if (!q) { out.replaceChildren(); return; } try { const r = await call('/search?q=' + encodeURIComponent(q)); out.replaceChildren(renderResults(r, { songRow, onArtist: async a => list(a.name, await call('/artist?name=' + encodeURIComponent(a.name))), onAlbum: async a => list(a.album, await call(`/album?artist=${encodeURIComponent(a.artist)}&album=${encodeURIComponent(a.album)}`)) })); } catch (e) { toast(e.message, true); } }
+    const inp = h('input', { class: 'jb-in', type: 'search', placeholder: 'Search songs, artists, albums', 'aria-label': 'Search', autocomplete: 'off' });
+    const out = h('div', { class: 'jb-sout' });
+    const songRow = (s, i = 0) => { const b = h('button', { class: 'btn primary jb-add', type: 'button', onclick: async () => { b.disabled = true; try { await call('/add', { guest: 'kiosk-screen', name: 'Big screen', trackId: s.id }); b.textContent = '✓ In'; b.classList.add('in'); refresh(); } catch (e) { b.disabled = false; toast(e.message, true); } } }, 'Add');
+      return h('div', { class: 'jb-row' }, board?.style === 'retro' ? h('span', { class: 'jbr-code' }, 'C' + (i + 1)) : null, h('div', { class: 'jb-t' }, h('b', null, s.title), h('small', null, s.artist)), b); };
+    const list = (title, songs) => out.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: run }, '‹ Back'), h('h2', { class: 'jb-gh' }, title), ...songs.map(songRow));
+    async function run() { const q = inp.value.trim(); if (!q) { out.replaceChildren(); return; } try { const r = await call('/search?q=' + encodeURIComponent(q)); if (q !== inp.value.trim()) return; out.replaceChildren(renderResults(r, { songRow, onArtist: async a => list(a.name, await call('/artist?name=' + encodeURIComponent(a.name))), onAlbum: async a => list(albumName(a), await call(`/album?artist=${encodeURIComponent(a.artist)}&album=${encodeURIComponent(albumName(a))}`)) })); } catch (e) { toast(e.message, true); } }
     inp.addEventListener('input', () => { clearTimeout(inp._t); inp._t = setTimeout(run, 250); });
-    const wrap = h('div', { class: 'jb-dlg', onclick: e => { if (e.target === wrap) wrap.remove(); } }, h('div', { class: 'jb-search-pane', role: 'dialog', 'aria-label': 'Search & add' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Search & add'), h('button', { class: 'btn', onclick: () => wrap.remove() }, 'Close')), inp, out));
+    const wrap = h('div', { class: 'jb-dlg', onclick: e => { if (e.target === wrap) wrap.remove(); } }, h('div', { class: 'jb-search-pane', role: 'dialog', 'aria-label': 'Search & add' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Search & add'), h('button', { class: 'btn', type: 'button', onclick: () => wrap.remove() }, 'Close')), inp, out));
     root.append(wrap); inp.focus();
   }
+  const qrSrc = () => '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || '');
+  const thumb = id => (id ? h('img', { class: 'jb-th', src: `/api/v1/art/track/${id}?size=128`, alt: '', loading: 'lazy' }) : h('span', { class: 'jb-th' }));
+
+  // ---- Modern (bug fixes only): cover, now playing, progress, requester, Search & add | Up next with art, QR ----
+  const mod = h('div', { class: 'jbm' });
   const cover = h('img', { class: 'jb-cover', alt: '' });
   const left = h('div', { class: 'jb-left' }), right = h('div', { class: 'jb-right' }), chips = h('div', { class: 'jb-chips' });
-  const tubes = h('div', { class: 'jb-tubes', 'aria-hidden': 'true' }, ...Array.from({ length: 8 }, () => h('i')));
-  function draw() {
-    const b = board; if (!b) return;
-    root.classList.toggle('retro', b.style === 'retro'); root.classList.toggle('paused', b.now?.state !== 'playing');
-    root.style.setProperty('--beat', String((b.beat ?? 50) / 100));
-    if (b.now?.trackId) cover.src = `/api/v1/art/track/${b.now.trackId}?size=512`; else cover.removeAttribute('src');
-    const pos = b.now ? b.now.positionMs : 0, dur = b.now?.durationMs || 0;
-    chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null);
+  mod.append(left, right);
+  function drawModern(b) {
+    if (b.now?.trackId) { const u = `/api/v1/art/track/${b.now.trackId}?size=512`; if (cover.getAttribute('src') !== u) cover.src = u; } else cover.removeAttribute('src');
+    const pos = b.now ? b.now.positionMs : 0, dur = b.now?.durationMs || 0, pct = dur ? Math.min(100, pos / dur * 100) : 0;
     left.replaceChildren(h('div', { class: 'jb-disc' }, cover), h('span', { class: 'jb-kick' }, 'NOW PLAYING'),
       h('h1', { class: 'jb-title' }, b.now?.title || 'Add the first song'), h('div', { class: 'jb-artist' }, b.now?.artist || ''),
-      h('div', { class: 'jb-prog' }, h('i', { style: `width:${dur ? Math.min(100, pos / dur * 100) : 0}%` })),
-      h('div', { class: 'row' }, h('small', { class: 'jb-dim' }, fmtTime(pos)), h('span', { class: 'grow' }), h('span', { class: 'jb-led' }, b.next.length ? selCode(0) : '--'), h('small', { class: 'jb-dim' }, fmtTime(dur))),
+      h('div', { class: 'jb-prog', style: `--p:${pct}%` }, h('i'), h('b')),
+      h('div', { class: 'row jb-times' }, h('small', { class: 'jb-dim' }, mss(pos)), h('span', { class: 'grow' }), h('small', { class: 'jb-dim' }, mss(dur))),
       b.now?.by ? h('div', { class: 'jb-by' }, `Requested by ${b.now.by}`) : null,
-      h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, '⌕ Search & add'));
+      h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, h('span', { class: 'jb-sico', 'aria-hidden': 'true' }), 'Search & add'));
     right.replaceChildren(
-      h('div', { class: 'jb-next' }, h('h2', null, h('span', null, 'UP NEXT'), h('span', null, plural(b.next.length, 'song'))),
-        ...(b.next.length ? b.next.slice(0, 6).map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, b.style === 'retro' ? selCode(i) : String(i + 1)), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
+      h('div', { class: 'jb-next' }, h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
+        ...(b.next.length ? b.next.slice(0, 5).map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x.trackId), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
           : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')])),
-      h('div', { class: 'jb-join' }, h('div', null, h('b', null, 'Scan to add a song'), h('br'), h('code', { class: 'jb-url' }, ''), h('br'), h('small', { class: 'jb-dim' }, 'No app, no login')), h('img', { class: 'jb-qr', src: '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || ''), alt: 'QR code to join the Jukebox' })));
-    api('/jukebox/join').then(j => { const u = right.querySelector('.jb-url'); if (u) u.textContent = j.url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''); }).catch(() => {});
+      h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), h('code', { class: 'jb-url' }, joinUrl), h('small', { class: 'jb-dim' }, 'No app, no login')), h('img', { class: 'jb-qr', src: qrSrc(), alt: 'QR code to join the Jukebox' })));
   }
-  let beat = 0; const pulse = () => { beat = (beat + 1) % 2; tubes.querySelectorAll('i').forEach((t, i) => t.style.setProperty('--pulse', String((i + beat) % 2))); };
+
+  // ---- 0.3.4 H4 Retro CD: rebuilt to the approved render (980 x 551 design stage, scaled to the screen) ----
+  const ret = h('div', { class: 'jbr' });
+  ret.innerHTML = RETRO_SVG + `<div class="jbr-disc"><img alt=""><i class="jbr-sheen"></i><i class="jbr-hub"></i><i class="jbr-spindle"></i></div>
+    <span class="jbr-badge l"></span><span class="jbr-badge r"></span>
+    <div class="jbr-plac"><span class="jbr-kick">NOW&nbsp;&nbsp;PLAYING</span><span class="jbr-vfd"></span><div class="jbr-line"><b class="jbr-title"></b><span class="jbr-artist"></span></div><span class="jbr-by"></span></div>
+    <div class="jbr-rack"><span class="jbr-h a">UP NEXT</span><span class="jbr-h b">MORE TO PICK</span><div class="jbr-col a"></div><div class="jbr-col b"></div></div>
+    <div class="jbr-qr"><span>Scan to pick<br>a song</span><img alt="QR code to join the Jukebox"><small></small></div>
+    <button type="button" class="jbr-select" aria-label="Search and add a song"><span>SELECT</span></button><span class="jbr-sel-l">Search &amp; add</span>`;
+  ret.querySelector('.jbr-select').addEventListener('click', openSearch);
+  const q = sel => ret.querySelector(sel);
+  const strip = (cls, codeTxt, kids) => h('div', { class: 'jbr-strip ' + cls }, h('span', { class: 'jbr-code' }, codeTxt), h('span', { class: 'jbr-st' }, kids));
+  async function loadPicks() { if (!code || Date.now() - picksAt < 45000) return; picksAt = Date.now(); try { picks = await guestApi(code)('/picks?n=5'); } catch { /* keep the old ones */ } }
+  function drawRetro(b) {
+    const n = b.now, img = q('.jbr-disc img');
+    if (n?.trackId) { const u = `/api/v1/art/track/${n.trackId}?size=512`; if (img.getAttribute('src') !== u) img.src = u; img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
+    q('.jbr-badge.l').textContent = `${plural(b.perGuest, 'pick')} per guest`;
+    q('.jbr-badge.r').textContent = b.locked ? 'Requests paused' : `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`;
+    q('.jbr-title').textContent = n?.title || 'Add the first song'; q('.jbr-artist').textContent = n?.artist || '';
+    q('.jbr-vfd').textContent = n ? `SEL ${selNo(n.trackId)} ${mss(n.positionMs)}/${mss(n.durationMs || 0)}` : 'SEL --- -:--/-:--';
+    q('.jbr-by').textContent = n?.by ? `Requested by ${n.by}` : '';
+    q('.jbr-col.a').replaceChildren(...[0, 1, 2, 3, 4].map(i => { const x = b.next[i]; return strip(x ? '' : 'empty', 'A' + (i + 1), x ? [h('span', { class: 'jbr-tt' }, x.title), x.by ? h('span', { class: 'jbr-who' }, ' · ' + x.by) : null] : ''); }));
+    const more = picks.filter(p => !b.next.some(x => x.trackId === p.id)).slice(0, 5);
+    q('.jbr-col.b').replaceChildren(...[0, 1, 2, 3, 4].map(i => { const p = more[i]; return strip('dim', 'B' + (i + 1), p ? `${p.title} · ${p.artist}` : ''); }));
+    const qi = q('.jbr-qr img'); if (qi.getAttribute('src') !== qrSrc()) qi.src = qrSrc(); q('.jbr-qr small').textContent = joinUrl;
+  }
+  function fit() { const k = Math.min(innerWidth / 980, innerHeight / 551); root.style.setProperty('--k', String(k)); }
+  function draw() {
+    const b = board; if (!b) return;
+    const isRetro = b.style === 'retro';
+    root.classList.toggle('retro', isRetro); root.classList.toggle('modern', !isRetro); root.classList.toggle('paused', b.now?.state !== 'playing');
+    root.style.setProperty('--beat', String((b.beat ?? 50) / 100));
+    chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null);
+    if (isRetro) { loadPicks().then(() => board === b && drawRetro(b)); drawRetro(b); } else drawModern(b);
+  }
   async function refresh() { try { const [st, b] = await Promise.all([api('/jukebox'), api('/jukebox/board')]); if (!st.running) { closeKiosk(); return; } code = st.code; board = b; draw(); } catch { /* keep the last picture */ } }
-  root.append(bg, tubes, logo, chips, left, right);
+  root.append(bg, mod, ret, logo, chips);
   document.body.append(root); document.body.classList.add('jb-kiosk');
+  fit(); addEventListener('resize', fit);
+  api('/jukebox/join').then(j => { joinUrl = j.url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''); draw(); }).catch(() => {});
   document.addEventListener('keydown', block, true); document.addEventListener('contextmenu', noMenu, true);
   try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch?.(() => {}); } catch { /* not allowed */ }
   try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
   try { viz = new Viz(bg, { preview: false }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
   window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: true }));
-  refresh(); iv = setInterval(() => { refresh(); if (board?.style === 'retro' && board?.now?.state === 'playing') pulse(); }, 1000);
-  kiosk = { root, close: () => { clearInterval(iv); viz?.destroy?.(); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
+  refresh(); iv = setInterval(refresh, 1000);
+  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
 }
 export function closeKiosk() { const k = kiosk; kiosk = null; k?.close(); }

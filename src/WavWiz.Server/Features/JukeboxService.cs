@@ -98,6 +98,15 @@ public sealed class JukeboxService
             r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, all);
         return new { artists, albums, songs };
     }
+    /// <summary>0.3.4 H4 Retro CD: "More to pick" (B1-B5) - a few random allowed songs that are not already queued. Read-only suggestions.</summary>
+    public object Picks(int n = 5)
+    {
+        var (w, ps) = Allowed(Cfg()); n = Math.Clamp(n, 1, 10);
+        var queued = _cond.Queue().Where(x => x.Kind == "track").Select(x => x.RefId).ToHashSet();
+        var rows = _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} ORDER BY random() LIMIT {n + Math.Min(40, queued.Count)}",
+            r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, ps);
+        return rows.Where(x => !queued.Contains(x.id)).Take(n).ToList();
+    }
     public object ArtistSongs(string name) { var (w, ps) = Allowed(Cfg()); return _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} AND (artist=$a OR album_artist=$a) ORDER BY album, disc_no, track_no", r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, ps.Append(("$a", (object?)name)).ToArray()); }
     public object AlbumSongs(string artist, string album) { var (w, ps) = Allowed(Cfg()); return _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} AND album=$al AND (album_artist=$a OR artist=$a) ORDER BY disc_no, track_no", r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, ps.Append(("$a", (object?)artist)).Append(("$al", (object?)album)).ToArray()); }
 
@@ -141,13 +150,14 @@ public sealed class JukeboxService
     }
 
     /// <summary>Now playing + next songs with requester names (big screen and guest page).</summary>
-    public object Board(bool host = false)
+    /// 0.3.4: <paramref name="me"/> = the asking phone's guest id; only its own picks get mine = true.
+    public object Board(bool host = false, string? me = null)
     {
         var now = _cond.Now(); var q = _cond.Queue(); var c = Cfg();
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
         return new { running = Running, locked = Locked, style = c.Style, voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
             now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
-            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) ? r.Guest : null }) };
+            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) &&  r2.Guest == me }) };
     }
 
     /// <summary>Auto-fill: when the queue runs dry, add a random allowed song from the chosen playlist (or genre). Called every second.</summary>

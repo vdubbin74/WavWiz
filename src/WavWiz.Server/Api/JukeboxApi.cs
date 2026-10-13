@@ -29,8 +29,9 @@ public static class JukeboxApi
 
         // ---- guests: no sign-in, the session code only ----
         IResult Guard(HttpContext c, Func<IResult> f) => jb.Guest(c) ? f() : Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
-        g.MapGet("/jukebox/guest/board", (HttpContext c) => Guard(c, () => Results.Json(jb.Board()))).Anon();
+        g.MapGet("/jukebox/guest/board", (HttpContext c, string? g) => Guard(c, () => Results.Json(jb.Board(false, g)))).Anon();   // 0.3.4: ?g=<guest id> marks this phone's picks
         g.MapGet("/jukebox/guest/search", (HttpContext c, string? q) => Guard(c, () => Results.Json(jb.Search(q ?? "")))).Anon();
+        g.MapGet("/jukebox/guest/picks", (HttpContext c, int? n) => Guard(c, () => Results.Json(jb.Picks(n ?? 5)))).Anon();   // 0.3.4 H4: Retro CD B1-B5
         g.MapGet("/jukebox/guest/artist", (HttpContext c, string name) => Guard(c, () => Results.Json(jb.ArtistSongs(name)))).Anon();
         g.MapGet("/jukebox/guest/album", (HttpContext c, string artist, string album) => Guard(c, () => Results.Json(jb.AlbumSongs(artist, album)))).Anon();
         // cover art for guests: only songs from the allowed music

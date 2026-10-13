@@ -2,6 +2,7 @@
 // names, Backup and restore, the Calibration sub-tab extras and the Jukebox tab.
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly } from './ui.js';
+import { jbPreview } from './jukebox-preview.js';
 
 export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub'];
 export const ROLE_NAMES = [['view', 'View', 'can browse and see what plays'], ['control', 'Control', 'can play, pause and change volume'], ['admin', 'Admin', 'can change every setting']];
@@ -100,28 +101,28 @@ export function jukeboxPane(S, settings, { admin }) {
   const box = h('div', { class: 'jbset' });
   let cfg = { ...JB_DEFAULTS }, roots = [], playlists = [];
   const save = async (patch, el) => { cfg = { ...cfg, ...patch }; try { await api('/jukebox/config', { method: 'PUT', body: patch }); savedMark(el); paintPreview(); } catch (e) { toast('Not saved. ' + e.message, true); } };
-  const preview = h('div', { class: 'jbprev', 'aria-label': 'Preview' });
-  function paintPreview() {
-    preview.className = 'jbprev jb-' + cfg.style;
-    preview.replaceChildren(h('div', { class: 'jbprev-art' }, cfg.style === 'retro' ? h('div', { class: 'jbcd spin' }) : h('div', { class: 'jbart' })),
-      h('div', { class: 'jbprev-q' }, h('b', null, 'Now playing'), h('div', { class: 'small dim' }, 'Next: requested by Sam'), h('div', { class: 'jbqr' }, 'QR')),
-      cfg.style === 'retro' ? h('div', { class: 'jbtubes' }, h('i'), h('i'), h('i')) : null);
-  }
+  // 0.3.4 H4b: one preview card per style (true layout, scaled); picking a card switches the style
+  const cards = h('div', { class: 'jbcards', role: 'radiogroup', 'aria-label': 'Display style' });
+  function paintPreview() { cards.querySelectorAll('.jbcard').forEach(c => { const on = c.dataset.style === cfg.style; c.classList.toggle('on', on); c.setAttribute('aria-checked', String(on)); }); }
   async function load() {
     try { [cfg, roots, playlists] = await Promise.all([api('/jukebox/config'), api('/library/roots').catch(() => []), api('/playlists').catch(() => [])]); cfg = { ...JB_DEFAULTS, ...cfg }; } catch (e) { box.replaceChildren(h('p', { class: 'err' }, 'Jukebox settings could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
     const A = el => adminOnly(S, el, admin);
-    const chip = (v, t) => A(h('button', { type: 'button', role: 'radio', class: 'themechip' + (cfg.style === v ? ' on' : ''), 'aria-checked': String(cfg.style === v), onclick: ev => { box.querySelectorAll('.jbstyle .themechip').forEach(b => { b.classList.toggle('on', b === ev.currentTarget); b.setAttribute('aria-checked', String(b === ev.currentTarget)); }); save({ style: v }, ev.currentTarget); } }, t));
+    const card = (v, t, sub) => A(h('button', { type: 'button', role: 'radio', class: 'jbcard' + (cfg.style === v ? ' on' : ''), 'data-style': v, 'aria-checked': String(cfg.style === v), 'aria-label': `${t} style`, onclick: ev => { if (cfg.style !== v) save({ style: v }, ev.currentTarget); } },
+      jbPreview(v), h('span', { class: 'jbcard-l' }, h('span', { class: 'jbradio', 'aria-hidden': 'true' }), h('span', { class: 'grow' }, h('b', null, t), h('small', null, sub)), h('span', { class: 'jbcard-live' }, 'LIVE PREVIEW'))));
     const num = (k, min, max, l) => A(h('input', { type: 'number', min, max, value: cfg[k], style: 'width:80px', 'aria-label': l, onchange: ev => save({ [k]: Math.max(min, Math.min(max, +ev.target.value || min)) }, ev.target) }));
     const tog = (k, l) => h('label', { class: 'row' }, h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg[k], 'aria-label': l, onchange: ev => save({ [k]: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })), l);
     const multi = (list, key, label, val, txt) => h('div', { class: 'jbsrc', role: 'group', 'aria-label': label }, list.length ? list.map(x => h('label', { class: 'row small' }, A(h('input', { type: 'checkbox', checked: (cfg[key] || []).includes(val(x)), onchange: ev => { const set = new Set(cfg[key] || []); ev.target.checked ? set.add(val(x)) : set.delete(val(x)); save({ [key]: [...set] }, ev.target); } })), txt(x))) : h('span', { class: 'small dim' }, 'None yet.'));
     const pin = A(h('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: 8, placeholder: cfg.hasPin ? '•••• (set)' : '4-8 digits', 'aria-label': 'Host PIN', style: 'width:120px' }));
     const fillSel = A(h('select', { 'aria-label': 'Auto-fill from', onchange: ev => save({ autofill: { ...cfg.autofill, kind: 'playlist', id: +ev.target.value || null } }, ev.target) }, h('option', { value: '' }, 'Off'), playlists.map(p => h('option', { value: p.id, selected: cfg.autofill?.id === p.id }, p.name))));
     box.replaceChildren(
-      h('div', { class: 'card jbstyle', id: 'sec-jbstyle' }, h('h3', null, 'Display style ', admin ? null : adminTag()), h('div', { class: 'row wrap', style: 'align-items:flex-start;gap:14px' },
-        h('div', { class: 'grow' }, h('div', { class: 'themechips', role: 'radiogroup', 'aria-label': 'Display style' }, chip('modern', 'Modern'), chip('retro', 'Retro CD')),
-          h('p', { class: 'small dim' }, 'The big screen and the guest page use this style and your theme colors.'), tog('cdSound', 'CD-changer sound (off by default)'),
-          h('div', { class: 'field' }, h('label', null, 'Bubble lights pulse with the beat'), A(h('input', { type: 'range', min: 0, max: 100, step: 1, value: cfg.beat, 'aria-label': 'Bubble light beat', onchange: ev => save({ beat: +ev.target.value }, ev.target) })))),
-        h('div', { class: 'jbprev-pin' }, preview))),
+      h('div', { class: 'card jbstyle', id: 'sec-jbstyle' }, h('h3', null, 'Display style ', admin ? null : adminTag()), h('p', { class: 'small dim' }, 'How the guest TV screen looks. Guests’ phones follow the same style.'),
+        (cards.replaceChildren(card('modern', 'Modern (default)', 'Clean, follows your theme'), card('retro', 'Retro CD', 'Chrome-and-neon CD jukebox')), cards),
+        h('p', { class: 'small dim jbcards-hint' }, 'Click a card to switch · example data'),
+        h('div', { class: 'jbretro-opts' }, h('div', { class: 'jbsub' }, 'RETRO CD OPTIONS'),
+          h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Bubble light pulse'), h('div', { class: 'small dim' }, 'Lights pulse with the beat. 50% default, 100% max.')),
+            (() => { const out = h('span', { class: 'jbbeatv' }, (cfg.beat ?? 50) + '%'); return [A(h('input', { type: 'range', min: 0, max: 100, step: 1, value: cfg.beat ?? 50, class: 'jbbeat', 'aria-label': 'Bubble light pulse', oninput: ev => { out.textContent = ev.target.value + '%'; }, onchange: ev => save({ beat: +ev.target.value }, ev.target) })), out]; })()),
+          h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'CD-changer sound'), h('div', { class: 'small dim' }, 'A soft click and whirr between songs. Off by default.')), h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg.cdSound, 'aria-label': 'CD-changer sound', onchange: ev => save({ cdSound: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })))),
+        h('p', { class: 'small dim' }, 'The big screen and the guest page use this style and your theme colors.')),
       h('div', { class: 'card', id: 'sec-jbsources' }, h('h3', null, 'Allowed music ', admin ? null : adminTag()), learn('Guests can only search and add songs from these folders and playlists. Nothing ticked means the whole library.'),
         h('div', { class: 'row wrap', style: 'align-items:flex-start;gap:20px' }, h('div', null, h('b', { class: 'small' }, 'Folders'), multi(roots, 'folders', 'Folders', r => r.path, r => r.path)), h('div', null, h('b', { class: 'small' }, 'Playlists'), multi(playlists, 'playlists', 'Playlists', p => p.id, p => p.name)))),
       h('div', { class: 'card', id: 'sec-jbrules' }, h('h3', null, 'Rules ', admin ? null : adminTag()),

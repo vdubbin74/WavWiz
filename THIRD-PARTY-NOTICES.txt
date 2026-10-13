@@ -50,6 +50,12 @@ The "WavWiz" wordmark in the page header was drawn from outlines of Nunito Extra
 Nunito is not sold on its own with WavWiz; it is used here as a derivative (converted to vector outlines), which the OFL permits.
 
 ============================================================
+6b. Jukebox Retro CD fonts  -  SIL Open Font License 1.1 / Apache License 2.0
+============================================================
+Special Elite and Yellowtail (Apache-2.0), Righteous, Monoton and VT323 (OFL-1.1) are shipped unmodified as web fonts for the Jukebox Retro CD screen and guest page only.
+Copyrights and the full license texts: FONTS-JUKEBOX.txt.
+
+============================================================
 7. Build-time tools (not included in the installer's program files)
 ============================================================
 Inno Setup (installer compiler) - Copyright (C) 1997-2026 Jordan Russell and Martijn Laan. The compiler is not distributed; the generated setup program contains small Inno Setup runtime stubs under the Inno Setup license, which allows free redistribution of installers it creates.
