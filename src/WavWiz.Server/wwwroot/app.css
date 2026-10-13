@@ -1776,3 +1776,35 @@ body.jb-kiosk #app{visibility:hidden}
   .desk.libexpanded .libpanel,.desk.devexpanded .libpanel,.desk.libexpanded .devpanel,.desk.devexpanded .devpanel{grid-row:1/2}
   .listpanel .listup[hidden],.listpanel .listcol[hidden]{display:none}
 }
+/* F8: every popup = the center panel width (--centerw, 1140 px at 1920 wide), fixed size, menu pinned; grids keep their row counts and shrink */
+@media (min-width:901px){
+  dialog.settings-dlg,dialog.page,dialog.eqdialog,dialog.gsdlg{width:min(var(--centerw,1140px),calc(calc(100vw / var(--z,1)) - 32px));max-width:none;box-sizing:border-box}
+  dialog.settings-dlg:not(.ss-edit){height:min(860px,calc(calc(100vh / var(--z,1)) - 32px))}
+  .appsub .pgrid-theme{grid-template-columns:repeat(5,minmax(0,1fr))} .appsub .pgrid.vizgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .appsub .pgrid-eq{grid-template-columns:repeat(3,minmax(0,1fr))} .appsub .pgrid-np{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pgrid{grid-auto-flow:row}
+}
+/* F9: the Settings search is pinned in the fixed header; the result count has a reserved slot, so typing never moves anything */
+dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
+.setsearch-w{flex:none;display:flex;align-items:center;gap:8px;width:330px}
+.setsearch-w .setsearch{width:220px;flex:none}
+.setsearch-w .setsearch-n{display:inline-block;width:100px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* F16: Settings two-column card layout (every main tab except Appearance) */
+@media (min-width:901px){
+  .settings-sec.on:not([data-g=appearance]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  .settings-sec:not([data-g=appearance])>:not(.card),.settings-sec:not([data-g=appearance])>.card.wide{grid-column:1/-1}
+  .settings-sec:not([data-g=appearance]) .devsubsec:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  .settings-sec:not([data-g=appearance]) .devsubsec>:not(.card){grid-column:1/-1}
+  .settings-sec:not([data-g=appearance]) .card{margin:0;padding:10px 12px;border-radius:3px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:6px;align-content:start;min-width:0}
+  .settings-sec:not([data-g=appearance]) .card>*{grid-column:1/-1;min-width:0;margin-top:0;margin-bottom:0}
+  .settings-sec:not([data-g=appearance]) .card>.field:not(:has(input[type=range],textarea,table,.seg,ul,.list)),
+  .settings-sec:not([data-g=appearance]) .card>label.row:not(:has(input[type=range])),
+  .settings-sec:not([data-g=appearance]) .card>.setrow:not(:has(input[type=range],table)){grid-column:auto}
+  .settings-sec:not([data-g=appearance]) .card>h3{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-text,var(--accent));display:flex;align-items:center;gap:8px;margin:0}
+  .settings-sec:not([data-g=appearance]) .card .help>p{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .settings-sec:not([data-g=appearance]) .card .field>label{display:block;font-size:12px;margin-bottom:3px}
+}
+.infoi{display:inline-grid;place-items:center;width:15px;height:15px;padding:0;border-radius:50%;border:1px solid var(--line);background:none;color:var(--dim);font:italic 700 10px/1 Georgia,serif;cursor:help;vertical-align:1px}
+.infoi:hover,.infoi[aria-expanded=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.btn.primary.muted-btn,.settings-sec .btn.primary{background:none;border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.settings-sec .btn.danger{background:none;border-color:var(--red,#e5484d);color:var(--red,#e5484d)}

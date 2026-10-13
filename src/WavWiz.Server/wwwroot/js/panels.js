@@ -62,3 +62,5 @@ export const LIST_STEPS = ['collapsed', 'open', 'expanded'];
 export function listStep(p, dir) { const i = LIST_STEPS.indexOf(normPanels(p).list), j = Math.max(0, Math.min(2, i + (dir === 'up' ? 1 : -1))); return { ...p, list: LIST_STEPS[j] }; }
 /** Which arrows the Playlist header shows: up while it can grow, down while it can shrink. */
 export const listArrows = list => ({ up: list !== 'expanded', down: list !== 'collapsed' });
+/** 0.3.2 F8: the center panel width with both side panels open (popup width fallback while a panel is expanded). 1920 -> 1140. */
+export const centerWidthFor = vw => Math.round(vw - LIBW(vw) - DEVW(vw) - GAP * 4);

@@ -15,7 +15,12 @@ export function savedMark(el) {
   setTimeout(() => m.classList.add('fade'), 1100); setTimeout(() => m.remove(), 1600);
 }
 /** §7.7: one or two lines of help, the detail behind "Learn more". */
-export const learn = (short, long) => h('div', { class: 'help' }, h('p', { class: 'dim small' }, short), long ? h('details', { class: 'learn' }, h('summary', { class: 'small' }, 'Learn more'), h('p', { class: 'dim small' }, long)) : null);
+/** 0.3.2 F16: one dim line; the long help sits behind an (i) button (tooltip + click to show it in place, still found by Search). */
+export const learn = (short, long) => {
+  const more = long ? h('p', { class: 'dim small learnmore', hidden: true }, long) : null;
+  const i = long ? h('button', { type: 'button', class: 'infoi', title: long, 'aria-label': 'More about this', 'aria-expanded': 'false', onclick: () => { more.hidden = !more.hidden; i.setAttribute('aria-expanded', String(!more.hidden)); } }, 'i') : null;
+  return h('div', { class: 'help' }, h('p', { class: 'dim small' }, short, i ? ' ' : null, i), more);
+};
 /** §7.5: admin options are shown disabled with this tag for everyone else - never hidden. */
 export const adminTag = () => h('span', { class: 'tag admintag', title: 'Only an administrator can change this.' }, 'Admin');
 

@@ -9,7 +9,7 @@ import { listTable } from './listtable.js';
 import { icon, setIcon } from './icons.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction, listStep } from './panels.js';
+import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction, listStep, centerWidthFor } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
 import { retireRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
@@ -156,6 +156,9 @@ async function startMain() {
     const n = keyAction(P6, ev); if (n) { ev.preventDefault(); setPanels(n, ev.code === 'BracketRight' ? 'dev' : 'lib'); }
   });
   applyPanels(true);
+  // 0.3.2 F8: every popup is as wide as the center panel (1140 px at 1920 wide); --centerw follows it on every layout change
+  const centerW = () => { const r = nowc.el.getBoundingClientRect(); const w = r.width > 200 ? r.width : centerWidthFor(window.innerWidth); document.documentElement.style.setProperty('--centerw', Math.round(w) + 'px'); };
+  new ResizeObserver(centerW).observe(nowc.el); window.addEventListener('resize', centerW); centerW();
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
   drawStatus(); maybeWhatsNew(S);
