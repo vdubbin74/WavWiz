@@ -11,7 +11,7 @@ export const kioskOpen = () => !!kiosk;
 
 /** Playback > Start Jukebox… (admin only). A host PIN is required so the big screen can be left. */
 export async function startJukebox(S) {
-  if (!isAdmin(S)) return;
+  if (!isAdmin(S)) { toast('Only an administrator can start Jukebox. Sign in as admin first.', true); return; }   // 0.3.3 G13
   let cfg; try { cfg = await api('/jukebox/config'); } catch (e) { toast(e.message, true); return; }
   const pin = h('input', { type: 'password', inputmode: 'numeric', maxlength: '8', placeholder: cfg.hasPin ? 'Keep the current PIN' : '4–8 digits', 'aria-label': 'Host PIN' });
   const full = h('input', { type: 'checkbox', checked: true });
@@ -21,8 +21,9 @@ export async function startJukebox(S) {
     h('label', { class: 'fld' }, h('span', null, 'Host PIN'), pin),
     h('label', { class: 'row' }, full, h('span', null, 'Open the locked big screen on this PC')));
   const d = dialog('Start Jukebox', body, [
-    ['Cancel', () => d.close()],
-    ['Start Jukebox', async () => {
+    // 0.3.3 G13: dialog() takes { text, onclick, cls, keep } - the old [label, fn, cls] arrays rendered blank, dead buttons
+    { text: 'Cancel' },
+    { text: 'Start Jukebox', cls: 'primary', keep: true, onclick: async () => {
       const p = pin.value.trim();
       if (!cfg.hasPin && !/^\d{4,8}$/.test(p)) { toast('Pick a host PIN (4–8 digits) first.', true); pin.focus(); return; }
       try {
@@ -30,7 +31,7 @@ export async function startJukebox(S) {
         const t = loadTheme(); await api('/jukebox/start', { method: 'POST', body: { theme: { accent: t.accent, accent2: t.accent2, hl: t.hl, bg: t.bg, ink: t.ink } } });
         d.close(); if (full.checked) openKiosk(S);
       } catch (e) { toast(e.message, true); }
-    }, 'primary'],
+    } },
   ]);
 }
 
@@ -53,8 +54,8 @@ async function hostControls(S) {
       h('button', { class: 'btn', disabled: !ctl, onclick: async () => { await api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } }); d.close(); } }, b.locked ? 'Unlock queue' : 'Lock queue'),
       h('button', { class: 'btn', onclick: () => { d.close(); openKiosk(S); } }, 'Open big screen')),
     h('h3', null, 'Up next'), rows.length ? rows : h('p', { class: 'small' }, 'Nothing queued yet.')), [
-    ['Stop Jukebox', async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); d.close(); } catch (e) { toast(e.message, true); } }, 'danger'],
-    ['Close', () => d.close()],
+    { text: 'Stop Jukebox', cls: 'danger', keep: true, onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); d.close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } },
+    { text: 'Close' },
   ]);
 }
 async function stopWithPin(S, pin) { await api('/jukebox/stop', { method: 'POST', body: { pin: pin || '' } }); }
