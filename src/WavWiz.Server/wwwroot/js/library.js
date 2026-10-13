@@ -5,7 +5,15 @@ import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShu
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 
-const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites']];
+const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio']];
+// 0.3.5 J9: Playlists + Radio tabs (were popups); the tools are tabs of the expanded Library only (next-j9-lib-*.png)
+export const TOOL_TABS = [['rip', 'CD ripper'], ['tags', 'Tag & cover fix'], ['cleanup', 'Tidy up library']];
+export const EXTRA_TABS = new Set(['playlists', 'radio', 'rip', 'tags', 'cleanup']);
+/** Which tabs the Library shows (pure): the narrow panel = row 1 + row 2 (Playlists, Radio); expanded = everything + Tools. */
+export function libTabs(expanded) {
+  return expanded ? { main: ['artists', 'albums', 'genres', 'years', 'folders', 'playlists', 'radio'], more: ['recent', 'favorites'], tools: TOOL_TABS.map(t => t[0]) }
+    : { main: ['artists', 'albums', 'genres', 'folders'], row2: ['playlists', 'radio'], more: ['years', 'recent', 'favorites'], tools: [] };
+}
 const GRID_KINDS = new Set(['albums', 'recent', 'favorites']);
 const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', years: 'years', recent: 'albums', folders: 'folders', favorites: 'favorites', songs: 'songs' };
 
@@ -63,13 +71,20 @@ export function libraryView(S, opts = {}) {
     if (had) { search.focus({ preventScroll: true }); try { search.setSelectionRange(a, b); } catch { /* type=search */ } }
   };
 
-  const MAIN = ['artists', 'albums', 'genres', 'folders'];
-  const pick = k => { st.tab = k; if (compact) S.libTabC = k; else S.libTab = k; st.stack = []; st.q = ''; search.value = ''; draw(); };
-  const tabs = () => compact && !expanded
-    ? h('div', { class: 'tabs ctabs', role: 'tablist' }, TABS.filter(([k]) => MAIN.includes(k)).map(([k, t]) => h('button', { role: 'tab', class: st.tab === k && !st.stack.length ? 'on' : '', onclick: () => pick(k) }, t.toUpperCase())),
-        h('select', { 'aria-label': 'More ways to browse', class: 'moresel' + (MAIN.includes(st.tab) ? '' : ' on'), onchange: ev => ev.target.value && pick(ev.target.value) }, h('option', { value: '' }, '⋯'),
-          ['years', 'recent', 'favorites'].map(k => h('option', { value: k, selected: st.tab === k }, TABS.find(t => t[0] === k)[1].replace('♥ ', '')))))
-    : h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, TABS.map(([k, t]) => h('button', { role: 'tab', class: (st.tab === k && !st.stack.length ? 'on' : '') + (k === 'favorites' ? ' favtab' : ''), onclick: () => pick(k) }, t)));
+  const extras = opts.extras || {};
+  const pick = k => { if (TOOL_TABS.some(t => t[0] === k) && !expanded) k = 'artists'; st.tab = k; if (compact) S.libTabC = k; else S.libTab = k; st.stack = []; st.q = ''; search.value = ''; draw(); };
+  const tname = k => (TABS.find(t => t[0] === k) || TOOL_TABS.find(t => t[0] === k))[1];
+  const tabBtn = (k, cls = '') => h('button', { role: 'tab', 'data-tab': k, class: ((st.tab === k && !st.stack.length) ? 'on ' : '') + cls, 'aria-selected': String(st.tab === k), onclick: () => pick(k) }, compact && !expanded ? tname(k).toUpperCase() : tname(k));
+  const moreSel = keys => h('select', { 'aria-label': 'More ways to browse', class: 'moresel' + (keys.includes(st.tab) ? ' on' : ''), onchange: ev => ev.target.value && pick(ev.target.value) }, h('option', { value: '' }, '⋯'),
+    keys.map(k => h('option', { value: k, selected: st.tab === k }, tname(k).replace('♥ ', ''))));
+  const tabs = () => {
+    const T = libTabs(expanded);
+    if (compact && !expanded) return h('div', { class: 'ctabwrap' },
+      h('div', { class: 'tabs ctabs', role: 'tablist' }, T.main.map(k => tabBtn(k)), moreSel(T.more)),
+      h('div', { class: 'tabs ctabs row2', role: 'tablist' }, T.row2.map(k => tabBtn(k)), h('span', { class: 'small dim libtoolhint' }, 'Tools in Expanded view')));
+    return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)), moreSel(T.more),
+      T.tools.length ? [h('span', { class: 'tabsep small dim', 'aria-hidden': 'true' }, 'TOOLS'), ...T.tools.map(k => tabBtn(k, 'tooltab'))] : null);
+  };
   const push = page => { st.stack.push(page); draw(); };
   const back = () => { st.stack.pop(); draw(); };
   const save = () => saveLibPrefs(P);
@@ -214,7 +229,8 @@ export function libraryView(S, opts = {}) {
     folders: async () => foldersPage(''),
     favorites: favoritesPage,
   };
-  const pageKind = () => st.q ? null : st.stack.length ? st.stack[st.stack.length - 1].kind : st.tab;
+  for (const k of EXTRA_TABS) rootPage[k] = async () => { const v = extras[k]; if (!v) return [empty('Not available here.')]; v.reload?.(); st.kind = null; return [h('div', { class: 'libextra', 'data-extra': k }, v.el)]; };
+  const pageKind = () => st.q ? null : st.stack.length ? st.stack[st.stack.length - 1].kind : EXTRA_TABS.has(st.tab) ? null : st.tab;
 
   /** Sort select + A-Z / Z-A flip + grid/list (+ count when expanded). Remembered per tab per browser. */
   function drawTools(kind) {
@@ -241,6 +257,7 @@ export function libraryView(S, opts = {}) {
     if (st.stack.length) crumbs.append(h('button', { class: 'btn', onclick: back }, '‹ Back'), h('b', { class: 'ell' }, st.stack[st.stack.length - 1].title));
     content.replaceChildren(h('p', { class: 'dim' }, 'Loading…')); drawTools(pageKind());
     try {
+      root.dataset.tab = st.tab; root.classList.toggle('extratab', EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length);
       const nodes = st.q ? await findPage(st.q) : st.stack.length ? await st.stack[st.stack.length - 1].load() : await rootPage[st.tab]();
       if (my !== drawing) return;
       content.replaceChildren(...nodes); drawTools(pageKind());
@@ -255,5 +272,7 @@ export function libraryView(S, opts = {}) {
   window.addEventListener('resize', () => { if (st.dirty && visible()) draw(); });
   loadFavs(); draw();
   return { el: root, reload: draw, get dirty() { return st.dirty; }, get expanded() { return expanded; },
-    setExpanded(on) { expanded = !!on; P.expanded = expanded; save(); draw(); } };
+    setExpanded(on) { expanded = !!on; P.expanded = expanded; if (!expanded && TOOL_TABS.some(t => t[0] === st.tab)) st.tab = 'artists'; save(); draw(); },
+    /** 0.3.5 J9: open a tab from a menu (Library > Playlists / Radio / tools). */
+    showTab(k) { pick(k); }, get tab() { return st.tab; } };
 }

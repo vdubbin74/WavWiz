@@ -28,18 +28,34 @@ export const adminTag = () => h('span', { class: 'tag admintag', title: 'Only an
 /** §7.6: "Reset this section" - same style and position on every section, with a confirm. */
 export function resetBar(S, label, { admin, server = {}, local = null, done } = {}) {
   const keys = Object.keys(server || {}); const serverOnly = keys.length > 0 && !local;
+  if (!keys.length && !local && label !== 'Jukebox') return h('div', { class: 'secbar empty' });   // 0.3.5: sections with nothing to reset (Access, Diagnostics, About)
+  // 0.3.5 J9 #15: resets at once, with Undo (no confirm popup)
   const b = h('button', { class: 'btn sm resetsec', type: 'button', onclick: async () => {
-    if (!(await ask('Reset this section', `Put every ${label} option back to its default?`, { ok: 'Reset', danger: true }))) return;
     try {
+      const keep = {}; if (local) for (const k of local) try { keep[k] = localStorage.getItem(k); } catch { /* private mode */ }
+      let before = null; try { before = keys.length ? await api('/settings') : null; } catch { /* no undo for server keys */ }
+      let jbBefore = null; if (label === 'Jukebox') try { jbBefore = await api('/jukebox/config'); } catch { /* none */ }
       if (local) for (const k of local) try { localStorage.removeItem(k); } catch { /* private mode */ }
       const body = {}; for (const k of keys) if (server[k] !== null) body[k] = server[k];
       if (Object.keys(body).length) await api('/settings', { method: 'PUT', body });
       if (label === 'Jukebox') await api('/jukebox/config', { method: 'PUT', body: { reset: true } });
+      undoToast(`${label} options are back to their defaults.`, async () => {
+        if (local) for (const [k, v] of Object.entries(keep)) try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ }
+        if (before) { const back = {}; for (const k of Object.keys(body)) if (k in before) back[k] = before[k]; if (Object.keys(back).length) await api('/settings', { method: 'PUT', body: back }); }
+        if (jbBefore) { const { hasPin, ...cfg } = jbBefore; void hasPin; await api('/jukebox/config', { method: 'PUT', body: cfg }).catch(() => {}); }
+        done?.();
+      });
       done?.();
     } catch (e) { toast('Could not reset. ' + e.message, true); }
   } }, 'Reset this section');
   if (serverOnly || label === 'Jukebox') adminOnly(S, b, admin);
   return h('div', { class: 'secbar' }, h('span', { class: 'grow' }), b);
+}
+/** 0.3.5 J9: a toast with an Undo button (replaces "are you sure" popups for things that are easy to put back). */
+export function undoToast(text, undo, ms = 8000) {
+  document.querySelector('.undotoast')?.remove();
+  const t = h('div', { class: 'undotoast', role: 'status' }, h('span', null, text), h('button', { class: 'btn sm', type: 'button', onclick: async () => { t.remove(); try { await undo(); } catch (e) { toast(e.message, true); } } }, 'Undo'));
+  document.body.append(t); setTimeout(() => t.remove(), ms); return t;
 }
 
 /** §7.3: search in the Settings header - filters / jumps to matching options across tabs and sub-tabs and highlights the hit. */

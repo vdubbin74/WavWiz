@@ -52,11 +52,19 @@ export function listTable(S, ctl) {
   }
   new ResizeObserver(() => { if (widths.length) layout(); }).observe(wrap);
 
+  function inlineSave() {
+    const name = h('input', { type: 'text', maxlength: 80, placeholder: 'Playlist name', class: 'qsave-in', 'aria-label': 'New playlist name', onkeydown: ev => { if (ev.key === 'Enter') go(); if (ev.key === 'Escape') done(); } });
+    const done = () => { btns.replaceChildren(); draw(); };
+    const go = async () => { const n = name.value.trim(); if (!n) { name.focus(); return; } try { await api('/playlists', { method: 'POST', body: { name: n, fromQueue: true } }); toast(`Saved as “${n}”`); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); done(); } catch (e) { toast(e.message, true); } };
+    btns.replaceChildren(h('span', { class: 'qsave row' }, name, h('button', { class: 'btn sm primary', type: 'button', onclick: go }, 'Save'), h('button', { class: 'btn sm', type: 'button', onclick: done }, 'Cancel')));
+    name.focus();
+  }
   function draw() {
     const can = canControl(S), cur = S.now?.index ?? -1, playing = S.now?.state && S.now.state !== 'stopped';
     const total = S.queue.reduce((a, q) => a + (q.durationMs || 0), 0);
     meta.textContent = S.queue.length ? `${S.queue.length} track${S.queue.length === 1 ? '' : 's'} • ${fmtDur(total)}` : '';
-    btns.replaceChildren(can && S.queue.length ? [h('button', { class: 'btn sm', onclick: () => ctl.saveQueue() }, 'Save as playlist'), h('button', { class: 'btn sm', onclick: () => ctl.act('/queue/clear') }, 'Clear')] : null);
+    // 0.3.5 J9 #9: Save as playlist = an inline name field in the Playlist header (no popup); kept across redraws while typing
+    if (!btns.querySelector('.qsave')) btns.replaceChildren(can && S.queue.length ? [h('button', { class: 'btn sm', 'data-act': 'savequeue', onclick: () => inlineSave() }, 'Save as playlist'), h('button', { class: 'btn sm', onclick: () => ctl.act('/queue/clear') }, 'Clear')] : null);
     if (!S.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: 6 }, 'The playlist is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
     if (dragging) return;   // never redraw under a drag
     sel = sel.filter(i => i < S.queue.length);

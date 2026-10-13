@@ -13,7 +13,9 @@ export const flatEq = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0),
 
 /** 0.3.0 §3.4: "Sound · Kitchen" */
 export const soundTitle = speaker => (speaker ? `Sound · ${speaker}` : 'Sound (EQ)');
-export async function openEq(S, refresh, deviceId) {
+/** 0.3.5 J9 #5: with `host` the Sound / EQ editor is drawn inline (the open speaker card's Sound / EQ section) instead of a window.
+ *  Returns { close } either way. */
+export async function openEq(S, refresh, deviceId, host = null) {
   const outputs = S.zones.flatMap(z => z.outputs.map(o => ({ ...o, zone: z.name }))).filter(o => o.connected || o.active);
   if (!outputs.length) return toast('No speaker is connected yet.', true);
   let presets = []; try { presets = await api('/dsp/presets'); } catch (e) { return toast(e.message, true); }
@@ -23,7 +25,12 @@ export async function openEq(S, refresh, deviceId) {
   const devOut = outputs.find(o => o.deviceId === dev);
   let cur = flatEq(), presetId = null, dirty = false, previewing = false, area = null, lastResp = null;
   const body = h('div', { class: 'eqdlg' });
-  const d = dialog(soundTitle(devOut?.zone), body, [], { cls: 'eqdialog', onClose: async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } })); refresh && refresh(); } });
+  const onClose = async () => { area?.destroy(); if (previewing) { try { await api('/dsp/revert', { method: 'POST', body: { deviceId: dev } }); } catch { /* gone */ } } window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } })); refresh && refresh(); };
+  let d;
+  if (host) {   // inline: same header (title, Lock EQ) and body, closed by the card
+    const el = h('div', { class: 'eqinline' }, h('header', { class: 'eqi-h' }, h('span', { class: 'grow' }, soundTitle(devOut?.zone)), h('button', { class: 'btn sm', type: 'button', onclick: () => d.close() }, 'Done')), h('div', { class: 'body' }, body));
+    host.replaceChildren(el); d = { el, close: () => { el.remove(); onClose(); } };
+  } else d = dialog(soundTitle(devOut?.zone), body, [], { cls: 'eqdialog', onClose });
   d.el.querySelector('header .grow')?.append(h('span', { class: 'small dim eqsub' }, 'Changes play live on this speaker.'));
   // 0.2.3 U9: Lock EQ in the header (remembered on this device): the sliders then ignore the wheel, drag and click
   const lock = eqLockBox(loadEqLock(), v => { saveEqLock(v); area?.setLocked(v); });
@@ -105,13 +112,16 @@ export async function openEq(S, refresh, deviceId) {
       window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: dev } }));
     } catch (e) { toast(e.message, true); }
   }
+  // 0.3.5 J9 #10: "Save as a new preset" asks for the name in a field next to the preset list (no popup)
   function askName() {
     return new Promise(res => {
+      body.querySelector('.eqname')?.remove();
       const inp = h('input', { type: 'text', maxlength: 40, value: cur.name && cur.name !== 'Custom' ? cur.name : 'My sound', 'aria-label': 'Preset name' });
-      let done = false; const fin = v => { if (!done) { done = true; res(v); } };
-      dialog('Save as a new preset', h('div', { class: 'field' }, h('label', null, 'Preset name'), inp),
-        [{ text: 'Save', cls: 'primary', onclick: () => { const v = inp.value.trim(); if (!v) { toast('Give the preset a name.', true); return false; } fin(v); } }, { text: 'Cancel', onclick: () => fin(null) }],
-        { onClose: () => fin(null) });
+      let done = false; const fin = v => { if (!done) { done = true; box.remove(); res(v); } };
+      const ok = () => { const v = inp.value.trim(); if (!v) { toast('Give the preset a name.', true); inp.focus(); return; } fin(v); };
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') ok(); if (ev.key === 'Escape') fin(null); });
+      const box = h('span', { class: 'eqname row' }, inp, h('button', { class: 'btn sm primary', type: 'button', onclick: ok }, 'Save'), h('button', { class: 'btn sm', type: 'button', onclick: () => fin(null) }, 'Cancel'));
+      (preSel.parentElement || body).append(box);
       setTimeout(() => { inp.focus(); inp.select(); }, 0);
     });
   }
@@ -121,6 +131,7 @@ export async function openEq(S, refresh, deviceId) {
     try { lastResp = await api('/dsp/response', { method: 'POST', body: { preset: cur } }); area?.setResponse(lastResp); preGain.hidden = !lastResp.preGainDb; preGain.textContent = `${fmtDb(lastResp.preGainDb || 0)} dB`; } catch { /* approx curve stays */ }
   }
   load();
+  return d;
 }
 
 /** 0.3.3 G14: the live spectrum starts only when the glow goes from 0 to above 0. Pure. */

@@ -44,7 +44,7 @@ public static class UiUrl
     /// <summary>0.2.5: the page address with a screen to open (#calibrate). Only known screen names; anything else returns the address unchanged.</summary>
     public static string WithScreen(string baseUrl, string screen)
     {
-        if (screen is not ("calibrate")) return baseUrl;
+        if (screen is not ("calibrate" or "jukebox" or "jukebox-stop")) return baseUrl;   // 0.3.5 J15: tray Start / Stop Jukebox
         var i = baseUrl.IndexOf('#'); return (i >= 0 ? baseUrl[..i] : baseUrl) + "#" + screen;
     }
     /// <summary>0.3.0 §2: the tray's Remote mode choice rides to the page as ?remote=1 / ?remote=0 (the page remembers it).</summary>

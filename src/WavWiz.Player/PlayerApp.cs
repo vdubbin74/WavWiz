@@ -22,6 +22,10 @@ internal sealed class PlayerApp : ApplicationContext
     {
         _showWindow = showWindow;
         _s = PlayerSettings.Load(); Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
+        // 0.3.5 J16: the tray Display size (the Player window's extra zoom on top of Windows scaling) is NOT the same setting as Settings >
+        // Appearance size (the page's own Small / Default / Large); both multiplied. With the tray item gone, an old extra zoom could no longer be
+        // changed, so it goes back to Auto (follow Windows) once; Settings > Appearance is the one size control from now on.
+        if (_s.UiScale != UiScale.Auto) { Log($"tray Display size {_s.UiScale}% retired -> Auto (Settings > Appearance has the size now)"); _s.UiScale = UiScale.Auto; _s.Save(); }
         _outputs = new WasapiOutputProvider(_clock);
         _mics = new WasapiMicProvider(_clock);        // 0.2.5 PC-mic calibration (native WASAPI capture)
         _tray = new NotifyIcon { Icon = MakeIcon(), Text = Tip("Starting"), ContextMenuStrip = _menu, Visible = true };
@@ -151,8 +155,10 @@ internal sealed class PlayerApp : ApplicationContext
         if (st is { Connected: true }) _menu.Items.Add(new ToolStripMenuItem(st.NotCalibrated ? $"Delay: ~{st.LatencyMs:0} ms - NOT calibrated" : $"Delay: +{st.LatencyMs:0} ms ({st.LatencySource})") { Enabled = false });
         _menu.Items.Add(new ToolStripSeparator());
         var open = new ToolStripMenuItem("Open player...", null, (_, _) => OpenUi()) { Font = new Font(SystemFonts.MenuFont!, FontStyle.Bold), ToolTipText = "Opens WavWiz (sign in as Player or Administrator)" }; _menu.Items.Add(open);
+        // 0.3.5 J15/J16 (next-menus-tray.png): Start Jukebox... (Stop Jukebox... while it runs, with the usual confirm in the page)
+        _menu.Items.Add(new ToolStripMenuItem(_jukeboxOn ? "Stop Jukebox..." : "Start Jukebox...", null, (_, _) => OpenUi(_jukeboxOn ? "jukebox-stop" : "jukebox")) { ToolTipText = _jukeboxOn ? "Guests can no longer add songs. The music keeps playing." : "Guests add songs from their phones (administrator)" });
+        _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
         _menu.Items.Add(new ToolStripMenuItem("Calibrate speakers...", null, (_, _) => OpenUi("calibrate")) { ToolTipText = "Measure every speaker's delay with this PC's microphone (or your phone)" });
-        _menu.Items.Add(new ToolStripMenuItem("Open in my web browser", null, (_, _) => WebUiForm.OpenInBrowser(WebUiForm.UiAddress(_s))));
         var outs = new ToolStripMenuItem("Output (speaker on this PC)");
         if (_client != null)
             foreach (var o in _client.ListOutputs())
@@ -163,21 +169,18 @@ internal sealed class PlayerApp : ApplicationContext
             }
         if (outs.DropDownItems.Count == 0) outs.DropDownItems.Add(new ToolStripMenuItem("No outputs found") { Enabled = false });
         _menu.Items.Add(outs);
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(new ToolStripMenuItem("Open in my web browser", null, (_, _) => WebUiForm.OpenInBrowser(WebUiForm.UiAddress(_s))));
         _menu.Items.Add(new ToolStripMenuItem("Server && pairing...", null, (_, _) => Repair()));
-        _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
-                var auto = new ToolStripMenuItem("Start with Windows") { Checked = _s.StartWithWindows, CheckOnClick = true }; auto.Click += (_, _) => { _s.StartWithWindows = auto.Checked; _s.Save(); ApplyAutostart(); }; _menu.Items.Add(auto);
+        var auto = new ToolStripMenuItem("Start with Windows") { Checked = _s.StartWithWindows, CheckOnClick = true }; auto.Click += (_, _) => { _s.StartWithWindows = auto.Checked; _s.Save(); ApplyAutostart(); }; _menu.Items.Add(auto);
         _menu.Items.Add(new ToolStripMenuItem("Open log folder", null, (_, _) => { try { System.Diagnostics.Process.Start("explorer.exe", Path.GetDirectoryName(_logPath)!); } catch { } }));
-        var sizeMenu = new ToolStripMenuItem("Display size");
-        foreach (var c in UiScale.Choices) { var v = c; var it = new ToolStripMenuItem(UiScale.Label(v)) { Checked = UiScale.Normalize(_s.UiScale) == v }; it.Click += (_, _) => SetUiScale(v); sizeMenu.DropDownItems.Add(it); }
-        _menu.Items.Add(sizeMenu);
-        _menu.Items.Add(new ToolStripMenuItem("About WavWiz (BETA)...", null, (_, _) => { using var a = new AboutForm(_s); a.ShowDialog(); }));
+        // 0.3.5 J2/J16: Display size left the tray (Settings > Appearance > Theme has the size); About is Settings > About
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitApp()));
     }
 
     private bool _notPaired;
-    /// <summary>Display size (Auto, 100-300 %): saved, applied to the open window at once and to dialogs opened later.</summary>
-    private void SetUiScale(int v) { _s.UiScale = UiScale.Normalize(v); _s.Save(); _web?.ApplyZoom(); }
+    private volatile bool _jukeboxOn;   // 0.3.5 J15: reported by the page (WebUiForm.JukeboxState)
     /// <summary>"Pair again": forgets the old token and restarts the player, which then shows the connection dialog (or pairs by itself when the server is on this PC).</summary>
     private void PairAgain() { _secrets.Delete("token"); Application.Restart(); }
 
@@ -201,7 +204,7 @@ internal sealed class PlayerApp : ApplicationContext
             // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
             _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
         }
-        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(), null); _web.Show(); _web.Activate();
+        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(), null); _web.JukeboxState += on => _jukeboxOn = on; _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()

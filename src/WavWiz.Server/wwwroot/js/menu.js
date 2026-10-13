@@ -2,8 +2,7 @@
 // The View menu is gone: Theme, Visualizer, Now Playing style and Display size all live on Settings > Appearance. Phone hamburger reuses the same tree.
 import { h, api, toast } from './util.js';
 import { openSettings } from './settings.js';
-import { openAbout, openWhatsNew } from './about.js';
-import { openEq } from './eq.js';
+import { openWhatsNew } from './about.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
@@ -26,51 +25,50 @@ function menuActions(S, ctl, desktop = false) {
   return {
     go, refreshAll, act, admin, control,
     // 0.2.0 item 31: elevate in place (same pairing, same speaker), and drop back again - no sign-out, no new pairing code
+    // 0.3.5 J16 (next-menus-*.png): menus open the inline homes from J8 / J9 - no page popups any more
     file: [
-      ['Settings…', () => openSettings(S, refreshAll, go)],
+      ['Settings', () => openSettings(S, refreshAll, go)],
       'hr',
       ['Sign in as admin…', () => signInAsAdmin(S), null, () => admin()],
       ['Leave admin mode', () => leaveAdmin(S), null, () => !S.auth?.elevated],
       ['Sign out', async () => { try { await api('/auth/logout', { method: 'POST' }); location.reload(); } catch (e) { toast(e.message, true); } }],
     ],
-    // 0.2.1 F8: one "Queue" (the separate "Playlist" item is gone - on the desktop Queue still slides the bottom panel)
     library: [
       ['Browse library', browseLib],
       ['Playlists', () => go('playlists')],
+      ['Radio', () => go('radio')],
       ['Queue', listPanel],
       'hr',
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
+      ['CD ripper', () => go('rip'), () => !admin()],
+      ['Tag & cover fix', () => go('tags'), () => !admin()],
       ['Tidy up library', () => go('cleanup'), () => !admin()],
-      ['Tag & cover fix…', () => go('tags'), () => !admin()],
-      ['CD ripper…', () => go('rip'), () => !admin()],
     ],
-    // 0.2.1 F8: Radio finder is a tab inside Internet radio; Scenes, Schedules and Calibrate moved to Devices
     playback: [
       ['Play / Pause', () => { if (S.now?.state === 'playing') act('/stream/pause'); else act('/stream/play', {}); }],
       ['Next', () => act('/stream/next')],
       ['Previous', () => act('/stream/prev')],
       'hr',
-      ['Internet radio', () => go('radio')],
-      ['Sound / EQ…', () => openEq(S, refreshAll)],
+      ['Sound / EQ', () => go('eq')],
+      ['Sleep timer', () => go('sleep')],
       'hr',
       ['Start Jukebox…', () => go('jukebox'), () => !admin()],   // 0.3.0 §1 (beta): admin only, read-only for others
     ],
-    // 0.2.0 item 2: no "This phone as a device" anywhere - every browser joins as a speaker by itself.
     devices: [
       ['Devices & zones', devPanel],
-      ['Scenes & Schedules…', () => go('scenes')],
+      ['Scenes, schedules & alarms', () => go('scenes')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
-      ['Mini player', () => ctl.openMini?.()],      // 0.3.2 F3: replaces Remote mode
+      ['Mini player', () => ctl.openMini?.()],
       'hr',
-      ['Pair a player…', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
-      ['Away-from-home…', () => go('remote'), () => !admin()],
+      ['Pair a player', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
+      ['Away-from-home access', () => go('remote'), () => !admin()],
     ],
     help: [
-      ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],      // 0.2.0 item 11: the Getting started dialog, not Diagnostics
-      ['Diagnostics', () => go('diag')],      // 0.2.1 F8: the Status card lives here now (moved from Settings)
+      ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],
       ["What's new", () => openWhatsNew()],
-      ['About WavWiz…', () => openAbout(S)],
+      ['Diagnostics', () => go('diag')],
+      ['About WavWiz', () => go('about')],
     ],
   };
 }

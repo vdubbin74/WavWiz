@@ -1,7 +1,9 @@
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
-import { networkCard } from './diag.js';
+import { networkCard, diagnosticsView } from './diag.js';
+import { remoteView } from './remote.js';
+import { aboutBody } from './about.js';
 import { appearancePane } from './appearance.js';
 import { npPreview, npStyleThumb } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
@@ -24,6 +26,10 @@ export const GROUPS = [
   ['library', 'Library'],
   ['network', 'Network'],
   ['jukebox', 'Jukebox'],
+  // 0.3.5 J9: these were popups from the File / Help / Devices menus
+  ['access', 'Access'],
+  ['diagnostics', 'Diagnostics'],
+  ['about', 'About'],
 ];
 /** 0.3.0 §7.6: what "Reset this section" puts back (server settings) - local looks are reset in the browser. */
 export const RESET = {
@@ -34,23 +40,33 @@ export const RESET = {
   library: { 'library.onlineArt': true },
   network: { 'airplay.levelDb': 0, 'spotify.levelDb': 0 },
   jukebox: { 'jukebox.config': null },
+  access: {}, diagnostics: {}, about: {},
 };
+/** 0.3.5 J9: which Settings section a deep link opens. Pure. */
+export function sectionFor(section) {
+  return section === 'players' || section === 'phone' || section === 'devices' || section === 'calibration' ? 'devices'
+    : section === 'library' ? 'library' : section === 'network' ? 'network' : section === 'playback' ? 'playback'
+    : section === 'general' || section === 'backup' ? 'general' : section === 'jukebox' ? 'jukebox'
+    : section === 'remote' || section === 'access' ? 'access' : section === 'diag' || section === 'diagnostics' ? 'diagnostics' : section === 'about' ? 'about'
+    : 'appearance';
+}
 
 // 0.2.2 T2: deep links into the Appearance sub-sections
 const APP_SECTION = { theme: 'theme', themes: 'theme', viz: 'viz', visualizer: 'viz', eq: 'eq', eqstyle: 'eq', np: 'np', npstyle: 'np', display: 'display' };
+/** 0.3.5 J9 #15: after an Appearance reset (or its Undo) the looks are applied in place - no page reload, so Undo stays on screen. */
+async function reapplyLooks() {
+  try { const t = await import('./theme.js'); t.applyTheme(t.loadTheme()); } catch { /* ignore */ }
+  try { const u = await import('./uiscale.js'); u.applyScale(u.loadScale()); } catch { /* ignore */ }
+  try { const sl = await import('./sliderstyle.js'); sl.applySlider?.(sl.loadSlider()); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent('wavwiz:viz')); window.dispatchEvent(new CustomEvent('wavwiz:eqstyle')); } catch { /* ignore */ }
+}
 export async function openSettings(S, refresh, nav, section) {
   const admin = S.auth.role === 'admin';
   const body = h('div', { class: 'settings-body' });
   // 0.2.1 F8: theme / viz open Appearance (one page) - the visualizer panel's Looks button unfolds the looks gallery there
   let app = null;
   const d = dialog('Settings', body, [{ text: 'Close' }], { cls: 'settings-dlg', onClose: () => { app?.hide?.(); refresh?.(); } });   // 0.2.5 C: up to ~1200 px wide
-  let active = section === 'players' || section === 'phone' || section === 'devices' || section === 'calibration' ? 'devices'
-    : section === 'library' ? 'library'
-    : section === 'network' ? 'network'
-    : section === 'playback' ? 'playback'
-    : section === 'general' || section === 'backup' ? 'general'
-    : section === 'jukebox' ? 'jukebox'
-    : 'appearance';
+  let active = sectionFor(section);
   let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
   const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
   d.el.querySelector('header .grow').after(search.el);
@@ -64,7 +80,11 @@ export async function openSettings(S, refresh, nav, section) {
       if (admin) tokens = await api('/tokens');
     } catch (e) { body.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
 
-    const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [] };
+    const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [], access: [], diagnostics: [], about: [] };
+    // 0.3.5 J9: Away-from-home access, Diagnostics and About are Settings sections (no page popups)
+    { const rv = remoteView(S); panes.access.push(h('div', { class: 'card setpage', id: 'sec-remote' }, rv.el)); }
+    { const dv = diagnosticsView(S); panes.diagnostics.push(h('div', { class: 'card setpage', id: 'sec-diag' }, dv.el)); dv.reload?.(); }
+    panes.about.push(h('div', { class: 'card setpage', id: 'sec-about' }, aboutBody(S)));
     const cal = [], players = [];
 
     app?.hide?.(); app = appearancePane({ S, looks: section === 'viz', section: APP_SECTION[section], preview: () => npPreview(), npThumb: npStyleThumb });
@@ -127,7 +147,7 @@ export async function openSettings(S, refresh, nav, section) {
     panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Home network'),
       h('p', { class: 'dim small' }, 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.'),
       h('p', { class: 'small' }, `Listening on ${st.bind}`),
-      nav ? h('button', { class: 'btn', onclick: () => { d.close(); nav('remote'); } }, 'Away-from-home (Tailscale)…') : null));
+      h('button', { class: 'btn', onclick: () => { active = 'access'; paint(); } }, 'Away-from-home access (Tailscale)')));
     panes.network.push(networkCard({ auth: { role: admin ? 'admin' : 'view' } }));      // 0.1.3: Private/Public, re-detect, use the new address
     // 0.1.2: AirPlay + Spotify Connect with level (0…+6 dB) arrows
     const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : rc.airplay.installed ? 'Not running - see Diagnostics.' : 'Not installed on this PC.') : '';
@@ -175,7 +195,7 @@ export async function openSettings(S, refresh, nav, section) {
       h('button', { class: active === id ? 'on' : '', role: 'tab', id: 'stab-' + id, 'aria-controls': 'ssec-' + id, 'aria-selected': String(active === id), 'data-g': id, onclick: () => { active = id; paint(); } }, label)));
     navEl.addEventListener('keydown', ev => { if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return; const i = GROUPS.findIndex(g => g[0] === active), n = (i + (ev.key === 'ArrowRight' ? 1 : -1) + GROUPS.length) % GROUPS.length; active = GROUPS[n][0]; paint(); navEl.children[n].focus(); });
     const sections = GROUPS.map(([id, label]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id, id: 'ssec-' + id, role: 'tabpanel', 'aria-labelledby': 'stab-' + id },
-      resetBar(S, label, { admin, server: RESET[id], local: id === 'appearance' ? THEME_RESET_KEYS : null, done: () => { if (id === 'appearance') location.reload(); else draw(); } }), ...panes[id]));
+      resetBar(S, label, { admin, server: RESET[id], local: id === 'appearance' ? THEME_RESET_KEYS : null, done: () => { if (id === 'appearance') reapplyLooks(); draw(); } }), ...panes[id]));
     // 0.3.1 B10: "Reset this section" gets a fixed slot - the right end of the sub-tab bar where a section has sub-tabs, else its own row
     for (const sec of sections) placeReset(sec);
     // 0.3.1 B12: one fixed-size shell - the tab menu stays pinned, only the content area below it scrolls
@@ -209,11 +229,16 @@ export async function openSettings(S, refresh, nav, section) {
   }
   // 0.3.0 §7.4: an inline "Saved ✓" beside the changed control; toasts only for errors
   async function putSettings(o, el = document.activeElement) { try { await api('/settings', { method: 'PUT', body: o }); savedMark(el); } catch (e) { toast('Not saved. ' + e.message, true); } }
-  async function makeToken() {
-    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant' }), role = h('select', { 'aria-label': 'Access' }, ROLE_NAMES.map(([r, t, d]) => h('option', { value: r, title: d }, `${t} - ${d}`)));
+  /** 0.3.5 J9 #11: Create API token is inline in the Paired devices & tokens card (no popup). */
+  function makeToken(ev) {
+    const card = ev?.target?.closest?.('.card') || document.getElementById('sec-tokens'); if (!card) return;
+    card.querySelector('.tokform')?.remove();
+    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant', 'aria-label': 'Token name' }), role = h('select', { 'aria-label': 'Access' }, ROLE_NAMES.map(([r, t, d]) => h('option', { value: r, title: d }, `${t} - ${d}`)));
     const out = h('div', { class: 'mono small', style: 'word-break:break-all' });
-    dialog('Create API token', [h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out],
-      [{ text: 'Create', cls: 'primary', keep: true, onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } return false; } }, { text: 'Done', onclick: () => { draw(); } }]);
+    const form = h('div', { class: 'tokform inlineform' }, h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out,
+      h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { form.remove(); if (out.childNodes.length) draw(); } }, 'Done'),
+        h('button', { class: 'btn primary', type: 'button', onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } } }, 'Create')));
+    card.append(form); name.focus();
   }
   /** 0.2.1 F8: Library view (this device) - how the Expanded Library opens. Saves at once; the Library redraws through 'wavwiz:libprefs'. */
   function libViewCard() {

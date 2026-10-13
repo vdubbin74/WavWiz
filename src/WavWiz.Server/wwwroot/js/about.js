@@ -1,9 +1,17 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.4';
+export const WHATS_NEW_VERSION = '0.3.5';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
+// 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.3.5 (only what shipped)
+  ['Devices, side by side', 'Expanded Devices shows Scenes & Schedules, Zones and Speakers, with Speakers on the right where they always are. Open a speaker card to change its output, max volume, delay and EQ right there.'],
+  ['Scenes, schedules and alarms in place', 'Create and edit them right in the Scenes & Schedules column. The Devices menu opens it.'],
+  ['Clearer device cards', 'Each speaker and zone card shows its name with an OFF | ON switch, one row of tags, and the volume bar with mute. A capped bar shows its limit and never slides past it.'],
+  ['Library tabs', 'Playlists and Radio are tabs in the Library. CD ripper, Tag & cover fix and Tidy up library are tabs in the expanded Library. The playlist stays on the right while the Library is expanded, so you can drop songs exactly where you want.'],
+  ['Jukebox', 'Jukebox starts with an empty playlist and puts yours back when it stops. Guests see how many plays they have left. The big screen fills any TV, and the tray menu can start and stop it.'],
+  ['Fewer popups', 'Sleep timer is a button in Now Playing, and many small windows became inline. Every remaining window has the same width.'],
   // 0.3.4 (only what shipped)
   ['Install on your phone', 'Add WavWiz to your home screen (Share > Add to Home Screen on iPhone): it opens full screen with the WavWiz icon. Over https it also loads faster and always picks up a new version.'],
   ['Jukebox styles', 'Modern and Retro CD now look the way they should, and the style you pick is the one guests and the big screen get. Settings > Jukebox shows a preview of each style.'],
@@ -94,7 +102,18 @@ export function aboutBody(S) {
 }
 export function openAbout(S) { return dialog('About WavWiz', aboutBody(S), [{ text: 'Close' }], { cls: 'page' }); }
 
+/** 0.3.5 J9 #14: What's new is a dismissible card at the top of the main screen. */
 export function openWhatsNew(onClose) {
+  if (typeof document === 'undefined') return null;
+  document.querySelector('.wncard')?.remove();
+  const close = () => { card.remove(); onClose?.(); };
+  const card = h('section', { class: 'wncard', role: 'region', 'aria-label': `What's new in WavWiz ${WHATS_NEW_VERSION}` },
+    h('div', { class: 'wn-h' }, h('b', null, `What's new in WavWiz ${WHATS_NEW_VERSION} BETA`), h('span', { class: 'grow' }), h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Got it'), h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Dismiss', onclick: close }, '✕')),
+    h('ul', { class: 'wn-list' }, WHATS_NEW.slice(0, 6).map(([t, x]) => h('li', null, h('b', null, h('span', { class: 'newchip' }, 'NEW'), t), h('div', { class: 'small dim' }, x)))));
+  const top = document.querySelector('.topbar'); if (top) top.after(card); else document.body.prepend(card);
+  return { el: card, close };
+}
+export function openWhatsNewDialog(onClose) {
   return dialog(`What's new in WavWiz ${WHATS_NEW_VERSION} BETA`, h('div', { class: 'whatsnew' }, h('div', { class: 'row' }, wordmark('wordmark')), h('ul', null, WHATS_NEW.map(([t, x]) => h('li', null, h('b', null, h('span', { class: 'newchip' }, 'NEW'), t), h('div', { class: 'small dim' }, x))))),
     [{ text: 'Got it', cls: 'primary' }], { cls: 'whatsnew-dlg', onClose });
 }

@@ -2005,3 +2005,29 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   dialog.settings-dlg>header .setsearch-w .setsearch-n{display:none}
   dialog.settings-dlg>header .iconbtn{flex:none}
 }
+
+/* ===================== 0.3.5 ===================== */
+/* J1: every popup, dialog and Settings = ONE fixed width (--popw, the center panel's standard width on this screen); content scrolls inside.
+   Same width regardless of content (confirms too). Phones keep the full-screen sheet. */
+@media (min-width:901px){
+  dialog,dialog.page,dialog.settings-dlg,dialog.eqdialog,dialog.gsdlg,dialog.ask-dlg,dialog.ss-dlg,dialog.whatsnew-dlg{width:min(var(--popw,1140px),calc(calc(100vw / var(--z,1)) - 32px))!important;max-width:min(var(--popw,1140px),calc(calc(100vw / var(--z,1)) - 32px))!important;min-width:0!important;box-sizing:border-box}
+  dialog>.body{overflow:auto}
+}
+/* J9 #14: What's new card at the top of the main screen */
+.wncard{position:fixed;z-index:60;top:calc(var(--toph,46px) + 8px);left:50%;transform:translateX(-50%);width:min(var(--popw,1140px),calc(calc(100vw / var(--z,1)) - 24px));max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:3px;box-shadow:0 10px 30px rgba(0,0,0,.45);padding:10px 14px;box-sizing:border-box}
+.wncard .wn-h{display:flex;align-items:center;gap:8px}
+.wncard .wn-list{margin:8px 0 0;padding-left:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px 14px}
+.wncard .wn-list li{padding:4px 0}
+/* J9: Undo toast; inline forms; Settings pages that used to be popups */
+.undotoast{position:fixed;z-index:200;left:50%;bottom:calc(var(--npbarh,72px) + 18px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;padding:8px 10px 8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.inlineform{margin-top:10px;padding:10px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;background:var(--panel2,rgba(255,255,255,.03))}
+.inlineform .field{margin:0 0 8px}
+.settings-sec .setpage{grid-column:1/-1}
+.secbar.empty{display:none}
+/* J9 #8 Add to playlist dropdown; #9 inline Save as playlist */
+.pldrop{position:fixed;z-index:300;display:flex;flex-direction:column;min-width:240px;max-width:320px;max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:4px;box-shadow:0 10px 26px rgba(0,0,0,.45)}
+.pldrop>button{display:flex;gap:8px;align-items:center;text-align:left;background:none;border:0;color:var(--ink);padding:7px 10px;border-radius:3px;cursor:pointer}
+.pldrop>button:hover,.pldrop>button:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.pldrop .pl-h{padding:4px 10px}
+.pldrop .pl-new{display:flex;gap:6px;padding:4px 6px}.pldrop .pl-new[hidden]{display:none}.pldrop .pl-new input{flex:1;min-width:0}
+.qsave{gap:6px}.qsave-in{width:180px}

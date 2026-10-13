@@ -73,3 +73,12 @@ export function centerPopupWidth(rectW, offsetW, vw, z = 1) {
   if (!(w > 200)) w = centerWidthFor(vw / z);
   return Math.round(Math.max(280, Math.min(w, vw / z - 32)));
 }
+
+/** 0.3.5 J1: the one fixed popup width - the center column's standard width (normal view, both side panels open) for this SCREEN
+ *  (screenW = screen.availWidth; the window width only when it is larger, e.g. a spanned window). Never resized with the window;
+ *  only capped so it always fits inside the viewport (phones get the full width from the CSS). Pure. */
+export function popupWidth(screenW, vw, z = 1) {
+  const base = Math.max(screenW || 0, vw || 0) / z;
+  const w = base >= 1000 ? centerWidthFor(base) : base - 32;
+  return Math.round(Math.max(280, w));
+}

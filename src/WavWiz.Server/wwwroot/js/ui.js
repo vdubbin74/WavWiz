@@ -40,16 +40,28 @@ export function sheet(title, actions) {
   document.addEventListener('keydown', esc); document.body.append(el); el.querySelector('button.act')?.focus(); return close;
 }
 
+/** 0.3.5 J9 #8: Add to playlist = a small dropdown next to the song row (no window); "New playlist…" is typed in place. */
+let lastPt = { x: 0, y: 0 };
+if (typeof document !== 'undefined') document.addEventListener('pointerdown', ev => { lastPt = { x: ev.clientX, y: ev.clientY }; }, true);
 export async function pickPlaylist(S, ref, title = 'Add to playlist') {
   let lists = []; try { lists = await api('/playlists'); } catch (e) { return toast(e.message, true); }
-  const nm = h('input', { type: 'text', placeholder: 'New playlist name', maxlength: 80 });
-  const add = async id => { try { const r = await api(`/playlists/${id}/items`, { method: 'POST', body: ref }); toast(`Added ${r.added} item(s)`); d.close(); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); } catch (e) { toast(e.message, true); } };
-  const create = async () => {
-    const name = nm.value.trim(); if (!name) return toast('Type a name for the new playlist.', true);
-    try { const p = await api('/playlists', { method: 'POST', body: { name } }); await add(p.id); } catch (e) { toast(e.message, true); }
-  };
-  const d = dialog(title, [lists.length ? h('ul', { class: 'list' }, lists.map(p => h('li', { class: 'item', onclick: () => add(p.id) }, h('div', { class: 't' }, h('div', { class: 't1' }, p.name), h('div', { class: 't2' }, `${p.count} items`))))) : h('p', { class: 'dim' }, 'No playlists yet - create the first one:'),
-    h('div', { class: 'row', style: 'margin-top:10px' }, nm, h('button', { class: 'btn primary', onclick: create }, 'Create + add'))], [{ text: 'Cancel' }]);
+  document.querySelector('.pldrop')?.remove();
+  const close = () => { box.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); };
+  const outside = ev => { if (!box.contains(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') close(); };
+  const add = async id => { try { const r = await api(`/playlists/${id}/items`, { method: 'POST', body: ref }); toast(`Added ${r.added} item(s)`); close(); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); } catch (e) { toast(e.message, true); } };
+  const nm = h('input', { type: 'text', placeholder: 'New playlist name', maxlength: 80, 'aria-label': 'New playlist name', onkeydown: ev => { if (ev.key === 'Enter') create(); } });
+  const create = async () => { const name = nm.value.trim(); if (!name) { nm.focus(); return; } try { const p = await api('/playlists', { method: 'POST', body: { name } }); await add(p.id); } catch (e) { toast(e.message, true); } };
+  const newRow = h('div', { class: 'pl-new', hidden: true }, nm, h('button', { class: 'btn sm primary', type: 'button', onclick: create }, 'Add'));
+  const box = h('div', { class: 'pldrop mpanel', role: 'menu', 'aria-label': title },
+    h('div', { class: 'pl-h small dim' }, title),
+    ...lists.map(p => h('button', { type: 'button', role: 'menuitem', onclick: () => add(p.id) }, h('span', { class: 'grow ell' }, p.name), h('span', { class: 'small dim' }, String(p.count)))),
+    h('button', { type: 'button', role: 'menuitem', class: 'pl-newbtn', onclick: () => { newRow.hidden = false; nm.focus(); } }, 'New playlist…'), newRow);
+  document.body.append(box);
+  const r = box.getBoundingClientRect(), z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+  const vw = innerWidth / z, vh = innerHeight / z, x = lastPt.x / z, y = lastPt.y / z;
+  box.style.left = Math.max(4, Math.min(x, vw - r.width - 4)) + 'px'; box.style.top = Math.max(4, Math.min(y, vh - r.height - 4)) + 'px';
+  setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); }, 0);
+  return { el: box, close };
 }
 
 /** Makes a row work everywhere: click = open/play (caller), "..." = menu, right-click = menu, long-press on touch = menu, drag (desktop) = add to a playlist/queue. */

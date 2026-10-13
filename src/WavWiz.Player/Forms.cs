@@ -148,12 +148,20 @@ public sealed class WebUiForm : Form
     public string? StartScreen { get; set; }
     /// <summary>0.3.2 F3: the page asked for the mini player.</summary>
     public event Action? MiniRequested;
+    /// <summary>0.3.5 J15: the page reports whether Jukebox is running (tray shows Start or Stop Jukebox...).</summary>
+    public event Action<bool>? JukeboxState;
     /// <summary>0.3.0 §2: reload at a new address (remote mode on/off).</summary>
     public void Navigate(string url) { try { _url = url; if (_web.CoreWebView2 != null && url.Length > 0) _web.CoreWebView2.Navigate(url); } catch { } }
 
     public void OpenScreen(string screen)
     {
-        try { if (_web.CoreWebView2 != null && _url.Length > 0) _web.CoreWebView2.Navigate(UiUrl.WithScreen(_url, screen)); else StartScreen = screen; } catch { }
+        try
+        {
+            // 0.3.5 J15: Start / Stop Jukebox from the tray only change the page's #hash (no reload, the page asks the usual questions)
+            if (_web.CoreWebView2 != null && screen.StartsWith("jukebox", StringComparison.Ordinal)) { _ = _web.CoreWebView2.ExecuteScriptAsync("location.hash='" + (screen == "jukebox-stop" ? "jukebox-stop" : "jukebox") + "'"); return; }
+            if (_web.CoreWebView2 != null && _url.Length > 0) _web.CoreWebView2.Navigate(UiUrl.WithScreen(_url, screen)); else StartScreen = screen;
+        }
+        catch { }
     }
 
     /// <summary>Applies the UI-size setting to the page (WebView2 draws at the monitor scale by itself; this is the extra zoom).</summary>
@@ -212,7 +220,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { if (e.WebMessageAsJson.Contains("\"mini\"")) MiniRequested?.Invoke(); } catch { } };   // 0.3.2 F3: Devices > Mini player
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
