@@ -69,6 +69,8 @@ for (const style of STYLES) {
   ok(`[${tag}] album result opens its songs and one is added`, nAlbum > 0 && !!albumTitle, `${nAlbum} songs, added ${albumTitle}`);
   const mine = await g.locator('.jb-mine').innerText();
   ok(`[${tag}] footer counts my picks`, style === 'retro' ? /Your picks: 2 of 3/.test(mine) : /Your songs in queue: 2 of 3/.test(mine), mine);
+  const mf = await g.evaluate(() => { const m = document.querySelector('.jb-mine'); const r = m.getBoundingClientRect(); return { h: Math.round(r.height), sw: m.scrollWidth, cw: m.clientWidth, lh: parseFloat(getComputedStyle(m).lineHeight) || 20, right: Math.round(r.right), iw: innerWidth }; });
+  ok(`[${tag}] footer pick count on one line and fully visible on the phone`, mf.sw <= mf.cw + 1 && mf.right <= mf.iw && mf.h < 2 * mf.lh + 20, JSON.stringify(mf));
   await shot(g, `jb-${tag}-guest-added`);
   const board = await api('/jukebox/board');
   ok(`[${tag}] both songs are in the Jukebox queue with the guest name`, [songTitle, albumTitle].every(t => (board.next || []).some(x => x.title.toUpperCase() === t.toUpperCase() && x.by === 'Sam')), JSON.stringify(board.next.map(x => [x.title, x.by])));
