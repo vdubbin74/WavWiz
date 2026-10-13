@@ -1858,3 +1858,9 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .dtagrow:not(:has(.dtag,.dkind svg,.dstate:not(:empty))){display:none}
 .dtagrow .dtags{display:contents} .dtagrow .dkind{display:inline-grid;place-items:center;opacity:.7} .dtagrow .dkind svg{width:13px;height:13px}
 .zcard .ztagrow{--tagx:18px}
+
+/* ===================== 0.3.3 ===================== */
+/* G1: Settings (and every center popup) is never wider than the live center column (--centerw, measured in main.js) */
+@media (min-width:901px){
+  dialog.settings-dlg,dialog.page,dialog.eqdialog,dialog.gsdlg{width:calc(min(var(--centerw,1140px),calc(calc(100vw / var(--z,1)) - 32px)));max-width:var(--centerw,calc(calc(100vw / var(--z,1)) - 32px))}
+}

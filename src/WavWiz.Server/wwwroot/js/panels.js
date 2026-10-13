@@ -64,3 +64,12 @@ export function listStep(p, dir) { const i = LIST_STEPS.indexOf(normPanels(p).li
 export const listArrows = list => ({ up: list !== 'expanded', down: list !== 'collapsed' });
 /** 0.3.2 F8: the center panel width with both side panels open (popup width fallback while a panel is expanded). 1920 -> 1140. */
 export const centerWidthFor = vw => Math.round(vw - LIBW(vw) - DEVW(vw) - GAP * 4);
+/** 0.3.3 G1: popup width = the live center column. rectW is getBoundingClientRect().width (device-zoomed in some engines), offsetW the
+ *  layout width; both are reduced to CSS px of the zoomed page. While the center is hidden (a side panel expanded) the both-panels-open
+ *  width is used. Never wider than the viewport minus 32 px. Pure. */
+export function centerPopupWidth(rectW, offsetW, vw, z = 1) {
+  let w = rectW;
+  if (offsetW > 0 && rectW > 0 && Math.abs(rectW - offsetW * z) < Math.abs(rectW - offsetW)) w = rectW / z;   // rect came back zoomed
+  if (!(w > 200)) w = centerWidthFor(vw / z);
+  return Math.round(Math.max(280, Math.min(w, vw / z - 32)));
+}
