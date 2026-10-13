@@ -1812,8 +1812,6 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .pgrid-np .pg-prev{flex:none}
 .pgrid-np .npthumb{position:relative;inset:auto;width:100%}
 .pgrid-np>[role=radio][aria-checked=true]{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
-.pgrid-np .npthumb .pn-center .np-tablemain{grid-template-columns:auto minmax(0,1fr)}
-.pgrid-np .npthumb .pn-center .pn-art{grid-row:1 / span 2}
 
 /* 0.3.2 F16 (pass 2): the card columns stack independently (2 px rows, cards span their height - see settings.js masonry()), one dim line per card */
 @media (min-width:901px){
@@ -1864,3 +1862,8 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 @media (min-width:901px){
   dialog.settings-dlg,dialog.page,dialog.eqdialog,dialog.gsdlg{width:calc(min(var(--centerw,1140px),calc(calc(100vw / var(--z,1)) - 32px)));max-width:var(--centerw,calc(calc(100vw / var(--z,1)) - 32px))}
 }
+/* G2 / G2b: Now Playing picker - ONE card per row at full content width; each preview is the true-size panel scaled down, clipped to the card */
+.appsub .pgrid-np,.pgrid-np,.appsub .pgrid.pgrid-np{grid-template-columns:minmax(0,1fr) !important}
+.pgrid-np .npthumb{overflow:hidden;contain:paint}
+.pgrid-np .npthumb>.np-ctlpanel{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;max-height:none;max-width:none}
+.pgrid-np .pg-prev{overflow:hidden}

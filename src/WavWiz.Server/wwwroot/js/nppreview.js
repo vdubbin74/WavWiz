@@ -63,8 +63,9 @@ export function npPreview() {
  *  scaled to the card. update() re-clones (called about once a second while the card is on screen). */
 export function npStyleThumb(styleId, playing = () => false) {
   const stage = h('div', { class: 'npthumb' }); let panel = null;
-  // 0.3.2 F12: true size (never scaled up), the card height follows the panel - no fixed aspect, no visualizer
-  const fit = () => { if (!panel) return; const sw = stage.clientWidth || 543, w = Math.min(W, Math.max(sw, 1)), s = Math.min(1, sw / w); panel.style.width = w + 'px'; panel.style.transform = s < 1 ? `scale(${s})` : ''; stage.style.height = Math.ceil(panel.offsetHeight * s) + 'px'; };
+  // 0.3.3 G2: the panel is laid out at its TRUE in-app width (the live Now Playing panel, else the center column) so buttons, glow and
+  // waveform keep their real proportions, then the whole thing is scaled down with transform: scale() to the card; the card clips (overflow hidden).
+  const fit = () => { if (!panel) return; const sw = stage.clientWidth || 543, w = trueNpWidth(), s = thumbScale(w, sw); panel.style.width = w + 'px'; panel.style.transform = s < 1 ? `scale(${s})` : ''; stage.style.height = Math.ceil(panel.offsetHeight * s) + 'px'; };
   function update() {
     const tpl = npPanelTemplate(); if (!tpl) { stage.replaceChildren(); panel = null; return; }
     panel = fillSample(tpl.cloneNode(true), { ...loadNpPrefs(), style: styleId }, { keepSong: playing() });
@@ -74,3 +75,13 @@ export function npStyleThumb(styleId, playing = () => false) {
   update();
   return { el: stage, update };
 }
+
+/** 0.3.3 G2: width of the real Now Playing panel in the app (CSS px), else the center popup width, else 760. */
+export function trueNpWidth() {
+  if (typeof document === 'undefined') return W;
+  const live = document.querySelector('.np-ctlpanel:not(.npprev-panel)'); const lw = live?.offsetWidth || 0;
+  if (lw > 300) return lw;
+  const cw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--centerw')); return cw > 300 ? Math.round(cw - 24) : W;
+}
+/** 0.3.3 G2: scale factor for a preview laid out at trueW shown in a cardW-wide card. Never scales up. Pure. */
+export const thumbScale = (trueW, cardW) => (trueW > 0 && cardW > 0 ? Math.min(1, cardW / trueW) : 1);
