@@ -1900,3 +1900,51 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .desk.listexpanded .listpanel{grid-area:2/2/3/3}
   .desk.listexpanded .libpanel{grid-area:1/1/3/2} .desk.listexpanded .devpanel{grid-area:1/3/3/4}
 }
+/* G6: every volume bar stretches right up to its % readout (no dead gap) */
+.devpanel .dvol{display:grid!important;grid-template-columns:minmax(0,1fr) 38px 28px;gap:6px;align-items:center}
+.devpanel .dvol input[type=range]{width:100%;min-width:0;margin:0}
+.devpanel .dvol:has(.vlock){grid-template-columns:minmax(0,1fr) 14px 38px 28px}
+/* G10: slim standard Devices panel - one-line master, small subheads with counts, 2-line rows */
+.devpanel:not(.expanded) .dmaster{display:flex;align-items:center;gap:8px;padding:4px 2px 6px;margin:0}
+.devpanel:not(.expanded) .dmaster .dlbl{margin:0;white-space:nowrap} .devpanel:not(.expanded) .mvword{display:none}
+.devpanel:not(.expanded) .dmaster .dvol{flex:1;min-width:0}
+.devpanel .slimsub{margin:6px 0 2px;padding:3px 2px;gap:6px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);font-size:11px;letter-spacing:.08em}
+.devpanel .slimsub>span:first-child{color:var(--accent2-text,var(--accent2));font-weight:800}
+.devpanel .drow.slim{padding:5px 8px 4px;margin:0 0 4px;min-height:0;display:flex;flex-direction:column;gap:1px}
+.devpanel .drow.slim .dtop{min-height:22px;gap:6px}
+.devpanel .drow.slim .dvol input[type=range]{min-height:20px;height:20px}
+.slimtags{display:inline-flex;gap:4px;flex:none} .slimtags .dtag{font-size:8.5px;padding:0 4px;line-height:14px}
+.devpanel:not(.expanded) .zlist{display:flex;flex-direction:column;gap:4px}
+.devpanel:not(.expanded) .zcard{padding:5px 8px 4px;margin:0}
+/* G7: zone cards = device cards (dot / name / switch, bar + % + mute, tags row) */
+.zcard.dlike{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.zcard.dlike .zc-top{display:flex;align-items:center;gap:6px;min-height:22px}
+.zcard.dlike .zname{font:inherit;font-weight:700;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer;min-width:0}
+.zcard.dlike.muted .mutebtn{color:var(--amber);border-color:var(--amber)}
+.dtag.zone{color:var(--dim)}
+/* G9: E1 expanded view - Zones | Speakers | Scenes & Schedules, plain panel background, thin left line per column */
+.devpanel.expanded .dexp-main.e1{display:grid!important;grid-template-columns:340px minmax(0,1fr) 330px;column-gap:18px;align-items:start}
+.devpanel.expanded .e1>.ecol{grid-column:auto!important;min-width:0;display:flex;flex-direction:column;gap:8px;border-left:1px solid color-mix(in srgb,var(--accent2) 60%,transparent);padding-left:12px;background:none}
+.devpanel.expanded .e1>.ecol::before{display:none}
+.devpanel.expanded .e1 .zall{display:flex;gap:8px;align-items:baseline;padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:none;color:var(--ink);cursor:pointer;text-align:left}
+.devpanel.expanded .e1 .zall.on{border-color:var(--hl,var(--accent))}
+.devpanel.expanded .e1 .zlist{display:flex;flex-direction:column;gap:8px}
+.devpanel.expanded .e1 .zcard{padding:8px 10px;cursor:pointer;background:none}
+.devpanel.expanded .e1 .zcard.picked{border-color:var(--hl,var(--accent));box-shadow:0 0 0 1px var(--hl,var(--accent))}
+.e1 .scolhead,.e1 .srow .sline{display:grid;grid-template-columns:10px minmax(90px,150px) minmax(0,1fr) 210px 150px 104px 36px 30px;column-gap:10px;align-items:center}
+.e1 .scolhead{font-size:10px;letter-spacing:.1em;color:var(--dim);padding:0 10px}
+.e1 .slist,.e1 .ulist{display:flex;flex-direction:column;gap:6px}
+.e1 .srow{padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:none;margin:0}
+.e1 .srow.hl{border-color:var(--hl,var(--accent))}
+.e1 .srow.dimmed{opacity:.45}
+.e1 .srow .sout{font-size:12px;color:var(--dim);min-width:0} .e1 .srow .skind{font-size:9.5px;letter-spacing:.08em;color:var(--accent2-text,var(--accent2));font-weight:700}
+.e1 .srow .sout.warn{color:var(--amber)}
+.e1 .srow .dvol{grid-template-columns:minmax(0,1fr) 38px 28px}
+.e1 .srow .stags{display:flex;gap:4px;overflow:hidden} .e1 .srow .saddzone{white-space:nowrap;padding:0 8px;font-size:11px}
+.e1 .srow .dexpand{padding:0;width:30px} .e1 .srow .dexpand .dexp-l{display:none}
+.e1 .srow .dset,.e1 .srow>.dsettings{grid-column:1/-1}
+.e1 .udiv{border-top:1px dashed var(--line);padding-top:8px;margin-top:6px;font-size:11px;letter-spacing:.08em}
+.e1 .udiv b{color:var(--dim)}
+.zaddmenu{position:absolute;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:4px;display:flex;flex-direction:column;min-width:160px}
+.zaddmenu button{background:none;border:0;color:var(--ink);text-align:left;padding:6px 10px;cursor:pointer;border-radius:3px} .zaddmenu button:hover,.zaddmenu button:focus-visible{background:var(--accent-soft)}
+.e1 .srow .saddzone{position:relative}
