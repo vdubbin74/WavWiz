@@ -1,13 +1,15 @@
 // WavWiz 0.3.4: Jukebox end to end in BOTH styles (Modern, Retro CD) the way a guest uses it:
 // start (host dialog) -> big screen in a plain browser -> phone guest page: type a multi-word search with real keystrokes, focus kept the whole time
 // -> add a single song AND a song from an album result -> both on the big screen -> stop. Screenshots for every view.
-import { chromium, devices } from 'playwright';
+import { chromium, webkit, devices } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim();
 const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const R = []; const ok = (n, c, i = '') => { R.push(!!c); console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + i : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-034-${n}.png` });
 const STYLES = (process.argv[2] || 'modern,retro').split(',');
+// WW_GUEST=webkit runs the phone guest page in real WebKit (iPhone Safari engine)
+const GB = process.env.WW_GUEST === 'webkit' ? await webkit.launch() : null;
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 // a speaker so the music actually plays
 const spx = await cb.newContext({ viewport: { width: 800, height: 600 } }); await spx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
@@ -41,7 +43,7 @@ for (const style of STYLES) {
   else ok('[modern] big screen shows Modern (cover, up next, QR), no cabinet; logo + chips stay absolutely positioned', look.modern && !look.retro && look.cover && !look.svg && look.logoPos === 'absolute' && look.chipsPos === 'absolute', JSON.stringify(look));
   await shot(big, `jb-${tag}-bigscreen-before`);
   // phone guest page (iPhone emulation)
-  const gctx = await cb.newContext({ ...devices['iPhone 13'] }); const g = await gctx.newPage(); const gerrs = []; g.on('pageerror', e => gerrs.push(e.message));
+  const gctx = await (GB || cb).newContext({ ...devices['iPhone 13'] }); const g = await gctx.newPage(); const gerrs = []; g.on('pageerror', e => gerrs.push(e.message));
   await g.goto(B + '/jukebox.html?j=' + encodeURIComponent(st.code)); await g.waitForTimeout(2500);
   ok(`[${tag}] guest page uses the ${style} look`, (await g.evaluate(() => document.body.classList.contains('retro'))) === (style === 'retro'));
   await g.locator('input.jb-name').fill('Sam');
