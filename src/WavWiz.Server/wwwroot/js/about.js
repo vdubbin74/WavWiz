@@ -15,7 +15,7 @@ export const WHATS_NEW = [
   ['Jukebox starts again', 'Playback > Start Jukebox… works again: the Start and Stop buttons were blank and did nothing in 0.3.2.'],
   ['New Settings look', 'Settings is a clean list per section in your theme colors, and never wider than the center panel.'],
   ['Devices', 'The Devices panel is slimmer, so more speakers fit. Expanded shows Zones, Speakers (one line each, with the output name) and Scenes & Schedules side by side. Speakers that are not in a zone get + Add to zone.'],
-  ['Volume slider style', 'Settings > Appearance > Display size: Gradient (from your theme colors, the default) or Flat.'],
+  ['Volume slider style', 'Settings > Appearance > Theme (under Display size): Gradient (from your theme colors, the default) or Flat.'],
   ['Playlist drag and drop', 'Drag songs to reorder them (Ctrl / Shift to pick several, Ctrl+Z undoes), or drag songs, albums and folders from the Library to the spot you want.'],
   ['Now Playing and the Playlist', 'Expanding the Playlist slides Now Playing up with it. The Now Playing picker shows each style full width and to scale.'],
   ['Mini player', 'A mute button, a window transparency control (solid again when you point at it) and text that fits.'],

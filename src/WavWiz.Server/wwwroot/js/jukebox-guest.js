@@ -2,7 +2,7 @@
 // 0.3.4 H6/H7: the page is built ONCE (name + search inputs never leave the DOM); refreshes and new results only replace the slots
 // around them, so typing a whole multi-word search keeps focus and the caret. H4: Modern or Retro CD (maroon) look, from the host's setting.
 import { applyTheme, PRESETS } from './theme.js';
-import { guestId, guestApi, groupHead, artistLine, albumLine, albumName, mineLine, minePicks, NAME_KEY, selNo } from './jukebox-core.js';
+import { guestId, guestApi, groupHead, artistLine, albumLine, albumName, mineLine, minePicks, playsLine, playsLeft, NAME_KEY, selNo } from './jukebox-core.js';
 import { renderResults, el } from './jukebox-view.js';
 
 const code = new URLSearchParams(location.search).get('j') || '';
@@ -31,7 +31,7 @@ function build() { if (built) return; built = true; app.replaceChildren(title, n
 
 async function add(t, btn) {
   btn.disabled = true;
-  try { await call('/add', { guest: gid, name: nameIn.value.trim(), trackId: t.id }); added.add(t.id); markIn(btn); msg = ''; paintMsg(); await refresh(); }
+  try { await call('/add', { guest: gid, name: nameIn.value.trim(), trackId: t.id }); added.add(t.id); markIn(btn); msg = ''; paintMsg(); if (board && Number.isFinite(board.playsLeft)) { board.playsLeft = Math.max(0, board.playsLeft - 1); paintNow(); } await refresh(); }
   catch (e) { btn.disabled = false; flash(e.message); }
 }
 const markIn = btn => { btn.disabled = true; btn.classList.add('in'); btn.replaceChildren(el('span', { class: 'jb-chk', 'aria-hidden': 'true' }, '✓'), retro() ? ' IN' : ' In'); btn.setAttribute('aria-label', 'Added'); };
@@ -70,8 +70,8 @@ function paintNow() {
       : el('div', { class: 'jb-np' }, el('small', {}, 'Nothing playing yet. Add the first song!')));
   }
   noteSlot.replaceChildren(b.locked ? el('p', { class: 'jb-note' }, 'The host has paused requests for now.') : '');
-  const mine = minePicks(b, gid);
-  foot.replaceChildren(el('span', { class: 'jb-mine' }, retro() ? `Your picks: ${mine} of ${b.perGuest ?? 3}` : mineLine(b, gid)),
+  // 0.3.5 J18: "3 available plays" - counts down with each add, back up as each pick has played or is removed (server count, survives reloads)
+  foot.replaceChildren(el('span', { class: 'jb-mine jb-plays', 'data-left': String(playsLeft(b, gid)) }, playsLine(b, gid)),
     b.voteSkip && b.now ? el('button', { class: 'btn', type: 'button', onclick: vote }, `👎 Skip (${b.votes}/${b.votesNeeded})`) : null);
 }
 function paintBody() {
@@ -92,5 +92,5 @@ async function refresh() {
   } catch (e) { if (e.status === 403) ended(e.message); }
 }
 if (!code) ended('Scan the QR code on the big screen to join.');
-else { refresh(); setInterval(() => { if (!document.hidden) refresh(); }, 5000); }
+else { refresh(); setInterval(() => { if (!document.hidden) refresh(); }, 3000); document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); }); }
 export { groupHead, artistLine, albumLine, selNo };

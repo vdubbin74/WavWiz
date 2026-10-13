@@ -22,6 +22,10 @@ export function minePicks(board, gid) { return (board?.next || []).filter(x => x
 export const selNo = trackId => 100 + (Math.abs(Number(trackId) || 0) % 900);
 /** Up next total, e.g. "5 songs · 19 min" (durations when known, else ~3.5 min a song). */
 export function upNextLine(next) { const n = (next || []).length; if (!n) return plural(0, 'song'); const ms = next.reduce((a, x) => a + (x.durationMs > 0 ? x.durationMs : 210000), 0); return `${plural(n, 'song')} · ${Math.max(1, Math.round(ms / 60000))} min`; }
+/** 0.3.5 J18: plays this guest has left - the server's own count (board.playsLeft, same rule as the per-guest limit), else from the board. */
+export function playsLeft(board, gid) { const per = board?.perGuest ?? 3; if (Number.isFinite(board?.playsLeft)) return Math.max(0, Math.min(per, board.playsLeft)); return Math.max(0, per - minePicks(board, gid)); }
+/** "3 available plays" / "1 available play" / "No plays left" */
+export function playsLine(board, gid) { const n = playsLeft(board, gid); return n === 0 ? '0 available plays' : `${n} available play${n === 1 ? '' : 's'}`; }
 /** "Your songs in queue: 1 of 3" */
 export function mineLine(board, gid) {
   const mine = (board?.next || []).filter(x => x.mine || (x.guest && x.guest === gid)).length;

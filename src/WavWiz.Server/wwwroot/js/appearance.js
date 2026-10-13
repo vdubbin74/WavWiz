@@ -181,15 +181,18 @@ function displaySizeCard() {
   return { el: box, reload: draw };
 }
 
-export const APP_SUBS = [['theme', 'Theme'], ['viz', 'Visualizer'], ['eq', 'EQ'], ['np', 'Now Playing'], ['display', 'Display size']];
+// 0.3.5 J2: Display size is part of the theme - it sits on the Theme page (no Display size sub-tab any more)
+export const APP_SUBS = [['theme', 'Theme'], ['viz', 'Visualizer'], ['eq', 'EQ'], ['np', 'Now Playing']];
 const SUB_KEY = 'wavwiz.appsub';
 /** The Appearance pane (0.2.2 T2; 0.2.5 C: sub-tabs on top): one sub-section at a time. `opts.section` opens a sub-section (the visualizer
  *  panel's Looks button opens Visualizer); otherwise the last one used in this session, else Theme. `opts.preview` builds the F9 strip. */
 export function appearancePane(opts = {}) {
   const theme = themeCard(), viz = vizCard(), np = npStyleCard(null, opts.S || null, opts.npThumb || null), eqs = eqStyleCard(opts.S || null), disp = displaySizeCard();
-  const pages = { theme, viz, eq: eqs, np, display: disp };
+  const themePage = { el: h('div', { class: 'apptheme' }, theme.el, disp.el), reload: () => { theme.reload?.(); disp.reload(); }, hide: () => theme.hide?.() };
+  const pages = { theme: themePage, viz, eq: eqs, np, display: themePage };
   let saved = null; try { saved = sessionStorage.getItem(SUB_KEY); } catch { /* ignore */ }
   let cur = opts.looks ? 'viz' : (pages[opts.section] ? opts.section : (pages[saved] ? saved : 'theme'));
+  const wantDisplay = cur === 'display'; if (cur === 'display') cur = 'theme';
   // 0.2.5 C: a row of sub-tabs right under the main Settings tabs (was a left column), so the content uses the full Settings width
   const nav = h('nav', { class: 'appnav subtabs', 'aria-label': 'Appearance sections' },
     APP_SUBS.map(([id, label]) => h('button', { type: 'button', 'data-sub': id, 'aria-current': String(id === cur), onclick: () => select(id) }, label)));
@@ -204,6 +207,7 @@ export function appearancePane(opts = {}) {
     host.scrollTop = 0;
   }
   select(cur);
+  if (wantDisplay) setTimeout(() => disp.el.scrollIntoView?.({ block: 'start' }), 60);
   const el = h('div', { class: 'appearance appstack' }, nav, host);
   /** Stop every live preview (Settings closed or another tab); `resume` restarts the visible one. */
   const hide = () => { viz.hide(); eqs.hide(); np.hide?.(); };

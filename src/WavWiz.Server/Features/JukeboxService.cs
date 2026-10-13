@@ -65,8 +65,48 @@ public sealed class JukeboxService
                 if (th.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String && System.Text.RegularExpressions.Regex.IsMatch(v.GetString()!, "^#[0-9a-fA-F]{6}$")) t[k] = v.GetString()!;
         Theme = t; return StartCore();
     }
-    private string StartCore() { lock (_l) { Running = true; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); } _ev.Publish("jukebox", State()); return Code!; }
-    public void Stop() { lock (_l) { Running = false; Code = null; } _ev.Publish("jukebox", State()); }
+    private string StartCore()
+    {
+        lock (_l)
+        {
+            // 0.3.5 J13: start with an EMPTY playlist so guest picks play promptly; the host's playlist is kept and comes back on Stop
+            if (!Running)
+            {
+                var q = _cond.Queue(); var now = _cond.Now();
+                _saved = q.Count > 0 ? (q.ToList(), Math.Clamp(now.Index, 0, q.Count - 1)) : null;
+                if (q.Count > 0) _cond.Clear();
+            }
+            Running = true; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); _filler.Clear();
+        }
+        _ev.Publish("jukebox", State()); return Code!;
+    }
+    public void Stop()
+    {
+        lock (_l)
+        {
+            if (!Running) return;
+            Running = false; Code = null;
+            // 0.3.5 J13: put the host's playlist back. The song playing now keeps playing; the old playlist sits around it in its old order and
+            // carries on from the song that was playing when Jukebox started. Jukebox songs still to come are dropped.
+            var sv = _saved; _saved = null; _filler.Clear();
+            if (sv is { } s0 && s0.Items.Count > 0)
+            {
+                var now = _cond.Now(); var q = _cond.Queue();
+                if (now.Item != null && now.State != "stopped")
+                {
+                    for (int i = q.Count - 1; i >= 0; i--) if (q[i].Id != now.Item.Id) _cond.Remove(i);
+                    _cond.Insert(s0.Items.Skip(s0.Index), 1);
+                    _cond.Insert(s0.Items.Take(s0.Index), 0);
+                }
+                else { _cond.Clear(); _cond.Add(s0.Items, false); }
+            }
+        }
+        _ev.Publish("jukebox", State()); _ev.Publish("queue");
+    }
+    private (List<QueueItem> Items, int Index)? _saved;
+    private readonly HashSet<long> _filler = new();   // 0.3.5 J13: queue item ids added as random filler (guest picks go in front of them)
+    /// <summary>0.3.5 J13: true when the host's playlist is being kept aside (tests / host UI).</summary>
+    public int SavedCount { get { lock (_l) return _saved?.Items.Count ?? 0; } }
     public bool Guest(HttpContext c) => Running && Code != null && CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(c.Request.Headers[Header].ToString() is { Length: > 0 } h ? h : c.Request.Query["j"].ToString()), System.Text.Encoding.UTF8.GetBytes(Code));
     public void SetLocked(bool on) { Locked = on; _ev.Publish("jukebox", State()); }
     public void Ban(string guest) { lock (_l) _banned.Add(guest); }
@@ -122,19 +162,31 @@ public sealed class JukeboxService
             if (!IsAllowed(trackId)) return "That song isn't available here.";
             var q = _cond.Queue(); var now = _cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
             if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
-            var mine = _req.Count(kv => kv.Value.Guest == guest && upcoming.Contains(kv.Key));
+            var mine = Waiting(guest);
             if (mine >= c.PerGuest) return $"You already have {mine} song{(mine == 1 ? "" : "s")} waiting. Add more once one has played.";
             var items = _cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
             var it = items[0];
             if (c.ArtistCooldownMin > 0 && _artistAt.TryGetValue(it.Artist, out var at) && Clock() - at < TimeSpan.FromMinutes(c.ArtistCooldownMin)) return $"{it.Artist} played a moment ago. Try another artist for now.";
-            _cond.Add(items, false);
-            if (_cond.State == Playback.PlayState.Stopped) { var qq = _cond.Queue(); _cond.Jump(qq.Count - 1); }
-            var added = _cond.Queue().LastOrDefault(); if (added != null) _req[added.Id] = (guest, string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim()[..Math.Min(24, name.Trim().Length)]);
+            // 0.3.5 J13: guest picks always go before random filler
+            var before = q.Select(x => x.Id).ToHashSet(); var pos = -1;
+            for (int i = Math.Max(0, now.Index + 1); i < q.Count; i++) if (_filler.Contains(q[i].Id)) { pos = i; break; }
+            if (pos >= 0) _cond.Insert(items, pos); else _cond.Add(items, false);
+            var qn = _cond.Queue(); var added = qn.FirstOrDefault(x => !before.Contains(x.Id));
+            if (_cond.State == Playback.PlayState.Stopped && added != null) _cond.Jump(qn.ToList().FindIndex(x => x.Id == added.Id));
+            if (added != null) _req[added.Id] = (guest, string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim()[..Math.Min(24, name.Trim().Length)]);
             _artistAt[it.Artist] = Clock();
             _ev.Publish("queue"); return null;
         }
     }
 
+    /// <summary>0.3.5 J18: this guest's picks still to play or playing now - the same count the per-guest limit uses (unchanged since 0.3.0),
+    /// so the guest page's "N available plays" always matches what the server allows. A play comes back once that pick has played or is removed.</summary>
+    private int Waiting(string guest)
+    {
+        var q = _cond.Queue(); var now = _cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
+        if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
+        return _req.Count(kv => kv.Value.Guest == guest && upcoming.Contains(kv.Key));
+    }
     /// <summary>Vote to skip the current song (one vote per guest per song). Returns (votes, needed, skipped).</summary>
     public (int Votes, int Needed, bool Skipped, string? Err) Vote(string guest)
     {
@@ -155,7 +207,8 @@ public sealed class JukeboxService
     {
         var now = _cond.Now(); var q = _cond.Queue(); var c = Cfg();
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
-        return new { running = Running, locked = Locked, style = c.Style, voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
+        int? left = null; if (!string.IsNullOrEmpty(me)) lock (_l) left = Math.Max(0, c.PerGuest - Waiting(me));
+        return new { running = Running, locked = Locked, style = c.Style, playsLeft = left, filler = now.Item != null && _filler.Contains(now.Item.Id), voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
             now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
             next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) &&  r2.Guest == me }) };
     }
@@ -164,17 +217,27 @@ public sealed class JukeboxService
     public void Tick()
     {
         if (!Running) return;
-        var c = Cfg(); if (c.Autofill.Id == null && string.IsNullOrEmpty(c.Autofill.Genre)) return;
+        var c = Cfg();
         var now = _cond.Now(); var q = _cond.Queue();
         bool dry = q.Count == 0 || now.Index >= q.Count - 1 && (now.State == "stopped" || now.DurationMs > 0 && now.DurationMs - now.PositionMs < 15_000);
         if (!dry) return;
         if (q.Count > 0 && now.Index < q.Count - 1) return;
         var (w, ps) = Allowed(c);
-        var src = c.Autofill.Id != null ? $" AND id IN (SELECT track_id FROM playlist_item WHERE playlist_id={c.Autofill.Id.Value})" : " AND genre=$g";
-        var id = _db.Scalar($"SELECT id FROM track WHERE {w}{src} ORDER BY random() LIMIT 1", ps.Append(("$g", (object?)c.Autofill.Genre)).ToArray());
+        // 0.3.5 J13: random filler from the chosen playlist / genre, else from all the allowed music
+        var src = c.Autofill.Id != null ? $" AND id IN (SELECT track_id FROM playlist_item WHERE playlist_id={c.Autofill.Id.Value})" : !string.IsNullOrEmpty(c.Autofill.Genre) ? " AND genre=$g" : "";
+        var recent = q.Where(x => x.Kind == "track" && x.RefId != null).Select(x => x.RefId!.Value).TakeLast(20).ToList();
+        var notRecent = recent.Count > 0 ? $" AND id NOT IN ({string.Join(",", recent)})" : "";
+        var id = _db.Scalar($"SELECT id FROM track WHERE {w}{src}{notRecent} ORDER BY random() LIMIT 1", ps.Append(("$g", (object?)c.Autofill.Genre)).ToArray())
+              ?? _db.Scalar($"SELECT id FROM track WHERE {w}{src} ORDER BY random() LIMIT 1", ps.Append(("$g", (object?)c.Autofill.Genre)).ToArray());
         if (id == null) return;
         var items = _cond.TracksToItems(new[] { Convert.ToInt64(id) }); if (items.Count == 0) return;
-        _cond.Add(items, false); if (now.State == "stopped") _cond.Jump(_cond.Queue().Count - 1);
+        lock (_l)
+        {
+            if (!Running) return;
+            var before = _cond.Queue().Select(x => x.Id).ToHashSet();
+            _cond.Add(items, false); var added = _cond.Queue().FirstOrDefault(x => !before.Contains(x.Id)); if (added != null) _filler.Add(added.Id);
+            if (_cond.State == Playback.PlayState.Stopped) _cond.Jump(_cond.Queue().Count - 1);
+        }
         _ev.Publish("queue");
     }
 }
