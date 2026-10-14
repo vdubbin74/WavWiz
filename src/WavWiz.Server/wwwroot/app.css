@@ -2169,8 +2169,10 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .qtable tr.cur td{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-text,var(--accent))}
 .qtable td.num{color:var(--dim)}
 .qins{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-/* 0.3.5 J4: the approved 56 px card height (18 + 14 + 18 + gaps + border) for every closed speaker / zone card */
-.dc3:not(.dset){gap:2px;padding:0 8px;height:56px;box-sizing:border-box;justify-content:center;overflow:hidden}
-.dc3:not(.dset) .dc3l1{height:18px} .dc3:not(.dset) .dc3l1 .onpill{height:18px}
+/* 0.3.5 J4: the approved ~56 px closed card (18 + 14 + 18 + gaps + border); every child sized to fit, nothing clipped */
+.dc3:not(.dset){gap:2px!important;padding:1px 8px 0!important;box-sizing:border-box;justify-content:center}
+.dc3:not(.dset) .dc3l1{height:18px!important;min-height:0!important} .dc3:not(.dset) .dc3l1 .onpill{height:18px} .dc3:not(.dset) .dc3l1 .dexpand{height:18px;min-height:0;padding:0 4px;display:inline-flex;align-items:center}
 .dc3:not(.dset) .dc3l2{height:14px;min-height:14px} .dc3:not(.dset) .dtag{line-height:12px;padding-top:0;padding-bottom:0}
-.dc3:not(.dset) .dc3l3{height:18px;display:flex;align-items:center} .dc3:not(.dset) .dc3l3 button{height:18px;width:18px;min-height:0;padding:0}
+.dc3:not(.dset) .dc3l2 .btn,.dc3:not(.dset) .dc3l2 button{height:14px;min-height:0;padding:0 6px;font-size:10px;line-height:12px}
+.dc3:not(.dset) .dc3l3{height:18px;display:flex;align-items:center} .dc3:not(.dset) .dc3l3 .vbar,.dc3:not(.dset) .dc3l3 .vbar input{height:18px;min-height:0}
+.dc3:not(.dset) .dc3l3 button{height:18px;width:18px;min-height:0;padding:0} .dc3:not(.dset) .dc3l3 .pct{line-height:18px}

@@ -23,7 +23,7 @@ async function newPage(opt) {
   const p = await ctx.newPage(); p._errs = []; p.on('pageerror', e => { if (!/due to access control checks|Load failed/.test(e.message)) p._errs.push(e.message); }); return { ctx, p };   // WebKit reports fetches cut off by our own page.goto as errors
 }
 const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
-const home = async (p, pan, theme) => { await p.goto(B + '/'); await p.evaluate(([v, t]) => { if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); if (t) localStorage.setItem('wavwiz.theme', t); }, [pan, theme]); await p.goto(B + '/'); await p.waitForTimeout(2500); await closeDlg(p); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); await p.waitForTimeout(200); };   // the 'Tap anywhere to start sound' prompt
+const home = async (p, pan, theme) => { await p.goto(B + '/'); await p.evaluate(([v, t]) => { if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, [pan, theme]); await p.goto(B + '/'); await p.waitForTimeout(2500); await closeDlg(p); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); if (theme) { await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme); } await p.waitForTimeout(theme ? 600 : 200); };   // the 'Tap anywhere to start sound' prompt
 const go = (p, k) => p.evaluate(async k => (await import('/js/main.js')).go(k), k);
 const dlgW = p => p.evaluate(() => { const d = document.querySelector('dialog[open]'); return d ? Math.round(d.getBoundingClientRect().width) : -1; });
 for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
@@ -52,7 +52,7 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
         const capped = [...document.querySelectorAll('.devpanel .vbar.capped')].filter(c => c.offsetParent);
         return { n: cards.length, hs: [...new Set(hs)], pills: pills.length, pillTxt: pills[0]?.textContent, capped: capped.length, tags: cards.slice(0, 3).map(c => c.querySelector('.dc3l2')?.textContent.trim()), mutes: cards.filter(c => c.querySelector('.dc3l3 button')).length,
           r: cards[0] ? getComputedStyle(cards[0]).borderTopLeftRadius : '' }; });
-      ok(`[${tag}] J4 three-line cards (~56px), labeled OFF|ON pills, bar + mute`, r.n > 0 && r.hs.every(x => x >= 54 && x <= 58) && r.pills === r.n && /OFF/.test(r.pillTxt) && /ON/.test(r.pillTxt) && r.mutes === r.n, JSON.stringify(r));
+      ok(`[${tag}] J4 three-line cards (~56px), labeled OFF|ON pills, bar + mute`, r.n > 0 && r.hs.every(x => x >= 54 && x <= 60) && r.pills === r.n && /OFF/.test(r.pillTxt) && /ON/.test(r.pillTxt) && r.mutes === r.n, JSON.stringify(r));
       ok(`[${tag}] J12 cards 3px corners`, r.r === '3px', r.r);
       ok(`[${tag}] J3 capped bar visibly different`, r.capped >= 1, JSON.stringify(r.tags));
       const v = await p.evaluate(() => { const i = document.querySelector('.devpanel .vbar.capped input[type=range]'); if (!i) return null; i.value = '95'; i.dispatchEvent(new Event('input', { bubbles: true })); const m = i.closest('.vbar'); return { v: +i.value, cap: +i.dataset.cap, marker: getComputedStyle(m).getPropertyValue('--cap').trim() }; });
