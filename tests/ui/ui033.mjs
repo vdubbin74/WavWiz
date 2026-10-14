@@ -44,8 +44,8 @@ await step('smoke', async () => {
 if (want('g1')) await step('g1', async () => {
   for (const pan of [NORMAL, { ...NORMAL, lib: 'rail' }, { ...NORMAL, lib: 'rail', dev: 'rail' }]) {
     await setPanels(p, pan); await home(); await openSet('general');
-    const r = await p.evaluate(() => { const d = document.querySelector('dialog[open].settings-dlg').getBoundingClientRect(), c = document.querySelector('.nowcol').getBoundingClientRect(); return { d: Math.round(d.width), c: Math.round(c.width) }; });
-    ok(`G1 Settings not wider than the center panel (${pan.lib}/${pan.dev})`, r.d <= r.c + 1 && r.d >= r.c - 40, JSON.stringify(r));
+    const r = await p.evaluate(() => { const d = document.querySelector('dialog[open].settings-dlg').getBoundingClientRect(), c = document.querySelector('.nowcol').getBoundingClientRect(); return { d: Math.round(d.width), c: Math.round(c.width), w: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--popw')) }; });
+    ok(`G1->J1 Settings = the one fixed popup width (--popw) whatever the panels (${pan.lib}/${pan.dev})`, Math.abs(r.d - r.w) <= 2, JSON.stringify(r));   // 0.3.5 J1 supersedes G1 (no longer follows the live center panel)
   }
   await setPanels(p, NORMAL); await home(); await openSet('general'); await shot(p, 'settings-general');
 });
@@ -86,26 +86,26 @@ if (want('dev')) await step('dev', async () => {
   const r = await p.evaluate(() => { const rows = [...document.querySelectorAll('.devpanel .drow.slim')].map(e => Math.round(e.getBoundingClientRect().height));
     const bar = document.querySelector('.devpanel .drow.slim .dvol'), sl = bar?.querySelector('input').getBoundingClientRect(), pc = bar?.querySelector('.pct').getBoundingClientRect();
     const subs = [...document.querySelectorAll('.devpanel .slimsub>span:first-child')].map(e => e.textContent); const z = document.querySelector('.devpanel .zcard.dlike');
-    return { rows, gap: sl && pc ? Math.round(pc.left - sl.right) : null, subs, zone: !!z && !!z.querySelector('.sw') && !!z.querySelector('.dvol .mutebtn'), tip: document.querySelector('.devpanel .drow.slim')?.title || '' }; });
+    return { rows, gap: sl && pc ? Math.round(pc.left - sl.right) : null, subs, zone: !!document.querySelector('.devpanel .zcard.dc3 .onpill') && !!document.querySelector('.devpanel .zcard.dc3 .dc3l3 button'), tip: document.querySelector('.devpanel .drow.slim')?.title || '' }; });
   ok('G10 slim rows ~56 px', r.rows.length > 0 && r.rows.every(h => h <= 62), JSON.stringify(r.rows));
   ok('G6 bar runs up to the % (≤ 8 px gap)', r.gap != null && r.gap <= 8, String(r.gap));
   ok('G8 "Speakers" subhead (panel title stays Devices), Zones subhead', r.subs.includes('SPEAKERS') && r.subs.includes('ZONES'), JSON.stringify(r.subs));
-  ok('G7 zone card = device card look (switch, bar, mute)', r.zone);
+  ok('G7->J4 zone card = speaker card look (OFF|ON pill, bar, mute)', r.zone);
   ok('G10 output name in the row tooltip', /·|-/.test(r.tip), r.tip);
   await setPanels(p, { ...NORMAL, exp: 'dev' }); await home(); await clean(); await shot(p, 'devices-e1');
   const e = await p.evaluate(() => { const cols = [...document.querySelectorAll('.devpanel.expanded .e1>.ecol')].map(c => [c.className, Math.round(c.getBoundingClientRect().width)]);
     const rows = [...document.querySelectorAll('.e1 .srow')]; const bars = rows.map(r => Math.round(r.querySelector('.dvol').getBoundingClientRect().left));
-    return { cols, n: rows.length, oneLine: rows.every(r => r.querySelector('.sline').getBoundingClientRect().height < 44), aligned: new Set(bars).size <= 1, out: rows[0]?.querySelector('.sout')?.title || '', un: !!document.querySelector('.e1 .udiv'), add: document.querySelectorAll('.e1 .saddzone').length }; });
-  ok('G9 three columns Zones | Speakers | Scenes & Schedules', e.cols.length === 3 && /zcol/.test(e.cols[0][0]) && /scol/.test(e.cols[1][0]) && /sscol/.test(e.cols[2][0]) && e.cols[1][1] > e.cols[0][1], JSON.stringify(e.cols));
-  ok('G9 one-line speaker rows, bars aligned, output line with tooltip', e.n > 0 && e.oneLine && e.aligned && e.out.length > 0, JSON.stringify(e));
+    return { cols, n: rows.length, oneLine: rows.every(r => r.querySelector('.sline').getBoundingClientRect().height < 44), aligned: new Set(bars).size <= 1, out: rows[0]?.querySelector('.sout')?.title || '', c3: document.querySelectorAll('.e1 .scol .dcard.dc3').length, c3al: new Set([...document.querySelectorAll('.e1 .scol .dcard.dc3 .dc3l3')].map(x => Math.round(x.getBoundingClientRect().left))).size <= 1, un: !!document.querySelector('.e1 .udiv'), add: document.querySelectorAll('.e1 .saddzone').length }; });
+  ok('G9->J5 three columns Scenes & Schedules | Zones | Speakers', e.cols.length === 3 && /sscol/.test(e.cols[0][0]) && /zcol/.test(e.cols[1][0]) && /^scol/.test(e.cols[2][0]), JSON.stringify(e.cols));
+  ok('G9->J4 speaker cards in the Speakers column (3-line cards, bars aligned)', e.c3 > 0 && e.c3al, JSON.stringify(e));   // 0.3.5 J4/J6 cards replace the G9 one-line rows
   const z = p.locator('.e1 .zcard').first(); if (await z.count()) { await z.click({ position: { x: 20, y: 30 } }); await p.waitForTimeout(800);
-    const hlr = await p.evaluate(() => ({ dim: document.querySelectorAll('.e1 .srow.dimmed').length, all: document.querySelectorAll('.e1 .srow').length, picked: !!document.querySelector('.e1 .zcard.picked') }));
+    const hlr = await p.evaluate(() => ({ dim: document.querySelectorAll('.e1 .scol .dc3.dimmed').length, all: document.querySelectorAll('.e1 .scol .dc3').length, picked: !!document.querySelector('.e1 .zcard.picked') }));
     ok('G9 selecting a zone highlights its speakers and dims the others', hlr.picked && hlr.dim > 0 && hlr.dim < hlr.all, JSON.stringify(hlr)); await shot(p, 'devices-e1-zone'); await p.locator('.e1 .zall').click(); }
   await setTheme(p, 'pepecoin'); await p.waitForTimeout(500); await shot(p, 'devices-e1-pepecoin'); await setTheme(p, 'default');
 });
 
 if (want('g11')) await step('g11', async () => {
-  await setPanels(p, NORMAL); await home(); await openSet('appearance', 'Display size'); await shot(p, 'slider-style-setting');
+  await setPanels(p, NORMAL); await home(); await openSet('appearance', 'Theme');   // 0.3.5 J2: Display size is on the Theme page await shot(p, 'slider-style-setting');
   const tr = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--voltrack').trim());
   const g = await tr(); await p.locator('.sliderstyle button[data-slider=flat]').click(); await p.waitForTimeout(300); const f = await tr();
   const acc = await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()); ok('G11 Gradient (default) from theme colors, Flat = primary (0.3.4: one-color gradient)', /gradient/.test(g) && (f === acc || f.replace(/\s/g, '') === `linear-gradient(${acc},${acc})`), JSON.stringify({ g, f, acc }));
@@ -134,7 +134,7 @@ if (want('g12')) await step('g12', async () => {
 if (want('g14')) await step('g14', async () => {
   await home(); await clean(); await p.evaluate(async () => { const m = await import('/js/main.js'); m.go?.('eq'); }); await p.waitForTimeout(400);
   if (!(await p.locator('dialog[open] [data-eqglow]').count())) { await p.locator('.topbar button', { hasText: /Sound/ }).first().click().catch(() => {}); await p.waitForTimeout(1500); }
-  if (!(await p.locator('dialog[open] [data-eqglow]').count())) { await p.locator('text=Playback').first().click(); await p.locator('text=Sound / EQ…').first().click(); await p.waitForTimeout(1500); }
+  if (!(await p.locator('dialog[open] [data-eqglow]').count())) { await p.locator('text=Playback').first().click(); await p.locator('text=Sound / EQ').first().click(); await p.waitForTimeout(1500); }
   const sl = p.locator('dialog[open] [data-eqglow]').first();
   if (!(await sl.count())) { ok('G14 glow slider found', false); return; }
   await sl.evaluate(e => { window.__g14 = e; e.value = 0; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }); await p.waitForTimeout(500);
@@ -167,8 +167,8 @@ if (want('mini')) await step('mini', async () => {
 
 await step('regress', async () => {
   await setPanels(p, { ...NORMAL, exp: 'dev' }); await home(); await clean();
-  const r = await p.evaluate(() => ({ lock: !!document.querySelector('.vlock') || true, f21: [...document.querySelectorAll('.e1 .srow .stags')].length > 0 }));
-  ok('regress: F21 tags have their own slot on speaker rows', r.f21);
+  const r = await p.evaluate(() => ({ lock: !!document.querySelector('.vlock') || true, f21: [...document.querySelectorAll('.e1 .scol .dc3 .dc3l2')].length > 0 }));
+  ok('regress: F21->J4 tags have their own row on speaker cards', r.f21);
   ok('regress: no script errors during the run', errs.length === 0, errs.slice(0, 3).join(' | '));
 });
 const pass = R.filter(r => r.pass).length; console.log(`\nui033: ${pass}/${R.length} passed`); await cb.close(); process.exit(pass === R.length ? 0 : 1);

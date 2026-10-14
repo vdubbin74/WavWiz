@@ -44,7 +44,7 @@ await step('volcap', async () => {
   await api(`/zones/${z.id}`, 'PATCH', { volume: 90 }); let v = (await api('/zones?all=1')); v = (Array.isArray(v) ? v : v.zones).find(x => x.id === z.id).volume; ok('volume cap: direct raise stops at the cap', v <= 40, v);
   await api('/zones/master', 'POST', { set: 100 }); v = (await api('/zones?all=1')); v = (Array.isArray(v) ? v : v.zones).find(x => x.id === z.id).volume; ok('volume cap: master 100 stays under the cap', v <= 40, v);
   await api(`/zones/${z.id}`, 'PATCH', { volume: 10 }); v = (await api('/zones?all=1')); v = (Array.isArray(v) ? v : v.zones).find(x => x.id === z.id).volume; ok('volume cap: lowering is allowed', v === 10, v);
-  await home(); const lock = await p.evaluate(() => document.querySelectorAll('.devpanel .vlock').length); ok('volume cap: padlock shown by the bar', lock > 0, lock); await shot('volcap');
+  await home(); const lock = await p.evaluate(() => document.querySelectorAll('.devpanel .vbar.capped, .devpanel .dtag.capped').length); ok('volume cap: capped bar + CAPPED tag (J3 replaces the padlock)', lock > 0, lock); await shot('volcap');
   await api(`/zones/${z.id}/volcap`, 'PUT', { cap: 100, locked: false }); await api('/zones/master', 'POST', { set: 60 });
 });
 await step('art', async () => {

@@ -35,7 +35,7 @@ for (const style of STYLES) {
   await ctx2.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const big = await ctx2.newPage(); const berrs = []; big.on('pageerror', e => berrs.push(e.message));
   await big.goto(B + '/'); await big.waitForTimeout(3500); await big.evaluate(() => { document.querySelectorAll('dialog[open]').forEach(d => d.close()); document.querySelectorAll('.phone-unlock').forEach(e => e.remove()); });
-  await big.locator('#jbchip').click(); await big.waitForTimeout(1000); await big.locator('dialog[open] button', { hasText: 'Open big screen' }).click(); await big.waitForTimeout(3000);
+  await big.locator('#jbchip').click(); await big.waitForTimeout(1000); await big.locator('.jbpanel button', { hasText: 'Open big screen' })   /* 0.3.5 J9 #13: host controls are a dropdown */.click(); await big.waitForTimeout(3000);
   const look = await big.evaluate(() => { const j = document.querySelector('.jb'); const vis = s => { const e = j.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0; };
     return { retro: j.classList.contains('retro'), modern: j.classList.contains('modern'), svg: vis('.jbr-svg'), disc: vis('.jbr-disc'), rack: j.querySelectorAll('.jbr-col.a .jbr-strip').length, more: j.querySelectorAll('.jbr-col.b .jbr-strip').length, select: vis('.jbr-select'), cover: vis('.jbm .jb-cover'), logoPos: getComputedStyle(j.querySelector('.jb-logo')).position, chipsPos: getComputedStyle(j.querySelector('.jb-chips')).position,
       font: getComputedStyle(j.querySelector('.jbr-title')).fontFamily, fontsOk: [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family) }; });
@@ -91,7 +91,7 @@ for (const style of STYLES) {
   await big.locator('.jb-search-pane button', { hasText: 'Close' }).click();
   // stop from the host controls
   await p.evaluate(() => { document.querySelectorAll('dialog[open]').forEach(d => d.close()); document.querySelectorAll('.phone-unlock').forEach(e => e.remove()); });
-  await p.locator('#jbchip').click(); await p.waitForTimeout(1000); await p.locator('dialog[open] footer button', { hasText: 'Stop Jukebox' }).click(); await p.waitForTimeout(700);
+  await p.locator('#jbchip').click(); await p.waitForTimeout(1000); await p.locator('.jbpanel button', { hasText: 'Stop Jukebox' }).click(); await p.waitForTimeout(700);
   await p.locator('dialog[open] button', { hasText: /^Stop$/ }).last().click(); await p.waitForTimeout(2500);
   st = await api('/jukebox'); ok(`[${tag}] Stop: jukebox stopped and the big screen closed`, st.running === false && !(await big.evaluate(() => !!document.querySelector('.jb'))), JSON.stringify(st));
   ok(`[${tag}] no script errors (host, big screen, phone)`, !errs.length && !berrs.length && !gerrs.length, [...errs, ...berrs, ...gerrs].join(' | '));
