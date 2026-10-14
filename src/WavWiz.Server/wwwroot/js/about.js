@@ -117,10 +117,12 @@ export function openWhatsNewDialog(onClose) {
   return dialog(`What's new in WavWiz ${WHATS_NEW_VERSION} BETA`, h('div', { class: 'whatsnew' }, h('div', { class: 'row' }, wordmark('wordmark')), h('ul', null, WHATS_NEW.map(([t, x]) => h('li', null, h('b', null, h('span', { class: 'newchip' }, 'NEW'), t), h('div', { class: 'small dim' }, x))))),
     [{ text: 'Got it', cls: 'primary' }], { cls: 'whatsnew-dlg', onClose });
 }
+/** Compare dotted versions (pure). */
+export const verCmp = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0 ? 1 : -1; } return 0; };
 /** Shown once per device (keyed on the version in localStorage), never on the sign-in screens. */
 export function maybeWhatsNew(S) {
   const key = 'wavwiz.whatsnew'; let seen = null; try { seen = localStorage.getItem(key); } catch { /* private mode */ return; }
-  if (seen === WHATS_NEW_VERSION) return;
+  if (seen && verCmp(seen, WHATS_NEW_VERSION) >= 0) return;   // 0.3.5: seen this or a newer version (a downgrade does not show it again)
   openWhatsNew(); try { localStorage.setItem(key, WHATS_NEW_VERSION); } catch { /* ignore */ }
   void S;
 }

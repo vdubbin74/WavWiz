@@ -62,7 +62,7 @@ test('0.2.2 T8: Menu > Devices > Devices & zones always opens the EXPANDED Devic
 test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playing, Display size), one page each with a live preview', async () => {
   globalThis.localStorage ??= { getItem: () => null, setItem() {} };
   const ap = src('appearance.js'), th = src('themes.js'), vp = src('vizpage.js'), st = src('settings.js');
-  assert.match(ap, /export const APP_SUBS = \[\['theme', 'Theme'\], \['viz', 'Visualizer'\], \['eq', 'EQ'\], \['np', 'Now Playing'\], \['display', 'Display size'\]\]/);
+  assert.match(ap, /export const APP_SUBS = \[\['theme', 'Theme'\], \['viz', 'Visualizer'\], \['eq', 'EQ'\], \['np', 'Now Playing'\]\]/   /* 0.3.5 J2 */);
   assert.match(ap, /h\('nav', \{ class: 'appnav subtabs', 'aria-label': 'Appearance sections' \}/);   // 0.2.5 C: sub-tabs on top
   // Theme = the 0.2.0 Themes page layout (theme cards + Custom colors card) + live app preview that recolors on hover
   assert.match(th, /function previewCard\(id, p, current, onPick, onHover\)/); assert.match(th, /class: 'themegrid pgrid pgrid-theme'/); assert.match(th, /h\('h3', null, 'Custom colors'\)/);

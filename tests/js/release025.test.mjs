@@ -120,7 +120,7 @@ test('0.2.5 B: card layout per render v2 - mute on the right, one Settings chevr
   assert.match(card, /h\('div', \{ class: 'dvol' \}, vol, pct, mute\)/, 'slider · % · round mute on the right');
   assert.equal((card.match(/settingsToggle\(/g) || []).length, 1);
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('const connKey'));
-  for (const t of ["sec('OUTPUT'", "sec('DELAY'", "'Test sound'", "'Sound / EQ'", "'More ▾'", "'Rename…'", "'Set as reference'", "'Delay history…'", "'Forget device…'"]) assert.ok(set.includes(t), t);
+  for (const t of ["sec('OUTPUT'", "sec('DELAY'", "'Test sound'", "'Sound / EQ'", "'More ▾'", "'Rename'", "'Set as reference'", "'Delay history'", "'Forget device…'"]) assert.ok(set.includes(t), t);
   assert.match(d, /'Stop using as mic'/); assert.match(d, /'Calibration mic'/);
   const row = d.slice(d.indexOf('function standardRow('), d.indexOf('// ---- 0.2.5: the "Calibration mic" line'));
   assert.doesNotMatch(row, /settingsToggle|cardSettings/, 'Standard rows have no Settings');
@@ -133,7 +133,7 @@ test('0.2.5 C: Settings - Appearance sections are sub-tabs under the main tabs, 
   assert.match(ap, /h\('nav', \{ class: 'appnav subtabs', 'aria-label': 'Appearance sections' \},/);
   assert.match(ap, /class: 'appearance appstack' \}, nav, host\)/);
   assert.doesNotMatch(ap, /appsplit|appnav-h/);
-  const a = await imp('appearance'); assert.deepEqual(a.APP_SUBS.map(x => x[1]), ['Theme', 'Visualizer', 'EQ', 'Now Playing', 'Display size']);
+  const a = await imp('appearance'); assert.deepEqual(a.APP_SUBS.map(x => x[1]), ['Theme', 'Visualizer', 'EQ', 'Now Playing']);   // 0.3.5 J2: Display size lives on the Theme page
   assert.match(st, /cls: 'settings-dlg'/);
   assert.match(css, /dialog\.settings-dlg\{width:min\(1200px,calc\(calc\(100vw \/ var\(--z,1\)\) - 32px\)\)\}/);
   assert.match(css, /\.appnav\.subtabs\{flex-direction:row/);

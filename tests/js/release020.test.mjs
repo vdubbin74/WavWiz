@@ -124,7 +124,7 @@ test('0.2.0 items 10 + 26 + 27 + 28 + 30: three Devices sizes, master on top, mu
   const s = src('devices.js');
   assert.match(s, /'MASTER', h\('span', \{ class: 'mvword' \}, ' VOLUME'\)/);   // 0.3.3 G10: one-line "MASTER" in the slim panel assert.match(s, /'\/zones\/master', \{ set:/); assert.match(s, /mutebtn/);
   assert.match(s, /latencyControl\(\{ label: `\$\{z\.name\} delay`/); /* 0.2.5: the delay slider moved into Settings (approved render v2) */ assert.match(s, /Output unavailable/); assert.match(s, /'\/calibration\/reference', \{ method: 'PUT'/);
-  assert.match(s, /k: 'ref', text: 'REF'/); /* 0.2.5 tag (render v2) */ assert.match(s, /Set as reference/); assert.match(s, /canTune\(S, z\)/); assert.match(s, /Forget device…/); assert.match(s, /Rename…/);
+  assert.match(s, /k: 'ref', text: 'REF'/); /* 0.2.5 tag (render v2) */ assert.match(s, /Set as reference/); assert.match(s, /canTune\(S, z\)/); assert.match(s, /Forget device…/); assert.match(s, /'Rename'/); /* 0.3.5 J9 #3: inline rename */
   assert.doesNotMatch(s, /can \? h\('button'/, 'no control is hidden because of the role');
   const ui = await imp('ui');
   const S = { auth: { role: 'control' }, zones: [{ id: 1, playerId: 'web-1', connected: true, mine: true }, { id: 2, playerId: 'pc', connected: true, mine: false }] };

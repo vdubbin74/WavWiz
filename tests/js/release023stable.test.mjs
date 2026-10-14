@@ -108,7 +108,7 @@ test('0.2.3: Standard rows have no Settings; tapping a device opens Expanded wit
   p = d.devicesPanel(S, c); document.body.append(p.el);
   const rows = p.el.querySelectorAll('.drow');
   assert.equal(rows.length, 2);
-  for (const r of rows) { assert.equal(r.querySelector('.dexpand'), null, 'no Settings button'); assert.equal(r.querySelector('.dsettings'), null); assert.ok(r.querySelector('.dvol input')); assert.ok(r.querySelector('.mutebtn')); assert.ok(r.querySelector('.sw')); }
+  for (const r of rows) { assert.equal(r.querySelector('.dexpand'), null, 'no Settings button'); assert.equal(r.querySelector('.dsettings'), null); assert.ok(r.querySelector('.dvol input')); assert.ok(r.querySelector('.mutebtn')); assert.ok(r.querySelector('.onpill')); }   // 0.3.5 J4: labeled OFF|ON pill
   const r2 = p.el.querySelector('.drow[data-zone-id="2"]');
   for (let i = 1; i <= 10; i++) { push(S, i); p.draw(); }
   assert.equal(p.el.querySelector('.drow[data-zone-id="2"]'), r2, 'rows are patched in place too');
@@ -116,6 +116,6 @@ test('0.2.3: Standard rows have no Settings; tapping a device opens Expanded wit
   assert.equal(p.size, 'expanded');
   const c2 = card(p.el, 2);
   assert.ok(c2, 'its card is shown'); assert.ok(c2.classList.contains('hl'), 'and highlighted');
-  assert.ok(c2.querySelector('.dexpand'), 'one tap from its Settings');
+  assert.ok(c2.querySelector('.dsettings'), '0.3.5 J6: its settings open in place');
   p.el.remove();
 });

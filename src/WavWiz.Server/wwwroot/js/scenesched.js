@@ -3,6 +3,7 @@
 // Run now / Skip next / Snooze / Stop; Admin = everything. The UI checks isAdmin before offering edit actions (the API requires Admin for them).
 import { h, api, toast, dialog, ask } from './util.js';
 import { canControl, isAdmin, adminOnly } from './ui.js';
+import { undoToast } from './settingsui.js';
 
 export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const ACTIONS = [['play', 'Play something'], ['scene', 'Apply a scene'], ['volumes', 'Set volumes'], ['stop', 'Stop playback'], ['all_off', 'All off']];
@@ -172,7 +173,7 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
 }
 
 /** The single editor for alarms and schedules ("What should happen?"). */
-export function openScheduleEditor(S, r, kind, data, done) {
+export function openScheduleEditor(S, r, kind, data, done, host = null, onClose = null) {
   const p = r?.payload || {}; let action = r?.action === 'play_radio' ? 'play' : r?.action || kind || 'play';
   const name = h('input', { type: 'text', maxlength: 60, value: r?.name || (action === 'play' ? 'Wake up' : ''), 'aria-label': 'Name' });
   const time = h('input', { type: 'time', value: r?.time || '07:00', step: 60, 'aria-label': 'Time (server clock)' });
@@ -249,15 +250,30 @@ export function openScheduleEditor(S, r, kind, data, done) {
     fld('What should happen?', segA), fld('Name', name),
     h('div', { class: 'row wrap' }, fld('Time (server clock)', time), fld('Repeat', h('div', { class: 'row wrap' }, short('Weekdays', () => { once = ''; onceIn.hidden = true; days = new Set('12345'); }), short('Every day', () => { once = ''; onceIn.hidden = true; days = new Set('0123456'); }), short('Once', () => { onceIn.hidden = false; if (!onceIn.value) { const t = new Date(Date.now() + 864e5); onceIn.value = t.toISOString().slice(0, 10); } once = onceIn.value; }), onceIn))),
     h('div', { class: 'ss-daygrid', role: 'group', 'aria-label': 'Days' }, dayBtns), hint, fields, sentence);
-  const dd = dialog(r ? (r.alarm ? 'Edit alarm' : 'Edit schedule') : action === 'play' ? 'New alarm' : 'New schedule', form, [], { cls: 'settings-dlg ss-dlg ss-edit' + (phone() ? ' ss-phone' : '') });
-  dd.el.querySelector('header .grow').after(testBtn);
-  const cancel = h('button', { class: 'btn', type: 'button', onclick: () => dd.close() }, 'Cancel');
+  const title = r ? (r.alarm ? 'Edit alarm' : 'Edit schedule') + (host ? `: ${r.name}` : '') : action === 'play' ? 'New alarm' : 'New schedule';
+  let dd;
+  if (host) {   // 0.3.5 J7: inline in the Scenes & Schedules column, in place of the row (or at the top for a new one)
+    let enabled = r ? !!r.enabled : true;
+    const en = h('button', { type: 'button', class: 'onpill' + (enabled ? ' on' : ''), role: 'switch', 'aria-checked': String(enabled), 'aria-label': 'Enabled', onclick: () => { enabled = !enabled; en.classList.toggle('on', enabled); en.setAttribute('aria-checked', String(enabled)); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
+    const del = r ? h('button', { type: 'button', class: 'btn sm danger', onclick: async () => { if (!(await ask('Delete', `Delete “${r.name}”?`, { ok: 'Delete', danger: true }))) return; try { await api(`/schedules/${r.id}`, { method: 'DELETE' }); dd.close(); done?.(); } catch (e) { toast(e.message, true); } } }, 'Delete…') : null;
+    const wrap = h('div', { class: 'card ss-inline ss-edit', role: 'group', 'aria-label': title, 'data-edit': r ? r.id : 'new' },
+      h('div', { class: 'row ss-ih' }, h('b', { class: 'grow' }, title), h('span', { class: 'small dim' }, 'Enabled'), en, testBtn), form,
+      h('div', { class: 'row ss-savebar' }, del, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => dd.close() }, 'Cancel'), save));
+    wrap._enabled = () => enabled;
+    wrap.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('select')) { ev.preventDefault(); ev.stopPropagation(); dd.close(); } });
+    host.replaceChildren(wrap); dd = { el: wrap, close: () => { wrap.remove(); onClose?.(); } };
+  } else {
+    dd = dialog(title, form, [], { cls: 'settings-dlg ss-dlg ss-edit' + (phone() ? ' ss-phone' : '') });
+    dd.el.querySelector('header .grow').after(testBtn);
+    const cancel = h('button', { class: 'btn', type: 'button', onclick: () => dd.close() }, 'Cancel');
+    dd.el.append(h('footer', { class: 'ss-savebar' }, cancel, save));
+  }
   save.addEventListener('click', async () => {
     const b = { name: name.value, time: time.value, days: once ? '' : [...days].sort().join(''), onceDate: once || '', action, payload: payload() };
+    if (dd.el._enabled) b.enabled = dd.el._enabled();
     try { if (r) await api(`/schedules/${r.id}`, { method: 'PUT', body: b }); else await api('/schedules', { method: 'POST', body: b }); dd.close(); done?.(); }
     catch (e) { hint.textContent = 'Not saved: ' + e.message; }
   });
-  dd.el.append(h('footer', { class: 'ss-savebar' }, cancel, save));
   name.addEventListener('input', preview); time.addEventListener('input', preview);
   drawFields(); sync(); loadPick();
   return dd;
@@ -314,4 +330,126 @@ export function sleepChip(S, st) {
   if (!c) { c = h('button', { id: 'sleepchip', class: 'chip sleepchip', type: 'button', onclick: () => openSleep(S) }); (document.querySelector('.np-title,.nowtop,#now') || document.body).append(c); }
   const end = Date.now() + st.remainingSec * 1000; c._end = end; c.textContent = `☾ ${Math.ceil(st.remainingSec / 60)} min`;
   clearInterval(c._iv); c._iv = setInterval(() => { const s = Math.max(0, Math.round((c._end - Date.now()) / 1000)); c.textContent = s > 90 ? `☾ ${Math.ceil(s / 60)} min` : `☾ ${s} s`; if (!s) clearInterval(c._iv); }, 1000);
+}
+
+// ---- 0.3.5 J7: the Scenes & Schedules column of Expanded Devices is THE place to add, edit and delete scenes, schedules and alarms (inline,
+// no windows). "+ New scene", "+ From current setup", "+ Alarm", "+ New schedule" and every ✎ open the editor right here; Run, Skip next and the
+// OFF|ON pill work without opening anything. "Update from current setup" applies at once with Undo. Edit actions stay admin-only (read-only otherwise).
+const pillEl = (on, label, ok, fn) => { const b = h('button', { type: 'button', class: 'onpill' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(!!on), 'aria-label': label, disabled: !ok, title: ok ? '' : 'Only an administrator can change this.', onclick: ev => { ev.stopPropagation(); fn(!on); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON')); if (!ok) b.classList.add('ro'); return b; };
+const pencil = (label, ok, fn) => { const b = h('button', { type: 'button', class: 'btn sm iconsq ss-pen', 'aria-label': label, title: ok ? label : 'Only an administrator can change this.', disabled: !ok, onclick: fn }, '✎'); if (!ok) b.classList.add('ro'); return b; };
+export function sceneRange(sc) { const vols = (sc.members || []).filter(m => m.enabled).map(m => Math.round(m.volume)); return !vols.length ? '' : Math.min(...vols) === Math.max(...vols) ? `${vols[0]}%` : `${Math.min(...vols)}–${Math.max(...vols)}%`; }
+export function scenesColumn(S, { refresh } = {}) {
+  const admin = isAdmin(S), ctlOk = canControl(S), locale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+  const root = h('section', { class: 'ssc-col', 'aria-label': 'Scenes and schedules' });
+  let data = { scenes: [], rows: [], stations: [], now: null, server: null }, editing = null;   // editing: {kind:'scene'|'sched'|'capture', id|null, kind2}
+  const busy = () => !!editing || !!root.querySelector('input:focus,select:focus');
+  async function load(force) {
+    if (!force && busy()) return;
+    try { const [scenes, rows, ck, stations] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock').catch(() => ({})), api('/radio').catch(() => [])]);
+      data = { scenes, rows, now: ck.now, server: ck.server, stations }; } catch { /* offline: keep what we have */ }
+    draw();
+  }
+  root._refresh = () => { if (!busy() && Date.now() - (root._at || 0) > 15000) { root._at = Date.now(); load(); } };
+  const reload = () => { editing = null; load(true); refresh?.(); };
+  function draw() {
+    const next = data.rows.filter(r => r.enabled && r.nextRunAt).sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0];
+    const head = h('div', { class: 'pane-h dsec-h ssc-h' }, h('span', null, 'SCENES & SCHEDULES'), h('span', { class: 'grow' }),
+      h('span', { class: 'small dim ss-clock' }, `Times use the server PC’s clock (${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'})`));
+    const nextBar = next ? h('div', { class: 'ss-next ssc-next' }, h('span', { class: 'grow ell' }, h('b', null, 'Next up: '), `${next.name}, ${whenLabel(next.nextRunAt, data.now, locale)} (${countdown(next.nextRunAt, data.now)})`, h('span', { class: 'dim' }, ' · ' + summary(next, { ...data, zones: S.zones || [] }))),
+      h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => skip(next) }, 'Skip next')) : h('p', { class: 'small dim' }, 'Nothing scheduled.');
+    const sceneHost = h('div', { class: 'ss-cards ssc-scenes' });
+    const btn = (t, fn, cls = 'btn sm') => adminOnly(S, h('button', { class: cls, type: 'button', onclick: fn }, t));
+    const scHead = h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCENES'), h('span', { class: 'dim' }, String(data.scenes.length)), h('span', { class: 'grow' }),
+      btn('+ From current setup', () => { editing = { kind: 'capture' }; draw(); }), btn('+ New scene', () => { editing = { kind: 'scene', id: null }; draw(); }, 'btn sm accent-o'));
+    if (editing?.kind === 'capture') sceneHost.append(captureForm());
+    if (editing?.kind === 'scene' && editing.id == null) sceneHost.append(sceneEditor(null));
+    for (const sc of data.scenes) sceneHost.append(editing?.kind === 'scene' && editing.id === sc.id ? sceneEditor(sc) : sceneRow(sc));
+    if (!data.scenes.length && !editing) sceneHost.append(h('p', { class: 'dim small' }, 'No scenes yet. A scene remembers which speakers are on and how loud they are.'));
+    const rowsHost = h('div', { class: 'ss-rows ssc-rows' });
+    const shHead = h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCHEDULES & ALARMS'), h('span', { class: 'dim' }, String(data.rows.length)), h('span', { class: 'grow' }),
+      btn('+ Alarm', () => openEdit(null, 'play'), 'btn sm accent-o'), btn('+ New schedule', () => openEdit(null, 'scene'), 'btn sm accent-o'));
+    const newHost = h('div', { class: 'ssc-newsched' });
+    rowsHost.append(newHost);
+    const hosts = new Map();
+    for (const r of data.rows) { const x = h('div', { class: 'ssc-slot' }, schedRow(r)); hosts.set(r.id, x); rowsHost.append(x); }
+    if (!data.rows.length) rowsHost.append(h('p', { class: 'dim small' }, 'No schedules yet. Add an alarm to wake up to music, or a schedule to switch scenes.'));
+    const last = data.rows.filter(r => r.lastRunAt).sort((a, b) => b.lastRunAt.localeCompare(a.lastRunAt))[0];
+    root.replaceChildren(head, nextBar, scHead, sceneHost, shHead, rowsHost, last ? h('div', { class: 'small dim ss-foot' }, `Last ran: ${last.name}, ${whenLabel(last.lastRunAt, data.now, locale)} · ${last.lastResult === 'OK' ? 'OK' : (last.lastResult || '')}`) : null);
+    if (editing?.kind === 'sched') { const host = editing.id == null ? newHost : hosts.get(editing.id); const r = data.rows.find(x => x.id === editing.id) || null;
+      if (host) openScheduleEditor(S, r, editing.kind2, data, reload, host, () => { editing = null; draw(); }); }
+  }
+  function openEdit(r, kind) { editing = { kind: 'sched', id: r ? r.id : null, kind2: kind }; draw(); root.querySelector('.ss-inline')?.scrollIntoView?.({ block: 'nearest' }); }
+  function sceneRow(sc) {
+    const on = (sc.members || []).filter(m => m.enabled), used = data.rows.filter(r => r.payload?.sceneId === sc.id).length;
+    const names = on.map(m => (S.zones || []).find(z => z.id === m.deviceId)?.name).filter(Boolean);
+    return h('div', { class: 'card ss-card ssc-scene' + (sc.active ? ' on' : ''), 'data-scene': sc.id },
+      h('button', { type: 'button', class: 'ss-play', 'aria-label': `Run ${sc.name}`, disabled: !ctlOk, onclick: () => runScene(sc) }, '▶'),
+      h('div', { class: 'grow ss-mid' }, h('div', { class: 'row' }, h('b', null, sc.name), sc.active ? h('span', { class: 'tag c dtag zplaying' }, 'ACTIVE') : null),
+        h('div', { class: 'small dim ell', title: names.join(' + ') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${used ? ` · used by ${used} schedule${used === 1 ? '' : 's'}` : ''}`)),
+      h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => runScene(sc) }, 'Run'),
+      pencil(`Edit scene ${sc.name}`, admin, () => { editing = { kind: 'scene', id: sc.id }; draw(); }));
+  }
+  function schedRow(r) {
+    const days = h('span', { class: 'ss-days', 'aria-label': r.onceDate ? 'Once' : 'Days: ' + [...r.days].map(x => DAYS[+x]).join(', ') }, r.onceDate ? h('b', null, 'Once ' + r.onceDate) : DAYS.map((t, i) => r.days.includes(String(i)) ? h('b', null, t[0]) : h('span', null, t[0])));
+    const nxt = !r.enabled ? 'Paused' : r.skippedRunAt && r.skippedRunAt !== r.nextRunAt ? `Skipped · Next ${whenLabel(r.nextRunAt, data.now, locale)}` : r.nextRunAt ? 'Next: ' + whenLabel(r.nextRunAt, data.now, locale) : 'Done';
+    return h('div', { class: 'card ss-row ssc-sched' + (r.enabled ? '' : ' off'), 'data-sched': r.id },
+      h('span', { class: 'ss-tm' }, fmtHm(r.time, locale)),
+      h('div', { class: 'grow ss-mid' }, h('div', { class: 'row' }, h('b', null, r.name), h('span', { class: 'dtag' + (r.alarm ? ' muted' : '') }, r.alarm ? 'ALARM' : 'SCHEDULE')), h('div', { class: 'small dim ell' }, summary(r, { ...data, zones: S.zones || [] }))),
+      h('div', { class: 'ss-when' }, days, h('div', { class: 'small dim' }, nxt)),
+      pillEl(r.enabled, `${r.name} on or off`, admin, async v => { try { await api(`/schedules/${r.id}`, { method: 'PUT', body: { enabled: v } }); load(true); } catch (e) { toast('Could not switch it. ' + e.message, true); } }),
+      pencil(`Edit ${r.name}`, admin, () => openEdit(r)));
+  }
+  function captureForm() {
+    const n = h('input', { type: 'text', maxlength: 60, value: 'Party', 'aria-label': 'Scene name' });
+    const save = async () => { try { await api('/scenes/capture', { method: 'POST', body: { name: n.value } }); toast(`Scene “${n.value.trim()}” saved`); reload(); } catch (e) { toast(e.message, true); } };
+    n.addEventListener('keydown', ev => { if (ev.key === 'Enter') save(); if (ev.key === 'Escape') { editing = null; draw(); } });
+    queueMicrotask(() => { n.focus?.(); n.select?.(); });
+    return h('div', { class: 'card ss-inline ss-capture' }, h('b', null, 'New scene from current setup'), h('p', { class: 'small dim' }, 'Saves which speakers are on and how loud they are right now.'),
+      h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', null, 'Name'), n)), h('div', { class: 'row ss-savebar' }, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { editing = null; draw(); } }, 'Cancel'), h('button', { class: 'btn primary', type: 'button', onclick: save }, 'Save')));
+  }
+  function sceneEditor(sc) {
+    const name = h('input', { type: 'text', maxlength: 60, value: sc?.name || '', placeholder: 'e.g. Dinner party', 'aria-label': 'Scene name' });
+    const iconIn = h('input', { type: 'text', maxlength: 4, value: sc?.icon || '🎛', 'aria-label': 'Icon', class: 'ss-icon' });
+    const members = (S.zones || []).map(z => { const ex = (sc?.members || []).find(m => m.deviceId === z.id); let en = ex ? ex.enabled : sc ? false : z.enabled;
+      const out = h('span', { class: 'mono small ss-pct' }, `${Math.round(ex ? ex.volume : z.volume)}%`);
+      const vol = h('input', { type: 'range', min: 0, max: 100, step: 1, 'data-coarse': 5, value: Math.round(ex ? ex.volume : z.volume), class: 'grow', 'aria-label': `${z.name} volume`, oninput: ev => { out.textContent = ev.target.value + '%'; } });
+      const m = { z, vol, get en() { return en; } };
+      const pill = pillEl(en, `${z.name} in this scene`, true, v => { en = v; pill.classList.toggle('on', v); pill.setAttribute('aria-checked', String(v)); pill.onclick = ev => { ev.stopPropagation(); en = !en; pill.classList.toggle('on', en); pill.setAttribute('aria-checked', String(en)); }; });
+      m.row = h('div', { class: 'row ss-mem' }, h('span', { class: 'ss-mn ell' }, z.name), pill, vol, out); return m; });
+    const err = h('span', { class: 'small err', role: 'status' });
+    const body = () => ({ name: name.value, icon: iconIn.value, members: members.map(m => ({ deviceId: m.z.id, enabled: m.en, volume: +m.vol.value })) });
+    const save = async () => { try { if (sc) await api(`/scenes/${sc.id}`, { method: 'PUT', body: body() }); else await api('/scenes', { method: 'POST', body: body() }); toast('Scene saved'); reload(); } catch (e) { err.textContent = 'Not saved: ' + e.message; } };
+    const el = h('div', { class: 'card ss-inline ss-sceneedit', role: 'group', 'aria-label': sc ? `Edit scene ${sc.name}` : 'New scene', 'data-edit': sc ? sc.id : 'new' },
+      h('div', { class: 'row ss-ih' }, h('b', { class: 'grow' }, sc ? `Edit scene: ${sc.name}` : 'New scene')),
+      h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Icon'), iconIn)),
+      h('div', { class: 'row' }, h('span', { class: 'dlbl grow' }, 'SPEAKERS & VOLUMES'), h('button', { type: 'button', class: 'btn sm', onclick: () => { for (const m of members) { m.vol.value = String(Math.round(m.z.volume)); m.vol.dispatchEvent(new Event('input')); } } }, 'Use current volumes')),
+      members.length ? members.map(m => m.row) : h('p', { class: 'small dim' }, 'No speakers yet.'), err,
+      h('div', { class: 'row ss-savebar' }, sc ? h('button', { type: 'button', class: 'btn sm danger', onclick: () => delScene(sc) }, 'Delete…') : null, sc ? h('button', { type: 'button', class: 'btn sm', onclick: () => dupScene(sc) }, 'Duplicate') : null,
+        sc ? h('button', { type: 'button', class: 'btn sm', title: 'Replace this scene with the speakers and volumes playing now', onclick: () => updateFromNow(sc) }, 'Update from current setup') : null,
+        h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { editing = null; draw(); } }, 'Cancel'), h('button', { class: 'btn primary', type: 'button', onclick: save }, 'Save')));
+    el.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); editing = null; draw(); } });
+    return el;
+  }
+  async function runScene(sc) { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`${sc.name} is on`); load(true); refresh?.(); } catch (e) { toast('The scene could not run. ' + e.message, true); } }
+  // J9 #6: no confirm window - the scene is updated at once, Undo puts the old speakers and volumes back
+  async function updateFromNow(sc) {
+    const before = { name: sc.name, icon: sc.icon, members: (sc.members || []).map(m => ({ deviceId: m.deviceId, enabled: m.enabled, volume: m.volume })) };
+    try { await api('/scenes/capture', { method: 'POST', body: { name: sc.name, id: sc.id } }); reload();
+      undoToast(`“${sc.name}” now uses the current speakers and volumes.`, async () => { await api(`/scenes/${sc.id}`, { method: 'PUT', body: before }); load(true); }); }
+    catch (e) { toast(e.message, true); }
+  }
+  async function dupScene(sc) { try { await api('/scenes', { method: 'POST', body: { name: (sc.name + ' copy').slice(0, 60), icon: sc.icon, members: sc.members } }); reload(); } catch (e) { toast(e.message, true); } }
+  async function delScene(sc) {
+    if (!(await ask('Delete scene', `Delete the scene “${sc.name}”?`, { ok: 'Delete', danger: true }))) return;
+    try { await api(`/scenes/${sc.id}`, { method: 'DELETE' }); reload(); }
+    catch (e) {
+      if (e.status !== 409) return toast(e.message, true);
+      if (await ask('Scene in use', `${e.message} Delete it anyway? Those schedules will stop applying a scene.`, { ok: 'Delete anyway', danger: true })) { try { await api(`/scenes/${sc.id}?force=true`, { method: 'DELETE' }); reload(); } catch (e2) { toast(e2.message, true); } }
+    }
+  }
+  async function skip(r) { try { const x = await api(`/schedules/${r.id}/skip`, { method: 'POST' }); toast(x.skipped ? `Skipping the next “${r.name}”` : `“${r.name}” runs as usual`); load(true); } catch (e) { toast(e.message, true); } }
+  root._open = what => { if (what === 'alarm') openEdit(null, 'play'); else if (what === 'scene') { editing = { kind: 'scene', id: null }; draw(); } else if (what === 'schedule') openEdit(null, 'scene'); };
+  if (typeof window !== 'undefined' && window.addEventListener) { const on = () => { if (root.isConnected) load(); }; window.addEventListener('wavwiz:schedules', on); window.addEventListener('wavwiz:sleep', on); }
+  draw(); root._at = Date.now(); load(true);
+  return root;
 }

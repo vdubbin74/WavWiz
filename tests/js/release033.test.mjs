@@ -16,7 +16,7 @@ test('G1: popup width = the live center column (zoom-corrected, fallback, viewpo
   assert.equal(centerPopupWidth(1250, 1000, 1920, 1.25), 1000, 'a zoomed rect is brought back to CSS px');
   assert.equal(centerPopupWidth(0, 0, 1920, 1), 1140, 'center hidden: both-panels-open width');
   assert.ok(centerPopupWidth(5000, 5000, 1280, 1) <= 1248);
-  assert.match(src('main.js'), /centerPopupWidth\(r\.width, nowc\.el\.offsetWidth/); assert.match(src('main.js'), /wavwiz:uiscale', centerW/);
+  assert.match(src('main.js'), /popupWidth\(window\.screen\?\.availWidth/);   /* 0.3.5 J1 */ assert.match(src('main.js'), /wavwiz:uiscale', centerW/);
   assert.match(css, /max-width:var\(--centerw/);
 });
 test('G2/G2b: previews at true width, scaled down, one per row, clipped', async () => {
@@ -51,7 +51,7 @@ test('G6-G10: Speakers wording, output line, groups, highlight, zone on, slim ro
   assert.deepEqual(d.speakerGroups(zs, gs).unassigned.map(z => z.id), [3]); assert.deepEqual(d.speakerGroups(zs, []).unassigned, []);
   assert.deepEqual([...d.zoneHighlight(gs, 9)], [1, 2]); assert.equal(d.zoneHighlight(gs, 'all'), null);
   assert.equal(d.zoneOn(zs, gs[0]), true); assert.equal(d.zoneOn(zs, { deviceIds: [2, 3] }), false);
-  const s = src('devices.js'); assert.match(s, /'\+ Add to zone'/); assert.match(s, /' · not in any zone'/); assert.match(s, /reconcile\(emain, \[zcol, scol, sscol\]\)/);
+  const s = src('devices.js'); assert.match(s, /'\+ Add to zone'/); assert.match(s, /' · not in any zone'/); assert.match(s, /reconcile\(emain, \[sscol, zcol, scol\]\)/   /* 0.3.5 J5 B */);
   assert.match(s, /ro\(h\('button', \{ type: 'button', class: 'btn sm saddzone'[^]*isAdmin\(S\)\)/, 'Add to zone is read-only for non-admins');
   assert.match(css, /\.devpanel \.dvol\{display:grid!important;grid-template-columns:minmax\(0,1fr\) 38px 28px/);
   assert.match(css, /\.dexp-main\.e1\{display:grid!important;grid-template-columns:340px minmax\(0,1fr\) 330px/);

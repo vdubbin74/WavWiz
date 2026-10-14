@@ -1,7 +1,7 @@
 ; WavWiz (BETA) installer. Compile:  ISCC /DAppVersion=0.0.4 /DDistDir=<dist> /DRepoDir=<repo> /DOutDir=<out> installer\WavWiz.iss   (build\make-installer.ps1 does this; works under Wine)
 ; FULL self-contained installer only: the target PCs have no .NET. There is no slim / framework-dependent variant.
 #ifndef AppVersion
-  #define AppVersion "0.3.4"
+  #define AppVersion "0.3.5"
 #endif
 #ifndef RepoDir
   #define RepoDir ".."

@@ -104,18 +104,18 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   for (const t of ['File', 'Library', 'Playback', 'Devices', 'Help']) assert.match(m, new RegExp(`'${t}'`));
   assert.doesNotMatch(m, /'View'|'Theme…'|'Visualizer…'|'Display size'|'Radio finder'|\['Playlist',/);
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
-  assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Queue', 'Rescan folders', 'Tidy up library', 'Tag & cover fix…', 'CD ripper…']);
-  assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Internet radio', 'Sound / EQ…', 'Start Jukebox…']);
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes & Schedules…', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player…', 'Away-from-home…']);   // 0.3.0 §5: one window
-  assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', 'Diagnostics', "What's new", 'About WavWiz…']);
+  assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists', 'Radio', 'Queue', 'Rescan folders', 'CD ripper', 'Tag & cover fix', 'Tidy up library']   /* 0.3.5 J16 menus */);
+  assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Sound / EQ', 'Sleep timer', 'Start Jukebox…']);   // 0.3.5 J16
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Scenes, schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16
+  assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', "What's new", 'Diagnostics', 'About WavWiz']);   // 0.3.5 J16
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
-  assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n\];/);   // 0.3.0 §7: General/Playback/Jukebox tabs
-  assert.doesNotMatch(st, /'about'|id: 'sec-status'/);
+  assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n/   /* 0.3.5 J9 adds Access, Diagnostics, About */);   // 0.3.0 §7: General/Playback/Jukebox tabs
+  assert.doesNotMatch(st, /id: 'sec-status'/);   // 0.3.5 J9 #1: About is a Settings section again (it was a popup)
   assert.match(dg, /id: 'sec-status'/);
-  assert.match(ap, /const pages = \{ theme, viz, eq: eqs, np, display: disp \}/);   // 0.2.2 T2: one sub-section at a time
+  assert.match(ap, /const pages = \{ theme: themePage, viz, eq: eqs, np, display: themePage \}/);   // 0.3.5 J2: Display size is on the Theme page
   assert.match(st, /panes\.library\.push\(libViewCard\(\)\);/);
   for (const t of ["'Default view'", "'Tile size'", "'Default sort'", "'Remember view per tab'", "'Reset to defaults'", "'wavwiz:libprefs'"]) assert.ok(st.includes(t), t);
-  assert.match(main, /\[\['mine', 'My stations'\], \['finder', 'Radio finder'\]\]/);
+  assert.match(src('radiotab.js'), /My stations/); assert.match(src('radiotab.js'), /radiofinder/);   // 0.3.5 J9: the Radio tab shows My stations + the finder side by side
   assert.doesNotMatch(main, /\['finder', 'Finder'\]/);
 });
 
@@ -145,7 +145,7 @@ test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song l
   const n = src('now.js');
   assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
-  assert.match(n, /h\('div', \{ class: 'np-vol' \}, eqBtn\)\)\)/);
+  assert.match(n, /class: 'np-vol' \}, eqBtn/);   // 0.3.5 J8: the Sleep button sits next to it
 });
 
 test('0.2.1 F12: three EQ looks over the same DSP; LED bars default; ±12 dB in 0.5 dB steps; keys/drag/wheel; glow 50 % default; Save asks a name', async () => {
@@ -166,7 +166,7 @@ test('0.2.1 F12: three EQ looks over the same DSP; LED bars default; ±12 dB in 
   const v = src('eqview.js'), e = src('eq.js'), ap = src('appearance.js');
   assert.match(v, /role: 'slider'/); assert.match(v, /addEventListener\('wheel'/); assert.match(v, /setPointerCapture/); assert.match(v, /ArrowLeft' \|\| ev\.key === 'ArrowRight'/);
   assert.match(v, /dbToFrac\(r\.db\[k\] - pg\)/, 'the curve overlay shows the EQ shape (pre-gain added back)');
-  assert.match(e, /\/dsp\/preview/); assert.match(e, /\/dsp\/response/); assert.match(e, /'Save as a new preset'/); assert.doesNotMatch(e, /'aria-label': 'Preset name', oninput/);
+  assert.match(e, /\/dsp\/preview/); assert.match(e, /\/dsp\/response/); assert.match(e, /Save as a new preset/); assert.doesNotMatch(e, /'aria-label': 'Preset name', oninput/);
   for (const t of ["'Auto pre-gain'", "'Loudness'", "'Limiter'", "'Bypass'", "'Flat'", "'Revert'", "'Save & use on this speaker'", "'Previewing live'"]) assert.ok(e.includes(t), t);
   assert.match(ap, /'EQ style'/); assert.match(ap, /interactive: false/);
   assert.match(src('viz.js'), /export function spectrumTap\(onFrame\)/);
@@ -250,7 +250,7 @@ test('0.2.1 F18 + F19: Calibrate + Test sound live in each card\'s own settings 
   // 0.2.3 U12: the ••• flip became a chevron Expand control that opens the settings below the card face, in place
   assert.match(face, /open \? cardSettings\(S, ctl, z\) : null/); assert.match(face, /settingsToggle\(z\.name, open, flip\)/); assert.doesNotMatch(d, /•••'/);   // 0.2.5 (render v2): a 'More ▾' menu inside Settings is back by design
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
-  for (const t of ["'OUTPUT'", "'DELAY'", "'Calibrate'", "'Test sound'", "'Sound / EQ'", "'More ▾'", "'Delay history…'", "connSection(z)", "'Rename…'", "'Forget device…'", "'Set as reference'", "exactDelay(", "measuredNote(cur)"]   /* 0.2.5 Settings per render v2 (by ear lives in Calibrate) */) assert.ok(set.includes(t), t);
+  for (const t of ["'OUTPUT'", "'DELAY'", "'Calibrate'", "'Test sound'", "'Sound / EQ'", "'More ▾'", "'Delay history'", "connSection(z)", "'Rename'", "'Forget device…'", "'Set as reference'", "exactDelay(", "measuredNote(cur)"]   /* 0.2.5 Settings per render v2 (by ear lives in Calibrate) */) assert.ok(set.includes(t), t);
   assert.doesNotMatch(d, /openZone|zone\.js|'Details…'/);
   assert.throws(() => src('zone.js'), /ENOENT/, 'the pop-up module is removed');
   assert.match(css, /\.dsettings\{/);

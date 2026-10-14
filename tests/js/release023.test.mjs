@@ -203,7 +203,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   assert.match(d, /if \(ev\.key === 'Escape' && openSet\.has\(z\.id\)/);
   // admin-only items stay visible, read-only for others
   const set = d.slice(d.indexOf('function cardSettings('), d.indexOf('async function delayHistory('));
-  assert.match(set, /item\('Rename…', \(\) => rename\(S, ctl, z\), admin, ADMIN_HINT\)/); assert.match(set, /item\('Forget device…', \(\) => forget\(ctl, z\), admin, ADMIN_HINT, 'danger'\)/);   // 0.2.5: in More ▾
+  assert.match(set, /item\('Rename', \(\) => rename\(S, ctl, z, wrap\), admin, ADMIN_HINT\)/);   /* 0.3.5 J9 #3 */ assert.match(set, /item\('Forget device…', \(\) => forget\(ctl, z\), admin, ADMIN_HINT, 'danger'\)/);   // 0.2.5: in More ▾
   assert.match(set, /ro\(h\('button'/);
   // themed like the panel expand arrows; the chevron flips; rounded 4-6 px
   assert.match(src('icons.js'), /chevD: '<path d="M6 9l6 6 6-6"\/>'/);
@@ -212,7 +212,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   // the Standard rows keep only name, status, volume, Mute and on/off; tapping the name opens Expanded with that card highlighted
   assert.doesNotMatch(row, /settingsToggle|cardSettings|escCloses|dexpand/);
   assert.match(row, /onclick: \(\) => openDevice\(z\.id\)/);
-  assert.match(d, /(?:standardRow|slimRow)\(S, ctl, z, id => ctl\.setDevSize\?\.\('expanded', id\)\)/);   // 0.3.3 G10: slimRow wraps standardRow
+  assert.match(d, /(?:standardRow|slimRow|card3)\(S, ctl, z, (?:\{ slim: true, openDevice: )?id => (?:\{ setCardOpen\(id, true\); )?ctl\.setDevSize\?\.\('expanded', id\)/);   // 0.3.3 G10: slimRow wraps standardRow
   assert.doesNotMatch(css, /\.drow[^{]*\.(dexpand|dexp-l|dsettings)|\.drow\.dset/);
 });
 
