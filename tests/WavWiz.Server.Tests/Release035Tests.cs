@@ -80,4 +80,22 @@ public class Release035Tests
         Assert.Equal(1, await Left("guest-aaaa-1"));
         var host = await admin.GetJson("/api/v1/jukebox/board"); Assert.Equal(JsonValueKind.Null, host.GetProperty("playsLeft").ValueKind);
     }
+
+    [Fact]
+    public async Task J10_decade_node_holds_every_song_of_that_decade_only()
+    {
+        var f = await ServerFixture.StartAsync(); await using var _ = f; var admin = f.As(f.Token(Role.Admin));
+        var dir = Directory.CreateDirectory(Path.Combine(f.Dir.Path, "music")).FullName;
+        int[] years = { 1989, 1990, 1995, 1999, 2000 };
+        for (int i = 0; i < years.Length; i++) TestMedia.Tone(Path.Combine(dir, $"{i}.flac"), 5, 440, $"Song {i}", "Band", "Album " + i, 1, "Rock", years[i]);
+        await admin.PostAsJsonAsync("/api/v1/library/roots", new { path = dir });
+        for (int i = 0; i < 200; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() == years.Length) break; await Task.Delay(100); }
+        var rows = f.Server.S.Library.ByDecade(1990);
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(f.Server.S.Library.ByDecade(1995).Count, rows.Count);   // any year inside the decade means the decade
+        Assert.Single(f.Server.S.Library.ByDecade(1980)); Assert.Single(f.Server.S.Library.ByDecade(2000));
+        var id = (await (await admin.PostAsJsonAsync("/api/v1/playlists", new { name = "90s" })).Json()).GetProperty("id").GetInt64();
+        (await admin.PostAsJsonAsync($"/api/v1/playlists/{id}/items", new { kind = "node", node = "decade:1990s" })).EnsureSuccessStatusCode();
+        Assert.Equal(3, (await admin.GetJson($"/api/v1/playlists/{id}")).GetProperty("items").GetArrayLength());
+    }
 }
