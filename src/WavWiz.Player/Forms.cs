@@ -324,6 +324,29 @@ public sealed class MiniPlayerForm : Form
         }
         catch { Close(); }
     }
+    /// <summary>0.3.5 J17: the mini player's right-click menu. Transparency presets apply at once (real window transparency: Form.Opacity on the
+    /// whole layered window) and are saved; the page is told so its own slider and Settings stay in step.</summary>
+    private void ShowMenu()
+    {
+        var m = new ContextMenuStrip();
+        var tr = new ToolStripMenuItem("Transparency");
+        foreach (var pct in new[] { 100, 90, 80, 70, 60, 50, 40, 30 })
+        {
+            var it = new ToolStripMenuItem(pct == 100 ? "100 % (solid)" : $"{pct} %") { Checked = Math.Abs(_set.MiniOpacity - pct / 100.0) < 0.026 };
+            it.Click += (_, _) => { var v = MiniPlayer.ClampOpacity(pct / 100.0); Opacity = v; _set.MiniOpacity = v; _set.Save(); Post(new { cmd = "opacity", value = v }); };
+            tr.DropDownItems.Add(it);
+        }
+        m.Items.Add(tr);
+        var top = new ToolStripMenuItem("Keep on top") { Checked = TopMost };
+        top.Click += (_, _) => { TopMost = !TopMost; _set.MiniPinned = TopMost; _set.Save(); Post(new { cmd = "pin", on = TopMost }); };
+        m.Items.Add(top);
+        m.Items.Add(new ToolStripSeparator());
+        m.Items.Add("Open the full app", null, (_, _) => _openFull());
+        m.Items.Add("Close", null, (_, _) => Close());
+        m.Closed += (_, _) => BeginInvoke(new Action(() => m.Dispose()));
+        m.Show(Cursor.Position);
+    }
+    private void Post(object o) { try { _web.CoreWebView2?.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(o)); } catch { } }
     private void OnMessage(string json)
     {
         try
@@ -334,7 +357,12 @@ public sealed class MiniPlayerForm : Form
                 case "drag": ReleaseCapture(); SendMessage(Handle, 0xA1 /* WM_NCLBUTTONDOWN */, (IntPtr)2 /* HTCAPTION */, IntPtr.Zero); Remember(); break;
                 case "pin": TopMost = r.TryGetProperty("on", out var on) && on.GetBoolean(); _set.MiniPinned = TopMost; _set.Save(); break;
                 case "ready": if (r.TryGetProperty("pinned", out var p)) { TopMost = p.GetBoolean() || _set.MiniPinned; } if (r.TryGetProperty("opacity", out var o0) && o0.TryGetDouble(out var ov0)) { _set.MiniOpacity = MiniPlayer.ClampOpacity(ov0); _set.Save(); } break;
-                case "opacity": if (r.TryGetProperty("value", out var o) && o.TryGetDouble(out var ov)) { var v = MiniPlayer.ClampOpacity(ov); Opacity = v; if (v < 1) { _set.MiniOpacity = v; _set.Save(); } } break;   // 0.3.3 G4b (1.0 while hovered is not saved)
+                case "opacity":   // 0.3.3 G4b; 0.3.5 J17: "save" carries the chosen value (100 % too), "value" what to show now (solid while hovered)
+                    if (r.TryGetProperty("value", out var o) && o.TryGetDouble(out var ov)) { Opacity = MiniPlayer.ClampOpacity(ov); }
+                    if (r.TryGetProperty("save", out var sv) && sv.TryGetDouble(out var svv)) { var keep = MiniPlayer.ClampOpacity(svv); if (Math.Abs(keep - _set.MiniOpacity) > 0.001) { _set.MiniOpacity = keep; _set.Save(); } }
+                    else if (r.TryGetProperty("value", out var o1) && o1.TryGetDouble(out var ov1) && ov1 < 1) { _set.MiniOpacity = MiniPlayer.ClampOpacity(ov1); _set.Save(); }
+                    break;
+                case "menu": ShowMenu(); break;   // 0.3.5 J17: right-click menu with a labeled Transparency submenu
                 case "full": _openFull(); break;
                 case "close": Close(); break;
             }

@@ -32,3 +32,9 @@ html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);
 .mp.slim .mp-a,.mp.slim .mp-vol,.mp.slim .mp-pin,.mp.slim .mp-op,.mp.slim .mp-seek span{display:none}
 .mp.slim .mp-ctl{width:auto}
 .mp.slim .mp-side{grid-template-columns:24px 24px}
+/* 0.3.5 J17: labeled transparency row (replaces the volume slider while open) */
+.mp-oprow{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.mp-oprow[hidden]{display:none}
+.mp-oprow .mp-opl{font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--accent2-text,var(--accent2));white-space:nowrap}
+.mp-oprow input{flex:1;min-width:40px}
+.mp-oprow .mp-opv{font-size:11px;font-variant-numeric:tabular-nums;width:32px;text-align:right}

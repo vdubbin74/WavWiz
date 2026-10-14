@@ -14,6 +14,7 @@ import { eqArea, eqLockBox } from './eqview.js';
 import { flatEq } from './eq.js';
 import { thisDevice, canControl } from './ui.js';
 import { gridEl, pgCard, markGrid, whileVisible } from './pgrid.js';
+import { OPACITY_MIN, loadOpacity, saveOpacity, clampOpacity } from './minifit.js';
 
 const prevHead = (title, extra) => h('div', { class: 'npprev-h' }, h('span', { class: 'npprev-live' }, h('i', { 'aria-hidden': 'true' }), 'LIVE PREVIEW'), extra != null ? h('span', { class: 'small dim' }, extra) : null, h('span', { class: 'grow' }), h('span', { class: 'npprev-ex' }, title || 'EXAMPLE DATA'));
 
@@ -188,7 +189,8 @@ const SUB_KEY = 'wavwiz.appsub';
  *  panel's Looks button opens Visualizer); otherwise the last one used in this session, else Theme. `opts.preview` builds the F9 strip. */
 export function appearancePane(opts = {}) {
   const theme = themeCard(), viz = vizCard(), np = npStyleCard(null, opts.S || null, opts.npThumb || null), eqs = eqStyleCard(opts.S || null), disp = displaySizeCard();
-  const themePage = { el: h('div', { class: 'apptheme' }, theme.el, disp.el), reload: () => { theme.reload?.(); disp.reload(); }, hide: () => theme.hide?.() };
+  const mini = miniCard();
+  const themePage = { el: h('div', { class: 'apptheme' }, theme.el, disp.el, mini.el), reload: () => { theme.reload?.(); disp.reload(); mini.reload(); }, hide: () => theme.hide?.() };
   const pages = { theme: themePage, viz, eq: eqs, np, display: themePage };
   let saved = null; try { saved = sessionStorage.getItem(SUB_KEY); } catch { /* ignore */ }
   let cur = opts.looks ? 'viz' : (pages[opts.section] ? opts.section : (pages[saved] ? saved : 'theme'));
@@ -213,4 +215,17 @@ export function appearancePane(opts = {}) {
   const hide = () => { viz.hide(); eqs.hide(); np.hide?.(); };
   const resume = () => { if (cur === 'viz') viz.reload(); else if (cur === 'eq') eqs.reload(); };
   return { el, hide, resume, select, current: () => cur, theme, viz: { ...viz, reload: resume }, np, eqs, disp };
+}
+
+/** 0.3.5 J17: Settings > Appearance > Theme: the mini player's window transparency (the mini player follows at once; in WavWiz Player it is real
+ *  window transparency). Same value as the mini player's own Transparency control and right-click menu. */
+export function miniCard() {
+  const val = h('span', { class: 'mono small' }), sl = h('input', { type: 'range', min: OPACITY_MIN, max: 100, step: 5, 'aria-label': 'Mini player transparency (opacity)', class: 'grow',
+    oninput: () => { const v = clampOpacity(+sl.value); val.textContent = v + '%'; saveOpacity(v); } });
+  const reload = () => { const v = loadOpacity(); sl.value = String(v); val.textContent = v + '%'; };
+  reload();
+  const el = h('div', { class: 'card appsec minicard', 'data-sec': 'mini' }, h('h3', null, 'Mini player'),
+    h('div', { class: 'row' }, h('label', { class: 'grow' }, 'Transparency'), sl, val),
+    h('p', { class: 'small dim' }, '100% is solid. Lower values let you see what is behind the mini player; it changes live while you move the slider. Also in the mini player: right-click › Transparency.'));
+  return { el, reload };
 }

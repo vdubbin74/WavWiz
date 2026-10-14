@@ -185,7 +185,10 @@ export function openKiosk(S) {
     q('.jbr-col.b').replaceChildren(...[0, 1, 2, 3, 4].map(i => { const p = more[i]; return strip('dim', 'B' + (i + 1), p ? `${p.title} · ${p.artist}` : ''); }));
     const qi = q('.jbr-qr img'); if (qi.getAttribute('src') !== qrSrc()) qi.src = qrSrc(); q('.jbr-qr small').textContent = joinUrl;
   }
-  function fit() { const k = Math.min(innerWidth / 980, innerHeight / 551); root.style.setProperty('--k', String(k)); }
+  // 0.3.5 J14: both styles are fixed 16:9 stages scaled to the screen. The page zoom (Display size) is taken out first, so a TV or PC at any
+  // size, resolution or pixel ratio gets a stage that fills it (Retro 980 x 551, Modern 1920 x 1080).
+  function fit() { const f = root.clientWidth > 0 ? stageFit(root.clientWidth, root.clientHeight) : stageFit(innerWidth, innerHeight, Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1);   // the stage's own CSS px: right whatever the zoom support
+    root.style.setProperty('--k', String(f.retro)); root.style.setProperty('--k2', String(f.modern)); root.style.setProperty('--kd', String(Math.max(1, f.modern))); }
   function draw() {
     const b = board; if (!b) return;
     const isRetro = b.style === 'retro';
@@ -195,7 +198,8 @@ export function openKiosk(S) {
     if (isRetro) { loadPicks().then(() => board === b && drawRetro(b)); drawRetro(b); } else drawModern(b);
   }
   async function refresh() { try { const [st, b] = await Promise.all([api('/jukebox'), api('/jukebox/board')]); if (!st.running) { closeKiosk(); return; } code = st.code; board = b; draw(); } catch { /* keep the last picture */ } }
-  root.append(bg, mod, ret, logo, chips);
+  const stage = h('div', { class: 'jb-stage' }, mod, logo, chips);   // 0.3.5 J14
+  root.append(bg, stage, ret);
   document.body.append(root); document.body.classList.add('jb-kiosk');
   fit(); addEventListener('resize', fit);
   api('/jukebox/join').then(j => { joinUrl = j.url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''); draw(); }).catch(() => {});
@@ -207,4 +211,6 @@ export function openKiosk(S) {
   refresh(); iv = setInterval(refresh, 1000);
   kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
 }
+/** 0.3.5 J14: scale factors for the two stages from the window size in device px and the page zoom (pure). */
+export function stageFit(w, hgt, z = 1) { const W = w / (z || 1), H = hgt / (z || 1); return { retro: Math.min(W / 980, H / 551), modern: Math.min(W / 1920, H / 1080) }; }
 export function closeKiosk() { const k = kiosk; kiosk = null; k?.close(); }

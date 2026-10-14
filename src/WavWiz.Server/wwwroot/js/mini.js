@@ -36,19 +36,30 @@ const close = h('button', { type: 'button', class: 'mp-b mp-x', 'aria-label': 'C
 if (!host) { pin.disabled = true; pin.title = 'Keep on top works in the WavWiz Player window'; }
 // 0.3.3 G4b: window transparency - 100 % (opaque) by default, 30 % minimum, solid while the pointer is over the window, remembered.
 // The Opacity button swaps the bottom slider between Volume and Opacity (back to Volume after 6 s without a change).
-let opac = loadOpacity(); let opMode = false, opT = 0;
-const opSl = h('input', { type: 'range', class: 'mp-opsl', min: OPACITY_MIN, max: 100, value: opac, 'aria-label': 'Window opacity', title: 'Window opacity', hidden: true,
-  oninput: () => { opac = clampOpacity(+opSl.value); saveOpacity(opac); applyOpacity(); armOp(); } });
+// 0.3.5 J17: the transparency control is labeled ("Transparency 70 %"), it is also in the right-click menu (WavWiz Player: a real menu with
+// presets; browser: the same labeled slider) and in Settings > Appearance; the window keeps the chosen transparency while it is being adjusted
+// (it no longer turns solid under the pointer then, so the change is visible live), and every change is saved, 100 % too.
+let opac = loadOpacity(); let opMode = false, opT = 0, adjusting = false;
+const opVal = h('span', { class: 'mp-opv', 'aria-live': 'polite' }, opac + '%');
+const opSl = h('input', { type: 'range', class: 'mp-opsl', min: OPACITY_MIN, max: 100, value: opac, 'aria-label': 'Window transparency (opacity)', title: 'Transparency: how solid the mini player is',
+  oninput: () => { adjusting = true; setOpac(+opSl.value); armOp(); }, onchange: () => { adjusting = false; armOp(); } });
+const opRow = h('label', { class: 'mp-oprow', hidden: true }, h('span', { class: 'mp-opl' }, 'Transparency'), opSl, opVal);
 const opBtn = b('mp-op', 'opacity', 'Window transparency', () => setOpMode(!opMode));
 const armOp = () => { clearTimeout(opT); opT = setTimeout(() => setOpMode(false), 6000); };
-function setOpMode(on) { opMode = on; vol.hidden = on; opSl.hidden = !on; opBtn.classList.toggle('on', on); opBtn.setAttribute('aria-pressed', String(on)); if (on) { opSl.value = String(opac); armOp(); } else clearTimeout(opT); }
+export function setOpac(v, save = true) { opac = clampOpacity(v); opSl.value = String(opac); opVal.textContent = opac + '%'; if (save) saveOpacity(opac); applyOpacity(); }
+function setOpMode(on) { opMode = on; vol.hidden = on; opRow.hidden = !on; opBtn.classList.toggle('on', on); opBtn.setAttribute('aria-pressed', String(on)); if (on) { opSl.value = String(opac); opVal.textContent = opac + '%'; armOp(); } else clearTimeout(opT); applyOpacity(); }
 let hover = false;
-export function applyOpacity() { const v = hover ? 100 : opac; if (!send('opacity', { value: v / 100 })) root.style.opacity = String(v / 100); else root.style.opacity = ''; }
+/** 0.3.5 J17: solid under the pointer only when nobody is adjusting the transparency (pure). */
+export const shownOpacity = (opacPct, { hover: hv = false, adjusting: adj = false } = {}) => (hv && !adj ? 100 : opacPct);
+export function applyOpacity() { const v = shownOpacity(opac, { hover, adjusting: adjusting || opMode }); if (!send('opacity', { value: v / 100, save: opac / 100 })) root.style.opacity = String(v / 100); else root.style.opacity = ''; }
 document.documentElement.addEventListener('mouseenter', () => { hover = true; applyOpacity(); }); document.documentElement.addEventListener('mouseleave', () => { hover = false; applyOpacity(); });
 window.addEventListener('blur', () => { if (!document.hasFocus()) { hover = false; applyOpacity(); } });
-const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute), h('div', { class: 'mp-vol' }, vol, opSl));
+window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.mini.opacity') setOpac(loadOpacity(), false); });   // Settings > Appearance changed it
+document.addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });
+const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute), h('div', { class: 'mp-vol' }, vol, opRow));
 root.append(art, txt, ctl, h('div', { class: 'mp-side' }, pin, full, opBtn, close));
 applyOpacity();
+host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'opacity' && Number.isFinite(+m.value)) setOpac(Math.round(+m.value * 100)); if (m.cmd === 'pin') { pinned = !!m.on; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } paintPin(); } });
 
 // drag by the art or empty space (never by a control)
 root.addEventListener('mousedown', ev => { if (ev.button !== 0 || ev.target.closest('button,input')) return; send('drag'); });

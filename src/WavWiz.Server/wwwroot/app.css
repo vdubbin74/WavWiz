@@ -2142,3 +2142,30 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .desk.libexpanded .libpanel .tile .gblock.j10 .galb{display:none}
   .desk.libexpanded .libpanel .tile .gblock.j10 .gname{font-size:18px;background:none;padding:0;margin:0;text-shadow:0 1px 3px color-mix(in srgb,var(--bg) 85%,transparent)}
 }
+/* ---- 0.3.5 J12: one look everywhere - every on/off control is the same labeled OFF | ON pill (checkbox switches, div switches, card pills),
+   one section-heading style, 3 px corners, and the playlist table states (header, hover, selected, playing, drop line) from the theme ---- */
+:root{--pill-on:var(--accent);--pill-on-ink:var(--accent-ink);--pill-off:var(--panel2);--pill-bg:var(--bg)}
+.switch{width:58px!important;height:20px!important}
+.switch span,.settings-dlg .switch span{display:flex!important;border-radius:3px!important;background:var(--pill-bg)!important;border:1px solid var(--line)!important;overflow:hidden;transition:none}
+.switch span::before,.switch span::after,.settings-dlg .switch span::after{content:"OFF";position:static!important;flex:1;display:grid!important;place-items:center;width:auto!important;height:auto!important;transform:none!important;border-radius:0!important;font-size:9px;font-weight:800;letter-spacing:.04em;line-height:1}
+.switch span::before{background:var(--pill-off);color:var(--ink)}
+.switch span::after,.settings-dlg .switch span::after{content:"ON";background:transparent!important;color:var(--dim)}
+.switch input:checked+span,.settings-dlg .switch input:checked+span{background:var(--pill-bg)!important;border-color:var(--line)!important}
+.switch input:checked+span::before{background:transparent;color:var(--dim)}
+.switch input:checked+span::after,.settings-dlg .switch input:checked+span::after{background:var(--pill-on)!important;color:var(--pill-on-ink)}
+.switch input:disabled+span{opacity:.6}
+.sw{width:58px!important;height:20px!important;display:inline-flex;overflow:hidden;background:var(--pill-bg)!important;border-color:var(--line)!important;border-radius:3px}
+.sw::before,.sw::after{content:"OFF";position:static!important;flex:1;display:grid;place-items:center;width:auto!important;height:auto!important;border-radius:0!important;font-size:9px;font-weight:800;letter-spacing:.04em;transition:none}
+.sw::before{background:var(--pill-off);color:var(--ink)} .sw::after{content:"ON";background:transparent!important;color:var(--dim)}
+.sw.on::before{background:transparent;color:var(--dim)} .sw.on::after{background:var(--pill-on)!important;color:var(--pill-on-ink)}
+.onpill{height:20px;min-width:58px} .onpill span{flex:1;justify-content:center}
+.onpill.on .op-on{background:var(--pill-on);color:var(--pill-on-ink)} .onpill:not(.on) .op-off{background:var(--pill-off);color:var(--ink)}
+.btn,.chip,.tag,.dtag,input,select,textarea,.card,dialog,.mpanel,.menu-pop{border-radius:3px}
+.pane-h>span:first-child,.dlbl,.ss-t,.sec{letter-spacing:.06em}
+.qtable th{color:var(--accent2-text,var(--accent2));background:var(--panel2);border-bottom:1px solid var(--line)}
+.qtable td{border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+.qtable tr:hover td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.qtable tr.sel td{background:color-mix(in srgb,var(--accent2) 16%,transparent)}
+.qtable tr.cur td{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-text,var(--accent))}
+.qtable td.num{color:var(--dim)}
+.qins{background:var(--accent);box-shadow:0 0 6px var(--accent)}

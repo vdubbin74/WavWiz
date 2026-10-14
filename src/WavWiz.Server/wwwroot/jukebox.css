@@ -230,3 +230,42 @@
 .jbpm-join>div{display:flex;flex-direction:column;gap:6px;align-items:flex-end} .jbpm-join b{font-size:17px} .jbpm-join code{color:var(--accent2-text,var(--accent2));font-size:13px} .jbpm-join small{color:var(--dim);font-size:11px}
 .jbpm-join .jbpv-qr{width:126px;height:126px;background-size:14px 14px}
 @media (max-width:700px){.jbcards{grid-template-columns:1fr}}
+
+/* ---- 0.3.5 J14: the Modern big screen is a fixed 1920 x 1080 (16:9) stage scaled to fill any screen (1080p, 1440p, 4K, TV browsers with odd
+   pixel ratios); every size below is in stage px, so fonts, QR and covers grow with the screen. Retro keeps its 980 x 551 stage. ---- */
+.jb-stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform:translate(-50%,-50%) scale(var(--k2,1));transform-origin:50% 50%;z-index:1}
+.jb-stage .jbm{position:absolute;inset:0}
+.jb-stage .jb-logo{font-size:20px} .jb-stage .jb-logo b{font-size:30px}
+.jb-stage .jb-chip{font-size:20px;padding:7px 14px}
+.jb-stage .jb-prog{height:8px} .jb-stage .jb-prog>b{width:18px;height:18px;margin:-9px 0 0 -9px}
+.jb-dlg>*{transform:scale(var(--kd,1));transform-origin:50% 50%}
+.jb.retro .jb-stage .jb-chips{display:none}
+.jb-stage .jb-logo{position:absolute;top:21.6px;left:38.4px;z-index:3;background:none;border:0;color:var(--dim);font-size:13px;cursor:default;padding:6px;text-align:left;line-height:1.2}
+.jb-stage .jb-chips{position:absolute;top:21.6px;right:38.4px;z-index:3;display:flex;gap:8px}
+.jb-stage .jbm{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1fr);gap:43.2px 153.6px;padding:129.6px 38.4px 54.0px 76.8px;box-sizing:border-box}
+.jb-stage .jb-left{display:flex;flex-direction:column;justify-content:flex-start;gap:13.0px;min-width:0;position:relative}
+.jb-stage .jb-disc{position:relative;width:403.2px;aspect-ratio:1}
+.jb-stage .jb-kick{color:var(--accent-text,var(--accent));font-size:20.5px;letter-spacing:.12em;font-weight:700;margin-top:21.6px}
+.jb-stage .jb-title{font-size:58.3px;font-weight:800;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
+.jb-stage .jb-artist{color:var(--accent2-text,var(--accent2));font-size:32.4px}
+.jb-stage .jb-by{color:var(--hl-text,var(--hl));font-weight:700;font-size:30.2px}
+.jb-stage .jb-prog{position:relative;height:5px;background:var(--line);border-radius:3px;margin-top:21.6px;max-width:648.0px}
+.jb-stage .jb-times{max-width:648.0px;font-family:var(--mono,ui-monospace),monospace}
+.jb-stage .jb-times small{color:var(--ink)!important;font-size:21.6px}
+.jb-stage .btn.jb-big{min-height:108.0px;font-size:43.2px;border-radius:var(--btn-radius);cursor:pointer;border:1px solid var(--accent);margin-top:25.9px;max-width:648.0px;display:flex;align-items:center;justify-content:center}
+.jb-stage .jb-right{display:flex;flex-direction:column;gap:54.0px;min-width:0;justify-content:space-between}
+.jb-stage .jb-next{background:color-mix(in srgb,var(--panel) 70%,transparent);border:1px solid var(--line);border-radius:var(--radius);padding:17.3px 30.7px}
+.jb-stage .jb-next h2{display:flex;justify-content:space-between;align-items:center;font-size:21.6px;letter-spacing:.14em;color:var(--dim);margin:0 0 15.1px}
+.jb-stage .jb-nrow{display:flex;gap:23.0px;align-items:center;padding:10.8px 0;border-top:1px solid var(--line)}
+.jb-stage .jb-nrow .n{width:1.6em;color:var(--dim);text-align:center;font-weight:700;font-size:28.1px}
+.jb-stage .jb-th{width:82.1px;height:82.1px;border-radius:var(--radius);object-fit:cover;background:var(--panel2);flex:none;display:inline-block}
+.jb-stage .jb-nrow .jb-t b{font-size:31.3px}
+.jb-stage .jb-nrow .jb-t small{display:block;color:var(--dim);font-size:23.8px}
+.jb-stage .jb-join{display:flex;gap:38.4px;align-items:center;justify-content:flex-end;text-align:right}
+.jb-stage .jb-jtxt{display:flex;flex-direction:column;gap:10.8px;align-items:flex-end}
+.jb-stage .jb-jtxt b{font-size:32.4px}
+.jb-stage .jb-join img{width:249.6px;aspect-ratio:1;background:var(--jr-c24);padding:8px;border-radius:var(--radius)}
+.jb-stage .jb-join code{color:var(--accent2-text,var(--accent2));font-size:23.8px}
+.jb-stage .jb-logo{font-size:20px} .jb-stage .jb-logo b{font-size:30px}
+.jb-stage .jb-chip{font-size:20px;padding:7px 14px} .jb-stage .jb-chips{gap:12px}
+.jb-stage .jb-prog{height:8px} .jb-stage .jb-prog>b{width:18px;height:18px;margin:-9px 0 0 -9px}
