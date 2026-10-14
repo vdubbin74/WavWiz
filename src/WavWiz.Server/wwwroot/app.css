@@ -2130,7 +2130,7 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .desk.libexpanded.libdev .devpanel .devbody{display:block!important;overflow:auto}
   .desk.libexpanded.libdev .devpanel .devexp{display:none!important}
   .desk.libexpanded.libdev .listpanel{visibility:hidden!important}
-  .desk.libexpanded .libpanel .tilegrid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))!important}
+  .desk.libexpanded .libpanel .tilegrid{grid-template-columns:repeat(auto-fill,132px)!important;justify-content:start}
 }
 .tile .t3{margin-top:3px} .tile .tcount{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:3px;border:1px solid var(--accent);color:var(--accent-text,var(--accent))}
 .qins[data-label]::after{content:attr(data-label);position:absolute;right:6px;top:-16px;font-size:11px;font-weight:700;color:var(--accent-text,var(--accent));background:var(--panel);padding:0 4px;border-radius:3px;white-space:nowrap}
