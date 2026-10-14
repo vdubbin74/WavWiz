@@ -49,7 +49,7 @@ export function appPreview() {
   const caption = () => { const t = loadTheme(); const n = t.preset !== 'custom' && PRESETS[t.preset] ? PRESETS[t.preset].name : 'Custom colors'; name.textContent = n; cap.textContent = `Recolors as you hover or pick. Move away to go back to ${n}.`; };
   /** Show theme p in the preview only (null = back to the active theme). */
   function hover(p) {
-    for (const k of Object.keys(derive(PRESETS.default))) app.style.removeProperty(k);
+    for (const k of [...Object.keys(derive(PRESETS.default)), '--amber', '--red', '--green']) app.style.removeProperty(k);
     if (p) { for (const [k, v] of Object.entries(derive(p))) app.style.setProperty(k, v); name.textContent = p.name + ' - preview'; } else caption();
   }
   caption();

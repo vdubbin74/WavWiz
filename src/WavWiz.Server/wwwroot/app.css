@@ -2176,3 +2176,11 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .dc3:not(.dset) .dc3l2 .btn,.dc3:not(.dset) .dc3l2 button{height:14px;min-height:0;padding:0 6px;font-size:10px;line-height:12px}
 .dc3:not(.dset) .dc3l3{height:18px;display:flex;align-items:center} .dc3:not(.dset) .dc3l3 .vbar,.dc3:not(.dset) .dc3l3 .vbar input{height:18px;min-height:0}
 .dc3:not(.dset) .dc3l3 button{height:18px;width:18px;min-height:0;padding:0} .dc3:not(.dset) .dc3l3 .pct{line-height:18px}
+/* ---- 0.3.5 Pepecoin brand-only status colors: theme.js sets --amber/--red to copper and --green to the primary; warning/MUTED/danger/OK follow them (no yellow) ---- */
+:root[data-theme=pepecoin] .err{color:var(--red)}
+:root[data-theme=pepecoin] :is(.pill.warn,.chip.warn,.badge.uncalibrated,.badge.recheck){border-color:var(--amber);color:var(--amber)}
+:root[data-theme=pepecoin] .pill.bad{border-color:var(--red);color:var(--red)}
+:root[data-theme=pepecoin] :is(.pill.ok,.badge.synced){border-color:var(--green);color:var(--green)}
+:root[data-theme=pepecoin] .np-spk .dot.warn{background:var(--amber);box-shadow:0 0 5px var(--amber)}
+:root[data-theme=pepecoin] :is(.np-spk .dot.bad,.pm-status .dot.bad){background:var(--red);box-shadow:0 0 5px var(--red)}
+:root[data-theme=pepecoin] .pm-status .dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}

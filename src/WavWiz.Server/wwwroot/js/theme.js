@@ -71,7 +71,9 @@ export function derive(t) {
   // 0.3.0 §7.11: secondary text stays as quiet as before but never under 4.5:1; Pepecoin text/fill pairs come from its brand kit only
   let dim = mix(ink, bg, 0.42); for (let k = 0.42; k > 0 && !surf.every(sf => contrast(dim, sf) >= 4.5); k -= 0.02) dim = mix(ink, bg, Math.max(0, k));
   const pal = t.preset === 'pepecoin' || t.brand ? [bg, '#FFFFFF', ink] : null;
+  const pepe = t.preset === 'pepecoin';   // 0.3.5: Pepecoin status colors from the brand kit only (warning/MUTED/danger = copper, OK = primary)
   return {
+    ...(pepe ? { '--amber': '#C07A4E', '--red': '#C07A4E', '--green': '#269B4D' } : {}),
     '--lock-red': t.preset === 'pepecoin' ? '#C07A4E' : 'var(--red)',   // 0.3.2 F19: Lock EQ on = the theme's danger red; Pepecoin uses its copper
     '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl, pal), '--bg': bg,
     '--panel': panel, '--panel2': panel2, '--line': mix(bg, toward, light ? 0.18 : 0.2),
@@ -113,6 +115,7 @@ export function resetTheme() { try { localStorage.removeItem(KEY); } catch { /* 
 
 export function applyTheme(t) {
   const vars = derive(t), st = document.documentElement.style;
+  for (const k of ['--amber', '--red', '--green']) st.removeProperty(k);   // 0.3.5: Pepecoin-only overrides do not leak into other themes
   for (const [k, v] of Object.entries(vars)) st.setProperty(k, v);
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t.bg);
   document.documentElement.dataset.theme = t.preset || 'custom';
