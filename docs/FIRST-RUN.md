@@ -87,7 +87,7 @@ Menus do things, Settings sets things:
 - **Devices:** Devices & zones, Scenes & Schedules…, Calibrate speakers…, Phone role… (on a phone), Use as remote only, Pair a player…, Away-from-home…
 - **Help:** Getting started, Diagnostics, What's new, About WavWiz…
 
-**Settings** has seven tabs: **General** (including Backup), **Appearance**, **Playback** (crossfade), **Devices** (sub-tabs **Players & access** and **Calibration**), **Library**, **Network** and **Jukebox**. Use the search box in the header to jump to an option. Changes save right away (a **Saved ✓** appears next to them); every section has **Reset this section**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme**, **Visualizer**, **EQ**, **Now Playing** and **Display size**. On a large screen Settings grows to about 1200 px wide, so the previews have room. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll; Display size has no preview because the whole app changes as you pick. Appearance choices apply to the device you are using.
+**Settings** has seven tabs: **General** (including Backup), **Appearance**, **Playback** (crossfade), **Devices** (sub-tabs **Players & access** and **Calibration**), **Library**, **Network** and **Jukebox**. Use the search box in the header to jump to an option. Changes save right away (a **Saved ✓** appears next to them); every section has **Reset this section**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme** (which includes **Display size**), **Visualizer**, **EQ** and **Now Playing**. Settings and every other window have the same fixed width as the center panel; content scrolls inside. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll. Appearance choices apply to the device you are using.
 
 **Lock EQ:** the Sound (EQ) window and **Appearance → EQ** have a **Lock EQ** checkbox. When it is checked, the EQ sliders ignore the mouse wheel, dragging, clicks and keys, so scrolling the page never changes the sound. Each device remembers it (off by default; unlocked, the wheel fine-tunes a slider in 0.5 dB steps). **Appearance → EQ** shows this speaker's real EQ and always opens locked; uncheck it to make changes, which are saved to the speaker's own preset.
 
@@ -97,7 +97,7 @@ Want just the playback controls in a small window? Choose **Devices → Mini pla
 
 ### Max-volume lock
 
-An admin can give any device a **max volume** in its Settings and lock it. While it is locked, nothing raises that device above the cap: not the master volume, a zone, a scene, schedule or alarm, the mini player or the API. Turning it down always works. A small padlock shows by the device's volume bar.
+An admin can give any device a **max volume** in its Settings and lock it. While it is locked, nothing raises that device above the cap: not the master volume, a zone, a scene, schedule or alarm, the mini player or the API. Turning it down always works. Setting a cap locks it. A capped bar shows a marker at the limit and stops there.
 
 ### Jukebox (beta)
 
@@ -105,7 +105,7 @@ An admin can give any device a **max volume** in its Settings and lock it. While
 
 ### Alarms, sleep timer and crossfade
 
-**Devices → Scenes & Schedules…** holds scenes, schedules and alarms (beta) in one window, with the server's clock in the header and a **Sleep timer** button. Crossfade is in **Settings → Playback** (0–12 s, off by default).
+**Devices → Scenes & Schedules…** opens Expanded Devices, where the Scenes & Schedules column holds scenes, schedules and alarms (beta); create and edit them right there. The **Sleep** button is in Now Playing. Crossfade is in **Settings → Playback** (0–12 s, off by default).
 
 ### Backup
 

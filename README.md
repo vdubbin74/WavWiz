@@ -20,7 +20,7 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Screenshots
 
-![WavWiz main window with the library, Now Playing, three connected devices and the playlist](docs/img/wavwiz-main.png)
+![WavWiz main window with the library, the 10-band EQ, Now Playing, four connected devices and the playlist](docs/img/wavwiz-main.png)
 
 | Device settings, opened in place | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 | Phone (browser) | Add a music folder |
 | --- | --- |
-| ![WavWiz Now Playing on a phone](docs/img/wavwiz-phone.png) | ![Settings, Music folders with a network folder being added](docs/img/wavwiz-settings-library.png) |
+| ![WavWiz Devices on a phone, with four devices playing in sync](docs/img/wavwiz-phone.png) | ![Settings, Music folders with a network folder being added](docs/img/wavwiz-settings-library.png) |
 
 **Visualizers**
 
@@ -55,7 +55,7 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 ## Features
 
 - **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. Every browser that opens WavWiz joins as a speaker by itself. No sync measurements are published yet.
-- **Devices, zones and scenes** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. In the Expanded Devices view, each device card opens its settings in place: sound check, exact delay, Sound / EQ, audio output, connection, Rename, Set as reference, and Forget. The normal Devices list stays compact; tap a device's name to jump to its card. Expanded, the Devices panel shows three columns: **Zones** (optional groups such as “Downstairs”, each with one volume bar, Mute and an on/off switch for all its speakers), **Speakers** (grouped by zone, with an Unassigned group and **+ Add to zone**), and **Scenes & Schedules**. Revoking a device removes it everywhere at once; it has to pair again.
+- **Devices, zones and scenes** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. In the Expanded Devices view, each device card opens its settings in place: sound check, exact delay, Sound / EQ, audio output, connection, Rename, Set as reference, and Forget. The normal Devices list stays compact; tap a device's name to jump to its card. Expanded, the Devices panel shows three columns: **Scenes & Schedules** (create and edit scenes, schedules and alarms right there), **Zones** (optional groups such as “Downstairs”, each with one volume bar, Mute and an OFF | ON switch for all its speakers), and **Speakers** on the right (grouped by zone, with an Unassigned group and **+ Add to zone**). Revoking a device removes it everywhere at once; it has to pair again.
 - **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers and Wi-Fi PCs line up instead of echoing between devices; on PCs the delay is kept per audio output. **Calibrate speakers** measures it with the microphone of a WavWiz Player PC (USB, headset or built-in mic; recommended), or with your phone as the microphone (scan a QR code; a mic-only page, needs the one-time HTTPS setup), or by ear. The music pauses while it measures. *Beta: phone-mic calibration on iPhone may not show the microphone prompt yet; use the PC mic for now.*
 - **AirPlay, built in** — The server appears as the AirPlay speaker **WavWiz – Whole House**. Send audio from apps on iPhone, iPad, or Mac; it plays on every device in sync, with title and artwork on Now Playing.
 - **Optional Spotify Connect** — Off by default. Turn it on in Settings → Network; WavWiz appears in Spotify’s device list and streams to every device. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
@@ -68,9 +68,9 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 - **Control without playing** — Any phone, browser or PC can control the music without playing it: just leave its speaker switched off.
 - **Mini player** — WavWiz Player opens a small window with cover, title, seek bar, previous / play / next, mute and volume. Pin it on top, make it slim, or make it see-through (solid again on hover).
 - **Playlist drag and drop** — Reorder songs (Ctrl/Shift multi-select, Ctrl+Z to undo) and drop songs, albums or folders from the Library right where you want them.
-- **Max-volume lock** — An admin can cap any device's volume and lock it; nothing raises it above the cap (master, zones, scenes, alarms, the API).
+- **Max-volume lock** — An admin can cap any device's volume and lock it; nothing raises it above the cap (master, zones, scenes, alarms, the API). A capped bar shows a marker at the limit.
 - **Add to home screen** — On a phone or tablet, add WavWiz to the home screen to open it like an app, full screen with its own icon.
-- **Alarms (beta), sleep timer, crossfade** — One Scenes & Schedules window: alarms with fade-in, snooze and skip, a sleep timer with fade-out, and optional crossfade (off by default; never inside an album).
+- **Alarms (beta), sleep timer, crossfade** — Alarms with fade-in, snooze and skip in the Scenes & Schedules column of Expanded Devices, a Sleep button in Now Playing with fade-out, and optional crossfade (off by default; never inside an album).
 - **Backup and restore** — One file with settings, playlists, scenes, alarms, EQ presets and device names; no passwords or certificates in it.
 - **Admin mode** — File → Sign in as admin… unlocks house settings on any paired device without signing out; admin-only items are read-only (never hidden) for everyone else.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.

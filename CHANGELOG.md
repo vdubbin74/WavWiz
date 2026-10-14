@@ -12,6 +12,22 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.5] - 2026-10-14 (beta)
+- Expanded Devices: Scenes & Schedules, Zones and Speakers side by side, with Speakers anchored on the right where they sit in the normal view. A speaker card opens in place to change its output, max volume, delay, EQ and name.
+- Scenes, schedules and alarms are created and edited right in the Scenes & Schedules column; the Devices menu items open it (the separate window remains only on phones).
+- Device cards: name with a labeled OFF | ON switch, one row of status tags, and the volume bar with mute. Zones use the same card.
+- Max-volume lock fixed: setting a cap now locks it, and a capped bar shows a marker at the limit and stops there.
+- Sleep timer is a button in Now Playing.
+- Fewer popups: Playlists and Radio are Library tabs; CD ripper, Tag & cover fix and Tidy up library are tabs in the expanded Library; many small windows became inline. Every remaining window has the same fixed width.
+- The playlist stays on the right while the Library is expanded, so songs can be dropped exactly where you want; the drop label shows the dragged count.
+- Library Genres and Years tiles use artwork from the active theme colors with legible counts, at a smaller fixed tile size; years are grouped by decade.
+- Display size moved into Settings > Appearance > Theme.
+- One consistent look: shared window chrome, headings, tabs, buttons, labeled ON/OFF switches and tags in every theme, including the playlist table. The Pepecoin theme uses brand-kit colors only (copper replaces yellow and red).
+- Jukebox: starts with an empty playlist and restores yours when it stops; plays random filler from the library until a guest picks (guest picks always come first); guests see how many plays they have left; the big screen scales to fill any TV, including 4K.
+- WavWiz Player tray menu: Start Jukebox… / Stop Jukebox….
+- Mini player: a clearly labeled transparency control (slider, Settings and the Player right-click menu) with a live preview.
+- Not yet confirmed on real hardware: tray Jukebox, mini player window transparency, 4K in TV built-in browsers, and the plays-left counter with several phones at once.
+
 ## [0.3.4] - 2026-10-13 (beta)
 - Installable web app: home-screen icon and iOS/Android home-screen support, a full web app manifest (192 px and maskable icons), and a versioned service worker that never caches the API or live connections; a new version replaces the old one.
 - Playlist numbers 10 and up no longer wrap.
