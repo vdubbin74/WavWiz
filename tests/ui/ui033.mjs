@@ -133,9 +133,11 @@ if (want('g12')) await step('g12', async () => {
 
 if (want('g14')) await step('g14', async () => {
   await home(); await clean(); await p.evaluate(async () => { const m = await import('/js/main.js'); m.go?.('eq'); }); await p.waitForTimeout(400);
-  if (!(await p.locator('dialog[open] [data-eqglow]').count())) { await p.locator('.topbar button', { hasText: /Sound/ }).first().click().catch(() => {}); await p.waitForTimeout(1500); }
-  if (!(await p.locator('dialog[open] [data-eqglow]').count())) { await p.locator('text=Playback').first().click(); await p.locator('text=Sound / EQ').first().click(); await p.waitForTimeout(1500); }
-  const sl = p.locator('dialog[open] [data-eqglow]').first();
+  if (!(await p.locator('[data-eqglow]:visible').count())) { await p.locator('.topbar button', { hasText: /Sound/ }).first().click().catch(() => {}); await p.waitForTimeout(1500); }
+  if (!(await p.locator('[data-eqglow]:visible').count())) { await p.locator('text=Playback').first().click(); await p.locator('text=Sound / EQ').first().click(); await p.waitForTimeout(1500); }
+  // 0.3.5: desktop Playback > Sound / EQ is the center EQ panel (no glow there); the glow slider lives in Settings > Appearance > EQ
+  if (!(await p.locator('[data-eqglow]:visible').count())) { await closeDlg(p); await p.evaluate(async () => (await import('/js/main.js')).go('settings:eq')); await p.waitForTimeout(1500); }
+  const sl = p.locator('[data-eqglow]:visible').first();
   if (!(await sl.count())) { ok('G14 glow slider found', false); return; }
   await sl.evaluate(e => { window.__g14 = e; e.value = 0; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }); await p.waitForTimeout(500);
   const b = await sl.boundingBox(); await p.mouse.move(b.x + 3, b.y + b.height / 2); await p.mouse.down();
