@@ -87,3 +87,20 @@ export function blockColors(name) {
   const hue = x % 360, h2 = (hue + 28 + (x >>> 9) % 30) % 360;
   return [`hsl(${hue} 68% 46%)`, `hsl(${h2} 72% 30%)`];
 }
+
+/** 0.3.5 J10: genre / year tile art from the active theme only - a pattern (waves, bars, dots, rings), which theme color leads, and the
+ * gradient mix, all deterministic from the name (a genre keeps its look on every device; the colors follow the theme). Pure. */
+export const TILE_PATTERNS = ['waves', 'bars', 'dots', 'rings'];
+export function tileSpec(name) {
+  let x = 2166136261 >>> 0; for (const ch of String(name ?? '')) x = Math.imul(x ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return { pattern: TILE_PATTERNS[x % 4], lead: (x >>> 3) % 2 ? 2 : 1, mix: 34 + (x >>> 5) % 22, seed: x };
+}
+/** 0.3.5 J10: "24 songs · 2 albums" (pure). */
+export const tileCount = n => `${n.tracks} song${n.tracks === 1 ? '' : 's'} · ${n.albums} album${n.albums === 1 ? '' : 's'}`;
+/** 0.3.5 J10: years grouped by decade (newest first unless the list is ascending), keeping the given order inside a decade. Pure. */
+export function byDecade(rows) {
+  const out = []; let cur = null;
+  for (const r of rows) { const y = +r.name; const d = Number.isFinite(y) && y > 0 ? Math.floor(y / 10) * 10 : null; const k = d == null ? 'Unknown' : `${d}s`;
+    if (!cur || cur.key !== k) { cur = { key: k, rows: [] }; out.push(cur); } cur.rows.push(r); }
+  return out;
+}

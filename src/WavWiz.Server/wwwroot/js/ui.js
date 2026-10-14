@@ -65,7 +65,12 @@ export async function pickPlaylist(S, ref, title = 'Add to playlist') {
 }
 
 /** Makes a row work everywhere: click = open/play (caller), "..." = menu, right-click = menu, long-press on touch = menu, drag (desktop) = add to a playlist/queue. */
-export function attachItem(S, el, ref, title, { menu = [], more = true } = {}) {
+/** 0.3.5 J11: what is being dragged from the Library (the playlist's drop line says "Drop here: 17 songs at #4"). */
+export const dragInfo = { count: null, title: '', kind: '' };
+export const songsLabel = n => `${n} song${n === 1 ? '' : 's'}`;
+/** "Drop here: 17 songs at #4" (pure; no count known -> "Drop here at #4"). */
+export const dropLabel = (count, at) => `Drop here${count != null ? ': ' + songsLabel(count) : ''} at #${at + 1}`;
+export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '' } = {}) {
   const openMenu = () => {
     if (!canControl(S)) return toast('Your access is view-only, so you can browse but not play.', false);
     sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, ...menu]);
@@ -73,7 +78,12 @@ export function attachItem(S, el, ref, title, { menu = [], more = true } = {}) {
   if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(); } }, '⋯'));
   el.addEventListener('contextmenu', ev => { ev.preventDefault(); openMenu(); });
   longPress(el, openMenu);
-  if (canControl(S)) { el.draggable = true; el.addEventListener('dragstart', ev => { ev.dataTransfer.setData(MIME, JSON.stringify(ref)); ev.dataTransfer.setData('text/plain', title); ev.dataTransfer.effectAllowed = 'copy'; el.classList.add('dragging'); }); el.addEventListener('dragend', () => el.classList.remove('dragging')); }
+  if (canControl(S)) { el.draggable = true; el.addEventListener('dragstart', ev => { ev.dataTransfer.setData(MIME, JSON.stringify(ref)); ev.dataTransfer.setData('text/plain', title); ev.dataTransfer.effectAllowed = 'copy'; el.classList.add('dragging');
+    const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.count = n; dragInfo.title = title; dragInfo.kind = kind;
+    // 0.3.5 J11: a small ghost - title, kind · N songs, and a count badge
+    try { const g = h('div', { class: 'dragghost' }, h('div', { class: 'dg-t' }, h('b', { class: 'ell' }, title), h('span', { class: 'small dim' }, [kind, n != null ? songsLabel(n) : null].filter(Boolean).join(' · '))), n != null ? h('span', { class: 'dgbadge' }, String(n)) : null);
+      document.body.append(g); ev.dataTransfer.setDragImage?.(g, 14, 14); setTimeout(() => g.remove(), 0); } catch { /* old browsers: default ghost */ } });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragInfo.count = null; dragInfo.title = ''; }); }
   return el;
 }
 

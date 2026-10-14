@@ -1,5 +1,5 @@
 import { h, fmtDur, fmtTime } from './util.js';
-import { canControl, MIME } from './ui.js';
+import { canControl, MIME, dragInfo, dropLabel } from './ui.js';
 import { api, toast } from './util.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
@@ -20,7 +20,9 @@ export function listTable(S, ctl) {
   const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse the playlist', 'aria-expanded': 'true', title: 'Collapse the playlist', onclick: () => ctl.listStep ? ctl.listStep('down') : ctl.toggleList?.() }, '˅');
   const setState = st => { const a = { up: st !== 'expanded', down: st !== 'collapsed' }; upBtn.hidden = !a.up; colBtn.hidden = !a.down; colBtn.setAttribute('aria-expanded', String(st !== 'collapsed')); };
   const setCollapsed = c => setState(c === true ? 'collapsed' : c === false ? 'open' : c);
-  const head = h('div', { class: 'pane-h' }, title, meta, btns, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
+  // 0.3.5 J11: while the Library is expanded the playlist is the right-hand column; "Devices ›" swaps the Devices panel in (and back)
+  const devSwap = h('button', { type: 'button', class: 'btn sm libswap', title: 'Show the Devices panel here instead of the playlist', onclick: () => ctl.libSwap?.(true) }, 'Devices ›');
+  const head = h('div', { class: 'pane-h' }, title, meta, btns, devSwap, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Playlist' }, head, wrap);
   /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
   const setNextBlock = el => { head.insertBefore(el, meta); };
@@ -95,6 +97,7 @@ export function listTable(S, ctl) {
     const boxes = rowBoxes(), t = dropIndex(boxes, ev.clientY), wr = wrap.getBoundingClientRect();
     const y = boxes.length ? (t < boxes.length ? boxes[t].top : boxes[boxes.length - 1].bottom) : wr.top + 24;
     insLine.hidden = false; insLine.style.top = (y - wr.top + wrap.scrollTop - 1) + 'px'; insLine.dataset.at = String(t);
+    insLine.dataset.label = ev.dataTransfer.types.includes(QMIME) ? `Move here: #${t + 1}` : dropLabel(dragInfo.count, t);   // 0.3.5 J11: the dragged count ("17 songs")
     scrollV = edgeScroll(ev.clientY, wr.top, wr.bottom); if (scrollV && !scrollT) scrollT = requestAnimationFrame(tick);
   });
   wrap.addEventListener('dragleave', ev => { if (!wrap.contains(ev.relatedTarget)) { clearIns(); stopScroll(); } });

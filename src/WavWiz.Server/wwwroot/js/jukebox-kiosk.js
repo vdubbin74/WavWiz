@@ -47,21 +47,34 @@ export function jukeboxChip(S, st) {
   if (!c) { c = h('button', { id: 'jbchip', class: 'chip jbchip', type: 'button', onclick: () => hostControls(S) }); (document.querySelector('.topbar .grow') || document.body).after(c); }
   c.textContent = st.locked ? '♫ Jukebox on · locked' : '♫ Jukebox on';
 }
+/** 0.3.5 J9 #13: Jukebox host controls are a small panel that drops down from the "Jukebox on" chip (no window). Ban guest and Stop Jukebox keep their confirms. */
 async function hostControls(S) {
-  let b; try { b = await api('/jukebox/board'); } catch (e) { toast(e.message, true); return; }
-  const ctl = canControl(S);
-  const rows = b.next.map(x => h('div', { class: 'row jbhost' }, h('span', { class: 'grow' }, x.title, x.by ? h('small', { class: 'jb-by' }, ' · ' + x.by) : null),
-    h('button', { class: 'btn', disabled: !ctl, onclick: async () => { await api('/queue/move', { method: 'POST', body: { from: x.index, to: b.next[0].index } }).catch(e => toast(e.message, true)); d.close(); hostControls(S); } }, 'Pin next'),
-    h('button', { class: 'btn', disabled: !ctl, onclick: async () => { await api(`/queue/${x.index}`, { method: 'DELETE' }).catch(e => toast(e.message, true)); d.close(); hostControls(S); } }, 'Remove'),
-    x.guest ? h('button', { class: 'btn danger', disabled: !ctl, onclick: async () => { if (await ask('Ban this guest', `Stop requests from ${x.by || 'this guest'}?`, { ok: 'Ban', danger: true })) { await api('/jukebox/ban', { method: 'POST', body: { guest: x.guest } }).catch(e => toast(e.message, true)); toast('Banned.'); } } }, 'Ban') : null));
-  const d = dialog('Jukebox', h('div', null,
-    h('div', { class: 'row' },
-      h('button', { class: 'btn', disabled: !ctl, onclick: async () => { await api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } }); d.close(); } }, b.locked ? 'Unlock queue' : 'Lock queue'),
-      h('button', { class: 'btn', onclick: () => { d.close(); openKiosk(S); } }, 'Open big screen')),
-    h('h3', null, 'Up next'), rows.length ? rows : h('p', { class: 'small' }, 'Nothing queued yet.')), [
-    { text: 'Stop Jukebox', cls: 'danger', keep: true, onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); d.close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } },
-    { text: 'Close' },
-  ]);
+  const old = document.querySelector('.jbpanel'); if (old) { old._close(); return; }
+  const chip = document.getElementById('jbchip'); const ctl = canControl(S);
+  const panel = h('div', { class: 'jbpanel mpanel', role: 'group', 'aria-label': 'Jukebox' });
+  const out = ev => { if (!panel.contains(ev.target) && !chip?.contains(ev.target) && !ev.target.closest?.('dialog')) close(); }, esc = ev => { if (ev.key === 'Escape' && !document.querySelector('dialog[open]')) close(); };
+  function close() { panel.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); }
+  panel._close = close;
+  async function draw() {
+    let b; try { b = await api('/jukebox/board'); } catch (e) { toast(e.message, true); close(); return; }
+    const act = async (fn) => { try { await fn(); } catch (e) { toast(e.message, true); } draw(); };
+    const rows = b.next.map(x => h('div', { class: 'row jbhost' }, h('span', { class: 'grow ell' }, x.title, x.by ? h('small', { class: 'jb-by' }, ' · ' + x.by) : null, x.filler ? h('small', { class: 'dim' }, ' · filler') : null),
+      h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/queue/move', { method: 'POST', body: { from: x.index, to: b.next[0].index } })) }, 'Pin next'),
+      h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api(`/queue/${x.index}`, { method: 'DELETE' })) }, 'Remove'),
+      x.guest ? h('button', { class: 'btn sm danger', disabled: !ctl, onclick: async () => { if (await ask('Ban this guest', `Stop requests from ${x.by || 'this guest'}?`, { ok: 'Ban', danger: true })) act(async () => { await api('/jukebox/ban', { method: 'POST', body: { guest: x.guest } }); toast('Banned.'); }); } }, 'Ban guest') : null));
+    panel.replaceChildren(
+      h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Jukebox'), h('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Close', onclick: close }, '✕')),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } })) }, b.locked ? 'Unlock queue' : 'Lock queue'),
+        h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),
+        h('button', { class: 'btn sm danger', onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } }, 'Stop Jukebox')),
+      h('div', { class: 'dlbl' }, 'UP NEXT'), rows.length ? h('div', { class: 'jbrows' }, rows) : h('p', { class: 'small dim' }, 'Nothing queued yet.'));
+  }
+  document.body.append(panel);
+  const r = chip?.getBoundingClientRect?.(), z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+  panel.style.top = ((r ? r.bottom : 50) / z + 6) + 'px'; panel.style.left = Math.max(8, Math.min((r ? r.left : 100) / z, innerWidth / z - 440)) + 'px';
+  await draw();
+  setTimeout(() => { document.addEventListener('pointerdown', out, true); document.addEventListener('keydown', esc, true); }, 0);
 }
 let jbRunning = false;
 export const jukeboxRunning = () => jbRunning;

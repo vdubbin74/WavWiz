@@ -118,7 +118,7 @@ async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed') };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
@@ -192,6 +192,8 @@ function toggleLib(force) { if (force === true) return setPanels({ ...P6, lib: '
 function toggleLibExpanded(force) { setPanels(expand(P6, 'lib', force ?? P6.exp !== 'lib'), 'lib'); }
 function toggleDev(force) { if (force === true) return setPanels({ ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); if (force === false) return setPanels(railClick(P6, 'dev'), 'dev'); setPanels(chevron(P6, 'dev'), 'dev'); }
 function toggleDevExpanded(force) { setPanels(expand(P6, 'dev', force ?? P6.exp !== 'dev'), 'dev'); }
+/** 0.3.5 J11 (option A): with the Library expanded the right column shows the playlist; "Devices ›" swaps the Devices panel in, "‹ Playlist" back. */
+function libSwap(v) { if (!desk) return; desk.classList.toggle('libdev', !!v); devp.setSize(v ? 'standard' : (desk.classList.contains('devcollapsed') ? 'collapsed' : 'standard')); listt.relayout?.(); }
 function setDevSize(sz, highlight = null) { devHl = highlight; setPanels(sz === 'expanded' ? expand(P6, 'dev', true) : sz === 'collapsed' ? { ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp } : { ...P6, dev: 'normal', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); }
 let P6 = null, lastOpened = null, devHl = null, libWasExp = false;
 function setPanels(n, opened = null) { P6 = savePanels(normPanels(n)); lastOpened = opened; applyPanels(); }
@@ -205,7 +207,8 @@ function applyPanels(first = false) {
   libpanel.classList.toggle('israil', ls === 'rail'); libpanel.title = ls === 'rail' ? 'Open the Library panel ( [ )' : '';
   const b = libpanel.querySelector('.libcol'); b.textContent = chevronGlyph(e, 'lib'); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
   paintExpandBtn(libpanel.querySelector('.libexp'), 'Library', ls === 'expanded');   // 0.3.1 B4/B6
-  devp.setSize(ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
+  if (ls !== 'expanded') desk.classList.remove('libdev');   // 0.3.5 J11
+  devp.setSize(desk.classList.contains('libdev') ? 'standard' : ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
   if ((ls === 'expanded') !== libWasExp || first) { libWasExp = ls === 'expanded'; libC.setExpanded(libWasExp); }
   if (ls !== 'rail' && !first) libC.reload();
   if (first) setTimeout(() => nowc.viz?.resize?.(), 0);

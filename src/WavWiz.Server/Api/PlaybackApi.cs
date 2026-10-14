@@ -29,6 +29,7 @@ public static class PlaybackApi
                     else if (node.StartsWith("artist:")) rows = s.Library.ByArtist(node[7..]);
                     else if (node.StartsWith("genre:")) rows = s.Library.ByGenre(node[6..]);
                     else if (node.StartsWith("year:") && int.TryParse(node[5..], out var yr)) rows = s.Library.ByYear(yr);
+                    else if (node.StartsWith("decade:") && int.TryParse(node[7..].TrimEnd('s'), out var dec)) rows = s.Library.ByDecade(dec);   // 0.3.5 J10: "decade:1990s"
                     else if (node.StartsWith("folder:")) rows = s.Library.TracksInFolderTree(node[7..]);
                     else if (node == "recent") rows = s.Library.Recent(); else { error = "unknown node"; return new(); }
                     return s.Conductor.TracksToItems(rows.Select(r => r.Id));

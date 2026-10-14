@@ -1,0 +1,16 @@
+import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim();
+const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:1920,height:1080}}); await ctx.addCookies([{name:'unison_session',value:sess,url:B}]);
+await ctx.addInitScript(()=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');});
+const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+await p.goto(B+'/'); await p.waitForSelector('.desk'); await p.waitForTimeout(2000);
+await p.evaluate(async()=>(await import('/js/main.js')).go('radio')); await p.waitForTimeout(800);
+await p.click('.libtabs button:has-text("Albums"), button:has-text("Albums")').catch(e=>errs.push('albums '+e.message)); await p.waitForTimeout(1200);
+await p.screenshot({path:'/tmp/ww035-albums.png'});
+await p.click('button:has-text("Genres")').catch(e=>errs.push(e.message)); await p.waitForTimeout(1200);
+await p.screenshot({path:'/tmp/ww035-genres.png'});
+await p.click('button:has-text("Years")').catch(e=>errs.push(e.message)); await p.waitForTimeout(1200);
+await p.screenshot({path:'/tmp/ww035-years.png'});
+await p.click('.libswap:visible'); await p.waitForTimeout(800); await p.screenshot({path:'/tmp/ww035-swap.png'});
+console.log(JSON.stringify(errs)); await b.close();

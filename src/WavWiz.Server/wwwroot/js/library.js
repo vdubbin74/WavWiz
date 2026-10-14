@@ -1,8 +1,8 @@
 import { h, api, toast, fmtTime } from './util.js';
 import { cover, trackArt, artistCover } from './art.js';
 import { icon } from './icons.js';
-import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist } from './ui.js';
-import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors } from './libsort.js';
+import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist, songsLabel } from './ui.js';
+import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 
 const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio']];
@@ -100,7 +100,7 @@ export function libraryView(S, opts = {}) {
   const artistRow = a => {
     const el = h('li', { class: 'item', onclick: () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }) }, artistCover(a.name, a.artTrackIds, 'sm rnd', 96),
       h('div', { class: 't' }, h('div', { class: 't1 ell' }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'} • ${a.tracks} song${a.tracks === 1 ? '' : 's'}`)));
-    return attachItem(S, el, refNode('artist:' + a.name), a.name);
+    return attachItem(S, el, refNode('artist:' + a.name), a.name, { count: a.tracks ?? null, kind: 'Artist' });
   };
   const openAlbum = al => push({ title: al.album, kind: 'songs', load: () => tracksPage(al) });
   const albumRow = al => nameRow(al.album, [al.artist, al.year || null, `${al.tracks} song${al.tracks === 1 ? '' : 's'}`].filter(Boolean).join(' • '), trackArt(al.artTrackId, 96), refNode(albumNode(al.artist, al.album)), () => openAlbum(al), '♫', false, heartBtn(S, 'album', albumRef(al.artist, al.album), al.album), { album: al.album, artist: al.artist });
@@ -112,8 +112,8 @@ export function libraryView(S, opts = {}) {
         playingAlbum(al) ? h('span', { class: 'tilebadge' }, '▮▮▮ Playing') : null,
         heartBtn(S, 'album', albumRef(al.artist, al.album), al.album),
         canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow(ref); } }, '▶') : null),
-      h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, albumSub(al)));
-    return attachItem(S, el, ref, al.album, { more: false });   // tiles: right-click / long-press menu, no ⋯ row
+      h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, albumSub(al)), al.tracks != null ? h('div', { class: 't3' }, h('span', { class: 'tcount' }, songsLabel(al.tracks))) : null);   // 0.3.5 J11
+    return attachItem(S, el, ref, al.album, { more: false, count: al.tracks ?? null, kind: 'Album' });   // tiles: right-click / long-press menu, no ⋯ row
   };
   // ---- 0.2.1 F4 / F13 tiles: artists (round), genres + years (color blocks with a cover collage), folders (2x2 mosaic) ----
   const playBtn = (ref, label) => canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${label}`, onclick: ev => { ev.stopPropagation(); playNow(ref); } }, '▶') : null;
@@ -122,24 +122,30 @@ export function libraryView(S, opts = {}) {
     const el = h('li', { class: 'tile atile', onclick: () => push({ title: a.name, kind: 'albums', load: () => albumsPage({ artist: a.name }) }) },
       h('div', { class: 'tileart rnd' }, artistArt(a), playBtn(ref, a.name)),
       h('div', { class: 't1 ell', title: a.name }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'} · ${a.tracks} song${a.tracks === 1 ? '' : 's'}`));
-    return attachItem(S, el, ref, a.name, { more: false });
+    return attachItem(S, el, ref, a.name, { more: false, count: a.tracks ?? null, kind: 'Artist' });
   };
-  const blockTile = (key, sub) => n => {
-    const ref = refNode(key + ':' + n.name), [c1, c2] = blockColors(n.name);
+  // 0.3.5 J10: theme-colored tiles with a pattern per name (no album covers), a soft scrim behind the text, a bold title and a clear count
+  const blockTile = key => n => {
+    const ref = refNode(key + ':' + n.name), t = tileSpec(n.name);
     const el = h('li', { class: 'tile btile', onclick: () => push({ title: n.name, kind: 'albums', load: () => albumsPage({ [key]: key === 'year' ? +n.name : n.name }) }) },
-      h('div', { class: 'gblock', style: `--g1:${c1};--g2:${c2}` }, h('b', { class: 'gname ell' }, n.name), h('span', { class: 'gsub' }, sub(n)),
-        h('div', { class: 'gcollage', 'aria-hidden': 'true' }, (n.artTrackIds || []).slice(0, 3).map((id, i) => cover(trackArt(id, 192), 'gc gc' + i, '♫'))), playBtn(ref, n.name)));
-    return attachItem(S, el, ref, n.name, { more: false });
+      h('div', { class: `gblock j10 p-${t.pattern} lead${t.lead}`, style: `--gmix:${t.mix}%` }, tilePattern(t),
+        h('b', { class: 'gname ell', title: n.name }, n.name), tileCountEl(n), playBtn(ref, n.name)));
+    return attachItem(S, el, ref, n.name, { more: false, count: n.tracks ?? null, kind: key === 'year' ? 'Year' : 'Genre' });
   };
-  const genreTile = blockTile('genre', n => `${n.albums} album${n.albums === 1 ? '' : 's'}`);
-  const yearTile = blockTile('year', n => `${n.albums} album${n.albums === 1 ? '' : 's'} · ${n.tracks} song${n.tracks === 1 ? '' : 's'}`);
+  const tileCountEl = n => h('span', { class: 'gsub gcount', title: tileCount(n) }, h('b', null, songsLabel(n.tracks)), h('span', { class: 'galb' }, ` · ${n.albums} album${n.albums === 1 ? '' : 's'}`));
+  const genreTile = blockTile('genre');
+  const yearTile = blockTile('year');
+  const decadeTile = (n, rows) => { const t = tileSpec(n.name);
+    const el = h('li', { class: 'tile btile dtile', 'data-decade': n.name, onclick: () => push({ title: n.name, kind: 'years', load: async () => { st.decade = true; try { return [list('years', rows, countRow('📅', 'year'), yearTile)]; } finally { st.decade = false; } } }) },
+      h('div', { class: `gblock j10 p-${t.pattern} lead${t.lead}`, style: `--gmix:${t.mix}%` }, tilePattern(t), h('b', { class: 'gname ell' }, n.name), tileCountEl(n)));
+    return attachItem(S, el, refNode('decade:' + n.name), n.name, { more: false, count: n.tracks, kind: 'Decade' }); };
   const folderTile = f => {
     const ids = (f.artTrackIds || []).slice(0, 4), name = f.name.split(/[\\/]/).filter(Boolean).pop() || f.name;
     const el = h('li', { class: 'tile ftile', onclick: () => push({ title: name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) },
       h('div', { class: 'tileart fmosaic' + (ids.length < 2 ? ' one' : '') }, ...(ids.length ? ids.map(id => cover(trackArt(id, 192), 'fm', '♫')) : [h('div', { class: 'cover fm' }, '📁')]),
         h('span', { class: 'fbadge', 'aria-hidden': 'true' }, folderGlyph()), playBtn(refNode('folder:' + f.path), name)),
       h('div', { class: 't1 ell', title: f.name }, name), h('div', { class: 't2' }, `${f.tracks} track${f.tracks === 1 ? '' : 's'}`));
-    return attachItem(S, el, refNode('folder:' + f.path), name, { more: false });
+    return attachItem(S, el, refNode('folder:' + f.path), name, { more: false, count: f.tracks ?? null, kind: 'Folder' });
   };
   const countRow = (glyph, key) => n => nameRow(n.name, `${n.tracks} song${n.tracks === 1 ? '' : 's'} • ${n.albums} album${n.albums === 1 ? '' : 's'}`, null, refNode(key + ':' + n.name), () => push({ title: n.name, kind: 'albums', load: () => albumsPage({ [key]: key === 'year' ? +n.name : n.name }) }), glyph);
 
@@ -148,7 +154,14 @@ export function libraryView(S, opts = {}) {
   function list(kind, rows, make, tile = make === albumRow ? albumTile : null) {
     const key = P.sort[kind], sorted = sortRows(kind, rows, key, P.flip[kind], seed); st.count = rows.length; st.kind = kind;
     const grid = !!tile && gridOn(kind);
-    const mk = grid ? tile : make; const ul = h('ul', { class: grid ? 'tilegrid tg-' + kind : 'list' }); const ch = chunked(ul, sorted, (row, i) => mk(row, i, sorted));
+    const mk = grid ? tile : make;
+    if (grid && kind === 'years' && (key || 'name') === 'name' && !st.decade) {   // 0.3.5 J10/J11: Years open as decade tiles, then single years
+      const ul = h('ul', { class: 'tilegrid tg-years tg-decades' });
+      for (const g of byDecade(sorted)) { const sum = { name: g.key, tracks: g.rows.reduce((a, r) => a + (r.tracks || 0), 0), albums: g.rows.reduce((a, r) => a + (r.albums || 0), 0) };
+        ul.append(decadeTile(sum, g.rows)); }
+      return ul;
+    }
+    const ul = h('ul', { class: grid ? 'tilegrid tg-' + kind : 'list' }); const ch = chunked(ul, sorted, (row, i) => mk(row, i, sorted));
     if (isLetterSort(kind, key) && sorted.length >= (expanded ? 20 : 40)) {
       const idx = letterIndex(kind, sorted, key);
       jump = l => { const i = idx.get(l); if (i == null) return; ch?.upTo?.(i); ul.children[i]?.scrollIntoView({ block: 'start' }); };
@@ -275,4 +288,15 @@ export function libraryView(S, opts = {}) {
     setExpanded(on) { expanded = !!on; P.expanded = expanded; if (!expanded && TOOL_TABS.some(t => t[0] === st.tab)) st.tab = 'artists'; save(); draw(); },
     /** 0.3.5 J9: open a tab from a menu (Library > Playlists / Radio / tools). */
     showTab(k) { pick(k); }, get tab() { return st.tab; } };
+}
+
+/** 0.3.5 J10: the tile pattern as a small inline SVG painted with theme colors (CSS variables), deterministic from the tile seed. */
+function tilePattern(t) {
+  let x = t.seed || 1; const r = () => ((x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 4294967296);
+  let body = '';
+  if (t.pattern === 'waves') for (let i = 0; i < 6; i++) { const y = 40 + i * 9, a = 4 + r() * 8; body += `<path d="M0 ${y} C 40 ${y - a}, 80 ${y + a}, 120 ${y} S 200 ${y - a}, 240 ${y}" fill="none" class="pl" stroke-width="1.2"/>`; }
+  else if (t.pattern === 'bars') for (let i = 0; i < 16; i++) { const hgt = 10 + r() * 40; body += `<rect x="${6 + i * 14.5}" y="${100 - hgt}" width="8" height="${hgt}" class="pf"/>`; }
+  else if (t.pattern === 'dots') for (let y = 8; y < 100; y += 14) for (let i = 0; i < 18; i++) body += `<circle cx="${8 + i * 13.5 + (y % 28 ? 6 : 0)}" cy="${y}" r="1.6" class="pf"/>`;
+  else { const cx = 170 + r() * 50, cy = 60 + r() * 30; for (let i = 1; i < 9; i++) body += `<circle cx="${cx}" cy="${cy}" r="${i * 11}" fill="none" class="pl" stroke-width="1.2"/>`; }
+  const el = h('div', { class: 'gpat', 'aria-hidden': 'true' }); el.innerHTML = `<svg viewBox="0 0 240 100" preserveAspectRatio="none">${body}</svg>`; return el;
 }

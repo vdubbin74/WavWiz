@@ -104,6 +104,8 @@ public sealed partial class LibraryService
     }
 
     public List<TrackRow> ByAlbumKey(string albumArtist, string album) => ByAlbum(albumArtist, album);
+    /// <summary>0.3.5 J10: every song of a decade (1990 = 1990-1999).</summary>
+    public List<TrackRow> ByDecade(int decade) { decade -= decade % 10; return _db.Query($"SELECT {Cols} FROM track WHERE missing=0 AND year>=$a AND year<=$b ORDER BY year, album_artist, album, disc_no, track_no", Map, ("$a", decade), ("$b", decade + 9)); }
     public List<TrackRow> ByYear(int year) => _db.Query($"SELECT {Cols} FROM track WHERE missing=0 AND year=$y ORDER BY album_artist, album, disc_no, track_no", Map, ("$y", year));
 
     public List<TrackRow> Tracks(string? artist, string? album, string? genre, int? year, int limit = 5000)

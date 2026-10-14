@@ -79,7 +79,7 @@ test('G12: reorder (multi-select block), server moves, undo, insertion index, au
 });
 test('G13: Jukebox dialogs use object buttons (keep on Start / Stop), non-admin toast, no array-form dialog() anywhere', () => {
   const k = src('jukebox-kiosk.js');
-  assert.match(k, /\{ text: 'Start Jukebox', cls: 'primary', keep: true, onclick:/); assert.match(k, /\{ text: 'Stop Jukebox', cls: 'danger', keep: true, onclick:/);
+  assert.match(k, /\{ text: 'Start Jukebox', cls: 'primary', keep: true, onclick:/); assert.match(k, /'Stop Jukebox'\)\)|\{ text: 'Stop Jukebox', cls: 'danger', keep: true, onclick:/   /* 0.3.5 J9 #13: host panel, Stop keeps its confirm */);
   assert.match(k, /if \(!isAdmin\(S\)\) \{ toast\(/);
   for (const f of ['jukebox-kiosk.js', 'main.js', 'devices.js', 'settings.js', 'settingsui.js', 'about.js', 'scenesched.js', 'playlists.js', 'radiofinder.js', 'calibrate.js', 'eq.js'])
     assert.doesNotMatch(src(f), /dialog\([^;]*?,\s*\[\s*\[/, f + ': array-form dialog buttons');

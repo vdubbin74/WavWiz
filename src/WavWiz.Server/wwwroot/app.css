@@ -2103,3 +2103,42 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .dc3 .vbar.capped input[type=range]::-webkit-slider-thumb{background:var(--accent2)!important;border-color:var(--accent2)}
 .dc3 .vbar.capped input[type=range]::-moz-range-thumb{background:var(--accent2)!important}
 .dc3 .dc3l1 .dname{flex:0 1 auto}
+/* J9 #13: Jukebox host panel under the "Jukebox on" chip */
+.jbpanel{position:fixed;z-index:300;width:min(430px,calc(100vw / var(--z,1) - 16px));max-height:calc(70vh / var(--z,1));overflow:auto;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:3px;padding:10px 12px;box-shadow:0 10px 26px rgba(0,0,0,.45)}
+.jbpanel .jbrows{display:flex;flex-direction:column;gap:4px}
+/* ---- 0.3.5 J10: genre / year tiles from the theme colors, a pattern per name, scrim + bold count ---- */
+.tile .gblock.j10{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) var(--gmix,40%),var(--panel)),color-mix(in srgb,var(--accent2) calc(var(--gmix,40%) - 14%),var(--panel2)));color:var(--ink);border-left:3px solid var(--accent);padding:10px 12px;gap:6px}
+.tile .gblock.j10.lead2{background:linear-gradient(135deg,color-mix(in srgb,var(--accent2) var(--gmix,40%),var(--panel)),color-mix(in srgb,var(--accent) calc(var(--gmix,40%) - 14%),var(--panel2)));border-left-color:var(--accent2)}
+.tile .gblock.j10 .gpat{position:absolute;inset:0;pointer-events:none;opacity:.55}
+.tile .gblock.j10 .gpat svg{width:100%;height:100%;display:block}
+.tile .gblock.j10 .gpat .pl{stroke:var(--accent2)} .tile .gblock.j10.lead2 .gpat .pl{stroke:var(--accent)}
+.tile .gblock.j10 .gpat .pf{fill:var(--accent)} .tile .gblock.j10.lead2 .gpat .pf{fill:var(--accent2)}
+.tile .gblock.j10 .gname{position:relative;z-index:1;align-self:flex-start;max-width:100%;font-size:16px;font-weight:800;color:var(--ink);padding:1px 6px;margin-left:-6px;border-radius:3px;background:color-mix(in srgb,var(--bg) 55%,transparent);text-shadow:none}
+.tile .gblock.j10 .gcount{position:relative;z-index:1;align-self:flex-start;font-size:12px;font-weight:800;opacity:1;color:var(--ink);padding:2px 8px;border-radius:3px;background:color-mix(in srgb,var(--bg) 78%,transparent)}
+.lib.compact .tile .gblock.j10 .gname{font-size:14px}
+.decades .decade-h{margin:10px 0 6px;color:var(--accent2-text,var(--accent2))}
+/* ---- 0.3.5 J11 (option A): Library expanded = Library | Playlist column (Devices › swaps the Devices panel in); 132 px tiles; drag ghost + drop label ---- */
+.libswap{display:none}
+@media (min-width:901px){
+  .desk.libexpanded{--rightw:clamp(380px,calc(25vw / var(--z,1)),520px)!important;--libw:calc(100% - var(--rightw) - 20px)!important}
+  .desk.libexpanded .libswap{display:inline-flex}
+  .desk.libexpanded:not(.libdev) .listpanel{grid-area:1/3/2/4!important;display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;border-color:var(--accent)}
+  .desk.libexpanded:not(.libdev) .devpanel{display:none!important}
+  .desk.libexpanded:not(.libdev) .listpanel .qtable :is(th,td):nth-child(n+4):not(:last-child){display:none}
+  .desk.libexpanded.libdev .devpanel{grid-area:1/3/2/4!important}
+  .desk.libexpanded.libdev .devpanel :is(.devbody,.devtitle,.devcount){display:revert!important}
+  .desk.libexpanded.libdev .devpanel .devbody{display:block!important;overflow:auto}
+  .desk.libexpanded.libdev .devpanel .devexp{display:none!important}
+  .desk.libexpanded.libdev .listpanel{visibility:hidden!important}
+  .desk.libexpanded .libpanel .tilegrid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))!important}
+}
+.tile .t3{margin-top:3px} .tile .tcount{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:3px;border:1px solid var(--accent);color:var(--accent-text,var(--accent))}
+.qins[data-label]::after{content:attr(data-label);position:absolute;right:6px;top:-16px;font-size:11px;font-weight:700;color:var(--accent-text,var(--accent));background:var(--panel);padding:0 4px;border-radius:3px;white-space:nowrap}
+.dragghost{position:fixed;top:-200px;left:-400px;display:flex;align-items:center;gap:10px;padding:6px 10px;max-width:280px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;color:var(--ink)}
+.dragghost .dg-t{display:flex;flex-direction:column;min-width:0} .dgbadge{background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:11px;padding:1px 7px;border-radius:3px}
+.tile .gblock.j10 .gcount{white-space:nowrap}
+@media (min-width:901px){
+  .desk.libexpanded .libpanel .tile .gblock.j10{aspect-ratio:1/1}
+  .desk.libexpanded .libpanel .tile .gblock.j10 .galb{display:none}
+  .desk.libexpanded .libpanel .tile .gblock.j10 .gname{font-size:18px;background:none;padding:0;margin:0;text-shadow:0 1px 3px color-mix(in srgb,var(--bg) 85%,transparent)}
+}
