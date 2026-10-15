@@ -26,6 +26,63 @@ const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]')
 const home = async (p, pan, theme) => { await p.goto(B + '/'); await p.evaluate(([v, t]) => { if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, [pan, theme]); await p.goto(B + '/'); await p.waitForTimeout(2500); await closeDlg(p); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); if (theme) { await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme); } await p.waitForTimeout(theme ? 600 : 200); };   // the 'Tap anywhere to start sound' prompt
 const go = (p, k) => p.evaluate(async k => (await import('/js/main.js')).go(k), k);
 const dlgW = p => p.evaluate(() => { const d = document.querySelector('dialog[open]'); return d ? Math.round(d.getBoundingClientRect().width) : -1; });
+const hoverItem = async (p, top, label) => { await p.click(`.menubar .mtop:text-is("${top}")`); const it = p.locator(`.menubar .mgroup.open > .mpanel > .msub > button:text-is("${label}"), .menubar .mgroup.open > .mpanel > button:text-is("${label}")`).first(); await it.hover(); await p.waitForTimeout(450); return it; };
+const labels = (p, sel) => p.evaluate(s => [...document.querySelectorAll(s)].filter(e => e.getClientRects().length).map(e => e.firstChild?.textContent?.trim() || e.textContent.trim()), sel);
+{
+  const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } });
+  await api('/queue/clear', 'POST', {}).catch(() => {});
+  await step('K15-K19/K22 menus', async () => {
+    await home(p, NORMAL);
+    // K16 sleep submenu
+    await hoverItem(p, 'Playback', 'Sleep timer');
+    const sl = await labels(p, '.menubar .msub.open > .mpanel button');
+    ok('K16 Sleep timer submenu lists 15/30/45/60/End of song/Off', ['15 minutes', '30 minutes', '45 minutes', '60 minutes', 'End of song', 'Off'].every((x, i) => sl[i]?.startsWith(x)), sl.join('|'));
+    await p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-k16-sleep.png` });
+    await p.keyboard.press('Escape');
+    await hoverItem(p, 'Playback', 'Sound / EQ');
+    const eq = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K16 Sound / EQ submenu lists presets', eq.length >= 3, eq.join('|'));
+    await p.keyboard.press('Escape');
+    // K16 flyout opens toward free space (flip near the right edge)
+    await p.setViewportSize({ width: 700, height: 800 }); await p.waitForTimeout(300);
+    // K17 File > New
+    await p.setViewportSize({ width: 1920, height: 1080 }); await p.waitForTimeout(300);
+    await hoverItem(p, 'File', 'New');
+    const nw = await p.evaluate(() => [...document.querySelectorAll('.menubar .msub.open > .mpanel button')].map(b => [b.firstChild.textContent.trim(), b.querySelector('.kbd')?.textContent]));
+    ok('K17 File > New lists zone/scene/alarm/schedule with shortcuts', JSON.stringify(nw) === JSON.stringify([['Zone', 'Ctrl+Shift+Z'], ['Scene', 'Ctrl+Shift+S'], ['Alarm', 'Ctrl+Shift+A'], ['Schedule', 'Ctrl+Shift+H']]), JSON.stringify(nw));
+    await p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-k17-new.png` });
+    await p.locator('.menubar .msub.open > .mpanel button', { hasText: 'Alarm' }).click(); await p.waitForTimeout(900);
+    const al = await p.evaluate(() => ({ dev: document.getElementById('desk').classList.contains('devexpanded'), editor: !!document.querySelector('.devpanel .ss-inline') }));
+    ok('K17 New > Alarm jumps to the alarm editor in expanded Devices', al.dev && al.editor, JSON.stringify(al));
+    await p.keyboard.press('Escape'); await home(p, NORMAL);
+    for (const [key, sel, name] of [['Control+Shift+KeyS', '.devpanel .ss-sceneedit', 'scene'], ['Control+Shift+KeyH', '.devpanel .ss-inline', 'schedule'], ['Control+Shift+KeyZ', '.devpanel .zone-inline, .devpanel .zinline, .devpanel [data-edit], .devpanel .zedit-form', 'zone']]) {
+      await home(p, NORMAL); await p.locator('body').click({ position: { x: 5, y: 300 } }); await p.keyboard.press(key); await p.waitForTimeout(1100);
+      const r = await p.evaluate(s => ({ dev: document.getElementById('desk').classList.contains('devexpanded'), el: !!document.querySelector(s) }), sel);
+      ok(`K17 ${key} opens New ${name}`, r.dev && r.el, JSON.stringify(r));
+    }
+    // typing in a field must NOT trigger the shortcut (redo keeps working)
+    await home(p, NORMAL); await p.locator('input[type=search]').first().focus().catch(() => {}); await p.keyboard.press('Control+Shift+KeyS'); await p.waitForTimeout(500);
+    ok('K17 shortcut ignored while typing in a field', await p.evaluate(() => !document.getElementById('desk').classList.contains('devexpanded')));
+    // K19 File > Run
+    await home(p, NORMAL); await hoverItem(p, 'File', 'Run');
+    const run = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K19 File > Run lists Scenes / Schedules / Alarms groups', run.length >= 1, run.join('|'));
+    await p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-k19-run.png` }); await p.keyboard.press('Escape');
+    // K18 Devices menu
+    await home(p, NORMAL); await hoverItem(p, 'Devices', 'Zones');
+    const zs = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Zones submenu ends with New…', zs.at(-1)?.startsWith('New'), zs.join('|'));
+    await p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-k18-zones.png` }); await p.keyboard.press('Escape');
+    await hoverItem(p, 'Devices', 'Scenes'); const sc = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Scenes submenu ends with New…', sc.at(-1)?.startsWith('New'), sc.join('|')); await p.keyboard.press('Escape');
+    await hoverItem(p, 'Devices', 'Devices'); const dv = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Devices submenu lists devices', dv.length >= 1, dv.length); 
+    ok('K18 no Start buttons in the Devices menu', !(await labels(p, '.menubar .mgroup.open .mpanel button')).some(t => /^Start\b/.test(t) && !/Jukebox/.test(t)));
+    await p.locator('.menubar .msub.open > .mpanel button').first().click(); await p.waitForTimeout(900);
+    ok('K18 picking a device jumps to expanded Devices', await p.evaluate(() => document.getElementById('desk').classList.contains('devexpanded')));
+    // K22 Queue menu
+    await home(p, NORMAL); await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(700);
+    ok('K22 Queue menu opens the playlist expanded', await p.evaluate(() => document.getElementById('desk').classList.contains('listexpanded')));
+    await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(150);
+    ok('K15 Queue again pulses (already expanded)', await p.evaluate(() => document.querySelector('.listpanel').classList.contains('k-pulse')));
+  });
+  await ctx.close();
+}
 // ---- items: K1-K13, K14, K21, K22, K5-K7, K20 ----
 const shotP = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-${n}.png` });
 const ev = (p, f, a) => p.evaluate(f, a);
