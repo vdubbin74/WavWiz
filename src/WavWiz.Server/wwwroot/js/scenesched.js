@@ -342,6 +342,7 @@ export function scenesColumn(S, { refresh } = {}) {
   const admin = isAdmin(S), ctlOk = canControl(S), locale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
   const root = h('section', { class: 'ssc-col', 'aria-label': 'Scenes and schedules' });
   let data = { scenes: [], rows: [], stations: [], now: null, server: null, profiles: [] }, editing = null;   // editing: {kind:'scene'|'sched'|'capture', id|null, kind2}
+  const freshProfiles = async () => { try { data.profiles = await api('/profiles'); } catch { /* keep */ } };   // 0.3.6 K7: a profile saved a moment ago is in the picker
   const busy = () => !!editing || !!root.querySelector('input:focus,select:focus');
   async function load(force) {
     if (!force && busy()) return;
@@ -360,7 +361,7 @@ export function scenesColumn(S, { refresh } = {}) {
     const sceneHost = h('div', { class: 'ss-cards ssc-scenes' });
     const btn = (t, fn, cls = 'btn sm') => adminOnly(S, h('button', { class: cls, type: 'button', onclick: fn }, t));
     const scHead = h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCENES'), h('span', { class: 'dim' }, String(data.scenes.length)), h('span', { class: 'grow' }),
-      btn('+ From current setup', () => { editing = { kind: 'capture' }; draw(); }), btn('+ New scene', () => { editing = { kind: 'scene', id: null }; draw(); }, 'btn sm accent-o'));
+      btn('+ From current setup', async () => { await freshProfiles(); editing = { kind: 'capture' }; draw(); }), btn('+ New scene', async () => { await freshProfiles(); editing = { kind: 'scene', id: null }; draw(); }, 'btn sm accent-o'));
     if (editing?.kind === 'capture') sceneHost.append(captureForm());
     if (editing?.kind === 'scene' && editing.id == null) sceneHost.append(sceneEditor(null));
     for (const sc of data.scenes) sceneHost.append(editing?.kind === 'scene' && editing.id === sc.id ? sceneEditor(sc) : sceneRow(sc));
@@ -387,7 +388,7 @@ export function scenesColumn(S, { refresh } = {}) {
       h('div', { class: 'grow ss-mid' }, h('div', { class: 'row' }, h('b', null, sc.name), sc.active ? h('span', { class: 'tag c dtag zplaying' }, 'ACTIVE') : null),
         h('div', { class: 'small dim ell', title: names.join(' + ') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${on.some(m => m.profileId) ? ` · ${on.filter(m => m.profileId).length} with a profile` : ''}${used ? ` · used by ${used} schedule${used === 1 ? '' : 's'}` : ''}`)),
       h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => runScene(sc) }, 'Run'),
-      pencil(`Edit scene ${sc.name}`, admin, () => { editing = { kind: 'scene', id: sc.id }; draw(); }));
+      pencil(`Edit scene ${sc.name}`, admin, async () => { await freshProfiles(); editing = { kind: 'scene', id: sc.id }; draw(); }));
   }
   function schedRow(r) {
     const days = h('span', { class: 'ss-days', 'aria-label': r.onceDate ? 'Once' : 'Days: ' + [...r.days].map(x => DAYS[+x]).join(', ') }, r.onceDate ? h('b', null, 'Once ' + r.onceDate) : DAYS.map((t, i) => r.days.includes(String(i)) ? h('b', null, t[0]) : h('span', null, t[0])));
@@ -451,7 +452,7 @@ export function scenesColumn(S, { refresh } = {}) {
     }
   }
   async function skip(r) { try { const x = await api(`/schedules/${r.id}/skip`, { method: 'POST' }); toast(x.skipped ? `Skipping the next “${r.name}”` : `“${r.name}” runs as usual`); load(true); } catch (e) { toast(e.message, true); } }
-  root._open = what => { if (what === 'alarm') openEdit(null, 'play'); else if (what === 'scene') { editing = { kind: 'scene', id: null }; draw(); } else if (what === 'schedule') openEdit(null, 'scene'); };
+  root._open = what => { if (what === 'alarm') openEdit(null, 'play'); else if (what === 'scene') { freshProfiles().then(() => { editing = { kind: 'scene', id: null }; draw(); }); } else if (what === 'schedule') openEdit(null, 'scene'); };
   if (typeof window !== 'undefined' && window.addEventListener) { const on = () => { if (root.isConnected) load(); }; window.addEventListener('wavwiz:schedules', on); window.addEventListener('wavwiz:sleep', on); }
   draw(); root._at = Date.now(); load(true);
   return root;
