@@ -1,10 +1,17 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.5';
+export const WHATS_NEW_VERSION = '0.3.6';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.3.6 (only what shipped)
+  ['Speaker settings', 'Open a speaker and its settings fill a fixed column on the right: volume, max volume, delay, balance, bass, treble, EQ and output. Save the whole set as a speaker profile and pick a profile per speaker in a scene.'],
+  ['Playlist columns', 'Pick the columns, drag them into any order, resize them, click a heading to sort, and lock the layout.'],
+  ['Menus that open things', 'Hover a menu item to see its choices. File > New makes a zone, scene, alarm or schedule (Ctrl+Shift+Z / S / A / H). File > Run starts a scene or an alarm now. The Queue menu opens the playlist.'],
+  ['Back up and restore', 'File > Back up now, Restore backup and Undo restore. Your settings, scenes and profiles come back in one step.'],
+  ['Mini player in the Library', 'With the Library expanded, a full mini player sits at the bottom right under Devices. With Devices collapsed its rail shows the cover and progress, and pointing at it opens the full mini player.'],
+  ['Look and feel', 'Thin chevrons, accent-edge rails, one smooth slide everywhere, themed VU meters, and LED bars for the EQ view with each band at its real frequency.'],
   // 0.3.5 (only what shipped)
   ['Devices, side by side', 'Expanded Devices shows Scenes & Schedules, Zones and Speakers, with Speakers on the right where they always are. Open a speaker card to change its output, max volume, delay and EQ right there.'],
   ['Scenes, schedules and alarms in place', 'Create and edit them right in the Scenes & Schedules column. The Devices menu opens it.'],

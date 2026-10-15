@@ -4,6 +4,7 @@ import { canControl, MIME, dragInfo, dropLabel } from './ui.js';
 import { api, toast } from './util.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
+import { pulse } from './motion.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
@@ -129,7 +130,7 @@ export function listTable(S, ctl) {
       const q = S.queue[i], isCur = i === cur && playing, dg = can && !sort;
       // 0.3.3 G12: grip + drag to reorder (Ctrl / Shift click selects several), plain click still plays that row. 0.3.6: no row reorder while a sort is showing.
       const tr = h('tr', { class: (isCur ? 'cur' : '') + (sel.includes(i) ? ' sel' : ''), 'data-i': i, draggable: dg ? 'true' : 'false', 'aria-selected': String(sel.includes(i)),
-        onclick: ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { sel = nextSelection(sel, i, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, anchor); if (!ev.shiftKey) anchor = i; draw(); return; } sel = [i]; anchor = i; can && ctl.act('/stream/jump', { index: i }); } });
+        onclick: ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { sel = nextSelection(sel, i, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, anchor); if (!ev.shiftKey) anchor = i; draw(); return; } sel = [i]; anchor = i; if (isCur) pulse(tr); can && ctl.act('/stream/jump', { index: i }); } });
       if (dg) tr.addEventListener('dragstart', ev => { if (!sel.includes(i)) { sel = [i]; anchor = i; } dragging = sel.slice(); ev.dataTransfer.setData(QMIME, JSON.stringify(dragging)); ev.dataTransfer.setData('text/plain', q.title); ev.dataTransfer.effectAllowed = 'move'; tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('dragging', dragging.includes(+r.dataset.i))); });
       tr.addEventListener('dragend', () => { dragging = null; clearIns(); stopScroll(); tbody.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); setTimeout(draw, 0); });
       ids.forEach((id, k) => tr.append(cellFor(id, q, i, isCur, can, k === ids.length - 1)));

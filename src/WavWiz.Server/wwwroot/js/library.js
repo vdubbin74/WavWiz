@@ -1,6 +1,7 @@
 import { h, api, toast, fmtTime } from './util.js';
 import { cover, trackArt, artistCover } from './art.js';
 import { icon } from './icons.js';
+import { pulse } from './motion.js';
 import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist, songsLabel } from './ui.js';
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
@@ -201,7 +202,7 @@ export function libraryView(S, opts = {}) {
   const isPlayingTrack = t => { const it = S.now?.item; return !!it && (it.refId === t.id || (it.kind === 'track' && it.id === t.id)) && it.kind !== 'radio'; };
   const trackList = (rows, kind = 'songs', albumPage = false) => list(kind, rows, (t, i, shown) => {
     const on = isPlayingTrack(t);
-    const el = h('li', { class: 'item' + (on ? ' playing' : ''), onclick: () => canControl(S) ? playNow({ kind: 'tracks', ids: shown.map(x => x.id), index: i }) : toast('Your access is view-only.') }, h('span', { class: 'num' }, on ? '▮▮▮' : t.trackNo ?? i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, (albumPage ? [t.artist] : [t.artist, t.album]).filter(Boolean).join(' • '))),
+    const el = h('li', { class: 'item' + (on ? ' playing' : ''), onclick: ev => { if (on) pulse(ev.currentTarget); return canControl(S) ? playNow({ kind: 'tracks', ids: shown.map(x => x.id), index: i }) : toast('Your access is view-only.'); } }, h('span', { class: 'num' }, on ? '▮▮▮' : t.trackNo ?? i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, (albumPage ? [t.artist] : [t.artist, t.album]).filter(Boolean).join(' • '))),
       heartBtn(S, 'track', t.id, t.title), h('span', { class: 'dur' }, fmtTime(t.durationMs)));
     return attachItem(S, el, refTracks([t.id]), t.title);
   });

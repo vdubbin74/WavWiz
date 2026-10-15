@@ -12,6 +12,12 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.6] - 2026-10-14 (beta)
+- K1-K22: playlist title bar and columns (pick, reorder, resize, sort, lock); thin chevrons and accent-edge rails; cover placeholder and fade; one shared 250 ms glide and pulse; themed VU and LED EQ bars with real band frequencies; Library expanded with an in-column mini player; Queue menu opens the playlist.
+- Expanded Devices: speaker settings column (fixed 380 px), speaker profiles, a profile per device in scenes (new balance control, Player-side).
+- Menus: hover submenus, File > New (Ctrl+Shift+Z/S/A/H), File > Run, Devices submenus.
+- Backup: Back up now, saved backups, Restore with summary, Undo restore.
+
 ## [0.3.5] - 2026-10-14 (beta)
 - Expanded Devices: Scenes & Schedules, Zones and Speakers side by side, with Speakers anchored on the right where they sit in the normal view. A speaker card opens in place to change its output, max volume, delay, EQ and name.
 - Scenes, schedules and alarms are created and edited right in the Scenes & Schedules column; the Devices menu items open it (the separate window remains only on phones).

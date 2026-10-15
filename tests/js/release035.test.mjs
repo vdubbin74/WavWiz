@@ -58,6 +58,6 @@ test('J7 what\'s new version compare', async () => {
   assert.equal(verCmp('0.3.5', '0.3.5'), 0); assert.equal(verCmp('9.9.9', '0.3.5'), 1); assert.equal(verCmp('0.3.10', '0.3.9'), 1); assert.equal(verCmp('0.3.4', '0.3.5'), -1);
 });
 test('J12 switches are labeled pills with 3px corners; no hex in 0.3.5 css', () => {
-  const css = readFileSync(join(web, 'app.css'), 'utf8'); const i = css.indexOf('0.3.5'); assert.ok(i > 0);
+  const css = readFileSync(join(web, 'app.css'), 'utf8'); const i = css.indexOf('0.3.6'); assert.ok(i > 0);
   assert.doesNotMatch(css.slice(i), /#[0-9a-f]{3,8}\b(?![\w-])/i);
 });
