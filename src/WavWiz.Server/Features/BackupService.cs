@@ -14,7 +14,7 @@ public sealed class BackupService
     public static readonly (string Table, string Label)[] Tables =
     {
         ("setting", "Settings"), ("playlist", "Playlists"), ("playlist_item", "Playlist songs"), ("radio_station", "Radio stations"), ("favorite", "Favorites"),
-        ("scene", "Scenes"), ("scene_member", "Scene speakers"), ("schedule", "Schedules & alarms"),
+        ("scene", "Scenes"), ("scene_member", "Scene speakers"), ("device_profile", "Speaker profiles"), ("schedule", "Schedules & alarms"),
         ("dsp_preset", "EQ presets"), ("output_device_dsp", "EQ per speaker"),
         ("zone", "Device names & volumes"), ("output_device", "Speaker outputs"), ("calibration", "Device delays"), ("zone_group", "Speaker groups"), ("zone_group_member", "Speaker group members"),
     };

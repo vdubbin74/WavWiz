@@ -18,6 +18,7 @@ public sealed class Services
     public Features.ScheduleService Schedules = null!;
     public Features.SleepService Sleep = null!;
     public Features.BackupService Backup = null!;
+    public Features.DeviceProfileService Profiles = null!;   // 0.3.6 K6
     public Features.JukeboxService Jukebox = null!;
     public Features.SpeakerFollowService Speakers = null!;
     public Features.RadioFinderService RadioFinder = null!;

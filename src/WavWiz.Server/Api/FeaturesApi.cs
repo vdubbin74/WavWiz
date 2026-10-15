@@ -17,6 +17,16 @@ public static class FeaturesApi
             return err != null ? Ext.Bad(err) : Results.Json(new { id });
         }).Req(Role.Control);
 
+        // ---- 0.3.6 K6 speaker settings profiles ----
+        g.MapGet("/profiles", () => Results.Json(s.Profiles.List().Select(p => new { id = p.Id, name = p.Name, data = p.Data, updatedAt = p.UpdatedAt }))).Req(Role.View);
+        g.MapGet("/profiles/for/{zoneId:long}", (long zoneId) => { var id = s.Profiles.LoadedOn(zoneId); return Results.Json(new { profileId = id, modified = id is long i && s.Profiles.Modified(zoneId, i) }); }).Req(Role.View);
+        g.MapPost("/profiles", async (HttpContext c) => { var b = await c.Request.Body(); var zid = b.Long("zoneId") ?? b.Long("deviceId"); if (zid == null) return Ext.Bad("zoneId required");
+            var (id, err) = s.Profiles.Save(b.Str("name"), b.Long("id"), zid.Value); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
+        g.MapDelete("/profiles/{id:long}", (long id) => { s.Profiles.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapPost("/profiles/{id:long}/apply", async (long id, HttpContext c) => { var b = await c.Request.Body(); var zid = b.Long("zoneId") ?? b.Long("deviceId"); if (zid == null) return Ext.Bad("zoneId required");
+            if (!ZoneApi.IsAdmin(c) && !s.Zones.IsMine(zid.Value, c.Who(), c.Connection.RemoteIpAddress)) return Ext.Bad("Only an administrator can load a profile onto another person's device.", 403);
+            var (err, skipped) = s.Profiles.Apply(id, zid.Value); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, skipped }); }).Req(Role.Control);
+
         // ---- B3 scenes ----
         g.MapGet("/scenes", () => Results.Json(s.Scenes.List())).Req(Role.View);
         g.MapPost("/scenes", async (HttpContext c) =>
@@ -113,14 +123,14 @@ public static class FeaturesApi
         g.MapPost("/tags/jobs/{id:long}/undo", (long id) => { var err = s.TagFix.Undo(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
     }
 
-    private static List<(long, double, bool)>? ParseMembers(JsonElement b)
+    private static List<(long, double, bool, long?)>? ParseMembers(JsonElement b)
     {
         if (b.Prop("members") is not JsonElement arr || arr.ValueKind != JsonValueKind.Array) return null;
-        var list = new List<(long, double, bool)>();
+        var list = new List<(long, double, bool, long?)>();
         foreach (var e in arr.EnumerateArray())
         {
             var id = e.Long("deviceId") ?? e.Long("id"); if (id == null) continue;
-            list.Add((id.Value, e.Num("volume") ?? 60, e.Bool("enabled") != false));
+            list.Add((id.Value, e.Num("volume") ?? 60, e.Bool("enabled") != false, e.Long("profileId")));
         }
         return list;
     }

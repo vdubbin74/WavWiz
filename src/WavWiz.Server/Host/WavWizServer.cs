@@ -45,6 +45,8 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Schedules = new Features.ScheduleService(db, zones, cond, events);
         s.Schedules.Resolve = q => Api.PlaybackApi.ResolveItems(s, q, out _);      // 0.3.0: alarms play a playlist/album/song/radio
         s.Sleep = new Features.SleepService(zones, cond, events);
+        s.Profiles = new Features.DeviceProfileService(db, zones, dsp, cal, events);
+        s.Scenes.Profiles = s.Profiles;
         s.Backup = new Features.BackupService(db, events, Path.Combine(cfg.DataDir, "backups"));
         s.Jukebox = new Features.JukeboxService(db, cond, events);
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };

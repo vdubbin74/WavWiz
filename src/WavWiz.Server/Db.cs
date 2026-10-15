@@ -95,6 +95,12 @@ public sealed class Db
         ALTER TABLE schedule ADD COLUMN skip_until TEXT;
         ALTER TABLE schedule ADD COLUMN last_result TEXT;
         """,
+        // v7 (0.3.6 K6 / K7): speaker settings profiles (named, loadable on any speaker) and a profile reference per scene device.
+        """
+        CREATE TABLE device_profile(id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE, json TEXT NOT NULL, updated_at TEXT NOT NULL);
+        CREATE UNIQUE INDEX ux_device_profile_name ON device_profile(name COLLATE NOCASE);
+        ALTER TABLE scene_member ADD COLUMN profile_id INTEGER;
+        """,
     };
 
     public SqliteConnection Open()

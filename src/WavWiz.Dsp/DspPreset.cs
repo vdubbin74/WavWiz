@@ -17,6 +17,8 @@ public sealed record DspPreset
     public double PreampDb { get; init; }
     public bool AutoPreamp { get; init; } = true;
     public bool Bypass { get; init; }
+    /// <summary>0.3.6 K6: stereo balance, -100 (all left) .. 0 (center) .. +100 (all right). Applied after the EQ, before the limiter.</summary>
+    public double Balance { get; init; }
     public double[] GraphicDb { get; init; } = new double[10];
     public ShelfSettings Bass { get; init; } = new(0, 100);
     public ShelfSettings Treble { get; init; } = new(0, 10000);
@@ -32,6 +34,7 @@ public sealed record DspPreset
         for (int i = 0; i < 10; i++) g[i] = i < GraphicDb.Length ? Clamp(Fix(GraphicDb[i]), -12, 12) : 0;
         return this with
         {
+            Balance = Clamp(Fix(Balance), -100, 100),
             TrimDb = Clamp(Fix(TrimDb), -24, 6),
             PreampDb = Clamp(Fix(PreampDb), -24, 12),
             GraphicDb = g,

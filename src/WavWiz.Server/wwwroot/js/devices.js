@@ -8,6 +8,8 @@ import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { whenIdle } from './slider.js';
 import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
+import { speakerSettings } from './spkset.js';
+import { pulse } from './motion.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -360,6 +362,11 @@ export function settingsToggle(name, open, onToggle) {
     title: open ? 'Hide settings (Esc)' : 'Settings: delay, output, test sound, calibrate, rename…', onclick: ev => { ev.stopPropagation(); onToggle(); } },
   icon('chevD'), h('span', { class: 'dexp-l' }, 'Settings'));
 }
+/** 0.3.6 K5: the card's Settings button in the expanded view: it points the way the settings open (left) and flips to the closing arrow while they are open. */
+function settingsOpener(name, active, onToggle) {
+  const b = h('button', { type: 'button', class: 'dexpand spk-opener' + (active ? ' on' : ''), 'aria-expanded': String(active), 'aria-label': `${active ? 'Hide' : 'Show'} settings for ${name}`, title: active ? 'Close the settings' : 'Settings: volume, cap, delay, balance, EQ, output, profiles…', onclick: ev => { ev.stopPropagation(); onToggle(); } });
+  setChev(b, active ? 'r' : 'l'); return b;
+}
 /** Re-render one card / row in place after it opened or closed; focus stays on its Expand control. */
 function toggleSettings(z, el, render) {
   setCardOpen(z.id, !openSet.has(z.id));
@@ -660,6 +667,8 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 export function devicesPanel(S, ctl) {
   const root = h('section', { class: 'devpanel', 'aria-label': 'Devices and zones' }), body = h('div', { class: 'devbody' });
   let size = loadDevSize(), hl = null, zpick = loadZonePick(), zedit = null;
+  let spk = (() => { try { const v = sessionStorage.getItem('wavwiz.spk'); return v == null ? null : +v; } catch { return null; } })();   // 0.3.6 K5: the speaker whose settings are open
+  const setSpk = id => { spk = id; try { if (id == null) sessionStorage.removeItem('wavwiz.spk'); else sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } draw(true); };
   const setPick = v => { zpick = v; saveZonePick(v); draw(true); };
   const setEdit = v => { zedit = v; draw(true); };
   // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
@@ -721,7 +730,7 @@ export function devicesPanel(S, ctl) {
       const scol = kid(emain, 'scol') || h('div', { class: 'scol ecol' });
       const { zoned, unassigned: un } = speakerGroups(S.zones, groups);
       const oldS = new Map([...scol.querySelectorAll('.dc3')].map(e => [e.dataset.zoneId, e]));
-      const mk = (z, addable) => { const o = { hl: z.id === hl, dim: !!hset && !hset.has(z.id), addable, groups, settings: true }; return keepCard(oldS.get(String(z.id)), S, z, `3|${rowKey(o.hl, o.dim, addable, groups.length)}|1|0`, () => card3(S, ctl, z, o), busy); };
+      const mk = (z, addable) => { const o = { hl: z.id === hl, dim: !!hset && !hset.has(z.id), addable, groups, settings: true, active: z.id === spk, onSettings: id => setSpk(spk === id ? null : id) }; return keepCard(oldS.get(String(z.id)), S, z, `3|${rowKey(o.hl, o.dim, addable, groups.length)}|1|0|${o.active ? 1 : 0}`, () => card3(S, ctl, z, o), busy); };
       const hz = hl != null ? S.zones.find(z => z.id === hl) : null;
       const head = h('div', { class: 'pane-h dsec-h devs-h' }, h('span', null, SPEAKERS_LABEL.toUpperCase()), h('span', { class: 'small dim' }, String(zoned.length)), h('span', { class: 'grow' }),
         pg || hz ? h('button', { class: 'btn sm', onclick: () => { hl = null; setPick('all'); } }, 'Show all') : h('span', { class: 'small dim' }, `${S.zones.filter(z => z.connected).length} online`));
@@ -733,7 +742,25 @@ export function devicesPanel(S, ctl) {
       const sscol = kid(emain, 'sscol') || h('div', { class: 'sscol ecol' });
       if (!sscol.firstChild) sscol.append(scenesColumn(S, { refresh: ctl.refreshAll, zones: () => S.zones }));
       else sscol.firstChild._refresh?.();
-      reconcile(emain, [sscol, zcol, scol]);
+      // 0.3.6 K5: Speaker Settings is the widest column. Open: Scenes & Schedules folds into a slim bar on the far left, Zones slides left, the Speakers column never changes width.
+      const spZ = spk != null ? S.zones.find(z => z.id === spk) : null; if (spk != null && !spZ) { spk = null; }
+      const spcol = kid(emain, 'spcol') || h('div', { class: 'spcol ecol', 'aria-hidden': 'true' });
+      if (spZ) {
+        let pnl = spcol.firstChild;
+        if (!pnl || pnl.dataset.zoneId !== String(spZ.id)) {
+          pnl?._destroy?.();
+          pnl = speakerSettings(S, ctl, spZ, { onDone: () => setSpk(null), outputPicker: zz => outputPicker(S, ctl, zz),
+            calibrate: zz => { const cu = chosenOutput(zz); return h('button', { type: 'button', class: 'btn calbtn' + (zz.badge === 'recheck' || zz.badge === 'uncalibrated' ? ' primary' : ''), disabled: !(canTune(S, zz) && zz.connected && !zz.reference) || undefined, title: zz.reference ? 'This is the reference speaker.' : '', onclick: () => openCalibration(S, ctl.refreshAll, zz.id) }, 'Calibrate sync'); },
+            more: zz => moreMenu(S, ctl, zz, chosenOutput(zz), null) });
+          spcol.replaceChildren(pnl);
+        } else pnl._patch?.(spZ);
+        spcol.removeAttribute('aria-hidden');
+      } else if (spcol.firstChild) { spcol.firstChild._destroy?.(); setTimeout(() => { if (spk == null) spcol.replaceChildren(); }, 320); spcol.setAttribute('aria-hidden', 'true'); }
+      emain.classList.toggle('spk-open', !!spZ);
+      if (!sscol.querySelector('.ss-rail')) sscol.prepend(h('button', { type: 'button', class: 'ss-rail', 'aria-label': 'Scenes and schedules (folded away while speaker settings are open) - open', title: 'Show Scenes & Schedules again', onclick: () => setSpk(null) },
+        h('span', { class: 'ss-rail-c' }, icon('chevR')), h('span', { class: 'prail-ic' }, '▶'), h('span', { class: 'prail-t' }, 'SCENES & SCHEDULES'), h('span', { class: 'prail-n ss-rail-n' })));
+      const ssn = sscol.querySelector('.ss-rail-n'); if (ssn) ssn.textContent = String(sscol.querySelectorAll('.ssc-scene').length + sscol.querySelectorAll('.ssc-sched').length || '');
+      reconcile(emain, [sscol, zcol, spcol, scol]);
       reconcile(body, [etop, emain]);
       if (busy.v) later();
       return;
@@ -742,7 +769,7 @@ export function devicesPanel(S, ctl) {
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
     const groups = S.groups || [], { zoned, unassigned: un } = speakerGroups(S.zones, groups), old = childCards(body, 'drow');
     const sub = (t, n, cls = '') => h('div', { class: 'pane-h dsec-h slimsub ' + cls }, h('span', null, t), h('span', { class: 'small dim' }, String(n)));
-    const row = z => keepCard(old.get(String(z.id)), S, z, `3|${rowKey(false, false, false, 0)}|0|1`, () => card3(S, ctl, z, { slim: true, openDevice: id => { setCardOpen(id, true); ctl.setDevSize?.('expanded', id); } }), busy);
+    const row = z => keepCard(old.get(String(z.id)), S, z, `3|${rowKey(false, false, false, 0)}|0|1`, () => card3(S, ctl, z, { slim: true, openDevice: id => { spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } }), busy);
     reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S),
       sub(SPEAKERS_LABEL.toUpperCase(), zoned.length, 'devs-h'),
       S.zones.length ? zoned.map(row) : h('p', { class: 'dim small pad' }, EMPTY),
@@ -925,31 +952,32 @@ function capBar(label, value, cap, can, send, title) {
   return { wrap, vol, pct, patch: (v, c) => { if (idle(vol)) { vol.value = String(v); pct.textContent = Math.round(v) + '%'; paint(Math.round(v), c); } else paint(+vol.value, c); } };
 }
 /** J4: one speaker card. Standard panel: the name opens Expanded with this card highlighted. Expanded / phone page: the card opens its settings in place (J6). */
-function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [], settings: withSettings = false, openDevice = null, slim = false } = {}) {
+function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [], settings: withSettings = false, openDevice = null, slim = false, onSettings = null, active = false } = {}) {
   z = { ...z };
-  const can = canControl(S), me = thisDevice(S)?.id === z.id, open = withSettings && openSet.has(z.id);
+  // 0.3.6 K5: in the expanded view a speaker's settings open in the wide Speaker Settings column (onSettings) instead of folding out inside the card
+  const can = canControl(S), me = thisDevice(S)?.id === z.id, open = withSettings && !onSettings && openSet.has(z.id);
   let card;
-  const flip = () => { card = toggleSettings(z, card, () => card3(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, { hl, dim, addable, groups, settings: withSettings, openDevice, slim })); };
+  const flip = onSettings ? () => onSettings(z.id) : () => { card = toggleSettings(z, card, () => card3(S, ctl, (S.zones || []).find(x => x.id === z.id) || z, { hl, dim, addable, groups, settings: withSettings, openDevice, slim })); };
   const dot = h('span', { class: 'dot ' + dotClass(z), title: stateText(z) });
   const name = openDevice ? h('button', { type: 'button', class: 'dname ell', title: (me ? 'This device. ' : '') + 'Show this device with all of its controls and settings', onclick: () => openDevice(z.id) }, z.name)
-    : withSettings ? h('button', { type: 'button', class: 'dname ell', title: open ? 'Hide settings' : 'Show settings', 'aria-expanded': String(open), onclick: flip }, z.name)
+    : withSettings ? h('button', { type: 'button', class: 'dname ell', title: (open || active) ? 'Hide settings' : 'Show settings', 'aria-expanded': String(open || active), onclick: flip }, z.name)
     : h('b', { class: 'dname ell' }, z.name);
   const pill = onPill(z.name, z.enabled, can, () => { z.enabled = !z.enabled; pill._set(z.enabled); ctl.act(`/zones/${z.id}`, { enabled: z.enabled }, 'PATCH'); });
   const bar = capBar(`${z.name} volume`, z.volume, capOf(z), can, v => ctl.act(`/zones/${z.id}`, { volume: v }, 'PATCH'));
   const mute = muteButton(S, ctl, z);
   const tags = h('div', { class: 'dtagrow dc3tags' }, tagEls3(cardTags3(z))); tags._k = JSON.stringify(cardTags3(z));
   const hide = open ? h('button', { type: 'button', class: 'linkbtn dhide', 'aria-controls': `dset-${z.id}`, onclick: flip }, '▲ Hide settings') : null;
-  const exp = withSettings && !open ? settingsToggle(z.name, false, flip) : null;
+  const exp = withSettings && !open ? (onSettings ? settingsOpener(z.name, active, flip) : settingsToggle(z.name, false, flip)) : null;
   const add = addable ? ro(h('button', { type: 'button', class: 'btn sm saddzone', title: 'Add this speaker to a zone', onclick: ev => { ev.stopPropagation(); addToZoneMenu(S, ctl, z, ev.currentTarget, groups); } }, '+ Add to zone'), isAdmin(S)) : null;
   const set = open ? cardSettings(S, ctl, z) : null;
   const ol = outputTypeLine(z);
-  card = h('div', { class: 'dcard dc3' + (slim ? ' drow slim' : '') + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl ? ' hl' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : '') + (me || z.mine ? ' mine' : ''),
+  card = h('div', { class: 'dcard dc3' + (slim ? ' drow slim' : '') + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl || active ? ' hl' : '') + (active ? ' spk-active' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : '') + (me || z.mine ? ' mine' : ''),
     'data-room': z.name, 'data-device': z.name, 'data-zone-id': z.id, title: ol ? `${z.name} - ${ol}` : z.name },
     h('div', { class: 'dtop dc3l1' }, dot, name, h('span', { class: 'grow' }), hide, exp, pill),
     h('div', { class: 'dc3l2' }, tags, add),
     h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute),
     set);
-  card._sig = cardSig(S, z, `3|${rowKey(hl, dim, addable, groups.length)}|${withSettings ? 1 : 0}|${slim ? 1 : 0}`);
+  card._sig = cardSig(S, z, `3|${rowKey(hl, dim, addable, groups.length)}|${withSettings ? 1 : 0}|${slim ? 1 : 0}|${active ? 1 : 0}`);
   card._patch = nz => {
     Object.assign(z, nz);
     card.classList.toggle('off', !z.enabled); card.classList.toggle('muted', !!z.muted); card.classList.toggle('gone', !z.connected);
@@ -959,7 +987,7 @@ function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [
     const t = JSON.stringify(cardTags3(z)); if (tags._k !== t) { tags._k = t; tags.replaceChildren(...tagEls3(cardTags3(z))); }
     set?._patch?.(z);
   };
-  return withSettings ? escCloses(card, z, flip) : card;
+  return withSettings && !onSettings ? escCloses(card, z, flip) : card;
 }
 /** J4 zone card: the same three lines; picking it highlights its speakers (Expanded); ✎ edits it in place (J9 #2). */
 function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null } = {}) {

@@ -341,12 +341,12 @@ export function sceneRange(sc) { const vols = (sc.members || []).filter(m => m.e
 export function scenesColumn(S, { refresh } = {}) {
   const admin = isAdmin(S), ctlOk = canControl(S), locale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
   const root = h('section', { class: 'ssc-col', 'aria-label': 'Scenes and schedules' });
-  let data = { scenes: [], rows: [], stations: [], now: null, server: null }, editing = null;   // editing: {kind:'scene'|'sched'|'capture', id|null, kind2}
+  let data = { scenes: [], rows: [], stations: [], now: null, server: null, profiles: [] }, editing = null;   // editing: {kind:'scene'|'sched'|'capture', id|null, kind2}
   const busy = () => !!editing || !!root.querySelector('input:focus,select:focus');
   async function load(force) {
     if (!force && busy()) return;
-    try { const [scenes, rows, ck, stations] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock').catch(() => ({})), api('/radio').catch(() => [])]);
-      data = { scenes, rows, now: ck.now, server: ck.server, stations }; } catch { /* offline: keep what we have */ }
+    try { const [scenes, rows, ck, stations, profiles] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock').catch(() => ({})), api('/radio').catch(() => []), api('/profiles').catch(() => [])]);
+      data = { scenes, rows, now: ck.now, server: ck.server, stations, profiles }; } catch { /* offline: keep what we have */ }
     draw();
   }
   root._refresh = () => { if (!busy() && Date.now() - (root._at || 0) > 15000) { root._at = Date.now(); load(); } };
@@ -385,7 +385,7 @@ export function scenesColumn(S, { refresh } = {}) {
     return h('div', { class: 'card ss-card ssc-scene' + (sc.active ? ' on' : ''), 'data-scene': sc.id },
       h('button', { type: 'button', class: 'ss-play', 'aria-label': `Run ${sc.name}`, disabled: !ctlOk, onclick: () => runScene(sc) }, '▶'),
       h('div', { class: 'grow ss-mid' }, h('div', { class: 'row' }, h('b', null, sc.name), sc.active ? h('span', { class: 'tag c dtag zplaying' }, 'ACTIVE') : null),
-        h('div', { class: 'small dim ell', title: names.join(' + ') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${used ? ` · used by ${used} schedule${used === 1 ? '' : 's'}` : ''}`)),
+        h('div', { class: 'small dim ell', title: names.join(' + ') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${on.some(m => m.profileId) ? ` · ${on.filter(m => m.profileId).length} with a profile` : ''}${used ? ` · used by ${used} schedule${used === 1 ? '' : 's'}` : ''}`)),
       h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => runScene(sc) }, 'Run'),
       pencil(`Edit scene ${sc.name}`, admin, () => { editing = { kind: 'scene', id: sc.id }; draw(); }));
   }
@@ -413,11 +413,14 @@ export function scenesColumn(S, { refresh } = {}) {
     const members = (S.zones || []).map(z => { const ex = (sc?.members || []).find(m => m.deviceId === z.id); let en = ex ? ex.enabled : sc ? false : z.enabled;
       const out = h('span', { class: 'mono small ss-pct' }, `${Math.round(ex ? ex.volume : z.volume)}%`);
       const vol = h('input', { type: 'range', min: 0, max: 100, step: 1, 'data-coarse': 5, value: Math.round(ex ? ex.volume : z.volume), class: 'grow', 'aria-label': `${z.name} volume`, oninput: ev => { out.textContent = ev.target.value + '%'; } });
-      const m = { z, vol, get en() { return en; } };
+      // 0.3.6 K7: an optional speaker profile per device - loaded first, then the scene's on/off and volume (zones are never touched by profiles)
+      const prof = h('select', { class: 'ss-prof', 'aria-label': `${z.name} profile`, title: 'Load a speaker profile on this device when the scene runs', 'data-dev': z.id },
+        h('option', { value: '' }, 'No profile'), ...(data.profiles || []).map(p => h('option', { value: p.id, selected: ex?.profileId === p.id }, p.name)));
+      const m = { z, vol, prof, get en() { return en; } };
       const pill = pillEl(en, `${z.name} in this scene`, true, v => { en = v; pill.classList.toggle('on', v); pill.setAttribute('aria-checked', String(v)); pill.onclick = ev => { ev.stopPropagation(); en = !en; pill.classList.toggle('on', en); pill.setAttribute('aria-checked', String(en)); }; });
-      m.row = h('div', { class: 'row ss-mem' }, h('span', { class: 'ss-mn ell' }, z.name), pill, vol, out); return m; });
+      m.row = h('div', { class: 'row ss-mem' }, h('span', { class: 'ss-mn ell' }, z.name), pill, (data.profiles || []).length ? prof : null, vol, out); return m; });
     const err = h('span', { class: 'small err', role: 'status' });
-    const body = () => ({ name: name.value, icon: iconIn.value, members: members.map(m => ({ deviceId: m.z.id, enabled: m.en, volume: +m.vol.value })) });
+    const body = () => ({ name: name.value, icon: iconIn.value, members: members.map(m => ({ deviceId: m.z.id, enabled: m.en, volume: +m.vol.value, profileId: m.prof.value ? +m.prof.value : null })) });
     const save = async () => { try { if (sc) await api(`/scenes/${sc.id}`, { method: 'PUT', body: body() }); else await api('/scenes', { method: 'POST', body: body() }); toast('Scene saved'); reload(); } catch (e) { err.textContent = 'Not saved: ' + e.message; } };
     const el = h('div', { class: 'card ss-inline ss-sceneedit', role: 'group', 'aria-label': sc ? `Edit scene ${sc.name}` : 'New scene', 'data-edit': sc ? sc.id : 'new' },
       h('div', { class: 'row ss-ih' }, h('b', { class: 'grow' }, sc ? `Edit scene: ${sc.name}` : 'New scene')),

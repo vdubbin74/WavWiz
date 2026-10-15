@@ -2344,3 +2344,49 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .bkpanel .bk-list{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
 .bkpanel .bk-row{text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:8px 10px;cursor:pointer}
 .bkpanel .bk-row:hover{border-color:var(--accent);background:var(--accent-soft)}
+/* K5: expanded Devices - the Speakers column is ALWAYS --rightw (380px at 1920); normal = Scenes 740 / Zones 740 / Devices 380; with speaker settings open: slim Scenes bar | Zones 380 | Settings (widest) | Speakers 380 */
+.devpanel.expanded .dexp-main.e1{display:flex!important;grid-template-columns:none!important;gap:0!important;min-height:0;align-items:stretch}
+.devpanel.expanded .dexp-main.e1>.ecol{min-width:0;box-sizing:border-box;margin-right:14px;transition:flex var(--glide) var(--glide-ease),margin var(--glide) var(--glide-ease),opacity var(--glide-fade) var(--glide-ease);overflow:auto}
+.devpanel.expanded .dexp-main.e1>.sscol{flex:1 1 0}
+.devpanel.expanded .dexp-main.e1>.zcol{flex:1 1 0}
+.devpanel.expanded .dexp-main.e1>.spcol{flex:0 0 0;margin-right:0;opacity:0;pointer-events:none;overflow:hidden;padding:0}
+.devpanel.expanded .dexp-main.e1>.scol{flex:0 0 var(--spkcol);margin-right:0;width:var(--spkcol)}
+.devpanel.expanded .dexp-main.e1.spk-open>.sscol{flex:0 0 46px;overflow:hidden}
+.devpanel.expanded .dexp-main.e1.spk-open>.zcol{flex:0 0 380px}
+.devpanel.expanded .dexp-main.e1.spk-open>.spcol{flex:1 1 0;margin-right:14px;opacity:1;pointer-events:auto;overflow:auto}
+.sscol .ss-rail{display:none}
+.spk-open>.sscol{position:relative}
+.spk-open>.sscol .ss-rail{display:flex;flex-direction:column;align-items:center;gap:8px;position:absolute;inset:0;width:100%;padding:8px 0;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;color:var(--accent-text,var(--accent));cursor:pointer;z-index:2}
+.spk-open>.sscol .ss-rail:hover{background:var(--accent-soft);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 35%,transparent)}
+.spk-open>.sscol .ss-rail .prail-t{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:.14em;font-weight:800}
+.spk-open>.sscol>:not(.ss-rail){visibility:hidden}
+.ss-rail-c svg{width:14px;height:14px}
+.dcard.spk-active{border-color:var(--accent)!important;background:color-mix(in srgb,var(--accent) 10%,var(--panel2))}
+.dexpand.spk-opener{width:28px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--accent);border-radius:3px;background:var(--panel2);color:var(--accent-text,var(--accent))}
+.dexpand.spk-opener:hover,.dexpand.spk-opener.on{background:var(--accent-soft)}
+/* Speaker Settings panel */
+.spkset{display:flex;flex-direction:column;gap:12px;min-height:100%;padding:14px 16px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-sizing:border-box;animation:k-fadein var(--glide-fade) var(--glide-ease)}
+.spkset.spk-loaded{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.spk-head{display:flex;align-items:center;gap:10px}
+.spk-title{margin:0;font-size:14px;letter-spacing:.1em;color:var(--accent2-text,var(--accent2));font-weight:800}
+.spk-state{font-size:11px;color:var(--dim);letter-spacing:.04em;text-transform:lowercase}.spk-state.ok{color:var(--green)}
+.spk-profrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:3px}
+.spk-pwrap{position:relative;display:inline-flex;align-items:center}
+.spk-prof{min-width:190px;font-weight:700}
+.spk-moddot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);margin-right:6px;flex:none}
+.spk-moddot[hidden]{display:none}
+.spk-pname{width:170px}
+.spk-hint{max-width:340px;text-align:right}
+.spk-body{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:26px;flex:1}
+.spk-left{display:flex;flex-direction:column;gap:18px}
+.spk-row{display:flex;flex-direction:column;gap:6px}
+.spk-l{display:flex;justify-content:space-between;font-size:13px}.spk-v{color:var(--accent-text,var(--accent));font-weight:700}
+.spk-range{width:100%;height:26px;cursor:pointer}
+.spk-right{display:flex;flex-direction:column;gap:10px;min-width:0}
+.spk-eq{min-height:190px}
+.spk-btns{gap:8px;flex-wrap:wrap;margin-top:6px}
+@media (max-width:1400px){.spk-body{grid-template-columns:1fr}}
+
+:root{--spkcol:clamp(250px,calc(22vw / var(--z,1)),380px)}   /* the standard Devices panel width: 380px at 1920, the Speakers column in EVERY expanded state */
+.devpanel.expanded .dexp-main.e1.spk-open>.zcol{flex:0 0 var(--spkcol)}
+.ss-mem .ss-prof{max-width:150px;font-size:12px}

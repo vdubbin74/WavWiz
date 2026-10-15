@@ -21,6 +21,7 @@ public sealed class DspChain : IAudioProcessor
     private double _volumePercent = 100;
     private volatile bool _muted;
     private double _gainTarget = 1, _gainNow = 1;
+    private double _balL = 1, _balR = 1;
 
     // limiter state
     private double _limGain = 1;
@@ -117,6 +118,19 @@ public sealed class DspChain : IAudioProcessor
             }
         }
         _gainNow = g1;
+        // 0.3.6 K6: balance (linear: the far side is turned down, the near side stays at full level); ramped across the block
+        {
+            double b = cur.Preset.Balance / 100.0, tl = b > 0 ? 1 - b : 1, tr = b < 0 ? 1 + b : 1;
+            if (tl != _balL || tr != _balR || tl != 1 || tr != 1)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    float fl = (float)(_balL + (tl - _balL) * (i + 1) / n), fr = (float)(_balR + (tr - _balR) * (i + 1) / n);
+                    buf[i * 2] *= fl; buf[i * 2 + 1] *= fr;
+                }
+                _balL = tl; _balR = tr;
+            }
+        }
         Limit(buf, n, cur.Preset.Limiter);
     }
 
