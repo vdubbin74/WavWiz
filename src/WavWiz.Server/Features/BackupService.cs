@@ -22,7 +22,36 @@ public sealed class BackupService
     public static bool IsSecretSetting(string key) => Secret.IsMatch(key) && !key.EndsWith("pinHash", StringComparison.Ordinal);
 
     private readonly Db _db; private readonly EventHub _ev;
-    public BackupService(Db db, EventHub ev) { _db = db; _ev = ev; }
+    private readonly string? _dir;
+    public BackupService(Db db, EventHub ev, string? snapshotDir = null) { _db = db; _ev = ev; _dir = snapshotDir; }
+
+    // ---- 0.3.6 K20: "Back up now" saves a snapshot on the server; Restore picks one; every restore first saves a "before restore" snapshot so Undo is one click.
+    public sealed record Snapshot(string Name, string CreatedAt, long Size, string Kind);
+    public const int KeepManual = 10, KeepUndo = 3;
+    private static readonly Regex SnapName = new(@"^WavWiz-\d{8}-\d{6}(-before-restore)?\.wavwizbackup$", RegexOptions.Compiled);
+    public static bool ValidSnapshotName(string? n) => n != null && SnapName.IsMatch(n);
+    public Snapshot SaveSnapshot(string appVersion, bool beforeRestore = false, DateTime? at = null)
+    {
+        if (_dir == null) throw new InvalidOperationException("No backup folder.");
+        Directory.CreateDirectory(_dir);
+        var t = at ?? DateTime.Now; var name = $"WavWiz-{t:yyyyMMdd-HHmmss}{(beforeRestore ? "-before-restore" : "")}.wavwizbackup"; var path = Path.Combine(_dir, name);
+        for (var i = 1; File.Exists(path); i++) { t = t.AddSeconds(1); name = $"WavWiz-{t:yyyyMMdd-HHmmss}{(beforeRestore ? "-before-restore" : "")}.wavwizbackup"; path = Path.Combine(_dir, name); if (i > 600) break; }
+        File.WriteAllBytes(path, Export(appVersion));
+        Prune();
+        var fi = new FileInfo(path); return new Snapshot(name, fi.LastWriteTime.ToString("O"), fi.Length, beforeRestore ? "before-restore" : "manual");
+    }
+    public List<Snapshot> ListSnapshots()
+    {
+        if (_dir == null || !Directory.Exists(_dir)) return new();
+        return new DirectoryInfo(_dir).GetFiles("WavWiz-*.wavwizbackup").Where(f => ValidSnapshotName(f.Name)).OrderByDescending(f => f.Name)
+            .Select(f => new Snapshot(f.Name, f.LastWriteTime.ToString("O"), f.Length, f.Name.Contains("-before-restore") ? "before-restore" : "manual")).ToList();
+    }
+    public byte[]? ReadSnapshot(string name) => _dir != null && ValidSnapshotName(name) && File.Exists(Path.Combine(_dir, name)) ? File.ReadAllBytes(Path.Combine(_dir, name)) : null;
+    private void Prune()
+    {
+        var all = ListSnapshots();
+        foreach (var f in all.Where(x => x.Kind == "manual").Skip(KeepManual).Concat(all.Where(x => x.Kind == "before-restore").Skip(KeepUndo))) { try { File.Delete(Path.Combine(_dir!, f.Name)); } catch { /* in use */ } }
+    }
 
     public byte[] Export(string appVersion)
     {

@@ -6,7 +6,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
+import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { GLIDE, glide, pulse, pulseSel } from './motion.js';
@@ -24,7 +24,7 @@ import { artPushed, setArtCv } from './art.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
-import { canControl, thisDevice } from './ui.js';
+import { canControl, thisDevice, isAdmin } from './ui.js';
 import { isPlayerUa } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
 import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning } from './jukebox-kiosk.js';
@@ -35,6 +35,8 @@ import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
+import { newKindForKey, isTypingTarget } from './menusub.js';
+import { showPendingUndo } from './backupflow.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -140,7 +142,7 @@ async function startMain() {
   S.view = wide() ? 'library' : 'now';
 
   const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
-  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
+  const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => openEq(S, refreshAll) }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
   const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
@@ -167,6 +169,7 @@ async function startMain() {
   window.addEventListener('resize', () => { if (wide() && S.view === 'now') go('library'); applyPanels(); });
   window.addEventListener('keydown', ev => {
     if (ev.key === 'Escape') toggleDrawer(false);
+    const nk = !document.querySelector('dialog[open],.sheet,.dlg,.jb') && newKindForKey(ev, isTypingTarget(ev.target)); if (nk) { ev.preventDefault(); openNew(nk); return; }   // K17
     if (!wide() || document.querySelector('dialog[open],.sheet,.dlg,.jb')) return;
     const n = keyAction(P6, ev); if (n) { ev.preventDefault(); setPanels(n, ev.code === 'BracketRight' ? 'dev' : 'lib'); }
   });
@@ -180,7 +183,7 @@ async function startMain() {
   new ResizeObserver(centerW).observe(nowc.el); new ResizeObserver(centerW).observe(desk); window.addEventListener('resize', centerW); window.addEventListener('wavwiz:uiscale', centerW); desk.addEventListener('transitionend', centerW); centerW();
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
-  drawStatus(); maybeWhatsNew(S);
+  drawStatus(); maybeWhatsNew(S); showPendingUndo();
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
   api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
@@ -200,9 +203,11 @@ async function startMain() {
 }
 /** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */
 function toggleLib(force) { if (force === true) return setPanels({ ...P6, lib: 'rail', exp: P6.exp === 'lib' ? null : P6.exp }, 'lib'); if (force === false) return setPanels(railClick(P6, 'lib'), 'lib'); setPanels(chevron(P6, 'lib'), 'lib'); }
-function toggleLibExpanded(force) { setPanels(expand(P6, 'lib', force ?? P6.exp !== 'lib'), 'lib'); }
+function toggleLibExpanded(force) { if (force === true && P6.exp === 'lib') { pulse(libpanel); return; }   // K15: already open -> pulse it
+  setPanels(expand(P6, 'lib', force ?? P6.exp !== 'lib'), 'lib'); }
 function toggleDev(force) { if (force === true) return setPanels({ ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); if (force === false) return setPanels(railClick(P6, 'dev'), 'dev'); setPanels(chevron(P6, 'dev'), 'dev'); }
-function toggleDevExpanded(force) { setPanels(expand(P6, 'dev', force ?? P6.exp !== 'dev'), 'dev'); }
+function toggleDevExpanded(force) { if (force === true && P6.exp === 'dev') { pulse(devp.el); return; }   // K15
+  setPanels(expand(P6, 'dev', force ?? P6.exp !== 'dev'), 'dev'); }
 /** 0.3.5 J11 (option A): with the Library expanded the right column shows the playlist; "Devices ›" swaps the Devices panel in, "‹ Playlist" back. */
 function libSwap(v) { if (!desk) return; desk.classList.toggle('libdev', !!v); devp.setSize(v ? 'standard' : (desk.classList.contains('devcollapsed') ? 'collapsed' : 'standard')); listt.relayout?.(); }
 function setDevSize(sz, highlight = null) { devHl = highlight; setPanels(sz === 'expanded' ? expand(P6, 'dev', true) : sz === 'collapsed' ? { ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp } : { ...P6, dev: 'normal', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); }
@@ -278,11 +283,37 @@ async function openAboutInto(el) { const { aboutBody } = await import('./about.j
 
 function buildDrawer() {
   navButtons = [];
-  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, openMini }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
+  const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
   return h('div', { class: 'drawer', id: 'drawer', role: 'dialog', 'aria-label': 'Menu' }, h('div', { class: 'scrim', onclick: () => toggleDrawer(false) }), nav);
 }
 function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
 
+/** 0.3.6 K22: Queue always opens the playlist expanded; when it already is, it pulses (K15). */
+export function openQueue() {
+  if (!wide()) return go('queue');
+  if (P6.list === 'expanded') { pulse(listt.el); return; }
+  setList('expanded');
+}
+/** 0.3.6 K17: File > New (and Ctrl+Shift+Z / S / A / H) jumps to that editor in the expanded Devices view. */
+export function openNew(kind) {
+  if (!isAdmin(S)) { toast('Only an administrator can create this.', true); return; }
+  if (!wide()) { if (kind === 'zone') return editZone(S, null, refreshAll); return openScenesSchedules(S, refreshAll, kind === 'alarm' ? { at: 'alarm' } : {}); }
+  const was = P6.exp === 'dev'; if (!was) toggleDevExpanded(true);
+  const run = () => {
+    if (kind === 'zone') { document.querySelector('.devpanel .zadd-new')?.click(); pulseSel('.devpanel .zones-h'); }
+    else { const c = document.querySelector('.devpanel .ssc-col'); c?._open?.(kind); setTimeout(() => pulseSel(document.querySelector('.devpanel .ss-inline') || c), 60); }
+  };
+  if (was) run(); else setTimeout(run, GLIDE.ms + 140);
+}
+/** 0.3.6 K18: a device / zone / scene picked from the Devices menu: open the expanded Devices view, scroll to it and pulse it. */
+export function jumpTo(kind, id) {
+  if (!wide()) return go(kind === 'scene' ? 'scenes' : 'devices');
+  const was = P6.exp === 'dev'; if (!was) toggleDevExpanded(true);
+  const sel = kind === 'zone' ? `[data-group-id="${id}"]` : kind === 'scene' ? `[data-scene="${id}"]` : `[data-zone-id="${id}"]`;
+  const run = () => { const el = [...document.querySelectorAll('.devpanel ' + sel)].find(e => e.getClientRects().length) || document.querySelector('.devpanel ' + sel); if (el) pulse(el); };
+  if (was) run(); else setTimeout(run, GLIDE.ms + 140);
+}
+export function openPlaylist(id) { toggleLibExpanded(true); setTimeout(() => { libC.showTab('playlists'); }, P6.exp === 'lib' ? 0 : GLIDE.ms); void id; }
 export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
@@ -305,8 +336,8 @@ export function go(k, force) {
     if (k === 'playlists') { toggleLib(false); libC.showTab('playlists'); return; }
     if (k === 'radio') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab('radio'); return; }
     if (k === 'rip' || k === 'tags' || k === 'cleanup') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab(k); return; }
-    if (k === 'eq') { nowc.showCenter?.('eq'); return; }     // Playback > Sound / EQ = the center EQ panel
-    if (k === 'queue') { listt.el.classList.add('flash'); setTimeout(() => listt.el.classList.remove('flash'), 900); return; }
+    if (k === 'eq') { nowc.showCenter?.('eq'); pulse(nowc.stage); return; }     // Playback > Sound / EQ = the center EQ panel
+    if (k === 'queue') return openQueue();
     return openPage(k);
   }
   if (k === 'scenes' || k === 'schedules' || k === 'alarms') return openScenesSchedules(S, refreshAll);   // phone sheet

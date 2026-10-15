@@ -8,6 +8,8 @@ import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
+import { NEW_KEYS, sleepSpec, eqSpec, playlistsSpec, zonesSpec, scenesSpec, deviceListSpec, runSpec } from './menusub.js';
+import { importSettings, restoreBackup, exportSettings, backUpNow } from './backupflow.js';
 
 
 function menuActions(S, ctl, desktop = false) {
@@ -19,7 +21,7 @@ function menuActions(S, ctl, desktop = false) {
   const browseLib = () => (desktop && wideNow() && ctl.toggleLibExpanded ? ctl.toggleLibExpanded(true) : go('library'));
   // 0.2.2 T8: "Devices & zones" always opens the EXPANDED Devices view on the desktop, from any state (like Browse library); the phone keeps its page.
   const devPanel = () => (desktop && wideNow() && ctl.toggleDevExpanded ? ctl.toggleDevExpanded(true) : go('devices'));
-  const listPanel = () => (desktop && wideNow() && ctl.toggleList ? ctl.toggleList() : go('queue'));      // 0.1.1: desktop slides the bottom Playlist; phone opens the full page
+  const listPanel = () => (desktop && wideNow() && ctl.openQueue ? ctl.openQueue() : go('queue'));   // 0.3.6 K22: always opens the playlist expanded (pulses if it already is)      // 0.1.1: desktop slides the bottom Playlist; phone opens the full page
   const admin = () => S.auth?.role === 'admin';
   const control = () => canControl(S);
   return {
@@ -29,13 +31,25 @@ function menuActions(S, ctl, desktop = false) {
     file: [
       ['Settings', () => openSettings(S, refreshAll, go)],
       'hr',
+      // 0.3.6 K17 / K19: New ▸ (zone, scene, alarm, schedule) and Run ▸ (scenes, schedules, alarms - the only place to start them)
+      ['New', null, null, null, { sub: () => [
+        ['Zone', () => ctl.openNew('zone'), () => !admin(), null, { kbd: NEW_KEYS.zone }], ['Scene', () => ctl.openNew('scene'), () => !admin(), null, { kbd: NEW_KEYS.scene }],
+        ['Alarm', () => ctl.openNew('alarm'), () => !admin(), null, { kbd: NEW_KEYS.alarm }], ['Schedule', () => ctl.openNew('schedule'), () => !admin(), null, { kbd: NEW_KEYS.schedule }]] }],
+      ['Run', null, () => !control(), null, { sub: () => runSpec(S, ctl) }],
+      'hr',
+      // 0.3.6 K20
+      ['Import settings…', () => importSettings(S, refreshAll), () => !admin()],
+      ['Restore backup…', () => restoreBackup(S, refreshAll), () => !admin()],
+      ['Export settings', () => exportSettings(S), () => !admin()],
+      ['Back up now', () => backUpNow(S), () => !admin()],
+      'hr',
       ['Sign in as admin…', () => signInAsAdmin(S), null, () => admin()],
       ['Leave admin mode', () => leaveAdmin(S), null, () => !S.auth?.elevated],
       ['Sign out', async () => { try { await api('/auth/logout', { method: 'POST' }); location.reload(); } catch (e) { toast(e.message, true); } }],
     ],
     library: [
       ['Browse library', browseLib],
-      ['Playlists', () => go('playlists')],
+      ['Playlists…', () => go('playlists'), null, null, { sub: () => playlistsSpec(S, ctl) }],
       ['Radio', () => go('radio')],
       ['Queue', listPanel],
       'hr',
@@ -49,14 +63,18 @@ function menuActions(S, ctl, desktop = false) {
       ['Next', () => act('/stream/next')],
       ['Previous', () => act('/stream/prev')],
       'hr',
-      ['Sound / EQ', () => go('eq')],
-      ['Sleep timer', () => go('sleep')],
+      ['Sound / EQ', () => go('eq'), null, null, { sub: () => eqSpec(S, ctl) }],
+      ['Sleep timer', () => go('sleep'), null, null, { sub: () => sleepSpec(S) }],
       'hr',
       ['Start Jukebox…', () => go('jukebox'), () => !admin()],   // 0.3.0 §1 (beta): admin only, read-only for others
     ],
     devices: [
       ['Devices & zones', devPanel],
-      ['Scenes, schedules & alarms', () => go('scenes')],
+      // 0.3.6 K18: hover submenus listing devices, zones and scenes (click jumps to it), each ending with New… (no Start buttons: File > Run is the one place to start)
+      ['Devices', devPanel, null, null, { sub: () => deviceListSpec(S, { ...ctl, canAdmin: admin }) }],
+      ['Zones', devPanel, null, null, { sub: () => zonesSpec(S, { ...ctl, canAdmin: admin }) }],
+      ['Scenes', () => go('scenes'), null, null, { sub: () => scenesSpec(S, { ...ctl, canAdmin: admin }) }],
+      ['Schedules & alarms', () => go('schedules')],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
       ['Mini player', () => ctl.openMini?.()],
@@ -97,6 +115,33 @@ export function createMenuBar(S, ctl) {
       onclick: ev => { ev.stopPropagation(); closeAll(); onclick?.(); },
     }, label);
   }
+  /** 0.3.6 K16: a choice-list item opens a flyout on hover (or Right arrow / click); it opens toward the free side of the screen and fills asynchronously. */
+  function flyout(label, fn, subFn, disabled) {
+    const sub = h('div', { class: 'msub flyout' + (disabled ? ' dis' : '') }), panel = h('div', { class: 'mpanel', role: 'menu', 'aria-label': label });
+    let loaded = 0;
+    const place = () => {
+      sub.classList.remove('flip', 'up'); panel.style.top = '';
+      const r = panel.getBoundingClientRect(), z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+      if (r.right > innerWidth - 6) sub.classList.add('flip');
+      const over = r.bottom - (innerHeight - 6); if (over > 0) panel.style.top = -Math.min(over / z, panel.offsetHeight - 30) + 'px';
+    };
+    const fill = async () => {
+      const tok = ++loaded; panel.replaceChildren(h('div', { class: 'mloading' }, 'Loading…')); place();
+      let spec = []; try { spec = await subFn(); } catch { spec = []; }
+      if (tok !== loaded) return; panel.replaceChildren(...fromSpec(spec)); place();
+    };
+    const open = () => { if (disabled) return; sub.parentElement?.querySelectorAll(':scope>.msub.open').forEach(x => { if (x !== sub) x.classList.remove('open'); }); if (!sub.classList.contains('open')) { sub.classList.add('open'); fill(); } };
+    const btn = h('button', { type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', disabled: disabled || undefined,
+      onclick: ev => { ev.stopPropagation(); if (fn) { closeAll(); fn(); } else open(); },
+      onmouseenter: open, onfocus: () => {},
+      onkeydown: ev => { if (ev.key === 'ArrowRight') { ev.preventDefault(); open(); panel.querySelector('button')?.focus(); } } }, label);
+    if (disabled) btn.title = ADMIN_HINT;
+    panel.addEventListener('keydown', ev => { if (ev.key === 'ArrowLeft') { ev.preventDefault(); sub.classList.remove('open'); btn.focus(); } });
+    sub.addEventListener('mouseleave', () => sub.classList.remove('open'));
+    sub.append(btn, panel);
+    new MutationObserver(() => btn.setAttribute('aria-expanded', String(sub.classList.contains('open')))).observe(sub, { attributes: true, attributeFilter: ['class'] });
+    return sub;
+  }
   function top(label, ...kids) {
     const group = h('div', { class: 'mgroup' });
     // 0.2.1 F6: Windows-style - one click opens a menu; while any menu is open, hovering another top-level menu switches to it (no click);
@@ -112,9 +157,11 @@ export function createMenuBar(S, ctl) {
   function fromSpec(spec) {
     return spec.map(s => {
       if (s === 'hr') return h('hr');
-      const [label, fn, dis, hide] = s;
+      const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
-      const b = item(label, fn, { disabled: !!dis?.() }); if (dis?.()) b.title = ADMIN_HINT;     // 0.2.0 item 28: read-only, never hidden
+      if (o?.sub) return flyout(label, fn, o.sub, !!dis?.());
+      const b = item(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;     // 0.2.0 item 28: read-only, never hidden
+      if (o?.kbd) b.append(h('span', { class: 'kbd' }, o.kbd)); if (o?.heading) b.classList.add('mheading');
       return b;
     }).filter(Boolean);
   }
@@ -152,9 +199,11 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
   function fromSpec(spec) {
     return spec.map(s => {
       if (s === 'hr') return h('hr');
-      const [label, fn, dis, hide] = s;
+      const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
-      const b = leaf(label, fn, { disabled: !!dis?.() }); if (dis?.()) b.title = ADMIN_HINT;
+      if (o?.sub) return nestedAsync(label, o.sub);
+      const b = leaf(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;
+      if (o?.kbd) b.append(h('span', { class: 'kbd' }, o.kbd)); if (o?.heading) b.classList.add('mheading');
       return b;
     }).filter(Boolean);
   }
@@ -167,6 +216,12 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
     } }, label);
     box.append(btn, panel);
     return box;
+  }
+  /** 0.3.6: the same choice lists as the PC flyouts, as tap-to-open accordions on the phone. */
+  function nestedAsync(label, subFn) {
+    const sub = h('div', { class: 'msub' }), panel = h('div', { class: 'mpanel' });
+    const btn = h('button', { type: 'button', onclick: async ev => { ev.stopPropagation(); const open = sub.classList.toggle('open'); if (!open) return; panel.replaceChildren(h('div', { class: 'mloading' }, 'Loading…')); let spec = []; try { spec = await subFn(); } catch { spec = []; } panel.replaceChildren(...fromSpec(spec)); } }, label);
+    sub.append(btn, panel); return sub;
   }
   function nested(label, kids) {
     const sub = h('div', { class: 'msub' });

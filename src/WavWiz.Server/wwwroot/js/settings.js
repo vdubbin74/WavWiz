@@ -2,6 +2,7 @@ import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
 import { networkCard, diagnosticsView } from './diag.js';
+import { pulseSel } from './motion.js';
 import { remoteView } from './remote.js';
 import { aboutBody } from './about.js';
 import { appearancePane } from './appearance.js';
@@ -192,7 +193,7 @@ export async function openSettings(S, refresh, nav, section) {
     }
 
     const navEl = h('div', { class: 'settings-nav', role: 'tablist', 'aria-label': 'Settings sections' }, GROUPS.map(([id, label]) =>
-      h('button', { class: active === id ? 'on' : '', role: 'tab', id: 'stab-' + id, 'aria-controls': 'ssec-' + id, 'aria-selected': String(active === id), 'data-g': id, onclick: () => { active = id; paint(); } }, label)));
+      h('button', { class: active === id ? 'on' : '', role: 'tab', id: 'stab-' + id, 'aria-controls': 'ssec-' + id, 'aria-selected': String(active === id), 'data-g': id, onclick: () => { if (active === id) { pulseSel(body.querySelector('.settings-sec.on')); return; } active = id; paint(); } }, label)));   // K15: the current tab pulses
     navEl.addEventListener('keydown', ev => { if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return; const i = GROUPS.findIndex(g => g[0] === active), n = (i + (ev.key === 'ArrowRight' ? 1 : -1) + GROUPS.length) % GROUPS.length; active = GROUPS[n][0]; paint(); navEl.children[n].focus(); });
     const sections = GROUPS.map(([id, label]) => h('div', { class: 'settings-sec' + (active === id ? ' on' : ''), 'data-g': id, id: 'ssec-' + id, role: 'tabpanel', 'aria-labelledby': 'stab-' + id },
       resetBar(S, label, { admin, server: RESET[id], local: id === 'appearance' ? THEME_RESET_KEYS : null, done: () => { if (id === 'appearance') reapplyLooks(); draw(); } }), ...panes[id]));

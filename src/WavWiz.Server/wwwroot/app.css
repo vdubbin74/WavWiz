@@ -2322,3 +2322,25 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .minirail .mp-rbar{width:30px;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
   .minirail .mp-rbar i{display:block;height:100%;width:var(--p,0%);background:var(--accent)}
 }
+/* K16-K19 menu flyouts (hover submenus) */
+.menubar .msub.flyout>.mpanel{position:absolute;left:100%;top:-5px;margin:0;min-width:190px;border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:4px 0;box-shadow:0 6px 20px rgba(0,0,0,.45);z-index:50}
+.menubar .msub.flyout.flip>.mpanel{left:auto;right:100%}
+.menubar .msub.flyout>button::after{content:"▸"}
+.menubar .msub.flyout.open>button::after{content:"▸"}
+.menubar .msub.flyout.open>button{background:var(--accent-soft)}
+.menubar .msub.flyout:not(.open)>.mpanel{display:none}
+.menubar .msub.flyout>.mpanel{max-height:min(70vh,520px);overflow:auto}
+.menubar .mpanel .mloading{padding:7px 14px;color:var(--dim);font-size:12px}
+.menubar .mpanel button .kbd,.drawer .mpanel button .kbd{margin-left:auto;padding-left:22px;color:var(--dim);font-size:11px;letter-spacing:.02em;font-family:var(--mono,inherit)}
+.menubar .mpanel button.mheading,.drawer .mpanel button.mheading{opacity:1;color:var(--accent2-text,var(--accent2));font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:default;padding-top:8px;padding-bottom:3px}
+.menubar .mpanel button.mheading:hover{background:none}
+/* K20 in-panel backup flow */
+.bkpanel{position:fixed;top:46px;right:14px;width:min(440px,calc(100vw - 28px));max-height:calc(100vh - 80px);overflow:auto;z-index:60;background:var(--panel);border:1px solid var(--accent);border-radius:3px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+.bkpanel.in{animation:k-dropin var(--glide) var(--glide-ease)}
+.bkpanel .bk-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.bkpanel .bk-bar{margin-top:10px;gap:8px}
+.bkpanel .tbl{width:100%;font-size:12px}
+.bkpanel .tbl tr.chg td{color:var(--accent2-text,var(--accent2))}
+.bkpanel .bk-list{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
+.bkpanel .bk-row{text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:8px 10px;cursor:pointer}
+.bkpanel .bk-row:hover{border-color:var(--accent);background:var(--accent-soft)}

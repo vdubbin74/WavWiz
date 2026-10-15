@@ -1,0 +1,2 @@
+await br.close();
+const fails = R.filter(x => !x).length; console.log(`\n${R.length - fails}/${R.length} passed`); process.exit(fails ? 1 : 0);
