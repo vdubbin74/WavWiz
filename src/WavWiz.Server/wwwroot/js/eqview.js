@@ -5,32 +5,33 @@
 import { h } from './util.js';
 import { EQ_BANDS, EQ_LABELS, dbToFrac, fracToDb, keyStep, fmtDb, logX, colX, snapDb, approxResponse, wheelGain } from './eqstyle.js';
 import { iconSvg } from './icons.js';
-import { magnitudes, bands as specBands, bandEdges, smooth } from './vizmath.js';
+import { magnitudes, smooth, eqBandLevels, eqBandsFromMags, EQ_HZ } from './vizmath.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs = {}) => { const e = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
-const SEGS = 24, METER = 12, GLOW_BARS = 48;
+const SEGS = 24, LEDS = 34;   // 0.3.6 K11: LEDS = segments of each live level bar
 const TITLES = { led: ['10-BAND EQ', '±12 dB · 0.5 dB steps · drag a cap'], faders: ['GRAPHIC EQ', '10 bands · ±12 dB · 0.5 dB steps'], curve: ['SPECTRUM', '20 Hz to 20 kHz · ±12 dB · drag a node'] };
 const hzText = i => (EQ_BANDS[i] >= 1000 ? EQ_LABELS[i] : EQ_LABELS[i] + ' Hz');
 const valCls = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero');
-// band centre frequencies of the glow bars (same edges the visualizers use, 48 kHz feed)
-const GLOW_HZ = (() => { const e = bandEdges(GLOW_BARS), binHz = 48000 / 1024; return Array.from({ length: GLOW_BARS }, (_, b) => Math.sqrt(e[b] * e[b + 1]) * binHz); })();
+/** 0.3.6 K11: LED bar colors per theme (CSS --led-lo / --led-mid / --led-hi, set in theme.js derive()); parsed once per look. */
+const hexRgb = c => { c = String(c || '').trim(); const m = /^#([0-9a-f]{6})$/i.exec(c); if (m) { const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; } const r = /rgba?\((\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(c); return r ? [+r[1], +r[2], +r[3]] : [61, 220, 132]; };
+const ledRamp = (lo, mid, hi, u) => { const [a, b, t] = u < 0.62 ? [lo, mid, u / 0.62] : [mid, hi, (u - 0.62) / 0.38]; return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`; };
 
 export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50, interactive = true, locked = false, onChange = () => {}, onSelect = () => {} } = {}) {
   let isLocked = !!locked;
-  let g = gains.slice(), sel = -1, glowLvl = glow, untap = null, levels = new Float64Array(GLOW_BARS), meter = new Float64Array(10);
+  let g = gains.slice(), sel = -1, glowLvl = glow, untap = null, meter = new Float64Array(10), peaks = new Float64Array(10), peakAt = new Float64Array(10), ledKey = '', ramp = null;
+  const leds = [], mkLed = i => { const c = h('canvas', { class: 'eqled', 'aria-hidden': 'true', 'data-led': i }); leds.push(c); return c; };
   const xOf = style === 'curve' ? hz => logX(hz) : hz => colX(hz);
   const live = h('span', { class: 'eqa-live', hidden: true }, h('i', { 'aria-hidden': 'true' }), 'Live music');
   // 0.2.3 U9: small padlock shown on the area while Lock EQ is on
   const lockMark = h('span', { class: 'eqa-lock', title: 'Lock EQ is on - uncheck it to change the EQ', hidden: true }); lockMark.innerHTML = iconSvg('lock');
   const head = h('div', { class: 'eqa-h' }, h('b', null, TITLES[style][0]), h('span', { class: 'small dim' }, TITLES[style][1]), h('span', { class: 'grow' }), live, lockMark);
-  const canvas = h('canvas', { class: 'eqa-glow', 'aria-hidden': 'true' });
   const grid = h('div', { class: 'eqa-grid', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('i', { class: db === 0 ? 'zero' : '', style: `top:${dbToFrac(db) * 100}%` })));
   const scale = h('div', { class: 'eqa-scale', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('span', { style: `top:${dbToFrac(db) * 100}%` }, db === 0 ? '0 dB' : (db > 0 ? '+' : '') + db)));
   const curve = svg('svg', { class: 'eqa-curve', viewBox: '0 0 1000 1000', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
   const path = svg('path', { 'vector-effect': 'non-scaling-stroke' }); curve.append(path);
   const tip = h('div', { class: 'eqa-tip', hidden: true, role: 'status', 'aria-live': 'polite' });
-  const field = h('div', { class: 'eqa-field' }, canvas, grid);
+  const field = h('div', { class: 'eqa-field' }, grid);
   const bandEls = [];
 
   // --- the 10 bands -------------------------------------------------------------------------------------------------
@@ -38,6 +39,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   if (style === 'curve') {
     const vgrid = h('div', { class: 'eqa-vgrid', 'aria-hidden': 'true' }, [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].map(f => h('i', { style: `left:${logX(f) * 100}%` }, h('span', null, f >= 1000 ? f / 1000 + 'k' : String(f)))));
     field.append(vgrid, curve);
+    EQ_BANDS.forEach((hz, i) => { const led = mkLed(i); led.style.left = logX(hz) * 100 + '%'; field.append(led); });
     EQ_BANDS.forEach((hz, i) => { const n = h('div', { class: 'eqn', ...sliderAttrs(i), style: `left:${logX(hz) * 100}%` }, String(i + 1)); bandEls.push(n); field.append(n); });
   } else {
     const cols = h('div', { class: 'eqa-cols' });
@@ -46,11 +48,10 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
       let col;
       if (style === 'led') {
         const segs = h('div', { class: 'eqb-segs', 'aria-hidden': 'true' }, Array.from({ length: SEGS }, () => h('i')));
-        col = h('div', { class: 'eqb', ...sliderAttrs(i) }, val, segs, h('span', { class: 'eqb-cap', 'aria-hidden': 'true' }), hzl);
+        col = h('div', { class: 'eqb', ...sliderAttrs(i) }, val, segs, mkLed(i), h('span', { class: 'eqb-cap', 'aria-hidden': 'true' }), hzl);
       } else {
         const ticks = h('div', { class: 'eqb-ticks', 'aria-hidden': 'true' }, Array.from({ length: 9 }, (_, k) => h('i', { style: `top:${k * 12.5}%` })));
-        const meterEl = h('div', { class: 'eqb-meter', 'aria-hidden': 'true' }, Array.from({ length: METER }, () => h('i')));
-        col = h('div', { class: 'eqb', ...sliderAttrs(i) }, val, ticks, h('span', { class: 'eqb-slot', 'aria-hidden': 'true' }), h('span', { class: 'eqb-fill', 'aria-hidden': 'true' }), meterEl, h('span', { class: 'eqb-knob', 'aria-hidden': 'true' }), hzl);
+        col = h('div', { class: 'eqb', ...sliderAttrs(i) }, val, ticks, h('span', { class: 'eqb-slot', 'aria-hidden': 'true' }), h('span', { class: 'eqb-fill', 'aria-hidden': 'true' }), mkLed(i), h('span', { class: 'eqb-knob', 'aria-hidden': 'true' }), hzl);
       }
       bandEls.push(col); cols.append(col);
     });
@@ -115,37 +116,44 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
     });
   });
 
-  // --- live spectrum glow -------------------------------------------------------------------------------------------
-  function drawGlow() {
-    const w = canvas.clientWidth, hh = canvas.clientHeight; if (!w || !hh) return;
-    const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
-    if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(hh * dpr); }
-    const c = canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, hh);
-    if (!glowLvl) return;
-    const cs = getComputedStyle(el), a1 = cs.getPropertyValue('--accent').trim() || '#FF3C00', a2 = cs.getPropertyValue('--accent2').trim() || '#19C3B1';
-    const k = glowLvl / 100, curveStyle = style === 'curve';
-    c.beginPath(); c.moveTo(0, hh);
-    let x0 = 0; GLOW_HZ.forEach((hz, b) => { const x = Math.max(0, Math.min(1, xOf(hz))) * w, y = hh - levels[b] * hh * (curveStyle ? 0.95 : 0.8); if (!b) { c.lineTo(0, y); x0 = x; } c.lineTo(x, y); }); void x0;
-    c.lineTo(w, hh - levels[GLOW_BARS - 1] * hh * 0.5); c.lineTo(w, hh); c.closePath();
-    const gr = curveStyle ? c.createLinearGradient(0, 0, w, 0) : c.createLinearGradient(0, 0, 0, hh);
-    gr.addColorStop(0, a1); gr.addColorStop(1, a2);
-    c.globalAlpha = (curveStyle ? 0.55 : 0.32) * k; c.fillStyle = gr; c.fill();
-    if (curveStyle) { c.globalAlpha = Math.min(1, 0.9 * k); c.strokeStyle = a2; c.lineWidth = 1; c.stroke(); }
-    c.globalAlpha = 1;
+  // --- live LED bars (0.3.6 K11) ------------------------------------------------------------------------------------
+  // Permanent vertical LED bars (34 segments) on every band slider. Each bar shows the REAL level of its own band (centered on the slider label),
+  // with a peak-hold dot that falls slowly and a soft glow (the look's Glow setting). The spectrum glow behind the EQ is gone.
+  function colors() {
+    const cs = getComputedStyle(el), lo = cs.getPropertyValue('--led-lo'), mid = cs.getPropertyValue('--led-mid'), hi = cs.getPropertyValue('--led-hi'), key = lo + mid + hi;
+    if (key !== ledKey || !ramp) { ledKey = key; const L = hexRgb(lo), M = hexRgb(mid), H = hexRgb(hi); ramp = Array.from({ length: LEDS }, (_, k) => ledRamp(L, M, H, k / (LEDS - 1))); }
+    return ramp;
   }
+  function drawGlow() { paintMeters(); }   // kept for the callers that redraw after a resize / glow change: it repaints the bars now
   function paintMeters() {
-    if (style !== 'faders') return;
-    bandEls.forEach((b, i) => { const n = Math.round(meter[i] * METER), m = b.querySelector('.eqb-meter').children; for (let s = 0; s < METER; s++) m[s].className = METER - 1 - s < n ? (s < 3 ? 'lit hi' : 'lit') : ''; });
+    const dpr = Math.min(2, globalThis.devicePixelRatio || 1), cols = colors(), glowK = glowLvl / 100;
+    leds.forEach((c, i) => {
+      const w = c.clientWidth, hh = c.clientHeight; if (!w || !hh) return;
+      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(hh * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr); }
+      const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, hh);
+      const gap = Math.max(1, hh / 260), segH = (hh - (LEDS - 1) * gap) / LEDS, lit = Math.round(meter[i] * LEDS), pk = peaks[i] > 0.02 ? Math.min(LEDS - 1, Math.max(0, Math.round(peaks[i] * LEDS) - 1)) : -1, inset = Math.max(0, w * 0.12);
+      for (let k = 0; k < LEDS; k++) {
+        const y = hh - (k + 1) * segH - k * gap, on = k < lit; x.fillStyle = cols[k]; x.globalAlpha = on ? 1 : 0.16;
+        if (on && glowK > 0) { x.shadowColor = cols[k]; x.shadowBlur = 7 * glowK; } else x.shadowBlur = 0;
+        x.fillRect(inset, y, w - 2 * inset, Math.max(1, segH));
+      }
+      x.shadowBlur = 0;
+      if (pk >= 0) { const y = hh - (pk + 1) * segH - pk * gap + segH / 2; x.globalAlpha = 1; x.fillStyle = '#fff'; if (glowK > 0) { x.shadowColor = '#fff'; x.shadowBlur = 8 * glowK; } x.beginPath(); x.arc(w / 2, y, Math.max(2.2, Math.min(w * 0.22, 4)), 0, Math.PI * 2); x.fill(); x.shadowBlur = 0; }
+      x.globalAlpha = 1;
+    });
   }
-  const tmp = new Float64Array(GLOW_BARS), tmp10 = new Float64Array(10);
-  function onFrame(win, audible) {
+  const tmp10 = new Float64Array(10);
+  function onFrame(win, audible, bandBytes) {
     live.hidden = !audible;
-    if (win) { const mags = magnitudes(win); smooth(levels, specBands(mags, GLOW_BARS, tmp)); smooth(meter, specBands(mags, 10, tmp10)); }
-    else { smooth(levels, new Float64Array(GLOW_BARS)); smooth(meter, new Float64Array(10)); }
-    drawGlow(); paintMeters();
+    if (win && bandBytes) smooth(meter, eqBandLevels(bandBytes, tmp10));                    // the server's real 8192-point octave bands
+    else if (win) smooth(meter, eqBandsFromMags(magnitudes(win), tmp10));                    // older server: browser FFT, same band centers
+    else smooth(meter, tmp10.fill(0));
+    const now = performance.now();
+    for (let i = 0; i < 10; i++) { if (meter[i] >= peaks[i]) { peaks[i] = meter[i]; peakAt[i] = now; } else if (now - peakAt[i] > 700) peaks[i] = Math.max(meter[i], peaks[i] - 0.012); }
+    paintMeters();
   }
   /** A still example spectrum (Appearance preview, or before the first live frame). */
-  function exampleSpectrum() { for (let b = 0; b < GLOW_BARS; b++) { const t = b / (GLOW_BARS - 1); levels[b] = Math.max(0.08, 0.75 * Math.exp(-((t - 0.28) ** 2) / 0.09) + 0.18 * (1 - t)); } for (let i = 0; i < 10; i++) meter[i] = Math.max(0.1, 0.8 - i * 0.06 + (i % 3) * 0.05); }
+  function exampleSpectrum() { for (let i = 0; i < 10; i++) { meter[i] = Math.max(0.1, 0.8 - i * 0.06 + (i % 3) * 0.05); peaks[i] = Math.min(1, meter[i] + 0.1); } }
   function setGlow(v) { glowLvl = v; drawGlow(); }
   /** U9: Lock EQ - bands ignore wheel / drag / click / keys and look slightly dimmed with a small lock. */
   function setLocked(v) {
@@ -155,9 +163,9 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   function startLive(tap) { if (untap || !tap) return; untap = tap(onFrame); }
   function stopLive() { untap?.(); untap = null; }   // 0.3.1 B15: off-screen previews stop listening
   function destroy() { untap?.(); untap = null; ro?.disconnect(); }
-  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => drawGlow()) : null; ro?.observe(canvas);
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => paintMeters()) : null; ro?.observe(field);
   setGains(g); setResponse(null); if (interactive) setLocked(isLocked);
-  if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(drawGlow); }
+  if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(paintMeters); }
   return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, stopLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
 }
 

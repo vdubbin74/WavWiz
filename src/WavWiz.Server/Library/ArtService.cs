@@ -22,7 +22,7 @@ public sealed class ArtService
     // ---- 0.3.1 B19: corrupted (magenta/green striped) thumbnails. The decoder used to conceal damaged / unsupported data and the result was cached
     // forever. Now: sniff the format, decode strictly (any decode error = no picture), normalize to 8-bit RGB with even sizes, re-check the JPEG we
     // made, and reject striped noise. A rejected picture is "no art": the web UI shows its themed initials tile. The cache is rebuilt once on upgrade.
-    public const int CacheVersion = 3;   // 0.3.2 F10/F11: 3 = rebuilt after the 0.3.1 validator rejected every picture
+    public const int CacheVersion = 4;   // 0.3.6 K4: 4 = stale thumbnails from older builds are cleared once. 0.3.2 F10/F11: 3 F10/F11: 3 = rebuilt after the 0.3.1 validator rejected every picture
     /// <summary>0.3.2 F10: art URL version sent to the web UI (&amp;cv=) so pictures the browser / WebView2 cached from older builds are never reused.</summary>
     public static string UrlVersion => CacheVersion + "." + WavWiz.Core.WavWizInfo.Version;
     /// <summary>0.3.2 F11: validator problems (could not check a thumbnail; the thumbnail is kept). Newest last, max 50.</summary>

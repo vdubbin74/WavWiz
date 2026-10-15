@@ -43,14 +43,21 @@ function friendlySender(s) {
 /** Cover element: themed placeholder underneath, the real picture on top once it loads (no picture = placeholder stays; nothing flickers).
  * 0.2.1 F13: gen = { album, artist } draws a unique generated cover as the placeholder, gen = { portrait: name } a round artist portrait. */
 export function cover(src, cls = '', glyph = '♪', gen = null) {
-  const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') }, gen ? '' : glyph);
-  if (gen) box.append(gen.portrait != null ? genNode('artist', gen.portrait) : genNode('album', gen.album, gen.artist));
+  // 0.3.6 K4: while the picture loads the tile shows the dark theme placeholder (never the generated cover, never an accent gradient); the <img> stays hidden
+  // until it has loaded AND decoded, then fades in (~150 ms). The generated cover is drawn only AFTER a failed load (or when there is no picture at all).
+  const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') + (src ? ' loading' : '') }, gen ? '' : glyph);
+  const showGen = () => { box.classList.remove('loading'); if (gen && !box.querySelector('.gencover') && !box.classList.contains('loaded')) box.append(gen.portrait != null ? genNode('artist', gen.portrait) : genNode('album', gen.album, gen.artist)); };
   const load = u => {
-    const img = h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.remove();
-    img.onload = () => { if (!img.naturalWidth) { img.remove(); return; } box.classList.add('loaded'); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
+    const img = h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async', class: 'cimg' }); img.onerror = () => { img.remove(); showGen(); };
+    img.onload = () => {
+      if (!img.naturalWidth) { img.remove(); showGen(); return; }
+      const shown = () => { box.classList.remove('loading'); box.classList.add('loaded'); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
+      (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(shown);
+    };
     box.append(img);
   };
-  if (src) { load(src); if (gen && gen.portrait == null) { box.dataset.src = src; box._wwReload = () => { if (!box.classList.contains('loaded') && !box.querySelector('img')) load(src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now()); }; } }
+  if (src) { load(src); if (gen && gen.portrait == null) { box.dataset.src = src; box._wwReload = () => { if (!box.classList.contains('loaded') && !box.querySelector('img')) { box.classList.add('loading'); box.querySelector('.gencover')?.remove(); load(src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now()); } }; } }
+  else showGen();
   return box;
 }
 
@@ -58,15 +65,15 @@ export function cover(src, cls = '', glyph = '♪', gen = null) {
  * covers - a 2x2 mosaic when 4 load, else the first one that loads; 3) the generated portrait only when nothing loads at all.
  * T4b: the element is tagged with the artist name so an "art" push from the server swaps the photo in live (artPushed). */
 export function artistCover(name, ids = [], cls = 'lg rnd', size = 384) {
-  const box = h('div', { class: 'cover acover ' + cls + ' gen', 'data-artist': name || '' });
-  box.append(genNode('artist', name || ''));
-  const done = () => { box.classList.add('loaded'); box.querySelector('.gencover')?.remove(); };
+  const box = h('div', { class: 'cover acover ' + cls + ' gen loading', 'data-artist': name || '' });
+  const showGen = () => { box.classList.remove('loading'); if (!box.classList.contains('loaded') && !box.querySelector('.gencover')) box.append(genNode('artist', name || '')); };   // 0.3.6 K4: only after every picture failed
+  const done = () => { box.classList.remove('loading'); box.classList.add('loaded'); box.querySelector('.gencover')?.remove(); };
   const tryAlbums = () => {
     const list = (ids || []).filter(Boolean).slice(0, 4); if (!list.length || box.querySelector('.amosaic')) return;
     const m = h('div', { class: 'amosaic', 'aria-hidden': 'true' }); let pending = list.length; const ok = [];
     const settle = () => {
       if (--pending > 0) return;
-      if (!ok.length) { m.remove(); return; }                                 // no album art either: the generated portrait stays
+      if (!ok.length) { m.remove(); showGen(); return; }                      // no album art either: the generated portrait is drawn
       m.replaceChildren(...(ok.length >= 4 ? ok.slice(0, 4) : [ok[0]])); m.classList.toggle('one', ok.length < 4); m.hidden = false; done();
     };
     m.hidden = true;
@@ -77,7 +84,7 @@ export function artistCover(name, ids = [], cls = 'lg rnd', size = 384) {
     box.append(m);
   };
   const photo = (bust) => {
-    const src = artistArt(name, size); if (!src) { tryAlbums(); return; }
+    const src = artistArt(name, size); if (!src) { tryAlbums(); if (!(ids || []).filter(Boolean).length) showGen(); return; }
     const img = h('img', { class: 'aphoto', alt: '', loading: 'lazy', decoding: 'async', src: bust ? `${src}&v=${bust}` : src });
     img.onerror = () => { img.remove(); tryAlbums(); };
     img.onload = () => { if (!img.naturalWidth) { img.remove(); tryAlbums(); return; } box.querySelector('.aphoto:not(:last-of-type)')?.remove(); box.querySelector('.amosaic')?.remove(); done(); };

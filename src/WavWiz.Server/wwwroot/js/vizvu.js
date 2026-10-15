@@ -35,6 +35,24 @@ export const vuAngle = p => -0.72 + Math.min(1.12, Math.max(-0.035, p)) * 1.44;
 const PIV = 1.45, RAD = 1.15, CREST = 8;   // typical music peak-to-rms difference in dB
 export const SCALE = [-20, -10, -7, -5, -3, -1, 0, 1, 2, 3];
 
+const hexOk = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+const mixHex = (a, b, t) => { const p = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+const rgb01 = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16) / 255);
+/** 0.3.6 K13: the Classic analog meter follows the theme and keeps the retro look. Accent = needle (soft glow), scale marks and numbers (darkened for contrast);
+ *  the 0..+3 hot zone, its marks and the peak LED use the theme's hot color; the dial is backlit in the theme color. Bezel, screws, pivot cap, shadow and glass glare are
+ *  unchanged. Pepecoin (brand colors only): white face with a green backlight, #212121 needle, copper hot zone. */
+export function themedClassic(theme) {
+  const t = theme || {}, base = STYLES.classic;
+  if (!hexOk(t.accent)) return base;
+  const hot = hexOk(t.hot) ? t.hot : '#C62F22', acc2 = hexOk(t.accent2) ? t.accent2 : t.accent;
+  if (t.preset === 'pepecoin') {
+    return { ...base, themed: true, face: ['#FFFFFF', mixHex('#FFFFFF', '#269B4D', 0.22), mixHex('#269B4D', '#16532A', 0.6)], ink: '#16532A', vu: '#16532A', red: '#C07A4E', needle: '#212121', pk: '#C07A4E', hot, accent: '#269B4D', accent2: '#208241', glow: rgb01('#269B4D'), led: rgb01('#269B4D'), ledOff: rgb01('#16532A') };
+  }
+  const cream = '#fbe3b4';
+  return { ...base, themed: true, face: [mixHex(cream, t.accent, 0.42), mixHex(cream, t.accent, 0.62), mixHex(t.accent, '#000000', 0.62)], ink: mixHex(t.accent, '#000000', 0.5), vu: mixHex(t.accent, '#000000', 0.5), red: hot, needle: mixHex(t.accent, '#000000', 0.12), pk: hot, hot,
+    accent: t.accent, accent2: acc2, glow: rgb01(t.accent), led: rgb01(acc2), ledOff: rgb01(mixHex(acc2, '#000000', 0.8)) };
+}
+
 const STYLES = {
   classic: { bezel: ['#7a7e85', '#3a3d42', '#1c1d20'], face: ['#fbe3b4', '#f1c27d', '#9b6532'], ink: '#2b1d10', red: '#c62f22', needle: '#151515', pk: '#d8261c', cap: '#1a1a1a', glass: 0.14, vu: '#2b1d10' },
   dark: { bezel: ['#4a4e55', '#24272c', '#121316'], face: ['#2a2f37', '#1b1f25', '#0e1014'], ink: '#d7dce4', red: '#ff5a4d', needle: '#f2f4f7', pk: '#ff4040', cap: '#05070a', glass: 0.07, vu: '#9aa3b2' },
@@ -44,7 +62,9 @@ export class VuScene {
   constructor(opts) { this.kind = '2d'; this.preview = !!opts.preview; this.n = [new Needle(), new Needle()]; this.pk = [0, 0]; this.led = [0, 0]; this.ledHold = [0, 0]; this.bar = 0; this.barPeak = 0; this.barHold = 0; this.ref = -18; this.t = 0; this.face = null; this.configure(opts); }
   configure({ settings, theme }) { if (settings) this.settings = settings; if (theme) this.theme = theme; this.fx = this.settings?.fx || {}; this.pal = palette(this.settings || {}, this.theme || {}); this.face = null; }
   style() {
-    const k = this.fx.style || 'classic'; if (k !== 'neon') return STYLES[k] || STYLES.classic;
+    const k = this.fx.style || 'classic';
+    if (k === 'classic') return themedClassic(this.theme);   // 0.3.6 K13
+    if (k !== 'neon') return STYLES[k] || STYLES.classic;
     const c = (v, a = 1) => `rgba(${Math.round(v[0] * 255)},${Math.round(v[1] * 255)},${Math.round(v[2] * 255)},${a})`, P = this.pal;
     return { bezel: ['#2a2f3a', '#151922', '#0a0c11'], face: ['#141a26', '#0c1019', '#06080d'], ink: c(P.s), red: c(P.p), needle: c(P.a), pk: c(P.p), cap: '#05070a', glass: 0.05, vu: c(P.s, 0.8), neon: true };
   }
@@ -56,7 +76,7 @@ export class VuScene {
   drawFace(w, h, L) { return faceCanvas(this.style(), w, h, L); }
   draw2d(ctx, w, h, dt, f) {
     const S = this.style(); this.t += dt;
-    const L = layout(w, h), key = `${w}x${h}:${this.fx.style}:${this.pal.p}:${this.pal.s}`;
+    const L = layout(w, h), key = `${w}x${h}:${this.fx.style}:${this.pal.p}:${this.pal.s}:${this.theme?.hot}:${this.theme?.preset}`;
     if (!this.face || this.faceKey !== key) { this.face = this.drawFace(w, h, L); this.faceKey = key; }
     ctx.fillStyle = '#05070a'; ctx.fillRect(0, 0, w, h); ctx.drawImage(this.face, 0, 0);
     const m = meterStep(this, dt, f);
@@ -94,6 +114,7 @@ function barColor(sc, u) {
   const st = sc.fx.style || 'classic', P = sc.pal;
   if (st === 'neon') return u < 0.6 ? P.p : u < 0.92 ? P.s : hex('#ff3b30');
   if (st === 'dark') return hex(u < 0.6 ? '#3ddc84' : u < 0.85 ? '#ffd23f' : '#ff3b30');
+  const th = sc.theme; if (th && hexOk(th.accent)) return hex(u < 0.6 ? th.accent : u < 0.93 ? (hexOk(th.accent2) ? th.accent2 : th.accent) : (th.preset === 'pepecoin' ? '#C07A4E' : hexOk(th.hot) ? th.hot : '#C62F22'));   // 0.3.6 K13: theme colors
   return hex(u < 0.6 ? '#ffa63d' : u < 0.93 ? '#33d6a6' : '#ff4433');
 }
 /** 0.1.3 meter ballistics shared by the GPU and 2D meters: one bouncy needle per meter (kick impulse, lively pegs), peak LEDs, and a level bar
@@ -127,19 +148,19 @@ export class VuGLScene {
   dispose() { this.g.freeTexture(this.tex); this.tex = null; }
   draw(dt, f) {
     const g = this.g, w = g.w, h = g.h, S = this.style(), P = this.pal, I = Math.min(1.6, this.settings?.intensity ?? 1); this.t += dt;
-    const L = layout(w, h), key = `${w}x${h}:${this.fx.style}:${P.p}:${P.s}`;
+    const L = layout(w, h), key = `${w}x${h}:${this.fx.style}:${P.p}:${P.s}:${this.theme?.hot}:${this.theme?.preset}`;
     g.begin(); g.fade(0, [0.02, 0.027, 0.04]);
     if (this.faceKey !== key || !this.tex) { this.tex = g.texture(faceCanvas(S, w, h, L), this.tex); this.faceKey = key; }
     g.image(this.tex, 0, 0, w, h, 1);
     const m = meterStep(this, dt, f), lightFace = !S.neon && (this.fx.style || 'classic') === 'classic';
-    const nCol = hex(S.neon ? '#ffffff' : S.needle.startsWith('#') ? S.needle : '#f2f4f7'), glowCol = S.neon ? P.a : lightFace ? [1, 0.55, 0.2] : [0.85, 0.9, 1];
+    const nCol = hex(S.neon ? '#ffffff' : S.needle.startsWith('#') ? S.needle : '#f2f4f7'), glowCol = S.neon ? P.a : lightFace ? (S.glow || [1, 0.55, 0.2]) : [0.85, 0.9, 1];
     const meters = L.meters.map(([mx, my, mw, mh], i) => { const b = mh * 0.09, fx = mx + b, fy = my + b, fw = mw - 2 * b, fh = mh - 2 * b; return { fx, fy, fw, fh, px: fx + fw / 2, py: fy + fh * PIV, R: fh * RAD, pos: m.pos[i], i }; });
     const tip = (M, p, r) => { const a = vuAngle(p); return [M.px + Math.sin(a) * r, M.py - Math.cos(a) * r]; };
     // 1) over: needle shadows, dark needles on the light face, unlit bar segments
     for (const M of meters) {
       const [x1, y1] = tip(M, M.pos, M.fh * 0.42), [x2, y2] = tip(M, M.pos, M.R * 1.03), wd = Math.max(1.6, M.fh * 0.03);
       g.line(x1 + M.fh * 0.025, y1 + M.fh * 0.035, x2 + M.fh * 0.025, y2 + M.fh * 0.035, wd * 2.2, [0, 0, 0], 0.32, 1);
-      if (lightFace) g.line(x1, y1, x2, y2, wd * 1.25, [0.06, 0.05, 0.05], 1, 1);
+      if (lightFace) g.line(x1, y1, x2, y2, wd * 1.25, S.themed ? hex(S.needle) : [0.06, 0.05, 0.05], 1, 1);
     }
     const [bx, by, bw, bh] = L.bar, segs = this.preview ? 24 : 40, gap = bw / segs * 0.22, sw = bw / segs - gap;
     for (let i = 0; i < segs; i++) { const u = (i + 0.5) / segs; if (u > this.bar && !(Math.abs(u - this.barPeak) < 0.5 / segs && this.barPeak > 0.03)) g.quad(bx + i * (sw + gap), by, bx + i * (sw + gap) + sw, by, bx + i * (sw + gap), by + bh, bx + i * (sw + gap) + sw, by + bh, barColor(this, i / (segs - 1)), 0.11); }
@@ -151,7 +172,7 @@ export class VuGLScene {
       if (!lightFace) g.line(x1, y1, x2, y2, wd * 1.2, nCol, 1, 0.6);
       g.sprite(x2, y2, wd * 3.2, glowCol, (0.25 + 0.5 * lvl) * I);
       const lx = M.fx + M.fw * 0.87, ly = M.fy + M.fh * 0.68, lr = Math.max(2, M.fh * 0.035), red = this.led[M.i] > 0.05;
-      const lc = red ? [1, 0.24, 0.16] : m.audible ? [0.16, 0.83, 0.6] : [0.06, 0.2, 0.15], la = red ? 0.4 + 0.6 * this.led[M.i] : m.audible ? 0.9 : 0.5;
+      const lc = red ? (S.themed ? hex(S.hot) : [1, 0.24, 0.16]) : m.audible ? (S.led || [0.16, 0.83, 0.6]) : (S.ledOff || [0.06, 0.2, 0.15]), la = red ? 0.4 + 0.6 * this.led[M.i] : m.audible ? 0.9 : 0.5;
       g.sprite(lx, ly, lr * 1.6, lc, la); if (red || m.audible) g.sprite(lx, ly, lr * 5, lc, la * 0.35);
     }
     for (let i = 0; i < segs; i++) {

@@ -16,6 +16,15 @@ export const PRESETS = {
   steel:    { name: 'Blue Steel',    accent: '#A9BCCF', accent2: '#5F7488', hl: '#E0B15A', bg: '#18202A', ink: '#E3EAF2' },
   lime:     { name: 'Lime Circuit',  accent: '#A3E635', accent2: '#22D3EE', hl: '#F472D0', bg: '#0B120E', ink: '#ECFCCB' },
 };
+/** 0.3.6 K13: the "hot" color of each theme (the VU meter's 0..+3 zone, peak LEDs, level-bar top). Pepecoin: brand copper only. */
+export const HOT = { default: '#C62F22', pepecoin: '#C07A4E', ember: '#C62F22', arctic: '#E5533D', violet: '#D9298B', mono: '#C62F22', daylight: '#C62F22', nebula: '#D9298B', steel: '#C62F22', lime: '#C62F22' };
+/** 0.3.6 K11: LED bar ramp (low, middle, top). Midnight Neon: green, amber, copper-red; Pepecoin: brand green, green, copper (brand colors only); others: second color, main color, hot color. */
+export function ledColors(t, accent, accent2) {
+  if (t.preset === 'default') return { '--led-lo': '#3DDC84', '--led-mid': '#F5C542', '--led-hi': '#D9552B' };
+  if (t.preset === 'pepecoin') return { '--led-lo': '#269B4D', '--led-mid': '#208241', '--led-hi': '#C07A4E' };
+  return { '--led-lo': accent2, '--led-mid': accent, '--led-hi': hotFor(t) };
+}
+export const hotFor = t => (t && HOT[t.preset]) || '#C62F22';
 export const DEFAULT_THEME_ID = 'default';
 const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
 const migrate = () => { try { migrateKey(localStorage, 'unison.theme.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
@@ -74,6 +83,8 @@ export function derive(t) {
   const pepe = t.preset === 'pepecoin';   // 0.3.5: Pepecoin status colors from the brand kit only (warning/MUTED/danger = copper, OK = primary)
   return {
     ...(pepe ? { '--amber': '#C07A4E', '--red': '#C07A4E', '--green': '#269B4D' } : {}),
+    '--hot': hotFor(t),
+    ...ledColors(t, accent, accent2),   // 0.3.6 K11: the EQ's live LED bars
     '--lock-red': t.preset === 'pepecoin' ? '#C07A4E' : 'var(--red)',   // 0.3.2 F19: Lock EQ on = the theme's danger red; Pepecoin uses its copper
     '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl, pal), '--bg': bg,
     '--panel': panel, '--panel2': panel2, '--line': mix(bg, toward, light ? 0.18 : 0.2),

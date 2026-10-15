@@ -99,3 +99,31 @@ export class Particles {
   }
   step(dtMs) { const k = dtMs / 16.7; for (const q of this.p) { q.x += q.vx * k; q.y += q.vy * k; q.vx *= 0.985; q.vy *= 0.985; q.life -= 0.014 * k; } this.p = this.p.filter(q => q.life > 0); }
 }
+
+// ---- 0.3.6 K11: the EQ's live LED bars show the REAL level of each band, centered on the slider labels --------------------------------------
+/** Band centers = the EQ slider labels (31 62 125 250 500 1k 2k 4k 8k 16k Hz); each band is one octave (fc/sqrt2 .. fc*sqrt2). */
+export const EQ_HZ = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+export const eqBandEdges = fc => [fc / Math.SQRT2, fc * Math.SQRT2];
+/** The server's 10 band bytes ((dBFS + 72) * 255 / 72, 0 = silent) -> 0..1 bar heights (dB scale, floor -62 dB, +1.3 dB per band tilt because highs carry less energy).
+ *  `gainDb` is the same auto-gain / sensitivity shift the visualizers use. A silent band stays exactly 0. */
+export function eqBandLevels(bytes, out = new Float64Array(10), gainDb = 0, floorDb = 62) {
+  for (let i = 0; i < 10; i++) {
+    const b = bytes?.[i] ?? 0; if (!b) { out[i] = 0; continue; }
+    const db = b * 72 / 255 - 72 + 1.3 * i + gainDb;
+    out[i] = Math.min(1, Math.max(0, (db + floorDb) / floorDb));
+  }
+  return out;
+}
+/** Fallback when the server feed has no band bytes (older server): the same octave bands from the browser's 1024-point magnitudes. The two lowest bands share
+ *  the first bins (47 Hz per bin) - that is exactly why the server feed exists. Returns { levels, real: false }. */
+export function eqBandsFromMags(mags, out = new Float64Array(10), gainDb = 0, floorDb = 62, sampleRate = 48000) {
+  const binHz = sampleRate / N;
+  for (let i = 0; i < 10; i++) {
+    const [lo, hi] = eqBandEdges(EQ_HZ[i]); let p = 0;
+    for (let k = Math.max(0, Math.floor(lo / binHz)); k <= Math.min(mags.length - 1, Math.ceil(hi / binHz)); k++) p += mags[k] * mags[k];
+    const m = Math.sqrt(p / Math.SQRT2);
+    if (m < 1e-5) { out[i] = 0; continue; }
+    out[i] = Math.min(1, Math.max(0, (20 * Math.log10(m) + 1.3 * i + gainDb + floorDb) / floorDb));
+  }
+  return out;
+}

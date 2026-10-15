@@ -55,7 +55,7 @@ export const autoQuality = () => autoTier(deviceFacts());
 /** 0.2.0: where Auto STARTS: Low on TVs and unknown graphics chips (it climbs to the ceiling only after measured smooth frames). */
 export const autoStart = () => { const f = deviceFacts(); return startsLow({ tv: isTvUa(), renderer: f.renderer }) ? 'low' : null; };
 
-function themeColors() { try { const cs = getComputedStyle(document.documentElement); return { accent: cs.getPropertyValue('--accent').trim().toUpperCase(), accent2: cs.getPropertyValue('--accent2').trim().toUpperCase(), hl: cs.getPropertyValue('--hl').trim().toUpperCase() }; } catch { return {}; } }
+function themeColors() { try { const cs = getComputedStyle(document.documentElement); return { accent: cs.getPropertyValue('--accent').trim().toUpperCase(), accent2: cs.getPropertyValue('--accent2').trim().toUpperCase(), hot: cs.getPropertyValue('--hot').trim().toUpperCase(), preset: document.documentElement.dataset.theme || '', hl: cs.getPropertyValue('--hl').trim().toUpperCase() }; } catch { return {}; } }
 
 /** Playback position 0..1 (null = live/unknown) for the Waveform river marker; set by Now Playing. */
 let progress = null; export function setVizProgress(f) { progress = f; }
@@ -65,12 +65,12 @@ const feed = { subs: new Set(), live: null, win: null, extra: null, audible: fal
 function feedSub(v) {
   feed.subs.add(v);
   if (!feed.live) feed.live = liveSocket('/ws/viz?delayMs=0', { binary: true, pingText: null, silentMs: 1e9,
-    onMessage: ev => { const u = new Uint8Array(ev.data); if (u[0] === 1 && u.length >= 1025) { feed.win = u.subarray(1, 1025).slice(); feed.extra = u.length >= 1029 ? u.subarray(1025, 1029).slice() : null; feed.audible = true; feed.lastData = performance.now(); feed.frames++; } else if (u[0] === 0) { feed.audible = false; feed.win = null; feed.extra = null; } for (const s of feed.subs) s.kick(); },
+    onMessage: ev => { const u = new Uint8Array(ev.data); if (u[0] === 1 && u.length >= 1025) { feed.win = u.subarray(1, 1025).slice(); feed.extra = u.length >= 1029 ? u.subarray(1025, 1029).slice() : null; feed.bands = u.length >= 1039 ? u.subarray(1029, 1039).slice() : null;  /* 0.3.6 K11: ten octave-band levels from the server's 8192-point FFT */  feed.audible = true; feed.lastData = performance.now(); feed.frames++; } else if (u[0] === 0) { feed.audible = false; feed.win = null; feed.extra = null; } for (const s of feed.subs) s.kick(); },
     onClose: () => { feed.audible = false; } });
 }
 function feedUnsub(v) { feed.subs.delete(v); if (!feed.subs.size && feed.live) { feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; } }
 /** 0.2.1 F12: the Sound (EQ) spectrum glow reads the same shared feed. onFrame(waveBytes|null, audible); returns an unsubscribe function. */
-export function spectrumTap(onFrame) { const sub = { kick: () => onFrame(feed.win, feed.audible) }; feedSub(sub); return () => feedUnsub(sub); }
+export function spectrumTap(onFrame) { const sub = { kick: () => onFrame(feed.win, feed.audible, feed.bands) }; feedSub(sub); return () => feedUnsub(sub); }
 
 export const live = new Set();          // running controllers, read by Diagnostics
 export function vizStats() { const v = [...live].find(x => !x.preview) || [...live][0]; return v ? v.stats() : null; }

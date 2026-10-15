@@ -2263,3 +2263,21 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .plpicker .plp-row input{accent-color:var(--accent)}
 .plpicker .plp-reset{margin:6px 6px 2px;min-height:26px}
 .plpicker .plp-note{font-size:11px;color:var(--dim);padding:2px 8px 4px}
+
+/* K4: Library / cover tiles - dark theme placeholder (no accent gradient), the picture fades in once loaded + decoded; the generated cover only after a failed load */
+.cover{background:var(--panel2);color:var(--dim)}
+.cover img,.cover .cimg{transition:opacity 150ms ease-out}
+.cover.loading img,.cover.loading .cimg{opacity:0}
+.cover.loaded img,.cover.loaded .cimg{opacity:1}
+.cover:not(.loaded):not(.gen) img{opacity:0}
+.cover.gen:not(.loaded){background:var(--panel2)}
+.cover.loading{background:linear-gradient(135deg,var(--panel2),color-mix(in srgb,var(--panel2) 82%,var(--ink)));}
+@media (prefers-reduced-motion:reduce){ .cover img,.cover .cimg{transition:none} }
+/* K11: permanent LED bars (34 segments) on every EQ band; the gain-segment strip and the spectrum glow are gone */
+.eqled{position:absolute;pointer-events:none;display:block}
+.eqarea[data-eqstyle=led] .eqb-segs{display:none}
+.eqarea[data-eqstyle=led] .eqled{left:24%;right:24%;top:0;bottom:0;width:52%;height:100%}
+.eqarea[data-eqstyle=faders] .eqled{left:calc(50% - 8px);width:16px;top:0;bottom:0;height:100%}
+.eqarea[data-eqstyle=curve] .eqa-field>.eqled{top:0;bottom:0;width:16px;height:100%;transform:translateX(-50%);z-index:1}
+.eqarea[data-eqstyle=led] .eqb-cap{z-index:2}
+.eqa-glow{display:none!important}
