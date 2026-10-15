@@ -5,7 +5,7 @@ const sess = readFileSync('/tmp/ww030/sess', 'utf8').trim();
 const R = []; const ok = (name, pass, info = '') => { R.push({ name, pass, info }); console.log((pass ? 'PASS ' : 'FAIL ') + name + (info ? ' :: ' + info : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-030-${n}.png` });
 const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return r.json().catch(() => ({})); };
-const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 200)); } };
+const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 1500)); } };
 const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
 const ONLY = process.argv[2] || '';
 const want = n => !ONLY || ONLY.split(',').includes(n);
@@ -18,7 +18,7 @@ const speaker = await spc.newPage(); await speaker.goto(B + '/'); await speaker.
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const ctx = await cb.newContext({ viewport: { width: 1400, height: 900 } });
 await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
-await ctx.addInitScript(() => { if (!localStorage.getItem('seeded')) { localStorage.setItem('seeded', '1'); localStorage.setItem('wavwiz.center.v1', 'viz'); localStorage.setItem('wavwiz.devsize', 'standard'); } });
+await ctx.addInitScript(() => { if (!localStorage.getItem('seeded')) { localStorage.setItem('seeded', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.center.v1', 'viz'); localStorage.setItem('wavwiz.devsize', 'standard'); } });
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
 await step('smoke', async () => {
   await p.goto(B + '/'); await p.waitForSelector('.desk', { timeout: 15000 }); await p.waitForTimeout(2500);
@@ -52,7 +52,7 @@ if (want('panels')) await step('panels', async () => {
   const back = await p.evaluate(() => document.getElementById('desk').className);
   ok('§6 [ folds Library to a 30 px rail', Math.round(lib) <= 32, 'width ' + lib);
   ok('§6 Shift+] expands Devices, Esc returns to the exact layout', /devexpanded/.test(exp.c) && back === before, before + ' -> ' + exp.c + ' -> ' + back);
-  ok('§6 header has at most 2 buttons', exp.buttons <= 2, String(exp.buttons));
+  ok('§6 header has at most 3 buttons (0.3.6 K3: expand, playlist, fold-to-rail)', exp.buttons <= 3, String(exp.buttons));
   await p.reload(); await p.waitForSelector('.desk'); const kept = await p.evaluate(() => localStorage.getItem('wavwiz.panels'));
   ok('§6 state survives reload (one key)', !!kept, kept);
   await p.setViewportSize({ width: 1000, height: 800 }); await p.waitForTimeout(700); await closeDlg(p);

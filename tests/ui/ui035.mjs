@@ -67,11 +67,13 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
         return { a: a && [a.left, a.right], b: b && [b.left, b.right], c: c && [c.left, c.right], d: [d.left, d.right], page: document.documentElement.scrollWidth <= innerWidth + 1, np: document.querySelector('.npbar')?.getBoundingClientRect().height > 0 }; });
       ok(`[${tag}] J5 Scenes & Schedules | Zones | Speakers (Speakers on the right)`, r.a && r.b && r.c && r.a[0] < r.b[0] && r.b[0] < r.c[0] && Math.abs(r.c[1] - r.d[1]) < 40 && r.page && r.np, JSON.stringify(r));
       await p.locator('.devpanel .scol .dcard.dc3 .dname').first().click(); await p.waitForTimeout(800);
-      const s6 = await p.evaluate(() => { const c = document.querySelector('.devpanel .scol .dcard.dc3'); return { dlg: !!document.querySelector('dialog[open]'), t: c?.textContent || '', h: Math.round(c?.getBoundingClientRect().height || 0) }; });
-      ok(`[${tag}] J6 speaker settings open in place (no window)`, !s6.dlg && /Hide settings/.test(s6.t) && s6.h > 120, JSON.stringify({ dlg: s6.dlg, h: s6.h }));
+      const s6 = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), col: !!document.querySelector('.devpanel .spcol .spkset'), w: Math.round(document.querySelector('.devpanel .spcol')?.getBoundingClientRect().width || 0) }));
+      ok(`[${tag}] J6 speaker settings open in place (0.3.6 K5: the settings column, no window)`, !s6.dlg && s6.col && s6.w > 200, JSON.stringify(s6));
       await shot('devices-expanded-settings');
+      await p.locator('.spkset [data-act="spk-done"]').first().click({ timeout: 3000 }).catch(() => {}); await p.waitForTimeout(600);
       const t7 = await p.evaluate(() => document.querySelector('.devpanel .ssc-col')?.textContent || '');
       ok(`[${tag}] J7 scenes & schedules column has the create buttons`, ['+ From current setup', '+ New scene', '+ Alarm', '+ New schedule'].every(x => t7.includes(x)), t7.slice(0, 200));
+      await p.locator('.spkset [data-act="spk-done"]').first().click({ timeout: 3000 }).catch(() => {}); await p.waitForTimeout(600);   // 0.3.6 K5: Done closes the settings column and brings the Scenes column back
       await p.locator('.devpanel .ssc-col button', { hasText: '+ New scene' }).first().click(); await p.waitForTimeout(600);
       const e7 = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), inl: !!document.querySelector('.devpanel .ssc-col .ss-inline') }));
       ok(`[${tag}] J7 new scene edits inline`, !e7.dlg && e7.inl, JSON.stringify(e7)); await shot('scene-inline');
@@ -99,8 +101,7 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
       ok(`[${tag}] J11 expanded Library keeps the playlist column, ~132px tiles`, r.list && !r.dev && Math.abs(r.w - 132) <= 12, JSON.stringify(r));
       await p.locator('.libpanel button', { hasText: /^Years$/ }).first().click(); await p.waitForTimeout(1500); await shot('library-years');
       const y = await p.evaluate(() => [...document.querySelectorAll('.libpanel .dtile')].filter(x => x.offsetParent).length); const yrs = (await api('/library/years')).filter?.(r => +r.name > 0).length || 0; ok(`[${tag}] J10 Years open as decade tiles` + (yrs ? '' : ' (fixture has no years: no tiles expected)'), yrs ? y >= 1 : y === 0, `${y} tiles, ${yrs} years`);
-      await p.locator('.libswap:visible').first().click({ timeout: 3000 }).catch(() => {}); await p.waitForTimeout(600);
-      ok(`[${tag}] J11 Devices button swaps the Devices panel in`, await p.evaluate(() => document.querySelector('.desk').classList.contains('libdev') && !!document.querySelector('.devpanel')?.offsetParent));
+      ok(`[${tag}] J11 (0.3.6 K14: the Devices swap is replaced by the in-column mini player)`, await p.evaluate(() => document.querySelector('.desk').classList.contains('libexpanded') && !!document.querySelector('.minicol .mp')?.offsetParent));
     });
     await step(`[${tag}] J12 consistent controls`, async () => {
       await home(p, NORMAL); await go(p, 'settings:general'); await p.waitForTimeout(900); await shot('settings-general');
