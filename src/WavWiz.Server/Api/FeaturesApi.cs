@@ -25,7 +25,7 @@ public static class FeaturesApi
         g.MapDelete("/profiles/{id:long}", (long id) => { s.Profiles.Delete(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapPost("/profiles/{id:long}/apply", async (long id, HttpContext c) => { var b = await c.Request.Body(); var zid = b.Long("zoneId") ?? b.Long("deviceId"); if (zid == null) return Ext.Bad("zoneId required");
             if (!ZoneApi.IsAdmin(c) && !s.Zones.IsMine(zid.Value, c.Who(), c.Connection.RemoteIpAddress)) return Ext.Bad("Only an administrator can load a profile onto another person's device.", 403);
-            var (err, skipped) = s.Profiles.Apply(id, zid.Value); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, skipped }); }).Req(Role.Control);
+            var (err, skipped) = s.Profiles.Apply(id, zid.Value, withCap: ZoneApi.IsAdmin(c)); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, skipped }); }).Req(Role.Control);
 
         // ---- B3 scenes ----
         g.MapGet("/scenes", () => Results.Json(s.Scenes.List())).Req(Role.View);

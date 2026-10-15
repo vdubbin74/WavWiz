@@ -40,12 +40,13 @@ public sealed class DeviceProfileService
         name = (name ?? "").Trim(); if (name.Length is 0 or > 60) return (0, "name must be 1-60 characters");
         JsonObject data; try { data = Capture(zoneId); } catch (KeyNotFoundException e) { return (0, e.Message); }
         var now = DateTimeOffset.UtcNow.ToString("O"); var json = data.ToJsonString();
-        var existing = id ?? (_db.Scalar("SELECT id FROM device_profile WHERE name=$n COLLATE NOCASE", ("$n", name)) as long?);
+        var existing = id;   // Save as (no id) always makes a new profile; a name that is taken is refused below
         if (existing is long eid && Exists(eid))
         {
             if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM device_profile WHERE name=$n COLLATE NOCASE AND id<>$i", ("$n", name), ("$i", eid))) > 0) return (0, "a profile with that name already exists");
             _db.Exec("UPDATE device_profile SET name=$n,json=$j,updated_at=$t WHERE id=$i", ("$n", name), ("$j", json), ("$t", now), ("$i", eid)); MarkLoaded(zoneId, eid); _ev.Publish("profiles"); return (eid, null);
         }
+        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM device_profile WHERE name=$n COLLATE NOCASE", ("$n", name))) > 0) return (0, "a profile with that name already exists");
         var nid = _db.Insert("INSERT INTO device_profile(name,json,updated_at) VALUES($n,$j,$t)", ("$n", name), ("$j", json), ("$t", now));
         MarkLoaded(zoneId, nid); _ev.Publish("profiles"); return (nid, null);
     }
@@ -79,7 +80,7 @@ public sealed class DeviceProfileService
     }
 
     /// <summary>Loads a profile onto a speaker: cap, then volume (the cap is enforced), delay, EQ and output. A part the speaker cannot take (no such output, offline) is skipped and listed.</summary>
-    public (string? Err, List<string> Skipped) Apply(long profileId, long zoneId, bool withVolume = true)
+    public (string? Err, List<string> Skipped) Apply(long profileId, long zoneId, bool withVolume = true, bool withCap = true)
     {
         var skipped = new List<string>();
         var p = Get(profileId); if (p == null) return ("profile not found", skipped);
@@ -94,7 +95,7 @@ public sealed class DeviceProfileService
             else if (!(z.Outputs.FirstOrDefault(x => x.Active)?.Name == name)) skipped.Add("output");
             z = _zones.Zone(zoneId) ?? z;
         }
-        if (d.TryGetProperty("volCap", out var cap) && (cap.ValueKind == JsonValueKind.Number || cap.ValueKind == JsonValueKind.Null))
+        if (withCap && d.TryGetProperty("volCap", out var cap) && (cap.ValueKind == JsonValueKind.Number || cap.ValueKind == JsonValueKind.Null))
             _zones.SetVolCap(zoneId, cap.ValueKind == JsonValueKind.Number ? cap.GetDouble() : 100, d.TryGetProperty("volLocked", out var lk) && lk.ValueKind == JsonValueKind.True);
         if (withVolume && d.TryGetProperty("volume", out var vol) && vol.ValueKind == JsonValueKind.Number) _zones.Patch(zoneId, null, vol.GetDouble(), null, null);
         var act = z.Outputs.FirstOrDefault(x => x.Active) ?? z.Outputs.FirstOrDefault(x => x.DeviceId == z.ChosenDeviceId) ?? z.Outputs.FirstOrDefault();

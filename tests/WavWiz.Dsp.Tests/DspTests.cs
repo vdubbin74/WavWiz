@@ -222,4 +222,15 @@ public class DspTests
         var r = DspChain.Response(p, Fs, new[] { 1000.0 });
         Assert.Equal(6.0, r[0], 0.05);
     }
+
+    [Fact]
+    public void K5_balance_trims_only_the_far_channel_and_center_is_untouched()
+    {
+        var c = new DspChain(Fs); c.SetPreset(DspPreset.Flat with { Balance = 100 }); var o = Run(c, Sine(1000, 0.3, 24000)); double l = 0, r = 0; for (int i = 12000; i < 24000; i++) { l += o[2 * i] * o[2 * i]; r += o[2 * i + 1] * o[2 * i + 1]; }
+        Assert.True(l < 1e-6, "full right silences the left"); Assert.True(r > 100, "the right channel is untouched");
+        var c2 = new DspChain(Fs); c2.SetPreset(DspPreset.Flat with { Balance = -50 }); var o2 = Run(c2, Sine(1000, 0.3, 24000)); double a = 0, b = 0; for (int i = 12000; i < 24000; i++) { a += o2[2 * i] * o2[2 * i]; b += o2[2 * i + 1] * o2[2 * i + 1]; }
+        Assert.True(Math.Abs(a / b - 1) > 0.5 && b < a, "left 50: right quieter, left unchanged");
+        Assert.Equal(100, (DspPreset.Flat with { Balance = 999 }).Normalize().Balance); Assert.Equal(-100, (DspPreset.Flat with { Balance = -999 }).Normalize().Balance);
+        var c3 = new DspChain(Fs); c3.SetPreset(DspPreset.Flat with { Balance = 0 }); var o3 = Run(c3, Sine(1000, 0.3, 24000)); for (int i = 10000; i < 24000; i++) Assert.Equal(o3[2 * i], o3[2 * i + 1]);
+    }
 }

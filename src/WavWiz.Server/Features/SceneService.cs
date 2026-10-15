@@ -63,7 +63,7 @@ public sealed class SceneService
         foreach (var (dev, vol, en, prof) in members)
         {
             // K7: the device's profile first (without its own volume), then the scene's on/off and volume - zone volume still scales and the cap is still enforced by Patch
-            if (en && prof is long pr && Profiles != null) { try { Profiles.Apply(pr, dev, withVolume: false); } catch { /* a profile that cannot load never stops the scene */ } }
+            if (en && prof is long pr && Profiles != null) { try { Profiles.Apply(pr, dev, withVolume: false, withCap: false); } catch { /* a profile that cannot load never stops the scene */ } }
             _zones.Patch(dev, null, vol, null, en);
         }
         _ev.Publish("zones"); _ev.Publish("scenes"); return null;
