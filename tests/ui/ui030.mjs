@@ -93,12 +93,12 @@ if (want('jukebox')) await step('jukebox', async () => {
   ok('Jukebox: Ctrl+Shift+J asks for the PIN; a wrong PIN keeps it locked', pad && await p.evaluate(() => !!document.querySelector('.jb')));
   const g = await (await cb.newContext({ viewport: { width: 390, height: 844 }, isMobile: true })).newPage();
   await g.goto(`${B}/jukebox.html?j=${code}`); await g.waitForTimeout(1500); await g.fill('.jb-search', 'band'); await g.waitForTimeout(1000);
-  const heads = await g.$$eval('.jb-gh', e => e.map(x => x.textContent)); const lines = await g.$$eval('.jb-row small', e => e.map(x => x.textContent));
+  const heads = (await g.$$eval('.jb-gh', e => e.map(x => x.textContent))).filter(x => x !== 'Results'); const lines = await g.$$eval('.jb-row small', e => e.map(x => x.textContent));
   ok('Jukebox: grouped search, counts limited to allowed music', heads.join('|') === 'Artists (1)|Albums (1)|Songs (3)' && lines.includes('3 songs'), heads.join('|') + ' / ' + lines.slice(0, 3).join(','));
   await shot(g, 'jukebox-guest-search');
   for (let i = 0; i < 3; i++) { await g.locator('.jb-add').nth(i).click(); await g.waitForTimeout(700); }
-  const note = await g.$$eval('.jb-note', e => e.map(x => x.textContent).join(' '));
-  ok('Jukebox: guest adds songs within the limit (3rd refused at 2)', /already have 2/.test(note), note); await shot(g, 'jukebox-guest-limit');
+  const note = await g.evaluate(() => document.body.innerText);   // 0.3.5 J18: the guest page shows "N available plays" (0 once the limit is used)
+  ok('Jukebox: guest adds songs within the limit (3rd refused at 2)', /0 available plays|already have 2/.test(note), note.slice(0, 200)); await shot(g, 'jukebox-guest-limit');
   await p.waitForTimeout(1500); await shot(p, 'jukebox-kiosk-queue');
   const b = await api('/jukebox/board'); ok('Jukebox: board lists requests', (b.next || []).length + (b.now ? 1 : 0) >= 2, JSON.stringify(b).slice(0, 150));
   await api('/jukebox/config', 'PUT', { style: 'retro' }); await p.waitForTimeout(1600); await shot(p, 'jukebox-kiosk-retro');
@@ -117,10 +117,11 @@ if (want('themes')) await step('themes', async () => {
 });
 if (want('remote')) await step('remote', async () => {
   const r = await ctx.newPage(); await r.goto(B + '/?remote=1'); await r.waitForSelector('.desk'); await r.waitForTimeout(2500);
-  const st = await r.evaluate(() => ({ banner: !!document.getElementById('remotebanner'), bg: getComputedStyle(document.getElementById('remotebanner') || document.body).backgroundColor, key: localStorage.getItem('wavwiz.remoteMode'), dev: !!window.__wavwizPhone }));
+  // Remote mode was retired (remotemode.js: isRemote() is always false): the old ?remote=1 link must not show a banner or leave the flag behind
+  const st = await r.evaluate(() => ({ banner: !!document.getElementById('remotebanner'), key: localStorage.getItem('wavwiz.remoteMode') }));
   await shot(r, 'remote-mode');
   await r.goto(B + '/'); await r.waitForTimeout(2000); const kept = await r.evaluate(() => !!document.getElementById('remotebanner'));
-  ok('Remote mode: banner shown (Highlight color), remembered after reload', st.banner && kept && st.key === '1', JSON.stringify(st));
+  ok('Remote mode is retired: ?remote=1 shows no banner and nothing is remembered', !st.banner && !kept && st.key !== '1', JSON.stringify(st));
   await r.evaluate(() => localStorage.setItem('wavwiz.remoteMode', '0')); await r.close();
 });
 if (want('phone')) await step('phone-sheet', async () => {
