@@ -7,7 +7,6 @@ import { isAdmin, canTune, canControl, ADMIN_HINT } from './ui.js';
 import { flatEq } from './eq.js';
 import { loadEqPrefs, ownEqName, loadEqLock } from './eqstyle.js';
 import { eqArea } from './eqview.js';
-import { spectrumTap } from './viz.js';
 
 /** "Center" / "Left 20" / "Right 35". Pure. */
 export const balanceLabel = v => { const n = Math.round(v); return n === 0 ? 'Center' : n < 0 ? `Left ${-n}` : `Right ${n}`; };
@@ -28,9 +27,10 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     const r = h('input', { type: 'range', min, max, step, value, class: 'spk-range', 'aria-label': label, 'data-coarse': step === 1 ? 5 : undefined });
     r.addEventListener('input', () => { out.textContent = fmt(+r.value); onInput?.(+r.value); });
     r.addEventListener('change', () => onChange?.(+r.value));
+    r.addEventListener('pointerdown', () => { r._drag = true; }); const up = () => { r._drag = false; }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up); r.addEventListener('blur', up);
     if (!ok) ro(r, false, hint);
     const row = h('div', { class: 'spk-row ' + cls }, h('div', { class: 'spk-l' }, h('span', null, label), out), r);
-    row._set = v => { if (document.activeElement !== r) { r.value = String(v); out.textContent = fmt(+v); } };
+    row._set = v => { if (document.activeElement !== r && !r._drag) { r.value = String(v); out.textContent = fmt(+v); } };
     row._input = r; return row;
   };
   const putVol = debounce(v => ctl.act(`/zones/${z.id}`, { volume: v }, 'PATCH'), 90);
@@ -50,7 +50,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
       const mine = r.presets.find(x => x.source !== 'builtin' && x.name === name); let id;
       if (mine) { await api(`/dsp/presets/${mine.id}`, { method: 'PUT', body }); id = mine.id; } else id = (await api('/dsp/presets', { method: 'POST', body })).id;
       await api(`/dsp/assignments/${encodeURIComponent(r.out.deviceId)}`, { method: 'PUT', body: { presetId: id, enabled: true, bypass: r.cur.bypass } });
-      r.presets = await api('/dsp/presets'); window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: r.out.deviceId } })); refreshProfile();
+      r.presets = await api('/dsp/presets'); if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: r.out.deviceId } })); refreshProfile();
     } catch (e) { toast(e.message, true); }
   }, 600);
   const previewEq = debounce(() => { if (real) api('/dsp/preview', { method: 'POST', body: { deviceId: real.out.deviceId, preset: real.cur, bypass: real.cur.bypass } }).catch(() => {}); }, 120);
@@ -76,7 +76,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     const p = loadEqPrefs();
     area = eqArea({ style: p.style, gains: [...real.cur.graphicDb], glow: p.glow, interactive: true, locked: loadEqLock() || !tune,
       onChange: (i, db) => { if (loadEqLock() || !tune) return; edit(c => { c.graphicDb[i] = db; }); } });
-    eqHost.replaceChildren(area.el); if (p.glow > 0) area.startLive?.(spectrumTap);
+    eqHost.replaceChildren(area.el);   // no live meters here: the Now Playing EQ shows the music, this one is for settings
   }
 
   // ---- K6 profile row
@@ -138,7 +138,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     if (real && o && real.out.deviceId !== o.deviceId) loadReal();
   };
   root._destroy = () => { gone = true; area?.stopLive?.(); area?.destroy?.(); };
-  window.addEventListener('wavwiz:eqchanged', e => { if (!gone && e.detail?.deviceId === real?.out?.deviceId && !root.contains(document.activeElement)) loadReal(); });
+  if (typeof window !== 'undefined') window.addEventListener('wavwiz:eqchanged', e => { if (!gone && e.detail?.deviceId === real?.out?.deviceId && !root.contains(document.activeElement)) loadReal(); });
   paintProfile(); refreshProfile(true); loadReal(); void o0;
   return root;
 }

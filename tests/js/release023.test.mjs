@@ -33,7 +33,7 @@ test('0.2.3 U2: minimized Playlist shows "Up next: Title · Artist" centered on 
   assert.match(l, /const setNextBlock = el => \{ head\.insertBefore\(el, meta\); \}/);
   assert.match(m, /const on = desk\.classList\.contains\('listcollapsed'\)/);
   assert.match(m, /const c = col\.left \+ col\.width \/ 2, room = Math\.min\(c - \(listt\.leftEdge\(\) \+ 16\), listt\.rightEdge\(\) - 16 - c\)/);
-  assert.match(m, /listt\.setCollapsed\?\.\(st\); placeNext\(\);/);   // 0.3.2 F13: state = collapsed / open / expanded
+  assert.match(m, /listt\.setCollapsed\?\.\(st\); syncMini\(\); placeNext\(\);/);   // 0.3.2 F13: state = collapsed / open / expanded
   assert.match(css, /\.desk\.listcollapsed \.plnext:not\(\[hidden\]\)\{display:flex;[^}]*transform:translateX\(-50%\)/);
   assert.doesNotMatch(css, /\.desk\.listcollapsed \.listpanel \.pane-h \.small,\.desk\.listcollapsed \.listpanel \.pane-h \.row:not\(\.listcolwrap\)\{display:none\}/);
 });
@@ -212,7 +212,7 @@ test('0.2.3 U12: device cards open their settings with a themed chevron Expand c
   // the Standard rows keep only name, status, volume, Mute and on/off; tapping the name opens Expanded with that card highlighted
   assert.doesNotMatch(row, /settingsToggle|cardSettings|escCloses|dexpand/);
   assert.match(row, /onclick: \(\) => openDevice\(z\.id\)/);
-  assert.match(d, /(?:standardRow|slimRow|card3)\(S, ctl, z, (?:\{ slim: true, openDevice: )?id => (?:\{ setCardOpen\(id, true\); )?ctl\.setDevSize\?\.\('expanded', id\)/);   // 0.3.3 G10: slimRow wraps standardRow
+  assert.match(d, /openDevice: id => \{ spk = id;[^\n]*ctl\.setDevSize\?\.\('expanded', id\)/);   // 0.3.6 K5: tapping a slim row opens Expanded with that speaker's settings column
   assert.doesNotMatch(css, /\.drow[^{]*\.(dexpand|dexp-l|dsettings)|\.drow\.dset/);
 });
 

@@ -769,7 +769,7 @@ export function devicesPanel(S, ctl) {
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
     const groups = S.groups || [], { zoned, unassigned: un } = speakerGroups(S.zones, groups), old = childCards(body, 'drow');
     const sub = (t, n, cls = '') => h('div', { class: 'pane-h dsec-h slimsub ' + cls }, h('span', null, t), h('span', { class: 'small dim' }, String(n)));
-    const row = z => keepCard(old.get(String(z.id)), S, z, `3|${rowKey(false, false, false, 0)}|0|1`, () => card3(S, ctl, z, { slim: true, openDevice: id => { spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } }), busy);
+    const row = z => keepCard(old.get(String(z.id)), S, z, `3|${rowKey(false, false, false, 0)}|0|1|0`, () => card3(S, ctl, z, { slim: true, openDevice: id => { spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } }), busy);
     reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S),
       sub(SPEAKERS_LABEL.toUpperCase(), zoned.length, 'devs-h'),
       S.zones.length ? zoned.map(row) : h('p', { class: 'dim small pad' }, EMPTY),

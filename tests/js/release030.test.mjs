@@ -44,7 +44,7 @@ test('0.3.0 §5: schedule helpers - plain labels, Save needs a day, summaries, t
   assert.deepEqual(m.SLEEP.map(x => x[1]), ['Off', '15 min', '30 min', '45 min', '60 min', '90 min', 'End of song', 'End of album', 'Custom…']);
 });
 test('0.3.0 §5: one menu entry, delete always confirms, edit actions gated by isAdmin, same dialog shell as Settings', () => {
-  const m = src('menu.js'); assert.match(m, /Scenes, schedules & alarms/);   /* 0.3.5 J16 */ assert.doesNotMatch(m, /\['Schedules'/);
+  const m = src('menu.js'); assert.match(m, /\['Scenes', \(\) => go\('scenes'\)/); assert.match(m, /Schedules & alarms/);   /* 0.3.5 J16 */ assert.doesNotMatch(m, /\['Schedules'/);
   const s = src('scenesched.js');
   assert.match(s, /cls: 'settings-dlg ss-dlg/); assert.match(s, /const admin = isAdmin\(S\)/);
   for (const fn of ['delScene', 'del(r)']) assert.ok(s.includes(fn));

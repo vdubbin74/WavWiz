@@ -24,57 +24,52 @@ function push(S, i, change = {}) {
 const card = (root, id) => root.querySelector(`.dcard[data-zone-id="${id}"]`);
 const open = (root, id) => { card(root, id).querySelector('.dexpand').click(); return card(root, id); };
 
-test('0.2.3 fix: Expanded panel - an open card, its settings and a typed delay survive a burst of updates', async () => {
-  localStorage.setItem('wavwiz.devsize', 'expanded');
+// 0.3.6 K5: a speaker's settings open in the wide Speaker Settings column (not inside the card). The same guarantees hold for that column.
+const spk = root => root.querySelector('.spcol .spkset');
+const delaySlider = root => spk(root).querySelector('input[aria-label="Delay / sync offset"]');
+test('0.2.3 fix (K5): Expanded panel - the open Speaker Settings, its sliders and a dragged value survive a burst of updates', async () => {
+  localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2), zone(3)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
-  const c1 = open(p.el, 1), set1 = c1.querySelector('.dsettings'), box = set1.querySelector('.latbox'), other = card(p.el, 2);
-  assert.ok(set1, 'settings open'); assert.ok(c1.classList.contains('dset'));
-  box.focus(); box.value = '137';                                       // the user is typing an exact delay
+  const c1 = open(p.el, 1), other = card(p.el, 2);
+  const set1 = spk(p.el), box = delaySlider(p.el);
+  assert.ok(set1, 'settings open in the column'); assert.ok(c1.classList.contains('spk-active')); assert.ok(p.el.querySelector('.dexp-main').classList.contains('spk-open'));
+  box.focus(); box.value = '137';
   for (let i = 1; i <= 25; i++) { push(S, i, { 2: { muted: i > 20 } }); p.draw(); }
-  assert.equal(card(p.el, 1), c1, 'the open card is the same element');
-  assert.equal(c1.querySelector('.dsettings'), set1, 'its settings were not rebuilt');
-  assert.equal(c1.querySelector('.latbox'), box);
-  assert.equal(document.activeElement, box, 'focus stays in the delay box');
-  assert.equal(box.value, '137', 'the typed delay is kept');
+  assert.equal(spk(p.el), set1, 'the settings column was not rebuilt');
+  assert.equal(delaySlider(p.el), box); assert.equal(document.activeElement, box, 'focus stays'); assert.equal(box.value, '137', 'the dragged value is kept');
   assert.equal(card(p.el, 2), other, 'closed cards are kept too');
-  // live values were patched in place
-  assert.ok(other.classList.contains('muted')); assert.equal(other.querySelector('.dtag.muted').textContent, 'MUTED');   // 0.2.5: a MUTED tag (render v2)
+  assert.ok(other.classList.contains('muted')); assert.equal(other.querySelector('.dtag.muted').textContent, 'MUTED');
   assert.equal(other.querySelector('.dvol input').value, String(S.zones[1].volume));
-  assert.match(set1.querySelector('.dsconn').textContent, /sync ±2\.5 ms/);
   p.el.remove();
 });
 
-test('0.2.3 fix: a slider drag inside the open card is not interrupted; a change that needs a rebuild waits for pointerup', async () => {
-  localStorage.setItem('wavwiz.devsize', 'expanded');
+test('0.2.3 fix (K5): a slider drag in the Speaker Settings is not interrupted by a rename; the title follows in place', async () => {
+  localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
-  const c1 = card(p.el, 1).classList.contains('dset') ? card(p.el, 1) : open(p.el, 1);
-  const sl = c1.querySelector('.dsettings .latslider');
-  sl.dispatchEvent(ev('pointerdown')); sl.value = '420';                  // finger down, dragging
-  for (let i = 1; i <= 10; i++) { push(S, i, { 1: { name: 'Living room' } }); p.draw(); }   // a rename would rebuild the card
-  assert.equal(card(p.el, 1), c1, 'not rebuilt under the drag');
-  assert.equal(c1.querySelector('.dsettings .latslider'), sl);
-  assert.equal(sl.value, '420', 'the dragged value is not overwritten');
-  sl.dispatchEvent(ev('pointerup')); await wait(80);                      // drag ends -> the waiting rebuild applies
-  assert.notEqual(card(p.el, 1), c1);
-  assert.equal(card(p.el, 1).querySelector('.dname').textContent, 'Living room');
-  assert.ok(card(p.el, 1).querySelector('.dsettings'), 'still open after the rebuild');
-  assert.ok(card(p.el, 1).classList.contains('dsnoanim'), 'no slide-in replay');
+  open(p.el, 1);
+  const set1 = spk(p.el), sl = delaySlider(p.el);
+  sl.dispatchEvent(ev('pointerdown')); sl.value = '420';
+  for (let i = 1; i <= 10; i++) { push(S, i, { 1: { name: 'Living room' } }); p.draw(); }
+  assert.equal(spk(p.el), set1); assert.equal(delaySlider(p.el), sl); assert.equal(sl.value, '420', 'the dragged value is not overwritten');
+  sl.dispatchEvent(ev('pointerup')); await wait(50);
+  assert.equal(spk(p.el), set1, 'still the same column after the drag ends');
+  assert.match(set1.querySelector('.spk-title').textContent, /LIVING ROOM/);
   p.el.remove();
 });
 
-test('0.2.3 fix: a removed device still leaves at once; the open card of another device is not disturbed', () => {
-  localStorage.setItem('wavwiz.devsize', 'expanded');
+test('0.2.3 fix (K5): a removed device still leaves at once; the open settings of another device are not disturbed; its own removal closes them', () => {
+  localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2), zone(3)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
-  const c1 = card(p.el, 1).classList.contains('dset') ? card(p.el, 1) : open(p.el, 1), box = c1.querySelector('.latbox');
+  open(p.el, 1); const set1 = spk(p.el), box = delaySlider(p.el);
   box.focus(); box.value = '88';
   S.zones = S.zones.filter(z => z.id !== 3); p.draw();
   assert.equal(card(p.el, 3), null, 'revoked device gone');
-  assert.equal(card(p.el, 1), c1); assert.equal(document.activeElement, box); assert.equal(box.value, '88');
-  S.zones = S.zones.filter(z => z.id !== 1); p.draw();                   // the open card's own device is removed: it closes and goes
-  assert.equal(card(p.el, 1), null); assert.ok(card(p.el, 2));
+  assert.equal(spk(p.el), set1); assert.equal(document.activeElement, box); assert.equal(box.value, '88');
+  S.zones = S.zones.filter(z => z.id !== 1); p.draw();
+  assert.equal(card(p.el, 1), null); assert.ok(card(p.el, 2)); assert.ok(!p.el.querySelector('.dexp-main').classList.contains('spk-open'), 'settings closed with their device');
   p.el.remove();
 });
 
@@ -116,6 +111,6 @@ test('0.2.3: Standard rows have no Settings; tapping a device opens Expanded wit
   assert.equal(p.size, 'expanded');
   const c2 = card(p.el, 2);
   assert.ok(c2, 'its card is shown'); assert.ok(c2.classList.contains('hl'), 'and highlighted');
-  assert.ok(c2.querySelector('.dsettings'), '0.3.5 J6: its settings open in place');
+  assert.ok(spk(p.el), '0.3.6 K5: its settings open in the Speaker Settings column'); assert.ok(c2.classList.contains('spk-active'));
   p.el.remove();
 });

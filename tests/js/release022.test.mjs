@@ -15,7 +15,7 @@ test('0.2.2 T4: artist tiles fall back to the artist\'s album covers (mosaic of 
   const a = src('art.js');
   assert.match(a, /export function artistCover\(name, ids = \[\], cls = 'lg rnd', size = 384\)/);
   assert.match(a, /ok\.length >= 4 \? ok\.slice\(0, 4\) : \[ok\[0\]\]/);
-  assert.match(a, /if \(!ok\.length\) \{ m\.remove\(\); return; \}\s*\/\/ no album art either: the generated portrait stays/);
+  assert.match(a, /if \(!ok\.length\) \{ m\.remove\(\); showGen\(\); return; \}\s*\/\/ no album art either: the generated portrait is drawn/);
   assert.match(a, /export function artPushed\(d\)/);
   assert.match(src('main.js'), /m\.type === 'art'\) \{ artPushed\(m\.data\)/);
   const l = src('library.js');

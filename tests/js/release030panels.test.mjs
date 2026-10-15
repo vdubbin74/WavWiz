@@ -34,7 +34,7 @@ test('§6: the chevron points where the panel will move; labels and every click 
 test('§6: one key wavwiz.panels; the 0.2.x keys migrate once; state survives reload', async () => {
   const P = await imp('panels');
   const s = mem({ 'wavwiz.libcollapsed': '1', 'wavwiz.devsize': 'expanded', 'wavwiz.listcollapsed': '1', 'wavwiz.npctlcollapsed': '1' });
-  const p = P.loadPanels(s); assert.deepEqual(p, { lib: 'rail', dev: 'normal', exp: 'dev', list: 'collapsed', ctl: 'collapsed' });
+  const p = P.loadPanels(s); assert.deepEqual(p, { lib: 'rail', dev: 'normal', exp: 'dev', list: 'collapsed', ctl: 'collapsed', ctlSet: true });
   assert.ok(s.getItem(P.PANELS_KEY)); s.setItem('wavwiz.libcollapsed', '0');
   assert.deepEqual(P.loadPanels(s), p, 'migrated once; the new key wins');
   P.savePanels({ ...p, exp: 'lib' }, s); assert.equal(P.loadPanels(s).exp, 'lib');
