@@ -3,7 +3,7 @@ namespace WavWiz.Server.Media;
 
 public enum RepeatMode { Off, All, One }
 
-public sealed record QueueItem(long Id, string Kind /* track|radio */, string Location /* file path or stream URL */, string Title, string Artist, string Album, long DurationMs, long? RefId, string? Genre = null, int? Year = null, string? ArtUrl = null);
+public sealed record QueueItem(long Id, string Kind /* track|radio */, string Location /* file path or stream URL */, string Title, string Artist, string Album, long DurationMs, long? RefId, string? Genre = null, int? Year = null, string? ArtUrl = null, int? TrackNo = null);
 
 /// <summary>
 /// Turns a queue into one continuous sample stream. Gapless: when a decoder is exhausted the NEXT decoder (started as soon as the current one's reader

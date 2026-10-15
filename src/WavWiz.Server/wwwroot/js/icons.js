@@ -27,6 +27,11 @@ const P = {
   // 0.3.1 B6: standard expand (outward arrows) / collapse (inward arrows) icons, same on Library and Devices
   expandOut: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
   collapseIn: '<path d="M4 14h6v6M20 10h-6V4M14 10l6.5-6.5M10 14l-6.5 6.5"/>',
+  // 0.3.6 K1/K10: compact title-bar icons
+  save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12.5h9.4L17.5 7M10 11v5M14 11v5"/>',
+  checklist: '<path d="M4 6.5l1.6 1.6L8.5 5M4 12.5l1.6 1.6 2.9-3.1M4 18.5l1.6 1.6 2.9-3.1M12 6.5h8M12 12.5h8M12 18.5h8"/>',
+  unlock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
   // 0.3.6 K2: thin chevrons (1.6 stroke) for every expand / collapse; each points where the panel will move
   chevL: '<path d="M14.5 6.5l-5.5 5.5 5.5 5.5"/>', chevR: '<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>', chevU: '<path d="M6.5 14.5l5.5-5.5 5.5 5.5"/>', chevDn: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',

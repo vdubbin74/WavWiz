@@ -173,8 +173,8 @@ public sealed class Conductor : IDisposable
         var res = new List<QueueItem>();
         foreach (var id in ids)
         {
-            var r = _db.Query("SELECT id,path,title,artist,album,duration_ms,genre,year FROM track WHERE id=$i AND missing=0",
-                x => new QueueItem(0, "track", x.GetString(1), x.GetString(2), x.GetString(3), x.GetString(4), x.GetInt64(5), x.GetInt64(0), x.IsDBNull(6) ? null : x.GetString(6), x.IsDBNull(7) ? null : x.GetInt32(7)), ("$i", id)).FirstOrDefault();
+            var r = _db.Query("SELECT id,path,title,artist,album,duration_ms,genre,year,track_no FROM track WHERE id=$i AND missing=0",
+                x => new QueueItem(0, "track", x.GetString(1), x.GetString(2), x.GetString(3), x.GetString(4), x.GetInt64(5), x.GetInt64(0), x.IsDBNull(6) ? null : x.GetString(6), x.IsDBNull(7) ? null : x.GetInt32(7), null, x.IsDBNull(8) ? null : x.GetInt32(8)), ("$i", id)).FirstOrDefault();
             if (r != null) res.Add(r);
         }
         return res;

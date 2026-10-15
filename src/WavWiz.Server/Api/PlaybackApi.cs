@@ -8,7 +8,7 @@ public static class PlaybackApi
     private static object QueueDto(Services s)
     {
         var q = s.Conductor.Queue(); var now = s.Conductor.Now();
-        return new { items = q.Select((x, i) => new { id = x.Id, index = i, kind = x.Kind, title = x.Title, artist = x.Artist, album = x.Album, genre = x.Genre, year = x.Year, durationMs = x.DurationMs, refId = x.RefId, artUrl = x.ArtUrl }), index = now.Index };
+        return new { items = q.Select((x, i) => new { id = x.Id, index = i, kind = x.Kind, title = x.Title, artist = x.Artist, album = x.Album, genre = x.Genre, year = x.Year, trackNo = x.TrackNo, durationMs = x.DurationMs, refId = x.RefId, artUrl = x.ArtUrl }), index = now.Index };
     }
 
     public static List<QueueItem> ResolveItems(Services s, JsonElement b, out string? error)
