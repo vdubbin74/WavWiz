@@ -4,7 +4,7 @@ import { openEq } from './eq.js';
 import { latencyControl, clampMs } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
-import { icon, setIcon, iconSvg } from './icons.js';
+import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { whenIdle } from './slider.js';
 import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
@@ -663,17 +663,17 @@ export function devicesPanel(S, ctl) {
   const setPick = v => { zpick = v; saveZonePick(v); draw(true); };
   const setEdit = v => { zedit = v; draw(true); };
   // 0.2.2 T5: a true mirror of the Library header. Library = title … Esc, arrow, Expand (outer edge); Devices = Expand, arrow (outer edge), Esc, title …
-  const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Fold / open the Devices panel ( ] )', onclick: ev => { ev.stopPropagation(); ctl.toggleDev?.(); } }, '›');
+  const colBtn = h('button', { class: 'plus devcol', 'aria-label': arrowLabel('Devices', 'standard'), 'aria-expanded': 'true', title: 'Fold / open the Devices panel ( ] )', onclick: ev => { ev.stopPropagation(); ctl.toggleDev?.(); } }); setChev(colBtn, 'r');
   const expBtn = h('button', { class: 'plus devexp', 'aria-label': expandLabel('Devices', false), 'aria-pressed': 'false', title: 'Expand', onclick: ev => { ev.stopPropagation(); ctl.toggleDevExpanded?.(); } }, icon(expandIcon('right', false)));
   const count = h('span', { class: 'small dim devcount' });
   // 0.2.3 U7: the DEVICES title sits at the right edge, the true mirror image of LIBRARY at the left edge of the Library header
   // 0.3.0 §6: two controls kept apart - Expand on the inner edge (becomes "⤡ Esc"), chevron on the outer edge; a 30 px rail with icon + title
-  root.append(h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '◉'), h('span', { class: 'prail-t' }, 'DEVICES')),
+  root.append(h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '◉'), h('span', { class: 'prail-t' }, 'DEVICES'), h('span', { class: 'prail-n', title: 'Devices online / total' })),
     h('div', { class: 'pane-h devhead' }, expBtn, h('button', { type: 'button', class: 'btn sm libswap', title: 'Show the playlist here again', onclick: ev => { ev.stopPropagation(); ctl.libSwap?.(false); } }, '‹ Playlist'), h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES'), colBtn), body);   // 0.3.5 J11
   root.addEventListener('click', ev => { if (size === 'collapsed' && !ev.target.closest('.devcol')) ctl.toggleDev?.(false); });
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;
-    colBtn.textContent = s === 'collapsed' ? '‹' : '›'; colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
+    setChev(colBtn, s === 'collapsed' ? 'l' : 'r'); colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
     colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
     paintExpandBtn(expBtn, 'Devices', s === 'expanded');
     root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';

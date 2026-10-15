@@ -2,7 +2,7 @@ import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
 import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
-import { icon, setIcon, iconSvg } from './icons.js';
+import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
 import { heartBtn } from './fav.js';
@@ -92,7 +92,7 @@ export function createNow(S, ctl) {
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
   let ctlCollapsed = loadPanels().ctl === 'collapsed';   // 0.3.0 §6: one key for all panels
-  const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }, ctlCollapsed ? '˄' : '˅');
+  const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }); setChev(ctlColBtn, ctlCollapsed ? 'u' : 'd');
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
   // 0.2.3 U1 (replaces 0.2.2 T3): collapsed = ONE line - thumbnail, title · artist over a progress bar with elapsed / total, then every
   // control (heart, shuffle, prev, play/pause, next, repeat, volume + %, mute, EQ), all scaled to fit; nothing moves to the Playlist bar.
@@ -133,9 +133,9 @@ export function createNow(S, ctl) {
     ctlCollapsed = force ?? !ctlCollapsed;
     ctlPanel.classList.toggle('collapsed', ctlCollapsed);
     el.classList.toggle('ctlcollapsed', ctlCollapsed);
-    ctlColBtn.textContent = ctlCollapsed ? '˄' : '˅';
+    setChev(ctlColBtn, ctlCollapsed ? 'u' : 'd');
     ctlColBtn.setAttribute('aria-expanded', String(!ctlCollapsed));
-    savePanels({ ...loadPanels(), ctl: ctlCollapsed ? 'collapsed' : 'open' });
+    savePanels({ ...loadPanels(), ctl: ctlCollapsed ? 'collapsed' : 'open', ctlSet: true });
     paintCollapsed();
     setTimeout(() => viz?.resize(), 340);
   }

@@ -1,4 +1,5 @@
 import { h, fmtDur, fmtTime } from './util.js';
+import { setChev } from './icons.js';
 import { canControl, MIME, dragInfo, dropLabel } from './ui.js';
 import { api, toast } from './util.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
@@ -16,8 +17,8 @@ export function listTable(S, ctl) {
   const wrap = h('div', { class: 'qwrap' }, table);
   // 0.1.1: collapse arrow (slides the panel down to its header strip); View state lives on the desk element, saved per device
   // 0.3.2 F15: up arrow = expand (grow upward), down arrow = collapse; each only while that move is possible
-  const upBtn = h('button', { class: 'plus listup', 'aria-label': 'Expand the playlist upward', title: 'Expand the playlist', onclick: () => ctl.listStep?.('up') }, '˄');
-  const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse the playlist', 'aria-expanded': 'true', title: 'Collapse the playlist', onclick: () => ctl.listStep ? ctl.listStep('down') : ctl.toggleList?.() }, '˅');
+  const upBtn = h('button', { class: 'plus listup', 'aria-label': 'Expand the playlist upward', title: 'Expand the playlist', onclick: () => ctl.listStep?.('up') }); setChev(upBtn, 'u');
+  const colBtn = h('button', { class: 'plus listcol', 'aria-label': 'Collapse the playlist', 'aria-expanded': 'true', title: 'Collapse the playlist', onclick: () => ctl.listStep ? ctl.listStep('down') : ctl.toggleList?.() }); setChev(colBtn, 'd');
   const setState = st => { const a = { up: st !== 'expanded', down: st !== 'collapsed' }; upBtn.hidden = !a.up; colBtn.hidden = !a.down; colBtn.setAttribute('aria-expanded', String(st !== 'collapsed')); };
   const setCollapsed = c => setState(c === true ? 'collapsed' : c === false ? 'open' : c);
   // 0.3.5 J11: while the Library is expanded the playlist is the right-hand column; "Devices ›" swaps the Devices panel in (and back)

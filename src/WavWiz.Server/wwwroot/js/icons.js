@@ -28,13 +28,19 @@ const P = {
   expandOut: '<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
   collapseIn: '<path d="M4 14h6v6M20 10h-6V4M14 10l6.5-6.5M10 14l-6.5 6.5"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
+  // 0.3.6 K2: thin chevrons (1.6 stroke) for every expand / collapse; each points where the panel will move
+  chevL: '<path d="M14.5 6.5l-5.5 5.5 5.5 5.5"/>', chevR: '<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>', chevU: '<path d="M6.5 14.5l5.5-5.5 5.5 5.5"/>', chevDn: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',   // 0.2.3 U9: Lock EQ
   wave: '<path d="M3 12h1.5M6.5 8v8M10 5v14M13.5 9v6M17 7v10M20.5 11v2"/>',
   opacity: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 7h5M12 11h7M12 15h6" stroke-width="1.5"/>',
   pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',   // 0.3.2 F3 mini player: always on top
 };
 export const ICON_NAMES = Object.keys(P);
-export function iconSvg(name) { return `<svg class="ico-svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[name] || ''}</svg>`; }
+export function iconSvg(name) { const thin = /^chev[LRUD]/.test(name); return `<svg class="ico-svg${thin ? ' thin' : ''}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="${thin ? 1.6 : 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[name] || ''}</svg>`; }
 /** A span holding the icon (innerHTML of a fixed, local SVG string: no user data, CSP-safe). */
 export function icon(name, cls = '') { const s = document.createElement('span'); s.className = 'ic' + (cls ? ' ' + cls : ''); s.innerHTML = iconSvg(name); s.dataset.icon = name; return s; }
 export function setIcon(el, name) { if (el.dataset.icon === name) return; el.dataset.icon = name; el.innerHTML = iconSvg(name); }
+
+/** 0.3.6 K2: one chevron button face. dir = l | r | u | d (the way the panel will move). */
+export const chevName = dir => ({ l: 'chevL', r: 'chevR', u: 'chevU', d: 'chevDn' }[dir] || 'chevL');
+export function setChev(btn, dir) { btn.dataset.dir = dir; btn.classList.add('chv'); const n = chevName(dir); if (btn.dataset.icon !== n) { btn.dataset.icon = n; btn.innerHTML = iconSvg(n); } }

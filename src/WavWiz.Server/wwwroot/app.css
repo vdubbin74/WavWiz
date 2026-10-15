@@ -2184,3 +2184,50 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 :root[data-theme=pepecoin] .np-spk .dot.warn{background:var(--amber);box-shadow:0 0 5px var(--amber)}
 :root[data-theme=pepecoin] :is(.np-spk .dot.bad,.pm-status .dot.bad){background:var(--red);box-shadow:0 0 5px var(--red)}
 :root[data-theme=pepecoin] .pm-status .dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+
+/* ======================================================================================================================================
+   WavWiz 0.3.6 (K1-K22). Everything below overrides earlier rules on purpose (one block, easy to audit).
+   ====================================================================================================================================== */
+:root{--glide:250ms;--glide-ease:ease-in-out;--glide-fade:160ms}
+/* K8: ONE shared glide (defined in js/motion.js; these only read the variables) */
+@media (min-width:901px){
+  .desk{transition:grid-template-columns var(--glide) var(--glide-ease),grid-template-rows var(--glide) var(--glide-ease)}
+  .desk .nowcol,.desk .listpanel{transition:opacity var(--glide) var(--glide-ease),visibility 0s linear 0s}
+  .desk.libexpanded .nowcol,.desk.devexpanded .nowcol,.desk.libexpanded .listpanel,.desk.devexpanded .listpanel{transition:opacity var(--glide) var(--glide-ease),visibility 0s linear var(--glide)}
+  .desk .npbar{transition:opacity var(--glide) var(--glide-ease),visibility 0s linear var(--glide)}
+  .desk.libexpanded .npbar,.desk.devexpanded .npbar{transition:opacity var(--glide) var(--glide-ease)}
+}
+.listpanel .qwrap{transition:opacity var(--glide) var(--glide-ease),transform var(--glide) var(--glide-ease),max-height var(--glide) var(--glide-ease)}
+.np-ctlbody{transition:opacity var(--glide-fade) var(--glide-ease),transform var(--glide) var(--glide-ease),max-height var(--glide) var(--glide-ease)}
+.chv svg{transition:transform var(--glide) var(--glide-ease)}
+@keyframes k-fadein{from{opacity:0}to{opacity:1}}
+@keyframes k-dropin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.menupop,.menu .drop,.dd,.dropdown,.settings-sec.on,.dsettings,.k-fade{animation:k-fadein var(--glide-fade) var(--glide-ease) both}
+@media (prefers-reduced-motion:reduce){ .menupop,.menu .drop,.dd,.dropdown,.settings-sec.on,.dsettings,.k-fade,.chv svg{animation:none!important;transition:none!important} }
+/* K15: the ONE pulse (theme accent) */
+@keyframes k-pulse{0%{box-shadow:0 0 0 0 var(--accent),inset 0 0 0 0 var(--accent-soft)}35%{box-shadow:0 0 0 3px var(--accent),0 0 22px 2px var(--accent),inset 0 0 22px var(--accent-soft)}100%{box-shadow:0 0 0 0 transparent,inset 0 0 0 0 transparent}}
+.k-pulse{animation:k-pulse 900ms ease-out 1;position:relative}
+@media (prefers-reduced-motion:reduce){ .k-pulse{animation:none!important;outline:2px solid var(--accent)} }
+/* K2: clean thin chevron buttons: accent stroke, 3px box, hover = 15% accent tint */
+.plus.chv{width:22px;height:22px;min-width:22px;padding:0;border:1px solid var(--accent);border-radius:3px;background:transparent;color:var(--accent-text,var(--accent));display:inline-flex;align-items:center;justify-content:center}
+.plus.chv .ic{display:inline-flex} .plus.chv svg{width:14px;height:14px}
+.plus.chv:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);border-color:var(--accent);color:var(--accent-text,var(--accent))}
+/* K9: slimmer panel title bars (about 30px) with 22px icon buttons */
+.libpanel .pane-h,.devpanel .pane-h,.listpanel .pane-h,.np-vizpanel>.pane-h,.np-ctlpanel>.pane-h{min-height:30px;height:30px;padding:0 10px;box-sizing:border-box}
+.pane-h .plus,.pane-h .plus.libexp,.pane-h .plus.devexp,.pane-h .plus.chv{width:22px;height:22px;min-width:22px;height:22px;padding:0}
+.pane-h .btn.sm{min-height:22px;padding:0 8px;font-size:11px}
+.pane-h .plus svg{width:13px;height:13px}
+@media (min-width:901px){ .plus.pchev,.plus.pexp,.plus.devcol,.plus.devexp{min-width:22px;width:22px;height:22px;padding:0} }
+/* K3: collapsed Library / Devices bars - accent edge on the OUTER side, icon, vertical label, count badge, hover glow; Devices is the exact mirror */
+@media (min-width:901px){
+  .libpanel.israil,.devpanel.israil{position:relative;overflow:hidden;transition:box-shadow var(--glide) var(--glide-ease),border-color var(--glide) var(--glide-ease)}
+  .libpanel.israil::before,.devpanel.israil::before{content:"";position:absolute;top:0;bottom:0;width:3px;background:var(--accent);box-shadow:0 0 10px var(--accent);z-index:2}
+  .libpanel.israil::before{left:0} .devpanel.israil::before{right:0}
+  .libpanel.israil:hover,.devpanel.israil:hover{box-shadow:inset 0 0 18px var(--accent-soft),0 0 14px var(--accent-soft)}
+  .israil .prail-ic,.israil .prail-t{text-shadow:0 0 8px var(--accent-soft)}
+  .israil .prail-t{font-size:12px}
+  .libpanel .prail-t{transform:rotate(180deg)} .devpanel .prail-t{transform:none}   /* a true 180 degree pair: Library reads UP, Devices reads DOWN */
+  .prail-n{display:none;margin-top:auto;font-size:10px;font-weight:800;letter-spacing:.02em;color:var(--hl-text,var(--hl,var(--accent)));border:1px solid var(--hl,var(--accent));border-radius:3px;padding:1px 3px;line-height:1.2;background:color-mix(in srgb,var(--hl,var(--accent)) 12%,transparent);margin-bottom:4px;max-width:40px;overflow:hidden}
+  .israil .prail-n{display:block}
+  .israil .prail{min-height:0}
+}

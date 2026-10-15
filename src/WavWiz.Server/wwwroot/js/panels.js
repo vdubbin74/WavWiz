@@ -7,7 +7,7 @@ const base = v => (v === 'rail' ? 'rail' : 'normal');
 /** { lib: 'rail'|'normal', dev: 'rail'|'normal', exp: null|'lib'|'dev', list: 'open'|'collapsed', ctl: 'open'|'collapsed' } */
 export function normPanels(p) {
   p = p && typeof p === 'object' ? p : {};
-  return { lib: base(p.lib), dev: base(p.dev), exp: p.exp === 'lib' || p.exp === 'dev' ? p.exp : null, list: p.list === 'collapsed' ? 'collapsed' : p.list === 'expanded' ? 'expanded' : 'open', ctl: p.ctl === 'collapsed' ? 'collapsed' : 'open' };
+  return { lib: base(p.lib), dev: base(p.dev), exp: p.exp === 'lib' || p.exp === 'dev' ? p.exp : null, list: p.list === 'collapsed' ? 'collapsed' : p.list === 'expanded' ? 'expanded' : 'open', ctl: p.ctlSet ? (p.ctl === 'open' ? 'open' : 'collapsed') : 'collapsed', ...(p.ctlSet ? { ctlSet: true } : {}) };   // 0.3.6 K9: starts COLLAPSED until the user picks (then remembered)
 }
 /** One key; the 0.2.x keys (wavwiz.libcollapsed, wavwiz.devsize, wavwiz.listcollapsed, wavwiz.npctlcollapsed, libprefs.expanded) move over once. */
 export function loadPanels(store = globalThis.localStorage) {
@@ -16,7 +16,7 @@ export function loadPanels(store = globalThis.localStorage) {
     let libExp = false; try { libExp = !!JSON.parse(store.getItem('wavwiz.libprefs.v1') || store.getItem('wavwiz.libprefs') || 'null')?.expanded; } catch { /* ignore */ }
     const ds = store.getItem('wavwiz.devsize') || (store.getItem('wavwiz.devcollapsed') === '1' ? 'collapsed' : 'standard');
     const p = normPanels({ lib: store.getItem('wavwiz.libcollapsed') === '1' ? 'rail' : 'normal', dev: ds === 'collapsed' ? 'rail' : 'normal', exp: libExp ? 'lib' : ds === 'expanded' ? 'dev' : null,
-      list: store.getItem('wavwiz.listcollapsed') === '1' ? 'collapsed' : 'open', ctl: store.getItem('wavwiz.npctlcollapsed') === '1' ? 'collapsed' : 'open' });
+      list: store.getItem('wavwiz.listcollapsed') === '1' ? 'collapsed' : 'open', ctl: store.getItem('wavwiz.npctlcollapsed') === '1' ? 'collapsed' : 'open', ctlSet: store.getItem('wavwiz.npctlcollapsed') != null });
     store.setItem(PANELS_KEY, JSON.stringify(p)); return p;
   } catch { return normPanels(null); }
 }
@@ -33,6 +33,8 @@ export function expand(p, k, on = p.exp !== k) { return on ? { ...p, exp: k } : 
 export const esc = p => (p.exp ? { ...p, exp: null } : p);
 /** Chevron glyph: points where the panel will move. */
 export function chevronGlyph(p, k) { const s = shown(p, k), toLeft = k === 'lib' ? s !== 'rail' : s === 'rail'; return toLeft ? '‹' : '›'; }
+/** 0.3.6 K2: the same, as a direction letter for the SVG chevron (l | r). */
+export const chevronDir = (p, k) => (chevronGlyph(p, k) === '‹' ? 'l' : 'r');
 export function chevronLabel(p, k) { const name = k === 'lib' ? 'Library' : 'Devices', s = shown(p, k); return s === 'rail' ? `Open the ${name} panel` : `Fold the ${name} panel to a rail`; }
 /** Layout for this width: the saved state, but (temporarily, not saved) the other side folds to a rail when Now Playing would drop under 420 px,
  *  and an expanded panel falls back to normal for this load when the window is phone-sized. */

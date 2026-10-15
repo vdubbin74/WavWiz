@@ -8,10 +8,11 @@ import { openEq } from './eq.js';
 import { createNow } from './now.js';
 import { devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
-import { icon, setIcon } from './icons.js';
+import { icon, setIcon, setChev } from './icons.js';
+import { GLIDE, glide, pulse, pulseSel } from './motion.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronLabel, keyAction, listStep, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
+import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
 import { retireRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
@@ -139,9 +140,9 @@ async function startMain() {
 
   // 0.3.0 §6: one panel state (rail · normal · expanded), one key, two controls per header kept apart: chevron on the outer edge, expand on the inner edge
   P6 = loadPanels();
-  const colBtn = h('button', { class: 'plus libcol pchev', 'aria-label': chevronLabel(P6, 'lib'), 'aria-expanded': 'true', title: 'Fold / open the Library panel ( [ )', onclick: ev => { ev.stopPropagation(); setPanels(chevron(P6, 'lib'), 'lib'); } }, '‹');
+  const colBtn = h('button', { class: 'plus libcol pchev', 'aria-label': chevronLabel(P6, 'lib'), 'aria-expanded': 'true', title: 'Fold / open the Library panel ( [ )', onclick: ev => { ev.stopPropagation(); setPanels(chevron(P6, 'lib'), 'lib'); } }); setChev(colBtn, 'l');
   const expBtn = h('button', { class: 'plus libexp pexp', 'aria-label': expandLabel('Library', false), 'aria-pressed': 'false', title: 'Expand', onclick: ev => { ev.stopPropagation(); setPanels(expand(P6, 'lib'), 'lib'); } }, icon(expandIcon('left', false)));
-  const libRail = h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '♫'), h('span', { class: 'prail-t' }, 'LIBRARY'));
+  const libRail = h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '♫'), h('span', { class: 'prail-t' }, 'LIBRARY'), h('span', { class: 'prail-n', title: 'Songs in the library' }));
   libpanel = h('section', { class: 'libpanel', 'aria-label': 'Library' }, libRail, h('div', { class: 'pane-h' }, colBtn, h('span', { class: 'libtitle' }, 'LIBRARY'), h('span', { class: 'grow' }), expBtn), h('div', { class: 'libbody' }, libC.el));
   libpanel.addEventListener('click', ev => { if (libpanel.classList.contains('israil') && !ev.target.closest('button:not(.libpanel)')) setPanels(railClick(P6, 'lib'), 'lib'); });
   libpanel.addEventListener('dragenter', () => { if (libpanel.classList.contains('israil')) setPanels(railClick(P6, 'lib'), 'lib'); });
@@ -205,7 +206,7 @@ function applyPanels(first = false) {
   desk.classList.toggle('devcollapsed', ds === 'rail'); desk.classList.toggle('devexpanded', ds === 'expanded');
   desk.classList.toggle('autorail', !!e.auto);
   libpanel.classList.toggle('israil', ls === 'rail'); libpanel.title = ls === 'rail' ? 'Open the Library panel ( [ )' : '';
-  const b = libpanel.querySelector('.libcol'); b.textContent = chevronGlyph(e, 'lib'); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
+  const b = libpanel.querySelector('.libcol'); setChev(b, chevronDir(e, 'lib')); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
   paintExpandBtn(libpanel.querySelector('.libexp'), 'Library', ls === 'expanded');   // 0.3.1 B4/B6
   if (ls !== 'expanded') desk.classList.remove('libdev');   // 0.3.5 J11
   devp.setSize(desk.classList.contains('libdev') ? 'standard' : ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
@@ -244,7 +245,7 @@ function toggleList(force) { const c = force ?? !desk.classList.contains('listco
 /** 0.3.2 F13: collapsed · open · expanded (rises over the EQ / visualizer at center-column width; Now Playing stays visible below). */
 // 0.3.3 G5: expanding the Playlist slides Now Playing up with it to the top of the center column (covering the EQ / visualizer, which stop
 // rendering while covered); collapsing reverses it. Both move with the Playlist's timing (FLIP: measure, switch, animate from the old spot).
-export const LIST_ANIM = { ms: 320, ease: 'cubic-bezier(.4,0,.2,1)' };
+export const LIST_ANIM = GLIDE;   // 0.3.6 K8: the one shared glide (motion.js)
 function flipList(change) {
   const els = [nowc.el, listt.el].filter(Boolean), before = els.map(e => e.getBoundingClientRect().top);
   change();
@@ -362,6 +363,9 @@ function drawStatus() {
   const on = S.zones.filter(z => z.enabled && z.connected), act_ = (S.groups || []).find(g => g.active);
   const bad = S.zones.filter(z => z.connected && ['dropped', 'reconnecting', 'buffering'].includes(z.room?.state));
   const tracks = S.status?.library?.tracks;
+  // 0.3.6 K3: the count badges on the collapsed Library / Devices bars
+  const lb = document.querySelector('.libpanel .prail-n'), db = document.querySelector('.devpanel .prail-n');
+  if (lb) lb.textContent = tracks != null ? String(tracks) : ''; if (db) db.textContent = `${online}/${S.zones.length}`;
   statusbar.replaceChildren(
     // 0.2.2 T10: the top-right indicator is the one home of "Connected"; the status bar speaks up only when the connection drops
     S.connected === false ? h('span', { class: 'sb sbconn', role: 'status' }, h('span', { class: 'dot bad' }), 'Reconnecting…') : null,
