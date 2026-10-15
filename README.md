@@ -20,11 +20,15 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Screenshots
 
-![WavWiz main window with the library, the 10-band EQ, Now Playing, four connected devices and the playlist](docs/img/wavwiz-main.png)
+![WavWiz main window with the library, the live LED-bar EQ, a slim Now Playing bar, four connected devices and the playlist](docs/img/wavwiz-main.png)
 
-| Device settings, opened in place | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
+| Speaker settings with profiles | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
 | --- | --- | --- |
-| ![Two device cards, one opened to show sound check, exact delay, Sound / EQ, connection and Rename / Set as reference / Forget](docs/img/wavwiz-device-settings.png) | ![The 10-band EQ in the LED look with Lock EQ checked](docs/img/wavwiz-eq-lock.png) | ![Theme cards with the live preview pinned at the top](docs/img/wavwiz-appearance-theme.png) |
+| ![Speaker settings for one device: a profile row (Save, Save as), volume, cap, delay, balance, bass, treble, the live LED EQ and the output](docs/img/wavwiz-device-settings.png) | ![The 10-band EQ in the LED look with Lock EQ checked](docs/img/wavwiz-eq-lock.png) | ![Theme cards with the live preview pinned at the top](docs/img/wavwiz-appearance-theme.png) |
+
+**Hover menus: the Sleep timer times appear when you hover over it**
+
+![Playback menu with the Sleep timer submenu open: 15, 30, 45 and 60 minutes, End of song and Off](docs/img/wavwiz-menu-hover.png)
 
 **Minimized Now Playing: everything on one line**
 
@@ -55,13 +59,13 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 ## Features
 
 - **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. Every browser that opens WavWiz joins as a speaker by itself. No sync measurements are published yet.
-- **Devices, zones and scenes** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. In the Expanded Devices view, each device card opens its settings in place: sound check, exact delay, Sound / EQ, audio output, connection, Rename, Set as reference, and Forget. The normal Devices list stays compact; tap a device's name to jump to its card. Expanded, the Devices panel shows three columns: **Scenes & Schedules** (create and edit scenes, schedules and alarms right there), **Zones** (optional groups such as “Downstairs”, each with one volume bar, Mute and an OFF | ON switch for all its speakers), and **Speakers** on the right (grouped by zone, with an Unassigned group and **+ Add to zone**). Revoking a device removes it everywhere at once; it has to pair again.
+- **Devices, zones and scenes** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. In the Expanded Devices view, each device card opens its settings in place, in a wide center column: volume, volume cap, delay, balance, bass, treble, EQ, audio output, connection, Rename, Set as reference, and Forget. Save these settings as a **profile** and load them on any device; a scene can pick a profile for each device. Balance is applied by WavWiz Player. The normal Devices list stays compact; tap a device's name to jump to its card. Expanded, the Devices panel shows three columns: **Scenes & Schedules** (create and edit scenes, schedules and alarms right there), **Zones** (optional groups such as “Downstairs”, each with one volume bar, Mute and an OFF | ON switch for all its speakers), and **Speakers** on the right (grouped by zone, with an Unassigned group and **+ Add to zone**). Revoking a device removes it everywhere at once; it has to pair again.
 - **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers and Wi-Fi PCs line up instead of echoing between devices; on PCs the delay is kept per audio output. **Calibrate speakers** measures it with the microphone of a WavWiz Player PC (USB, headset or built-in mic; recommended), or with your phone as the microphone (scan a QR code; a mic-only page, needs the one-time HTTPS setup), or by ear. The music pauses while it measures. *Beta: phone-mic calibration on iPhone may not show the microphone prompt yet; use the PC mic for now.*
 - **AirPlay, built in** — The server appears as the AirPlay speaker **WavWiz – Whole House**. Send audio from apps on iPhone, iPad, or Mac; it plays on every device in sync, with title and artwork on Now Playing.
 - **Optional Spotify Connect** — Off by default. Turn it on in Settings → Network; WavWiz appears in Spotify’s device list and streams to every device. **Requires your own Spotify Premium account.** Unofficial open-source client (librespot); not made or endorsed by Spotify.
 - **Library** — Big cover tiles, album pages, artists, genres, and folders, with sorting and a letter strip on every tab, favorites (hearts), playlists, queue, internet radio, and optional CD ripping. Missing covers and artist photos are looked up online (MusicBrainz, Cover Art Archive, Wikidata / Wikimedia Commons, TheAudioDB; can be switched off), and anything still missing gets a generated cover in your theme colors. Missing tags/covers can be suggested from MusicBrainz (nothing is written until you approve it). Password-protected NAS shares, gapless album playback, and automatic volume leveling (ReplayGain / R128).
 - **Now Playing** — Four control panel styles (Classic, Center, Stack, Horizon) with adjustable panel effects. Minimized, the whole panel fits on one line in your style and theme, and the minimized Playlist shows what's up next.
-- **10-band EQ per speaker** — Shown live in the middle of Now Playing by default (one toggle switches to the visualizer). Three looks (LED bars, Studio faders, Spectrum curve), pre-gain, loudness and limiter. **Lock EQ** keeps the mouse wheel and stray clicks from changing it.
+- **10-band EQ per speaker** — Shown live in the middle of Now Playing by default (one toggle switches to the visualizer). Three looks (LED bars, Studio faders, Spectrum curve) with LED level bars that follow the real level of each band, pre-gain, loudness and limiter. **Lock EQ** keeps the mouse wheel and stray clicks from changing it.
 - **Visualizers** — Eight original looks (Particle burst, Waveform river, Speaker cone, Ring, Neon tunnel, Spectrum, VU meters, Graphic EQ), each with its own 0–100% effect controls (50% default), a Quality setting (Auto / Low / High / Ultra), and GPU post effects.
 - **Themes** — Ten presets plus Custom colors (Background, Main, Second, Highlight, Text). Settings → Appearance has live, pinned previews for Theme, Visualizer, EQ, and Now Playing.
 - **Jukebox mode (beta)** — A locked party screen: guests scan a QR code and add songs from their phone (no app, no sign-in), within the rules you set (allowed music, songs per guest, vote to skip, auto-fill). Modern and Retro CD styles, with preview cards in Settings → Jukebox. Only the host PIN exits; for a fully locked public PC use Windows Assigned Access.
@@ -71,7 +75,9 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 - **Max-volume lock** — An admin can cap any device's volume and lock it; nothing raises it above the cap (master, zones, scenes, alarms, the API). A capped bar shows a marker at the limit.
 - **Add to home screen** — On a phone or tablet, add WavWiz to the home screen to open it like an app, full screen with its own icon.
 - **Alarms (beta), sleep timer, crossfade** — Alarms with fade-in, snooze and skip in the Scenes & Schedules column of Expanded Devices, a Sleep button in Now Playing with fade-out, and optional crossfade (off by default; never inside an album).
-- **Backup and restore** — One file with settings, playlists, scenes, alarms, EQ presets and device names; no passwords or certificates in it.
+- **Backup and restore** — File menu: Import settings, Restore backup, Export settings and Back up now. One file with settings, playlists, scenes, alarms, EQ presets and device names; no passwords or certificates in it. Restore shows a summary first and offers Undo restore.
+- **Menus that save clicks** — Choice lists open as hover submenus (Sleep timer, Sound / EQ, Playlists, and lists of your devices, zones and scenes). File → New creates a zone, scene, alarm or schedule (Ctrl+Shift+Z / S / A / H; some browsers reserve a few of these), and File → Run starts a scene, schedule or alarm.
+- **Playlist columns** — Show or hide columns from the checklist icon (or right-click the header), drag to resize or reorder, click a header to sort, and lock the layout.
 - **Admin mode** — File → Sign in as admin… unlocks house settings on any paired device without signing out; admin-only items are read-only (never hidden) for everyone else.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.
 

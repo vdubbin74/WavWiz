@@ -12,11 +12,19 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
-## [0.3.6] - 2026-10-14 (beta)
-- K1-K22: playlist title bar and columns (pick, reorder, resize, sort, lock); thin chevrons and accent-edge rails; cover placeholder and fade; one shared 250 ms glide and pulse; themed VU and LED EQ bars with real band frequencies; Library expanded with an in-column mini player; Queue menu opens the playlist.
-- Expanded Devices: speaker settings column (fixed 380 px), speaker profiles, a profile per device in scenes (new balance control, Player-side).
-- Menus: hover submenus, File > New (Ctrl+Shift+Z/S/A/H), File > Run, Devices submenus.
-- Backup: Back up now, saved backups, Restore with summary, Undo restore.
+## [0.3.6] - 2026-10-15 (beta)
+- Playlist: a compact icon title bar (Save, Clear, column picker, lock), a full-width table, and columns you can show or hide, resize, reorder and sort by clicking a header. The lock freezes the column layout and is themed like the speaker status tags. The same title bar appears in every playlist view.
+- Chevrons and rails: clean thin chevrons on every expand and collapse control; the collapsed Library and Devices bars have an accent edge and a count badge (songs, devices online); title bars are slimmer (30 px); the Now Playing controls start collapsed into the narrow bar.
+- Library: a dark placeholder and a quick fade-in for album covers (no more bright flash before the image loads).
+- One shared 250 ms glide for every panel and slide, and one shared accent pulse when a menu item or button points at something already on screen (reduce-motion respected).
+- Library expanded: the Library takes the whole left panel, the playlist stays on the right, and the real mini player sits under it. Devices collapsed becomes a slim rail with a small cover and progress line; hover opens the mini player. Queue in the Library menu always opens the playlist expanded.
+- EQ: LED bars are permanent on every EQ look and follow the real level of each band's frequency (31 Hz to 16 kHz). The analog VU meter follows the theme (Pepecoin uses brand colors only). In visualizer mode, Power and Pop-out sit on the left so the swap button never moves.
+- Expanded Devices: opening a speaker's settings gives it a wide center column (Scenes & Schedules collapses to a bar, Zones slides left, Speakers keep their width).
+- Speaker profiles: save and load a speaker's volume, cap, delay, balance, bass, treble, EQ and output from the speaker settings; a scene can pick a profile per device. Scenes never change a max-volume cap. Balance is applied by WavWiz Player.
+- Menus: hover submenus for choice lists (for example the Sleep timer times); File > New (zone, scene, alarm, schedule) with Ctrl+Shift+Z / S / A / H; File > Run starts scenes, schedules and alarms; the Devices menu lists devices, zones and scenes and jumps straight to them.
+- Backup: File > Import settings, Restore backup, Export settings and Back up now. Restore shows a summary first and offers Undo restore. The last 10 saved backups are kept on the server.
+- Fixes: a scene can no longer lift a max-volume lock through a profile; Save as no longer overwrites a profile with the same name; the scene editor shows newly saved profiles; the Speakers column no longer balloons in expanded Devices.
+- Not yet confirmed on real hardware: Balance (it only affects Player-side audio), Ctrl+Shift+S / A / H (some browsers reserve them), the mini player hover pop-out with a real mouse, 4K screens, WebKit on a real iPhone, and the LED EQ and analog meter on a real GPU.
 
 ## [0.3.5] - 2026-10-14 (beta)
 - Expanded Devices: Scenes & Schedules, Zones and Speakers side by side, with Speakers anchored on the right where they sit in the normal view. A speaker card opens in place to change its output, max volume, delay, EQ and name.

@@ -62,7 +62,8 @@ On an iPhone or iPad, open WavWiz in Safari, tap **Share** and choose **Add to H
 
 - **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
 - **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
-- In the **Expanded** Devices view, each card shows the name with up to two tags (**REF** for the reference speaker, **MUTED**, **NO DELAY**, **OFFLINE**, or a phone's **SPEAKER** role), one status line (playing · output · delay), and the volume with a round **Mute** button on the right. Its **Settings** button opens the device's settings right under the card: **Output**, **Delay** (slider, exact ms and **Calibrate**, with "Measured with … · date"), **Test sound**, **Sound / EQ** and **More** (Rename, Set as reference, Delay history, Forget), plus one line of connection details. Controls only an administrator may change stay visible but read-only for everyone else.
+- In the **Expanded** Devices view, each card shows the name with up to two tags (**REF** for the reference speaker, **MUTED**, **NO DELAY**, **OFFLINE**, or a phone's **SPEAKER** role), one status line (playing · output · delay), and the volume with a round **Mute** button on the right. Its chevron button opens the device's settings in a wide center column (Scenes & Schedules folds into a bar and Zones slides left while it is open): **Volume**, **Volume cap**, **Delay** (slider, exact ms and **Calibrate**), **Balance**, **Bass**, **Treble**, the 10-band EQ, the **Output**, **Test sound** and **More** (Rename, Set as reference, Delay history, Forget). Balance is applied by WavWiz Player, so it has no effect on a browser speaker. Controls only an administrator may change stay visible but read-only for everyone else.
+- **Profiles:** the row at the top of the speaker settings saves everything above as a named profile (**Save**, **Save as…**) and loads it on any device. A dot by the name shows unsaved changes. In the scene editor, each device can pick a profile; a scene never changes a max-volume cap.
 - Use **per-device delay (0–1000 ms)** if Bluetooth speakers lag behind other devices. On PCs the delay is kept per audio output.
 
 ### Calibrate speakers
@@ -81,11 +82,17 @@ A link made by an administrator lets the phone calibrate every speaker; other us
 
 Menus do things, Settings sets things:
 
-- **File:** Settings…, Sign in as admin… / Leave admin mode, Sign out
-- **Library:** Browse library (opens the Expanded library), Playlists, Queue, Rescan folders, plus admin tools (Tidy up library, Tag & cover fix…, CD ripper…)
+- **File:** Settings, **New** (zone, scene, alarm, schedule; Ctrl+Shift+Z / S / A / H, and some browsers reserve a few of these), **Run** (starts a scene, schedule or alarm), Import settings…, Restore backup…, Export settings, Back up now, Sign in as admin… / Leave admin mode, Sign out
+- **Library:** Browse library (opens the Expanded library), Playlists, Queue (always opens the playlist expanded), Rescan folders, plus admin tools (Tidy up library, Tag & cover fix…, CD ripper…)
 - **Playback:** Play / Pause, Next, Previous, Internet radio, Sound / EQ…, Start Jukebox… (admin)
-- **Devices:** Devices & zones, Scenes & Schedules…, Calibrate speakers…, Phone role… (on a phone), Use as remote only, Pair a player…, Away-from-home…
+- **Devices:** Devices & zones, Devices / Zones / Scenes (hover to list them and jump straight to one), Schedules & alarms, Calibrate speakers…, Phone role… (on a phone), Use as remote only, Pair a player…, Away-from-home…
 - **Help:** Getting started, Diagnostics, What's new, About WavWiz…
+
+**Hover menus:** menu items that open a list of choices show it beside the item when you hover (for example **Playback → Sleep timer** lists 15, 30, 45 and 60 minutes, End of song and Off), so one click picks one. **Pulse:** when a menu item or button points at something already on screen (the EQ, the playlist, a Settings tab), that spot pulses briefly in your accent color; it respects reduce-motion.
+
+**Playlist columns:** the playlist title bar has a checklist icon (or right-click the header) to show or hide Title, Artist, Album, Year, Genre, Time and Track #, with **Reset columns**. Drag a column edge to resize, drag a header to reorder, click a header to sort (click again to reverse), and use the lock icon to freeze the layout. The narrow playlist beside an expanded Library shows fewer columns by default.
+
+**EQ:** the LED bars behind the EQ follow the real level of each band's frequency, on all three EQ looks.
 
 **Settings** has seven tabs: **General** (including Backup), **Appearance**, **Playback** (crossfade), **Devices** (sub-tabs **Players & access** and **Calibration**), **Library**, **Network** and **Jukebox**. Use the search box in the header to jump to an option. Changes save right away (a **Saved ✓** appears next to them); every section has **Reset this section**. Appearance has its own sub-tabs, in a row right under the main tabs: **Theme** (which includes **Display size**), **Visualizer**, **EQ** and **Now Playing**. Settings and every other window have the same fixed width as the center panel; content scrolls inside. The live previews on Theme, Visualizer, EQ and Now Playing stay pinned at the top while you scroll. Appearance choices apply to the device you are using.
 
@@ -109,7 +116,7 @@ An admin can give any device a **max volume** in its Settings and lock it. While
 
 ### Backup
 
-**Settings → General → Backup** (admin) exports a .wavwizbackup file and imports one with a preview. Passwords, certificates and private keys are never included; set those again after restoring on a new PC.
+**File → Back up now** saves a backup on the server (the last 10 are kept); **File → Restore backup…** picks one, shows a summary of what will change, then restores it, and an **Undo restore** button is offered right after. **File → Export settings** downloads a .wavwizbackup file and **File → Import settings…** reads one, with the same summary first. **Settings → General → Backup** (admin) exports and imports a file with a preview. Passwords, certificates and private keys are never included; set those again after restoring on a new PC.
 
 ## 8. AirPlay tip (VPN / isolation)
 
