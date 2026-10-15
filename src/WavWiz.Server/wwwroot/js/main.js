@@ -34,6 +34,7 @@ import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
+import { mountMini } from './mini.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -113,7 +114,15 @@ const NAV = [
 // NAV kept for page titles; phone hamburger uses createPhoneDrawerNav. 0.2.0 item 2: the "This phone as a device" page is gone.
 const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes & Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
-let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null;
+let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
+/** 0.3.6 K14 / K22: the real mini player lives in the right-hand column while the Library or the Playlist is expanded (and is not running otherwise). */
+function syncMini() {
+  if (!desk || !minicol) return;
+  const need = wide() && (desk.classList.contains('libexpanded') || (desk.classList.contains('listexpanded') && !desk.classList.contains('devexpanded')));
+  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true }); minicol.append(miniInst.rail); }
+  else if (!need && miniInst) { miniInst.destroy(); miniInst = null; minicol.replaceChildren(h('div', { class: 'mp embedded-host' })); }
+  desk.classList.toggle('minishown', need);
+}
 
 async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
@@ -147,7 +156,8 @@ async function startMain() {
   libpanel.addEventListener('click', ev => { if (libpanel.classList.contains('israil') && !ev.target.closest('button:not(.libpanel)')) setPanels(railClick(P6, 'lib'), 'lib'); });
   libpanel.addEventListener('dragenter', () => { if (libpanel.classList.contains('israil')) setPanels(railClick(P6, 'lib'), 'lib'); });
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
-  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : P6.list === 'expanded' ? ' listexpanded' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar);
+  minicol = h('section', { class: 'minicol', 'aria-label': 'Mini player' }, h('div', { class: 'mp embedded-host' }));
+  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : P6.list === 'expanded' ? ' listexpanded' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar, minicol);
   desk.addEventListener('transitionend', ev => { if (ev.target === desk && /grid-template/.test(ev.propertyName)) { nowc.viz?.resize?.(); placeNext(); } });   // §6: the viz resizes once the move has finished
   listt.setCollapsed?.(P6.list);
   wireNextBlock();
@@ -212,6 +222,7 @@ function applyPanels(first = false) {
   devp.setSize(desk.classList.contains('libdev') ? 'standard' : ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
   if ((ls === 'expanded') !== libWasExp || first) { libWasExp = ls === 'expanded'; libC.setExpanded(libWasExp); }
   if (ls !== 'rail' && !first) libC.reload();
+  syncMini();
   if (first) setTimeout(() => nowc.viz?.resize?.(), 0);
 }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
@@ -253,7 +264,7 @@ function flipList(change) {
   els.forEach((e, i) => { const dy = before[i] - e.getBoundingClientRect().top; if (Math.abs(dy) < 1 || !e.animate) return; e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: LIST_ANIM.ms, easing: LIST_ANIM.ease }); });
 }
 function setList(st) { const was = desk.classList.contains('listexpanded'); flipList(() => { desk.classList.toggle('listcollapsed', st === 'collapsed'); desk.classList.toggle('listexpanded', st === 'expanded'); });
-  if (was !== (st === 'expanded')) window.dispatchEvent(new CustomEvent('wavwiz:listcover', { detail: { covered: st === 'expanded' } })); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
+  if (was !== (st === 'expanded')) window.dispatchEvent(new CustomEvent('wavwiz:listcover', { detail: { covered: st === 'expanded' } })); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); syncMini(); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
 function listStepUi(dir) { setList(listStep(P6, dir).list); }
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {

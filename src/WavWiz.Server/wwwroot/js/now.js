@@ -57,7 +57,7 @@ export function createNow(S, ctl) {
   const prev = h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), next = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
   // 0.1.2 panel hotfix: controls live in their own SOLID panel below a separate visualizer panel (same chrome as Library / Devices / Playlist).
   // Control layout is unchanged: title/times | transport | master volume, device dots underneath.
-  const ovT1 = h('div', { class: 't1' }, 'Nothing playing'), ovT2 = h('div', { class: 't2' }, ' ');
+  const ovT1 = h('div', { class: 't1' }, 'Nothing playing'), ovT2 = h('div', { class: 't2' }, ' '), ovAA = h('span', { class: 'pn-aa ell' });   // 0.3.6 K21: artist - album on the time line (Center style)
   // 0.2.0 item 8: four panel styles (Classic default, Center, Stack, Horizon) share one set of controls; CSS (.pn-<style>) shows each
   // style's art + seek treatment. Art LEFT, one matching button style per panel, volume = speaker icon + slider + %, then Mute and More.
   const seekFrac = f => { if (!canControl(S) || !S.now?.item || isLive(S.now.item) || !S.now.durationMs) return; act('/stream/seek', { ms: Math.round(Math.min(1, Math.max(0, f)) * S.now.durationMs) }); };
@@ -84,7 +84,7 @@ export function createNow(S, ctl) {
   const tableMeta = h('div', { class: 'np-tablemeta pn-meta' },
     h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2), npHeart, pnClock),
     h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave,
-    h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, rev)));
+    h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, ovAA, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
@@ -300,6 +300,7 @@ export function createNow(S, ctl) {
     t1.textContent = it ? (radio ? (n.liveTitle || it.title) : it.title) : 'Nothing playing';
     t2.textContent = it ? (radio ? (n.liveTitle ? it.title : 'Internet radio') : (it.artist || ' ')) : 'Pick something from the library';
     if (E.ovTitles) { E.ovTitles.children[0].textContent = t1.textContent; E.ovTitles.children[1].textContent = t2.textContent; }
+    { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; }
     ctlNow.textContent = it ? [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' — ') : '';
     // genre line (mockup: "Ambient • Electronica"); falls back to album • year when the file has no genre tag
     const genres = it?.genre ? String(it.genre).split(/\s*[;/,|]\s*/).filter(Boolean).slice(0, 3) : [];

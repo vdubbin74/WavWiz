@@ -2281,3 +2281,44 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .eqarea[data-eqstyle=curve] .eqa-field>.eqled{top:0;bottom:0;width:16px;height:100%;transform:translateX(-50%);z-index:1}
 .eqarea[data-eqstyle=led] .eqb-cap{z-index:2}
 .eqa-glow{display:none!important}
+
+/* K21: Center style - artist (and album) sit on the time line under the waveform; the title row keeps only the song title (about 13px shorter, EQ taller) */
+.pn-aa{display:none}
+.pn-center .pn-aa{display:block;flex:0 1 auto;min-width:0;text-align:center;color:var(--accent2-text,var(--accent2));font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12px}
+.pn-center .np-tabletitles .t2{display:none}
+.pn-center .np-times .np-elv,.pn-center .np-times .np-rev{flex:0 0 auto}
+.pn-center .np-times{justify-content:space-between}
+/* K14 / K22: the real mini player (embedded) in the right-hand column */
+.minicol{display:none}
+.mp.embedded{height:auto;min-height:74px;box-sizing:border-box;width:100%}
+.mp-rail{display:none}
+@media (min-width:901px){
+  /* K14: Library expanded = Library takes the whole left side; the playlist is the right column; the full-width Now Playing bar is gone; the mini player sits under the playlist */
+  .desk.libexpanded{row-gap:0!important}
+  .desk.libexpanded .npbar{display:none!important}
+  .desk.libexpanded .libpanel{grid-area:1/1/3/2!important}
+  .desk.libexpanded .minicol{display:block;grid-area:2/3/3/4;position:relative;z-index:3;border:1px solid var(--accent);border-top:0;border-radius:0 0 var(--radius) var(--radius);background:var(--panel);margin-top:-1px}
+  .desk.libexpanded:not(.libdev) .listpanel{border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom-color:var(--line)}
+  .desk.libexpanded .minicol .mp{border:0;border-radius:0 0 var(--radius) var(--radius);background:transparent}
+  /* K22: playlist expanded = the playlist uses the full center height; Now Playing is the mini player at the bottom right under Devices (Devices gets shorter) */
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded){grid-template-rows:minmax(0,1fr) auto!important;row-gap:10px}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .nowcol{display:none}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .libpanel{grid-area:1/1/3/2}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .listpanel{grid-area:1/2/3/3}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .devpanel{grid-area:1/3/2/4}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .minicol{display:block;grid-area:2/3/3/4;position:relative;z-index:3}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .minicol .mp{border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel)}
+  /* K22: Devices collapsed -> the bottom of the bar shows ONLY a small cover and a short progress bar; hovering pops the full mini player out, anchored bottom-right */
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{position:absolute;right:0;bottom:0;width:var(--minipop,380px);z-index:30;opacity:0!important;pointer-events:none;transition:opacity var(--glide-fade) var(--glide-ease);box-shadow:0 8px 28px rgba(0,0,0,.55)}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:hover .mp,.desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:focus-within .mp{opacity:1!important;pointer-events:auto}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp .mp-rail{display:none}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol{min-height:60px}
+  .minirail{display:none}
+}
+.minicol .mp-rail{display:none}
+@media (min-width:901px){
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minirail{display:flex;flex-direction:column;align-items:center;gap:5px;position:absolute;inset:0;padding:4px 0;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);cursor:pointer;box-sizing:border-box}
+  .minirail .mp-rart{width:32px;height:32px;border-radius:3px;background:var(--panel2) center/cover no-repeat}
+  .minirail .mp-rbar{width:30px;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+  .minirail .mp-rbar i{display:block;height:100%;width:var(--p,0%);background:var(--accent)}
+}
