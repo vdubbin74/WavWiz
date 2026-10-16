@@ -2556,3 +2556,5 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .vfmini:hover .vfpop,.vfmini:focus-within .vfpop{opacity:1;visibility:visible;transition:opacity var(--glide-fade) var(--glide-ease) 0s,visibility 0s}
 @media (prefers-reduced-motion:reduce){ .vfbtn{animation:none} .vfmini .vfpop{transition:none} }
 .plname{flex:1 1 220px;min-width:180px}
+/* 0.3.8 L48 queue item menu: same popup as Add to playlist */
+.qmenu{min-width:210px}.qmenu button:disabled{opacity:.45;cursor:not-allowed}.qmenu .qm-note{padding:4px 10px 6px;max-width:240px}

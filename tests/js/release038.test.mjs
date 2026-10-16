@@ -41,3 +41,14 @@ test('L40 device order helpers', async () => {
   assert.deepEqual(m.moveBefore(['1', '2', '3'], 3, 1), ['3', '1', '2']); assert.deepEqual(m.moveBefore(['1', '2', '3'], 1, 3, true), ['2', '3', '1']);
   assert.match(src('devices.js'), /orderedGroups/); assert.match(src('devices.js'), /alloff/);
 });
+test('L48 queue item menu rows', async () => {
+  const m = await imp('queuemenu'); const ids = x => x.map(r => r.id).join();
+  assert.equal(ids(m.queueMenuItems({ i: 2, n: 5, cur: 0 })), 'play,next,remove,top,bottom,playlist,library,copy');
+  const open = m.queueMenuItems({ i: 2, n: 5, cur: 0 }); assert.ok(open.every(r => !r.lock)); assert.equal(open.find(r => r.id === 'next').to, 1);
+  const lk = m.queueMenuItems({ i: 2, n: 5, cur: 0, locked: true }); for (const id of ['remove', 'top', 'bottom']) assert.equal(lk.find(r => r.id === id).disabled, true, id);
+  assert.equal(lk.find(r => r.id === 'play').disabled, undefined); assert.equal(lk.find(r => r.id === 'playlist').disabled, undefined);
+  assert.equal(m.queueMenuItems({ i: 0, n: 5 }).find(r => r.id === 'top').disabled, true, 'already on top'); assert.equal(m.queueMenuItems({ i: 4, n: 5 }).find(r => r.id === 'bottom').disabled, true);
+  assert.equal(m.queueMenuItems({ i: 4, n: 5, cur: 1 }).find(r => r.id === 'next').to, 2); assert.equal(m.queueMenuItems({ i: 0, n: 5, cur: 3 }).find(r => r.id === 'next').to, 3);
+  assert.match(m.QUEUE_LOCK_HINT, /locked/);
+  assert.match(src('listtable.js'), /attachQueueMenu\(tr/); assert.match(src('main.js'), /attachQueueMenu\(rowEl/);
+});

@@ -7,6 +7,7 @@ import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } fr
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
 import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
+import { attachQueueMenu } from './queuemenu.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
@@ -149,6 +150,7 @@ export function listTable(S, ctl) {
       tr.addEventListener('dragend', () => { dragging = null; clearIns(); stopScroll(); tbody.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); setTimeout(draw, 0); });
       ids.forEach((id, k) => tr.append(cellFor(id, q, i, isCur, can, k === ids.length - 1)));
       if (can) tr.lastChild.append(h('button', { class: 'rm', 'aria-label': `Remove ${q.title} from the queue`, title: 'Remove', onclick: ev => { ev.stopPropagation(); ctl.act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕'));
+      if (can) attachQueueMenu(tr, S, ctl, i, () => L.locked);   // 0.3.8 L48
       return tr;
     }));
     const row = tbody.querySelector('tr.cur'); if (row && !wrap.matches(':hover')) row.scrollIntoView({ block: 'nearest' });

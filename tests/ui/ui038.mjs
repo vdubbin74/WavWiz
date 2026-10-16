@@ -96,5 +96,28 @@ await step('L47 full-screen visualizer hover player', async () => {
     await p.mouse.move(300, 300); await p.waitForTimeout(4200); ok('L47 idle: cursor hides and button dims', await p.evaluate(() => document.querySelector('.vizfull').classList.contains('idle'))); }
   await ctx.close();
 });
+await step('L48 queue item menu: desktop right-click, locked, phone long-press', async () => {
+  const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+  await api('/queue/clear', 'POST', {}); const lib = await api('/library/tracks?limit=20'); await api('/queue/add', 'POST', { kind: 'tracks', ids: lib.slice(0, 6).map(t => t.id) });
+  const { ctx, p } = await page(1920, 1080, NORMAL); await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (/plcol|queuecols|pl\.layout/i.test(k)) { try { const v = JSON.parse(localStorage.getItem(k)); v.locked = false; localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } } }); await p.reload(); await p.waitForTimeout(2500); await p.locator('.phone-unlock').click({ timeout: 1000 }).catch(() => {});
+  const row = p.locator('.qtable tbody tr[data-i]').nth(2); await row.click({ button: 'right' }); await p.waitForTimeout(300);
+  const labels = await p.locator('.qmenu button').allTextContents(); ok('L48 right-click opens the themed menu with 8 rows', labels.join('|') === 'Play now|Play next|Remove from queue|Move to top|Move to bottom|Add to playlist…|Show in Library|Copy title', labels.join('|'));
+  ok('L48 same popup styling as Add to playlist (.pldrop.mpanel)', await p.evaluate(() => { const b = document.querySelector('.qmenu'); return b.classList.contains('pldrop') && b.classList.contains('mpanel'); }));
+  ok('L48 nothing disabled while unlocked (middle row)', await p.locator('.qmenu button:disabled').count() === 0);
+  await p.screenshot({ path: `/workspace/screens/wavwiz-038-${ENG}-l48-menu.png` });
+  const before = (await api('/stream')).queue.items.map(x => x.title); await p.click('.qmenu [data-qm=top]'); await p.waitForTimeout(700); const after = (await api('/stream')).queue.items.map(x => x.title); ok('L48 Move to top works', after[0] === before[2], before.join() + ' -> ' + after.join());
+  await p.locator('.qtable tbody tr[data-i]').nth(1).click({ button: 'right' }); await p.waitForTimeout(250); await p.click('.qmenu [data-qm=remove]'); await p.waitForTimeout(700); ok('L48 Remove works', (await api('/stream')).queue.items.length === 5);
+  await p.click('.pllock'); await p.waitForTimeout(300); await p.locator('.qtable tbody tr[data-i]').nth(2).click({ button: 'right' }); await p.waitForTimeout(250);
+  const dis = await p.evaluate(() => ['remove', 'top', 'bottom', 'play', 'playlist', 'library', 'copy'].map(id => [id, document.querySelector(`.qmenu [data-qm=${id}]`)?.disabled])); const hint = await p.evaluate(() => document.querySelector('.qmenu [data-qm=remove]')?.title);
+  ok('L48 locked: Remove / Move to top / Move to bottom disabled, others enabled', dis.filter(([id, d]) => ['remove', 'top', 'bottom'].includes(id)).every(([, d]) => d) && dis.filter(([id]) => !['remove', 'top', 'bottom'].includes(id)).every(([, d]) => !d), JSON.stringify(dis));
+  ok('L48 locked: lock hint shown', /locked/.test(hint || '') && /locked/.test(await p.locator('.qmenu .qm-note').textContent()), hint);
+  await p.keyboard.press('Escape'); await p.click('.pllock').catch(() => {}); await ctx.close();
+  const ph = await br.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }); await ph.addCookies([{ name: 'unison_session', value: sess, url: B }]); await ph.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
+  const pp = await ph.newPage(); await pp.goto(B + '/'); await pp.waitForTimeout(2500); await pp.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); await pp.evaluate(async () => (await import('/js/main.js')).go('queue')); await pp.waitForTimeout(900);
+  const hasRows = await pp.locator('.qlist .item').count(); ok('L48 phone queue rows present', hasRows >= 3, hasRows);
+  await pp.evaluate(() => { const el = document.querySelectorAll('.qlist .item')[1]; const mk = (type) => { const t = new Touch({ identifier: 1, target: el, clientX: 120, clientY: 300 }); el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] })); }; mk('touchstart'); });
+  await pp.waitForTimeout(800); ok('L48 phone long-press opens the menu', await pp.locator('.qmenu').count() === 1);
+  await pp.screenshot({ path: `/workspace/screens/wavwiz-038-${ENG}-l48-phone.png` }); await ph.close();
+});
 await br.close();
 const fails = R.filter(x => !x).length; console.log(`\n${R.length - fails}/${R.length} passed`); process.exit(fails ? 1 : 0);

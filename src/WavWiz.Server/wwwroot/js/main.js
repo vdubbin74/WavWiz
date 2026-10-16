@@ -41,6 +41,7 @@ import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
+import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 
@@ -138,7 +139,7 @@ async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
+  const ctl = { act, refreshAll, showInLibrary: (t, q) => showInLibrary(t, q), go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
@@ -526,12 +527,14 @@ function drawQueue() {
   const lay = loadLayout(true), locked = !!lay.locked, dragOk = canDragRows({ can, locked });   // 0.3.7 L29: the same lock as the desktop table (per layout)
   const rows = S.queue.map((q, i) => {
     const playing = i === cur && S.now?.state !== 'stopped';
-    return h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, onclick: () => can && act('/stream/jump', { index: i }) },
+    const rowEl = h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, onclick: () => can && act('/stream/jump', { index: i }) },
       dragOk ? h('span', { class: 'qgrip', role: 'button', 'aria-label': `Drag ${q.title} to reorder`, title: 'Drag to reorder', onclick: ev => ev.stopPropagation() }, '⋮⋮') : null,
       h('span', { class: 'num' }, playing ? '▶' : i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))), h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''),
       can && !locked ? h('button', { class: 'more', 'aria-label': 'Move up', disabled: i === 0, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i - 1 }); } }, '▲') : null,
       can && !locked ? h('button', { class: 'more', 'aria-label': 'Move down', disabled: i === S.queue.length - 1, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i + 1 }); } }, '▼') : null,
       can ? h('button', { class: 'more', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
+    if (can) attachQueueMenu(rowEl, S, { refreshAll, showInLibrary }, i, () => !!loadLayout(true).locked);   // 0.3.8 L48 long-press
+    return rowEl;
   });
   const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
   root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow', style: 'margin:0' }, 'Queue'), h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
@@ -549,3 +552,9 @@ function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
 }
 
 boot();
+
+/** 0.3.8 L48: Queue item menu > Show in Library: open the Library and search for the song (phone: the Library page). */
+export function showInLibrary(title) {
+  const fill = () => { const s = document.querySelector('.libsearch input, input.libsearch'); if (!s) return; s.value = title; s.dispatchEvent(new Event('input', { bubbles: true })); try { s.scrollIntoView({ block: 'nearest' }); } catch { /* ignore */ } };
+  if (wide()) { toggleLibExpanded(true); setTimeout(fill, P6?.exp === 'lib' ? 0 : GLIDE.ms + 80); } else { go('library'); setTimeout(fill, 400); }
+}
