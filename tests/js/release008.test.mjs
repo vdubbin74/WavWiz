@@ -177,8 +177,8 @@ test('0.0.8/0.1.2 item 14: Now Playing visualizer panel + control panel', () => 
   assert.match(n, /openEq/); assert.match(n, /Master volume/);   // volume and Sound stay reachable (0.2.1 F10: Stop is gone from the panel; Play/Pause covers it)
 });
 
-test('0.0.8 version strings (0.3.6 now)', () => {
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.3\.6'/);
-  const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8'); assert.match(props, /<WavWizVersion>0\.3\.6</);
-  const iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8'); assert.match(iss, /#define AppVersion "0\.3\.6"/);
+test('0.0.8 version strings (0.3.7 now)', () => {
+  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.3\.7'/);
+  const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8'); assert.match(props, /<WavWizVersion>0\.3\.7</);
+  const iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8'); assert.match(iss, /#define AppVersion "0\.3\.7"/);
 });

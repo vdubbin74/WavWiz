@@ -1,10 +1,16 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.6';
+export const WHATS_NEW_VERSION = '0.3.7';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.3.7 (only what shipped)
+  ['Calibration you can trust', 'Louder test sound with a Test volume slider, a mic level check before each measurement with advice (move the mic closer or raise the test volume), a silent speaker is retried and named, confidence is always 0-100%, and your music only resumes when you say so.'],
+  ['Shortcuts and Home', 'Pin up to three shortcuts next to Home on the Now Playing bar and the mini player. Home brings you back to the default screen. Right-click a panel title or menu item to pin it.'],
+  ['One Sound / EQ', 'Every EQ button opens the single center EQ, with all sound settings and purpose-based presets right under it and one padlock.'],
+  ['Queue', 'Drag to reorder in every view including the phone. Lock the queue to lock sorting too. The sorted column is highlighted with a Sorted by chip, and the queue is restored after an unexpected exit.'],
+  ['Pair with a QR code', 'Pair a Player shows a QR code and the server address. The phone page has Add to Home Screen steps for iPhone and Android.'],
   // 0.3.6 (only what shipped)
   ['Speaker settings', 'Open a speaker and its settings fill a fixed column on the right: volume, max volume, delay, balance, bass, treble, EQ and output. Save the whole set as a speaker profile and pick a profile per speaker in a scene.'],
   ['Playlist columns', 'Pick the columns, drag them into any order, resize them, click a heading to sort, and lock the layout.'],
