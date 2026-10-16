@@ -1,10 +1,17 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.7';
+export const WHATS_NEW_VERSION = '0.3.8';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.3.8 (only what shipped)
+  ['Keyboard shortcuts', 'Space plays or pauses, Ctrl+Right / Left is next / previous, M mutes, Alt+M shows or hides the mini player, Alt+H goes Home, Alt+E opens Sound / EQ, Alt+Q the Queue and Ctrl+, Settings. Hints show in the menus; Help > Keyboard shortcuts lists them. They stay quiet while you type or a window is open.'],
+  ['Media keys', 'Play / Pause, Next, Previous, Mute and Volume up / down work from the keyboard even while WavWiz is minimized (Player), with a small on-screen volume indicator.'],
+  ['Pins in one click', 'Up to five shortcuts next to Home. A pin icon on the Library, Queue and Devices title bars pins or unpins in one click. In the mini player window one click opens the target in the main window.'],
+  ['Devices', 'Drag device and zone cards to reorder them. The Devices column has All off, All on and a master volume in the standard and the expanded view, and cards show what is playing when there are few devices.'],
+  ['Cleaner layouts', 'The collapsed Devices bar is a full-height slim bar with the mini player button inside it, also while the Library is open. The mini player floats over the full-screen visualizer from a softly glowing button.'],
+  ['One field style, themed locks', 'Every text field, search box and select shares one look in all themes, and every padlock follows the theme color. One padlock in the EQ title bar and one in Speaker Settings.'],
   // 0.3.7 (only what shipped)
   ['Calibration you can trust', 'Louder test sound with a Test volume slider, a mic level check before each measurement with advice (move the mic closer or raise the test volume), a silent speaker is retried and named, confidence is always 0-100%, and your music only resumes when you say so.'],
   ['Shortcuts and Home', 'Pin up to three shortcuts next to Home on the Now Playing bar and the mini player. Home brings you back to the default screen. Right-click a panel title or menu item to pin it.'],
@@ -14,7 +21,7 @@ export const WHATS_NEW = [
   // 0.3.6 (only what shipped)
   ['Speaker settings', 'Open a speaker and its settings fill a fixed column on the right: volume, max volume, delay, balance, bass, treble, EQ and output. Save the whole set as a speaker profile and pick a profile per speaker in a scene.'],
   ['Playlist columns', 'Pick the columns, drag them into any order, resize them, click a heading to sort, and lock the layout.'],
-  ['Menus that open things', 'Hover a menu item to see its choices. File > New makes a zone, scene, alarm or schedule (Ctrl+Shift+Z / S / A / H). File > Run starts a scene or an alarm now. The Queue menu opens the playlist.'],
+  ['Menus that open things', 'Hover a menu item to see its choices. File > New makes a zone, scene, alarm or schedule (Ctrl+Shift+Z / S / A / H). Help > Keyboard shortcuts lists every shortcut (Space, Ctrl+Right / Left, M, Alt+M, Alt+H, Alt+E, Alt+Q, Ctrl+,). File > Run starts a scene or an alarm now. The Queue menu opens the playlist.'],
   ['Back up and restore', 'File > Back up now, Restore backup and Undo restore. Your settings, scenes and profiles come back in one step.'],
   ['Mini player in the Library', 'With the Library expanded, a full mini player sits at the bottom right under Devices. With Devices collapsed its rail shows the cover and progress, and pointing at it opens the full mini player.'],
   ['Look and feel', 'Thin chevrons, accent-edge rails, one smooth slide everywhere, themed VU meters, and LED bars for the EQ view with each band at its real frequency.'],
