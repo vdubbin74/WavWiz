@@ -5,7 +5,7 @@ import { h, api, toast, debounce } from './util.js';
 import { icon } from './icons.js';
 import { isAdmin, canTune, canControl, ADMIN_HINT } from './ui.js';
 import { flatEq } from './eq.js';
-import { loadEqPrefs, ownEqName, loadEqLock } from './eqstyle.js';
+import { loadEqPrefs, ownEqName, loadEqLock, saveEqLock } from './eqstyle.js';
 import { eqArea } from './eqview.js';
 
 /** "Center" / "Left 20" / "Right 35". Pure. */
@@ -126,7 +126,12 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     ro(h('button', { type: 'button', class: 'btn', onclick: async () => { try { await api(`/zones/${z.id}/test-sound`, { method: 'POST' }); toast('Playing a chime in ' + z.name); } catch (e) { toast(e.message, true); } } }, 'Test sound'), can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.'),
     parts.more ? parts.more(z) : null);
   const left = h('div', { class: 'spk-left' }, vol, capRow, delay, balance, bass, treble);
-  const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl' }, 'EQUALIZER'), eqHost, h('div', { class: 'dlbl' }, 'OUTPUT'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), btns, parts.extra ? parts.extra(z) : null);
+  // 0.3.8 L35: the same padlock as the EQ title bar (one lock for everything)
+  const padlock = h('button', { type: 'button', class: 'plus eqpadlock spklock', 'data-act': 'eqpadlock' });
+  const paintPad = () => { const l = loadEqLock(); padlock.replaceChildren(icon(l ? 'lock' : 'unlock')); padlock.classList.toggle('on', l); padlock.setAttribute('aria-pressed', String(l)); const t = l ? 'Sound locked (click to unlock)' : 'Lock the sound (EQ and all settings)'; padlock.title = t; padlock.setAttribute('aria-label', t); };
+  padlock.addEventListener('click', () => saveEqLock(!loadEqLock())); paintPad();
+  if (typeof window !== 'undefined') window.addEventListener('wavwiz:eqlock', () => { paintPad(); if (!gone) paintEq(); });
+  const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), padlock), eqHost, h('div', { class: 'dlbl' }, 'OUTPUT'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), btns, parts.extra ? parts.extra(z) : null);
   root.append(h('div', { class: 'spk-head' }, title, status, h('span', { class: 'grow' }), done), profRow, h('div', { class: 'spk-body' }, left, right));
   capTitle();
   root.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('input[type=text],select')) { ev.stopPropagation(); parts.onDone?.(); } });

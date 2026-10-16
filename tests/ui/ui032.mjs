@@ -207,16 +207,16 @@ if (want('f19')) await step('f19', async () => {
   await setPanels(p, NORMAL); await p.evaluate(() => localStorage.setItem('wavwiz.center.v1', 'eq')); await home();
   for (const t of THEMES) {
     await setTheme(p, t); await p.waitForTimeout(300);
-    const lockOn = () => p.evaluate(() => document.querySelector('.np-stage .vbtns .ov-lock')?.classList.contains('on'));
-    if (await lockOn()) { await p.click('.np-stage .vbtns .ov-lock'); await p.waitForTimeout(400); }
+    const lockOn = () => p.evaluate(() => document.querySelector('.np-eqhead .eqpadlock')?.classList.contains('on'));
+    if (await lockOn()) { await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(400); }
     const area = p.locator('.np-stage .eqarea').first(); await p.mouse.move(5, 5); await p.waitForTimeout(300);
-    const a = await area.screenshot(); const offStyle = await p.evaluate(() => { const b = document.querySelector('.np-stage .vbtns .ov-lock'); const cs = getComputedStyle(b); return cs.color + '|' + cs.borderColor; });
-    await p.click('.np-stage .vbtns .ov-lock'); await p.waitForTimeout(400); await p.mouse.move(5, 5); await p.waitForTimeout(300);
-    const b = await area.screenshot(); const on = await p.evaluate(() => { const b = document.querySelector('.np-stage .vbtns .ov-lock'); const e = document.querySelector('.np-stage .eqarea'); const cs = getComputedStyle(b); return { on: b.classList.contains('on'), c: cs.color, bc: cs.borderColor, eqOp: getComputedStyle(e.querySelector('.eqa-plot') || e).opacity, filt: getComputedStyle(e.querySelector('.eqa-plot') || e).filter, title: e.title, cur: getComputedStyle(e.querySelector('.eqb') || e).cursor }; });
+    const a = await area.screenshot(); const offStyle = await p.evaluate(() => { const b = document.querySelector('.np-eqhead .eqpadlock'); const cs = getComputedStyle(b); return cs.color + '|' + cs.borderColor; });
+    await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(400); await p.mouse.move(5, 5); await p.waitForTimeout(300);
+    const b = await area.screenshot(); const on = await p.evaluate(() => { const b = document.querySelector('.np-eqhead .eqpadlock'); const e = document.querySelector('.np-stage .eqarea'); const cs = getComputedStyle(b); return { on: b.classList.contains('on'), c: cs.color, bc: cs.borderColor, eqOp: getComputedStyle(e.querySelector('.eqa-plot') || e).opacity, filt: getComputedStyle(e.querySelector('.eqa-plot') || e).filter, title: e.title, cur: getComputedStyle(e.querySelector('.eqb') || e).cursor }; });
     const want = t === 'pepecoin' ? 'rgb(192, 122, 78)' : await p.evaluate(() => { const d = document.createElement('i'); d.style.color = 'var(--red)'; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; });
     ok(`F19 ${t}: locked EQ not dimmed (same pixels), lock button ${t === 'pepecoin' ? 'copper' : 'danger red'}, unlocked normal`, Buffer.compare(a, b) === 0 && on.on && on.eqOp === '1' && on.filt === 'none' && on.c === want && offStyle.split('|')[0] !== want && on.title === 'EQ locked', JSON.stringify({ same: Buffer.compare(a, b) === 0, on, want, offStyle }));
     if (t === 'default' || t === 'pepecoin') await shot(p, 'f19-eq-locked-' + t);
-    await p.click('.np-stage .vbtns .ov-lock'); await p.waitForTimeout(300);
+    await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(300);
   }
   await setTheme(p, 'default');
 });

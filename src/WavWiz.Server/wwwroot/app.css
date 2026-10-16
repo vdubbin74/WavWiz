@@ -2512,3 +2512,5 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .pane-h .tpin:hover{color:var(--ink);border-color:var(--accent)}
 .pane-h .tpin.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft)}
 .scmore{font-weight:800;letter-spacing:.05em}
+.spk-eqh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.spk-eqh .eqpadlock{width:26px;height:26px;padding:0;display:inline-grid;place-items:center}

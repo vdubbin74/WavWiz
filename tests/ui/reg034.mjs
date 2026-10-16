@@ -53,10 +53,10 @@ await step('art', async () => {
   ok('art: art images load in the UI', imgs.length > 0 && imgs.every(i => i.ok), `${imgs.length} imgs`);
 });
 await step('eqlock', async () => {
-  await home(); await p.click('.vbtns .ov-lock'); await p.waitForTimeout(500);
-  const r = await p.evaluate(() => { const b = document.querySelector('.vbtns .ov-lock'); const eq = document.querySelector('.eqpanel,.eq,.eqwrap,canvas'); return { pressed: b.getAttribute('aria-pressed'), col: getComputedStyle(b).color, op: eq ? getComputedStyle(eq).opacity : '1', filt: eq ? getComputedStyle(eq).filter : '' }; });
+  await home(); await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(500);
+  const r = await p.evaluate(() => { const b = document.querySelector('.np-eqhead .eqpadlock'); const eq = document.querySelector('.eqpanel,.eq,.eqwrap,canvas'); return { pressed: b.getAttribute('aria-pressed'), col: getComputedStyle(b).color, op: eq ? getComputedStyle(eq).opacity : '1', filt: eq ? getComputedStyle(eq).filter : '' }; });
   ok('EQ lock: locks, button turns red, EQ not dimmed', r.pressed === 'true' && r.op === '1' && !/brightness|grayscale/.test(r.filt), JSON.stringify(r)); await shot('eqlock');
-  await p.click('.vbtns .ov-lock'); await p.waitForTimeout(300);
+  await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(300);
 });
 await step('mini', async () => {
   const m = await ctx.newPage(); const me = []; m.on('pageerror', e => me.push(e.message)); await m.setViewportSize({ width: 420, height: 160 }); await m.goto(B + '/mini.html'); await m.waitForTimeout(3000);

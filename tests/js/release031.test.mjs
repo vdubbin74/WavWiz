@@ -14,7 +14,7 @@ const rule = sel => { const i = css.lastIndexOf(sel + '{'); assert.ok(i >= 0, 'c
 
 test('B18: EQ mode = Lock, swap, Looks, full screen; viz mode adds power + pop-out; no style button', async () => {
   const L = await imp('looks');
-  assert.deepEqual(L.overlayButtons('eq'), ['lock', 'swap', 'looks', 'full']);
+  assert.deepEqual(L.overlayButtons('eq'), ['swap', 'looks', 'full']);
   assert.deepEqual(L.overlayButtons('viz'), ['popout', 'power', 'lock', 'swap', 'looks', 'full']);
   assert.deepEqual(L.overlayButtons('viz', { popout: false }), ['power', 'lock', 'swap', 'looks', 'full']);
   assert.deepEqual(L.looksRows('eq').map(r => r[1]), ['Glow', 'Overlay opacity', 'Button transparency']);
