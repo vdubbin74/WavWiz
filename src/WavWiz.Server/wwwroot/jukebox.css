@@ -8,7 +8,8 @@
 .jbg .btn.primary,.jb .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 /* 0.3.4 H7: '✓ In' must beat .jbg .btn.primary / .jb .btn.primary (same element), so it carries both classes */
 .jbg .btn.primary.jb-add.in,.jb .btn.primary.jb-add.in{background:transparent;color:var(--hl-text,var(--hl));border-color:var(--hl);opacity:1;cursor:default}
-.jb-in{display:block;width:100%;box-sizing:border-box;min-height:44px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--ink);font:inherit}
+.jb-in{display:block;width:100%;box-sizing:border-box;min-height:var(--fld-h,44px);margin:0 0 10px;padding:var(--fld-pad,8px 12px);border:1px solid var(--fld-line,var(--line));border-radius:3px;background:var(--fld-bg,var(--panel));color:var(--fld-ink,var(--ink));font:inherit}
+.jb-in::placeholder{color:var(--fld-ph,var(--dim));opacity:1}
 .jb-search:focus,.jb-in:focus{outline:2px solid var(--accent);outline-offset:1px}
 .jbg :focus-visible,.jb :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .jb-np{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:8px;margin:0 0 12px}

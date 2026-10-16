@@ -110,7 +110,7 @@ export function listTable(S, ctl) {
   new ResizeObserver(() => { if (ids.length) layout(); }).observe(wrap);
 
   function inlineSave() {
-    const name = h('input', { type: 'text', maxlength: 80, placeholder: 'Playlist name', class: 'qsave-in', 'aria-label': 'New playlist name', onkeydown: ev => { if (ev.key === 'Enter') go(); if (ev.key === 'Escape') done(); } });
+    const name = h('input', { type: 'text', maxlength: 80, placeholder: 'New playlist name', class: 'qsave-in', 'aria-label': 'New playlist name', onkeydown: ev => { if (ev.key === 'Enter') go(); if (ev.key === 'Escape') done(); } });
     const done = () => { btns.replaceChildren(); draw(); };
     const go = async () => { const n = name.value.trim(); if (!n) { name.focus(); return; } try { await api('/playlists', { method: 'POST', body: { name: n, fromQueue: true } }); toast(`Saved as “${n}”`); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); done(); } catch (e) { toast(e.message, true); } };
     btns.replaceChildren(h('span', { class: 'qsave row' }, name, h('button', { class: 'btn sm primary', type: 'button', onclick: go }, 'Save'), h('button', { class: 'btn sm', type: 'button', onclick: done }, 'Cancel')));

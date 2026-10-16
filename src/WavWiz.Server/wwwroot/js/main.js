@@ -527,7 +527,7 @@ function drawQueue() {
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
   const root = views.queue.el; root.querySelector('.qsave')?.remove();
-  const name = h('input', { type: 'text', maxlength: 80, placeholder: 'Playlist name', 'aria-label': 'New playlist name' });
+  const name = h('input', { type: 'text', maxlength: 80, placeholder: 'New playlist name', 'aria-label': 'New playlist name' });
   const box = h('div', { class: 'qsave row inlineform' }, name, h('button', { class: 'btn primary', onclick: async () => { try { await api('/playlists', { method: 'POST', body: { name: name.value, fromQueue: true } }); toast('Saved'); box.remove(); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); } catch (e) { toast(e.message, true); } } }, 'Save'), h('button', { class: 'btn', onclick: () => box.remove() }, 'Cancel'));
   root.firstChild?.after(box); name.focus();
 }

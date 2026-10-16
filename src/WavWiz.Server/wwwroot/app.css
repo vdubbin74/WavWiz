@@ -13,7 +13,10 @@ button,input,select,textarea{font:inherit;color:inherit;max-width:100%}
 :root{color-scheme:dark}
 :where(button){background-color:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px}
 :where(button:hover:not(:disabled)){border-color:var(--accent)}
-:where(input,select,textarea){background-color:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:3px}
+:root{--fld-h:40px;--fld-h-sm:28px;--fld-pad:9px 11px;--fld-pad-sm:2px 8px;--fld-radius:3px;--fld-fs:inherit;--fld-fs-sm:12px;--fld-bg:var(--bg);--fld-line:color-mix(in srgb,var(--line) 65%,var(--ink));--fld-ink:var(--ink);--fld-ph:color-mix(in srgb,var(--dim) 90%,transparent);--fld-focus:var(--hl,var(--accent))}   /* 0.3.8 L43: ONE field style */
+:where(input,select,textarea){background-color:var(--fld-bg);color:var(--fld-ink);border:1px solid var(--fld-line);border-radius:var(--fld-radius)}
+:where(input,textarea)::placeholder{color:var(--fld-ph);opacity:1}
+:where(input,select,textarea):disabled{opacity:.6;cursor:not-allowed}
 :where(input[type=range],input[type=checkbox],input[type=radio]){border:0;background-color:transparent;accent-color:var(--accent)}
 h1,h2,h3{margin:0} h2{font-size:18px} h3{font-size:15px;margin-bottom:6px}
 a{color:var(--accent2-text,var(--accent2))}
@@ -115,10 +118,10 @@ a{color:var(--accent2-text,var(--accent2))}
 .card{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:0 0 10px}
 .field{margin:8px 0;display:flex;flex-direction:column;gap:4px}
 .field label{font-size:12px;color:var(--dim)}
-input[type=text],input[type=search],input[type=password],input[type=number],input[type=url],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:9px 11px;min-height:40px;width:100%}
-input[type=text]:focus,input[type=search]:focus,input[type=password]:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+input[type=text],input[type=search],input[type=password],input[type=number],input[type=url],select,textarea{box-sizing:border-box;background:var(--fld-bg);border:1px solid var(--fld-line);border-radius:var(--fld-radius);padding:var(--fld-pad);min-height:var(--fld-h);font-size:var(--fld-fs);width:100%}
+input[type=text]:focus,input[type=search]:focus,input[type=password]:focus,input[type=number]:focus,input[type=url]:focus,select:focus,textarea:focus{outline:2px solid var(--fld-focus);outline-offset:1px}
 input[type=range]{width:100%;accent-color:var(--accent);min-height:30px}
-input[type=color]{width:46px;height:38px;padding:0;border:1px solid var(--line);border-radius:3px;background:none}
+input[type=color]{width:46px;height:38px;padding:0;border:1px solid var(--fld-line);border-radius:3px;background:none}
 .card.auth{max-width:440px;margin:24px auto}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .tabs button,.chipbtn{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:6px 13px;cursor:pointer;font-size:13px}
@@ -2070,7 +2073,7 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .dc3 .dexpand .dexp-l{display:none}
 .dc3.dset{border-color:var(--accent)}
 .dc3 .dsettings{margin-top:6px;padding-left:14px}
-.drenamebox{display:inline-flex;gap:4px;align-items:center;flex:1;min-width:0} .drenamebox input{flex:1;min-width:0;height:24px}
+.drenamebox{display:inline-flex;gap:4px;align-items:center;flex:1;min-width:0} .drenamebox input{flex:1;min-width:0;min-height:var(--fld-h-sm);height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
 .dshist .dhist{width:100%;font-size:12px}
 .zinline{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--accent);border-radius:3px}
 /* J5 option B: Scenes & Schedules | Zones | Speakers (Speakers pinned right) */
@@ -2238,7 +2241,7 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .listpanel .plbtns,.listpanel .plicons{display:inline-flex;gap:4px;align-items:center;flex:none}
 .listpanel .plbtns .plus{width:22px;height:22px}
 .listpanel .plbtns .plus svg{width:14px;height:14px}
-.listpanel .qsave{display:inline-flex;gap:4px;align-items:center}.listpanel .qsave-in{width:130px;height:22px;padding:0 6px}
+.listpanel .qsave{display:inline-flex;gap:4px;align-items:center}.listpanel .qsave-in{width:150px;min-height:var(--fld-h-sm);height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
 .listpanel .qwrap{overflow-x:hidden;overflow-y:auto}
 .qtable{min-width:0}
 .qtable td.lastc{position:relative}
@@ -2514,3 +2517,12 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .scmore{font-weight:800;letter-spacing:.05em}
 .spk-eqh{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .spk-eqh .eqpadlock{width:26px;height:26px;padding:0;display:inline-grid;place-items:center}
+/* ===== 0.3.8 L43 / L36: shared input style ===== */
+.fld-sm,.libtools select.libsort,.np-eqpick{min-height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
+.fld-auto{width:auto}
+:is(.card,.inlineform,.pldrop,.spk-profrow,.dialog-card,dialog){--fld-bg:var(--panel2)}
+.tp-pick input[type=color]{border-radius:3px}
+.latctl .latbox{min-height:var(--fld-h-sm);height:var(--fld-h-sm);padding:var(--fld-pad-sm)}
+.pldrop .pl-new input{min-height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
+.jb,.jbg{--fld-h:44px;--fld-bg:var(--panel);--fld-pad:8px 12px}
+.jb.retro,.jbg.retro{--fld-bg:var(--jr-c3);--fld-line:var(--jr-c16);--fld-ink:var(--jr-c15)}
