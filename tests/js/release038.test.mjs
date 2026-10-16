@@ -1,7 +1,7 @@
 // 0.3.8 pure-logic checks (L34, L37, L38, L43, L44). Run through run.sh like the others.
 import test from 'node:test'; import assert from 'node:assert/strict'; import { readFileSync } from 'node:fs'; import path from 'node:path';
-const dir = process.env.JS_DIR; const src = f => readFileSync(path.join(dir, f), 'utf8'); const css = readFileSync(path.join(dir, '..', 'app.css'), 'utf8');
-const imp = n => import(path.join(dir, n + '.js'));
+globalThis.Element ??= class {}; const dir = process.env.JS_DIR; const src = f => readFileSync(path.join(dir, f), 'utf8'); const css = readFileSync(path.join(dir, '..', 'app.css'), 'utf8');
+const imp = n => import('file://' + path.join(dir, n + '.js'));
 test('L44 hotkeys table + matcher', async () => {
   const m = await imp('hotkeys'); const k = (code, o = {}) => ({ code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, repeat: false, ...o });
   assert.equal(m.matchShortcut(k('Space')), 'playpause'); assert.equal(m.matchShortcut(k('KeyM')), 'mute');
