@@ -2126,7 +2126,7 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .desk.libexpanded{--rightw:clamp(380px,calc(25vw / var(--z,1)),520px)!important;--libw:calc(100% - var(--rightw) - 20px)!important}
   .desk.libexpanded .libswap{display:inline-flex}
   .desk.libexpanded:not(.libdev) .listpanel{grid-area:1/3/2/4!important;display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}
-  .desk.libexpanded:not(.libdev) .devpanel{display:flex!important;grid-area:1/4/3/5!important}   /* 0.3.8 L33: the collapsed Devices sleeve stays a real grid track */
+  .desk.libexpanded:not(.libdev) .devpanel{display:flex!important;grid-area:1/3/3/4!important}   /* 0.3.8 L33: the collapsed Devices sleeve stays a real grid track */
   .desk.libexpanded.libdev .devpanel{grid-area:1/3/2/4!important}
   .desk.libexpanded.libdev .devpanel :is(.devbody,.devtitle,.devcount){display:revert!important}
   .desk.libexpanded.libdev .devpanel .devbody{display:block!important;overflow:auto}
@@ -2495,7 +2495,9 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .spklock{color:var(--dim)}
 @media (min-width:901px){
   /* L33: the collapsed Devices sleeve stays a real 4th grid track while the Library is open (Queue stays in column 3) */
-  .desk.libexpanded:not(.libdev){--sleevew:30px;--libw:calc(100% - var(--rightw) - var(--sleevew) - 60px)!important;grid-template-columns:var(--libw) 0 var(--rightw) var(--sleevew)!important}
+  .desk.libexpanded:not(.libdev){--sleevew:30px;--libw:calc(100% - var(--rightw) - var(--sleevew) - 20px)!important;grid-template-columns:var(--libw) var(--rightw) var(--sleevew)!important}
+  .desk.libexpanded:not(.libdev) .listpanel{grid-area:1/2/2/3!important}
+  .desk.libexpanded:not(.libdev) .minicol{grid-area:2/2/3/3}
   .desk.libexpanded:not(.libdev) .devpanel{cursor:pointer}
   .desk.libexpanded:not(.libdev) .devpanel :is(.devbody,.devtitle,.devcount,.devexp){display:none!important}
   /* L42: collapsed Devices bar runs the full height; the hover button sits inside it at the bottom */
@@ -2541,3 +2543,16 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 [data-dkind]{position:relative;padding-left:16px!important}
 .dmaster{flex-wrap:wrap!important}.dmaster .mallrow{flex:1 1 100%;margin-top:2px}
 .dexp-top .dmaster .mallrow{flex:0 0 auto;margin:0}
+/* ===== 0.3.8 L47: glowing hover button + floating mini player over the full-screen visualizer ===== */
+.vizfull.idle{cursor:none}
+.vfmini{position:absolute;right:18px;bottom:18px;z-index:5}
+.vfbtn{width:40px;height:40px;border-radius:3px;border:1px solid var(--accent);background:color-mix(in srgb,var(--panel) 70%,transparent);color:var(--accent-text,var(--accent));font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;opacity:.9;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 55%,transparent);animation:vfglow 2.6s ease-in-out infinite;transition:opacity .4s ease}
+.vizfull.idle .vfbtn{opacity:.25;animation:none}
+.vfmini:hover .vfbtn,.vfmini:focus-within .vfbtn{opacity:1}
+@keyframes vfglow{0%,100%{box-shadow:0 0 8px color-mix(in srgb,var(--accent) 40%,transparent)}50%{box-shadow:0 0 18px color-mix(in srgb,var(--accent) 75%,transparent)}}
+.vfmini .vfpop{position:absolute;right:calc(100% + 0px);bottom:0;width:min(420px,calc(100vw / var(--z,1) - 90px));padding-right:10px;opacity:0;visibility:hidden;transition:opacity var(--glide-fade) var(--glide-ease) 300ms,visibility 0s linear calc(300ms + var(--glide-fade))}
+.vfmini .vfpop .mp{box-shadow:0 8px 28px rgba(0,0,0,.55);background:var(--panel);border:1px solid var(--accent);border-radius:3px;width:100%}
+.vfmini::after{content:'';position:absolute;right:100%;top:-8px;bottom:-8px;width:14px}
+.vfmini:hover .vfpop,.vfmini:focus-within .vfpop{opacity:1;visibility:visible;transition:opacity var(--glide-fade) var(--glide-ease) 0s,visibility 0s}
+@media (prefers-reduced-motion:reduce){ .vfbtn{animation:none} .vfmini .vfpop{transition:none} }
+.plname{flex:1 1 220px;min-width:180px}

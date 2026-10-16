@@ -9,6 +9,7 @@ import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js
 import { heartBtn } from './fav.js';
 import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
+import { mountMini } from './mini.js';
 import { loadPanels, savePanels } from './panels.js';
 import { loadEqLock, saveEqLock } from './eqstyle.js';
 import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, resetLooks, stepPct, ovSvg } from './looks.js';
@@ -277,18 +278,24 @@ export function createNow(S, ctl) {
     stage.classList.toggle('viz', !!show); stage.classList.toggle('eqmode', center === 'eq'); vname.textContent = vizState.error ? vizState.error : '';
     vname.classList.toggle('bad', !!vizState.error);
   }
+  let fullMini = null;
   function fullscreen() {
     if (overlay) return closeFull();
     overlay = h('div', { class: 'vizfull', role: 'dialog', 'aria-label': 'Visualizer full screen' }, h('button', { class: 'x', onclick: closeFull }, '✕ Close'));
     overlay.prepend(host); document.body.append(overlay); stage.classList.remove('viz'); viz?.resize();
     overlay.addEventListener('dblclick', closeFull); overlay.addEventListener('click', ev => { if (ev.target === host || ev.target.tagName === 'CANVAS') viz?.next(); });
     try { overlay.requestFullscreen?.().catch(() => {}); } catch { /* optional */ }
+    // 0.3.8 L47: a softly glowing button bottom right; hover floats the mini player over the visualizer (same bridge + 300 ms grace as the Devices button, L41). The button dims and the cursor hides when the mouse is idle.
+    const fm = h('div', { class: 'vfmini', 'data-vf': '1' }, h('button', { type: 'button', class: 'vfbtn', 'aria-label': 'Mini player', title: 'Mini player (hover)' }, '♪'), h('div', { class: 'vfpop' }));
+    overlay.append(fm); try { fullMini = mountMini(fm.querySelector('.vfpop'), { embedded: true, run: id => { closeFull(); ctl.runShortcut?.(id); }, home: () => { closeFull(); ctl.goHome?.(); } }); fm.querySelector('.vfpop').append(fullMini.root); } catch { /* optional */ }
+    let idleT = 0; const wake = () => { overlay?.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => { if (overlay && !fm.matches(':hover') && !fm.matches(':focus-within')) overlay.classList.add('idle'); }, 3000); };
+    overlay.addEventListener('mousemove', wake); overlay.addEventListener('pointerdown', wake); wake(); overlay._idleStop = () => clearTimeout(idleT);
     document.addEventListener('fullscreenchange', fsc); document.addEventListener('keydown', esc);
   }
   const fsc = () => { if (!document.fullscreenElement && overlay) closeFull(); };
   const esc = ev => { if (ev.key === 'Escape' && overlay) closeFull(); };
   function closeFull() {
-    if (!overlay) return; document.removeEventListener('fullscreenchange', fsc); document.removeEventListener('keydown', esc);
+    if (!overlay) return; overlay._idleStop?.(); try { fullMini?.destroy(); } catch { /* ok */ } fullMini = null; document.removeEventListener('fullscreenchange', fsc); document.removeEventListener('keydown', esc);
     stage.insertBefore(host, srcChip); overlay.remove(); overlay = null; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* ok */ } viz?.resize(); paintStage();
   }
   window.addEventListener('wavwiz:kiosk', () => { ensureViz(); paintStage(); });
