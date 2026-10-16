@@ -93,3 +93,14 @@ test('L29 drag-to-reorder in every Queue view; a showing sort asks to apply it; 
   const qd = await imp('qdrag'); const sorted = [2, 0, 1], mv = qd.movesFor([0, 1, 2], sorted);   // applying a sort = these server moves
   const w = [0, 1, 2]; for (const m of mv) { const [x] = w.splice(m.from, 1); w.splice(m.to, 0, x); } assert.deepEqual(w, sorted);
 });
+
+test('L30 sorted column + Sorted-by chip use the theme accent only; chip clear and queue Clear are disabled while locked', async () => {
+  const m = await imp('plcols');
+  assert.equal(m.sortChipText('Artist', 'asc'), 'Sorted by Artist ▲'); assert.equal(m.sortChipText('Year', 'desc'), 'Sorted by Year ▼');
+  const lt = src('listtable.js');
+  assert.match(lt, /sortChip/); assert.match(lt, /'data-act': 'sortclear'/); assert.match(lt, /disabled: L\.locked \|\| undefined, onclick: \(\) => \{ if \(L\.locked\) return; sort = null/);
+  assert.match(lt, /'data-act': 'clearqueue'[^}]*disabled: L\.locked/); assert.match(lt, /buildHead\(\); draw\(\); \} \}, icon\('unlock'\)/);
+  const block = css.slice(css.indexOf('0.3.7 L30'));
+  assert.match(block, /th\.sorted\{[^}]*var\(--accent/); assert.match(block, /\.sortchip\{[^}]*var\(--accent/);
+  assert.doesNotMatch(block.slice(0, block.indexOf('.listpanel .plus:disabled')), /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'no fixed colors: every theme (Pepecoin brand colors included) flows through the accent variable');
+});

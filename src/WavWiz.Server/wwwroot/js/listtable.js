@@ -7,7 +7,7 @@ import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } fr
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
 import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
-import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT } from './plcols.js';
+import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
 export function listTable(S, ctl) {
@@ -24,10 +24,12 @@ export function listTable(S, ctl) {
   const setCollapsed = c => setState(c === true ? 'collapsed' : c === false ? 'open' : c);
   // 0.3.6 K10: the column picker (checklist icon + right-click on the header) and the lock live in the TITLE BAR with the other icons, identical on every playlist view
   const pickBtn = h('button', { type: 'button', class: 'plus plpick', 'data-act': 'colpick', 'aria-label': 'Choose columns', title: 'Choose columns', 'aria-haspopup': 'true', onclick: ev => { ev.stopPropagation(); openPicker(pickBtn.getBoundingClientRect().left, pickBtn.getBoundingClientRect().bottom + 4); } }, icon('checklist'));
-  const lockBtn = h('button', { type: 'button', class: 'plus pllock', 'data-act': 'collock', 'aria-pressed': 'false', onclick: ev => { ev.stopPropagation(); L = setLocked(L, !L.locked); save(); paintLock(); buildHead(); } }, icon('unlock'));
+  const lockBtn = h('button', { type: 'button', class: 'plus pllock', 'data-act': 'collock', 'aria-pressed': 'false', onclick: ev => { ev.stopPropagation(); L = setLocked(L, !L.locked); save(); paintLock(); buildHead(); draw(); } }, icon('unlock'));
   const paintLock = () => { lockBtn.classList.toggle('on', L.locked); lockBtn.setAttribute('aria-pressed', String(L.locked)); const t = L.locked ? 'Columns locked (click to unlock)' : 'Lock the column layout'; lockBtn.title = t; lockBtn.setAttribute('aria-label', t); setIcon(lockBtn.querySelector('.ic'), L.locked ? 'lock' : 'unlock'); };
   const iconRow = h('span', { class: 'row plbtns' }, btns, pickBtn, lockBtn);
-  const head = h('div', { class: 'pane-h' }, title, meta, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
+  // 0.3.7 L30: "Sorted by Artist ▲ ✕" chip on the title bar; the ✕ gives back the queue's own order (disabled while the queue is locked)
+  const sortChip = h('span', { class: 'sortchip', hidden: true, role: 'status' });
+  const head = h('div', { class: 'pane-h' }, title, meta, sortChip, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Queue' }, head, wrap);
   /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
   const setNextBlock = el => { head.insertBefore(el, meta); };
@@ -59,7 +61,13 @@ export function listTable(S, ctl) {
     setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escKey, true); }, 0);
     box.querySelector('input:not(:disabled)')?.focus();
   }
+  function paintSortChip() {
+    sortChip.hidden = !sort; if (!sort) { sortChip.replaceChildren(); return; }
+    const x = h('button', { type: 'button', class: 'sortchip-x', 'data-act': 'sortclear', 'aria-label': 'Clear the sort (back to the queue order)', title: L.locked ? SORT_LOCK_HINT : 'Back to the queue order', disabled: L.locked || undefined, onclick: () => { if (L.locked) return; sort = null; buildHead(); draw(); } }, '✕');
+    sortChip.replaceChildren(h('span', { class: 'sortchip-t' }, sortChipText(byId(sort.id)?.pick || sort.id, sort.dir)), x);
+  }
   function buildHead() {
+    paintSortChip();
     const lay = widthsFor(L, 1000); ids = lay.ids;
     colgroup.replaceChildren(...ids.map(() => h('col'))); thead.replaceChildren();
     ids.forEach((id, i) => {
@@ -127,7 +135,7 @@ export function listTable(S, ctl) {
     const total = S.queue.reduce((a, q) => a + (q.durationMs || 0), 0);
     meta.textContent = S.queue.length ? `${S.queue.length} track${S.queue.length === 1 ? '' : 's'} • ${fmtDur(total)}` : '';
     // 0.3.5 J9 #9 + 0.3.6 K1: Save as playlist / Clear are compact icon buttons (tooltips); the name field is inline in the header; kept across redraws while typing
-    if (!btns.querySelector('.qsave')) btns.replaceChildren(can && S.queue.length ? [h('button', { class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: () => inlineSave() }, icon('save')), h('button', { class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: 'Clear the queue', onclick: () => clearQueue() }, icon('trash'))] : null);
+    if (!btns.querySelector('.qsave')) btns.replaceChildren(can && S.queue.length ? [h('button', { class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: () => inlineSave() }, icon('save')), h('button', { class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: L.locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: L.locked || undefined, onclick: () => { if (!L.locked) clearQueue(); } }, icon('trash'))] : null);
     if (!S.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: Math.max(1, ids.length) }, 'The queue is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
     if (dragging) return;   // never redraw under a drag
     sel = sel.filter(i => i < S.queue.length);

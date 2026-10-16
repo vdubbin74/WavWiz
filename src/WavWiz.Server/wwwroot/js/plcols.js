@@ -69,6 +69,9 @@ export function fracsFromWidths(l, ids, widths) {
 /** 0.3.7 L27: while the layout is locked the sort order is locked too: a click / option changes nothing. Unlocking gives it all back. */
 export const sortAllowed = l => !l.locked;
 export const applySort = (l, cur, id) => (sortAllowed(l) ? nextSort(cur, id) : cur);
+export const CLEAR_LOCK_HINT = 'Locked - unlock the queue (padlock) to clear it';
+/** 0.3.7 L30: text of the Sorted-by chip. */
+export const sortChipText = (name, dir) => `Sorted by ${name} ${dir === 'desc' ? '▼' : '▲'}`;
 export const SORT_LOCK_HINT = 'Sorting is locked while the queue is locked (click the padlock to unlock)';
 export function nextSort(cur, id) { if (!cur || cur.id !== id) return { id, dir: 'asc' }; if (cur.dir === 'asc') return { id, dir: 'desc' }; return null; }
 const keyOf = (c, q, i) => (c.id === 'num' ? i : c.kind === 'text' ? String(q[c.f] ?? '').toLocaleLowerCase() : Number(q[c.f] ?? -1));
