@@ -14,6 +14,7 @@ public sealed class PcMicBroker
 {
     private sealed class Pending { public readonly List<CalResult> Parts = new(); public readonly TaskCompletionSource<(float[] Mono, int Rate, long StartUs)> Tcs = new(TaskCreationOptions.RunContinuationsAsynchronously); }
     private readonly ConcurrentDictionary<string, Pending> _reqs = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<string>> _acks = new();
     private readonly EventHub _ev;
     public PcMicBroker(EventHub ev) { _ev = ev; }
 
@@ -21,6 +22,7 @@ public sealed class PcMicBroker
     {
         switch (r.Status)
         {
+            case "pattern-ack": if (r.Req != null && _acks.TryGetValue(r.Req, out var ak)) ak.TrySetResult(r.Note ?? "ok"); break;
             case "mic-list": if (r.Mics != null) { s.Mics = r.Mics; _ev.Publish("calmics"); } break;
             case "mic-level": _ev.Publish("miclevel", new { playerId = s.Id, micId = r.MicId, db = r.PeakDb ?? -100 }); break;
             case "mic-error":
@@ -56,6 +58,17 @@ public sealed class PcMicBroker
         }
         finally { _reqs.TryRemove(req, out _); }
     }
+
+    /// <summary>0.3.7 L24: a Player acknowledges every test pattern it was asked to schedule ("ok;lead=1432" or why it cannot: "no-clock", "late=-300").
+    /// Returns null when no acknowledgement comes (an older Player never sends one - that is not treated as a failure).</summary>
+    public void ExpectAck(string req) => _acks[req] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public async Task<string?> WaitAck(string req, TimeSpan timeout, CancellationToken ct)
+    {
+        if (!_acks.TryGetValue(req, out var t)) return null;
+        try { var done = await Task.WhenAny(t.Task, Task.Delay(timeout, ct)); return done == t.Task ? t.Task.Result : null; }
+        finally { _acks.TryRemove(req, out _); }
+    }
+    public static bool AckProblem(string? ack) => ack != null && !ack.StartsWith("ok", StringComparison.Ordinal);
 
     public void Level(PlayerSession mic, string micId, bool on) => mic.SendJson(MsgType.CalCmd, new CalCmd("mic-level", "meter", 0, on ? 1 : 0, null, micId));
     public void RefreshList(PlayerSession mic) => mic.SendJson(MsgType.CalCmd, new CalCmd("mic-list", "list", 0));

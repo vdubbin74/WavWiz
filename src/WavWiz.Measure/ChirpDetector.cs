@@ -1,7 +1,19 @@
 using System.Numerics;
 namespace WavWiz.Measure;
 
-public sealed record PatternHit(double StartSec, double SpreadMs, double Confidence, int ChirpsFound, string? Warning)
+/// <summary>0.3.7 L25/L26: the detector's <c>Confidence</c> is a peak-to-noise RATIO (about 4 = just found, 20-70 = clear), NOT a 0-1 value. Showing it x100 as a percent
+/// gave "6800%". <c>Quality</c> is the same measurement mapped to 0..1 (4 = 12 dB -> 0, 40 = 32 dB -> 1); SnrDb / PeakDb / RmsDb are the raw numbers for the log and the live meter.</summary>
+public static class CalQuality
+{
+    public static double SnrDb(double ratio) => double.IsFinite(ratio) && ratio > 0 ? 20 * Math.Log10(ratio) : -120;
+    public static double Clamp01(double v) => double.IsFinite(v) ? Math.Clamp(v, 0, 1) : 0;
+    public static double FromRatio(double ratio) => Clamp01((SnrDb(ratio) - 12) / 20);
+    public static int Pct(double c) => (int)Math.Round(Clamp01(c) * 100);
+    /// <summary>good / weak / quiet from the recording's peak level and the pattern's quality (the same words the pre-check shows).</summary>
+    public static string Rate(double peakDb, double quality) => peakDb < -50 ? "quiet" : quality >= 0.5 ? "good" : quality > 0 ? "weak" : "quiet";
+}
+
+public sealed record PatternHit(double StartSec, double SpreadMs, double Confidence, int ChirpsFound, string? Warning, double Quality = 0, double PeakDb = -120, double RmsDb = -120)
 {
     public bool Found => ChirpsFound >= 5 && Confidence >= 4;
 }
@@ -91,7 +103,9 @@ public sealed class ChirpDetector
         double peak = 0; foreach (var v in rec) peak = Math.Max(peak, Math.Abs(v));
         if (peak >= 0.99) warn = "recording is clipping - lower the volume";
         else if (peak < 0.003) warn = "recording is very quiet - move the phone closer";
-        return new PatternHit(med / ChirpPattern.SampleRate, spread, conf, est.Count, warn);
+        double ss = 0; foreach (var v in rec) ss += (double)v * v;
+        double rmsDb = rec.Length == 0 ? -120 : 10 * Math.Log10(Math.Max(1e-12, ss / rec.Length)), peakDb = 20 * Math.Log10(Math.Max(1e-6, peak));
+        return new PatternHit(med / ChirpPattern.SampleRate, spread, conf, est.Count, warn, CalQuality.FromRatio(conf), peakDb, rmsDb);
     }
 
     /// <summary>Same-recording mode: two patterns (reference, then device) in ONE capture, <paramref name="gapSec"/> apart.</summary>

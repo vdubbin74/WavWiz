@@ -6,7 +6,8 @@ using WavWiz.Server.Net;
 using WavWiz.Server.Zones;
 namespace WavWiz.Server.Calibration;
 
-public sealed record RunResult(string ZoneId, string Kind, bool Ok, double? RawLatencyMs, double Confidence, string? Note);
+/// <summary>Confidence is ALWAYS 0..1 (0.3.7 L26); SnrDb / PeakDb / RmsDb are the raw numbers of that attempt.</summary>
+public sealed record RunResult(string ZoneId, string Kind, bool Ok, double? RawLatencyMs, double Confidence, string? Note, double SnrDb = 0, double PeakDb = -120, double RmsDb = -120);
 public sealed record Proposal(long ZoneId, string ZoneName, string DeviceId, double OffsetMs, double ProposedLatencyMs, double SpreadMs, double Confidence, string? Warning, bool Commit);
 
 public sealed class CalSession
@@ -24,6 +25,8 @@ public sealed class CalSession
     public readonly ConcurrentDictionary<string, (long ZoneId, long AtUs, double Distance, string Kind, long RunId)> Pending = new();
     public readonly List<(long Zone, string Kind, double Raw, double Conf)> Runs = new();
     public readonly List<string> Notes = new();
+    /// <summary>0.3.7 L24: speakers that stayed silent after every retry (name), and the per-attempt measurements (L25: snr / peak / rms) for the log and the live meter.</summary>
+    public readonly List<string> Silent = new(); public readonly List<object> Attempts = new();
     public long RunSeq;
     public List<Proposal>? Proposals;
     public readonly object L = new();
@@ -90,7 +93,7 @@ public sealed class CalibrationService
 
     public object Progress(CalSession s)
     {
-        lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(),
+        lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(), silent = s.Silent.ToList(), attempts = s.Attempts.TakeLast(30).ToList(),
             proposals = s.Proposals, messages = s.Phase == "done" ? s.Notes.ToList() : null, guided = s.Guided, skipped = s.Skipped.ToList(),
             prompt = s.Phase == "waiting" && s.Prompt is { } gp ? new { step = gp.Step, steps = gp.Steps, zoneId = gp.ZoneId, name = gp.Name, kind = gp.Kind, text = gp.Text, canSkip = gp.CanSkip } : null, micName = s.MicName, micBluetooth = s.MicBluetooth, micDevice = s.MicDevice, referenceZoneId = s.ReferenceZoneId };
     }
@@ -130,28 +133,53 @@ public sealed class CalibrationService
                     }
                     Report(s, phase: "running");
                 }
-                foreach (var st in grp.Steps)
+                for (int round = 0; ; round++)
                 {
-                    if (ct.IsCancellationRequested || s.Ended) return;
-                    Report(s, step: i, label: st.Label);
-                    RunResult? res = null;
-                    for (int attempt = 0; attempt < 2 && !ct.IsCancellationRequested; attempt++)
+                    int i0 = i, grpHeard = 0; string? lastWhy = null; i = i0;
+                    foreach (var st in grp.Steps)
                     {
-                        var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
-                        var (at, err) = Play(s, st.ZoneId, st.Kind, 0, levelDb);
-                        if (err != null) { res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, err); break; }
-                        long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
-                        var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, st.Label, _clock.NowUs, ct);
-                        if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
-                        res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
-                        if (res.Ok && res.Confidence >= 0.4) break;
-                        if (attempt == 0) Report(s, log: $"{st.Label}: {(res.Ok ? "not clear enough" : res.Note)} - trying again");
-                        await Task.Delay(400, ct);
+                        if (ct.IsCancellationRequested || s.Ended) return;
+                        Report(s, step: i, label: st.Label);
+                        RunResult? res = null;
+                        // 0.3.7 L24: up to 3 tries per test sound. A try that was never heard is repeated with a longer lead time (a slow or Bluetooth player, a clock that was
+                        // not synced yet) and a Player that says it could not schedule the sound (no clock / too late) is not recorded at all - it is simply tried again.
+                        for (int attempt = 0; attempt < 3 && !ct.IsCancellationRequested; attempt++)
+                        {
+                            var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
+                            var req = Guid.NewGuid().ToString("N")[..12]; broker.ExpectAck(req);
+                            var (at, err) = Play(s, st.ZoneId, st.Kind, 0, levelDb, req, LeadUs + attempt * 1_500_000L);
+                            if (err != null) { res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, err); lastWhy = err; break; }
+                            var ack = await broker.WaitAck(req, TimeSpan.FromMilliseconds(1200), ct);
+                            if (PcMicBroker.AckProblem(ack)) { lastWhy = "its player could not start the sound (" + ack + ")"; res = new RunResult(st.ZoneId.ToString(), st.Kind, false, null, 0, lastWhy); s.Pending.TryRemove($"{st.ZoneId}:{st.Kind}", out _); Report(s, log: $"{st.Label}: {lastWhy} - trying again"); await Task.Delay(700, ct); continue; }
+                            long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
+                            var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, st.Label, _clock.NowUs, ct);
+                            if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
+                            res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
+                            // L25: every attempt is logged with the raw numbers and published for the live meter
+                            var line = $"{st.Label}: try {attempt + 1}: {(res.Ok ? "heard" : "not heard")}, snr {res.SnrDb:0.0} dB, mic peak {res.PeakDb:0.0} dBFS, rms {res.RmsDb:0.0} dBFS, quality {CalQuality.Pct(res.Confidence)}%{(ack != null ? ", player " + ack : "")}";
+                            lock (s.L) s.Attempts.Add(new { label = st.Label, zoneId = st.ZoneId, attempt = attempt + 1, ok = res.Ok, snrDb = Math.Round(res.SnrDb, 1), peakDb = Math.Round(res.PeakDb, 1), rmsDb = Math.Round(res.RmsDb, 1), quality = Math.Round(res.Confidence, 2), rating = CalQuality.Rate(res.PeakDb, res.Confidence) });
+                            _ev.Publish("calattempt", new { sessionId = s.Id, label = st.Label, ok = res.Ok, snrDb = res.SnrDb, peakDb = res.PeakDb, rmsDb = res.RmsDb, quality = res.Confidence, rating = CalQuality.Rate(res.PeakDb, res.Confidence) });
+                            Report(s, log: line);
+                            if (res.Ok && res.Confidence >= 0.4) break;
+                            lastWhy = res.Ok ? "the test sound was too weak at the microphone" : res.Note;
+                            if (res.Ok && attempt >= 1) break;                 // heard but weak: one more try is enough
+                            if (attempt < 2) Report(s, log: $"{st.Label}: {(res.Ok ? "not clear enough" : res.Note)} - trying again");
+                            await Task.Delay(400, ct);
+                        }
+                        i++;
+                        if (res is { Ok: true }) { heard++; grpHeard++; if (st.Kind == "ref") refHeard++; Report(s, step: i, log: $"{st.Label}: heard it ({CalQuality.Pct(res.Confidence)}% sure)"); }
+                        else Report(s, step: i, log: $"{st.Label}: {res?.Note ?? "not heard"}");
+                        await Task.Delay(300, ct);
                     }
-                    i++;
-                    if (res is { Ok: true }) { heard++; if (st.Kind == "ref") refHeard++; Report(s, step: i, log: $"{st.Label}: heard it ({res.Confidence * 100:0}% sure)"); }
-                    else Report(s, step: i, log: $"{st.Label}: {res?.Note ?? "not heard"}");
-                    await Task.Delay(300, ct);
+                    if (grp.Kind != "dev" || grpHeard > 0) break;
+                    // 0.3.7 L24: a speaker that stayed silent is NAMED, never skipped over silently.
+                    var why = $"{grp.Name} was silent: no test sound was heard after {grp.Steps.Count * 3} tries{(lastWhy != null ? " (" + lastWhy + ")" : "")}. Check that it is on, connected (a Bluetooth speaker may have gone to sleep) and turned up, then retry.";
+                    lock (s.L) { if (!s.Silent.Contains(grp.Name)) s.Silent.Add(grp.Name); s.Notes.Add(why); }
+                    Report(s, log: "SILENT: " + why);
+                    if (!s.Guided || round >= 2) { Report(s, phase: "failed", error: why); return; }
+                    var ans = await WaitReady(s, new GuidePrompt(gi + 1, groups.Count, grp.ZoneId, grp.Name, "silent", why, true), ct);
+                    if (ans == "skip") { lock (s.L) s.Skipped.Add(grp.ZoneId); Report(s, log: $"{grp.Name}: skipped (delay unchanged)"); break; }
+                    lock (s.L) s.Silent.Remove(grp.Name); Report(s, phase: "running", log: $"{grp.Name}: trying again");
                 }
             }
             if (!retry && refHeard == 0) { Report(s, phase: "failed", error: "The reference speaker was not heard. Turn it up, move the microphone closer to the listening spot, or check that the right mic is chosen."); return; }
@@ -241,14 +269,14 @@ public sealed class CalibrationService
     }
 
     /// <summary>Schedule the pattern on one zone. Returns the DAC time T (server clock) so the phone can mark it.</summary>
-    public (long AtUs, string? Error) Play(CalSession s, long zoneId, string kind, double distanceM, double levelDb = -20)
+    public (long AtUs, string? Error) Play(CalSession s, long zoneId, string kind, double distanceM, double levelDb = -20, string? req = null, long leadUs = 0)
     {
         var ps = SessionOfZone(zoneId, out var err); if (ps == null) return (0, err);
         Quiet(s);      // someone may have pressed Play since the session started
-        long at = _clock.NowUs + LeadUs;
+        long at = _clock.NowUs + (leadUs > 0 ? leadUs : LeadUs);
         long run = Interlocked.Increment(ref s.RunSeq);
         s.Pending[$"{zoneId}:{kind}"] = (zoneId, at, distanceM, kind, run);
-        ps.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, kind));
+        ps.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, kind, Req: req));
         return (at, null);
     }
 
@@ -297,18 +325,20 @@ public sealed class CalibrationService
             if (!a.Found) return Fail(s, zoneId, kind, $"could not hear the reference speaker ({a.ChirpsFound}/8 chirps){(a.Warning != null ? ": " + a.Warning : "")}");
             if (!b.Found) return Fail(s, zoneId, kind, $"heard the reference but not the speaker being measured ({b.ChirpsFound}/8 chirps) - turn it up or move the phone closer");
             double off = LatencyMath.SameRecordingOffsetMs(a.StartSec, b.StartSec, PairGapSec);
-            lock (s.L) s.Runs.Add((zoneId, "pair", off, Math.Min(a.Confidence, b.Confidence)));
-            return new RunResult(zoneId.ToString(), kind, true, off, Math.Min(a.Confidence, b.Confidence), null);
+            double pq = Math.Min(a.Quality, b.Quality);
+            lock (s.L) s.Runs.Add((zoneId, "pair", off, pq));
+            return new RunResult(zoneId.ToString(), kind, true, off, pq, null, CalQuality.SnrDb(Math.Min(a.Confidence, b.Confidence)), Math.Min(a.PeakDb, b.PeakDb), Math.Min(a.RmsDb, b.RmsDb));
         }
         var hit = _det.Find(mono48k);
-        if (!hit.Found) return Fail(s, zoneId, kind, $"could not hear the test sound ({hit.ChirpsFound}/8 chirps){(hit.Warning != null ? ": " + hit.Warning : "")} - turn the speaker up, move the phone closer, or quieten the room");
+        if (!hit.Found) return Fail(s, zoneId, kind, hit, $"could not hear the test sound ({hit.ChirpsFound}/8 chirps){(hit.Warning != null ? ": " + hit.Warning : "")} - turn the speaker up, move the phone closer, or quieten the room");
         double arrival = startServerUs + hit.StartSec * 1e6;
         double raw = LatencyMath.RawLatencyMs(arrival, p.AtUs, p.Distance);
-        lock (s.L) s.Runs.Add((zoneId, kind, raw, hit.Confidence));
-        return new RunResult(zoneId.ToString(), kind, true, raw, hit.Confidence, hit.Warning);
+        lock (s.L) s.Runs.Add((zoneId, kind, raw, hit.Quality));
+        return new RunResult(zoneId.ToString(), kind, true, raw, hit.Quality, hit.Warning, CalQuality.SnrDb(hit.Confidence), hit.PeakDb, hit.RmsDb);
     }
 
     private RunResult Fail(CalSession s, long zoneId, string kind, string note) { lock (s.L) s.Notes.Add(note); return new RunResult(zoneId.ToString(), kind, false, null, 0, note); }
+    private RunResult Fail(CalSession s, long zoneId, string kind, PatternHit hit, string note) { lock (s.L) s.Notes.Add(note); return new RunResult(zoneId.ToString(), kind, false, null, 0, note, CalQuality.SnrDb(hit.Confidence), hit.PeakDb, hit.RmsDb); }
 
     /// <summary>Median of the runs per speaker, offsets relative to the reference, reference drift check (spec 8.6).</summary>
     public (List<Proposal> Proposals, List<string> Messages) Finish(CalSession s)
@@ -357,7 +387,13 @@ public sealed class CalibrationService
             var z = _zones.Zone(r.Zone); if (z == null) continue;
             var act = z.Outputs.FirstOrDefault(o => o.Active); if (act == null) continue;
             double prop = Math.Round(Math.Clamp(refLatency + r.Offset + shift, 0, 2000), 1);
-            props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(r.Conf, 2), r.Warn, r.Conf >= 0.4));
+            {
+                var zr = runs.Where(x => x.Zone == r.Zone).ToList(); double q = zr.Count == 0 ? 0 : zr.Average(x => x.Conf);
+                string? why = r.Warn;
+                if (r.Conf < 0.4 && why == null) why = q >= 0.5 ? $"The test sound was loud and clear, but its timing varied by {r.Spread:0} ms between the runs, so the delay is uncertain. A wired PC mic can have uneven capture timing; try again with the mic nearer and the room quiet."
+                    : "The test sound was weak at the microphone - turn the speaker or the mic's Windows input level up, or move the mic closer.";
+                props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(CalQuality.Clamp01(r.Conf), 2), why, r.Conf >= 0.4));
+            }
         }
         if (shift > 0.5 && refZone?.Outputs.FirstOrDefault(o => o.Active) is { } ra && !props.Any(p => p.ZoneId == refZone.Id))
             props.Add(new Proposal(refZone.Id, refZone.Name, ra.DeviceId, 0, Math.Round(refLatency + shift, 1), 0, 1, "reference shifted to keep every speaker non-negative", true));
