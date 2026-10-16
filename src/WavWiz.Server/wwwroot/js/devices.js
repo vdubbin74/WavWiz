@@ -1,3 +1,4 @@
+import { orderedZones, orderedGroups, attachDevDrag } from './devorder.js';
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
 import { centerEq } from './centerview.js';
@@ -190,8 +191,13 @@ function masterRow(S, ctl) {
   ro(sl, canControl(S), 'Your access is view-only.');
   // 0.3.1 B7: the same track / thumb / length / % position as every device row (.dvol: slider, %, round Mute button) so the bars line up.
   // 0.3.2 F5 (supersedes B8): the slot right of the master bar is the same round mute icon button as the device rows; it mutes everything.
+  // 0.3.8 L46: the master row also has All off / All on (every speaker; a view-only user sees them disabled)
+  const setAll = on => { for (const z of S.zones || []) { if (!!z.enabled !== on) { z.enabled = on; ctl.act(`/zones/${z.id}`, { enabled: on }, 'PATCH'); } } ctl.redraw?.(); };
+  const allOff = h('button', { type: 'button', class: 'btn sm mall alloff', 'data-act': 'alloff', title: 'Switch every speaker off', onclick: () => setAll(false) }, 'All off');
+  const allOn = h('button', { type: 'button', class: 'btn sm mall allon', 'data-act': 'allon', title: 'Switch every speaker on', onclick: () => setAll(true) }, 'All on');
+  ro(allOff, canControl(S), 'Your access is view-only.'); ro(allOn, canControl(S), 'Your access is view-only.');
   return h('div', { class: 'dmaster' }, h('div', { class: 'dlbl' }, 'MASTER', h('span', { class: 'mvword' }, ' VOLUME')),
-    h('div', { class: 'dvol dvol-master' }, sl, pct, masterMuteButton(S, ctl)));
+    h('div', { class: 'dvol dvol-master' }, sl, pct, masterMuteButton(S, ctl)), h('div', { class: 'mallrow' }, allOff, allOn));
 }
 /** 0.2.1 F17: every device muted? (drives the master mute button) */
 export const allMuted = zones => (zones || []).length > 0 && zones.every(z => z.muted);
@@ -307,7 +313,7 @@ async function loadScenes(force) {
  * a live dot (off zones dimmed); picking one filters the cards. Optional SCENES chips below. F19: a zone's settings live in the sidebar's
  * own edit view (name, devices, play here, remove) - there is no zone Details pop-up. */
 function zonesSidebar(S, ctl, pick, setPick, edit, setEdit) {
-  const admin = isAdmin(S), can = canControl(S), groups = S.groups || [];
+  const admin = isAdmin(S), can = canControl(S), groups = orderedGroups(S.groups || []);
   const side = h('aside', { class: 'zside', 'aria-label': 'Zones' });
   if (edit !== null) return zoneEditView(S, ctl, side, groups.find(g => g.id === edit) || null, setEdit, setPick);
   const row = (key, name, count, extra = {}) => h('button', { type: 'button', class: 'zsrow' + (pick === key ? ' on' : '') + (extra.off ? ' off' : ''), 'aria-pressed': String(pick === key), 'data-zone': name,
@@ -706,6 +712,7 @@ export function devicesPanel(S, ctl) {
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
     if (size === 'expanded') {
+      body.classList.remove('rich');
       // 0.2.1 F7: master volume keeps the full-width strip; zones move to the ~180 px sidebar on the right (variant B) and filter the cards
       if (zpick !== 'all' && !(S.groups || []).some(g => g.id === zpick)) zpick = 'all';
       // tapping a device in Standard opens Expanded with its card highlighted: never hide that card behind a zone filter
@@ -714,7 +721,7 @@ export function devicesPanel(S, ctl) {
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main e1' });
       emain.classList.add('e1');
       reconcile(etop, [keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
-      const groups = S.groups || [], hset = zoneHighlight(groups, zpick), pg = groups.find(g => g.id === zpick);
+      const groups = orderedGroups(S.groups || []), hset = zoneHighlight(groups, zpick), pg = groups.find(g => g.id === zpick);
       // 0.3.5 J5 (option B): Scenes & Schedules | Zones | Speakers - the Speakers column stays pinned on the RIGHT (where the standard panel is)
       const oldSide = kid(emain, 'zcol');
       const zcol = !force && zedit !== null && oldSide ? oldSide : keepSection(oldSide, (() => {
@@ -761,13 +768,13 @@ export function devicesPanel(S, ctl) {
         h('span', { class: 'ss-rail-c' }, icon('chevR')), h('span', { class: 'prail-ic' }, '▶'), h('span', { class: 'prail-t' }, 'SCENES & SCHEDULES'), h('span', { class: 'prail-n ss-rail-n' })));
       const ssn = sscol.querySelector('.ss-rail-n'); if (ssn) ssn.textContent = String(sscol.querySelectorAll('.ssc-scene').length + sscol.querySelectorAll('.ssc-sched').length || '');
       reconcile(emain, [sscol, zcol, spcol, scol]);
-      reconcile(body, [etop, emain]);
+      reconcile(body, [etop, emain]); attachDevDrag(body);
       if (busy.v) later();
       return;
     }
     // 0.3.3 G10 (slim): one-line master, Speakers / Unassigned / Zones subheads with counts, 2-line rows (~56 px), output name in the tooltip
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
-    const groups = S.groups || [], { zoned, unassigned: un } = speakerGroups(S.zones, groups), old = childCards(body, 'drow');
+    const groups = orderedGroups(S.groups || []), { zoned, unassigned: un } = speakerGroups(S.zones, groups), old = childCards(body, 'drow');
     const sub = (t, n, cls = '') => h('div', { class: 'pane-h dsec-h slimsub ' + cls }, h('span', null, t), h('span', { class: 'small dim' }, String(n)));
     const row = z => keepCard(old.get(String(z.id)), S, z, `3|${rowKey(false, false, false, 0)}|0|1|0`, () => card3(S, ctl, z, { slim: true, openDevice: id => { spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } }), busy);
     reconcile(body, [keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S),
@@ -779,6 +786,10 @@ export function devicesPanel(S, ctl) {
       groups.length ? keepSection(kid(body, 'zlist'), h('div', { class: 'zlist' }, groups.map(g => zcard3(S, ctl, g))), busy)
         : h('p', { class: 'dim small pad' }, 'Zones are optional groups, like “Downstairs”. An administrator can create one to switch several speakers on together.'),
       ssCompact(S, ctl)]);
+    attachDevDrag(body);
+    // 0.3.8 L46 (option A): with few devices the cards grow and show what is playing in each; many devices stay compact
+    const rich = S.zones.length + groups.length <= 8; body.classList.toggle('rich', rich);
+    const it = S.now?.item, np = it?.title ? `▶ ${it.title}${it.artist ? ' · ' + it.artist : ''}` : 'Nothing playing'; body.style.setProperty('--np', JSON.stringify(np));
     if (busy.v) later();
   }
   setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(draw, draw));
@@ -822,7 +833,7 @@ export function outputTypeLine(z) {
 }
 /** G9/G10: speakers split into zoned (in at least one zone) and unassigned; with no zones at all every speaker is "zoned". Pure. */
 export function speakerGroups(zones, groups) {
-  const zs = zones || [], gs = groups || [];
+  const zs = orderedZones(zones || []), gs = groups || [];
   if (!gs.length) return { zoned: zs, unassigned: [] };
   const un = new Set(unassigned(zs, gs).map(z => z.id));
   return { zoned: zs.filter(z => !un.has(z.id)), unassigned: zs.filter(z => un.has(z.id)) };
