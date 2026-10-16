@@ -10,6 +10,8 @@ import { createNow } from './now.js';
 import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
+import { attachReorder, canDragRows } from './qreorder.js';
+import { loadLayout, saveLayout, setLocked } from './plcols.js';
 import { listenFromMini, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
@@ -494,20 +496,27 @@ async function maybeAutoSetup(tries = 0) {
 }
 
 // ---------------------------------------------------------------- Queue
+let qReorder = null;
 function drawQueue() {
   const root = views.queue.el; const can = canControl(S);
   const total = S.queue.reduce((a, q) => a + (q.durationMs || 0), 0), cur = S.now?.index ?? -1;
+  const lay = loadLayout(true), locked = !!lay.locked, dragOk = canDragRows({ can, locked });   // 0.3.7 L29: the same lock as the desktop table (per layout)
   const rows = S.queue.map((q, i) => {
     const playing = i === cur && S.now?.state !== 'stopped';
-    return h('div', { class: 'item' + (playing ? ' cur' : ''), onclick: () => can && act('/stream/jump', { index: i }) },
+    return h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, onclick: () => can && act('/stream/jump', { index: i }) },
+      dragOk ? h('span', { class: 'qgrip', role: 'button', 'aria-label': `Drag ${q.title} to reorder`, title: 'Drag to reorder', onclick: ev => ev.stopPropagation() }, '⋮⋮') : null,
       h('span', { class: 'num' }, playing ? '▶' : i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))), h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''),
-      can ? h('button', { class: 'more', 'aria-label': 'Move up', disabled: i === 0, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i - 1 }); } }, '▲') : null,
-      can ? h('button', { class: 'more', 'aria-label': 'Move down', disabled: i === S.queue.length - 1, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i + 1 }); } }, '▼') : null,
+      can && !locked ? h('button', { class: 'more', 'aria-label': 'Move up', disabled: i === 0, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i - 1 }); } }, '▲') : null,
+      can && !locked ? h('button', { class: 'more', 'aria-label': 'Move down', disabled: i === S.queue.length - 1, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i + 1 }); } }, '▼') : null,
       can ? h('button', { class: 'more', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
   });
+  const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
   root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow', style: 'margin:0' }, 'Queue'), h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
-    can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear')] : null),
-    S.queue.length ? h('div', { class: 'list' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
+    can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear'), lockBtn] : null),
+    S.queue.length ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
+  qReorder?.destroy(); qReorder = null;
+  const list = root.querySelector('.qlist');
+  if (list) qReorder = attachReorder(list, { can: () => canControl(S), locked: () => !!loadLayout(true).locked, onMove: async mv => { await act('/queue/move', mv); } });
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
   const root = views.queue.el; root.querySelector('.qsave')?.remove();

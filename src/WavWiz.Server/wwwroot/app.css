@@ -2443,3 +2443,8 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .eqall-top{gap:8px;flex-wrap:wrap}.eqall-name{width:150px}
 .eqallbtn.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .eqpadlock.on{color:var(--accent)}
+/* 0.3.7 L29: grip + insertion line in the phone / compact Queue list */
+.qlist{position:relative}.qlist .item{align-items:center}
+.qlist .qgrip{touch-action:none;cursor:grab;padding:8px 6px;color:var(--dim);font-size:14px;line-height:1;user-select:none}
+.qlist .item.dragging{opacity:.5}
+.qlist .qins{position:absolute;left:0;right:0;height:2px;background:var(--accent);pointer-events:none;z-index:3}

@@ -1,11 +1,12 @@
 import { h, fmtDur, fmtTime } from './util.js';
 import { setChev, icon, setIcon } from './icons.js';
 import { canControl, MIME, dragInfo, dropLabel } from './ui.js';
-import { api, toast } from './util.js';
+import { api, toast, ask } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
+import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
@@ -111,7 +112,7 @@ export function listTable(S, ctl) {
   const cellFor = (id, q, i, isCur, can, last) => {
     const lc = last ? ' lastc' : '';
     switch (id) {
-      case 'num': return h('td', { class: 'num' + lc }, can && !sort ? h('span', { class: 'qgrip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '⋮⋮') : null, isCur ? '▶' : i + 1);
+      case 'num': return h('td', { class: 'num' + lc }, can && !L.locked ? h('span', { class: 'qgrip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '⋮⋮') : null, isCur ? '▶' : i + 1);
       case 'title': return h('td', { class: 'ell' + lc, title: q.title }, q.title);
       case 'artist': return h('td', { class: 'ell' + lc, title: q.artist || '' }, q.artist || '');
       case 'album': return h('td', { class: 'ell' + lc, title: q.album || '' }, q.album || '');
@@ -132,7 +133,7 @@ export function listTable(S, ctl) {
     sel = sel.filter(i => i < S.queue.length);
     order = sortedIndexes(S.queue, sort);
     tbody.replaceChildren(...order.map(i => {
-      const q = S.queue[i], isCur = i === cur && playing, dg = can && !sort;
+      const q = S.queue[i], isCur = i === cur && playing, dg = canDragRows({ can, locked: L.locked });   // 0.3.7 L29: a sort showing no longer blocks the drag (it asks), the lock does
       // 0.3.3 G12: grip + drag to reorder (Ctrl / Shift click selects several), plain click still plays that row. 0.3.6: no row reorder while a sort is showing.
       const tr = h('tr', { class: (isCur ? 'cur' : '') + (sel.includes(i) ? ' sel' : ''), 'data-i': i, draggable: dg ? 'true' : 'false', 'aria-selected': String(sel.includes(i)),
         onclick: ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { sel = nextSelection(sel, i, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, anchor); if (!ev.shiftKey) anchor = i; draw(); return; } sel = [i]; anchor = i; if (isCur) pulse(tr); can && ctl.act('/stream/jump', { index: i }); } });
@@ -167,10 +168,17 @@ export function listTable(S, ctl) {
     const t = dropIndex(rowBoxes(), ev.clientY); clearIns();
     const rows = ev.dataTransfer.getData(QMIME), ref = ev.dataTransfer.getData(MIME);
     try {
-      if (rows) await moveRows(JSON.parse(rows), t);
+      if (rows) { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(); else await moveRows(JSON.parse(rows), t); }
       else if (ref) { await api('/queue/add', { method: 'POST', body: { ...JSON.parse(ref), at: sort ? (t < order.length ? order[t] : S.queue.length) : t } }); toast('Added to the queue'); ctl.refreshAll?.(); }
     } catch (e) { toast(e.message, true); ctl.refreshAll?.(); }
   });
+  /** 0.3.7 L29: while a sort is showing a drag cannot place a row (the view is not the queue order) - offer to make the sort the real order. */
+  async function applySortAsOrder() {
+    if (!await ask(APPLY_SORT_Q, 'The queue is rearranged to match what you see now. You can undo it with Ctrl+Z.', { ok: 'Apply sort' })) return;
+    const n = S.queue.length, ord = sortedIndexes(S.queue, sort), mv = movesFor([...Array(n).keys()], ord);
+    for (const m of mv) await api('/queue/move', { method: 'POST', body: m });
+    undo = ord; sort = null; buildHead(); toast('Sort applied as the queue order'); ctl.refreshAll?.();
+  }
   /** Reorder: the selected rows go to insertion point t as one block; remembered for Ctrl+Z. */
   async function moveRows(selIdx, t) {
     const n = S.queue.length, order = reorder(n, selIdx, t), ids = [...Array(n).keys()], mv = movesFor(ids, order);

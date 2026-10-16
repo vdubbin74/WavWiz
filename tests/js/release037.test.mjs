@@ -79,3 +79,17 @@ test('L7 purpose-based presets are grouped; All sound settings is in place, one 
   const e = src('eqsettings.js'); for (const w of ['Bass', 'Treble', 'Trim', 'Balance', 'Loudness', 'Limiter', 'Bypass', 'Auto pre-gain']) assert.match(e, new RegExp(`'${w}'`));
   assert.match(e, /Save as/); assert.match(src('devices.js'), /centerEq\(S, eqHost, \{ deviceId: cur\?\.deviceId \}\)/); assert.doesNotMatch(src('devices.js'), /openEq\(S, ctl\.refreshAll/);
 });
+
+test('L29 drag-to-reorder in every Queue view; a showing sort asks to apply it; the lock disables dragging', async () => {
+  const q = await imp('qreorder');
+  assert.deepEqual(q.moveFor(2, 0, 5), { from: 2, to: 0 }); assert.deepEqual(q.moveFor(1, 4, 5), { from: 1, to: 3 }); assert.deepEqual(q.moveFor(1, 5, 5), { from: 1, to: 4 });
+  assert.equal(q.moveFor(2, 2, 5), null); assert.equal(q.moveFor(2, 3, 5), null); assert.equal(q.moveFor(9, 0, 5), null);
+  assert.equal(q.canDragRows({ can: true, locked: false }), true); assert.equal(q.canDragRows({ can: true, locked: true }), false); assert.equal(q.canDragRows({ can: false, locked: false }), false);
+  assert.equal(q.APPLY_SORT_Q, 'Apply this sort as the queue order?');
+  const lt = src('listtable.js'), main = src('main.js');
+  assert.match(lt, /dg = canDragRows\(\{ can, locked: L\.locked \}\)/); assert.doesNotMatch(lt, /dg = can && !sort/);
+  assert.match(lt, /applySortAsOrder/); assert.match(lt, /APPLY_SORT_Q/);
+  assert.match(main, /attachReorder\(list/); assert.match(main, /qgrip/); assert.match(main, /loadLayout\(true\)/);
+  const qd = await imp('qdrag'); const sorted = [2, 0, 1], mv = qd.movesFor([0, 1, 2], sorted);   // applying a sort = these server moves
+  const w = [0, 1, 2]; for (const m of mv) { const [x] = w.splice(m.from, 1); w.splice(m.to, 0, x); } assert.deepEqual(w, sorted);
+});
