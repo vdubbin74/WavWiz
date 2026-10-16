@@ -12,7 +12,7 @@ import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
 import { loadLayout, saveLayout, setLocked } from './plcols.js';
-import { listenFromMini, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
+import { installMiniTargets, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
@@ -187,18 +187,25 @@ async function startMain() {
   // It is worked out from the screen, not the window, so it never stretches or shrinks while the window is resized (only capped to fit).
   const centerW = () => { const z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1; const w = popupWidth(window.screen?.availWidth || 0, window.innerWidth, z); document.documentElement.style.setProperty('--centerw', w + 'px'); document.documentElement.style.setProperty('--popw', w + 'px'); };
   new ResizeObserver(centerW).observe(nowc.el); new ResizeObserver(centerW).observe(desk); window.addEventListener('resize', centerW); window.addEventListener('wavwiz:uiscale', centerW); desk.addEventListener('transitionend', centerW); centerW();
-  // 0.3.7 L8: right-click a title bar (Library, Devices, Queue, the EQ) -> Pin / Unpin that destination as a shortcut
+  // 0.3.8 L37: a pin icon on every pinnable title bar toggles that destination as a shortcut in ONE click (no menu, no confirm); right-click does the same.
+  const titleId = t => t.closest('.libpanel') ? 'library' : t.closest('.devpanel') ? 'devices' : t.closest('.listpanel') ? 'queue' : 'eq';
+  const togglePinFor = id => { const lab = pinInfo(id).label, r = pinToggle(id); toast(r.full ? `All ${MAX_PINS} shortcut slots are taken - unpin one first.` : r.pins.includes(id) ? `Pinned: ${lab}` : `Unpinned: ${lab}`, r.full); };
+  const paintTitlePins = () => { const pins = loadPins(); document.querySelectorAll('.tpin').forEach(b => { const on = pins.includes(b.dataset.pin), lab = pinInfo(b.dataset.pin).label; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.title = on ? `Unpin ${lab} from shortcuts` : `Pin ${lab} to shortcuts`; b.setAttribute('aria-label', b.title); }); };
+  const addTitlePins = () => {
+    for (const sel of ['.libpanel > .pane-h', '.devpanel > .pane-h', '.listpanel > .pane-h']) {
+      const hd = document.querySelector(sel); if (!hd || hd.querySelector('.tpin')) continue;
+      const id = titleId(hd), b = h('button', { type: 'button', class: 'plus tpin', 'data-pin': id, onclick: ev => { ev.stopPropagation(); togglePinFor(id); } }, icon('pin'));
+      hd.insertBefore(b, hd.querySelector(':scope > .plus, :scope > .row .plus, :scope > .row, :scope > .grow + *')); paintTitlePins();
+    }
+  };
+  addTitlePins(); window.addEventListener('wavwiz:pins', paintTitlePins);
+  new MutationObserver(() => addTitlePins()).observe(desk, { childList: true, subtree: true });
   document.addEventListener('contextmenu', ev => {
     const t = ev.target.closest?.('.libpanel .pane-h, .devpanel .pane-h, .listpanel .pane-h, .np-stage'); if (!t || ev.target.closest('input,textarea,.plpicker')) return;
-    const id = t.closest('.libpanel') ? 'library' : t.closest('.devpanel') ? 'devices' : t.closest('.listpanel') ? 'queue' : 'eq';
-    if (id === 'queue' && ev.target.closest('th')) return;
-    ev.preventDefault(); document.querySelector('.scpop')?.remove();
-    const on = loadPins().includes(id), lab = pinInfo(id).label;
-    const pop = h('div', { class: 'scpop', role: 'menu' }, h('button', { type: 'button', class: 'btn sm', 'data-act': 'pin-title', onclick: () => { pop.remove(); const r = pinToggle(id); toast(r.full ? `All ${MAX_PINS} shortcut slots are taken - unpin one first.` : on ? `Unpinned: ${lab}` : `Pinned: ${lab}`, r.full); } }, on ? `Unpin “${lab}” from shortcuts` : `Pin “${lab}” to shortcuts`));
-    document.body.append(pop); pop.style.left = Math.min(ev.clientX, innerWidth - 220) + 'px'; pop.style.top = Math.min(ev.clientY, innerHeight - 50) + 'px';
-    setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
+    const id = titleId(t); if (id === 'queue' && ev.target.closest('th')) return;
+    ev.preventDefault(); togglePinFor(id);
   });
-  listenFromMini(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
+  installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
   drawStatus(); maybeWhatsNew(S); showPendingUndo();

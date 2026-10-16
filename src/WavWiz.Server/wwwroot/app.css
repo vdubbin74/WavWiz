@@ -2505,3 +2505,10 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:hover .mp,.desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:focus-within .mp{opacity:1!important;visibility:visible;transition:opacity var(--glide-fade) var(--glide-ease) 0s,visibility 0s}
 }
 @media (prefers-reduced-motion:reduce){ .desk .minicol .mp{transition-duration:0s,0s!important} }
+/* L37: one-click pin on title bars; pins up to 5; 'more' menu */
+.pane-h .tpin{color:var(--dim);border-color:var(--line);background:transparent;margin-left:auto}
+.pane-h .tpin + .plus,.pane-h .tpin + .row{margin-left:4px}
+.pane-h .tpin .ic,.pane-h .tpin svg{width:14px;height:14px}
+.pane-h .tpin:hover{color:var(--ink);border-color:var(--accent)}
+.pane-h .tpin.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft)}
+.scmore{font-weight:800;letter-spacing:.05em}

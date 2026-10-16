@@ -59,7 +59,7 @@ test('K10 playlist columns: defaults, picker, lock, reorder, resize, sort', asyn
   const q = [{ title: 'b', artist: 'x' }, { title: 'a', artist: 'y' }, { title: 'c', artist: 'z' }];
   assert.deepEqual(c.sortedIndexes(q, { id: 'title', dir: 'asc' }), [1, 0, 2]); assert.deepEqual(c.sortedIndexes(q, { id: 'title', dir: 'desc' }), [2, 0, 1]); assert.deepEqual(c.sortedIndexes(q, null), [0, 1, 2]);
   const t = src('listtable.js'); assert.match(t, /data-act': 'collock'/); assert.match(t, /data-act': 'colpick'/); assert.match(t, /plpicker/); assert.doesNotMatch(t, /libswap/);
-  assert.match(css, /\.pllock\.on[^{]*\{[^}]*lock-red/); assert.match(src('theme.js'), /'--lock-red': t\.preset === 'pepecoin' \? '#C07A4E'/);
+  assert.match(css, /\.pllock\.on[^{]*\{[^}]*var\(--accent\)/); assert.doesNotMatch(src('theme.js'), /lock-red/);
 });
 
 test('K11 EQ LED bars: real band centers, no spectrum glow, themed ramp, Pepecoin brand colors only', async () => {

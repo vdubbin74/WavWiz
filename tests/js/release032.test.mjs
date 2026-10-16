@@ -65,12 +65,12 @@ test('F18: padlock by the volume bar when the max-volume lock is on; admin-only 
   assert.match(d, /'Only an admin can change the max volume\.'/);
 });
 
-test('F19: locked EQ is never dimmed; Lock button = danger red, Pepecoin copper', async () => {
+test('F19 (0.3.8 L38): locked EQ is never dimmed; every lock follows the theme accent, no hard-coded red', async () => {
   const t = await imp('theme');
-  assert.equal(t.derive({ ...t.PRESETS.pepecoin, preset: 'pepecoin' })['--lock-red'], '#C07A4E');
-  for (const id of Object.keys(t.PRESETS).filter(k => k !== 'pepecoin')) assert.equal(t.derive({ ...t.PRESETS[id], preset: id })['--lock-red'], 'var(--red)', id);
+  for (const id of Object.keys(t.PRESETS)) assert.equal(t.derive({ ...t.PRESETS[id], preset: id })['--lock-red'], undefined, id);
+  assert.doesNotMatch(css, /lock-red/);
   assert.match(css, /\.eqarea\.locked \.eqa-plot,\.eqarea\.locked \.eqchips\{opacity:1;filter:none\}/);
-  assert.match(css, /\.stage \.vbtns \.ib\.ov-lock\.on\{color:var\(--lock-red\)/);
+  assert.match(css, /\.stage \.vbtns \.ib\.ov-lock\.on\{color:var\(--accent\)/);
   assert.match(src('eqview.js'), /if \(isLocked\) el\.title = 'EQ locked'/);
 });
 

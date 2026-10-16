@@ -1,10 +1,10 @@
-// WavWiz 0.3.7 L5 / L8 / L11 / L23: Home + up to THREE pinned shortcuts. One module for the Now Playing bar, the embedded mini player and the standalone mini player.
+// WavWiz 0.3.7 L5 / L8 / L11 / L23: Home + up to FIVE pinned shortcuts. One module for the Now Playing bar, the embedded mini player and the standalone mini player.
 // Layout (every size): the Home icon sits in the far RIGHT corner, a separator, then the pins stacking LEFTWARD (first pinned closest to the separator).
 // Pins are remembered per device (localStorage, shared by every window of this app, so the standalone mini player shows the same ones).
 import { h } from './util.js';
 import { icon } from './icons.js';
 
-export const MAX_PINS = 3;
+export const MAX_PINS = 5;
 export const PINS_KEY = 'wavwiz.pins.v1';
 /** Everything that can be pinned: app destinations only. `go` is the id main.js runs through ONE function (runShortcut) that collapses expanded views and brings the target to the front. */
 export const PINNABLE = [
@@ -43,24 +43,39 @@ export function shortcutsRow({ run, home, cls = '' } = {}) {
     setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
   };
   const set = p => { pins = savePins(p); draw(); };
+  /** 0.3.8 L37: in a very narrow window the pins nearest Home stay and the rest move into a 'more' menu. */
+  let cap = 99;
+  const calcCap = () => { const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1; };
+  const more = btn => {
+    document.querySelector('.scpop')?.remove();
+    const rest = pins.slice(cap).map(id => { const p = pinInfo(id); return h('button', { type: 'button', class: 'btn sm', 'data-sc': id, onclick: () => { pop.remove(); run?.(id); } }, p.label); });
+    const pop = h('div', { class: 'scpop', role: 'menu' }, ...rest); const r = btn.getBoundingClientRect(); document.body.append(pop);
+    pop.style.left = Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 6)) + 'px'; pop.style.top = Math.max(4, r.top - pop.offsetHeight - 6) + 'px';
+    setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
+  };
   function draw() {
-    el.replaceChildren(...rowOrder(pins).map(x => {
+    cap = calcCap();
+    const vis = cap >= pins.length ? pins : pins.slice(0, cap);
+    el.replaceChildren(...rowOrder(vis).map(x => {
+      if (x.kind === 'sep' && cap < pins.length) return h('span', { class: 'scsep', 'aria-hidden': 'true' });
       if (x.kind === 'sep') return h('span', { class: 'scsep', 'aria-hidden': 'true' });
-      if (x.kind === 'home') return h('button', { type: 'button', class: 'scbtn schome', 'data-sc': 'home', 'aria-label': 'Home', title: 'Home - back to the default screen', onclick: () => home?.() }, icon('home'));
+      if (x.kind === 'home') return h('button', { type: 'button', class: 'scbtn schome', 'data-sc': 'home', 'aria-label': 'Home', title: 'Home - back to the default screen (Alt+H)', onclick: () => home?.() }, icon('home'));
       const p = pinInfo(x.id), i = pins.indexOf(x.id);
-      const b = h('button', { type: 'button', class: 'scbtn scpin', 'data-sc': x.id, 'aria-label': p.label, title: p.label + ' (right-click or drag to rearrange)', draggable: 'true', onclick: () => run?.(x.id) }, icon(p.icon));
+      const b = h('button', { type: 'button', class: 'scbtn scpin', 'data-sc': x.id, 'aria-label': p.label, title: p.label + ' (right-click for order, or drag to rearrange)', draggable: 'true', onclick: () => run?.(x.id) }, icon(p.icon));
       b.addEventListener('contextmenu', ev => { ev.preventDefault(); popover(b, i); });
       b.addEventListener('dragstart', ev => { drag = i; ev.dataTransfer?.setData('text/plain', x.id); });
       b.addEventListener('dragover', ev => { if (drag >= 0) ev.preventDefault(); });
       b.addEventListener('drop', ev => { ev.preventDefault(); if (drag >= 0) set(movePin(pins, drag, i)); drag = -1; });
       return b;
     }));
+    if (cap < pins.length) { const mb = h('button', { type: 'button', class: 'scbtn scmore', 'data-sc': 'more', 'aria-label': 'More shortcuts', title: 'More shortcuts', onclick: () => more(mb) }, '…'); el.prepend(mb); }
   }
+  let ro = null; try { ro = new ResizeObserver(() => { const c = calcCap(); if (c !== cap) draw(); }); if (el.parentElement) ro.observe(el.parentElement); else setTimeout(() => el.parentElement && ro?.observe(el.parentElement), 0); } catch { /* no ResizeObserver */ }
   const onStore = ev => { if (!ev.key || ev.key === PINS_KEY) { pins = loadPins(); draw(); } };
   const onPins = () => { pins = loadPins(); draw(); };
   window.addEventListener('storage', onStore); window.addEventListener('wavwiz:pins', onPins);
   draw();
-  return { el, destroy: () => { window.removeEventListener('storage', onStore); window.removeEventListener('wavwiz:pins', onPins); } };
+  return { el, destroy: () => { ro?.disconnect(); window.removeEventListener('storage', onStore); window.removeEventListener('wavwiz:pins', onPins); } };
 }
 /** Pin / unpin from a menu row or a title bar. Tells every row in this window; returns the result (full = the 3 slots are taken). */
 export function pinToggle(id) {
@@ -72,3 +87,23 @@ export function pinToggle(id) {
 export const SC_CHANNEL = 'wavwiz-shortcuts';
 export function sendToMain(msg) { try { const c = new BroadcastChannel(SC_CHANNEL); c.postMessage(msg); c.close(); return true; } catch { return false; } }
 export function listenFromMini(fn) { try { const c = new BroadcastChannel(SC_CHANNEL); c.onmessage = ev => fn(ev.data || {}); return () => c.close(); } catch { return () => {}; } }
+
+/** 0.3.8 L34: one click from the standalone mini player. The target travels with the host 'full' message, over BroadcastChannel, and as a localStorage 'pending' note
+ *  (the main page may be hidden / throttled while it is brought forward). The main page runs it as soon as it is visible; a note older than 15 s is ignored. */
+export const PENDING_KEY = 'wavwiz.sc.pending';
+export function writePending(msg, store = globalThis.localStorage) { try { store.setItem(PENDING_KEY, JSON.stringify({ ...msg, ts: Date.now() })); } catch { /* ignore */ } }
+export function takePending(now = Date.now(), store = globalThis.localStorage) {
+  try { const v = JSON.parse(store.getItem(PENDING_KEY) || 'null'); store.removeItem(PENDING_KEY); if (v && now - v.ts < 15000 && (v.home || v.run)) return { home: !!v.home, run: v.run }; } catch { /* ignore */ }
+  return null;
+}
+/** Main window: run a target now when the page is visible, otherwise queue it until it is. Returns a stop function. */
+export function installMiniTargets(exec, doc = globalThis.document) {
+  let queued = null;
+  const vis = () => !doc || doc.visibilityState === 'visible';
+  const flush = () => { if (!vis()) return; const m = queued || takePending(); queued = null; if (m) { try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ } exec(m); } };
+  const stop1 = listenFromMini(msg => { if (!(msg.home || msg.run)) return; queued = msg; if (vis()) setTimeout(flush, 0); });
+  const onVis = () => flush(); const onSt = ev => { if (ev.key === PENDING_KEY) flush(); };
+  doc?.addEventListener?.('visibilitychange', onVis); globalThis.addEventListener?.('focus', onVis); globalThis.addEventListener?.('storage', onSt);
+  setTimeout(flush, 300);
+  return () => { stop1(); doc?.removeEventListener?.('visibilitychange', onVis); globalThis.removeEventListener?.('focus', onVis); globalThis.removeEventListener?.('storage', onSt); };
+}

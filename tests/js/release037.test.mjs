@@ -32,13 +32,13 @@ test('L26 confidence shown only as a real 0-100 %', async () => {
   assert.equal(m.confPct(NaN), null); assert.equal(m.confText(undefined), '—'); assert.equal(m.confText(0.234), '23%');
 });
 
-test('L5/L8/L11/L23 shortcuts: max 3 pins, Home far right, pins stack leftward, order is remembered', async () => {
+test('L5/L8/L11/L23 shortcuts: max 5 pins, Home far right, pins stack leftward, order is remembered', async () => {
   const m = await imp('shortcuts');
-  assert.equal(m.MAX_PINS, 3);
-  assert.deepEqual(m.cleanPins(['eq', 'eq', 'nope', 'queue', 'library', 'devices']), ['eq', 'queue', 'library']);
-  let r = m.togglePin([], 'eq'); r = m.togglePin(r.pins, 'queue'); r = m.togglePin(r.pins, 'scenes'); assert.deepEqual(r.pins, ['eq', 'queue', 'scenes']);
-  const full = m.togglePin(r.pins, 'sleep'); assert.equal(full.full, true); assert.deepEqual(full.pins, r.pins, 'a 4th pin changes nothing');
-  assert.deepEqual(m.togglePin(r.pins, 'queue').pins, ['eq', 'scenes'], 'pin again = unpin');
+  assert.equal(m.MAX_PINS, 5);
+  assert.deepEqual(m.cleanPins(['eq', 'eq', 'nope', 'queue', 'library', 'devices']), ['eq', 'queue', 'library', 'devices']);
+  let r = m.togglePin([], 'eq'); for (const k of ['queue', 'scenes', 'alarms', 'library']) r = m.togglePin(r.pins, k); assert.deepEqual(r.pins, ['eq', 'queue', 'scenes', 'alarms', 'library']);
+  const full = m.togglePin(r.pins, 'sleep'); assert.equal(full.full, true); assert.deepEqual(full.pins, r.pins, 'a 6th pin changes nothing');
+  assert.deepEqual(m.togglePin(r.pins, 'queue').pins, ['eq', 'scenes', 'alarms', 'library'], 'pin again = unpin');
   // the first pinned is closest to Home: DOM order left->right is last pin ... first pin, separator, Home
   assert.deepEqual(m.rowOrder(['eq', 'queue', 'scenes']).map(x => x.id || x.kind), ['scenes', 'queue', 'eq', 'sep', 'home']);
   assert.deepEqual(m.rowOrder([]).map(x => x.kind), ['home'], 'no pins: just Home, no separator');
@@ -106,7 +106,7 @@ test('L30 sorted column + Sorted-by chip use the theme accent only; chip clear a
 });
 
 test('every new 0.3.7 helper a module calls is imported there (a missing import blanks the page)', () => {
-  const need = { 'now.js': ['shortcutsRow'], 'main.js': ['attachReorder', 'canDragRows', 'loadLayout', 'saveLayout', 'setLocked', 'listenFromMini', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'reduced', 'pulse'], 'mini.js': ['shortcutsRow', 'sendToMain'],
+  const need = { 'now.js': ['shortcutsRow'], 'main.js': ['attachReorder', 'canDragRows', 'loadLayout', 'saveLayout', 'setLocked', 'installMiniTargets', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'reduced', 'pulse'], 'mini.js': ['shortcutsRow', 'sendToMain'],
     'menu.js': ['icon', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'toast'], 'listtable.js': ['canDragRows', 'APPLY_SORT_Q', 'ask', 'toast', 'applySort', 'sortAllowed', 'SORT_LOCK_HINT', 'CLEAR_LOCK_HINT', 'sortChipText', 'movesFor', 'sortedIndexes'],
     'centerview.js': ['soundSettings', 'icon', 'setIcon', 'saveEqLock', 'loadEqLock', 'flatEq'], 'calibrate.js': ['undoToast', 'api'], 'devices.js': ['centerEq'] };
   for (const [f, names] of Object.entries(need)) {
@@ -117,8 +117,8 @@ test('every new 0.3.7 helper a module calls is imported there (a missing import 
 
 test('L31/L23 standalone mini player: Home focuses the main window then goes Home; the in-app mini path is untouched', () => {
   const mini = src('mini.js'), main = src('main.js');
-  assert.match(mini, /const focusMain = \(\) => \{ if \(!send\('full'\)\)/); assert.match(mini, /home: home \|\| \(\(\) => \{ focusMain\(\); sendToMain\(\{ home: true \}\)/);
+  assert.match(mini, /const toMain = target => \{ writePending\(target\); if \(!send\('full', \{ target \}\)\)/); assert.match(mini, /home: home \|\| \(\(\) => toMain\(\{ home: true \}\)\)/);
   assert.match(main, /export function openMini\(\) \{[\s\S]*?cmd: 'mini'[\s\S]*?window\.open\('\/mini\.html'/);
   assert.match(main, /mountMini\(host, \{ embedded: true, run: runShortcut, home: goHome \}\)/);   // the embedded (in-app) mini runs the shortcuts directly, never through the window channel
-  assert.match(main, /listenFromMini\(msg => \{ if \(msg\.home\) goHome\(\)/);
+  assert.match(main, /installMiniTargets\(msg => \{ if \(msg\.home\) goHome\(\)/);
 });

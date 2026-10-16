@@ -8,7 +8,7 @@ import { applyTheme, loadTheme } from './theme.js';
 import { icon, setIcon } from './icons.js';
 import { itemArtUrl, setArtCv } from './art.js';
 import { fmtTime } from './util.js';
-import { shortcutsRow, sendToMain } from './shortcuts.js';
+import { shortcutsRow, sendToMain, writePending } from './shortcuts.js';
 import { OPACITY_MIN, clampOpacity, loadOpacity, saveOpacity, fitText } from './minifit.js';
 
 const host = window.chrome?.webview;
@@ -61,8 +61,8 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   (embedded ? root : document).addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });
   const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute), h('div', { class: 'mp-vol' }, vol, opRow));
   // 0.3.7 L10 / L11 / L23: the shortcuts row - Home far right, a separator, up to 3 pins leftward. The standalone window asks the main app window (it is brought to the front first).
-  const focusMain = () => { if (!send('full')) { try { window.opener?.focus(); } catch { /* ignore */ } } };
-  const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => { focusMain(); sendToMain({ run: id }); }), home: home || (() => { focusMain(); sendToMain({ home: true }); }) });
+  const toMain = target => { writePending(target); if (!send('full', { target })) { try { window.opener?.focus(); } catch { /* ignore */ } } sendToMain(target); };   // 0.3.8 L34: ONE click - bring the main window forward and carry the target with it
+  const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => toMain({ run: id })), home: home || (() => toMain({ home: true })) });
   root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])), sc.el);
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();
