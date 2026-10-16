@@ -99,7 +99,7 @@ test('K14/K22 the real mini player is a component used in the right column; the 
 
 test('K15 one pulse effect is used by menu targets', () => {
   const main = src('main.js'), s = src('settings.js');
-  assert.match(main, /pulse\(libpanel\)/); assert.match(main, /pulse\(devp\.el\)/); assert.match(main, /pulse\(listt\.el\)/); assert.match(main, /pulse\(nowc\.stage\)/); assert.match(s, /pulseSel\(body\.querySelector\('\.settings-sec\.on'\)\)/);
+  assert.match(main, /pulse\(libpanel\)/); assert.match(main, /pulse\(devp\.el\)/); assert.match(main, /pulse\(listt\.el\)/); assert.match(main, /pulse\(st\)/); assert.match(main, /export function showEq/); assert.match(s, /pulseSel\(body\.querySelector\('\.settings-sec\.on'\)\)/);
   assert.match(src('listtable.js'), /if \(isCur\) pulse\(tr\)/); assert.match(src('library.js'), /if \(on\) pulse\(ev\.currentTarget\)/);
 });
 

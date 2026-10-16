@@ -66,6 +66,10 @@ export function fracsFromWidths(l, ids, widths) {
   ids.forEach((id, i) => { f[id] = Math.min(0.95, Math.max(0.01, (widths[i] / total) * keep)); }); return { ...l, fracs: f };
 }
 /** Sort state: click 1 ascending, click 2 descending, click 3 back to the playlist's own order. */
+/** 0.3.7 L27: while the layout is locked the sort order is locked too: a click / option changes nothing. Unlocking gives it all back. */
+export const sortAllowed = l => !l.locked;
+export const applySort = (l, cur, id) => (sortAllowed(l) ? nextSort(cur, id) : cur);
+export const SORT_LOCK_HINT = 'Sorting is locked while the queue is locked (click the padlock to unlock)';
 export function nextSort(cur, id) { if (!cur || cur.id !== id) return { id, dir: 'asc' }; if (cur.dir === 'asc') return { id, dir: 'desc' }; return null; }
 const keyOf = (c, q, i) => (c.id === 'num' ? i : c.kind === 'text' ? String(q[c.f] ?? '').toLocaleLowerCase() : Number(q[c.f] ?? -1));
 /** Returns the ORIGINAL indexes in display order (stable). */

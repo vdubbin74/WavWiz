@@ -2418,3 +2418,6 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .calrate-big{font-size:18px;letter-spacing:.04em;text-transform:uppercase;margin:4px 0}
 .calrun-meter{margin:6px 0} .calrun-meter .calmeter{flex:1;min-width:120px}
 .calvol{gap:10px;margin:6px 0}
+.listpanel th.sortlocked{cursor:not-allowed}.listpanel th.sortlocked .thl{opacity:.8}
+.plpicker .plp-sort{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;padding:4px 8px;border-radius:3px;cursor:pointer}
+.plpicker .plp-sort.on{color:var(--accent)}.plpicker .plp-sort:disabled{opacity:.45;cursor:not-allowed}.plp-sorth{margin-top:6px}

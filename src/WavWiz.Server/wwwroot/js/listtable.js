@@ -6,7 +6,7 @@ import { clearQueueFlow } from './queueclear.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
-import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes } from './plcols.js';
+import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
 export function listTable(S, ctl) {
@@ -49,8 +49,10 @@ export function listTable(S, ctl) {
     const box = h('div', { class: 'plpicker', role: 'menu', 'aria-label': 'Columns' }, h('div', { class: 'plp-h' }, 'COLUMNS', L.locked ? h('span', { class: 'plp-lock' }, 'locked') : null),
       ...PL_COLS.map(c => { const cb = h('input', { type: 'checkbox', 'data-col': c.id, checked: !L.hidden.includes(c.id), disabled: L.locked, onchange: () => { L = toggleCol(L, c.id); save(); buildHead(); draw(); cb.checked = !L.hidden.includes(c.id); } });
         return h('label', { class: 'plp-row' }, cb, c.pick); }),
+      h('div', { class: 'plp-h plp-sorth' }, 'SORT BY', L.locked ? h('span', { class: 'plp-lock' }, 'locked') : null),
+      ...[['', 'Queue order'], ...PL_COLS.filter(c => c.id !== 'num').map(c => [c.id, c.pick])].map(([id, lab]) => h('button', { type: 'button', class: 'plp-sort' + ((sort?.id || '') === id ? ' on' : ''), 'data-sort': id, disabled: L.locked, title: L.locked ? SORT_LOCK_HINT : '', onclick: () => { if (!sortAllowed(L)) return; sort = id ? (sort?.id === id && sort.dir === 'asc' ? { id, dir: 'desc' } : { id, dir: 'asc' }) : null; buildHead(); draw(); closePicker(); } }, lab)),
       h('button', { type: 'button', class: 'btn sm plp-reset', 'data-act': 'colreset', disabled: L.locked, onclick: () => { L = resetLayout(L, narrow); save(); buildHead(); draw(); closePicker(); } }, 'Reset columns'),
-      L.locked ? h('div', { class: 'plp-note' }, 'Unlock the layout to change columns.') : null);
+      L.locked ? h('div', { class: 'plp-note' }, 'Unlock the queue to change columns and sorting.') : null);
     document.body.append(box);
     const r = box.getBoundingClientRect(); box.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 6)) + 'px'; box.style.top = Math.max(4, Math.min(y, innerHeight - r.height - 6)) + 'px';
     setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escKey, true); }, 0);
@@ -60,10 +62,11 @@ export function listTable(S, ctl) {
     const lay = widthsFor(L, 1000); ids = lay.ids;
     colgroup.replaceChildren(...ids.map(() => h('col'))); thead.replaceChildren();
     ids.forEach((id, i) => {
-      const c = byId(id), th = h('th', { 'data-col': id, class: (id === 'num' ? 'num' : id === 'time' ? 'dur' : '') + (sort?.id === id ? ' sorted' : '') + (L.locked ? '' : ' movable'), 'aria-sort': sort?.id === id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none' },
+      const c = byId(id), th = h('th', { 'data-col': id, class: (id === 'num' ? 'num' : id === 'time' ? 'dur' : '') + (sort?.id === id ? ' sorted' : '') + (L.locked ? ' sortlocked' : ' movable'), 'aria-sort': sort?.id === id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none' },
         h('span', { class: 'thl' }, c.head), h('span', { class: 'sortar', 'aria-hidden': 'true' }, sort?.id === id ? (sort.dir === 'asc' ? '▲' : '▼') : ''));
+      if (L.locked) { th.setAttribute('aria-disabled', 'true'); th.title = SORT_LOCK_HINT; }
       th.addEventListener('contextmenu', ev => { ev.preventDefault(); openPicker(ev.clientX, ev.clientY); });
-      th.addEventListener('click', () => { if (th._drag) { th._drag = false; return; } sort = nextSort(sort, id); buildHead(); draw(); });
+      th.addEventListener('click', () => { if (th._drag) { th._drag = false; return; } if (!sortAllowed(L)) { toast(SORT_LOCK_HINT); return; } sort = applySort(L, sort, id); buildHead(); draw(); });
       if (!L.locked) th.addEventListener('pointerdown', ev => startReorder(ev, th, id));
       if (i < ids.length - 1) {
         const grip = h('span', { class: 'grip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': `Resize the ${c.pick} column`, tabindex: L.locked ? -1 : 0 });
