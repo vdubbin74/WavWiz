@@ -85,7 +85,6 @@ export function derive(t) {
     ...(pepe ? { '--amber': '#C07A4E', '--red': '#C07A4E', '--green': '#269B4D' } : {}),
     '--hot': hotFor(t),
     ...ledColors(t, accent, accent2),   // 0.3.6 K11: the EQ's live LED bars
-    '--lock-red': t.preset === 'pepecoin' ? '#C07A4E' : 'var(--red)',   // 0.3.2 F19: Lock EQ on = the theme's danger red; Pepecoin uses its copper
     '--accent': accent, '--accent2': accent2, '--hl': hl, '--hl-ink': readableOn(hl, pal), '--bg': bg,
     '--panel': panel, '--panel2': panel2, '--line': mix(bg, toward, light ? 0.18 : 0.2),
     '--ink': ink, '--dim': dim, '--accent-ink': readableOn(accent, pal), '--accent-soft': `rgba(${r},${g},${b},.16)`,

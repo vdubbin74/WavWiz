@@ -1426,11 +1426,11 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 /* ===== 0.2.3 U9: Lock EQ - checkbox with a padlock (EQ dialog header, Appearance > EQ preview); locked bands look slightly dimmed ===== */
 .eqlockbox{display:inline-flex;align-items:center;gap:6px;flex:none;padding:3px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--ink);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;white-space:nowrap;cursor:pointer}
 .eqlockbox input{margin:0;width:14px;height:14px}
-.eqlockbox:has(input:checked){border-color:color-mix(in srgb,var(--accent2) 70%,var(--line));color:var(--accent2-text,var(--accent2))}
+.eqlockbox:has(input:checked){border-color:color-mix(in srgb,var(--accent) 70%,var(--line));color:var(--accent-text,var(--accent))}
 .eqlockbox:has(input:disabled){opacity:.55;cursor:default}
 .eqlock-ic svg,.eqa-lock svg{width:14px;height:14px;display:block}
 dialog.eqdialog > header .eqlockbox{margin-right:6px}
-.eqa-lock{display:inline-flex;color:var(--accent2-text,var(--accent2))} .eqa-lock[hidden]{display:none}
+.eqa-lock{display:inline-flex;color:var(--accent-text,var(--accent))} .eqa-lock[hidden]{display:none}
 .eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip{cursor:default}
 /* U10: the real-EQ summary line (preset, pre-gain, loudness) on the Appearance > EQ preview */
 .eqreal-sum{margin:-2px 0 6px;color:var(--ink);font-family:var(--mono);font-size:11px}
@@ -1849,8 +1849,8 @@ dialog.settings-dlg>header{flex:none;flex-wrap:nowrap;min-height:44px}
 .eqarea.locked .eqa-plot,.eqarea.locked .eqchips{opacity:1;filter:none}
 .eqarea.locked .eqa-lock{display:none!important}
 .eqarea.locked .eqb,.eqarea.locked .eqn,.eqarea.locked .eqchip,.eqarea.locked .eqa-plot{cursor:not-allowed}
-.stage .vbtns .ib.ov-lock.on{color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));box-shadow:none;background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
-.eqlockbox:has(input:checked){color:var(--lock-red);border-color:color-mix(in srgb,var(--lock-red) 70%,var(--line));background:color-mix(in srgb,var(--lock-red) 12%,var(--panel2))}
+.stage .vbtns .ib.ov-lock.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:none;background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
+.eqlockbox:has(input:checked){color:var(--accent);border-color:color-mix(in srgb,var(--accent) 70%,var(--line));background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
 /* 0.3.2 F21: status tags on their own row directly under the volume bar, starting at the name's left edge */
 .dtagrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px;min-width:0;padding-left:var(--tagx,16px)}
 .dtagrow:not(:has(.dtag,.dkind svg,.dstate:not(:empty))){display:none}
@@ -2122,8 +2122,8 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 @media (min-width:901px){
   .desk.libexpanded{--rightw:clamp(380px,calc(25vw / var(--z,1)),520px)!important;--libw:calc(100% - var(--rightw) - 20px)!important}
   .desk.libexpanded .libswap{display:inline-flex}
-  .desk.libexpanded:not(.libdev) .listpanel{grid-area:1/3/2/4!important;display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;border-color:var(--accent)}
-  .desk.libexpanded:not(.libdev) .devpanel{display:none!important}
+  .desk.libexpanded:not(.libdev) .listpanel{grid-area:1/3/2/4!important;display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}
+  .desk.libexpanded:not(.libdev) .devpanel{display:flex!important;grid-area:1/4/3/5!important}   /* 0.3.8 L33: the collapsed Devices sleeve stays a real grid track */
   .desk.libexpanded.libdev .devpanel{grid-area:1/3/2/4!important}
   .desk.libexpanded.libdev .devpanel :is(.devbody,.devtitle,.devcount){display:revert!important}
   .desk.libexpanded.libdev .devpanel .devbody{display:block!important;overflow:auto}
@@ -2250,14 +2250,14 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 body.plcol-dragging{cursor:grabbing;user-select:none}
 .qtable th .grip.off{cursor:default;pointer-events:none;opacity:.35}
 /* the lock: theme-colored like the speaker-card status tags (.dtag.role) when unlocked; red (copper in Pepecoin) glow when locked */
-.listpanel .plus.pllock{border-color:var(--accent2);color:var(--accent2-text,var(--accent2));background:transparent}
-.listpanel .plus.pllock:hover{background:color-mix(in srgb,var(--accent2) 15%,transparent)}
-.listpanel .plus.pllock.on{border-color:var(--lock-red,var(--red));color:var(--lock-red,var(--red));box-shadow:0 0 8px var(--lock-red,var(--red)),inset 0 0 6px color-mix(in srgb,var(--lock-red,var(--red)) 35%,transparent);background:color-mix(in srgb,var(--lock-red,var(--red)) 12%,transparent)}
+.listpanel .plus.pllock{border-color:var(--line);color:var(--dim);background:transparent}
+.listpanel .plus.pllock:hover{background:var(--accent-soft);color:var(--ink)}
+.listpanel .plus.pllock.on{border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px var(--accent),inset 0 0 6px color-mix(in srgb,var(--accent) 35%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .plus.plpick{border-color:var(--accent);color:var(--accent-text,var(--accent));background:transparent}
 .plus.plpick:hover{background:color-mix(in srgb,var(--accent) 15%,transparent)}
 .plpicker{position:fixed;z-index:80;min-width:170px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.5);padding:6px 4px;display:flex;flex-direction:column;gap:1px;animation:k-fadein var(--glide-fade) var(--glide-ease) both}
 .plpicker .plp-h{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--accent2-text,var(--accent2));padding:2px 8px 6px;display:flex;gap:8px;align-items:center}
-.plpicker .plp-lock{color:var(--lock-red,var(--red));letter-spacing:.06em;text-transform:uppercase;font-size:9px;border:1px solid var(--lock-red,var(--red));border-radius:3px;padding:1px 4px}
+.plpicker .plp-lock{color:var(--accent);letter-spacing:.06em;text-transform:uppercase;font-size:9px;border:1px solid var(--accent);border-radius:3px;padding:1px 4px}
 .plpicker .plp-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:13px}
 .plpicker .plp-row:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .plpicker .plp-row input{accent-color:var(--accent)}
@@ -2297,8 +2297,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.libexpanded{row-gap:0!important}
   .desk.libexpanded .npbar{display:none!important}
   .desk.libexpanded .libpanel{grid-area:1/1/3/2!important}
-  .desk.libexpanded .minicol{display:block;grid-area:2/3/3/4;position:relative;z-index:3;border:1px solid var(--accent);border-top:0;border-radius:0 0 var(--radius) var(--radius);background:var(--panel);margin-top:-1px}
-  .desk.libexpanded:not(.libdev) .listpanel{border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom-color:var(--line)}
+  .desk.libexpanded .minicol{display:block;grid-area:2/3/3/4;position:relative;z-index:3;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);margin-top:0}
   .desk.libexpanded .minicol .mp{border:0;border-radius:0 0 var(--radius) var(--radius);background:transparent}
   /* K22: playlist expanded = the playlist uses the full center height; Now Playing is the mini player at the bottom right under Devices (Devices gets shorter) */
   .desk.listexpanded:not(.libexpanded):not(.devexpanded){grid-template-rows:minmax(0,1fr) auto!important;row-gap:10px}
@@ -2414,7 +2413,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .calrate,.calrate-big{font-weight:800}
 .calrate[data-rating=good],.calrate-big[data-rating=good]{color:var(--green)}
 .calrate[data-rating=weak],.calrate-big[data-rating=weak]{color:var(--accent2-text,var(--accent2))}
-.calrate[data-rating=quiet],.calrate-big[data-rating=quiet],.calrate-big[data-rating=silent]{color:var(--lock-red,var(--red))}
+.calrate[data-rating=quiet],.calrate-big[data-rating=quiet],.calrate-big[data-rating=silent]{color:var(--red)}
 .calrate-big{font-size:18px;letter-spacing:.04em;text-transform:uppercase;margin:4px 0}
 .calrun-meter{margin:6px 0} .calrun-meter .calmeter{flex:1;min-width:120px}
 .calvol{gap:10px;margin:6px 0}
@@ -2473,9 +2472,8 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 /* 0.3.7 L9 / L10 / L12 / L13: Library open: the '#' column shrinks (the title gets the room), the mini player is its OWN panel under the queue with the standard 10 px gap, no collapse arrow on the pinned queue */
 @media (min-width:901px){
   .desk.libexpanded{row-gap:10px!important}
-  .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--accent);border-radius:var(--radius);overflow:hidden}
+  .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .desk.libexpanded .minicol .mp{border:0;border-radius:var(--radius)}
-  .desk.libexpanded:not(.libdev) .listpanel{border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius);border-bottom-color:var(--line)}
   .desk.libexpanded .listpanel .listcolwrap{display:none}
   .desk.libexpanded .listpanel .qtable col:first-child{width:34px!important}
 }
@@ -2486,3 +2484,24 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{right:calc(100% + 8px);bottom:0;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);width:var(--minipop,420px)}
 }
 .eqall-preset{flex:0 1 280px;min-width:200px}.eqall-top .eqall-name{flex:0 1 190px;width:auto}
+
+/* ===== 0.3.8 ===== */
+/* L38: every lock follows the theme: accent when on, line / dim when off (no hard-coded red) */
+.eqpadlock:not(.on),.ov-lock:not(.on){color:var(--dim)}
+.eqpadlock.on,.ov-lock.on,.spklock.on{color:var(--accent-text,var(--accent))}
+.spklock{color:var(--dim)}
+@media (min-width:901px){
+  /* L33: the collapsed Devices sleeve stays a real 4th grid track while the Library is open (Queue stays in column 3) */
+  .desk.libexpanded:not(.libdev){--sleevew:30px;--libw:calc(100% - var(--rightw) - var(--sleevew) - 60px)!important;grid-template-columns:var(--libw) 0 var(--rightw) var(--sleevew)!important}
+  .desk.libexpanded:not(.libdev) .devpanel{cursor:pointer}
+  .desk.libexpanded:not(.libdev) .devpanel :is(.devbody,.devtitle,.devcount,.devexp){display:none!important}
+  /* L42: collapsed Devices bar runs the full height; the hover button sits inside it at the bottom */
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded){row-gap:0!important}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .devpanel{grid-area:1/3/3/4}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol{grid-area:1/3/3/4;align-self:end;justify-self:center;width:calc(100% - 4px);max-width:36px;min-width:26px;margin-bottom:5px;min-height:36px}
+  /* L41: no gap between the button and the floating player (invisible bridge) + 300 ms grace before it closes; opens instantly */
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol::after{content:'';position:absolute;right:100%;top:-8px;bottom:-8px;width:14px}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{opacity:0!important;visibility:hidden;pointer-events:auto!important;transition:opacity var(--glide-fade) var(--glide-ease) 300ms,visibility 0s linear calc(300ms + var(--glide-fade))}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:hover .mp,.desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:focus-within .mp{opacity:1!important;visibility:visible;transition:opacity var(--glide-fade) var(--glide-ease) 0s,visibility 0s}
+}
+@media (prefers-reduced-motion:reduce){ .desk .minicol .mp{transition-duration:0s,0s!important} }
