@@ -171,7 +171,8 @@ public static class ZoneApi
                 var refName = s.Zones.Zone(sess.ReferenceZoneId)?.Name ?? "Reference";
                 var plan = Calibration.CalPlan.Build(sess.ReferenceZoneId, refName, picked, (int)Math.Clamp(b.Long("runs") ?? 3, 1, 3));
                 s.Events.Publish("calmics");
-                _ = Task.Run(() => s.Cal.RunPcMic(sess, plan, Math.Clamp(b.Num("levelDb") ?? -20, -40, -6)));
+                if (b.Num("testVolume") is double tv) sess.TestVolume = Math.Clamp(tv, 0, 100);
+                _ = Task.Run(() => s.Cal.RunPcMic(sess, plan, Math.Clamp(b.Num("levelDb") ?? Calibration.CalibrationService.DefaultLevelDb, -40, -6)));
             }
             return Results.Json(new { id = sess.Id, mode = sess.Mode, secure = c.Request.IsHttps, referenceZoneId = sess.ReferenceZoneId, onlyZoneId = sess.OnlyZoneId, micName = sess.MicName, micBluetooth = sess.MicBluetooth, bluetoothWarning = sess.MicBluetooth ? WavWiz.Core.Calibration.MicKinds.BluetoothWarning : null });
         }).Req(Role.Control);
@@ -219,7 +220,7 @@ public static class ZoneApi
             var b = await c.Request.Body(); var kind = b.Str("kind") ?? "dev"; if (kind is not ("ref" or "dev" or "ref-end")) return Ext.Bad("kind must be ref, dev or ref-end");
             long zone = kind is "ref" or "ref-end" ? sess.ReferenceZoneId : b.Long("zoneId") ?? 0;
             if (kind == "dev" && sess.OnlyZoneId != null && zone != sess.OnlyZoneId) return Ext.Bad(AdminOnly("measure another device"), 403);
-            var (at, err) = s.Cal.Play(sess, zone, kind, Math.Clamp(b.Num("distanceM") ?? 0, 0, 20), Math.Clamp(b.Num("levelDb") ?? -20, -40, -6));
+            var (at, err) = s.Cal.Play(sess, zone, kind, Math.Clamp(b.Num("distanceM") ?? 0, 0, 20), Math.Clamp(b.Num("levelDb") ?? Calibration.CalibrationService.DefaultLevelDb, -40, -6));
             return err != null ? Ext.Bad(err, 409) : Results.Json(new { atUs = at, zoneId = zone, kind, patternMs = new ChirpPattern().LengthMs });
         }).Req(Role.Control);
 
@@ -228,7 +229,7 @@ public static class ZoneApi
             var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404);
             var b = await c.Request.Body();
             if (sess.OnlyZoneId != null && (b.Long("zoneId") ?? 0) != sess.OnlyZoneId) return Ext.Bad(AdminOnly("measure another device"), 403);
-            var (at, gap, err) = s.Cal.PlayPair(sess, b.Long("zoneId") ?? 0, Math.Clamp(b.Num("levelDb") ?? -20, -40, -6));
+            var (at, gap, err) = s.Cal.PlayPair(sess, b.Long("zoneId") ?? 0, Math.Clamp(b.Num("levelDb") ?? Calibration.CalibrationService.DefaultLevelDb, -40, -6));
             return err != null ? Ext.Bad(err, 409) : Results.Json(new { atUs = at, gapSec = gap, patternMs = new ChirpPattern().LengthMs });
         }).Req(Role.Control);
 
@@ -247,6 +248,8 @@ public static class ZoneApi
             return Results.Json(res);
         }).Req(Role.Control);
 
+        // 0.3.7 L20: the calibration test sound's own volume (the speaker's max-volume lock still caps it); live while a run waits at a pre-check
+        g.MapPut("/calibration/sessions/{id}/testvolume", async (string id, HttpContext c) => { var sess = s.Cal.Get(id); if (sess == null) return Ext.Bad("session expired - start again", 404); var b = await c.Request.Body(); sess.TestVolume = Math.Clamp(b.Num("testVolume") ?? sess.TestVolume, 0, 100); return Results.Json(new { ok = true, testVolume = sess.TestVolume }); }).Req(Role.Control);
         // 0.3.1 B3: guided calibration - Ready / Skip for the waiting speaker, Retry one speaker
         g.MapPost("/calibration/sessions/{id}/guide", async (string id, HttpContext c) =>
         {

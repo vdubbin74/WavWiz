@@ -194,7 +194,7 @@ async function run(started) {
       try {
         try { off = await syncClock(); } catch (e) { if (e instanceof CalError && e.code === 'CLOCK_UNSTABLE') throw new CalError('WIFI_UNSTABLE', e.detail); throw e; }
         rec.start(); await sleep(400);
-        let play; try { play = await call(`/calibration/sessions/${sid}/play`, { method: 'POST', body: { kind: r.kind, zoneId: r.zone, distanceM: 0, levelDb: -20 } }); } catch (e) { throw new CalError('SESSION_FAILED', e.message); }
+        let play; try { play = await call(`/calibration/sessions/${sid}/play`, { method: 'POST', body: { kind: r.kind, zoneId: r.zone, distanceM: 0, levelDb: -12 } }); } catch (e) { throw new CalError('SESSION_FAILED', e.message); }
         order('play-requested');
         const serverNow = () => performance.now() * 1000 + off.offsetUs;
         const until = Date.now() + Math.max(0, (play.atUs - serverNow()) / 1000) + play.patternMs + 1500;

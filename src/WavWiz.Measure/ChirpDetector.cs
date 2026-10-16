@@ -8,12 +8,14 @@ public static class CalQuality
     public static double SnrDb(double ratio) => double.IsFinite(ratio) && ratio > 0 ? 20 * Math.Log10(ratio) : -120;
     public static double Clamp01(double v) => double.IsFinite(v) ? Math.Clamp(v, 0, 1) : 0;
     public static double FromRatio(double ratio) => Clamp01((SnrDb(ratio) - 12) / 20);
+    /// <summary>Time-domain signal-to-noise (dB, peak of the test sound over the quiet-room noise): 6 dB -> 0, 30 dB -> 1.</summary>
+    public static double FromTime(double snrDb) => Clamp01((snrDb - 6) / 24);
     public static int Pct(double c) => (int)Math.Round(Clamp01(c) * 100);
     /// <summary>good / weak / quiet from the recording's peak level and the pattern's quality (the same words the pre-check shows).</summary>
     public static string Rate(double peakDb, double quality) => peakDb < -50 ? "quiet" : quality >= 0.5 ? "good" : quality > 0 ? "weak" : "quiet";
 }
 
-public sealed record PatternHit(double StartSec, double SpreadMs, double Confidence, int ChirpsFound, string? Warning, double Quality = 0, double PeakDb = -120, double RmsDb = -120)
+public sealed record PatternHit(double StartSec, double SpreadMs, double Confidence, int ChirpsFound, string? Warning, double Quality = 0, double PeakDb = -120, double RmsDb = -120, double NoiseDb = -120, double SnrDb = 0)
 {
     public bool Found => ChirpsFound >= 5 && Confidence >= 4;
 }
@@ -105,7 +107,12 @@ public sealed class ChirpDetector
         else if (peak < 0.003) warn = "recording is very quiet - move the phone closer";
         double ss = 0; foreach (var v in rec) ss += (double)v * v;
         double rmsDb = rec.Length == 0 ? -120 : 10 * Math.Log10(Math.Max(1e-12, ss / rec.Length)), peakDb = 20 * Math.Log10(Math.Max(1e-6, peak));
-        return new PatternHit(med / ChirpPattern.SampleRate, spread, conf, est.Count, warn, CalQuality.FromRatio(conf), peakDb, rmsDb);
+        // 0.3.7 L25: what a person can act on - how far the test sound stands above the room/mic noise AT THE MIC (peak vs the quiet blocks of the same recording).
+        // The matched filter alone finds a chirp 30 dB below the noise, so a far, quiet mic still "found it" while timing jittered; this keeps distance visible.
+        var blocks = new List<double>(); for (int b = 0; b + 2400 <= rec.Length; b += 2400) { double e = 0; for (int k = b; k < b + 2400; k++) e += (double)rec[k] * rec[k]; blocks.Add(e / 2400); }
+        blocks.Sort(); double noiseDb = blocks.Count == 0 ? -120 : 10 * Math.Log10(Math.Max(1e-12, blocks[blocks.Count / 4])), snr = peakDb - noiseDb;
+        double quality = Math.Min(CalQuality.FromRatio(conf), CalQuality.FromTime(snr));
+        return new PatternHit(med / ChirpPattern.SampleRate, spread, conf, est.Count, warn, quality, peakDb, rmsDb, noiseDb, snr);
     }
 
     /// <summary>Same-recording mode: two patterns (reference, then device) in ONE capture, <paramref name="gapSec"/> apart.</summary>

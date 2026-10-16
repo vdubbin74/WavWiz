@@ -171,7 +171,9 @@ public sealed record DspConfig(string OutputDeviceId, long Revision, bool Bypass
 /// <summary>action = play-pattern: play the calibration chirp pattern on the active output at server time AtUs (saved offset 0, EQ bypassed).
 /// 0.2.5 PC-mic calibration (older players ignore these actions): mic-list (answer with the mics), mic-record (record MicId from server time AtUs
 /// to ToUs and send it back as mic-data parts tagged Req), mic-level (live input meter for MicId; LevelDb > 0 = on, else off; stops by itself after 60 s).</summary>
-public sealed record CalCmd(string Action, string SessionId, long AtUs, double LevelDb = -20, string? Label = null, string? MicId = null, long ToUs = 0, string? Req = null);
+public sealed record CalCmd(string Action, string SessionId, long AtUs, double LevelDb = -20, string? Label = null, string? MicId = null, long ToUs = 0, string? Req = null, double TestVolume = -1);
+// 0.3.7 L20: TestVolume (0-100, play-pattern only): the Player plays the test sound at THIS volume (its normal zone volume is restored afterwards) - the zone's own volume used to scale the test sound
+// down by up to 50 dB. The server has already applied the zone's max-volume lock to it. -1 = leave the zone volume alone (older servers).
 /// <summary>0.2.5 adds the PC-mic replies: Status mic-list (Mics), mic-level (PeakDb), mic-data (Req, Part of Parts, StartServerUs of the recording's first sample,
 /// Rate, Pcm16 = base64 little-endian 16-bit mono), mic-error (Req, Note).</summary>
 public sealed record CalResult(string SessionId, string Status, string? Note, string? Req = null, int Part = 0, int Parts = 0, long StartServerUs = 0, int Rate = 0,

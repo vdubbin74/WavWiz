@@ -27,6 +27,8 @@ public sealed class CalSession
     public readonly List<string> Notes = new();
     /// <summary>0.3.7 L24: speakers that stayed silent after every retry (name), and the per-attempt measurements (L25: snr / peak / rms) for the log and the live meter.</summary>
     public readonly List<string> Silent = new(); public readonly List<object> Attempts = new();
+    /// <summary>0.3.7 L20: the test sound's own volume (percent); each speaker's max-volume lock caps it.</summary>
+    public double TestVolume = 85;
     public long RunSeq;
     public List<Proposal>? Proposals;
     public readonly object L = new();
@@ -59,6 +61,7 @@ public sealed class CalibrationService
     private readonly Db _db; private readonly IMonotonicClock _clock; private readonly ZoneManager _zones; private readonly AudioHost _host; private readonly EventHub _ev;
     private readonly ConcurrentDictionary<string, CalSession> _sessions = new();
     private readonly ChirpDetector _det = new();
+    public const double DefaultLevelDb = -12;
     public const long LeadUs = 1_500_000;
     public const double PairGapSec = 5.0;
 
@@ -93,7 +96,7 @@ public sealed class CalibrationService
 
     public object Progress(CalSession s)
     {
-        lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(), silent = s.Silent.ToList(), attempts = s.Attempts.TakeLast(30).ToList(),
+        lock (s.L) return new { id = s.Id, mode = s.Mode, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, error = s.Error, log = s.Log.TakeLast(40).ToList(), silent = s.Silent.ToList(), testVolume = s.TestVolume, attempts = s.Attempts.TakeLast(30).ToList(),
             proposals = s.Proposals, messages = s.Phase == "done" ? s.Notes.ToList() : null, guided = s.Guided, skipped = s.Skipped.ToList(),
             prompt = s.Phase == "waiting" && s.Prompt is { } gp ? new { step = gp.Step, steps = gp.Steps, zoneId = gp.ZoneId, name = gp.Name, kind = gp.Kind, text = gp.Text, canSkip = gp.CanSkip } : null, micName = s.MicName, micBluetooth = s.MicBluetooth, micDevice = s.MicDevice, referenceZoneId = s.ReferenceZoneId };
     }
@@ -116,6 +119,9 @@ public sealed class CalibrationService
         Report(s, phase: "running", step: 0, steps: plan.Count, label: "Starting", log: retry ? "Measuring again" : $"Listening with {s.MicName}{(s.MicBluetooth ? " (Bluetooth - results may be off)" : "")}");
         int heard = 0, refHeard = 0; var ct = s.Cancel.Token;
         var groups = GuideGroups(plan);
+        // 0.3.7 L22: the live mic level meter stays on for the WHOLE run (it switches itself off after 60 s, so it is renewed) and is shown on the progress screen
+        var micPs = s.MicPlayerId != null ? _host.Get(s.MicPlayerId) : null; using var meterCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (micPs != null && s.MicId != null) { broker.Level(micPs, s.MicId, true); _ = Task.Run(async () => { try { while (!meterCts.IsCancellationRequested) { await Task.Delay(40_000, meterCts.Token); broker.Level(micPs, s.MicId!, true); } } catch { } }); }
         try
         {
             int i = 0;
@@ -132,6 +138,23 @@ public sealed class CalibrationService
                         Report(s, phase: "running", step: i += grp.Steps.Count, log: $"{grp.Name}: skipped (delay unchanged)"); continue;
                     }
                     Report(s, phase: "running");
+                    // 0.3.7 L22: a pre-check at EVERY spot, before any measurement: one test sound, rated good / weak / too quiet, with retry, skip or continue anyway
+                    bool skipGroup = false;
+                    for (int chk = 0; !ct.IsCancellationRequested; chk++)
+                    {
+                        Report(s, phase: "running", label: $"Checking the microphone at {grp.Name}");
+                        var (cres, cack) = await TryOnce(s, broker, grp.Steps[0], "pre", levelDb, LeadUs + (chk > 0 ? 1_000_000 : 0), $"{grp.Name} (check)", ct);
+                        var rating = cres.Ok ? CalQuality.Rate(cres.PeakDb, cres.Confidence) : "quiet";
+                        Report(s, log: $"{grp.Name}: check {rating}: snr {cres.SnrDb:0.0} dB, mic peak {cres.PeakDb:0.0} dBFS, rms {cres.RmsDb:0.0} dBFS, quality {CalQuality.Pct(cres.Confidence)}%");
+                        if (rating == "good") break;
+                        var capped = _zones.VolCapOf(grp.ZoneId) is { Locked: true, Cap: double cp } && cp < s.TestVolume - 0.01 ? $" This speaker's max volume is locked at {cp:0}%, which limits the test sound." : "";
+                        var guide = (rating == "weak" ? $"{grp.Name}: the test sound is weak at the microphone ({cres.SnrDb:0} dB above the room noise). Move the microphone closer to the speaker (about 3 ft), or raise the test volume." : $"{grp.Name}: the test sound is too quiet to measure (mic peak {cres.PeakDb:0} dBFS, {cres.SnrDb:0} dB above the room noise). Move the microphone closer to the speaker, raise the test volume, raise the mic's input level in Windows (Sound settings > Input > Properties > Levels), or check that this speaker is on and turned up.") + capped;
+                        var ans = await WaitReady(s, new GuidePrompt(gi + 1, groups.Count, grp.ZoneId, grp.Name, rating, guide, grp.Kind == "dev"), ct);
+                        if (ans == "skip" && grp.Kind == "dev") { lock (s.L) s.Skipped.Add(grp.ZoneId); Report(s, phase: "running", step: i += grp.Steps.Count, log: $"{grp.Name}: skipped (delay unchanged)"); skipGroup = true; break; }
+                        if (ans == "continue") { Report(s, phase: "running", log: $"{grp.Name}: continuing with a {rating} signal"); break; }
+                        Report(s, phase: "running", log: $"{grp.Name}: checking again");
+                    }
+                    if (skipGroup) continue;
                 }
                 for (int round = 0; ; round++)
                 {
@@ -188,6 +211,26 @@ public sealed class CalibrationService
         }
         catch (OperationCanceledException) { Report(s, phase: "canceled", label: "Canceled"); }
         catch (Exception e) { Report(s, phase: "failed", error: e.Message, log: "stopped: " + e.Message); }
+        finally { meterCts.Cancel(); if (micPs != null && s.MicId != null) { try { broker.Level(micPs, s.MicId, false); } catch { } } }
+    }
+
+    /// <summary>One test sound on one speaker, recorded and analysed (used by the L22 pre-check). The result carries the raw SNR / level numbers.</summary>
+    private async Task<(RunResult Res, string? Ack)> TryOnce(CalSession s, PcMicBroker broker, PlanStep st, string kind, double levelDb, long leadUs, string label, CancellationToken ct)
+    {
+        var mic = _host.Get(s.MicPlayerId!) ?? throw new InvalidOperationException("the PC with the microphone went offline");
+        var req = Guid.NewGuid().ToString("N")[..12]; broker.ExpectAck(req);
+        var (at, err) = Play(s, st.ZoneId, kind, 0, levelDb, req, leadUs);
+        if (err != null) return (new RunResult(st.ZoneId.ToString(), kind, false, null, 0, err), null);
+        var ack = await broker.WaitAck(req, TimeSpan.FromMilliseconds(1200), ct);
+        if (PcMicBroker.AckProblem(ack)) { s.Pending.TryRemove($"{st.ZoneId}:{kind}", out _); return (new RunResult(st.ZoneId.ToString(), kind, false, null, 0, "its player could not start the sound (" + ack + ")"), ack); }
+        long from = at - 500_000, to = at + (long)(new ChirpPattern().LengthMs * 1000) + 1_800_000;
+        var rec = await broker.Record(mic, s.Id, s.MicId!, from, to, label, _clock.NowUs, ct);
+        if (rec.Mono.Length == 0 || WavWiz.Core.Calibration.MicPcm.PeakDb(rec.Mono) <= -90) throw new InvalidOperationException("the microphone is silent - check that it is plugged in, not muted, and allowed in Windows privacy settings");
+        var res = Capture(s, st.ZoneId, kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
+        var rating = res.Ok ? CalQuality.Rate(res.PeakDb, res.Confidence) : "quiet";
+        lock (s.L) s.Attempts.Add(new { label, zoneId = st.ZoneId, attempt = 0, check = true, ok = res.Ok, snrDb = Math.Round(res.SnrDb, 1), peakDb = Math.Round(res.PeakDb, 1), rmsDb = Math.Round(res.RmsDb, 1), quality = Math.Round(res.Confidence, 2), rating });
+        _ev.Publish("calattempt", new { sessionId = s.Id, label, check = true, ok = res.Ok, snrDb = res.SnrDb, peakDb = res.PeakDb, rmsDb = res.RmsDb, quality = res.Confidence, rating });
+        return (res, ack);
     }
 
     /// <summary>0.3.1 B3: one group per speaker visit: consecutive plan steps on the same speaker and kind (reference, each speaker, the reference again).</summary>
@@ -216,7 +259,7 @@ public sealed class CalibrationService
     /// <summary>B3: the page's answer to the waiting prompt. Phone runs (no server gate) report a skip so the summary lists it.</summary>
     public string? Guide(CalSession s, string action, long? zoneId)
     {
-        if (action is not ("ready" or "skip")) return "action must be ready or skip";
+        if (action is not ("ready" or "skip" or "continue")) return "action must be ready, skip or continue";
         TaskCompletionSource<string>? g; GuidePrompt? p; lock (s.L) { g = s.Gate; p = s.Prompt; }
         if (g != null)
         {
@@ -276,8 +319,16 @@ public sealed class CalibrationService
         long at = _clock.NowUs + (leadUs > 0 ? leadUs : LeadUs);
         long run = Interlocked.Increment(ref s.RunSeq);
         s.Pending[$"{zoneId}:{kind}"] = (zoneId, at, distanceM, kind, run);
-        ps.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, kind, Req: req));
+        ps.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, kind, Req: req, TestVolume: EffectiveTestVolume(s, zoneId)));
         return (at, null);
+    }
+
+    /// <summary>0.3.7 L20: the volume the test sound plays at on this zone: the session's test volume, never above the zone's locked max-volume cap (said once in the notes).</summary>
+    public double EffectiveTestVolume(CalSession s, long zoneId)
+    {
+        double want = Math.Clamp(s.TestVolume, 0, 100), v = VolumeCap.Apply(want, _zones.VolCapOf(zoneId));
+        if (v < want - 0.01) { var note = $"{_zones.Zone(zoneId)?.Name ?? "A speaker"}'s max volume is locked at {v:0}%, so its test sound cannot be louder than that. Raise the lock, or move the microphone closer."; lock (s.L) if (!s.Notes.Contains(note)) s.Notes.Add(note); }
+        return v;
     }
 
     /// <summary>Same-recording mode: reference at T, device at T + gap, one recording.</summary>
@@ -288,8 +339,8 @@ public sealed class CalibrationService
         Quiet(s);
         long at = _clock.NowUs + LeadUs;
         s.Pending[$"{deviceZoneId}:pair"] = (deviceZoneId, at, 0, "pair", Interlocked.Increment(ref s.RunSeq));
-        rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, "reference"));
-        dp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at + (long)(PairGapSec * 1e6), levelDb, "device"));
+        rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at, levelDb, "reference", TestVolume: EffectiveTestVolume(s, s.ReferenceZoneId)));
+        dp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at + (long)(PairGapSec * 1e6), levelDb, "device", TestVolume: EffectiveTestVolume(s, deviceZoneId)));
         return (at, PairGapSec, null);
     }
 
@@ -301,8 +352,9 @@ public sealed class CalibrationService
         var dp = SessionOfZone(deviceZoneId, out var e2); if (dp == null) return (0, e2);
         candidateMs = Math.Clamp(candidateMs, 0, 1500);
         long at = _clock.NowUs + LeadUs;
-        rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", "ear", at, levelDb, "reference"));
-        dp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", "ear", at - (long)(candidateMs * 1000), levelDb, "device"));
+        var ev = session ?? new CalSession();
+        rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", "ear", at, levelDb, "reference", TestVolume: EffectiveTestVolume(ev, referenceZoneId)));
+        dp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", "ear", at - (long)(candidateMs * 1000), levelDb, "device", TestVolume: EffectiveTestVolume(ev, deviceZoneId)));
         return (at, null);
     }
 
@@ -327,18 +379,18 @@ public sealed class CalibrationService
             double off = LatencyMath.SameRecordingOffsetMs(a.StartSec, b.StartSec, PairGapSec);
             double pq = Math.Min(a.Quality, b.Quality);
             lock (s.L) s.Runs.Add((zoneId, "pair", off, pq));
-            return new RunResult(zoneId.ToString(), kind, true, off, pq, null, CalQuality.SnrDb(Math.Min(a.Confidence, b.Confidence)), Math.Min(a.PeakDb, b.PeakDb), Math.Min(a.RmsDb, b.RmsDb));
+            return new RunResult(zoneId.ToString(), kind, true, off, pq, null, Math.Min(a.SnrDb, b.SnrDb), Math.Min(a.PeakDb, b.PeakDb), Math.Min(a.RmsDb, b.RmsDb));
         }
         var hit = _det.Find(mono48k);
         if (!hit.Found) return Fail(s, zoneId, kind, hit, $"could not hear the test sound ({hit.ChirpsFound}/8 chirps){(hit.Warning != null ? ": " + hit.Warning : "")} - turn the speaker up, move the phone closer, or quieten the room");
         double arrival = startServerUs + hit.StartSec * 1e6;
         double raw = LatencyMath.RawLatencyMs(arrival, p.AtUs, p.Distance);
         lock (s.L) s.Runs.Add((zoneId, kind, raw, hit.Quality));
-        return new RunResult(zoneId.ToString(), kind, true, raw, hit.Quality, hit.Warning, CalQuality.SnrDb(hit.Confidence), hit.PeakDb, hit.RmsDb);
+        return new RunResult(zoneId.ToString(), kind, true, raw, hit.Quality, hit.Warning, hit.SnrDb, hit.PeakDb, hit.RmsDb);
     }
 
     private RunResult Fail(CalSession s, long zoneId, string kind, string note) { lock (s.L) s.Notes.Add(note); return new RunResult(zoneId.ToString(), kind, false, null, 0, note); }
-    private RunResult Fail(CalSession s, long zoneId, string kind, PatternHit hit, string note) { lock (s.L) s.Notes.Add(note); return new RunResult(zoneId.ToString(), kind, false, null, 0, note, CalQuality.SnrDb(hit.Confidence), hit.PeakDb, hit.RmsDb); }
+    private RunResult Fail(CalSession s, long zoneId, string kind, PatternHit hit, string note) { lock (s.L) s.Notes.Add(note); return new RunResult(zoneId.ToString(), kind, false, null, 0, note, hit.SnrDb, hit.PeakDb, hit.RmsDb); }
 
     /// <summary>Median of the runs per speaker, offsets relative to the reference, reference drift check (spec 8.6).</summary>
     public (List<Proposal> Proposals, List<string> Messages) Finish(CalSession s)
@@ -388,11 +440,12 @@ public sealed class CalibrationService
             var act = z.Outputs.FirstOrDefault(o => o.Active); if (act == null) continue;
             double prop = Math.Round(Math.Clamp(refLatency + r.Offset + shift, 0, 2000), 1);
             {
-                var zr = runs.Where(x => x.Zone == r.Zone).ToList(); double q = zr.Count == 0 ? 0 : zr.Average(x => x.Conf);
+                var zr = runs.Where(x => x.Zone == r.Zone).ToList(); double q = zr.Count == 0 ? 0 : zr.Average(x => CalQuality.Clamp01(x.Conf));   // per-test qualities are 0..1 (L26)
+                double overall = CalQuality.Clamp01(r.Conf * (0.4 + 0.6 * q));      // overall = timing agreement x signal quality: a quiet recording can no longer look 92% sure
                 string? why = r.Warn;
-                if (r.Conf < 0.4 && why == null) why = q >= 0.5 ? $"The test sound was loud and clear, but its timing varied by {r.Spread:0} ms between the runs, so the delay is uncertain. A wired PC mic can have uneven capture timing; try again with the mic nearer and the room quiet."
+                if (overall < 0.4 && why == null) why = q >= 0.5 ? $"The test sound was loud and clear, but its timing varied by {r.Spread:0} ms between the runs, so the delay is uncertain. A wired PC mic can have uneven capture timing; try again with the mic nearer and the room quiet."
                     : "The test sound was weak at the microphone - turn the speaker or the mic's Windows input level up, or move the mic closer.";
-                props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(CalQuality.Clamp01(r.Conf), 2), why, r.Conf >= 0.4));
+                props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(overall, 2), why, overall >= 0.4));
             }
         }
         if (shift > 0.5 && refZone?.Outputs.FirstOrDefault(o => o.Active) is { } ra && !props.Any(p => p.ZoneId == refZone.Id))

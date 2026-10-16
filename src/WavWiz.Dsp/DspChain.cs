@@ -41,6 +41,7 @@ public sealed class DspChain : IAudioProcessor
     public long LatencyUs => 0;
     public DspPreset Preset => _preset;
     public double VolumePercent => _volumePercent;
+    public bool Muted => _muted;
 
     /// <summary>Apply a preset (builds coefficients here, off the audio thread).</summary>
     public void SetPreset(DspPreset p)

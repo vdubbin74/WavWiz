@@ -284,18 +284,19 @@ public sealed class PlayerClient : IAsyncDisposable
         _calRestore?.Cancel();
         var pat = new ChirpPattern(c.LevelDb);
         // 0.3.7 L24: remember the real EQ-bypass setting once - a second pattern within 20 s used to read the bypass the FIRST pattern had set and leave the EQ off for good
-        if (!_patternActive) { _bypassBefore = _dsp.Preset.Bypass; _patternActive = true; }
+        if (!_patternActive) { _bypassBefore = _dsp.Preset.Bypass; _volBefore = c.TestVolume >= 0 ? _dsp.VolumePercent : -1; _mutedBefore = _dsp.Muted; _patternActive = true; }
+        if (c.TestVolume >= 0) { _dsp.SetMuted(false); _dsp.SetVolume(c.TestVolume); }      // L20: the test sound has its own volume, never the (maybe tiny) zone volume
         _dsp.SetBypass(true);                         // EQ off for the click test; trim + limiter stay (spec 8.5)
         // 0.3.7 L24: say whether this Player can really play it: the clock must be synced (without it the engine never plays the sound) and the start must still be ahead
         bool clockOk = _clock.IsValid; long leadMs = clockOk ? (c.AtUs - _clock.ToServerUs(_o.Clock.NowUs)) / 1000 : 0;
         string ack = !clockOk ? "no-clock" : leadMs < 150 ? $"late={leadMs}" : $"ok;lead={leadMs}";
         _engine.PlayTestSignal(pat.Signal, c.AtUs);
         var cts = _calRestore = new CancellationTokenSource();
-        _ = Task.Delay(TimeSpan.FromSeconds(20), cts.Token).ContinueWith(t => { if (!t.IsCanceled) { _engine.ClearTestSignal(); _dsp.SetBypass(_bypassBefore); _patternActive = false; } });
+        _ = Task.Delay(TimeSpan.FromSeconds(20), cts.Token).ContinueWith(t => { if (!t.IsCanceled) { _engine.ClearTestSignal(); _dsp.SetBypass(_bypassBefore); if (_volBefore >= 0) { _dsp.SetVolume(_volBefore); _dsp.SetMuted(_mutedBefore); } _patternActive = false; } });
         Say($"calibration pattern scheduled ({c.Label}): {ack}");
         if (c.Req != null) _ = SendCalAsync(new CalResult(c.SessionId, "pattern-ack", ack, c.Req));
     }
-    private bool _patternActive, _bypassBefore;
+    private bool _patternActive, _bypassBefore, _mutedBefore; private double _volBefore = -1;
 
     // ---------- player -> server ----------
     public Task SendOutputsAsync(string reason)

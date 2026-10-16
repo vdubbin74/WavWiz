@@ -100,7 +100,7 @@ public class Release025CalibrationTests
         await WaitUntil(() => Phase() == "waiting", 20000, "retry prompt"); Assert.Equal(devId, st.GetProperty("prompt").GetProperty("zoneId").GetInt64());
         before = micDev.Recordings; await Answer("ready");
         await WaitUntil(() => Phase() is "done" or "failed" && st.GetProperty("proposals").ValueKind == JsonValueKind.Array, 30000, "retry done");
-        Assert.Equal(before + 1, micDev.Recordings);
+        Assert.Equal(before + 2, micDev.Recordings);                                    // 0.3.7 L22: the pre-check at that spot, then the measurement
         var prop = st.GetProperty("proposals").EnumerateArray().Single(p => p.GetProperty("zoneId").GetInt64() == devId);
         Assert.InRange(prop.GetProperty("proposedLatencyMs").GetDouble(), 52 - 15 - 2.5, 52 - 15 + 2.5);
         Assert.DoesNotContain(st.GetProperty("messages").EnumerateArray(), m => m.GetString()!.StartsWith("Skipped"));
