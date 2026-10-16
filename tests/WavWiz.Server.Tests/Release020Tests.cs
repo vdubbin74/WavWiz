@@ -152,9 +152,10 @@ public class Release020Tests
         (await admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{id}/play", new { kind = "dev", zoneId = idb })).EnsureSuccessStatusCode();
         Assert.Equal(Playback.PlayState.Paused, cond.State);                       // ...the next chirp pauses it again
         var end = await (await admin.PostAsync($"/api/v1/calibration/sessions/{id}/end", null)).Json();
-        Assert.True(end.GetProperty("resumed").GetBoolean()); Assert.Equal(Playback.PlayState.Playing, cond.State);
+        Assert.True(end.GetProperty("canResume").GetBoolean()); Assert.False(end.GetProperty("resumed").GetBoolean()); Assert.Equal(Playback.PlayState.Paused, cond.State);   // 0.3.7 L21: stays paused, Resume is offered
+        (await admin.PostAsync("/api/v1/stream/resume", null)).EnsureSuccessStatusCode(); Assert.Equal(Playback.PlayState.Playing, cond.State);
         var again = await (await admin.PostAsync($"/api/v1/calibration/sessions/{id}/end", null)).Json();
-        Assert.False(again.GetProperty("resumed").GetBoolean());                  // ending twice never double-resumes
+        Assert.False(again.GetProperty("canResume").GetBoolean());                  // ending twice never double-resumes
     }
 
     [Fact]

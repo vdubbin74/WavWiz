@@ -316,7 +316,7 @@ function results(fin, failed, retry) {
       h('tbody', null, props.map(p => h('tr', null,
         h('td', null, h('input', { type: 'checkbox', checked: p.commit, disabled: !p.commit, 'aria-label': 'Save ' + p.zoneName, onchange: ev => pick.set(p.zoneId, ev.target.checked) })),
         h('td', null, p.zoneName, p.warning ? h('div', { class: 'small warn-t', text: p.warning }) : null),
-        h('td', { class: 'mono accent', text: `${Math.round(p.proposedLatencyMs)} ms` }), h('td', { class: 'mono', text: `${Math.round(p.confidence * 100)}%` }),
+        h('td', { class: 'mono accent', text: `${Math.round(p.proposedLatencyMs)} ms` }), h('td', { class: 'mono', text: (Number.isFinite(p.confidence) ? Math.max(0, Math.min(100, Math.round(p.confidence * 100))) + '%' : '—') }),
         h('td', null, retry ? h('button', { class: 'btn ghost small retry', onclick: () => retry(p.zoneId) }, 'Retry') : null)))))
       : h('p', { class: 'err-t', text: 'Nothing could be measured.' }),
     (fin.messages || []).length ? h('ul', { class: 'notes' }, fin.messages.map(m => h('li', { text: m }))) : null,

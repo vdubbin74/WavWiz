@@ -1,0 +1,35 @@
+const hoverItem = async (p, top, label) => { await p.click(`.menubar .mtop:text-is("${top}")`); const it = p.locator(`.menubar .mgroup.open > .mpanel > .msub > button:text-is("${label}"), .menubar .mgroup.open > .mpanel > button:text-is("${label}")`).first(); await it.hover(); await p.waitForTimeout(450); return it; };
+  // 0.3.7: every EQ entry point -> the ONE center EQ (never the old Sound popup), on the shared glide + pulse
+  await step('EQ entry points', async () => {
+    for (const [vpn, vopt] of VPS) {
+      const { ctx, p } = await newPage(vopt); const phone = vpn === 'iphone';
+      const fresh = async (pan) => { await p.goto(B + '/'); await p.evaluate(([v]) => { localStorage.setItem('wavwiz.center.v1', 'viz'); localStorage.setItem('wavwiz.center.migrated030', '1'); if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, [pan]); await p.goto(B + '/'); await p.waitForTimeout(2200); await closeDlg(p); };
+      const check = async (name) => {
+        await p.waitForTimeout(700);
+        const r = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), title: document.querySelector('dialog[open] h2,dialog[open] header')?.textContent || '',
+          eq: !!document.querySelector('.np-stage.eqmode'), eqv: !!document.querySelector('.np-stage .eqv, .np-stage .ceq, .np-stage canvas.eqcanvas, .np-stage [class*=eq]'), pulsed: !!document.querySelector('.np-stage.k-pulse, .np-stage[data-eqfront]'),
+          vis: (() => { const s = document.querySelector('.np-stage'); if (!s) return false; const b = s.getBoundingClientRect(); return b.width > 20 && b.height > 20 && b.bottom > 0 && b.top < innerHeight; })() }));
+        ok(`EQ[${vpn}] ${name}: center EQ, no Sound popup, visible, pulsed`, !r.dlg && r.eq && r.vis && r.pulsed, JSON.stringify(r));
+        await p.screenshot({ path: `/workspace/screens/wavwiz-037-${ENG}-eq-${vpn}-${name.replace(/\W+/g, '')}.png` });
+      };
+      // every EQ button in the Now Playing panel (bar, full panel, control strip)
+      await fresh(NORMAL);
+      const n = await p.evaluate(() => document.querySelectorAll('.eqbtn').length); ok(`EQ[${vpn}] Now Playing has EQ buttons`, n >= 1, n);
+      for (let i = 0; i < n; i++) {
+        await fresh(NORMAL);
+        const vis = await p.evaluate(i => { const b = [...document.querySelectorAll('.eqbtn')][i]; return !!(b && b.getClientRects().length); }, i);
+        if (!vis) continue;
+        await p.evaluate(i => [...document.querySelectorAll('.eqbtn')][i].click(), i); await check('button' + i);
+      }
+      if (!phone) {   // from an expanded Library / Devices / Queue the EQ button (and the menu) must collapse it and bring the center EQ forward
+        for (const [nm, pan] of [['lib', { lib: 'normal', dev: 'normal', exp: 'lib', list: 'open', ctl: 'open' }], ['dev', { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'open' }]]) {
+          await fresh(pan); const ok1 = await p.evaluate(() => { const b = [...document.querySelectorAll('.eqbtn')].find(b => b.getClientRects().length); if (b) b.click(); return !!b; });
+          if (ok1) { await check(`from-${nm}-expanded`); ok(`EQ[${vpn}] expanded ${nm} collapsed`, !(await p.evaluate(() => document.querySelector('.desk')?.className || '')).includes(nm + 'expanded')); }
+        }
+        await fresh(NORMAL); await go(p, 'eq'); await check('go-eq');
+        await fresh(NORMAL); await p.evaluate(() => window.dispatchEvent(new Event('resize')));
+        try { await hoverItem(p, 'Playback', 'Sound / EQ'); await p.evaluate(() => { const o = [...document.querySelectorAll('.menubar .msub.open > .mpanel button')].find(b => /Open the EQ/.test(b.textContent)); o?.click(); }); await check('menu-open-the-eq'); } catch (e) { ok(`EQ[${vpn}] menu`, false, e); }
+      } else { await fresh(null); await go(p, 'eq'); await check('go-eq'); }
+      ok(`EQ[${vpn}] no page errors`, !p._errs.length, p._errs.join('|')); await ctx.close();
+    }
+  });

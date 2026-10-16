@@ -279,15 +279,15 @@ public static class ZoneApi
             var b = await c.Request.Body(); var ids = b.Prop("zoneIds") is JsonElement a && a.ValueKind == JsonValueKind.Array ? a.EnumerateArray().Select(x => x.GetInt64()).ToList() : props.Where(p => p.Commit).Select(p => p.ZoneId).ToList();
             int skipped = 0;
             if (sess.OnlyZoneId != null) { skipped = ids.Count(x => x != sess.OnlyZoneId); ids = ids.Where(x => x == sess.OnlyZoneId).ToList(); }    // regular user: own device only
-            s.Cal.Commit(sess, ids, props); s.Cal.End(sess, "saved"); s.Events.Publish("zones"); return Results.Json(new { ok = true, saved = ids.Count, skipped });
+            s.Cal.Commit(sess, ids, props); var canResume = s.Cal.End(sess, "saved"); s.Events.Publish("zones"); return Results.Json(new { ok = true, saved = ids.Count, skipped, canResume });
         }).Req(Role.Control);
 
         // 0.2.0 item 29: end (finish, cancel or failure) - resumes the music if calibration paused it
         g.MapPost("/calibration/sessions/{id}/end", (string id, HttpContext c) =>
         {
-            var sess = s.Cal.Get(id); if (sess == null) return Results.Json(new { ok = true, resumed = false });
+            var sess = s.Cal.Get(id); if (sess == null) return Results.Json(new { ok = true, resumed = false, canResume = false });
             if (CalPhoneApi.LinkOf(c) is { } ml && sess.LinkToken != ml.Token) return Ext.Bad("not this phone's calibration", 403);
-            return Results.Json(new { ok = true, resumed = s.Cal.End(sess, "ended") });
+            return Results.Json(new { ok = true, resumed = false, canResume = s.Cal.End(sess, "ended") });   // 0.3.7 L21: offer Resume, never auto-resume
         }).Req(Role.Control);
 
         // 0.2.0 item 30: the house reference speaker (setting calibration.referenceZoneId). Everyone can read it; only an admin can change it.

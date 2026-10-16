@@ -10,7 +10,7 @@ import { createNow } from './now.js';
 import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
-import { GLIDE, glide, pulse, pulseSel } from './motion.js';
+import { GLIDE, glide, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
 import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
@@ -131,7 +131,7 @@ async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => openEq(S, refreshAll), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => showEq(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
@@ -315,6 +315,20 @@ export function jumpTo(kind, id) {
   if (was) run(); else setTimeout(run, GLIDE.ms + 140);
 }
 export function openPlaylist(id) { toggleLibExpanded(true); setTimeout(() => { libC.showTab('playlists'); }, P6.exp === 'lib' ? 0 : GLIDE.ms); void id; }
+/** 0.3.7: THE one way to show the EQ. Every entry point (Menu > Sound / EQ, the menu's EQ submenu, the Now Playing EQ button on every size,
+ *  tray / shortcuts) lands here: collapse anything expanded over Now Playing, bring the single center EQ to the front on the shared glide, pulse it.
+ *  The old Sound popup is never opened from here (it survives only as the per-speaker inline editor in an open speaker card). */
+export function showEq() {
+  if (!wide()) { if (S.view !== 'now') go('now'); }
+  else {
+    if (pageDlg) { pageDlg.close(); pageDlg = null; }
+    if (P6.exp === 'lib') toggleLibExpanded(false); else if (P6.exp === 'dev') toggleDevExpanded(false);
+    if (P6.list === 'expanded') setList('open');
+  }
+  nowc.showCenter?.('eq');
+  const front = () => { const st = nowc.stage; if (st) { st.dataset.eqfront = String(Date.now()); pulse(st); } };
+  if (wide() && !reduced()) setTimeout(front, GLIDE.ms); else front();
+}
 export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
@@ -337,12 +351,12 @@ export function go(k, force) {
     if (k === 'playlists') { toggleLib(false); libC.showTab('playlists'); return; }
     if (k === 'radio') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab('radio'); return; }
     if (k === 'rip' || k === 'tags' || k === 'cleanup') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab(k); return; }
-    if (k === 'eq') { nowc.showCenter?.('eq'); pulse(nowc.stage); return; }     // Playback > Sound / EQ = the center EQ panel
+    if (k === 'eq') return showEq();     // Playback > Sound / EQ = the center EQ panel (0.3.7: one function for every EQ entry point)
     if (k === 'queue') return openQueue();
     return openPage(k);
   }
   if (k === 'scenes' || k === 'schedules' || k === 'alarms') return openScenesSchedules(S, refreshAll);   // phone sheet
-  if (k === 'eq') return openEq(S, refreshAll);
+  if (k === 'eq') return showEq();
   if (S.view !== k) views[S.view]?.hide?.();
   S.view = k; desk.dataset.view = k;
   if (k !== 'now') { const v = views[k]; content.replaceChildren(v.el); v.reload?.(); }

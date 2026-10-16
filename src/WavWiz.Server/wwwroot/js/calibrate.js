@@ -1,4 +1,4 @@
-import { h, api, toast, dialog } from './util.js';
+import { h, api, toast, dialog, undoToast } from './util.js';
 import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 import { guideGroups, guideText, countdownOn, setCountdown, COUNTDOWN_S } from './calmic-core.js';
@@ -12,12 +12,14 @@ import { guideGroups, guideText, countdownOn, setCountdown, COUNTDOWN_S } from '
 //   3. By ear - no microphone at all.
 // 0.2.0 item 29: the server pauses the music for the whole session and resumes it when the session ENDS (finish, cancel or failure all call
 // /calibration/sessions/{id}/end). 0.2.0 items 28 + 30: the house reference is pre-selected; a regular user calibrates only their own speaker.
+/** 0.3.7 L21: calibration keeps the music paused for the whole run and, when it ends, OFFERS Resume (it never starts it by itself). */
+export function offerResume() { undoToast('Calibration ended - the music is paused', () => api('/stream/resume', { method: 'POST' }), 30000, 'Resume'); }
 export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   // a phone is a microphone, never the place that runs the wizard: it goes to the mic-only page (which makes its own link when signed in)
   if (isPhoneUa() && !isPlayerUa()) { location.href = '/calmic.html'; return; }
   const zones = S.zones.filter(z => z.connected && z.outputs.some(o => o.active));
   const body = h('div', { class: 'calx' }); let sessionId = null, phoneCard = null, pcCard = null, runView = null;
-  const endSession = () => { const id = sessionId; sessionId = null; if (id) api(`/calibration/sessions/${id}/end`, { method: 'POST' }).then(r => { if (r?.resumed) toast('Calibration ended - the music is playing again'); }).catch(() => {}); };
+  const endSession = () => { const id = sessionId; sessionId = null; if (id) api(`/calibration/sessions/${id}/end`, { method: 'POST' }).then(r => { if (r?.canResume) offerResume(); }).catch(() => {}); };
   const cleanup = () => { runView?.stop(); runView = null; pcCard?.stop(); phoneCard?.stop(); endSession(); };
   const d = dialog('Calibrate speakers', body, [], { onClose: () => { cleanup(); opts.onClose?.(); refresh && refresh(); } });
   if (zones.length < 2) { body.replaceChildren(h('p', null, 'You need at least two connected speakers: one is the reference (the one you leave alone) and the others are measured against it.'), h('p', { class: 'dim' }, 'You can still type a delay by hand: open a speaker’s Settings and use Delay.')); return; }
@@ -33,12 +35,15 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   if (hold && !admin) return;
   if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the speaker you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other speakers'))); return; }
   const defRef = house?.connected ? house.id : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);
-  const st = { ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), level: -20 };
+  const st = { ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), level: -12, testVolume: 85 };
   api('/settings').then(x => { const v = x?.['calibration.testLevelDb']; if (Number.isFinite(v)) st.level = v; }).catch(() => {});   // 0.3.0 §7.2: default from Settings > Devices > Calibration
   if (presetZoneId && presetZoneId === st.ref) { const other = zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
   if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the house reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
 
+  const vv = h('span', { class: 'small mono' }, st.testVolume + '%'), capEl = h('p', { class: 'small amber calcap', hidden: true });
+  const capNote = () => { const capped = zones.filter(z => (z.id === st.ref || st.sel.has(z.id)) && z.volLocked && (z.volCap ?? 100) < st.testVolume); capEl.hidden = !capped.length; capEl.textContent = capped.length ? `Capped by the max-volume lock: ${capped.map(z => `${z.name} at ${Math.round(z.volCap)}%`).join(', ')}. Raise the lock, or move the microphone closer.` : ''; };
   function speakersBox() {
+    queueMicrotask(capNote);
     const refZ = zones.find(z => z.id === st.ref);
     const refSel = h('select', { 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : '') + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));
     if (!admin) { refSel.disabled = true; refSel.title = 'Only an administrator can change the reference speaker.'; }
@@ -48,7 +53,10 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
         refZ && refZ.outputs.find(o => o.active)?.kind === 'bluetooth' ? h('p', { class: 'small amber calbtref' }, 'This reference plays over Bluetooth, whose delay can change when it reconnects. A wired speaker makes a steadier reference.') : null),
       h('div', { class: 'field' }, h('label', null, 'Speakers to calibrate'), zones.filter(z => z.id !== st.ref).map(z => { const own = admin || z.id === mine?.id; return h('label', { class: 'row' + (own ? '' : ' ro'), title: own ? '' : 'Only an administrator can calibrate other speakers.' }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), disabled: !own, onchange: ev => { ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id); } }), z.name, h('span', { class: 'small dim' }, z.outputs.find(o => o.active)?.label ?? '')); }),
         admin ? null : h('p', { class: 'small dim' }, 'You can calibrate the speaker you are using; the result is saved only to it.')),
-      h('div', { class: 'field' }, h('label', null, 'Test sound level'), h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' })));
+      h('div', { class: 'field' }, h('label', null, 'Test sound level'), h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' })),
+      // 0.3.7 L20: the test sound has its own volume (a speaker's own, maybe tiny, volume no longer scales it); a speaker's locked max volume still caps it
+      h('div', { class: 'field caltestvol' }, h('label', null, 'Test volume'), h('div', { class: 'row' }, h('input', { type: 'range', min: 0, max: 100, step: 1, value: st.testVolume, class: 'grow', 'aria-label': 'Test volume', oninput: ev => { st.testVolume = +ev.target.value; vv.textContent = st.testVolume + '%'; capNote(); } }), vv),
+        capEl));
   }
   const picked = () => { st.sel.delete(st.ref); return [...st.sel]; };
 
@@ -69,7 +77,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   async function startPcMic(pc, mic) {
     const zs = picked(); if (!zs.length) return toast('Choose at least one speaker to calibrate.', true);
     let sess;
-    try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'pc-mic', micPlayerId: pc.playerId, micId: mic.id, referenceZoneId: st.ref, zoneIds: zs, levelDb: st.level } }); }
+    try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'pc-mic', micPlayerId: pc.playerId, micId: mic.id, referenceZoneId: st.ref, zoneIds: zs, levelDb: st.level, testVolume: st.testVolume } }); }
     catch (e) { toast(e.message, true); return; }
     sessionId = sess.id; pcCard.stop(); pcCard = null; showRun(sess.id, { title: `Listening with ${sess.micName || mic.name}`, warn: sess.bluetoothWarning });
   }
@@ -81,14 +89,20 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     let timer = 0, gone = false;
     const head = h('h3', null, title), label = h('div', { class: 'calnow', 'aria-live': 'polite' }, 'Starting…'), bar = h('div', { class: 'calbar' }, h('i')), steps = h('div', { class: 'small dim' });
     const logEl = h('ul', { class: 'small dim callog' }), guide = h('div', { class: 'calguide', hidden: true });
+    // 0.3.7 L22: the live mic level stays on screen during the pre-check AND the measurement, with the current spot's name and the last rating (good / weak / too quiet)
+    const mBar = h('i'), mTxt = h('span', { class: 'small dim mono' }, ''), mSpot = h('span', { class: 'small calspot' }, ''), mRate = h('span', { class: 'calrate small', 'data-rating': '', hidden: true });
+    const mEl = h('div', { class: 'row calmeter-row calrun-meter' }, h('span', { class: 'small' }, 'Mic level'), h('div', { class: 'calmeter', role: 'meter', 'aria-label': 'Microphone level', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': 0 }, mBar), mTxt, mSpot, mRate);
+    const onLvl = ev => { const x = ev.detail; if (x?.db == null) return; const v = micLevelPct(x.db); mBar.style.width = v + '%'; mBar.parentNode.setAttribute('aria-valuenow', v); mTxt.textContent = x.db > -90 ? `${Math.round(x.db)} dB` : 'silent'; };
+    window.addEventListener('wavwiz:miclevel', onLvl);
     let promptKey = '', cdTimer = 0;
     const cancel = h('button', { class: 'btn', onclick: () => { endSession(); stop(); intro(); } }, 'Cancel');
-    body.replaceChildren(h('div', { class: 'card calrun' }, head, warn ? h('p', { class: 'small amber' }, warn) : null, label, guide, bar, steps, logEl, h('div', { class: 'row' }, h('span', { class: 'grow' }), cancel)));
+    body.replaceChildren(h('div', { class: 'card calrun' }, head, warn ? h('p', { class: 'small amber' }, warn) : null, label, mEl, guide, bar, steps, logEl, h('div', { class: 'row' }, h('span', { class: 'grow' }), cancel)));
     const paint = p => {
       if (gone) return;
       if (p.step && p.steps) { bar.firstChild.style.width = `${Math.round(p.step / p.steps * 100)}%`; steps.textContent = `Step ${p.step} of ${p.steps}`; }
       if (p.label) label.textContent = p.label;
       if (p.log) logEl.replaceChildren(...p.log.slice(-6).map(t => h('li', null, t)));
+      if (!phone) { mSpot.textContent = p.label ? `· ${p.label}` : ''; const a = (p.attempts || []).slice(-1)[0]; if (a) { mRate.hidden = false; mRate.dataset.rating = a.rating; mRate.textContent = `${a.check ? 'Check' : 'Last try'}: ${RATE_WORD[a.rating] || a.rating} (${Math.round(a.snrDb)} dB over noise, peak ${Math.round(a.peakDb)} dBFS)`; } }
       paintGuide(p);
       if (p.phase === 'failed') { stop(); failed(p.error || 'The measurement failed.'); return; }
       if (p.proposals && (p.phase === 'done' || phone)) { stop(); results(id, p.proposals, p.messages || [], phone); }
@@ -100,10 +114,19 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     function paintGuide(p) {
       const pr = p.phase === 'waiting' ? p.prompt : null;
       if (!pr) { guide.hidden = true; promptKey = ''; clearInterval(cdTimer); return; }
-      const key = `${pr.step}:${pr.zoneId}`; if (key === promptKey) return; promptKey = key; clearInterval(cdTimer);
+      const key = `${pr.step}:${pr.zoneId}:${pr.kind}`; if (key === promptKey) return; promptKey = key; clearInterval(cdTimer);
       const send = async action => { clearInterval(cdTimer); guide.querySelectorAll('button').forEach(b => { b.disabled = true; }); try { await api(`/calibration/sessions/${id}/guide`, { method: 'POST', body: { action, zoneId: pr.zoneId } }); } catch (e) { toast(e.message, true); } poll(); };
       const readyBtn = h('button', { class: 'btn primary calready', onclick: () => send('ready') }, 'Ready');
       const cd = h('input', { type: 'checkbox', checked: countdownOn(localStorage), onchange: ev => setCountdown(localStorage, ev.target.checked) });
+      const problem = ['quiet', 'weak', 'silent'].includes(pr.kind);
+      if (problem) {   // 0.3.7 L22 / L24: the pre-check rated this spot weak / too quiet, or the speaker stayed silent: say what to do; Retry / Continue anyway / Skip
+        const tv = h('input', { type: 'range', min: 0, max: 100, value: p.testVolume ?? 85, 'aria-label': 'Test volume', class: 'grow', onchange: ev => api(`/calibration/sessions/${id}/testvolume`, { method: 'PUT', body: { testVolume: +ev.target.value } }).catch(() => {}) });
+        const retry = h('button', { class: 'btn primary calretrycheck', onclick: () => send('ready') }, pr.kind === 'silent' ? 'Retry this speaker' : 'Check again');
+        guide.replaceChildren(h('div', { class: 'small dim calstep' }, `Step ${pr.step} of ${pr.steps}`), h('div', { class: 'calspk' }, pr.name), h('div', { class: `calrate-big`, 'data-rating': pr.kind }, RATE_WORD[pr.kind] || pr.kind), h('p', { class: 'calwhy' }, pr.text),
+          pr.kind === 'silent' ? null : h('div', { class: 'row calvol' }, h('span', { class: 'small' }, 'Test volume'), tv),
+          h('div', { class: 'row wrap' }, retry, pr.kind === 'silent' ? null : h('button', { class: 'btn calcontinue', onclick: () => send('continue') }, 'Continue anyway'), pr.canSkip ? h('button', { class: 'btn calskip', onclick: () => send('skip') }, 'Skip this speaker') : null));
+        guide.hidden = false; retry.focus?.(); return;
+      }
       guide.replaceChildren(h('div', { class: 'small dim calstep' }, `Step ${pr.step} of ${pr.steps}`), h('div', { class: 'calspk' }, pr.name), h('p', null, pr.text),
         h('div', { class: 'row wrap' }, readyBtn, pr.canSkip ? h('button', { class: 'btn calskip', onclick: () => send('skip') }, 'Skip') : null, h('span', { class: 'grow' }),
           h('label', { class: 'small' }, cd, ` ${COUNTDOWN_S} s countdown after Ready`)));
@@ -114,7 +137,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
       };
       guide.hidden = false; readyBtn.focus?.();
     }
-    function stop() { gone = true; clearTimeout(timer); clearInterval(cdTimer); window.removeEventListener('wavwiz:calrun', onRun); }
+    function stop() { gone = true; window.removeEventListener('wavwiz:miclevel', onLvl); clearTimeout(timer); clearInterval(cdTimer); window.removeEventListener('wavwiz:calrun', onRun); }
     function failed(msg) {
       endSession();
       body.replaceChildren(h('div', { class: 'card', role: 'alert', style: 'border-color:#8a2b26' }, h('h3', { class: 'err' }, 'Calibration did not finish'), h('p', null, msg),
@@ -130,13 +153,13 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     body.replaceChildren(h('div', { class: 'card' }, h('h3', null, 'Results'),
       props.length ? h('table', { class: 'tbl caltbl' }, h('thead', null, h('tr', null, ['Save', 'Speaker', 'Measured delay', 'Confidence', 'Note', ''].map(x => h('th', null, x)))), h('tbody', null, props.map(p =>
         h('tr', null, h('td', null, h('input', { type: 'checkbox', checked: p.commit, disabled: !p.commit, 'aria-label': 'Save ' + p.zoneName, onchange: ev => checks.set(p.zoneId, ev.target.checked) })), h('td', null, p.zoneName), h('td', { class: 'amber mono' }, `${Math.round(p.proposedLatencyMs)} ms`),
-          h('td', null, `${Math.round(p.confidence * 100)}%`), h('td', { style: 'white-space:normal' }, p.warning ?? ''),
+          h('td', null, confText(p.confidence)), h('td', { style: 'white-space:normal' }, p.warning ?? ''),
           h('td', null, phone || p.isReference ? null : h('button', { class: 'btn small calretry', title: `Measure ${p.zoneName} again`, onclick: async () => { try { await api(`/calibration/sessions/${sid}/retry`, { method: 'POST', body: { zoneId: p.zoneId } }); showRun(sid, { title: `Measuring ${p.zoneName} again` }); } catch (e) { toast(e.message, true); } } }, 'Retry'))))))
         : h('p', { class: 'err' }, 'Nothing could be measured.'),
       messages.length ? h('ul', { class: 'small amber' }, messages.map(m => h('li', null, m))) : null,
       phone ? h('p', { class: 'small dim' }, 'You can also save on the phone.') : null,
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { endSession(); intro(); } }, 'Redo'), h('span', { class: 'grow' }),
-        h('button', { class: 'btn primary', disabled: !props.some(p => p.commit), onclick: async () => { try { const r = await api(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...checks].filter(([, v]) => v).map(([k]) => k) } }); toast(`Saved ${r.saved} speaker(s).${r.skipped ? ` ${r.skipped} skipped (only your own speaker is saved).` : ''}`); sessionId = null; d.close(); } catch (e) { toast(e.message, true); } } }, 'Save all'))));
+        h('button', { class: 'btn primary', disabled: !props.some(p => p.commit), onclick: async () => { try { const r = await api(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...checks].filter(([, v]) => v).map(([k]) => k) } }); toast(`Saved ${r.saved} speaker(s).${r.skipped ? ` ${r.skipped} skipped (only your own speaker is saved).` : ''}`); sessionId = null; if (r.canResume) offerResume(); d.close(); } catch (e) { toast(e.message, true); } } }, 'Save all'))));
   }
 
   // ------------------------------------------------------------ by ear (no microphone, works on http)
@@ -161,6 +184,10 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
 
 /** 0.2.5 "Use this PC's microphone": the Player PCs with a microphone (a regular user sees only the PC they are on), a remembered mic picker with
  *  kind labels, the Bluetooth warning, a live input level, and Start. No microphone: says so plainly and points at the phone. */
+/** 0.3.7 L26: a confidence is shown only when it is a real 0-1 number, always as 0-100 %. */
+export const confPct = c => (Number.isFinite(c) ? Math.max(0, Math.min(100, Math.round(c * 100))) : null);
+export const confText = c => { const v = confPct(c); return v == null ? '—' : v + '%'; };
+export const RATE_WORD = { good: 'Good', weak: 'Weak', quiet: 'Too quiet', silent: 'Silent speaker' };
 export function micLevelPct(db) { if (db == null || !isFinite(db)) return 0; return Math.max(0, Math.min(100, Math.round((db + 60) / 60 * 100))); }
 export function pickPc(pcs) { const ok = (pcs || []).filter(p => p.supportsMic); return ok.find(p => p.mine && p.mics.length) || ok.find(p => p.mics.length) || ok[0] || null; }
 function pcMicCard(S, admin, { start }) {

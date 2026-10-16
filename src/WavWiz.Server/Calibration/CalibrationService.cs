@@ -78,7 +78,7 @@ public sealed class CalibrationService
         if (_cond.State == Playback.PlayState.Playing) { _cond.Pause(); lock (s.L) s.ResumeAfter = true; s.Notes.Add("music paused for the measurement"); }
     }
 
-    /// <summary>Ends a session (finish, save, cancel or failure): resumes the music if calibration paused it. Safe to call more than once.</summary>
+    /// <summary>Ends a session (finish, save, cancel or failure). Returns true when calibration paused the music and it is still paused (the page offers Resume). Safe to call more than once.</summary>
     public bool End(CalSession s, string why = "ended")
     {
         bool resume;
@@ -86,8 +86,8 @@ public sealed class CalibrationService
         try { s.Cancel.Cancel(); } catch { }
         _sessions.TryRemove(s.Id, out _);
         if (s.MicPlayerId != null || s.LinkToken != null) _ev.Publish("calmics");
-        if (resume && _cond != null && _cond.State == Playback.PlayState.Paused) _cond.Resume();
-        return resume;
+        // 0.3.7 L21: the music stays paused after calibration; the page OFFERS Resume (canResume) instead of starting it by itself
+        return resume && _cond != null && _cond.State == Playback.PlayState.Paused;
     }
 
     public int OpenSessions => _sessions.Count(x => !x.Value.Ended);
@@ -103,6 +103,7 @@ public sealed class CalibrationService
     private void Push(CalSession s) { _ev.Publish("calrun", new { id = s.Id, phase = s.Phase, step = s.Step, steps = s.Steps, label = s.Label, mode = s.Mode, linkToken = s.LinkToken }); }
     public void Report(CalSession s, string? phase = null, int? step = null, int? steps = null, string? label = null, string? log = null, string? error = null)
     {
+        if (phase is "running" or "waiting" || (phase == null && s.Phase is "running" or "waiting")) Quiet(s);      // 0.3.7 L21: paused for the ENTIRE calibration (someone pressing Play mid-run is paused again at once)
         lock (s.L) { if (phase != null) s.Phase = phase; if (step != null) s.Step = step.Value; if (steps != null) s.Steps = steps.Value; if (label != null) s.Label = label; if (log != null) s.Log.Add(log); if (error != null) s.Error = error; }
         Push(s);
     }
@@ -180,7 +181,7 @@ public sealed class CalibrationService
                             res = Capture(s, st.ZoneId, st.Kind, ToMono48k(rec.Mono, rec.Rate), rec.StartUs);
                             // L25: every attempt is logged with the raw numbers and published for the live meter
                             var line = $"{st.Label}: try {attempt + 1}: {(res.Ok ? "heard" : "not heard")}, snr {res.SnrDb:0.0} dB, mic peak {res.PeakDb:0.0} dBFS, rms {res.RmsDb:0.0} dBFS, quality {CalQuality.Pct(res.Confidence)}%{(ack != null ? ", player " + ack : "")}";
-                            lock (s.L) s.Attempts.Add(new { label = st.Label, zoneId = st.ZoneId, attempt = attempt + 1, ok = res.Ok, snrDb = Math.Round(res.SnrDb, 1), peakDb = Math.Round(res.PeakDb, 1), rmsDb = Math.Round(res.RmsDb, 1), quality = Math.Round(res.Confidence, 2), rating = CalQuality.Rate(res.PeakDb, res.Confidence) });
+                            lock (s.L) s.Attempts.Add(new { label = st.Label, zoneId = st.ZoneId, attempt = attempt + 1, check = false, ok = res.Ok, snrDb = Math.Round(res.SnrDb, 1), peakDb = Math.Round(res.PeakDb, 1), rmsDb = Math.Round(res.RmsDb, 1), quality = Math.Round(res.Confidence, 2), rating = CalQuality.Rate(res.PeakDb, res.Confidence) });
                             _ev.Publish("calattempt", new { sessionId = s.Id, label = st.Label, ok = res.Ok, snrDb = res.SnrDb, peakDb = res.PeakDb, rmsDb = res.RmsDb, quality = res.Confidence, rating = CalQuality.Rate(res.PeakDb, res.Confidence) });
                             Report(s, log: line);
                             if (res.Ok && res.Confidence >= 0.4) break;

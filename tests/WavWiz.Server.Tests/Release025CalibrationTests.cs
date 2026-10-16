@@ -135,7 +135,7 @@ public class Release025CalibrationTests
         // 0.3.1 B3: the run is guided now - answer Ready at each speaker
         await WaitUntil(() => { st = admin.GetJson($"/api/v1/calibration/sessions/{sid}").Result; if (st.GetProperty("phase").GetString() == "waiting") admin.PostAsJsonAsync($"/api/v1/calibration/sessions/{sid}/guide", new { action = "ready" }).Wait(); return st.GetProperty("phase").GetString() is "done" or "failed" or "canceled"; }, 60000, "PC-mic run");
         Assert.Equal("done", st.GetProperty("phase").GetString());
-        Assert.Equal(3, micDev.Recordings);            // reference, Kitchen, reference again - recorded natively on the mic PC
+        Assert.Equal(6, micDev.Recordings);            // (0.3.7 L22: a pre-check before each) reference, Kitchen, reference again - recorded natively on the mic PC
         var prop = st.GetProperty("proposals").EnumerateArray().Single(p => p.GetProperty("zoneId").GetInt64() == devId);
         double lat = prop.GetProperty("proposedLatencyMs").GetDouble(); Assert.InRange(lat, 52 - 15 - 2.5, 52 - 15 + 2.5);       // measured vs injected: 37 ms
         Assert.True(prop.GetProperty("confidence").GetDouble() >= 0.6, prop.ToString());

@@ -2411,3 +2411,10 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   /* in every expanded view the center stack is parked (out of the grid, invisible) exactly as the hidden center column was before */
   .desk:is(.libexpanded,.devexpanded,.listexpanded) .nowcol.np12>:is(.np-vizpanel,.np-ctlpanel){position:absolute!important;width:0!important;height:0!important;min-height:0!important;overflow:hidden!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;grid-area:auto!important;border:0!important;margin:0!important;padding:0!important}
 }
+.calrate,.calrate-big{font-weight:800}
+.calrate[data-rating=good],.calrate-big[data-rating=good]{color:var(--green)}
+.calrate[data-rating=weak],.calrate-big[data-rating=weak]{color:var(--accent2-text,var(--accent2))}
+.calrate[data-rating=quiet],.calrate-big[data-rating=quiet],.calrate-big[data-rating=silent]{color:var(--lock-red,var(--red))}
+.calrate-big{font-size:18px;letter-spacing:.04em;text-transform:uppercase;margin:4px 0}
+.calrun-meter{margin:6px 0} .calrun-meter .calmeter{flex:1;min-width:120px}
+.calvol{gap:10px;margin:6px 0}
