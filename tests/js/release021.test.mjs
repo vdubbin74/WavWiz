@@ -134,7 +134,7 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
   const n = src('now.js'), f = src('fav.js');
   assert.doesNotMatch(n, /np-volpop|np-volbtn|barMore|'aria-label': 'Stop'|act\('\/stream\/stop'\) \}, icon\('stop'\)/);
   assert.match(n, /const mkEq = \(\) => h\('button', \{ class: 'tbtn eqbtn', 'aria-label': 'Sound \(EQ\)'/);
-  assert.match(n, /muteBtn, h\('div', \{ class: 'np-vol' \}, eqBtn/); assert.match(n, /barMute, barEq\)\)/);
+  assert.match(n, /muteBtn, h\('div', \{ class: 'np-vol' \}, eqBtn/); assert.match(n, /barMute, barEq\), mkSc\('npb-sc'\)\)/);
   assert.match(n, /\{ class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' \}, xHeart, shuffle/);
   assert.match(f, /round \? 'heart tbtn ico' : 'heart'/);
   assert.match(css, /\.np-ctlpanel\.pn-classic \.np-xheart\{display:contents\}/);
@@ -143,7 +143,7 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
 
 test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song line) and the collapse arrow; no status chips or live dot', () => {
   const n = src('now.js');
-  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
+  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), (?:mkSc\('np-sc'\), )?h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
   assert.match(n, /class: 'np-vol' \}, eqBtn/);   // 0.3.5 J8: the Sleep button sits next to it
 });

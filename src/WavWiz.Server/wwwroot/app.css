@@ -2428,7 +2428,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .scbtn .ic{width:18px;height:18px}.scbtn .ic svg{width:18px;height:18px}
 .scsep{width:1px;height:18px;background:var(--line,rgba(255,255,255,.2));margin:0 3px}
 .schome{color:var(--accent)}
-.scpop{position:fixed;z-index:3000;display:flex;flex-direction:column;gap:2px;padding:4px;border:1px solid var(--line);border-radius:3px;background:var(--panel,#222)}
+.scpop{position:fixed;z-index:3000;display:flex;flex-direction:column;gap:2px;padding:4px;border:1px solid var(--line);border-radius:3px;background:var(--panel)}
 .scpop .btn{text-align:left;white-space:nowrap}
 .mpin{margin-left:auto;padding-left:10px;opacity:.35;font-size:11px;cursor:pointer}.mpanel button:hover .mpin,.mpin.on{opacity:.95}.mpanel button{display:flex;align-items:center}
 .np-ctlpanel .pane-h .scrow{margin-left:auto;margin-right:6px}

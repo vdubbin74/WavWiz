@@ -50,6 +50,8 @@ const wide = () => !matchMedia('(max-width:900px)').matches;
 
 // ---------------------------------------------------------------- boot
 // 0.2.2 T9 / 0.2.5: a phone arriving with ?cal=CODE (the PC's calibration QR code) is sent to the mic-only page /calmic.html (see calredirect.js)
+/** 0.3.7 L28: the Pair a player QR opens /?pair=123456 -> the code box is filled in (never signs in by itself; calibration links are unaffected). */
+const PAIR_PREFILL = (() => { try { const q = new URLSearchParams(location.search); const p = q.get('pair') || ''; return !q.get('cal') && /^[0-9]{6}$/.test(p) ? p : ''; } catch { return ''; } })();
 const CAL = (() => { try { const q = new URLSearchParams(location.search), cal = q.get('cal') || '', pair = q.get('pair') || ''; return { cal: /^[A-Za-z0-9]{6}$/.test(cal) ? cal : null, pair: /^[0-9]{6}$/.test(pair) ? pair : null }; } catch { return { cal: null, pair: null }; } })();
 async function boot() {
   if (CAL.cal || window.__wwCalRedirect) { location.replace('/calmic.html?cal=' + (CAL.cal || '')); return; }   // 0.2.5: calibration links go to the mic-only page; never join here
@@ -94,7 +96,7 @@ function renderLogin() {
   const root = h('div', { class: 'card auth' });
   const draw = () => {
     const msg = h('p', { class: 'err', role: 'alert' });
-    const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code', value: CAL.pair || '' });
+    const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code', value: PAIR_PREFILL });
     const name = h('input', { type: 'text', maxlength: 40, placeholder: 'e.g. Sam\'s phone', id: 'devname', value: deviceName() });
     const pw = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw' });
     root.replaceChildren(

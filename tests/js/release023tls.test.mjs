@@ -9,8 +9,8 @@ const t = readFileSync(`${js}/tls-setup.js`, 'utf8'), css = readFileSync(new URL
 test('0.2.3 fix: the iPhone / Android steps are visible without the script; the script only hides the OTHER phone\'s steps', () => {
   assert.match(css, /\.dev\{display:block\} \.dev\.hide\{display:none\}/);
   assert.doesNotMatch(css, /\.dev\{display:none\}/);
-  assert.match(t, /\.dev-ios'\)\?\.classList\.toggle\('hide', android\)/);
-  assert.match(t, /\.dev-android'\)\?\.classList\.toggle\('hide', ios\)/);
+  assert.match(t, /\.dev-ios'\)\.forEach\(e => e\.classList\.toggle\('hide', android\)\)/);
+  assert.match(t, /\.dev-android'\)\.forEach\(e => e\.classList\.toggle\('hide', ios\)\)/);
   assert.doesNotMatch(t, /classList\.toggle\('show', ios/);
 });
 
@@ -25,6 +25,6 @@ test('0.2.3 fix: check mode, not trusted -> download button for this phone + hig
 
 test('0.2.3 fix: the script keeps the same ?cal= rules and secure address as the server-rendered "Continue to secure calibration" link', () => {
   assert.match(t, /if \(!\/\^\[A-Za-z0-9\]\{6\}\$\/\.test\(cal\)\) return ''; return 'cal=' \+ cal \+ \(\/\^\[0-9\]\{6\}\$\/\.test\(pair\) \? '&pair=' \+ pair : ''\)/);
-  assert.match(t, /const secureHome = \(\) => calQ \? `https:\/\/\$\{host\}:\$\{https\}\/calmic\.html\?` \+ calQ\.replace\(\/&pair=\\d\+\/, ''\) : `https:\/\/\$\{host\}:\$\{https\}\/`/);   // 0.2.5: the mic-only page
+  assert.match(t, /const secureHome = \(\) => pairQ \? `https:\/\/\$\{host\}:\$\{https\}\/\?pair=\$\{pairQ\}` : calQ \? `https:\/\/\$\{host\}:\$\{https\}\/calmic\.html\?` \+ calQ\.replace\(\/&pair=\\d\+\/, ''\) : `https:\/\/\$\{host\}:\$\{https\}\/`/);   // 0.2.5: the mic-only page
   assert.match(t, /setTimeout\(\(\) => location\.replace\(secureHome\(\)\), 900\)/, 'trusted phone: still redirects on its own');
 });

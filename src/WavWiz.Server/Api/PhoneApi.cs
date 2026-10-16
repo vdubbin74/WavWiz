@@ -96,7 +96,7 @@ public static class PhoneApi
         var calUrl = s.Ca.Enabled ? SecureCalUrl(c, s) : null;
         if (calUrl != null) c.Response.Headers.CacheControl = "no-store";     // may carry a one-time pairing code
         var h = new StringBuilder();
-        h.Append("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name=theme-color content='#FF3C00'>")
+        h.Append("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name=theme-color content='#FF3C00'><link rel=manifest href='/manifest.webmanifest'><link rel=apple-touch-icon href='/assets/logo-180.png'><meta name=apple-mobile-web-app-capable content=yes><meta name=mobile-web-app-capable content=yes><meta name=apple-mobile-web-app-title content=WavWiz>")
          .Append("<title>WavWiz - phone set-up</title><link rel=icon href='/favicon.ico'><link rel=stylesheet href='/tls.css'></head>")
          .Append($"<body data-mode='{mode}' data-enabled='{(s.Ca.Enabled ? 1 : 0)}' data-host='{E(host)}' data-http='{s.Cfg.HttpPort}' data-https='{s.Cfg.HttpsPort}'><main>")
          .Append($"<header><img src='/assets/logo-64.png' width=40 height=40 alt=''><div><h1>WavWiz</h1><small>BETA {WavWizInfo.Version} - phone set-up</small></div></header>");
@@ -129,6 +129,14 @@ public static class PhoneApi
              .Append("<li>If the server's address ever changes, press <b>Set up HTTPS</b> again on the PC. You do not need to repeat these steps on the phone.</li></ul></section>");
             h.Append($"<section class=card id=done hidden><h2>All set</h2><p>Your phone trusts WavWiz.</p><p><a class=btn href='{E(https)}/'>Open WavWiz (secure)</a></p></section>");
         }
+        // 0.3.7 L28: Add to Home Screen - the app already ships a manifest (display: standalone), icons and a service worker (0.3.4 H1); this is the phone-friendly flow
+        h.Append("<section class='card dev dev-ios' id=a2hs-ios><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (iPhone / iPad, in <b>Safari</b>).</p><ol class='steps a2hs'>")
+         .Append("<li><h3>Tap Share</h3><p>The square with an arrow, at the bottom (iPhone) or top (iPad) of Safari.</p></li>")
+         .Append("<li><h3>Add to Home Screen</h3><p>Scroll down the list, tap <b>Add to Home Screen</b>, then <b>Add</b>.</p></li></ol></section>");
+        h.Append("<section class='card dev dev-android' id=a2hs-android><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (Android, in <b>Chrome</b>).</p>")
+         .Append("<p><button class=btn id=a2hsInstall hidden>Install WavWiz</button></p><ol class='steps a2hs'>")
+         .Append("<li><h3>Open the Chrome menu</h3><p>The three dots at the top right.</p></li>")
+         .Append("<li><h3>Install app</h3><p>Tap <b>Install app</b> (or <b>Add to Home screen</b>), then <b>Install</b>.</p></li></ol></section>");
         h.Append("</main><script src='/js/tls-setup.js' type='module'></script></body></html>");
         return h.ToString();
     }

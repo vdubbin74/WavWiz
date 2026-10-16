@@ -91,8 +91,8 @@ test('K13 analog VU follows the theme; Pepecoin white-green face, #212121 needle
 });
 
 test('K14/K22 the real mini player is a component used in the right column; the NP bar is gone when the Library is expanded', () => {
-  const m = src('mini.js'); assert.match(m, /export function mountMini\(root, \{ embedded = false \} = \{\}\)/); assert.match(m, /import '\.\/sliderstyle\.js'/); assert.match(m, /class: 'mutebtn mp-mute'/);
-  const main = src('main.js'); assert.match(main, /mountMini\(host, \{ embedded: true \}\)/); assert.match(main, /function syncMini/);
+  const m = src('mini.js'); assert.match(m, /export function mountMini\(root, \{ embedded = false(?:, run = null, home = null)? \} = \{\}\)/); assert.match(m, /import '\.\/sliderstyle\.js'/); assert.match(m, /class: 'mutebtn mp-mute'/);
+  const main = src('main.js'); assert.match(main, /mountMini\(host, \{ embedded: true(?:, run: runShortcut, home: goHome)? \}\)/); assert.match(main, /function syncMini/);
   assert.match(css, /\.desk\.libexpanded \.npbar\{display:none!important\}/); assert.match(css, /\.minirail/); assert.match(css, /devcollapsed[^{]*\.minicol:hover \.mp/);
   assert.match(main, /export function openQueue/); assert.match(src('menu.js'), /openQueue/);
 });

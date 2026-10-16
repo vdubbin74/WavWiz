@@ -164,6 +164,17 @@ public class Release037Tests
         var js = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "tls-setup.js"));
         Assert.Contains("?pair=${pairQ}", js);
         var st = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "settings.js")); Assert.Contains("to=pair&code=", st);
-        var mn = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "main.js")); Assert.Contains("value: CAL.pair || ''", mn);
+        var mn = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "main.js")); Assert.Contains("value: PAIR_PREFILL", mn);
+    }
+
+    [Fact]
+    public async Task L28_the_phone_setup_page_has_add_to_home_screen_steps_and_links_the_existing_manifest()
+    {
+        await using var f = await ServerFixture.StartAsync();
+        var page = await f.Http.GetStringAsync("/tls/setup");
+        Assert.Contains("rel=manifest href='/manifest.webmanifest'", page); Assert.Contains("apple-touch-icon", page); Assert.Contains("apple-mobile-web-app-capable", page);
+        Assert.Contains("Add to Home Screen", page); Assert.Contains("Share", page); Assert.Contains("Install app", page); Assert.Contains("a2hsInstall", page);
+        var web = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot"); var man = System.IO.File.ReadAllText(System.IO.Path.Combine(web, "manifest.webmanifest")); Assert.Contains("\"display\": \"standalone\"", man);
+        foreach (var png in new[] { "/assets/logo-192.png", "/assets/logo-512.png", "/assets/logo-180.png", "/assets/logo-maskable-512.png" }) Assert.True(System.IO.File.Exists(System.IO.Path.Combine(web, png.TrimStart('/'))), png);
     }
 }

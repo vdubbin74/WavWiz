@@ -148,7 +148,7 @@ test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop me
   assert.match(d, /wavwiz\.devcollapsed/); assert.match(m, /function toggleDev/);           // 0.2.0: the size (incl. the 0.1.x collapsed flag) lives in devices.js assert.match(css, /\.desk\.devcollapsed\{--rightw:46px\}/);
   assert.match(css, /\.desk\{transition:grid-template-columns/); assert.match(d, /devcol/);
   assert.match(menu, /menuActions\(S, ctl, true\)/, 'desktop menu bar asks for panel toggles');
-  assert.match(menu, /\['Browse library', browseLib\]/); assert.match(menu, /\['Devices & zones', devPanel\]/);
+  assert.match(menu, /\['Browse library', browseLib[^\]]*\]/); assert.match(menu, /\['Devices & zones', devPanel[^\]]*\]/);
   assert.match(menu, /createPhoneDrawerNav[\s\S]*menuActions\(S, ctl\)\;/, 'phone drawer keeps the full-screen pages');
 });
 

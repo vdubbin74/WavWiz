@@ -58,3 +58,13 @@ test('L1/L4/L17 every EQ / Queue / shortcut entry point goes through the shared 
   assert.match(menu, /pin: 'eq'/); assert.match(menu, /pin: 'queue'/); assert.match(mini, /shortcutsRow/); assert.match(mini, /sendToMain/);
   assert.match(css, /\.scrow/); assert.match(css, /\.schome/);
 });
+
+test('L28 pair QR shows the server address as text; Add to Home Screen uses the existing manifest, with iOS + Android steps and an install prompt', () => {
+  const st = src('settings.js'), tls = src('tls-setup.js');
+  assert.match(st, /to=pair&code=/); assert.match(st, /Server address: http:\/\/\$\{i\.host\}:\$\{i\.httpPort\}/); assert.match(st, /pairqr-addr/);
+  assert.match(tls, /beforeinstallprompt/); assert.match(tls, /a2hsInstall/); assert.match(tls, /display-mode: standalone/); assert.match(tls, /appinstalled/);
+  const man = JSON.parse(readFileSync(new URL('../../src/WavWiz.Server/wwwroot/manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(man.display, 'standalone'); assert.equal(man.start_url, '/');
+  assert.ok(man.icons.some(i => i.sizes === '192x192') && man.icons.some(i => i.sizes === '512x512') && man.icons.some(i => i.purpose === 'maskable'));
+  const idx = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/index.html', import.meta.url), 'utf8'); assert.match(idx, /rel="manifest"/); assert.match(idx, /apple-mobile-web-app-capable/);
+});

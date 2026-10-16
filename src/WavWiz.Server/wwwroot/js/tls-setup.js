@@ -6,8 +6,8 @@ const inApp = /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\/|; wv\)|Snapchat|T
 const safari = ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
 
 // 0.2.3 fix: the step sections are visible by default (tls.css) so they still show if this script cannot load; here only the OTHER phone's steps are hidden
-document.querySelector('.dev-ios')?.classList.toggle('hide', android);
-document.querySelector('.dev-android')?.classList.toggle('hide', ios);
+document.querySelectorAll('.dev-ios').forEach(e => e.classList.toggle('hide', android));
+document.querySelectorAll('.dev-android').forEach(e => e.classList.toggle('hide', ios));
 document.querySelector('.only-desktop')?.classList.toggle('show', !ios && !android);
 if (ios && !safari && enabled) {
   const w = document.createElement('div'); w.className = 'card warn';
@@ -50,7 +50,7 @@ async function check() {
     adv.push('If the server\'s address changed, press "Set up HTTPS" again on the PC.');
     adv.push('Phone date/time wrong? An out-of-date clock makes every certificate look invalid.');
     // 0.2.3 fix: not trusted -> put the download button for THIS phone right here and point at the install steps below
-    const steps = [...document.querySelectorAll('.dev')].filter(d => !d.classList.contains('hide'));
+    const steps = [...document.querySelectorAll('.dev:not(#a2hs-ios):not(#a2hs-android)')].filter(d => !d.classList.contains('hide'));
     const dl = document.createElement('p');
     for (const d of steps) { const b = d.querySelector('a.btn[href^="/tls/root-ca"]'); if (b) { const c = b.cloneNode(true); c.style.marginRight = '8px'; dl.append(c); } }
     steps.forEach(d => d.classList.add('focus'));
@@ -75,4 +75,15 @@ function good(msg) {
 if (enabled) {
   $('check').addEventListener('click', check);
   if (B.dataset.mode === 'check' || location.protocol === 'https:' || calQ) check();
+}
+
+// 0.3.7 L28: Add to Home Screen. Chrome / Android offers a real install prompt (beforeinstallprompt) -> the "Install WavWiz" button; iPhone has only the Share steps shown above.
+// Already running as an installed app (display-mode: standalone / navigator.standalone): the steps are hidden - nothing to add.
+{
+  const standalone = matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (standalone) document.querySelectorAll('#a2hs-ios,#a2hs-android').forEach(x => { x.hidden = true; });
+  let deferred = null; const ib = $('a2hsInstall');
+  addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); deferred = ev; if (ib) ib.hidden = false; });
+  ib?.addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); try { await deferred.userChoice; } catch { /* dismissed */ } deferred = null; ib.hidden = true; });
+  addEventListener('appinstalled', () => { document.querySelectorAll('#a2hs-ios,#a2hs-android').forEach(x => { x.hidden = true; }); });
 }
