@@ -1,6 +1,5 @@
 const hoverItem = async (p, top, label) => { await p.click(`.menubar .mtop:text-is("${top}")`); const it = p.locator(`.menubar .mgroup.open > .mpanel > .msub > button:text-is("${label}"), .menubar .mgroup.open > .mpanel > button:text-is("${label}")`).first(); await it.hover(); await p.waitForTimeout(450); return it; };
 // ---- 0.3.7 items (L1-L30) the way a user uses them ----
-const ZSTUB = async p => p.route('**/api/v1/zones*', async route => { const r = await route.fetch(); let z = await r.json(); if (Array.isArray(z) && z.length) { z = z.slice(0, 5); z[0] = { ...z[0], outputs: [{ deviceId: 'e2e-dev', name: 'E2E Speaker', connected: true, active: true, kind: 'wired' }] }; } await route.fulfill({ response: r, json: z }); });
 const unlockQ = p => p.evaluate(() => { const k = ['wavwiz.plcols.v1', 'wavwiz.plcols.narrow.v1']; for (const x of Object.keys(localStorage)) if (/plcol|queuecols|pl\.layout/i.test(x)) { try { const v = JSON.parse(localStorage.getItem(x)); v.locked = false; localStorage.setItem(x, JSON.stringify(v)); } catch { /* ignore */ } } });
 await api('/queue/clear', 'POST', {}).catch(() => {});
 for (let i = 0; i < 1; i++) { /* the library has songs; queue some */ }

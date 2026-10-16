@@ -96,7 +96,7 @@ if (want('dev')) await step('dev', async () => {
   const e = await p.evaluate(() => { const cols = [...document.querySelectorAll('.devpanel.expanded .e1>.ecol')].map(c => [c.className, Math.round(c.getBoundingClientRect().width)]);
     const rows = [...document.querySelectorAll('.e1 .srow')]; const bars = rows.map(r => Math.round(r.querySelector('.dvol').getBoundingClientRect().left));
     return { cols, n: rows.length, oneLine: rows.every(r => r.querySelector('.sline').getBoundingClientRect().height < 44), aligned: new Set(bars).size <= 1, out: rows[0]?.querySelector('.sout')?.title || '', c3: document.querySelectorAll('.e1 .scol .dcard.dc3').length, c3al: new Set([...document.querySelectorAll('.e1 .scol .dcard.dc3 .dc3l3')].map(x => Math.round(x.getBoundingClientRect().left))).size <= 1, un: !!document.querySelector('.e1 .udiv'), add: document.querySelectorAll('.e1 .saddzone').length }; });
-  ok('G9->J5 columns Scenes & Schedules | Zones | (settings, closed) | Speakers (0.3.6 K5: fourth column holds a speaker\'s settings)', e.cols.length === 4 && /sscol/.test(e.cols[0][0]) && /zcol/.test(e.cols[1][0]) && /spcol/.test(e.cols[2][0]) && e.cols[2][1] <= 2 && /^scol/.test(e.cols[3][0]) && e.cols[3][1] === 380, JSON.stringify(e.cols));
+  ok('G9->J5 (0.3.7 L3: three equal columns) Scenes & Schedules | Zones | (settings, closed) | Speakers (0.3.6 K5: fourth column holds a speaker\'s settings)', e.cols.length === 4 && /sscol/.test(e.cols[0][0]) && /zcol/.test(e.cols[1][0]) && /spcol/.test(e.cols[2][0]) && e.cols[2][1] <= 2 && /^scol/.test(e.cols[3][0]) && Math.abs(e.cols[3][1] - e.cols[0][1]) <= 2, JSON.stringify(e.cols));
   ok('G9->J4 speaker cards in the Speakers column (3-line cards, bars aligned)', e.c3 > 0 && e.c3al, JSON.stringify(e));   // 0.3.5 J4/J6 cards replace the G9 one-line rows
   const z = p.locator('.e1 .zcard').first(); if (await z.count()) { await z.click({ position: { x: 20, y: 30 } }); await p.waitForTimeout(800);
     const hlr = await p.evaluate(() => ({ dim: document.querySelectorAll('.e1 .scol .dc3.dimmed').length, all: document.querySelectorAll('.e1 .scol .dc3').length, picked: !!document.querySelector('.e1 .zcard.picked') }));
@@ -151,7 +151,7 @@ if (want('g14')) await step('g14', async () => {
 });
 
 if (want('mini')) await step('mini', async () => {
-  for (const [w, hh, n] of [[420, 72, 'main'], [300, 48, 'slim']]) for (const t of ['default', 'pepecoin']) {
+  for (const [w, hh, n] of [[420, 108, 'main'], [300, 48, 'slim']]) for (const t of ['default', 'pepecoin']) {
     const mc = await cb.newContext({ viewport: { width: w, height: hh } }); await mc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
     await mc.addInitScript(id => { localStorage.setItem('wavwiz.theme', JSON.stringify({ preset: id })); }, t);
     const mp = await mc.newPage(); const me = []; mp.on('pageerror', e => me.push(e.message)); await mp.goto(B + '/mini.html'); await mp.waitForTimeout(2500);

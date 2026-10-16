@@ -56,7 +56,7 @@ if (want('panels')) await step('panels', async () => {
   await p.reload(); await p.waitForSelector('.desk'); const kept = await p.evaluate(() => localStorage.getItem('wavwiz.panels'));
   ok('§6 state survives reload (one key)', !!kept, kept);
   await p.setViewportSize({ width: 1000, height: 800 }); await p.waitForTimeout(700); await closeDlg(p);
-  const np = await p.evaluate(() => document.querySelector('.nowcol').getBoundingClientRect().width);
+  const np = await p.evaluate(() => document.querySelector('.np-stage').getBoundingClientRect().width);
   ok('§6 1000 px window: Now Playing ≥ 420 px', np >= 420, 'np ' + np); await shot(p, 'panels-1000');
   await p.setViewportSize({ width: 1400, height: 900 });
 });

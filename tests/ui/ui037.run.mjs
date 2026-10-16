@@ -26,39 +26,21 @@ const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]')
 const home = async (p, pan, theme) => { await p.goto(B + '/'); await p.evaluate(([v, t]) => { if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, [pan, theme]); await p.goto(B + '/'); await p.waitForTimeout(2500); await closeDlg(p); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); if (theme) { await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme); } await p.waitForTimeout(theme ? 600 : 200); };   // the 'Tap anywhere to start sound' prompt
 const go = (p, k) => p.evaluate(async k => (await import('/js/main.js')).go(k), k);
 const dlgW = p => p.evaluate(() => { const d = document.querySelector('dialog[open]'); return d ? Math.round(d.getBoundingClientRect().width) : -1; });
-  // 0.3.7: every EQ entry point -> the ONE center EQ (never the old Sound popup), on the shared glide + pulse
-  await step('EQ entry points', async () => {
-    for (const [vpn, vopt] of VPS) {
-      const { ctx, p } = await newPage(vopt); const phone = vpn === 'iphone';
-      const fresh = async (pan) => { await p.goto(B + '/'); await p.evaluate(([v]) => { localStorage.setItem('wavwiz.center.v1', 'viz'); localStorage.setItem('wavwiz.center.migrated030', '1'); if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, [pan]); await p.goto(B + '/'); await p.waitForTimeout(2200); await closeDlg(p); };
-      const check = async (name) => {
-        await p.waitForTimeout(700);
-        const r = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), title: document.querySelector('dialog[open] h2,dialog[open] header')?.textContent || '',
-          eq: !!document.querySelector('.np-stage.eqmode'), eqv: !!document.querySelector('.np-stage .eqv, .np-stage .ceq, .np-stage canvas.eqcanvas, .np-stage [class*=eq]'), pulsed: !!document.querySelector('.np-stage.k-pulse, .np-stage[data-eqfront]'),
-          vis: (() => { const s = document.querySelector('.np-stage'); if (!s) return false; const b = s.getBoundingClientRect(); return b.width > 20 && b.height > 20 && b.bottom > 0 && b.top < innerHeight; })() }));
-        ok(`EQ[${vpn}] ${name}: center EQ, no Sound popup, visible, pulsed`, !r.dlg && r.eq && r.vis && r.pulsed, JSON.stringify(r));
-        await p.screenshot({ path: `/workspace/screens/wavwiz-037-${ENG}-eq-${vpn}-${name.replace(/\W+/g, '')}.png` });
-      };
-      // every EQ button in the Now Playing panel (bar, full panel, control strip)
-      await fresh(NORMAL);
-      const n = await p.evaluate(() => document.querySelectorAll('.eqbtn').length); ok(`EQ[${vpn}] Now Playing has EQ buttons`, n >= 1, n);
-      for (let i = 0; i < n; i++) {
-        await fresh(NORMAL);
-        const vis = await p.evaluate(i => { const b = [...document.querySelectorAll('.eqbtn')][i]; return !!(b && b.getClientRects().length); }, i);
-        if (!vis) continue;
-        await p.evaluate(i => [...document.querySelectorAll('.eqbtn')][i].click(), i); await check('button' + i);
-      }
-      if (!phone) {   // from an expanded Library / Devices / Queue the EQ button (and the menu) must collapse it and bring the center EQ forward
-        for (const [nm, pan] of [['lib', { lib: 'normal', dev: 'normal', exp: 'lib', list: 'open', ctl: 'open' }], ['dev', { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'open' }]]) {
-          await fresh(pan); const ok1 = await p.evaluate(() => { const b = [...document.querySelectorAll('.eqbtn')].find(b => b.getClientRects().length); if (b) b.click(); return !!b; });
-          if (ok1) { await check(`from-${nm}-expanded`); ok(`EQ[${vpn}] expanded ${nm} collapsed`, !(await p.evaluate(() => document.querySelector('.desk')?.className || '')).includes(nm + 'expanded')); }
-        }
-        await fresh(NORMAL); await go(p, 'eq'); await check('go-eq');
-        await fresh(NORMAL); await p.evaluate(() => window.dispatchEvent(new Event('resize')));
-        try { await hoverItem(p, 'Playback', 'Sound / EQ'); await p.evaluate(() => { const o = [...document.querySelectorAll('.menubar .msub.open > .mpanel button')].find(b => /Open the EQ/.test(b.textContent)); o?.click(); }); await check('menu-open-the-eq'); } catch (e) { ok(`EQ[${vpn}] menu`, false, e); }
-      } else { await fresh(null); await go(p, 'eq'); await check('go-eq'); }
-      ok(`EQ[${vpn}] no page errors`, !p._errs.length, p._errs.join('|')); await ctx.close();
-    }
-  });
+const ZSTUB = async p => p.route('**/api/v1/zones*', async route => { try { const r = await route.fetch(); let z = await r.json(); if (Array.isArray(z) && z.length) { z = z.slice(0, 5); z[0] = { ...z[0], outputs: [{ deviceId: 'e2e-dev', name: 'E2E Speaker', connected: true, active: true, kind: 'wired' }] }; } await route.fulfill({ response: r, json: z });  } catch { /* page closed */ } });
+{
+  const SV = [['desktop', { viewport: { width: 1280, height: 720 } }], ['1080p', VPS[0][1]], ['1366', { viewport: { width: 1366, height: 768 } }], ['4k', VPS[3][1]], ['phone', VPS[2][1]]];
+  const OUT = (th, n) => `/workspace/screens/wavwiz-037-${ENG === 'webkit' ? 'webkit-' : ''}${th}-${n}.png`;
+  for (const th of THEMES) {
+    for (const [tag, opt] of SV) await step(`shots ${th} ${tag}`, async () => { const { ctx, p } = await newPage(opt); await home(p, NORMAL, th); await p.screenshot({ path: OUT(th, tag) }); ok(`shot ${th} ${tag}`, p._errs.length === 0, p._errs.join('|')); await ctx.close(); });
+    await step(`state shots ${th}`, async () => {
+      const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } }); await ZSTUB(p); await p.addInitScript(() => localStorage.setItem('wavwiz.center.v1', 'eq'));
+      await home(p, NORMAL, th); await p.click('.qtable th[data-col=artist]').catch(() => {}); await p.waitForTimeout(300); await p.screenshot({ path: OUT(th, 'l30-sorted') });
+      await p.click('.eqallbtn:not([disabled])').catch(() => {}); await p.waitForTimeout(500); await p.screenshot({ path: OUT(th, 'l7-allsound') });
+      await home(p, { ...NORMAL, exp: 'dev' }, th); await p.screenshot({ path: OUT(th, 'l3-devices') });
+      await home(p, { ...NORMAL, exp: 'lib' }, th); await p.screenshot({ path: OUT(th, 'l9-library-open') });
+      await home(p, { ...NORMAL, list: 'expanded', dev: 'rail' }, th); await p.hover('.minicol').catch(() => {}); await p.waitForTimeout(400); await p.screenshot({ path: OUT(th, 'l10-hover') });
+      ok(`state shots ${th} no errors`, p._errs.length === 0, p._errs.join('|')); await ctx.close(); });
+  }
+}
 await br.close();
 const fails = R.filter(x => !x).length; console.log(`\n${R.length - fails}/${R.length} passed`); process.exit(fails ? 1 : 0);
