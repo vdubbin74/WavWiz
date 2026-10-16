@@ -3,6 +3,7 @@ import { openSleep } from './scenesched.js';   // 0.3.5 J8
 import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg, setChev } from './icons.js';
+import { shortcutsRow } from './shortcuts.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
 import { heartBtn } from './fav.js';

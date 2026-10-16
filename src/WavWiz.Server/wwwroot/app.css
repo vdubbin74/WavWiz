@@ -2455,3 +2455,27 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .sortchip-x{width:18px;height:18px;padding:0;border:0;border-radius:3px;background:transparent;color:inherit;cursor:pointer;line-height:1}
 .sortchip-x:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 30%,transparent)}.sortchip-x:disabled{opacity:.4;cursor:not-allowed}
 .listpanel .plus:disabled{opacity:.4;cursor:not-allowed}
+/* 0.3.7 L3: expanded Devices = three EQUAL columns (about 600 px at 1920) with identical 34 px title bars and 64 px two-line rows. Opening speaker settings keeps the K5 layout. */
+.devpanel.expanded .dexp-main.e1:not(.spk-open)>.ecol{flex:1 1 0;width:auto;min-width:0}
+.devpanel.expanded .dexp-main.e1:not(.spk-open)>.spcol{display:none}
+.devpanel.expanded .dexp-main.e1:not(.spk-open)>.zcol{margin-right:14px}
+.devpanel.expanded .dexp-main.e1>.ecol>.dsec-h,.devpanel.expanded .dexp-main.e1>.ecol>.ssc-col>.dsec-h,.devpanel.expanded .dexp-main.e1>.ecol .ssc-h{box-sizing:border-box;min-height:34px;height:34px;display:flex;align-items:center;margin:0 0 8px;padding:0 10px}
+.devpanel.expanded .dexp-main.e1>.ecol :is(.zcard,.dcard,.ssc-scene,.ssc-sched){box-sizing:border-box;min-height:64px}
+.devpanel.expanded .dexp-main.e1>.ecol :is(.zcard,.dcard){display:grid;align-content:center;row-gap:3px}
+/* 0.3.7 L18: collapsed Now Playing bar at 1366 and narrower centers: the song title keeps its room (min 200 px); the volume slider, % and Shuffle / Repeat step aside before anything overlaps. Mute, EQ, Heart, transport and Home + pins stay. */
+.np-ctlpanel.collapsed .ns-song{flex:1 1 220px;min-width:200px}
+.np-ctlpanel.collapsed .ns-seek{min-width:0;overflow:hidden}
+.np-ctlpanel.collapsed .ns-elv,.np-ctlpanel.collapsed .ns-dur{flex:none;white-space:nowrap}
+@container (max-width: 760px){
+  .np-ctlpanel.collapsed .ns-vol input[type=range],.np-ctlpanel.collapsed .ns-vol .volpct,.np-ctlpanel.collapsed .ns-vol>.ic,.np-ctlpanel.collapsed .ns-x .tbtn.tog{display:none}
+}
+@container (max-width: 560px){ .np-ctlpanel.collapsed .np-sc .scpin{display:none} .np-ctlpanel.collapsed .np-sc .scsep{display:none} }
+/* 0.3.7 L9 / L10 / L12 / L13: Library open: the '#' column shrinks (the title gets the room), the mini player is its OWN panel under the queue with the standard 10 px gap, no collapse arrow on the pinned queue */
+@media (min-width:901px){
+  .desk.libexpanded{row-gap:10px!important}
+  .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--accent);border-radius:var(--radius);overflow:hidden}
+  .desk.libexpanded .minicol .mp{border:0;border-radius:var(--radius)}
+  .desk.libexpanded:not(.libdev) .listpanel{border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius);border-bottom-color:var(--line)}
+  .desk.libexpanded .listpanel .listcolwrap{display:none}
+  .desk.libexpanded .listpanel .qtable col:first-child{width:34px!important}
+}

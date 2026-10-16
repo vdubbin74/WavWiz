@@ -104,3 +104,13 @@ test('L30 sorted column + Sorted-by chip use the theme accent only; chip clear a
   assert.match(block, /th\.sorted\{[^}]*var\(--accent/); assert.match(block, /\.sortchip\{[^}]*var\(--accent/);
   assert.doesNotMatch(block.slice(0, block.indexOf('.listpanel .plus:disabled')), /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'no fixed colors: every theme (Pepecoin brand colors included) flows through the accent variable');
 });
+
+test('every new 0.3.7 helper a module calls is imported there (a missing import blanks the page)', () => {
+  const need = { 'now.js': ['shortcutsRow'], 'main.js': ['attachReorder', 'canDragRows', 'loadLayout', 'saveLayout', 'setLocked', 'listenFromMini', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'reduced', 'pulse'], 'mini.js': ['shortcutsRow', 'sendToMain'],
+    'menu.js': ['icon', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'toast'], 'listtable.js': ['canDragRows', 'APPLY_SORT_Q', 'ask', 'toast', 'applySort', 'sortAllowed', 'SORT_LOCK_HINT', 'CLEAR_LOCK_HINT', 'sortChipText', 'movesFor', 'sortedIndexes'],
+    'centerview.js': ['soundSettings', 'icon', 'setIcon', 'saveEqLock', 'loadEqLock', 'flatEq'], 'calibrate.js': ['undoToast', 'api'], 'devices.js': ['centerEq'] };
+  for (const [f, names] of Object.entries(need)) {
+    const s = src(f), imports = [...s.matchAll(/^import\s*\{([^}]*)\}\s*from/gm)].map(m => m[1]).join(',') + ' ' + [...s.matchAll(/^(?:export )?(?:async )?(?:function|const|let) ([A-Za-z0-9_$]+)/gm)].map(m => m[1]).join(' ');
+    for (const n of names) assert.ok(new RegExp(`\\b${n}\\b`).test(imports), `${f} uses ${n} without importing / defining it`);
+  }
+});
