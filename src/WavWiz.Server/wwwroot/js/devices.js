@@ -678,7 +678,7 @@ export function devicesPanel(S, ctl) {
   // 0.2.3 U7: the DEVICES title sits at the right edge, the true mirror image of LIBRARY at the left edge of the Library header
   // 0.3.0 §6: two controls kept apart - Expand on the inner edge (becomes "⤡ Esc"), chevron on the outer edge; a 30 px rail with icon + title
   root.append(h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '◉'), h('span', { class: 'prail-t' }, 'DEVICES'), h('span', { class: 'prail-n', title: 'Devices online / total' })),
-    h('div', { class: 'pane-h devhead' }, expBtn, h('button', { type: 'button', class: 'btn sm libswap', title: 'Show the playlist here again', onclick: ev => { ev.stopPropagation(); ctl.libSwap?.(false); } }, '‹ Playlist'), h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES'), colBtn), body);   // 0.3.5 J11
+    h('div', { class: 'pane-h devhead' }, expBtn, h('button', { type: 'button', class: 'btn sm libswap', title: 'Show the queue here again', onclick: ev => { ev.stopPropagation(); ctl.libSwap?.(false); } }, '‹ Queue'), h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES'), colBtn), body);   // 0.3.5 J11
   root.addEventListener('click', ev => { if (size === 'collapsed' && !ev.target.closest('.devcol')) ctl.toggleDev?.(false); });
   const setSize = (s, highlight = null) => {
     size = s; hl = highlight;

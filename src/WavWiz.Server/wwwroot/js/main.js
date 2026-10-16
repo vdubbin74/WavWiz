@@ -1,6 +1,7 @@
 import './sliderstyle.js';   // 0.3.3 G11
 import './pwa.js';   // 0.3.4 H1
 import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
+import { clearQueueFlow } from './queueclear.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
@@ -450,7 +451,7 @@ function drawQueue() {
       can ? h('button', { class: 'more', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
   });
   root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow', style: 'margin:0' }, 'Queue'), h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
-    can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save as playlist'), h('button', { class: 'btn', onclick: () => act('/queue/clear') }, 'Clear')] : null),
+    can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear')] : null),
     S.queue.length ? h('div', { class: 'list' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)

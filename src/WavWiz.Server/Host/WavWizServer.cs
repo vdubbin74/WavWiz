@@ -26,7 +26,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var ffmpeg = cfg.ResolveFfmpeg();
         var events = new EventHub(); var auth = new AuthService(db);
         var lib = new Library.LibraryService(db);
-        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs };
+        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs }; cond.EnablePersistence();   // 0.3.7 L15
         var clockHost = new Net.ClockHost(cfg, cond.Clock); clockHost.Start();
         var audio = new Net.AudioHost(cfg, auth, cond.Clock, clockHost) { Log = u._log.Write }; audio.Start();
         var dsp = new Dsp.DspService(db);

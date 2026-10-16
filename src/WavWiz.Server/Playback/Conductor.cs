@@ -397,5 +397,54 @@ public sealed class Conductor : IDisposable
         return new NowPlaying(state, idx, pos, item?.DurationMs ?? 0, item, item?.Kind == "radio" ? (_liveTitle ?? _radio?.NowPlaying) : null, _notice, _shuffle, _repeat.ToString().ToLowerInvariant(), Interlocked.Read(ref _version));
     }
 
-    public void Dispose() { _timer.Dispose(); lock (_l) { DisposeSource(); } }
+    // ---------------- 0.3.7 L15: the last queue, track and position survive an unexpected exit (restored PAUSED, with a small note) ----------------
+    private Timer? _persistTimer; private string? _lastSaved;
+    public const string LastQueueKey = "playback.lastQueue";
+    public void EnablePersistence() { RestoreLast(); _persistTimer ??= new Timer(_ => SaveLast(), null, 2000, 2000); }
+    public string BuildLastJson()
+    {
+        lock (_l)
+        {
+            var np = NowNoLock();
+            var items = _queue.Where(q => !IsReceiver(q.Kind)).Select(q => new { k = q.Kind, id = q.RefId, u = q.RefId == null ? q.Location : null, t = q.RefId == null ? q.Title : null }).ToList();
+            int idx = Math.Clamp(np.Index, 0, Math.Max(0, items.Count - 1));
+            return System.Text.Json.JsonSerializer.Serialize(new { v = 1, index = idx, posMs = np.State == "stopped" ? 0 : np.PositionMs, items });
+        }
+    }
+    public void SaveLast() { try { var json = BuildLastJson(); if (json != _lastSaved) { _db.SetSetting(LastQueueKey, json); _lastSaved = json; } } catch { /* a failed save never disturbs playback */ } }
+    /// <summary>Puts the saved queue back (paused at the saved track and position). Returns the number of tracks restored.</summary>
+    public int RestoreLast()
+    {
+        try
+        {
+            var raw = _db.Setting(LastQueueKey); if (string.IsNullOrWhiteSpace(raw)) return 0;
+            using var doc = System.Text.Json.JsonDocument.Parse(raw); var root = doc.RootElement;
+            if (!root.TryGetProperty("items", out var arr) || arr.ValueKind != System.Text.Json.JsonValueKind.Array) return 0;
+            var list = new List<QueueItem>(); int want = root.TryGetProperty("index", out var ix) ? ix.GetInt32() : 0, newIdx = 0;
+            int pos = 0;
+            foreach (var e in arr.EnumerateArray())
+            {
+                var kind = e.GetProperty("k").GetString(); long? id = e.TryGetProperty("id", out var idp) && idp.ValueKind == System.Text.Json.JsonValueKind.Number ? idp.GetInt64() : null;
+                QueueItem? it = null;
+                if (kind == "track" && id != null) it = TracksToItems(new[] { id.Value }).FirstOrDefault();
+                else if (kind == "radio" && id != null) it = StationToItem(id.Value);
+                else if (kind == "radio" && e.TryGetProperty("u", out var up) && up.GetString() is { Length: > 0 } url) it = UrlItem(url, e.TryGetProperty("t", out var tp) ? tp.GetString() ?? "" : "");
+                if (pos++ == want) newIdx = list.Count;
+                if (it != null) list.Add(it);
+            }
+            if (list.Count == 0) return 0;
+            long posMs = root.TryGetProperty("posMs", out var pm) ? pm.GetInt64() : 0;
+            lock (_l)
+            {
+                if (_queue.Count > 0) return 0;
+                _queue.AddRange(list.Select(WithId)); _unshuffled = null; _index = Math.Clamp(newIdx, 0, _queue.Count - 1);
+                _pausedMs = _queue[_index].Kind == "radio" ? 0 : Math.Clamp(posMs, 0, Math.Max(0, _queue[_index].DurationMs - 1000)); _state = PlayState.Paused;
+                _notice = $"Restored your last queue ({_queue.Count} track{(_queue.Count == 1 ? "" : "s")}), paused where you left off."; Bump();
+            }
+            _events.Publish("queue", null); _events.Publish("now", null); return list.Count;
+        }
+        catch { return 0; }
+    }
+
+    public void Dispose() { _persistTimer?.Dispose(); SaveLast(); _timer.Dispose(); lock (_l) { DisposeSource(); } }
 }

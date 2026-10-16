@@ -34,6 +34,12 @@ export function toast(msg, bad = false, ms = 4500) {
   document.getElementById('toasts').append(t); setTimeout(() => t.remove(), ms);
 }
 
+/** 0.3.7 L14: a short toast with an Undo button (6 s). */
+export function undoToast(msg, undo, ms = 6000) {
+  const b = h('button', { class: 'btn sm', type: 'button', 'data-act': 'undo', onclick: async () => { t.remove(); try { await undo(); } catch (e) { toast(e.message || 'Could not undo', true); } } }, 'Undo');
+  const t = h('div', { class: 'toast undo', role: 'status' }, h('span', null, msg), b);
+  document.getElementById('toasts').append(t); setTimeout(() => t.remove(), ms); return t;
+}
 export const fmtTime = ms => { if (ms == null || !isFinite(ms) || ms < 0) return '--:--'; const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 export const fmtDur = ms => { const s = Math.floor(ms / 1000), hh = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return hh ? `${hh}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`; };
 
