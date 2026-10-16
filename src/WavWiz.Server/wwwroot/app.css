@@ -2433,3 +2433,13 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .mpin{margin-left:auto;padding-left:10px;opacity:.35;font-size:11px;cursor:pointer}.mpanel button:hover .mpin,.mpin.on{opacity:.95}.mpanel button{display:flex;align-items:center}
 .np-ctlpanel .pane-h .scrow{margin-left:auto;margin-right:6px}
 .npbar .npb-sc{margin-left:8px}
+/* 0.3.7 L7: All sound settings (in place under the EQ) + the one padlock */
+.np-eqhead{display:flex;align-items:center;gap:8px}
+.np-eqview.allopen{overflow:auto}
+.eqall{display:grid;gap:10px;padding:10px 12px;margin-top:8px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.eqall.locked{opacity:.72}.eqall-lock{margin:0;color:var(--accent)}
+.eqall .eqknobs{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.eqall .eqsws{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.eqall-top{gap:8px;flex-wrap:wrap}.eqall-name{width:150px}
+.eqallbtn.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.eqpadlock.on{color:var(--accent)}

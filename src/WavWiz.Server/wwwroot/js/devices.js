@@ -1,6 +1,6 @@
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
-import { openEq } from './eq.js';
+import { centerEq } from './centerview.js';
 import { latencyControl, clampMs } from './latency.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, isAdmin, canTune, ADMIN_HINT, thisDevice } from './ui.js';
@@ -480,7 +480,7 @@ function cardSettings(S, ctl, z) {
     cur ? sec('DELAY', h('div', { class: 'ddelay' }, delay, calib), note) : null,
     h('div', { class: 'dssec' }, h('div', { class: 'row dsbtns' },
       btn('Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.'),
-      btn('Sound / EQ', ev => { const b = ev.currentTarget; if (eqHost.firstChild) { eqHost.replaceChildren(); b.classList.remove('on'); return; } b.classList.add('on'); openEq(S, ctl.refreshAll, cur?.deviceId, eqHost); }, tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
+      btn('Sound / EQ', ev => { const b = ev.currentTarget; if (eqHost.firstChild) { eqHost._eq?.destroy(); eqHost._eq = null; eqHost.replaceChildren(); b.classList.remove('on'); return; } b.classList.add('on'); eqHost._eq = centerEq(S, eqHost, { deviceId: cur?.deviceId }); }   /* 0.3.7 L7: the SAME EQ + All sound settings as the center, for this speaker */, tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
       h('span', { class: 'grow' }), more)),
     eqHost, histHost,
     conn);

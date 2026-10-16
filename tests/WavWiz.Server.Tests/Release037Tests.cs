@@ -177,4 +177,20 @@ public class Release037Tests
         var web = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot"); var man = System.IO.File.ReadAllText(System.IO.Path.Combine(web, "manifest.webmanifest")); Assert.Contains("\"display\": \"standalone\"", man);
         foreach (var png in new[] { "/assets/logo-192.png", "/assets/logo-512.png", "/assets/logo-180.png", "/assets/logo-maskable-512.png" }) Assert.True(System.IO.File.Exists(System.IO.Path.Combine(web, png.TrimStart('/'))), png);
     }
+
+    [Fact]
+    public void L7_the_purpose_based_presets_replace_the_generic_ones_and_every_one_is_legal()
+    {
+        Assert.Equal(17, WavWiz.Server.Dsp.DspService.PurposePresets.Length);   // Flat + 16
+        foreach (var (grp, name, p) in WavWiz.Server.Dsp.DspService.PurposePresets)
+        {
+            var n = p.Normalize(); Assert.Equal(p.GraphicDb.Select(x => x).ToArray(), n.GraphicDb);   // nothing needed clamping
+            Assert.All(n.GraphicDb, x => Assert.InRange(x, -12, 12)); Assert.False(string.IsNullOrWhiteSpace(name));
+        }
+        using var t = new TempDir(); var db = new Db(t.File("w.db")); db.Migrate();
+        var d = new WavWiz.Server.Dsp.DspService(db);
+        var names = d.Presets().Where(x => x.Source == "builtin").Select(x => x.Name).ToList();
+        Assert.Contains("Late Night", names); Assert.Contains("Subwoofer Zone", names); Assert.Contains("Classical", names);
+        Assert.DoesNotContain("Bass boost", names); Assert.DoesNotContain("Vocal / speech", names);
+    }
 }

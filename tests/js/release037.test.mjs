@@ -68,3 +68,14 @@ test('L28 pair QR shows the server address as text; Add to Home Screen uses the 
   assert.ok(man.icons.some(i => i.sizes === '192x192') && man.icons.some(i => i.sizes === '512x512') && man.icons.some(i => i.purpose === 'maskable'));
   const idx = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/index.html', import.meta.url), 'utf8'); assert.match(idx, /rel="manifest"/); assert.match(idx, /apple-mobile-web-app-capable/);
 });
+
+test('L7 purpose-based presets are grouped; All sound settings is in place, one padlock locks it, Speaker settings embeds the same EQ', async () => {
+  const m = await imp('eqsettings');
+  const names = m.PRESET_GROUPS.flatMap(g => g[1]); assert.equal(names.length, 16);
+  for (const n of ['Late Night', 'Party Loud', 'Background', 'Vocals / Podcasts', 'Movie Night', 'Bluetooth Speaker', 'Bookshelf', 'Tower', 'Subwoofer Zone', 'Headphones', 'Outdoor', 'Hip-Hop', 'Rock / Metal', 'Acoustic / Jazz', 'Electronic', 'Classical']) assert.ok(names.includes(n), n);
+  const presets = [{ id: 1, name: 'Flat', source: 'builtin' }, { id: 2, name: 'Late Night', source: 'builtin' }, { id: 3, name: 'Hip-Hop', source: 'builtin' }, { id: 9, name: 'Kitchen sound', source: 'user' }, { id: 7, name: 'Old thing', source: 'builtin' }];
+  const g = m.groupPresets(presets); assert.deepEqual(g.map(x => x.label), ['', 'Situation', 'Music', 'Other built-in', 'My sounds']); assert.equal(g[4].items[0].name, 'Kitchen sound');
+  const c = src('centerview.js'); assert.match(c, /All sound settings/); assert.match(c, /eqpadlock/); assert.match(c, /saveEqLock\(!loadEqLock\(\)\)/); assert.match(c, /all\.setLocked\(locked \|\| !ok\)/);
+  const e = src('eqsettings.js'); for (const w of ['Bass', 'Treble', 'Trim', 'Balance', 'Loudness', 'Limiter', 'Bypass', 'Auto pre-gain']) assert.match(e, new RegExp(`'${w}'`));
+  assert.match(e, /Save as/); assert.match(src('devices.js'), /centerEq\(S, eqHost, \{ deviceId: cur\?\.deviceId \}\)/); assert.doesNotMatch(src('devices.js'), /openEq\(S, ctl\.refreshAll/);
+});

@@ -14,16 +14,38 @@ public sealed class DspService
 
     public DspService(Db db) { _db = db; Seed(); }
 
+    /// <summary>0.3.7 L7: purpose-based built-in presets, grouped by situation / speaker type / music. Graphic bands: 31 62 125 250 500 1k 2k 4k 8k 16k Hz.</summary>
+    public static readonly (string Group, string Name, DspPreset P)[] PurposePresets =
+    {
+        ("", "Flat", DspPreset.Flat),
+        ("Situation", "Late Night", new DspPreset { GraphicDb = new double[] { -6, -4, -1, 0, 0, 1, 2, 1, 0, -2 }, Loudness = new LoudnessSettings(true, 70), Limiter = new LimiterSettings(true, -3, 120, 0) }),
+        ("Situation", "Party Loud", new DspPreset { GraphicDb = new double[] { 4, 4, 2, 0, -1, 0, 1, 3, 3, 2 }, Bass = new ShelfSettings(3, 100), TrimDb = -2 }),
+        ("Situation", "Background", new DspPreset { GraphicDb = new double[] { -3, -2, -1, 0, 0, 0, 0, -1, -2, -3 }, TrimDb = -3 }),
+        ("Situation", "Vocals / Podcasts", new DspPreset { GraphicDb = new double[] { -6, -5, -3, -1, 1, 3, 4, 3, 0, -2 } }),
+        ("Situation", "Movie Night", new DspPreset { GraphicDb = new double[] { 4, 3, 1, 0, 0, 2, 3, 1, 1, 2 }, Bass = new ShelfSettings(2, 80) }),
+        ("Speaker type", "Bluetooth Speaker", new DspPreset { GraphicDb = new double[] { -3, -2, 0, 0, 0, 1, 1, 2, 1, 0 }, Bass = new ShelfSettings(-2, 150) }),
+        ("Speaker type", "Bookshelf", new DspPreset { GraphicDb = new double[] { 2, 3, 2, 0, 0, 0, 0, 0, 1, 1 }, Bass = new ShelfSettings(2, 90) }),
+        ("Speaker type", "Tower", new DspPreset { GraphicDb = new double[] { -1, -1, -1, 0, 0, 0, 0, 1, 1, 1 } }),
+        ("Speaker type", "Subwoofer Zone", new DspPreset { GraphicDb = new double[] { 3, 3, 1, -3, -6, -8, -8, -8, -8, -8 }, Bass = new ShelfSettings(3, 80) }),
+        ("Speaker type", "Headphones", new DspPreset { GraphicDb = new double[] { 2, 1, 0, -1, 0, 0, 1, 2, 1, 0 }, TrimDb = -2 }),
+        ("Speaker type", "Outdoor", new DspPreset { GraphicDb = new double[] { 5, 4, 2, 0, 0, 1, 2, 3, 3, 2 }, Bass = new ShelfSettings(4, 100) }),
+        ("Music", "Hip-Hop", new DspPreset { GraphicDb = new double[] { 5, 4, 2, 1, 0, -1, 0, 1, 2, 1 }, Bass = new ShelfSettings(3, 90) }),
+        ("Music", "Rock / Metal", new DspPreset { GraphicDb = new double[] { 3, 2, 1, -1, -2, 0, 2, 3, 3, 2 } }),
+        ("Music", "Acoustic / Jazz", new DspPreset { GraphicDb = new double[] { 0, 1, 2, 1, 0, 0, 1, 2, 2, 1 } }),
+        ("Music", "Electronic", new DspPreset { GraphicDb = new double[] { 4, 4, 1, 0, -2, 0, 1, 2, 3, 3 }, Bass = new ShelfSettings(2, 100) }),
+        ("Music", "Classical", new DspPreset { GraphicDb = new double[] { 0, 0, 0, 0, 0, 0, -1, -1, 0, 1 } }),
+    };
+    private static readonly string[] OldGenericPresets = { "Bass boost", "Vocal / speech", "Small speaker (tame bass)", "Bright room (softer treble)" };
+
     private void Seed()
     {
-        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM dsp_preset WHERE source='builtin'")) > 0) return;
         void Add(string name, DspPreset p) => _db.Insert("INSERT INTO dsp_preset(name,source,json,created_at,updated_at) VALUES($n,'builtin',$j,$t,$t)",
             ("$n", name), ("$j", JsonSerializer.Serialize(p.Normalize() with { Name = name }, J)), ("$t", DateTimeOffset.UtcNow.ToString("O")));
-        Add("Flat", DspPreset.Flat);
-        Add("Bass boost", new DspPreset { Bass = new ShelfSettings(5, 120) });
-        Add("Vocal / speech", new DspPreset { GraphicDb = new double[] { -4, -3, -2, 0, 1, 2, 3, 2, 0, -1 } });
-        Add("Small speaker (tame bass)", new DspPreset { Bass = new ShelfSettings(-4, 150), TrimDb = -1 });
-        Add("Bright room (softer treble)", new DspPreset { Treble = new ShelfSettings(-4, 8000) });
+        var have = new HashSet<string>(_db.Query("SELECT name FROM dsp_preset WHERE source='builtin'", r => r.GetString(0)));
+        foreach (var (_, name, p) in PurposePresets) if (!have.Contains(name)) Add(name, p);
+        // 0.3.7 L7: the four generic presets are replaced - except where a speaker still uses one (then it stays, so nothing changes under it)
+        foreach (var old in OldGenericPresets)
+            _db.Exec("DELETE FROM dsp_preset WHERE source='builtin' AND name=$n AND id NOT IN (SELECT dsp_preset_id FROM output_device_dsp WHERE dsp_preset_id IS NOT NULL) AND id NOT IN (SELECT dsp_preset_id FROM speaker_profile WHERE dsp_preset_id IS NOT NULL)", ("$n", old));
     }
 
     private static PresetRow Map(Microsoft.Data.Sqlite.SqliteDataReader r) =>
