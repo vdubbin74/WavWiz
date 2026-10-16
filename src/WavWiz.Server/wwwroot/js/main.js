@@ -40,6 +40,7 @@ import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
+import { installHotkeys } from './hotkeys.js';
 import { showPendingUndo } from './backupflow.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
@@ -204,6 +205,19 @@ async function startMain() {
     const t = ev.target.closest?.('.libpanel .pane-h, .devpanel .pane-h, .listpanel .pane-h, .np-stage'); if (!t || ev.target.closest('input,textarea,.plpicker')) return;
     const id = titleId(t); if (id === 'queue' && ev.target.closest('th')) return;
     ev.preventDefault(); togglePinFor(id);
+  });
+  // 0.3.8 L44: the approved global shortcuts (one table in hotkeys.js)
+  installHotkeys(id => {
+    switch (id) {
+      case 'playpause': return act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/play', S.now?.state === 'playing' ? undefined : {});
+      case 'next': return act('/stream/next');
+      case 'prev': return act('/stream/prev');
+      case 'mute': return [...document.querySelectorAll('.mutebtn')].find(b => b.getClientRects().length && !b.disabled)?.click();
+      case 'mini': try { if (window.chrome?.webview) { window.chrome.webview.postMessage({ cmd: 'mini', toggle: true }); return; } } catch { /* browser */ } return openMini();
+      case 'home': return goHome();
+      case 'settings': return runShortcut('settings');
+      default: return runShortcut(id);
+    }
   });
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();

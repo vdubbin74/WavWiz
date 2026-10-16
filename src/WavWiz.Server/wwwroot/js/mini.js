@@ -9,6 +9,7 @@ import { icon, setIcon } from './icons.js';
 import { itemArtUrl, setArtCv } from './art.js';
 import { fmtTime } from './util.js';
 import { shortcutsRow, sendToMain, writePending } from './shortcuts.js';
+import { installHotkeys } from './hotkeys.js';
 import { OPACITY_MIN, clampOpacity, loadOpacity, saveOpacity, fitText } from './minifit.js';
 
 const host = window.chrome?.webview;
@@ -63,6 +64,11 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   // 0.3.7 L10 / L11 / L23: the shortcuts row - Home far right, a separator, up to 3 pins leftward. The standalone window asks the main app window (it is brought to the front first).
   const toMain = target => { writePending(target); if (!send('full', { target })) { try { window.opener?.focus(); } catch { /* ignore */ } } sendToMain(target); };   // 0.3.8 L34: ONE click - bring the main window forward and carry the target with it
   const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => toMain({ run: id })), home: home || (() => toMain({ home: true })) });
+  // 0.3.8 L44: the same shortcuts inside the standalone window (Alt+M closes it, Alt+H opens the main window on Home)
+  if (!embedded) installHotkeys(id => {
+    if (id === 'playpause') play.click(); else if (id === 'next') next.click(); else if (id === 'prev') prev.click(); else if (id === 'mute') mute.click();
+    else if (id === 'mini') { if (!send('close')) window.close(); } else if (id === 'home') toMain({ home: true }); else if (['eq', 'queue', 'settings'].includes(id)) toMain({ run: id });
+  });
   root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])), sc.el);
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();

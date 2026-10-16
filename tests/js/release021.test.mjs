@@ -107,7 +107,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists…', 'Radio', 'Queue', 'Rescan folders', 'CD ripper', 'Tag & cover fix', 'Tidy up library']   /* 0.3.5 J16 menus */);
   assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Sound / EQ', 'Sleep timer', 'Start Jukebox…']);   // 0.3.5 J16
   assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Devices', 'Zones', 'Scenes', 'Schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16
-  assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', "What's new", 'Diagnostics', 'About WavWiz']);   // 0.3.5 J16
+  assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', "What's new", 'Keyboard shortcuts', 'Diagnostics', 'About WavWiz']);   // 0.3.5 J16
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
   assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n/   /* 0.3.5 J9 adds Access, Diagnostics, About */);   // 0.3.0 §7: General/Playback/Jukebox tabs
   assert.doesNotMatch(st, /id: 'sec-status'/);   // 0.3.5 J9 #1: About is a Settings section again (it was a popup)

@@ -1,6 +1,6 @@
 // Top menu: File / Library / Playback / Devices / Help. 0.2.1 F8: menus DO things, Settings SETS things - every item has exactly one home.
 // The View menu is gone: Theme, Visualizer, Now Playing style and Display size all live on Settings > Appearance. Phone hamburger reuses the same tree.
-import { h, api, toast } from './util.js';
+import { h, api, toast, dialog } from './util.js';
 import { openSettings } from './settings.js';
 import { openWhatsNew } from './about.js';
 import { openCalibration } from './calibrate.js';
@@ -10,6 +10,7 @@ import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 import { NEW_KEYS, sleepSpec, eqSpec, playlistsSpec, zonesSpec, scenesSpec, deviceListSpec, runSpec } from './menusub.js';
 import { icon } from './icons.js';
+import { keysFor, shortcutsBody } from './hotkeys.js';
 import { pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { importSettings, restoreBackup, exportSettings, backUpNow } from './backupflow.js';
 
@@ -39,7 +40,7 @@ function menuActions(S, ctl, desktop = false) {
     // 0.2.0 item 31: elevate in place (same pairing, same speaker), and drop back again - no sign-out, no new pairing code
     // 0.3.5 J16 (next-menus-*.png): menus open the inline homes from J8 / J9 - no page popups any more
     file: [
-      ['Settings', () => openSettings(S, refreshAll, go), null, null, { pin: 'settings' }],
+      ['Settings', () => openSettings(S, refreshAll, go), null, null, { pin: 'settings', kbd: keysFor('settings') }],
       'hr',
       // 0.3.6 K17 / K19: New ▸ (zone, scene, alarm, schedule) and Run ▸ (scenes, schedules, alarms - the only place to start them)
       ['New', null, null, null, { sub: () => [
@@ -61,7 +62,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Browse library', browseLib, null, null, { pin: 'library' }],
       ['Playlists…', () => go('playlists'), null, null, { sub: () => playlistsSpec(S, ctl) }],
       ['Radio', () => go('radio')],
-      ['Queue', listPanel, null, null, { pin: 'queue' }],
+      ['Queue', listPanel, null, null, { pin: 'queue', kbd: keysFor('queue') }],
       'hr',
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
       ['CD ripper', () => go('rip'), () => !admin()],
@@ -69,11 +70,11 @@ function menuActions(S, ctl, desktop = false) {
       ['Tidy up library', () => go('cleanup'), () => !admin()],
     ],
     playback: [
-      ['Play / Pause', () => { if (S.now?.state === 'playing') act('/stream/pause'); else act('/stream/play', {}); }],
-      ['Next', () => act('/stream/next')],
-      ['Previous', () => act('/stream/prev')],
+      ['Play / Pause', () => { if (S.now?.state === 'playing') act('/stream/pause'); else act('/stream/play', {}); }, null, null, { kbd: keysFor('playpause') }],
+      ['Next', () => act('/stream/next'), null, null, { kbd: keysFor('next') }],
+      ['Previous', () => act('/stream/prev'), null, null, { kbd: keysFor('prev') }],
       'hr',
-      ['Sound / EQ', () => go('eq'), null, null, { sub: () => eqSpec(S, ctl) , pin: 'eq' }],
+      ['Sound / EQ', () => go('eq'), null, null, { sub: () => eqSpec(S, ctl) , pin: 'eq', kbd: keysFor('eq') }],
       ['Sleep timer', () => go('sleep'), null, null, { sub: () => sleepSpec(S) , pin: 'sleep' }],
       'hr',
       ['Start Jukebox…', () => go('jukebox'), () => !admin()],   // 0.3.0 §1 (beta): admin only, read-only for others
@@ -87,7 +88,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Schedules & alarms', () => go('schedules'), null, null, { pin: 'alarms' }],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
-      ['Mini player', () => ctl.openMini?.()],
+      ['Mini player', () => ctl.openMini?.(), null, null, { kbd: keysFor('mini') }],
       'hr',
       ['Pair a player', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
       ['Away-from-home access', () => go('remote'), () => !admin()],
@@ -95,6 +96,7 @@ function menuActions(S, ctl, desktop = false) {
     help: [
       ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],
       ["What's new", () => openWhatsNew()],
+      ['Keyboard shortcuts', () => dialog('Keyboard shortcuts', shortcutsBody(h), [{ text: 'Close', cls: 'primary' }])],
       ['Diagnostics', () => go('diag')],
       ['About WavWiz', () => go('about')],
     ],
@@ -169,7 +171,7 @@ export function createMenuBar(S, ctl) {
       if (s === 'hr') return h('hr');
       const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
-      if (o?.sub) { const f = flyout(label, fn, o.sub, !!dis?.()); if (o.pin) f.querySelector(':scope > button')?.append(pinSpan(o.pin)); return f; }
+      if (o?.sub) { const f = flyout(label, fn, o.sub, !!dis?.()); if (o.kbd) f.querySelector(':scope > button')?.append(h('span', { class: 'kbd' }, o.kbd)); if (o.pin) f.querySelector(':scope > button')?.append(pinSpan(o.pin)); return f; }
       const b = item(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;     // 0.2.0 item 28: read-only, never hidden
       if (o?.pin) b.append(pinSpan(o.pin));
       if (o?.kbd) b.append(h('span', { class: 'kbd' }, o.kbd)); if (o?.heading) b.classList.add('mheading');

@@ -159,7 +159,7 @@ internal sealed class PlayerApp : ApplicationContext
         var open = new ToolStripMenuItem("Open player...", null, (_, _) => OpenUi()) { Font = new Font(SystemFonts.MenuFont!, FontStyle.Bold), ToolTipText = "Opens WavWiz (sign in as Player or Administrator)" }; _menu.Items.Add(open);
         // 0.3.5 J15/J16 (next-menus-tray.png): Start Jukebox... (Stop Jukebox... while it runs, with the usual confirm in the page)
         _menu.Items.Add(new ToolStripMenuItem(_jukeboxOn ? "Stop Jukebox..." : "Start Jukebox...", null, (_, _) => OpenUi(_jukeboxOn ? "jukebox-stop" : "jukebox")) { ToolTipText = _jukeboxOn ? "Guests can no longer add songs. The music keeps playing." : "Guests add songs from their phones (administrator)" });
-        _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
+        _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ShortcutKeyDisplayString = "Alt+M", ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
         _menu.Items.Add(new ToolStripMenuItem("Calibrate speakers...", null, (_, _) => OpenUi("calibrate")) { ToolTipText = "Measure every speaker's delay with this PC's microphone (or your phone)" });
         var outs = new ToolStripMenuItem("Output (speaker on this PC)");
         if (_client != null)
@@ -206,7 +206,7 @@ internal sealed class PlayerApp : ApplicationContext
             // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
             _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
         }
-        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(fromAppMenu: true), null); _web.JukeboxState += on => _jukeboxOn = on; _web.Show(); _web.Activate();
+        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += toggle => _ui.Post(_ => { if (toggle && _mini is { IsDisposed: false }) _mini.Close(); else OpenMini(fromAppMenu: true); }, null); _web.JukeboxState += on => _jukeboxOn = on; _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()

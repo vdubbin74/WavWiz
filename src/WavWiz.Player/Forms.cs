@@ -147,7 +147,7 @@ public sealed class WebUiForm : Form
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string? StartScreen { get; set; }
     /// <summary>0.3.2 F3: the page asked for the mini player.</summary>
-    public event Action? MiniRequested;
+    public event Action<bool>? MiniRequested;   // true = toggle (Alt+M): close the mini player when it is open
     /// <summary>0.3.5 J15: the page reports whether Jukebox is running (tray shows Start or Stop Jukebox...).</summary>
     public event Action<bool>? JukeboxState;
     /// <summary>0.3.0 §2: reload at a new address (remote mode on/off).</summary>
@@ -220,7 +220,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -341,8 +341,8 @@ public sealed class MiniPlayerForm : Form
         top.Click += (_, _) => { TopMost = !TopMost; _set.MiniPinned = TopMost; _set.Save(); Post(new { cmd = "pin", on = TopMost }); };
         m.Items.Add(top);
         m.Items.Add(new ToolStripSeparator());
-        m.Items.Add("Open the full app", null, (_, _) => _openFull());
-        m.Items.Add("Close", null, (_, _) => Close());
+        m.Items.Add(new ToolStripMenuItem("Open the full app", null, (_, _) => _openFull()) { ShortcutKeyDisplayString = "Alt+H" });
+        m.Items.Add(new ToolStripMenuItem("Close", null, (_, _) => Close()) { ShortcutKeyDisplayString = "Alt+M" });
         m.Closed += (_, _) => BeginInvoke(new Action(() => m.Dispose()));
         m.Show(Cursor.Position);
     }
