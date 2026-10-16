@@ -1,4 +1,3 @@
-const hoverItem = async (p, top, label) => { await p.click(`.menubar .mtop:text-is("${top}")`); const it = p.locator(`.menubar .mgroup.open > .mpanel > .msub > button:text-is("${label}"), .menubar .mgroup.open > .mpanel > button:text-is("${label}")`).first(); await it.hover(); await p.waitForTimeout(450); return it; };
   // 0.3.7: every EQ entry point -> the ONE center EQ (never the old Sound popup), on the shared glide + pulse
   await step('EQ entry points', async () => {
     for (const [vpn, vopt] of VPS) {

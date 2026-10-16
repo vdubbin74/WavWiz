@@ -1,0 +1,15 @@
+{
+  const SV = [['desktop', { viewport: { width: 1280, height: 720 } }], ['1080p', VPS[0][1]], ['1366', { viewport: { width: 1366, height: 768 } }], ['4k', VPS[3][1]], ['phone', VPS[2][1]]];
+  const OUT = (th, n) => `/workspace/screens/wavwiz-037-${ENG === 'webkit' ? 'webkit-' : ''}${th}-${n}.png`;
+  for (const th of THEMES) {
+    for (const [tag, opt] of SV) await step(`shots ${th} ${tag}`, async () => { const { ctx, p } = await newPage(opt); await home(p, NORMAL, th); await p.screenshot({ path: OUT(th, tag) }); ok(`shot ${th} ${tag}`, p._errs.length === 0, p._errs.join('|')); await ctx.close(); });
+    await step(`state shots ${th}`, async () => {
+      const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } }); await ZSTUB(p); await p.addInitScript(() => localStorage.setItem('wavwiz.center.v1', 'eq'));
+      await home(p, NORMAL, th); await p.click('.qtable th[data-col=artist]').catch(() => {}); await p.waitForTimeout(300); await p.screenshot({ path: OUT(th, 'l30-sorted') });
+      await p.click('.eqallbtn:not([disabled])').catch(() => {}); await p.waitForTimeout(500); await p.screenshot({ path: OUT(th, 'l7-allsound') });
+      await home(p, { ...NORMAL, exp: 'dev' }, th); await p.screenshot({ path: OUT(th, 'l3-devices') });
+      await home(p, { ...NORMAL, exp: 'lib' }, th); await p.screenshot({ path: OUT(th, 'l9-library-open') });
+      await home(p, { ...NORMAL, list: 'expanded', dev: 'rail' }, th); await p.hover('.minicol').catch(() => {}); await p.waitForTimeout(400); await p.screenshot({ path: OUT(th, 'l10-hover') });
+      ok(`state shots ${th} no errors`, p._errs.length === 0, p._errs.join('|')); await ctx.close(); });
+  }
+}

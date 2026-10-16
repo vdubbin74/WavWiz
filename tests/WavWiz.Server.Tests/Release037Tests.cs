@@ -193,4 +193,16 @@ public class Release037Tests
         Assert.Contains("Late Night", names); Assert.Contains("Subwoofer Zone", names); Assert.Contains("Classical", names);
         Assert.DoesNotContain("Bass boost", names); Assert.DoesNotContain("Vocal / speech", names);
     }
+
+    [Fact]
+    public void L31_mini_player_from_the_app_menu_is_always_on_top_and_minimizes_the_main_window_but_tray_open_does_not()
+    {
+        Assert.Equal((true, true), WavWiz.PlayerCore.MiniPlayer.OpenPlan(fromAppMenu: true, savedPinned: false));
+        Assert.Equal((true, true), WavWiz.PlayerCore.MiniPlayer.OpenPlan(true, true));
+        Assert.Equal((false, false), WavWiz.PlayerCore.MiniPlayer.OpenPlan(fromAppMenu: false, savedPinned: false));   // tray / other: nothing changes
+        Assert.Equal((true, false), WavWiz.PlayerCore.MiniPlayer.OpenPlan(false, true));                            // the saved Keep on top still rules, main window stays
+        var app = System.IO.File.ReadAllText(System.IO.Path.Combine(FindRepo(), "src", "WavWiz.Player", "PlayerApp.cs"));
+        Assert.Contains("OpenMini(fromAppMenu: true)", app); Assert.Contains("_web.WindowState = FormWindowState.Minimized", app); Assert.Contains("MiniPlayer.OpenPlan(fromAppMenu", app);
+    }
+    private static string FindRepo() { var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory); while (d != null && !System.IO.Directory.Exists(System.IO.Path.Combine(d.FullName, "src", "WavWiz.Player"))) d = d.Parent; return d!.FullName; }
 }

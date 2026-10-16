@@ -2479,3 +2479,10 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.libexpanded .listpanel .listcolwrap{display:none}
   .desk.libexpanded .listpanel .qtable col:first-child{width:34px!important}
 }
+/* 0.3.7 L10: Devices collapsed -> ONE small music-note button bottom right; hovering it floats the SAME mini player (shortcuts row + Home far right) to its left. No strip, no cover art. */
+@media (min-width:901px){
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol{width:36px;height:36px;min-height:36px;justify-self:end;align-self:end;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);display:grid;place-items:center;cursor:pointer}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol::before{content:'♪';color:var(--accent-text,var(--accent));font-size:18px;line-height:1}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{right:calc(100% + 8px);bottom:0;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);width:var(--minipop,420px)}
+}
+.eqall-preset{flex:0 1 280px;min-width:200px}.eqall-top .eqall-name{flex:0 1 190px;width:auto}

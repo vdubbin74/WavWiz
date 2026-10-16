@@ -1,0 +1,10 @@
+await step('L20-L26 calibration UI in the browser', async () => {
+  const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } }); await home(p, NORMAL);
+  await p.evaluate(async () => { const m = await import('/js/main.js'); m.go('calibrate'); }); await p.waitForTimeout(1500);
+  const r = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), vol: !!document.querySelector('input[aria-label="Test volume"]'), txt: document.querySelector('dialog[open]')?.textContent.slice(0, 200) }));
+  ok('L20 calibration dialog has a Test volume slider', r.dlg && r.vol, JSON.stringify(r));
+  await p.screenshot({ path: `/workspace/screens/wavwiz-037-${ENG}-l20-calibrate.png` });
+  const unit = await p.evaluate(async () => { const m = await import('/js/calibrate.js'); return { a: m.confText(0.92), b: m.confText(160), c: m.confText(NaN), d: m.confText(68), rate: m.RATE_WORD }; });
+  ok('L26 confidence never above 100% or invalid', unit.a === '92%' && unit.b === '100%' && unit.c === '—' && unit.d === '100%', JSON.stringify(unit));
+  await closeDlg(p); ok('calibration no page errors', !p._errs.length, p._errs.join('|')); await ctx.close();
+});

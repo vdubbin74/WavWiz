@@ -114,3 +114,11 @@ test('every new 0.3.7 helper a module calls is imported there (a missing import 
     for (const n of names) assert.ok(new RegExp(`\\b${n}\\b`).test(imports), `${f} uses ${n} without importing / defining it`);
   }
 });
+
+test('L31/L23 standalone mini player: Home focuses the main window then goes Home; the in-app mini path is untouched', () => {
+  const mini = src('mini.js'), main = src('main.js');
+  assert.match(mini, /const focusMain = \(\) => \{ if \(!send\('full'\)\)/); assert.match(mini, /home: home \|\| \(\(\) => \{ focusMain\(\); sendToMain\(\{ home: true \}\)/);
+  assert.match(main, /export function openMini\(\) \{[\s\S]*?cmd: 'mini'[\s\S]*?window\.open\('\/mini\.html'/);
+  assert.match(main, /mountMini\(host, \{ embedded: true, run: runShortcut, home: goHome \}\)/);   // the embedded (in-app) mini runs the shortcuts directly, never through the window channel
+  assert.match(main, /listenFromMini\(msg => \{ if \(msg\.home\) goHome\(\)/);
+});

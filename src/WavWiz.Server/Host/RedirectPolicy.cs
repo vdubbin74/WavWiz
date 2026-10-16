@@ -11,7 +11,7 @@ public static class RedirectPolicy
     /// <summary>0.2.3 fix: the static files the phone set-up pages (/tls/setup, /tls/check) load. They must come over plain http from the same origin as the page:
     /// redirected to https they are blocked by the page's CSP ('self' = the http origin), refused as a cross-origin module script, and on a phone that does not
     /// trust WavWiz yet they could not load anyway. These are public, non-secret files (no auth gate on static files); only the redirect is skipped.</summary>
-    public static readonly string[] SetupPageAssets = { "/tls.css", "/js/tls-setup.js", "/assets/logo-64.png", "/favicon.ico",
+    public static readonly string[] SetupPageAssets = { "/tls.css", "/js/tls-setup.js", "/assets/logo-64.png", "/favicon.ico", "/manifest.webmanifest", "/assets/logo-180.png", "/assets/logo-192.png", "/assets/logo-512.png",   // 0.3.7 L28: the set-up page now links the manifest + home-screen icons
         // 0.2.5: the phone's mic-only calibration page shows the one-time certificate steps over plain http when the phone does not trust WavWiz yet,
         // then moves itself to https - so it and its own files are never redirected (same lesson as the set-up page: page AND its assets)
         "/calmic.html", "/calmic.css", "/js/calmic.js", "/js/calmic-core.js", "/js/calerrors.js", "/js/roomsched.js" };

@@ -104,11 +104,13 @@ internal sealed class PlayerApp : ApplicationContext
 
     private MiniPlayerForm? _mini;
     /// <summary>0.3.2 F3: the mini player (replaces Remote mode). It never touches the speaker stream (F2).</summary>
-    private void OpenMini()
+    private void OpenMini(bool fromAppMenu = false)
     {
         if (_exiting) return;
-        if (_mini is { IsDisposed: false }) { _mini.Show(); _mini.Activate(); return; }
-        _mini = new MiniPlayerForm(_s, () => OpenUi()); _mini.FormClosed += (_, _) => _mini = null; _mini.Show();
+        var plan = MiniPlayer.OpenPlan(fromAppMenu, _s.MiniPinned);   // 0.3.7 L31: chosen from the app's menu -> always on top AND the main window steps aside (Home on the mini player brings it back)
+        if (_mini is { IsDisposed: false }) { _mini.Show(); _mini.TopMost = plan.TopMost; _mini.Activate(); }
+        else { if (plan.TopMost && !_s.MiniPinned) { _s.MiniPinned = true; _s.Save(); } _mini = new MiniPlayerForm(_s, () => OpenUi()); _mini.FormClosed += (_, _) => _mini = null; _mini.Show(); }
+        if (plan.MinimizeMain && _web is { IsDisposed: false }) _web.WindowState = FormWindowState.Minimized;
     }
 
     private int _refinding;
@@ -204,7 +206,7 @@ internal sealed class PlayerApp : ApplicationContext
             // 0.2.2 T7: bring it to the front even when another app has the focus (a second launch from the Start menu)
             _web.TopMost = true; _web.Activate(); _web.BringToFront(); _web.TopMost = false; return;
         }
-        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(), null); _web.JukeboxState += on => _jukeboxOn = on; _web.Show(); _web.Activate();
+        _web = new WebUiForm(_s) { StartScreen = screen }; _web.MiniRequested += () => _ui.Post(_ => OpenMini(fromAppMenu: true), null); _web.JukeboxState += on => _jukeboxOn = on; _web.Show(); _web.Activate();
     }
 
     private void ApplyAutostart()
