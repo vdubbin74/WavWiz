@@ -8,6 +8,7 @@ import { applyTheme, loadTheme } from './theme.js';
 import { icon, setIcon } from './icons.js';
 import { itemArtUrl, setArtCv } from './art.js';
 import { fmtTime } from './util.js';
+import { shortcutsRow, sendToMain } from './shortcuts.js';
 import { OPACITY_MIN, clampOpacity, loadOpacity, saveOpacity, fitText } from './minifit.js';
 
 const host = window.chrome?.webview;
@@ -16,7 +17,7 @@ export const send = (cmd, extra = {}) => { try { host?.postMessage({ cmd, ...ext
 export const shownOpacity = (opacPct, { hover: hv = false, adjusting: adj = false } = {}) => (hv && !adj ? 100 : opacPct);
 
 /** 0.3.6 K14 / K22: the mini player as a component. The page (mini.html, popup or Player window) mounts it full size; the main app mounts it with { embedded: true } in the right-hand column. */
-export function mountMini(root, { embedded = false } = {}) {
+export function mountMini(root, { embedded = false, run = null, home = null } = {}) {
   let now = null, level = 0, muted = false, pinned = false, dragging = false, timer = 0;
   try { pinned = localStorage.getItem('wavwiz.mini.pin') === '1'; } catch { /* ignore */ }
 
@@ -59,7 +60,10 @@ export function mountMini(root, { embedded = false } = {}) {
   window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.mini.opacity') setOpac(loadOpacity(), false); });   // Settings > Appearance changed it
   (embedded ? root : document).addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });
   const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute), h('div', { class: 'mp-vol' }, vol, opRow));
-  root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])));
+  // 0.3.7 L10 / L11 / L23: the shortcuts row - Home far right, a separator, up to 3 pins leftward. The standalone window asks the main app window (it is brought to the front first).
+  const focusMain = () => { if (!send('full')) { try { window.opener?.focus(); } catch { /* ignore */ } } };
+  const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => { focusMain(); sendToMain({ run: id }); }), home: home || (() => { focusMain(); sendToMain({ home: true }); }) });
+  root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])), sc.el);
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();
   if (!embedded) host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'opacity' && Number.isFinite(+m.value)) setOpac(Math.round(+m.value * 100)); if (m.cmd === 'pin') { pinned = !!m.on; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } paintPin(); } });
@@ -87,7 +91,7 @@ export function mountMini(root, { embedded = false } = {}) {
   }
   if (embedded) { root.classList.add('embedded'); paintPin(); poll(); timer = setInterval(poll, 1000); }
   else (async () => { try { const s = await api('/auth/state'); setArtCv(s.artCv); } catch { /* ignore */ } paintPin(); send('ready', { pinned, opacity: opac / 100 }); poll(); timer = setInterval(poll, 1000); })();
-  return { root, rail, poll, destroy: () => clearInterval(timer), setOpac, applyOpacity };
+  return { root, rail, poll, destroy: () => { clearInterval(timer); sc.destroy(); }, setOpac, applyOpacity };
 
 }
 

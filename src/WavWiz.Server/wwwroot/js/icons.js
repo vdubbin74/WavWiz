@@ -38,6 +38,14 @@ const P = {
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',   // 0.2.3 U9: Lock EQ
   wave: '<path d="M3 12h1.5M6.5 8v8M10 5v14M13.5 9v6M17 7v10M20.5 11v2"/>',
   opacity: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 7h5M12 11h7M12 15h6" stroke-width="1.5"/>',
+  home: '<path d="M3.5 11.2 12 4l8.5 7.2"/><path d="M5.8 10v9.5h4.4v-5h3.6v5h4.4V10"/>',   // 0.3.7 L5/L11: Home
+  queue: '<path d="M4 6.5h12M4 12h12M4 17.5h7"/><path d="M18.5 14.2v5.3m-2.6-2.65h5.2" />',
+  library: '<path d="M5 4.5v15M10 4.5v15"/><path d="m14.4 5.6 4.4 13.6"/>',
+  devices: '<rect x="6" y="3.5" width="12" height="17" rx="2"/><circle cx="12" cy="14.5" r="3"/><circle cx="12" cy="7.5" r="1"/>',
+  scenes: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9.5h17M8 5 6 9.5M13 5l-2 4.5"/>',
+  moon: '<path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4M6 6l1.7 1.7M16.3 16.3 18 18M18 6l-1.7 1.7M7.7 16.3 6 18"/>',
+  alarm: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 1.5M4.5 5.5 7 3.5M19.5 5.5 17 3.5"/>',
   pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',   // 0.3.2 F3 mini player: always on top
 };
 export const ICON_NAMES = Object.keys(P);

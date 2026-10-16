@@ -149,4 +149,21 @@ public class Release037Tests
         Assert.Equal("failed", s.Phase); Assert.Contains("Kitchen was silent", s.Error); Assert.Contains("Kitchen", s.Silent);
         cs.End(s);
     }
+
+    [Fact]
+    public async Task L28_the_pair_qr_carries_the_six_digit_code_to_the_phone_setup_page_and_nothing_else()
+    {
+        await using var f = await ServerFixture.StartAsync();
+        var plain = await f.Http.GetStringAsync("/tls/qr.svg?to=setup");
+        var pair = await f.Http.GetStringAsync("/tls/qr.svg?to=pair&code=123456");
+        var other = await f.Http.GetStringAsync("/tls/qr.svg?to=pair&code=654321");
+        Assert.Contains("<svg", pair); Assert.NotEqual(plain, pair); Assert.NotEqual(pair, other);   // the code is inside the QR
+        Assert.Equal(plain, await f.Http.GetStringAsync("/tls/qr.svg?to=pair&code=12ab56"));          // junk is dropped, never carried
+        Assert.Equal(plain, await f.Http.GetStringAsync("/tls/qr.svg?to=pair"));
+        var setup = await f.Http.GetStringAsync("/tls/setup?pair=123456"); Assert.Contains("tls-setup.js", setup);
+        var js = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "tls-setup.js"));
+        Assert.Contains("?pair=${pairQ}", js);
+        var st = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "settings.js")); Assert.Contains("to=pair&code=", st);
+        var mn = System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "main.js")); Assert.Contains("value: CAL.pair || ''", mn);
+    }
 }

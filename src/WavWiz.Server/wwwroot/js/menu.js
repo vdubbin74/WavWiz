@@ -9,9 +9,19 @@ import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 import { NEW_KEYS, sleepSpec, eqSpec, playlistsSpec, zonesSpec, scenesSpec, deviceListSpec, runSpec } from './menusub.js';
+import { icon } from './icons.js';
+import { pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { importSettings, restoreBackup, exportSettings, backUpNow } from './backupflow.js';
 
 
+/** 0.3.7 L8: a small pin on a menu row pins / unpins that destination as a shortcut (max 3; Home + pins live in the Now Playing bar and the mini player). */
+function pinSpan(id) {
+  const on = () => loadPins().includes(id);
+  const s = h('span', { class: 'mpin', role: 'button', tabindex: '-1', 'data-pin': id });
+  const paint = () => { const p = on(); s.classList.toggle('on', p); s.title = p ? 'Unpin from shortcuts' : 'Pin to shortcuts'; s.setAttribute('aria-label', s.title); s.setAttribute('aria-pressed', String(p)); if (!s.firstChild) s.append(icon('pin')); };
+  s.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); const r = pinToggle(id); if (r.full) toast(`All ${MAX_PINS} shortcut slots are taken - unpin one first.`, true); else toast(r.pins.includes(id) ? `Pinned: ${pinInfo(id).label}` : `Unpinned: ${pinInfo(id).label}`); paint(); });
+  window.addEventListener('wavwiz:pins', paint); paint(); return s;
+}
 function menuActions(S, ctl, desktop = false) {
   const { go, refreshAll, act } = ctl;
   // 0.0.8: on the desktop layout "Browse library" and "Devices & zones" slide their side panel in or out (no separate page);
@@ -29,7 +39,7 @@ function menuActions(S, ctl, desktop = false) {
     // 0.2.0 item 31: elevate in place (same pairing, same speaker), and drop back again - no sign-out, no new pairing code
     // 0.3.5 J16 (next-menus-*.png): menus open the inline homes from J8 / J9 - no page popups any more
     file: [
-      ['Settings', () => openSettings(S, refreshAll, go)],
+      ['Settings', () => openSettings(S, refreshAll, go), null, null, { pin: 'settings' }],
       'hr',
       // 0.3.6 K17 / K19: New ▸ (zone, scene, alarm, schedule) and Run ▸ (scenes, schedules, alarms - the only place to start them)
       ['New', null, null, null, { sub: () => [
@@ -48,10 +58,10 @@ function menuActions(S, ctl, desktop = false) {
       ['Sign out', async () => { try { await api('/auth/logout', { method: 'POST' }); location.reload(); } catch (e) { toast(e.message, true); } }],
     ],
     library: [
-      ['Browse library', browseLib],
+      ['Browse library', browseLib, null, null, { pin: 'library' }],
       ['Playlists…', () => go('playlists'), null, null, { sub: () => playlistsSpec(S, ctl) }],
       ['Radio', () => go('radio')],
-      ['Queue', listPanel],
+      ['Queue', listPanel, null, null, { pin: 'queue' }],
       'hr',
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
       ['CD ripper', () => go('rip'), () => !admin()],
@@ -63,18 +73,18 @@ function menuActions(S, ctl, desktop = false) {
       ['Next', () => act('/stream/next')],
       ['Previous', () => act('/stream/prev')],
       'hr',
-      ['Sound / EQ', () => go('eq'), null, null, { sub: () => eqSpec(S, ctl) }],
-      ['Sleep timer', () => go('sleep'), null, null, { sub: () => sleepSpec(S) }],
+      ['Sound / EQ', () => go('eq'), null, null, { sub: () => eqSpec(S, ctl) , pin: 'eq' }],
+      ['Sleep timer', () => go('sleep'), null, null, { sub: () => sleepSpec(S) , pin: 'sleep' }],
       'hr',
       ['Start Jukebox…', () => go('jukebox'), () => !admin()],   // 0.3.0 §1 (beta): admin only, read-only for others
     ],
     devices: [
-      ['Devices & zones', devPanel],
+      ['Devices & zones', devPanel, null, null, { pin: 'devices' }],
       // 0.3.6 K18: hover submenus listing devices, zones and scenes (click jumps to it), each ending with New… (no Start buttons: File > Run is the one place to start)
       ['Devices', devPanel, null, null, { sub: () => deviceListSpec(S, { ...ctl, canAdmin: admin }) }],
       ['Zones', devPanel, null, null, { sub: () => zonesSpec(S, { ...ctl, canAdmin: admin }) }],
-      ['Scenes', () => go('scenes'), null, null, { sub: () => scenesSpec(S, { ...ctl, canAdmin: admin }) }],
-      ['Schedules & alarms', () => go('schedules')],
+      ['Scenes', () => go('scenes'), null, null, { sub: () => scenesSpec(S, { ...ctl, canAdmin: admin }) , pin: 'scenes' }],
+      ['Schedules & alarms', () => go('schedules'), null, null, { pin: 'alarms' }],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
       ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
       ['Mini player', () => ctl.openMini?.()],
@@ -159,8 +169,9 @@ export function createMenuBar(S, ctl) {
       if (s === 'hr') return h('hr');
       const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
-      if (o?.sub) return flyout(label, fn, o.sub, !!dis?.());
+      if (o?.sub) { const f = flyout(label, fn, o.sub, !!dis?.()); if (o.pin) f.querySelector(':scope > button')?.append(pinSpan(o.pin)); return f; }
       const b = item(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;     // 0.2.0 item 28: read-only, never hidden
+      if (o?.pin) b.append(pinSpan(o.pin));
       if (o?.kbd) b.append(h('span', { class: 'kbd' }, o.kbd)); if (o?.heading) b.classList.add('mheading');
       return b;
     }).filter(Boolean);

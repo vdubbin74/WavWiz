@@ -23,6 +23,7 @@ import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, res
 let panelTpl = null;
 export const npPanelTemplate = () => panelTpl;
 export function createNow(S, ctl) {
+  const mkSc = cls => shortcutsRow({ run: id => ctl.runShortcut?.(id), home: () => ctl.goHome?.(), cls }).el;   // 0.3.7 L5/L11: Home (far right) + up to 3 pins
   const E = {}; let viz = null, vizState = { audible: false, error: null, preset: '' }, overlay = null, receivers = null;
   const act = ctl.act;
   const stage = h('div', { class: 'stage np-stage' }), coverHolder = h('div', { class: 'stagecover' }), host = h('div', { class: 'vizhost' }), vname = h('div', { class: 'vname' }), vbtns = h('div', { class: 'vbtns' });
@@ -119,7 +120,7 @@ export function createNow(S, ctl) {
   const nextBlock = h('div', { class: 'plnext', 'aria-label': 'Up next', hidden: true }, h('span', { class: 'pln-lbl' }, 'UP NEXT'), nxArt, nxT1, h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·'), nxT2);
   const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, pnArt, tableMeta, h('div', { class: 'pn-ctl' }, tableXport, tableVol)));
   const ctlPanel = h('section', { class: 'np-ctlpanel' + (ctlCollapsed ? ' collapsed' : ''), role: 'group', 'aria-label': 'Playback controls' },
-    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, ctlStrip, h('span', { class: 'grow' }), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
+    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, ctlStrip, h('span', { class: 'grow' }), mkSc('np-sc'), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
   function applyNpStyle() {
     const p = loadNpPrefs();
     for (const [id] of NP_STYLES) ctlPanel.classList.toggle('pn-' + id, p.style === id);
@@ -170,7 +171,7 @@ export function createNow(S, ctl) {
     barCover, h('div', { class: 'npb-titles' }, barT1, barT2), barHeart,
     h('div', { class: 'transport npb-x', role: 'group', 'aria-label': 'Transport' }, h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), barPlay, h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'))),
     h('div', { class: 'npb-seek' }, barElv, barProg, barRev),
-    h('div', { class: 'npb-vol' }, mkSleep(), icon('volume'), barVol, barPct, barMute, barEq));
+    h('div', { class: 'npb-vol' }, mkSleep(), icon('volume'), barVol, barPct, barMute, barEq), mkSc('npb-sc'));
   function syncVol(v, from) { for (const r of [vol, barVol, sVol]) if (r !== from && document.activeElement !== r) r.value = v; volPct.textContent = barPct.textContent = sPct.textContent = Math.round(v) + '%'; }
   /** This device's volume / mute on the panel, the mini bar and the header tag. */
   function drawMine() {
@@ -399,7 +400,7 @@ export function createNow(S, ctl) {
   /** 0.3.5: Playback > Sound / EQ shows the EQ in the center panel; Playback > Sleep timer opens the Sleep menu. */
   function showCenter(m) { setCenter(m); stage.scrollIntoView?.({ block: 'nearest' }); }
   function openSleepMenu() { const b = [...document.querySelectorAll('.npsleep')].find(x => x.getClientRects().length) || null; openSleep(S, null, b); }
-  return { el, mini, npbar, nextBlock, showCenter, openSleep: openSleepMenu, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
+  return { el, mini, npbar, nextBlock, showCenter, toggleCtl, openSleep: openSleepMenu, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
 }
 
 /** 0.3.3 G5: true while the expanded Playlist (with Now Playing slid up) covers the EQ / visualizer. */

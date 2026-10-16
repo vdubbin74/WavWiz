@@ -61,7 +61,8 @@ async function check() {
 // 0.2.2 T9: arrived from the Calibrate speakers QR code (?cal=CODE[&pair=CODE]): once the phone trusts WavWiz, go straight on to the secure
 // calibration page (the music pauses there automatically). Only these two short codes are passed on.
 const calQ = (() => { const q = new URLSearchParams(location.search), cal = q.get('cal') || '', pair = q.get('pair') || ''; if (!/^[A-Za-z0-9]{6}$/.test(cal)) return ''; return 'cal=' + cal + (/^[0-9]{6}$/.test(pair) ? '&pair=' + pair : ''); })();
-const secureHome = () => calQ ? `https://${host}:${https}/calmic.html?` + calQ.replace(/&pair=\d+/, '') : `https://${host}:${https}/`;   // 0.2.5: calibration goes to the mic-only page
+const pairQ = (() => { const p = new URLSearchParams(location.search).get('pair') || ''; return !calQ && /^[0-9]{6}$/.test(p) ? p : ''; })();   // 0.3.7 L28: Pair a player QR
+const secureHome = () => pairQ ? `https://${host}:${https}/?pair=${pairQ}` : calQ ? `https://${host}:${https}/calmic.html?` + calQ.replace(/&pair=\d+/, '') : `https://${host}:${https}/`;   // 0.2.5: calibration goes to the mic-only page
 if (calQ) { const t = $('statusTitle'); if (t) t.textContent = 'Getting your phone ready to calibrate'; }
 function good(msg) {
   set('ok', 'All set', msg);

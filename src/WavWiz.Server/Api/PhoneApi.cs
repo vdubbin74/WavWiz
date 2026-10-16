@@ -22,10 +22,12 @@ public static class PhoneApi
     {
         app.MapGet("/tls/setup", (HttpContext c) => Results.Content(Page(c, s, "setup"), "text/html; charset=utf-8")).Anon();
         app.MapGet("/tls/check", (HttpContext c) => Results.Content(Page(c, s, "check"), "text/html; charset=utf-8")).Anon();
-        app.MapGet("/tls/qr.svg", (HttpContext c, string? to) =>
+        app.MapGet("/tls/qr.svg", (HttpContext c, string? to, string? code) =>
         {
             var host = PhoneHost(c, s);
             string path = to switch { "check" => "/tls/check", "app" => "/", _ => "/tls/setup" };
+            // 0.3.7 L28: to=pair&code=123456 -> the phone setup page with the pairing code prefilled (only a 6-digit code is ever carried)
+            if (to == "pair") path = "/tls/setup" + (code is not null && PairCode.IsMatch(code) ? "?pair=" + code : "");
             c.Response.Headers.CacheControl = "no-store";
             return Results.Content(SystemApi.QrSvg($"http://{host}:{s.Cfg.HttpPort}{path}"), "image/svg+xml");
         }).Anon();

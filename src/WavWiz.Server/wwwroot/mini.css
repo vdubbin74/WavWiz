@@ -38,3 +38,9 @@ html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);
 .mp-oprow .mp-opl{font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--accent2-text,var(--accent2));white-space:nowrap}
 .mp-oprow input{flex:1;min-width:40px}
 .mp-oprow .mp-opv{font-size:11px;font-variant-numeric:tabular-nums;width:32px;text-align:right}
+
+/* 0.3.7 L23: shortcuts row under the controls (Home far right). Not shown in the slim size. */
+.mp{flex-wrap:wrap;align-content:center}
+.mp .mp-sc{flex:1 0 100%;justify-content:flex-end;margin:0;padding-top:2px;border-top:1px solid var(--line)}
+.mp.slim .mp-sc{display:none}
+.mp.embedded .mp-sc{flex-basis:100%}

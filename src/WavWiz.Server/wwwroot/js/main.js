@@ -10,6 +10,7 @@ import { createNow } from './now.js';
 import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
+import { listenFromMini, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
@@ -93,7 +94,7 @@ function renderLogin() {
   const root = h('div', { class: 'card auth' });
   const draw = () => {
     const msg = h('p', { class: 'err', role: 'alert' });
-    const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code' });
+    const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code', value: CAL.pair || '' });
     const name = h('input', { type: 'text', maxlength: 40, placeholder: 'e.g. Sam\'s phone', id: 'devname', value: deviceName() });
     const pw = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw' });
     root.replaceChildren(
@@ -122,7 +123,7 @@ let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, co
 function syncMini() {
   if (!desk || !minicol) return;
   const need = wide() && (desk.classList.contains('libexpanded') || (desk.classList.contains('listexpanded') && !desk.classList.contains('devexpanded')));
-  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true }); minicol.append(miniInst.rail); }
+  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, run: runShortcut, home: goHome }); minicol.append(miniInst.rail); }
   else if (!need && miniInst) { miniInst.destroy(); miniInst = null; minicol.replaceChildren(h('div', { class: 'mp embedded-host' })); }
   desk.classList.toggle('minishown', need);
 }
@@ -131,7 +132,7 @@ async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, go, openSetup, openEq: () => showEq(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
+  const ctl = { act, refreshAll, go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
@@ -182,6 +183,18 @@ async function startMain() {
   // It is worked out from the screen, not the window, so it never stretches or shrinks while the window is resized (only capped to fit).
   const centerW = () => { const z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1; const w = popupWidth(window.screen?.availWidth || 0, window.innerWidth, z); document.documentElement.style.setProperty('--centerw', w + 'px'); document.documentElement.style.setProperty('--popw', w + 'px'); };
   new ResizeObserver(centerW).observe(nowc.el); new ResizeObserver(centerW).observe(desk); window.addEventListener('resize', centerW); window.addEventListener('wavwiz:uiscale', centerW); desk.addEventListener('transitionend', centerW); centerW();
+  // 0.3.7 L8: right-click a title bar (Library, Devices, Queue, the EQ) -> Pin / Unpin that destination as a shortcut
+  document.addEventListener('contextmenu', ev => {
+    const t = ev.target.closest?.('.libpanel .pane-h, .devpanel .pane-h, .listpanel .pane-h, .np-stage'); if (!t || ev.target.closest('input,textarea,.plpicker')) return;
+    const id = t.closest('.libpanel') ? 'library' : t.closest('.devpanel') ? 'devices' : t.closest('.listpanel') ? 'queue' : 'eq';
+    if (id === 'queue' && ev.target.closest('th')) return;
+    ev.preventDefault(); document.querySelector('.scpop')?.remove();
+    const on = loadPins().includes(id), lab = pinInfo(id).label;
+    const pop = h('div', { class: 'scpop', role: 'menu' }, h('button', { type: 'button', class: 'btn sm', 'data-act': 'pin-title', onclick: () => { pop.remove(); const r = pinToggle(id); toast(r.full ? `All ${MAX_PINS} shortcut slots are taken - unpin one first.` : on ? `Unpinned: ${lab}` : `Pinned: ${lab}`, r.full); } }, on ? `Unpin “${lab}” from shortcuts` : `Pin “${lab}” to shortcuts`));
+    document.body.append(pop); pop.style.left = Math.min(ev.clientX, innerWidth - 220) + 'px'; pop.style.top = Math.min(ev.clientY, innerHeight - 50) + 'px';
+    setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
+  });
+  listenFromMini(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
   drawStatus(); maybeWhatsNew(S); showPendingUndo();
@@ -292,6 +305,8 @@ function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.
 /** 0.3.6 K22: Queue always opens the playlist expanded; when it already is, it pulses (K15). */
 export function openQueue() {
   if (!wide()) return go('queue');
+  if (pageDlg) { pageDlg.close(); pageDlg = null; }
+  if (P6.exp === 'dev') setPanels({ ...P6, exp: null }, 'dev');   // 0.3.7 L17: an expanded Devices view hides the queue - fold it back first, then bring the queue forward
   if (P6.list === 'expanded') { pulse(listt.el); return; }
   setList('expanded');
 }
@@ -318,6 +333,30 @@ export function openPlaylist(id) { toggleLibExpanded(true); setTimeout(() => { l
 /** 0.3.7: THE one way to show the EQ. Every entry point (Menu > Sound / EQ, the menu's EQ submenu, the Now Playing EQ button on every size,
  *  tray / shortcuts) lands here: collapse anything expanded over Now Playing, bring the single center EQ to the front on the shared glide, pulse it.
  *  The old Sound popup is never opened from here (it survives only as the per-speaker inline editor in an open speaker card). */
+/** 0.3.7 L4: every menu / pin / shortcut target runs through here: pages close, expanded views fold back, the target comes to the front in its home spot (pulse if already there). */
+export function runShortcut(id) {
+  switch (id) {
+    case 'eq': return showEq();
+    case 'queue': return openQueue();
+    case 'library': return wide() ? (toggleLibExpanded(true), undefined) : go('library');
+    case 'devices': return go('devices');
+    case 'scenes': return go('scenes');
+    case 'alarms': return go('alarms');
+    case 'sleep': return go('sleep');
+    case 'settings': return openSettings(S, refreshAll, go);
+    default: return undefined;
+  }
+}
+/** 0.3.7 L5: Home = the default Home Screen: Library left, EQ centre, Devices right, Queue bottom centre, Now Playing at the narrow bar. Same glide as everything else. */
+export function goHome() {
+  if (!wide()) { go('now'); return; }
+  if (pageDlg) { pageDlg.close(); pageDlg = null; }
+  document.querySelectorAll('dialog[open]').forEach(d => { if (d.classList.contains('page') || d.classList.contains('eqdialog')) d.close(); });
+  setList('open'); setPanels({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' }, null);
+  nowc.toggleCtl?.(true); nowc.showCenter?.('eq');
+  try { window.focus(); } catch { /* ignore */ }
+  setTimeout(() => pulse(desk), reduced() ? 0 : GLIDE.ms);
+}
 export function showEq() {
   if (!wide()) { if (S.view !== 'now') go('now'); }
   else {
@@ -372,7 +411,7 @@ const checklistGo = a => go(a);
  *  It never joins as a speaker, so opening or closing it never changes the streams (F2). */
 export function openMini() {
   try { window.chrome?.webview?.postMessage({ cmd: 'mini' }); if (window.chrome?.webview) return; } catch { /* not the Player */ }
-  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=72');
+  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=108');
 }
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }

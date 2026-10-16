@@ -31,3 +31,30 @@ test('L26 confidence shown only as a real 0-100 %', async () => {
   assert.equal(m.confPct(0.92), 92); assert.equal(m.confPct(68), 100); assert.equal(m.confPct(160), 100); assert.equal(m.confPct(-3), 0);
   assert.equal(m.confPct(NaN), null); assert.equal(m.confText(undefined), '—'); assert.equal(m.confText(0.234), '23%');
 });
+
+test('L5/L8/L11/L23 shortcuts: max 3 pins, Home far right, pins stack leftward, order is remembered', async () => {
+  const m = await imp('shortcuts');
+  assert.equal(m.MAX_PINS, 3);
+  assert.deepEqual(m.cleanPins(['eq', 'eq', 'nope', 'queue', 'library', 'devices']), ['eq', 'queue', 'library']);
+  let r = m.togglePin([], 'eq'); r = m.togglePin(r.pins, 'queue'); r = m.togglePin(r.pins, 'scenes'); assert.deepEqual(r.pins, ['eq', 'queue', 'scenes']);
+  const full = m.togglePin(r.pins, 'sleep'); assert.equal(full.full, true); assert.deepEqual(full.pins, r.pins, 'a 4th pin changes nothing');
+  assert.deepEqual(m.togglePin(r.pins, 'queue').pins, ['eq', 'scenes'], 'pin again = unpin');
+  // the first pinned is closest to Home: DOM order left->right is last pin ... first pin, separator, Home
+  assert.deepEqual(m.rowOrder(['eq', 'queue', 'scenes']).map(x => x.id || x.kind), ['scenes', 'queue', 'eq', 'sep', 'home']);
+  assert.deepEqual(m.rowOrder([]).map(x => x.kind), ['home'], 'no pins: just Home, no separator');
+  assert.deepEqual(m.movePin(['eq', 'queue', 'scenes'], 0, 2), ['queue', 'scenes', 'eq']);
+  const store = { d: {}, getItem(k) { return this.d[k] ?? null; }, setItem(k, v) { this.d[k] = v; } };
+  m.savePins(['queue', 'eq', 'bogus'], store); assert.deepEqual(m.loadPins(store), ['queue', 'eq']);
+  for (const id of ['eq', 'queue', 'library', 'devices', 'scenes', 'alarms', 'sleep', 'settings']) assert.ok(m.pinInfo(id), id);
+});
+
+test('L1/L4/L17 every EQ / Queue / shortcut entry point goes through the shared front-and-glide functions', () => {
+  const main = src('main.js'), now = src('now.js'), menu = src('menu.js'), mini = src('mini.js');
+  assert.match(main, /export function showEq/); assert.match(main, /export function runShortcut/); assert.match(main, /export function goHome/);
+  assert.match(main, /openEq: \(\) => showEq\(\)/); assert.match(main, /if \(k === 'eq'\) return showEq\(\)/);
+  assert.doesNotMatch(main.replace(/\/\*[\s\S]*?\*\//g, ''), /openEq\(S, refreshAll\)\s*[;}]\s*\n\s*if \(S\.view/, 'the phone go(eq) no longer opens the popup');
+  assert.match(now, /onclick: \(\) => ctl\.openEq\(\)/); assert.match(now, /mkSc\('np-sc'\)/); assert.match(now, /mkSc\('npb-sc'\)/);
+  assert.match(main, /if \(P6\.exp === 'dev'\) setPanels\(\{ \.\.\.P6, exp: null \}/);   // L17 queue from an expanded Devices view
+  assert.match(menu, /pin: 'eq'/); assert.match(menu, /pin: 'queue'/); assert.match(mini, /shortcutsRow/); assert.match(mini, /sendToMain/);
+  assert.match(css, /\.scrow/); assert.match(css, /\.schome/);
+});

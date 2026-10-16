@@ -2421,3 +2421,15 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .listpanel th.sortlocked{cursor:not-allowed}.listpanel th.sortlocked .thl{opacity:.8}
 .plpicker .plp-sort{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;padding:4px 8px;border-radius:3px;cursor:pointer}
 .plpicker .plp-sort.on{color:var(--accent)}.plpicker .plp-sort:disabled{opacity:.45;cursor:not-allowed}.plp-sorth{margin-top:6px}
+/* 0.3.7 L5/L8/L11: Home (far right) + up to 3 pinned shortcuts stacking leftward, same row in every Now Playing size and the mini players */
+.scrow{display:flex;align-items:center;gap:4px;flex:0 0 auto;margin-left:auto}
+.scbtn{width:28px;height:28px;display:grid;place-items:center;padding:0;border-radius:3px;background:transparent;border:1px solid transparent;color:var(--dim,inherit);cursor:pointer}
+.scbtn:hover,.scbtn:focus-visible{color:var(--accent);border-color:var(--accent)}
+.scbtn .ic{width:18px;height:18px}.scbtn .ic svg{width:18px;height:18px}
+.scsep{width:1px;height:18px;background:var(--line,rgba(255,255,255,.2));margin:0 3px}
+.schome{color:var(--accent)}
+.scpop{position:fixed;z-index:3000;display:flex;flex-direction:column;gap:2px;padding:4px;border:1px solid var(--line);border-radius:3px;background:var(--panel,#222)}
+.scpop .btn{text-align:left;white-space:nowrap}
+.mpin{margin-left:auto;padding-left:10px;opacity:.35;font-size:11px;cursor:pointer}.mpanel button:hover .mpin,.mpin.on{opacity:.95}.mpanel button{display:flex;align-items:center}
+.np-ctlpanel .pane-h .scrow{margin-left:auto;margin-right:6px}
+.npbar .npb-sc{margin-left:8px}

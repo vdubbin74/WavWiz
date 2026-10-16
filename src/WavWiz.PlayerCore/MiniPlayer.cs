@@ -3,7 +3,7 @@ namespace WavWiz.PlayerCore;
 /// <summary>0.3.2 F3: the mini player window (replaces Remote mode). Pure placement / address helpers so they can be tested off Windows.</summary>
 public static class MiniPlayer
 {
-    public const int Width = 420, Height = 72, SlimWidth = 300, SlimHeight = 48;
+    public const int Width = 420, Height = 108, SlimWidth = 300, SlimHeight = 48;
     /// <summary>The page the mini window loads: /mini.html on the same server as the full window.</summary>
     public static string Url(string uiAddress)
     {
