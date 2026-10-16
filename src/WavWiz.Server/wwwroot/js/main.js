@@ -7,7 +7,7 @@ import { openSettings } from './settings.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn } from './devices.js';
+import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
@@ -41,6 +41,7 @@ import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
+import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
@@ -219,6 +220,7 @@ async function startMain() {
       default: return runShortcut(id);
     }
   });
+  installMedia({ S, api, act, masterLevel, allMuted });   // 0.3.8 L45
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();

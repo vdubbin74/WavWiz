@@ -13,7 +13,7 @@ internal sealed class PlayerApp : ApplicationContext
     private readonly CancellationTokenSource _cts = new(); private WebUiForm? _web; private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new SynchronizationContext();
     private readonly string _logPath = Path.Combine(PlayerSettings.Dir, "logs", "player.log");
 
-    private readonly bool _showWindow;
+    private readonly bool _showWindow; private MediaKeys? _media;
     private readonly EventWaitHandle _showEvt = new(false, EventResetMode.AutoReset, StartArgs.ShowEventName);
     private readonly EventWaitHandle _exitEvt = new(false, EventResetMode.ManualReset, StartArgs.ExitEventName);
 
@@ -32,6 +32,12 @@ internal sealed class PlayerApp : ApplicationContext
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) OpenUi(); };
         _menu.Opening += (_, _) => BuildMenu();
         ApplyAutostart();
+        try
+        {
+            _media = new MediaKeys(); _media.Pressed += k => _ui.Post(_ => { if (_exiting) return; if (_web is { IsDisposed: false }) _web.PostMedia(k); else if (_mini is { IsDisposed: false }) _mini.PostMedia(k); }, null);
+            if (_media.Failed.Count > 0) Log("media keys not available (another app owns them): " + string.Join(", ", _media.Failed));
+        }
+        catch (Exception ex) { Log("media keys: " + ex.Message); }
         // 0.2.2 T7/T11: a second manual launch shows the window; the installer asks the Player to exit before it replaces the files.
         // Session end / Restart Manager (installer's CloseApplications) also exits cleanly.
         var watch = new Thread(() =>
@@ -222,7 +228,7 @@ internal sealed class PlayerApp : ApplicationContext
     }
 
     private bool _exiting;
-    private void ExitApp() { if (_exiting) return; _exiting = true; try { _mini?.Close(); } catch { } try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
+    private void ExitApp() { if (_exiting) return; _exiting = true; try { _media?.Dispose(); } catch { } try { _mini?.Close(); } catch { } try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
 
     /// <summary>The final WavWiz logo (embedded multi-size .ico); Windows picks the size that fits the tray.</summary>
     private static Icon MakeIcon()

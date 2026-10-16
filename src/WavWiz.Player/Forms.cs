@@ -153,6 +153,12 @@ public sealed class WebUiForm : Form
     /// <summary>0.3.0 §2: reload at a new address (remote mode on/off).</summary>
     public void Navigate(string url) { try { _url = url; if (_web.CoreWebView2 != null && url.Length > 0) _web.CoreWebView2.Navigate(url); } catch { } }
 
+    internal static void ShowOsd(string json)
+    {
+        try { using var d = System.Text.Json.JsonDocument.Parse(json); var r = d.RootElement; string? G(string n) => r.TryGetProperty(n, out var v) ? v.GetString() : null; OsdForm.Flash(G("text") ?? "", G("bg"), G("ink"), G("line")); } catch { }
+    }
+    /// <summary>0.3.8 L45: a global media key arrived (the page runs the action and answers with an on-screen indicator).</summary>
+    public void PostMedia(string key) { try { _web.CoreWebView2?.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(new { cmd = "media", key })); } catch { } }
     public void OpenScreen(string screen)
     {
         try
@@ -220,7 +226,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -346,6 +352,7 @@ public sealed class MiniPlayerForm : Form
         m.Closed += (_, _) => BeginInvoke(new Action(() => m.Dispose()));
         m.Show(Cursor.Position);
     }
+    public void PostMedia(string key) => Post(new { cmd = "media", key });
     private void Post(object o) { try { _web.CoreWebView2?.PostWebMessageAsJson(System.Text.Json.JsonSerializer.Serialize(o)); } catch { } }
     private void OnMessage(string json)
     {
@@ -363,6 +370,7 @@ public sealed class MiniPlayerForm : Form
                     else if (r.TryGetProperty("value", out var o1) && o1.TryGetDouble(out var ov1) && ov1 < 1) { _set.MiniOpacity = MiniPlayer.ClampOpacity(ov1); _set.Save(); }
                     break;
                 case "menu": ShowMenu(); break;   // 0.3.5 J17: right-click menu with a labeled Transparency submenu
+                case "osd": WebUiForm.ShowOsd(json); break;
                 case "full": _openFull(); break;
                 case "close": Close(); break;
             }

@@ -70,6 +70,11 @@ export function centerEq(S, host, opts = {}) {
     const lockBtn = h('button', { type: 'button', class: 'plus eqpadlock', 'data-act': 'eqpadlock', 'aria-pressed': String(locked), onclick: () => saveEqLock(!loadEqLock()) });
     lockBtn.append(icon(locked ? 'lock' : 'unlock')); const lt = locked ? 'Sound locked (click to unlock)' : 'Lock the sound (EQ and all settings)'; lockBtn.title = lt; lockBtn.setAttribute('aria-label', lt); lockBtn.classList.toggle('on', locked);
     const allBtn = h('button', { type: 'button', class: 'btn sm eqallbtn' + (allOpen ? ' on' : ''), 'data-act': 'allsound', 'aria-expanded': String(allOpen), disabled: !real || undefined, onclick: () => { allOpen = !allOpen; draw(); } }, 'All sound settings');
+    // 0.3.8 L39: the active preset as a plain themed select (same look as the output picker); every EQ chooser uses this select style
+    const presetSel = real ? h('select', { class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
+      onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
+      real.presetId == null ? h('option', { value: '', selected: true }, 'Custom (not saved)') : null,
+      (real.presets || []).map(p => h('option', { value: String(p.id), selected: p.id === real.presetId }, p.name))) : null;
     all = null;
     if (real && allOpen) {
       all = soundSettings({
@@ -82,7 +87,7 @@ export function centerEq(S, host, opts = {}) {
       });
       all.setLocked(locked || !ok);
     }
-    root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Sound · ${o.zone}` : 'Sound'), picker, h('span', { class: 'grow' }), note, allBtn, lockBtn),
+    root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Sound · ${o.zone}` : 'Sound'), picker, presetSel, h('span', { class: 'grow' }), note, allBtn, lockBtn),
       real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'), all ? all.el : null);
     root.classList.toggle('allopen', !!all);
   }

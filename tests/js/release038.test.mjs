@@ -29,3 +29,15 @@ test('L38/L43 css rules', () => {
   assert.doesNotMatch(css, /lock-red/); assert.match(css, /--fld-h:40px/); assert.match(css, /::placeholder\{color:var\(--fld-ph\)/);
   assert.match(css, /\.minicol::after\{content:'';position:absolute;right:100%/); assert.match(css, /--sleevew:30px/);
 });
+test('L45 media keys map to actions', async () => {
+  const m = await imp('media');
+  assert.deepEqual(m.mediaAction('playpause', { state: 'playing' }), { path: '/stream/pause' }); assert.deepEqual(m.mediaAction('playpause', { state: 'paused' }), { path: '/stream/play', body: {} });
+  assert.deepEqual(m.mediaAction('volup', {}), { master: 5 }); assert.deepEqual(m.mediaAction('voldown', {}), { master: -5 }); assert.equal(m.mediaAction('bogus', {}), null); assert.equal(m.clampPct(130), 100);
+  assert.match(src('main.js'), /installMedia\(/);
+});
+test('L40 device order helpers', async () => {
+  const m = await imp('devorder'); const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+  assert.deepEqual(m.applyOrder(items, ['3', '1']).map(x => x.id), [3, 1, 2, 4], 'new items keep natural order at the end');
+  assert.deepEqual(m.moveBefore(['1', '2', '3'], 3, 1), ['3', '1', '2']); assert.deepEqual(m.moveBefore(['1', '2', '3'], 1, 3, true), ['2', '3', '1']);
+  assert.match(src('devices.js'), /orderedGroups/); assert.match(src('devices.js'), /alloff/);
+});
