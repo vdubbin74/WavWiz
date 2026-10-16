@@ -9,4 +9,4 @@ const p=await ctx.newPage(); p.on('pageerror',e=>console.log('ERR',e.message));
 await p.goto(B+'/'); await p.evaluate(v=>localStorage.setItem('wavwiz.panels',JSON.stringify(v)),states); await p.goto(B+'/'); await p.waitForTimeout(2500);
 await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()));
 if(process.argv[6]) await p.evaluate(process.argv[6]); await p.waitForTimeout(800);
-await p.screenshot({path:out}); await br.close();
+if(process.argv[7]) console.log(JSON.stringify(await p.evaluate(process.argv[7]))); await p.screenshot({path:out}); await br.close();

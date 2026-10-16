@@ -2390,3 +2390,24 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 :root{--spkcol:clamp(250px,calc(22vw / var(--z,1)),380px)}   /* the standard Devices panel width: 380px at 1920, the Speakers column in EVERY expanded state */
 .devpanel.expanded .dexp-main.e1.spk-open>.zcol{flex:0 0 var(--spkcol)}
 .ss-mem .ss-prof{max-width:150px;font-size:12px}
+
+/* ===================== 0.3.7 ===================== */
+.toast.undo{display:flex;align-items:center;gap:12px}
+.toast.undo .btn{min-height:24px;padding:0 10px}
+/* L16: the collapsed Queue bar's "Up next" row is centered exactly in the bar (one line box, no stray padding, box-centered) */
+.desk.listcollapsed .plnext:not([hidden]){top:0;bottom:0;height:100%;margin:0;padding:0;line-height:1;align-items:center}
+.desk.listcollapsed .plnext>*{line-height:1.15;display:flex;align-items:center;margin:0;padding:0}
+.desk.listcollapsed .plnext .pln-t1,.desk.listcollapsed .plnext .pln-t2{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* L6: Home Screen - the Now Playing bar sits in the CENTER column UNDER the queue (same width as the queue). Collapsed it is the narrow bar; opened it grows upward
+   (the EQ above gives the height back) in the center column only. The Library and Devices sleeves run the full height and are never covered, resized or disrupted. */
+@media (min-width:901px){
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded){grid-template-rows:minmax(0,1fr) var(--listh,clamp(120px,calc(27vh / var(--z,1)),360px)) auto}
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded) .libpanel{grid-area:1/1/4/2}
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded) .devpanel{grid-area:1/3/4/4}
+  .desk .nowcol.np12{display:contents}
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded) .np-vizpanel{grid-area:1/2/2/3}
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded) .listpanel{grid-area:2/2/3/3}
+  .desk:not(.libexpanded):not(.devexpanded):not(.listexpanded) .np-ctlpanel{grid-area:3/2/4/3;align-self:end}
+  /* in every expanded view the center stack is parked (out of the grid, invisible) exactly as the hidden center column was before */
+  .desk:is(.libexpanded,.devexpanded,.listexpanded) .nowcol.np12>:is(.np-vizpanel,.np-ctlpanel){position:absolute!important;width:0!important;height:0!important;min-height:0!important;overflow:hidden!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;grid-area:auto!important;border:0!important;margin:0!important;padding:0!important}
+}
