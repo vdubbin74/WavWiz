@@ -2568,3 +2568,48 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 @container npctl (max-width:940px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-vol > .ic,.ns-vol input[type=range],.ns-dur){display:none} }
 @container npctl (max-width:820px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-x .np-heartslot,.ns-x .tog,.ns-elv){display:none} .np-ctlpanel.collapsed:has(.scrow .scbtn) .ns-art{width:34px;height:34px} }
 @container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-art,.ns-vol,.ns-x){display:none} }
+
+/* ===== 0.3.9 L51 / L53 / L54 / L56: expanded Devices view (layout B, approved render) ===== */
+/* L54: the whole speaker / zone card is the click target */
+.dc3.clickable,.zc3.clickable{cursor:pointer}
+.dc3.clickable:hover,.zc3.clickable:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--panel2))}
+.dc3.clickable :is(button,input,.vbar,.dgrip):hover{cursor:auto}
+/* L53: full-width bordered master row, capped slider, spaced All off / All on at the far right */
+.devpanel.expanded .dexp-top{border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:10px 16px;margin-bottom:10px;gap:20px}
+.devpanel.expanded .dexp-top .dmaster{flex:1 1 100%;flex-wrap:nowrap!important;gap:22px;align-items:center}
+.devpanel.expanded .dexp-top .dmaster .dvol-master{flex:0 1 640px;min-width:140px;gap:12px}
+.devpanel.expanded .dexp-top .dmaster .mallrow{flex:0 0 auto;margin:0 0 0 auto;gap:10px}
+.devpanel.expanded .dexp-top .dmaster .mallrow .mall{min-width:84px;white-space:nowrap;padding:2px 14px}
+/* L51: Now playing in each zone */
+.znow{border:1px solid var(--line);border-radius:3px;background:var(--panel);margin:0 0 10px}
+.znow-h{border-left:3px solid var(--accent);background:var(--panel2);padding:0 10px;min-height:30px;display:flex;align-items:center;gap:8px}
+.znow-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;padding:10px}
+.znow-tile{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:3px;background:var(--panel2);padding:8px 10px;min-width:0}
+.znow-art{width:44px;height:44px;flex:none;border-radius:3px;background:var(--panel) center/cover no-repeat;border:1px solid var(--line)}
+.znow-t{min-width:0;flex:1;display:grid;gap:1px}
+.znow-z{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.znow-s{font-weight:700;font-size:13px} .znow-a{font-size:11px;color:var(--dim)}
+.znow-p{height:3px;border-radius:3px;background:var(--line);margin-top:4px;overflow:hidden} .znow-p i{display:block;height:100%;width:var(--p,0%);background:var(--accent)}
+.znow-tile:is(.off,.idle) .znow-s{color:var(--dim);font-weight:500}
+/* bordered columns with header bars */
+.devpanel.expanded .dexp-main.e1>.ecol:not(.spcol){border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:0 10px 10px;overflow:auto}
+.devpanel.expanded .dexp-main.e1>.ecol>.dsec-h,.devpanel.expanded .dexp-main.e1>.ecol>.ssc-col>.dsec-h{margin:0 -10px 8px;padding:0 10px;background:var(--panel2);border-left:3px solid var(--accent)}
+.devpanel.expanded .dexp-main.e1.spk-open>.sscol{padding:0}
+/* 2-wide speaker card grid */
+.devpanel.expanded .e1 .scol .slist,.devpanel.expanded .e1 .scol .ulist{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;align-items:stretch}
+.devpanel.expanded .e1 .ecol .dc3:not(.dset),.devpanel.expanded .e1 .ecol .zc3{display:flex;flex-direction:column;justify-content:flex-start!important;align-content:normal;gap:7px!important;min-height:0;padding:10px 12px 10px 18px!important}
+.devpanel.expanded .e1 .ecol .dc3:not(.dset) .dc3l1,.devpanel.expanded .e1 .ecol .zc3 .dc3l1{height:auto!important;min-height:26px!important}
+.devpanel.expanded .e1 .ecol .dc3:not(.dset) .dc3l1 .dname{font-size:14px}
+.devpanel.expanded .e1 .ecol .dc3:not(.dset) .dc3l2,.devpanel.expanded .e1 .ecol .zc3 .dc3l2{height:auto!important;min-height:0!important}
+.devpanel.expanded .e1 .dc3out{display:grid;gap:1px;min-width:0} .devpanel.expanded .e1 .dc3out .dlbl{margin:0;font-size:9px;letter-spacing:.1em;color:var(--dim)}
+.devpanel.expanded .e1 .dc3out .dout{color:var(--accent-text,var(--accent));font-size:12px;font-weight:600}
+/* L56: volume slider edge to edge, the percentage at its right end; mute bottom right on the chip row */
+.devpanel.expanded .e1 .ecol .dc3l3{display:flex!important;align-items:center;gap:10px;width:100%;margin:0}
+.devpanel.expanded .e1 .ecol .dc3l3 .vbar{flex:1 1 auto;min-width:0;width:auto} .devpanel.expanded .e1 .ecol .dc3l3 .pct{flex:none;width:3.4em;text-align:right}
+.devpanel.expanded .e1 .dc3foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.devpanel.expanded .e1 .dc3foot .zchip,.devpanel.expanded .e1 .dc3mem .zchip{border:1px solid var(--accent);border-radius:3px;color:var(--accent-text,var(--accent));font-size:11px;padding:2px 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.devpanel.expanded .e1 .dc3foot .dchip{border:1px solid var(--line);border-radius:3px;color:var(--dim);font-size:11px;padding:2px 8px;white-space:nowrap}
+.devpanel.expanded .e1 .dc3foot .mutebtn{margin-left:auto;flex:none}
+/* large zone cards: members as chips */
+.devpanel.expanded .e1 .dc3mem{display:grid;gap:4px} .devpanel.expanded .e1 .dc3mem .dlbl{margin:0;font-size:9px;letter-spacing:.1em;color:var(--dim)}
+.devpanel.expanded .e1 .dc3chips{display:flex;flex-wrap:wrap;gap:6px}

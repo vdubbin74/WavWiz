@@ -11,6 +11,7 @@ import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
 import { speakerSettings } from './spkset.js';
 import { pulse } from './motion.js';
+import { itemArtUrl } from './art.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -768,7 +769,7 @@ export function devicesPanel(S, ctl) {
         h('span', { class: 'ss-rail-c' }, icon('chevR')), h('span', { class: 'prail-ic' }, '▶'), h('span', { class: 'prail-t' }, 'SCENES & SCHEDULES'), h('span', { class: 'prail-n ss-rail-n' })));
       const ssn = sscol.querySelector('.ss-rail-n'); if (ssn) ssn.textContent = String(sscol.querySelectorAll('.ssc-scene').length + sscol.querySelectorAll('.ssc-sched').length || '');
       reconcile(emain, [sscol, zcol, spcol, scol]);
-      reconcile(body, [etop, emain]); attachDevDrag(body);
+      reconcile(body, [etop, zonesNowStrip(S, groups), emain]); attachDevDrag(body);
       if (busy.v) later();
       return;
     }
@@ -794,6 +795,29 @@ export function devicesPanel(S, ctl) {
   }
   setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(draw, draw));
   return { el: root, draw, setSize, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
+}
+
+/** 0.3.9 L51: "Now playing in each zone" strip of the expanded view. The server has ONE stream, so every zone that is on while something plays shows that
+ *  one song (art, title, artist, progress); a zone that is off says so; with nothing playing every zone says "Nothing playing". Pure data in, element out. */
+export function zoneNowTiles(S, groups) {
+  const it = S.now?.item, st = S.now?.state, playing = !!it && (st === 'playing' || st === 'paused');
+  const prog = playing && S.now?.durationMs ? Math.min(100, Math.round((S.now.positionMs || 0) / S.now.durationMs * 100)) : 0;
+  return (groups || []).map(g => {
+    const on = zoneOn(S.zones || [], g);
+    if (playing && on) return { id: g.id, name: g.name, state: st, title: it.title || 'Untitled', artist: it.artist || '', progress: prog, item: it };
+    return { id: g.id, name: g.name, state: on ? 'idle' : 'off', title: on ? 'Nothing playing' : 'Off - nothing playing', artist: '', progress: 0, item: null };
+  });
+}
+function zonesNowStrip(S, groups) {
+  const tiles = zoneNowTiles(S, groups);
+  return h('section', { class: 'znow', 'aria-label': 'Now playing in each zone' },
+    h('div', { class: 'pane-h dsec-h znow-h' }, h('span', null, 'NOW PLAYING IN EACH ZONE'), h('span', { class: 'small dim' }, String(tiles.length)), h('span', { class: 'grow' }), h('span', { class: 'small dim' }, S.now?.state === 'playing' ? 'live' : '')),
+    h('div', { class: 'znow-row' }, tiles.length ? tiles.map(t => {
+      const url = t.item ? itemArtUrl(t.item, 96) : null;
+      return h('div', { class: 'znow-tile ' + t.state, 'data-group-id': t.id },
+        h('div', { class: 'znow-art', style: url ? `background-image:url("${url}")` : '' }),
+        h('div', { class: 'znow-t' }, h('div', { class: 'znow-z' }, t.name), h('div', { class: 'znow-s ell' }, t.title), h('div', { class: 'znow-a ell' }, t.artist), t.item ? h('div', { class: 'znow-p', style: `--p:${t.progress}%` }, h('i')) : null));
+    }) : h('p', { class: 'dim small pad' }, 'Create a zone to see what plays in each.')));
 }
 
 /** The Devices & zones page (phone tab / narrow screens): master + zones on top, then one Expanded card per device. */
@@ -978,16 +1002,22 @@ function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [
   const mute = muteButton(S, ctl, z);
   const tags = h('div', { class: 'dtagrow dc3tags' }, tagEls3(cardTags3(z))); tags._k = JSON.stringify(cardTags3(z));
   const hide = open ? h('button', { type: 'button', class: 'linkbtn dhide', 'aria-controls': `dset-${z.id}`, onclick: flip }, '▲ Hide settings') : null;
-  const exp = withSettings && !open ? (onSettings ? settingsOpener(z.name, active, flip) : settingsToggle(z.name, false, flip)) : null;
+  const big = !!onSettings;   // 0.3.9 L51/L56: the expanded view's card: output device line, zone chips + delay, mute bottom right
   const add = addable ? ro(h('button', { type: 'button', class: 'btn sm saddzone', title: 'Add this speaker to a zone', onclick: ev => { ev.stopPropagation(); addToZoneMenu(S, ctl, z, ev.currentTarget, groups); } }, '+ Add to zone'), isAdmin(S)) : null;
   const set = open ? cardSettings(S, ctl, z) : null;
   const ol = outputTypeLine(z);
   card = h('div', { class: 'dcard dc3' + (slim ? ' drow slim' : '') + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : '') + (hl || active ? ' hl' : '') + (active ? ' spk-active' : '') + (dim ? ' dimmed' : '') + (open ? ' dset' : '') + (me || z.mine ? ' mine' : ''),
     'data-room': z.name, 'data-device': z.name, 'data-zone-id': z.id, title: ol ? `${z.name} - ${ol}` : z.name },
-    h('div', { class: 'dtop dc3l1' }, dot, name, h('span', { class: 'grow' }), hide, exp, pill),
+    h('div', { class: 'dtop dc3l1' }, dot, name, h('span', { class: 'grow' }), hide, pill),
     h('div', { class: 'dc3l2' }, tags, add),
-    h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute),
+    big ? h('div', { class: 'dc3out' }, h('span', { class: 'dlbl' }, 'OUTPUT DEVICE'), h('b', { class: 'dout ell' }, (chosenOutput(z)?.name || '').trim() || 'No output chosen')) : null,
+    h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, big ? null : mute),
+    big ? h('div', { class: 'dc3foot' }, ...(groups || []).filter(g => (g.deviceIds || []).includes(z.id)).map(g => h('span', { class: 'zchip', title: `In zone ${g.name}` }, g.name)),
+      (() => { const o = chosenOutput(z); return h('span', { class: 'dchip delay', title: 'Delay (change it in Speaker Settings)' }, `Delay ${o && !o.notCalibrated ? '+' + Math.round(o.latencyMs) + ' ms' : 'not set'}`); })(), h('span', { class: 'grow' }), mute) : null,
     set);
+  // 0.3.9 L54: the whole card opens the speaker's settings; its own controls keep their actions
+  const open_ = openDevice ? () => openDevice(z.id) : withSettings ? flip : null;
+  if (open_) { card.classList.add('clickable'); card.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest('button,input,select,textarea,a,[role=switch],.vbar,.dlatency,.dgrip')) return; open_(); }); }
   card._sig = cardSig(S, z, `3|${rowKey(hl, dim, addable, groups.length)}|${withSettings ? 1 : 0}|${slim ? 1 : 0}|${active ? 1 : 0}`);
   card._patch = nz => {
     Object.assign(z, nz);
@@ -1015,7 +1045,11 @@ function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null } = {}) {
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), edit, pill),
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, g)))),
     h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute));
-  if (onPick) { card.setAttribute('aria-pressed', String(pick === g.id)); card.addEventListener('click', ev => { if (ev.target.closest('button,input,select,[role=switch]')) return; onPick(pick === g.id ? 'all' : g.id); }); }
+  if (onPick) card.setAttribute('aria-pressed', String(pick === g.id));
+  // 0.3.9 L54: the whole zone card is the target: it opens the zone (admin: its settings in place; otherwise it picks / un-picks the zone); inner controls keep their own actions
+  const act_ = onEdit && isAdmin(S) ? () => onEdit(g.id) : onPick ? () => onPick(pick === g.id ? 'all' : g.id) : null;
+  if (act_) { card.classList.add('clickable'); card.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest('button,input,select,textarea,a,[role=switch],.vbar,.dgrip')) return; act_(); }); }
+  if (onEdit) card.append(h('div', { class: 'dc3mem' }, h('span', { class: 'dlbl' }, 'SPEAKERS IN ZONE'), h('div', { class: 'dc3chips' }, ms.length ? ms.map(z => h('span', { class: 'zchip', title: z.name }, z.name)) : h('span', { class: 'small dim' }, 'No speakers yet'))));
   return card;
 }
 /** J9 #2: a zone's settings open in place in the Zones column (name, devices, play here, remove); also the inline New zone form. */
