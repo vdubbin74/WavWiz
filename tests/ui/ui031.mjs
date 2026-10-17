@@ -115,7 +115,7 @@ if (want('settings')) await step('settings', async () => {
 
 if (want('s1')) await step('s1', async () => {
   await p.evaluate(async () => { const m = await import('/js/main.js'); m.go('devices'); }); await p.waitForTimeout(1500);
-  if (!(await p.locator('.latslider:visible').count())) { const b = p.locator('button.dexpand:visible').first(); if (await b.count()) { await b.click(); await p.waitForTimeout(1000); } }
+  if (!(await p.locator('.latslider:visible').count())) { const b = p.locator('.dcard.clickable:visible .dname').first(); if (await b.count()) { await b.click(); await p.waitForTimeout(1000); } }
   const sl = p.locator('.latslider:visible').first();
   if (!(await sl.count())) { ok('S1 delay slider wheel ±1 / Shift ±10', false, 'no slider visible'); return; }
   await sl.scrollIntoViewIfNeeded(); await sl.hover(); const v0 = +(await sl.inputValue());
