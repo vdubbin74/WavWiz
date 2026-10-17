@@ -12,6 +12,57 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 Nothing yet.
 
+## [0.3.9] - 2026-10-17 (beta)
+This release rolls up 0.3.7, 0.3.8 and 0.3.9. The first two were test builds and were never published, so everything since 0.3.6 is listed here, grouped by theme.
+
+### Devices
+- Expanded Devices has three bordered columns (Scenes & Schedules, Zones, Speakers) with header bars, equal widths and equal gaps. Speaker cards sit in a two-wide grid and show the output device, status badge, zone chip and delay; the volume bar spans the full card width with the percentage at its right end, and Mute sits in the card's bottom-right corner. Zone cards are larger.
+- A "Now playing in each zone" strip shows the current song on zones that are playing and "Nothing playing" on the others. WavWiz still has one queue for the whole house, so every zone shows the same song for now. Separate music per zone is planned for 0.4.0.
+- Click anywhere on a speaker card to open its settings, or anywhere on a zone card to expand it. The expand arrow is gone; cards show a pointer and a hover highlight. The On/Off switch, Mute, volume, delay, pencil and drag handle keep their own actions.
+- Master row in both Devices views: All off, All on and a master volume, with room between the slider and the buttons.
+- Drag device and zone cards to reorder them (the order is remembered on each device). The standard Devices column uses large cards when there are few devices and compact cards when there are many.
+- The collapsed Devices bar is a slim full-height bar with the mini player button built in, also while the Library is open. It stays visible outside the Queue column.
+
+### Calibration
+- A louder test sound with a Test volume slider.
+- A mic check before each measurement, at every spot: it rates the level (good, weak or too quiet) and gives specific advice (move the mic closer, raise the test volume, check the Windows input). A live level meter stays visible during measurement.
+- Your music stays paused for the whole calibration and only resumes when you choose.
+- A silent speaker is retried automatically and named in the result instead of being skipped. Confidence always shows as 0-100% (readings above 100% in earlier builds were a display bug).
+- Calibration with a wired PC microphone has now succeeded on more than one setup, including a remote PC. Phone-mic calibration on iPhone is still in testing.
+
+### Queue
+- The panel is now called Queue everywhere (Playlists stay in the Library).
+- Drag to reorder in every view, including phones. While a sort is showing, dragging offers to apply that sort as the queue order.
+- Locking the queue also locks sorting. The sorted column is highlighted, with a "Sorted by" chip you can clear (disabled while the queue is locked).
+- Right-click (long-press on a phone) a queue item for Play now, Play next, Remove, Move to top or bottom, Add to playlist, Show in Library and Copy title. Remove and move are disabled while the queue is locked.
+- Clear asks for confirmation and offers a short Undo. After an unexpected exit, the queue and current song are restored and playback starts paused.
+
+### Sound and EQ
+- One EQ for every entry point. An "All sound settings" button expands presets, Bass, Treble, Trim, Balance, Loudness, Limiter and Bypass in place. The same panel is in Speaker Settings.
+- Purpose-based presets (by situation, speaker type and music style), shown in a plain select box that matches the output picker.
+- One EQ lock keeps the whole panel from changing; the duplicate padlock is gone. Every padlock in the app now follows your theme color.
+
+### Navigation, shortcuts and pins
+- Keyboard shortcuts: Space (play/pause), Ctrl+Right / Left (next/previous), M (mute), Alt+M (show/hide the mini player), Alt+H (Home), Alt+E (Sound / EQ), Alt+Q (Queue) and Ctrl+, (Settings). Hints appear in the menus and Help > Keyboard shortcuts lists them. They stay quiet while you type or a window is open.
+- Media keys on Windows (Play/Pause, Next, Previous, Mute, Volume up/down) work with WavWiz Player even while minimized, with a small on-screen volume indicator.
+- Home returns to the default screen. Pin up to five shortcuts next to Home on the Now Playing bar and in both mini players; a pin icon on the Library, Queue and Devices title bars pins or unpins in one click. In the standalone mini player, one click opens the target in the main window.
+- Every menu item and shortcut now brings its view to the front in its home spot (for example Sound / EQ and Queue work while the Library or Devices is expanded).
+- Fixes: pins never overlap the transport controls on a small or scaled window (tested at 200% Windows scaling with 75% display size), and resizing the window no longer leaves the center blank.
+
+### Now Playing and mini players
+- The Now Playing bar sits in the center column under the Queue. The collapsed bar keeps elapsed and total time at 1366 px wide, and "Up next" text is centered.
+- The standalone mini player has a large themed volume bar with the percentage, like the Devices tab, plus the Mute button next to the transport.
+- Choosing Mini player from the menu opens the always-on-top mini player and minimizes the main window; Home on the mini restores the main window.
+- A softly glowing button over the full-screen visualizer floats the mini player on hover. The hover mini player stays open while the pointer is on the button or the player.
+- Removed the accent ring around the Now Playing bar and the extra outline on the Queue; panels share one border.
+
+### Setup and look
+- Pair a Player shows a QR code and the server address as text. The phone page has Add to Home Screen steps for iPhone and Android.
+- Every text field, search box and select shares one style in all ten themes.
+
+### Not yet confirmed on real hardware
+Media keys and Alt shortcuts on more PCs, phone-mic calibration on iPhone, Balance (applied by WavWiz Player only), 4K screens, and TV browsers.
+
 ## [0.3.6] - 2026-10-15 (beta)
 - Playlist: a compact icon title bar (Save, Clear, column picker, lock), a full-width table, and columns you can show or hide, resize, reorder and sort by clicking a header. The lock freezes the column layout and is themed like the speaker status tags. The same title bar appears in every playlist view.
 - Chevrons and rails: clean thin chevrons on every expand and collapse control; the collapsed Library and Devices bars have an accent edge and a count badge (songs, devices online); title bars are slimmer (30 px); the Now Playing controls start collapsed into the narrow bar.
