@@ -48,9 +48,9 @@ const labels = (p, sel) => p.evaluate(s => [...document.querySelectorAll(s)].fil
     await p.locator('.menubar .msub.open > .mpanel button').first().click(); await p.waitForTimeout(900);
     ok('K18 picking a device jumps to expanded Devices', await p.evaluate(() => document.getElementById('desk').classList.contains('devexpanded')));
     // K22 Queue menu
-    await home(p, NORMAL); await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(700);
+    await home(p, NORMAL); await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-matches("^Queue")').click({ position: { x: 12, y: 12 } }); await p.waitForTimeout(700);
     ok('K22 Queue menu opens the playlist expanded', await p.evaluate(() => document.getElementById('desk').classList.contains('listexpanded')));
-    await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(150);
+    await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-matches("^Queue")').click({ position: { x: 12, y: 12 } }); await p.waitForTimeout(150);
     ok('K15 Queue again pulses (already expanded)', await p.evaluate(() => document.querySelector('.listpanel').classList.contains('k-pulse')));
   });
   await ctx.close();

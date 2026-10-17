@@ -81,7 +81,7 @@ const TITLE = { hasText: /^title/i };
   const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } });
   await step('K14/K22 mini player', async () => {
     await home(p, { ...NORMAL, exp: 'lib' }); await shotP(p, 'k14-lib-expanded');
-    const r = await ev(p, () => { const m = document.querySelector('.minicol .mp'), d = document.querySelector('.devpanel'), np = document.querySelector('.npbar'); const mb = m?.getBoundingClientRect(), db = d?.getBoundingClientRect(); return { mini: !!mb && mb.height > 40, belowDev: mb && db && mb.top >= db.bottom - 4, right: mb && Math.abs(mb.right - innerWidth) < 40, np: np ? getComputedStyle(np).display : 'none', playlist: !!document.querySelector('.listpanel')?.offsetParent }; });
+    const r = await ev(p, () => { const m = document.querySelector('.minicol .mp'), d = document.querySelector('.devpanel'), np = document.querySelector('.npbar'); const mb = m?.getBoundingClientRect(), db = d?.getBoundingClientRect(); return { mini: !!mb && mb.height > 40, belowDev: (() => { const lb = document.querySelector('.listpanel')?.getBoundingClientRect(); return !!(mb && lb && mb.top >= lb.bottom - 4); })(), right: mb && db && Math.abs(mb.right - db.left) < 20,   /* 0.3.8 L33: under the Queue, left of the Devices sleeve */ np: np ? getComputedStyle(np).display : 'none', playlist: !!document.querySelector('.listpanel')?.offsetParent }; });
     ok('K14 expanded Library: playlist kept, NP bar hidden, mini player bottom-right under Devices', r.mini && r.belowDev && r.right && r.np === 'none' && r.playlist, JSON.stringify(r));
     const mc = await ev(p, () => ({ play: !!document.querySelector('.minicol .mp-ctl button'), seek: !!document.querySelector('.minicol .mp-seek'), vol: !!document.querySelector('.minicol .mp-vol') }));
     ok('K14 the in-column mini player has controls, seek and volume', mc.play && mc.seek && mc.vol, JSON.stringify(mc));
@@ -195,9 +195,9 @@ const labels = (p, sel) => p.evaluate(s => [...document.querySelectorAll(s)].fil
     await p.locator('.menubar .msub.open > .mpanel button').first().click(); await p.waitForTimeout(900);
     ok('K18 picking a device jumps to expanded Devices', await p.evaluate(() => document.getElementById('desk').classList.contains('devexpanded')));
     // K22 Queue menu
-    await home(p, NORMAL); await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(700);
+    await home(p, NORMAL); await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-matches("^Queue")').click({ position: { x: 12, y: 12 } }); await p.waitForTimeout(700);
     ok('K22 Queue menu opens the playlist expanded', await p.evaluate(() => document.getElementById('desk').classList.contains('listexpanded')));
-    await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-is("Queue")').click(); await p.waitForTimeout(150);
+    await p.click('.menubar .mtop:text-is("Library")'); await p.locator('.menubar .mgroup.open > .mpanel > button:text-matches("^Queue")').click({ position: { x: 12, y: 12 } }); await p.waitForTimeout(150);
     ok('K15 Queue again pulses (already expanded)', await p.evaluate(() => document.querySelector('.listpanel').classList.contains('k-pulse')));
   });
   await ctx.close();
