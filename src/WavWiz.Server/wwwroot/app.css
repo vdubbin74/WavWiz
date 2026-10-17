@@ -2558,3 +2558,13 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .plname{flex:1 1 220px;min-width:180px}
 /* 0.3.8 L48 queue item menu: same popup as Add to playlist */
 .qmenu{min-width:210px}.qmenu button:disabled{opacity:.45;cursor:not-allowed}.qmenu .qm-note{padding:4px 10px 6px;max-width:240px}
+
+/* ===== 0.3.9 L50: pins never overlap the transport / volume on the collapsed Now Playing bar =====
+   The strip drops its optional parts (volume bar, %, duration, extra buttons, art) earlier whenever pins are shown,
+   the pins keep their size and paint above the strip, and the strip clips instead of spilling over them. */
+.np-ctlpanel.collapsed .np-strip{overflow:hidden}
+.np-ctlpanel .pane-h .scrow{flex:none;position:relative;z-index:2}
+@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) .ns-vol .volpct{display:none} .np-ctlpanel.collapsed:has(.scrow .scbtn) .np-strip{gap:10px} }
+@container npctl (max-width:940px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-vol > .ic,.ns-vol input[type=range],.ns-dur){display:none} }
+@container npctl (max-width:820px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-x .np-heartslot,.ns-x .tog,.ns-elv){display:none} .np-ctlpanel.collapsed:has(.scrow .scbtn) .ns-art{width:34px;height:34px} }
+@container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-art,.ns-vol,.ns-x){display:none} }
