@@ -9,7 +9,7 @@ public class Release032PlayerTests
     {
         Assert.Equal("http://192.168.1.50:47800/mini.html", MiniPlayer.Url("http://192.168.1.50:47800/?player=1"));
         Assert.Equal("", MiniPlayer.Url("")); Assert.Equal("", MiniPlayer.Url("not a url"));
-        Assert.Equal((420, 108), (MiniPlayer.Width, MiniPlayer.Height)); Assert.Equal((300, 48), (MiniPlayer.SlimWidth, MiniPlayer.SlimHeight));
+        Assert.Equal((420, 138), (MiniPlayer.Width, MiniPlayer.Height)); Assert.Equal((300, 48), (MiniPlayer.SlimWidth, MiniPlayer.SlimHeight));
     }
 
     [Fact]

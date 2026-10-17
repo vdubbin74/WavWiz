@@ -22,7 +22,7 @@ function push(S, i, change = {}) {
     outputs: z.outputs.map(o => ({ ...o, latencyMs: 120 + (i % 3) })), ...(change[z.id] || {}) }));
 }
 const card = (root, id) => root.querySelector(`.dcard[data-zone-id="${id}"]`);
-const open = (root, id) => { card(root, id).querySelector('.dexpand').click(); return card(root, id); };
+const open = (root, id) => { card(root, id).click(); return card(root, id); };   // 0.3.9 L54: the whole card opens it (the arrow is gone)
 
 // 0.3.6 K5: a speaker's settings open in the wide Speaker Settings column (not inside the card). The same guarantees hold for that column.
 const spk = root => root.querySelector('.spcol .spkset');

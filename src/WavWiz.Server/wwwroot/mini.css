@@ -8,19 +8,21 @@ html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);
 .mp .mp-t{font-weight:700;font-size:var(--mp-tfs,13px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .mp .mp-a{font-size:var(--mp-afs,11px);line-height:1.15;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;order:3}
 .mp .mp-seek{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums;order:2;min-width:0}
-.mp input[type=range]{min-height:0;height:12px;margin:0;padding:0;flex:1;min-width:24px}
-.mp input[type=range]::-webkit-slider-runnable-track{height:4px}
-.mp input[type=range]::-webkit-slider-thumb{width:10px;height:10px;margin-top:-3px;border-width:1px;box-shadow:none}
-.mp input[type=range]::-moz-range-thumb{width:9px;height:9px;border-width:1px;box-shadow:none}
-.mp .mp-ctl{display:flex;flex-direction:column;gap:5px;flex:none;width:112px}
+.mp .mp-seek input[type=range],.mp .mp-oprow input[type=range]{min-height:0;height:12px;margin:0;padding:0;flex:1;min-width:24px}
+.mp :is(.mp-seek,.mp-oprow) input[type=range]::-webkit-slider-runnable-track{height:4px}
+.mp :is(.mp-seek,.mp-oprow) input[type=range]::-webkit-slider-thumb{width:10px;height:10px;margin-top:-3px;border-width:1px;box-shadow:none}
+.mp :is(.mp-seek,.mp-oprow) input[type=range]::-moz-range-thumb{width:9px;height:9px;border-width:1px;box-shadow:none}
+.mp .mp-ctl{display:flex;flex-direction:column;gap:5px;flex:none;width:112px;justify-content:center}
 .mp .mp-tr{display:flex;gap:4px;align-items:center;justify-content:space-between}
 .mp .mp-b{width:24px;height:24px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer;font-size:12px;line-height:1}
 .mp .mp-b:hover{border-color:var(--accent)}
 .mp .mp-b .ico-svg,.mp .mutebtn .ico-svg{width:13px;height:13px}
 .mp .mp-b.play{color:var(--accent-text,var(--accent));border-color:var(--accent)}
 .mp .mp-b.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
-.mp .mp-vol{display:flex;align-items:center;height:20px}
-.mp .mp-vol input[hidden]{display:none}
+.mp .mp-vol{display:flex;align-items:center;gap:10px;flex:1 0 100%;height:26px;order:5}
+.mp .mp-vol .vbar{flex:1 1 auto;min-width:0}
+.mp .mp-vol .pct{flex:none;width:3.4em;text-align:right;font-size:12px}
+.mp .mp-vol [hidden]{display:none}
 .mp .mutebtn{width:24px;height:24px;border-radius:50%}
 .mp .mutebtn.on{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
 .mp .mp-side{display:grid;grid-template-columns:24px 24px;gap:4px;flex:none}
@@ -44,3 +46,7 @@ html,body.minibody{margin:0;height:100%;overflow:hidden;background:var(--panel);
 .mp .mp-sc{flex:1 0 100%;justify-content:flex-end;margin:0;padding-top:2px;border-top:1px solid var(--line)}
 .mp.slim .mp-sc{display:none}
 .mp.embedded .mp-sc{flex-basis:100%}
+
+/* 0.3.9 L57: the volume row is the same component as the Devices tab (.dvol .vbar .pct); the row sits above the shortcuts row */
+.mp .mp-sc{order:6}
+.mp.slim .mp-vol{display:none}

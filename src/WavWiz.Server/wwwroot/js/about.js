@@ -1,10 +1,15 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.8';
+export const WHATS_NEW_VERSION = '0.3.9';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.3.9 (only what shipped)
+  ['Devices, expanded', 'A "Now playing in each zone" strip, bordered Scenes, Zones and Speakers columns, a two-wide speaker card grid with the output device, zone and delay, large zone cards, and a roomy full-width master volume row. Click anywhere on a speaker or zone card to open it; the arrow is gone.'],
+  ['Pins and resizing', 'The pins never overlap the transport or volume on a small or scaled window, and resizing the window no longer leaves the center blank.'],
+  ['Mini player volume', 'A big themed volume bar with the percentage, the same as in the Devices tab, plus the mute button next to the transport.'],
+  ['Tidier edges', 'The mini player under the Queue uses the standard panel border.'],
   // 0.3.8 (only what shipped)
   ['Keyboard shortcuts', 'Space plays or pauses, Ctrl+Right / Left is next / previous, M mutes, Alt+M shows or hides the mini player, Alt+H goes Home, Alt+E opens Sound / EQ, Alt+Q the Queue and Ctrl+, Settings. Hints show in the menus; Help > Keyboard shortcuts lists them. They stay quiet while you type or a window is open.'],
   ['Media keys', 'Play / Pause, Next, Previous, Mute and Volume up / down work from the keyboard even while WavWiz is minimized (Player), with a small on-screen volume indicator.'],

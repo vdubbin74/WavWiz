@@ -448,7 +448,7 @@ const checklistGo = a => go(a);
  *  It never joins as a speaker, so opening or closing it never changes the streams (F2). */
 export function openMini() {
   try { window.chrome?.webview?.postMessage({ cmd: 'mini' }); if (window.chrome?.webview) return; } catch { /* not the Player */ }
-  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=108');
+  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=138');
 }
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }

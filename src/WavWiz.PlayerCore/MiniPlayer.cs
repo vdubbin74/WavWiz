@@ -3,7 +3,7 @@ namespace WavWiz.PlayerCore;
 /// <summary>0.3.2 F3: the mini player window (replaces Remote mode). Pure placement / address helpers so they can be tested off Windows.</summary>
 public static class MiniPlayer
 {
-    public const int Width = 420, Height = 108, SlimWidth = 300, SlimHeight = 48;
+    public const int Width = 420, Height = 138, SlimWidth = 300, SlimHeight = 48;
     /// <summary>0.3.7 L31: what opening the mini player does. From the app's own menu it is always on top and the main window is minimized; from the tray or anywhere else the saved Keep-on-top choice rules and the main window stays.</summary>
     public static (bool TopMost, bool MinimizeMain) OpenPlan(bool fromAppMenu, bool savedPinned) => (fromAppMenu || savedPinned, fromAppMenu);
     /// <summary>The page the mini window loads: /mini.html on the same server as the full window.</summary>

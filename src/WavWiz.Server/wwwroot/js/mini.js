@@ -34,7 +34,12 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const next = b('next', 'next', 'Next', () => act('/stream/next'));
   // 0.3.3 G4a: master mute - icon only, the same round mute button as the device cards (mutes / unmutes every speaker)
   const mute = h('button', { type: 'button', class: 'mutebtn mp-mute', 'aria-label': 'Mute all speakers', title: 'Mute all speakers', onclick: () => { muted = !muted; act('/zones/mute-all', { muted }); paintMute(); } }); mute.append(icon('volume'));
-  const vol = h('input', { type: 'range', min: 0, max: 100, value: 0, 'aria-label': 'Volume', oninput: () => { clearTimeout(vol._t); vol._t = setTimeout(() => act('/zones/master', { set: +vol.value }), 120); } });
+  // 0.3.9 L57: the same volume bar as the Devices tab (.dvol > .vbar + .pct): wide themed track, big handle, visible percentage
+  const volPct = h('span', { class: 'pct', 'aria-live': 'off' }, '0%');
+  const vol = h('input', { type: 'range', min: 0, max: 100, value: 0, 'aria-label': 'Volume', title: 'Master volume', oninput: () => { paintVol(+vol.value); clearTimeout(vol._t); vol._t = setTimeout(() => act('/zones/master', { set: +vol.value }), 120); } });
+  const volWrap = h('div', { class: 'vbar' }, vol);
+  const paintVol = v => { volWrap.style.setProperty('--v', v + '%'); volPct.textContent = Math.round(v) + '%'; };
+  paintVol(0);
   const pin = b('mp-pin', 'pin', 'Keep on top', () => { pinned = !pinned; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } send('pin', { on: pinned }); paintPin(); });
   const full = b('mp-full', 'expandOut', 'Open the full app', () => { if (!send('full')) { try { window.opener?.focus(); } catch { /* ignore */ } if (!window.opener) window.open('/', 'wavwiz-main'); } });
   const close = h('button', { type: 'button', class: 'mp-b mp-x', 'aria-label': 'Close', title: 'Close', onclick: () => { if (!send('close')) window.close(); } }, '✕');
@@ -52,7 +57,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const opBtn = b('mp-op', 'opacity', 'Window transparency', () => setOpMode(!opMode));
   const armOp = () => { clearTimeout(opT); opT = setTimeout(() => setOpMode(false), 6000); };
   function setOpac(v, save = true) { opac = clampOpacity(v); opSl.value = String(opac); opVal.textContent = opac + '%'; if (save) saveOpacity(opac); applyOpacity(); }
-  function setOpMode(on) { opMode = on; vol.hidden = on; opRow.hidden = !on; opBtn.classList.toggle('on', on); opBtn.setAttribute('aria-pressed', String(on)); if (on) { opSl.value = String(opac); opVal.textContent = opac + '%'; armOp(); } else clearTimeout(opT); applyOpacity(); }
+  function setOpMode(on) { opMode = on; volWrap.hidden = on; volPct.hidden = on; opRow.hidden = !on; opBtn.classList.toggle('on', on); opBtn.setAttribute('aria-pressed', String(on)); if (on) { opSl.value = String(opac); opVal.textContent = opac + '%'; armOp(); } else clearTimeout(opT); applyOpacity(); }
   let hover = false;
   function applyOpacity() { const v = shownOpacity(opac, { hover, adjusting: adjusting || opMode }); if (!send('opacity', { value: v / 100, save: opac / 100 })) root.style.opacity = String(v / 100); else root.style.opacity = ''; }
   const hoverEl = embedded ? root : document.documentElement;
@@ -60,7 +65,8 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   window.addEventListener('blur', () => { if (!document.hasFocus()) { hover = false; applyOpacity(); } });
   window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.mini.opacity') setOpac(loadOpacity(), false); });   // Settings > Appearance changed it
   (embedded ? root : document).addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });
-  const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute), h('div', { class: 'mp-vol' }, vol, opRow));
+  const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute));
+  const volRow = h('div', { class: 'mp-vol dvol' }, volWrap, volPct, opRow);   // its own full-width row
   // 0.3.7 L10 / L11 / L23: the shortcuts row - Home far right, a separator, up to 3 pins leftward. The standalone window asks the main app window (it is brought to the front first).
   const toMain = target => { writePending(target); if (!send('full', { target })) { try { window.opener?.focus(); } catch { /* ignore */ } } sendToMain(target); };   // 0.3.8 L34: ONE click - bring the main window forward and carry the target with it
   const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => toMain({ run: id })), home: home || (() => toMain({ home: true })) });
@@ -69,7 +75,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
     if (id === 'playpause') play.click(); else if (id === 'next') next.click(); else if (id === 'prev') prev.click(); else if (id === 'mute') mute.click();
     else if (id === 'mini') { if (!send('close')) window.close(); } else if (id === 'home') toMain({ home: true }); else if (['eq', 'queue', 'settings'].includes(id)) toMain({ run: id });
   });
-  root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])), sc.el);
+  root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [opBtn] : [pin, full, opBtn, close])), volRow, sc.el);
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();
   if (!embedded) host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'opacity' && Number.isFinite(+m.value)) setOpac(Math.round(+m.value * 100)); if (m.cmd === 'pin') { pinned = !!m.on; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } paintPin(); } });
@@ -92,7 +98,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
       pos.textContent = fmtTime(now?.positionMs || 0); dur.textContent = fmtTime(now?.durationMs || 0);
       if (!dragging && now?.durationMs) seek.value = String(Math.round((now.positionMs || 0) / now.durationMs * 1000));
       const zs = await api('/zones'); const on = zs.filter(z => z.enabled); level = on.length ? Math.max(...on.map(z => z.volume)) : 0; muted = zs.length > 0 && zs.every(z => z.muted);
-      if (document.activeElement !== vol) vol.value = String(Math.round(level)); paintMute();
+      if (document.activeElement !== vol) { vol.value = String(Math.round(level)); paintVol(level); } paintMute();
     } catch { t.textContent = 'Not connected'; }
   }
   if (embedded) { root.classList.add('embedded'); paintPin(); poll(); timer = setInterval(poll, 1000); }
