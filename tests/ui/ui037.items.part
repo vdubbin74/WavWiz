@@ -56,10 +56,10 @@ await step('L1/L4/L5/L8/L11/L17 Home + pins + front', async () => {
   // pin Sound / EQ from the menu
   await hoverItem(p, 'Playback', 'Sound / EQ').catch(() => {}); await p.evaluate(() => document.querySelector('.menubar .mpin[data-pin=eq]')?.click()); await p.waitForTimeout(300); await p.keyboard.press('Escape');
   ok('pin from the menu row adds a shortcut', await p.evaluate(() => !!document.querySelector('.np-ctlpanel .scpin[data-sc=eq]')));
-  // max 3
+  // max 5 (0.3.8 L37; was 3)
   await p.evaluate(async () => { const m = await import('/js/shortcuts.js'); m.pinToggle('queue'); m.pinToggle('library'); const r = m.pinToggle('devices'); window.__full = r.full; });
-  ok('a 4th pin is refused', await p.evaluate(() => window.__full === true) && (await p.locator('.np-ctlpanel .scpin').count()) === 3);
-  const order = await p.evaluate(() => [...document.querySelectorAll('.np-ctlpanel .scrow > *')].map(x => x.dataset.sc || 'sep')); ok('pins stack leftward of Home, first pin nearest', order.join() === 'library,queue,eq,sep,home'.replace('library,queue,eq', 'library,queue,eq') , order.join());
+  ok('0.3.8 L37: a 4th pin is accepted (limit is 5)', await p.evaluate(() => window.__full === false) && (await p.locator('.np-ctlpanel .scpin').count()) === 4);
+  const order = await p.evaluate(() => [...document.querySelectorAll('.np-ctlpanel .scrow > *')].map(x => x.dataset.sc || 'sep')); ok('pins stack leftward of Home, first pin nearest', order.join() === 'devices,library,queue,eq,sep,home', order.join());
   // L4/L17: from expanded Devices, pin Queue brings the queue forward; Home restores the default screen
   await p.evaluate(() => localStorage.setItem('wavwiz.pins.v1', JSON.stringify(['queue']))); await p.evaluate(v => localStorage.setItem('wavwiz.panels', JSON.stringify(v)), { ...NORMAL, exp: 'dev' }); await p.evaluate(() => { window.onbeforeunload = null; }); await p.context().addInitScript(() => { localStorage.setItem('wavwiz.pins.v1', JSON.stringify(['queue'])); }); await p.goto(B + '/'); await p.waitForTimeout(2800); await p.evaluate(() => document.querySelector('.np-ctlpanel .scpin[data-sc=queue], .npbar .scpin[data-sc=queue]')?.click()); await p.waitForTimeout(900);
   ok('L17 Queue from expanded Devices: devices folded, queue shown', await p.evaluate(() => { const d = document.querySelector('.desk'); const q = document.querySelector('.listpanel').getBoundingClientRect(); window.__dbg = d.className; return !d.classList.contains('devexpanded') && q.width > 100 && q.height > 100; }), await p.evaluate(() => JSON.stringify({c: document.querySelector('.desk').className, n: document.querySelectorAll('.scpin[data-sc=queue]').length, q: document.querySelector('.listpanel').getBoundingClientRect().toJSON()})));

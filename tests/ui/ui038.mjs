@@ -32,7 +32,7 @@ for (const [w, h] of [[1920, 1080], [1366, 768]]) {
     const { ctx, p } = await page(w, h, LISTEXP); const dv = await rect(p, '.devpanel'), mc = await rect(p, '.minicol');
     ok('L42 bar full height, button inside at the bottom ' + w, dv.h > h - 140 && mc.b <= dv.b + 1 && mc.y > dv.b - 60 && mc.x >= dv.x - 1, JSON.stringify({ dv, mc }));
     const op = () => p.evaluate(() => { const m = document.querySelector('.minicol .mp'); const c = getComputedStyle(m); return c.visibility === 'visible' && +c.opacity > 0.9; });
-    await p.mouse.move(mc.x + mc.w / 2, mc.y + mc.h / 2); await p.waitForTimeout(500); ok('L41 opens on the button ' + w, await op());
+    await p.mouse.move(mc.x - 80, mc.y - 80); await p.mouse.move(mc.x + mc.w / 2, mc.y + mc.h / 2, { steps: 8 }); await p.waitForTimeout(900); ok('L41 opens on the button ' + w, await op());
     const pr = await rect(p, '.minicol .mp'); ok('L41 player is left of the button', pr && pr.r <= mc.x + 2, JSON.stringify(pr));
     let alive = true; for (let i = 1; i <= 8; i++) { await p.mouse.move(mc.x - i * 3, mc.y + mc.h / 2, { steps: 2 }); await p.waitForTimeout(40); if (!await op()) alive = false; }
     ok('L41 stays open crossing the gap ' + w, alive);
@@ -105,9 +105,9 @@ await step('L48 queue item menu: desktop right-click, locked, phone long-press',
   ok('L48 same popup styling as Add to playlist (.pldrop.mpanel)', await p.evaluate(() => { const b = document.querySelector('.qmenu'); return b.classList.contains('pldrop') && b.classList.contains('mpanel'); }));
   ok('L48 nothing disabled while unlocked (middle row)', await p.locator('.qmenu button:disabled').count() === 0);
   await p.screenshot({ path: `/workspace/screens/wavwiz-038-${ENG}-l48-menu.png` });
-  const before = (await api('/stream')).queue.items.map(x => x.title); await p.click('.qmenu [data-qm=top]'); await p.waitForTimeout(700); const after = (await api('/stream')).queue.items.map(x => x.title); ok('L48 Move to top works', after[0] === before[2], before.join() + ' -> ' + after.join());
-  await p.locator('.qtable tbody tr[data-i]').nth(1).click({ button: 'right' }); await p.waitForTimeout(250); await p.click('.qmenu [data-qm=remove]'); await p.waitForTimeout(700); ok('L48 Remove works', (await api('/stream')).queue.items.length === 5);
-  await p.click('.pllock'); await p.waitForTimeout(300); await p.locator('.qtable tbody tr[data-i]').nth(2).click({ button: 'right' }); await p.waitForTimeout(250);
+  const before = (await api('/stream')).queue.items.map(x => x.title); await p.click('.qmenu [data-qm=top]', { timeout: 8000 }); await p.waitForTimeout(700); const after = (await api('/stream')).queue.items.map(x => x.title); ok('L48 Move to top works', after[0] === before[2], before.join() + ' -> ' + after.join());
+  await p.locator('.qtable tbody tr[data-i]').nth(1).click({ button: 'right' }); await p.waitForTimeout(250); await p.click('.qmenu [data-qm=remove]', { timeout: 8000 }); await p.waitForTimeout(700); ok('L48 Remove works', (await api('/stream')).queue.items.length === 5);
+  await p.click('.pllock', { timeout: 8000 }); await p.waitForTimeout(300); await p.locator('.qtable tbody tr[data-i]').nth(2).click({ button: 'right' }); await p.waitForTimeout(250);
   const dis = await p.evaluate(() => ['remove', 'top', 'bottom', 'play', 'playlist', 'library', 'copy'].map(id => [id, document.querySelector(`.qmenu [data-qm=${id}]`)?.disabled])); const hint = await p.evaluate(() => document.querySelector('.qmenu [data-qm=remove]')?.title);
   ok('L48 locked: Remove / Move to top / Move to bottom disabled, others enabled', dis.filter(([id, d]) => ['remove', 'top', 'bottom'].includes(id)).every(([, d]) => d) && dis.filter(([id]) => !['remove', 'top', 'bottom'].includes(id)).every(([, d]) => !d), JSON.stringify(dis));
   ok('L48 locked: lock hint shown', /locked/.test(hint || '') && /locked/.test(await p.locator('.qmenu .qm-note').textContent()), hint);
