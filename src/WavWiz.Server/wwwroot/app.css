@@ -2309,7 +2309,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.listexpanded:not(.libexpanded):not(.devexpanded) .listpanel{grid-area:1/2/3/3}
   .desk.listexpanded:not(.libexpanded):not(.devexpanded) .devpanel{grid-area:1/3/2/4}
   .desk.listexpanded:not(.libexpanded):not(.devexpanded) .minicol{display:block;grid-area:2/3/3/4;position:relative;z-index:3}
-  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .minicol .mp{border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel)}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .minicol .mp{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
   /* K22: Devices collapsed -> the bottom of the bar shows ONLY a small cover and a short progress bar; hovering pops the full mini player out, anchored bottom-right */
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{position:absolute;right:0;bottom:0;width:var(--minipop,380px);z-index:30;opacity:0!important;pointer-events:none;transition:opacity var(--glide-fade) var(--glide-ease);box-shadow:0 8px 28px rgba(0,0,0,.55)}
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:hover .mp,.desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol:focus-within .mp{opacity:1!important;pointer-events:auto}
@@ -2484,7 +2484,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 @media (min-width:901px){
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol{width:36px;height:36px;min-height:36px;justify-self:end;align-self:end;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);display:grid;place-items:center;cursor:pointer}
   .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol::before{content:'♪';color:var(--accent-text,var(--accent));font-size:18px;line-height:1}
-  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{right:calc(100% + 8px);bottom:0;border:1px solid var(--accent);border-radius:var(--radius);background:var(--panel);width:var(--minipop,420px)}
+  .desk.listexpanded.devcollapsed:not(.libexpanded):not(.devexpanded) .minicol .mp{right:calc(100% + 8px);bottom:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);width:var(--minipop,420px)}
 }
 .eqall-preset{flex:0 1 280px;min-width:200px}.eqall-top .eqall-name{flex:0 1 190px;width:auto}
 
@@ -2551,7 +2551,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .vfmini:hover .vfbtn,.vfmini:focus-within .vfbtn{opacity:1}
 @keyframes vfglow{0%,100%{box-shadow:0 0 8px color-mix(in srgb,var(--accent) 40%,transparent)}50%{box-shadow:0 0 18px color-mix(in srgb,var(--accent) 75%,transparent)}}
 .vfmini .vfpop{position:absolute;right:calc(100% + 0px);bottom:0;width:min(420px,calc(100vw / var(--z,1) - 90px));padding-right:10px;opacity:0;visibility:hidden;transition:opacity var(--glide-fade) var(--glide-ease) 300ms,visibility 0s linear calc(300ms + var(--glide-fade))}
-.vfmini .vfpop .mp{box-shadow:0 8px 28px rgba(0,0,0,.55);background:var(--panel);border:1px solid var(--accent);border-radius:3px;width:100%}
+.vfmini .vfpop .mp{box-shadow:0 8px 28px rgba(0,0,0,.55);background:var(--panel);border:1px solid var(--line);border-radius:3px;width:100%}
 .vfmini::after{content:'';position:absolute;right:100%;top:-8px;bottom:-8px;width:14px}
 .vfmini:hover .vfpop,.vfmini:focus-within .vfpop{opacity:1;visibility:visible;transition:opacity var(--glide-fade) var(--glide-ease) 0s,visibility 0s}
 @media (prefers-reduced-motion:reduce){ .vfbtn{animation:none} .vfmini .vfpop{transition:none} }

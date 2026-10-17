@@ -1,3 +1,4 @@
+import { viewForMode } from './viewmode.js';
 import './sliderstyle.js';   // 0.3.3 G11
 import './pwa.js';   // 0.3.4 H1
 import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
@@ -175,7 +176,15 @@ async function startMain() {
   tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
-  window.addEventListener('resize', () => { if (wide() && S.view === 'now') go('library'); applyPanels(); });
+  const applyMode = () => {   // 0.3.9 L52: keep the view state valid on both sides of the breakpoint (idle or playing)
+    const m = viewForMode({ wide: wide(), view: S.view, hasContent: !!content.firstChild });
+    if (m.clearContent) { content.replaceChildren(); S.view = m.view; desk.dataset.view = m.view; tabs.querySelectorAll('button').forEach(b => b.classList.remove('on')); }
+    else if (m.view !== S.view || desk.dataset.view !== m.view) go(m.view, true);
+    else if (!tabs.querySelector('button.on')) go(m.view, true);
+  };
+  window.addEventListener('resize', () => { applyMode(); applyPanels(); });
+  try { matchMedia('(max-width:900px)').addEventListener('change', () => { applyMode(); applyPanels(); }); } catch { /* old engines */ }
+  applyMode();
   window.addEventListener('keydown', ev => {
     if (ev.key === 'Escape') toggleDrawer(false);
     const nk = !document.querySelector('dialog[open],.sheet,.dlg,.jb') && newKindForKey(ev, isTypingTarget(ev.target)); if (nk) { ev.preventDefault(); openNew(nk); return; }   // K17
