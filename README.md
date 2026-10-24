@@ -20,23 +20,27 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Screenshots
 
-![WavWiz main window with the library, the live LED-bar EQ, a slim Now Playing bar, four connected devices and the playlist](docs/img/wavwiz-main.png)
+![WavWiz 0.4.9 main window: the library, the live LED EQ, the playlist, the compact Now Playing bar and six zones of speakers, each zone playing its own music](docs/img/wavwiz-main.png)
 
-| Speaker settings with profiles | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
+| Zones and speakers | Master volume | Jukebox zone |
 | --- | --- | --- |
-| ![Speaker settings for one device: a profile row (Save, Save as), volume, cap, delay, balance, bass, treble, the live LED EQ and the output](docs/img/wavwiz-device-settings.png) | ![The 10-band EQ in the LED look with Lock EQ checked](docs/img/wavwiz-eq-lock.png) | ![Theme cards with the live preview pinned at the top](docs/img/wavwiz-appearance-theme.png) |
+| ![Expanded Devices: scenes and schedules on the left, zone settings in the middle and every zone with its speakers on the right](docs/img/wavwiz-devices-zones.png) | ![Master volume mixer: the Everywhere slider on top, then each zone and its speakers](docs/img/wavwiz-master-volume.png) | ![Jukebox zone settings: its own queue and volume, and the speakers it plays on](docs/img/wavwiz-jukebox.png) |
+
+| Speaker settings | Sound (EQ) with Lock EQ | Settings > Appearance > Theme |
+| --- | --- | --- |
+| ![Settings for one speaker in a zone: move to zone, profile, volume, max volume, delay, balance, bass, treble, its own LED EQ and output](docs/img/wavwiz-device-settings.png) | ![The full-screen 10-band LED EQ with Lock EQ on](docs/img/wavwiz-eq-lock.png) | ![Settings > Appearance with the theme cards](docs/img/wavwiz-appearance-theme.png) |
 
 **Hover menus: the Sleep timer times appear when you hover over it**
 
 ![Playback menu with the Sleep timer submenu open: 15, 30, 45 and 60 minutes, End of song and Off](docs/img/wavwiz-menu-hover.png)
 
-**Minimized Now Playing: everything on one line**
+**Compact Now Playing bar: everything on one line**
 
-![Minimized Now Playing bar with cover, title, progress and every control on one line, and the Playlist bar showing Up next](docs/img/wavwiz-minimized-bar.png)
+![Compact Now Playing bar with cover, title, progress and every control on one line](docs/img/wavwiz-minimized-bar.png)
 
-| Phone (browser) | Add a music folder |
+| Phone (browser) | Music folders |
 | --- | --- |
-| ![WavWiz Devices on a phone, with four devices playing in sync](docs/img/wavwiz-phone.png) | ![Settings, Music folders with a network folder being added](docs/img/wavwiz-settings-library.png) |
+| ![Now Playing on a phone, controlling the Kitchen zone](docs/img/wavwiz-phone.png) | ![Settings > Library: library view options and the music folders on the server PC](docs/img/wavwiz-settings-library.png) |
 
 **Visualizers**
 
