@@ -70,7 +70,7 @@ public static class FeaturesApi
         g.MapPost("/alarm/snooze", () => { var err = s.Schedules.Snooze(); return err != null ? Ext.Bad(err, 409) : Results.Json(s.Schedules.AlarmState()); }).Req(Role.Control);
         g.MapPost("/alarm/stop", () => { var err = s.Schedules.StopAlarm(); return err != null ? Ext.Bad(err, 409) : Results.Json(new { ok = true }); }).Req(Role.Control);
         g.MapGet("/sleep", () => Results.Json(s.Sleep.State())).Req(Role.View);
-        g.MapPost("/sleep", async (HttpContext c) => { var b = await c.Request.Body(); var err = s.Sleep.Set(b.Str("mode"), b.Num("minutes"), b.LongList("zoneIds")); return err != null ? Ext.Bad(err) : Results.Json(s.Sleep.State()); }).Req(Role.Control);
+        g.MapPost("/sleep", async (HttpContext c) => { var b = await c.Request.Body(); var err = s.Sleep.Set(b.Str("mode"), b.Num("minutes"), b.LongList("zoneIds"), b.Str("zoneKey")); return err != null ? Ext.Bad(err) : Results.Json(s.Sleep.State()); }).Req(Role.Control);
 
         // ---- B6 radio finder ----
         g.MapGet("/radio/finder/search", async (string? name, string? tag, string? country, int? limit) =>
@@ -106,7 +106,7 @@ public static class FeaturesApi
         g.MapGet("/rip/drives", () => Results.Json(s.CdRip.Drives())).Req(Role.View);
         g.MapGet("/rip/formats", () => Results.Json(s.CdRip.Formats())).Req(Role.View);
         g.MapGet("/rip/jobs", () => Results.Json(s.CdRip.Jobs())).Req(Role.View);
-        g.MapPost("/rip/start", async (HttpContext c) => { var b = await c.Request.Body(); var (id, err) = s.CdRip.Start(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
+        g.MapPost("/rip/start", async (HttpContext c) => { if (s.Cfg.TestTreatAllClientsAsRemote || !AuthService.IsThisMachine(c.Connection.RemoteIpAddress)) return Ext.Bad("CD ripping is only available in the WavWiz app on the PC.", 403); /* 0.4.8 F57 */ var b = await c.Request.Body(); var (id, err) = s.CdRip.Start(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
 
         // ---- B9 tag / cover auto-fill ----
         g.MapGet("/tags/status", () => Results.Json(s.TagFix.Status())).Req(Role.View);

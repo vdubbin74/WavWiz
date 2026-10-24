@@ -1,10 +1,64 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.3.9';
+export const WHATS_NEW_VERSION = '0.4.9';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.4.9 (only what shipped)
+  ['Streaming quality', 'Settings > Playback > Streaming quality: Studio (24-bit / 48 kHz) or Studio Max (24-bit / 96 kHz). Players that can\'t play 96 kHz still get 48 kHz.'],
+  ['Jukebox zone', 'The Jukebox shows in Devices, has its own default speakers in Settings > Jukebox, and lets you pick speakers when you start it. From the kiosk you can switch to the app and come back with "Return to Jukebox".'],
+  ['Phone remote', 'On the phone, Now Playing is a full-screen remote with a simpler menu.'],
+  ['Devices in your order', 'Active zones come first in an order you set, with a Move menu and compact rows for offline or empty zones.'],
+  ['Smoother layout', 'Nothing jumps when panels slide, expand or collapse, the mixer sliders line up, and the mini player is no longer cut off.'],
+  // 0.4.8 (only what shipped)
+  ['Queue picker', 'Pick which zone\'s queue you see from the "Queue:" dropdown. The playing zone is marked "(playing)".'],
+  ['Master Volume mixer', 'One window for every zone and speaker volume, with each speaker\'s Delay and Max volume, in 2 columns with long sliders. Open it with the mixer button in the player bar.'],
+  ['Scrolling song titles', 'Long titles and artists scroll so you can read them, everywhere, including the phone and the mini player.'],
+  ['Live now playing', 'Zone and speaker cards show the current song right away.'],
+  ['Tidier layout', 'A player bar for the full-screen Queue, Roomy uses the Classic Devices bar, a full-height expanded Devices with no player in the way, a vertical Devices count, a smaller Delay box, a + button in Devices, a mini player that fits at 200%, and full-screen sound settings on the phone.'],
+  // 0.4.7 (only what shipped)
+  ['Library tabs always show', 'The Library tabs show on the first start too, and the selected tab is easy to read in every theme.'],
+  ['Devices full height again', 'With the Queue full screen, the Devices column runs all the way down again and the player bar stays beside it.'],
+  // 0.4.6 (only what shipped)
+  ['Drag zones to reorder them', 'Grab a zone by its name or its box title and drop it above or below another zone. The order is saved on this device. A plain click still opens the zone.'],
+  ['Roomy stays Roomy', 'The Roomy layout now holds when you expand the Library or the Queue, and Now Playing stays a full-width bar at the bottom.'],
+  ['Library tabs fit', 'The Library tabs stay on one line. Tabs that don\'t fit are under the "⋯" button.'],
+  // 0.4.5 (only what shipped)
+  ['Drag from the Library, everywhere', 'Drag songs, albums, artists, genres or folders onto any queue with a mouse, touch or a pen, also in the WavWiz Player window. Draggable rows show a grab hand.'],
+  // 0.4.4 (only what shipped)
+  ['Album art fixed', 'One album\'s cover no longer spreads across the library. Songs with missing tags show their real artist, and Settings has a "Rebuild album art" button.'],
+  ['Mute and unmute any speaker', 'Every speaker row, the speaker page and the phone view have a mute toggle next to the volume, and tapping a MUTED tag unmutes it.'],
+  ['Smoother Devices', 'Drag feedback in the Devices tree, click a zone title to control it, status tags jump to their setting, and the speaker page no longer jumps while you scroll.'],
+  ['Queue and schedule fixes', 'Drop songs on the collapsed Queue strip, copy a queue to another zone, cleaner schedule rows and full-width volume sliders.'],
+  // 0.4.3 (only what shipped)
+  ['Visualizer and EQ meters are back', 'Since 0.4.1 every zone plays in its own group, and only the main group fed the visualizer, so it and the EQ meters stayed flat. Every zone now feeds them, and they follow the zone you control.'],
+  ['EQ on phones and browsers', 'A phone, browser or TV used as a speaker now plays its EQ: saved presets, live previews, bass/treble, balance and trim, the same as the PC Player.'],
+  ['Cleaner Devices panel', 'Sentence-case zone boxes with a speaker count, Link / Split under the ON switch, one MASTER row and a paused-at-start zone shown as idle.'],
+  ['Speaker page and EQ fixes', 'EQ labels never overlap, exactly one preset is lit, the Home EQ adjusts the Controlling zone\'s speaker, and the speaker page shows its output and calibration.'],
+  // 0.4.2 (only what shipped)
+  ['Zones hold their own speakers', 'Each speaker belongs to exactly one zone, nested under it. Drag a speaker onto a zone, use "Move to zone", or right-click it. New speakers wait in an Unassigned group until you add them.'],
+  ['One queue box per zone', 'Every zone is a "Queue: <Zone>" box with one now-playing line, one volume slider and mute. Linked zones share a single accent box marked IN SYNC, and followers say "Queue from <Leader>".'],
+  ['Devices at a glance', 'A tree on the right, a detail pane in the middle (the Controlling zone by default) and Scenes & Schedules on the left. Speaker settings are one full page: Max volume, EQ with presets, delay and Calibrate.'],
+  ['Right-click menus everywhere', 'Zones, speakers and Unassigned speakers have menus with icons, submenus (Link to, Move to zone) and keyboard control; long-press on the phone.'],
+  ['Eight EQ presets', 'The list is trimmed to eight built-ins; presets you already use stay as your own. The EQ is never locked, and Save as preset is one click.'],
+  ['Scenes remember zones', 'A scene saves your zone layout and links. Schedules and alarms target zones.'],
+  // 0.4.1 (only what shipped)
+  ['Smaller zones win', 'Play in a smaller zone and only its speakers play it; they are greyed on larger zones ("playing in Kitchen"), and come back when it stops. A zone card shows "2 of 6 playing here".'],
+  ['Cleaner zone and speaker cards', 'A grip gutter on the left, a link icon instead of "LINKED WITH", and one shared now-playing box for linked zones. Drag a zone to reorder it, or drop it on the middle of another zone to link them. Right-click (or long-press) a card for its menu.'],
+  ['Queue for any zone', 'The Queue panel has a zone picker, and "Send this queue to another zone" copies or moves it.'],
+  ['Zone selector on the master panel', 'The same zone selector now sits next to the master volume, and in the mini and compact players.'],
+  ['Mini player', 'Volume, transparency (with a label), smaller close button, and keyboard shortcuts: Space, N, P, Up, Down, M, Esc.'],
+  ['Quicker calibration', 'Calibration takes one test per speaker by default (Thorough is still there), and a new speaker gets a one-tap "Calibrate this speaker".'],
+  ['iPhone', 'An Add to Home Screen guide with pictures, and a note that the name, calibration and mic settings are remembered on this phone.'],
+  ['Fixes', 'A deleted zone no longer leaves a stale group, an unknown zone falls back to the house, and repeated messages no longer pile up.'],
+  // 0.4.0 (only what shipped)
+  ['Zones that play their own music', 'Each zone can play its own music, or be linked with others. Pick a zone with the chip above the player; link, split off or link all from the Devices tab. Zones start linked, like before.'],
+  ['Jukebox zone', 'The Jukebox has its own zone and its own speaker picker, separate from the other zones.'],
+  ['Alarms and sleep timer per zone', 'An alarm or the sleep timer can target one zone, the Jukebox or every zone.'],
+  ['AirPlay and Spotify Connect per zone', 'In a zone\'s settings, switch on Phone casting: the zone shows as "WavWiz – <zone>" on phones (AirPlay and Spotify Connect), and what a phone sends plays in that zone only. Off by default.'],
+  ['Calibration', 'Calibrating a speaker pauses only its own zone; other zones keep playing.'],
+  ['Lighter on the server', 'An idle zone uses no decoder or timer, and linked zones share one decode.'],
   // 0.3.9 (only what shipped)
   ['Devices, expanded', 'A "Now playing in each zone" strip, bordered Scenes, Zones and Speakers columns, a two-wide speaker card grid with the output device, zone and delay, large zone cards, and a roomy full-width master volume row. Click anywhere on a speaker or zone card to open it; the arrow is gone.'],
   ['Pins and resizing', 'The pins never overlap the transport or volume on a small or scaled window, and resizing the window no longer leaves the center blank.'],
@@ -111,7 +165,7 @@ const FILES = [['/licenses/LICENSE.txt', 'WavWiz license'], ['/licenses/THIRD-PA
 export function aboutBody(S) {
   const v = S?.auth?.appVersion ?? '';
   return h('div', { class: 'about' },
-    h('div', { class: 'aboutHead' }, h('img', { src: '/assets/logo-128.png', alt: '', width: 72, height: 72 }), h('div', null, wordmark('wordmark big'), h('div', { class: 'small dim' }, `BETA ${v}`))),
+    h('div', { class: 'aboutHead' }, h('img', { src: '/assets/logo-128.png', alt: '', width: 72, height: 72 }), h('div', null, wordmark('wordmark big'), h('div', { class: 'small dim', 'data-wwv': 'BETA {v}' }, `BETA ${v}`))),
     h('p', null, 'WavWiz plays your own music in sync on every speaker in the house: PCs with Bluetooth or wired speakers, phones, TVs and any browser. No cloud account, no analytics, no telemetry.'),
     h('div', { class: 'card' }, h('h3', null, 'Privacy'), h('ul', { class: 'small' },
       h('li', null, 'No cloud account, no analytics, no telemetry. WavWiz doesn\'t open ports to the internet; by default it only listens on your home network.'),

@@ -3,6 +3,7 @@
 // changes. Theme and Visualizer are the 0.2.0 dedicated-page layouts again. Everything is saved on this device only.
 import { h, api, toast, debounce } from './util.js';
 import { SCALES, loadScale, applyScale, scaleFactor } from './uiscale.js';
+import { LAYOUTS, loadLayout, saveLayout } from './panels.js';
 import { SLIDER_STYLES, loadSlider, applySlider } from './sliderstyle.js';
 import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap } from './viz.js';
@@ -173,6 +174,11 @@ function displaySizeCard() {
       h('p', { class: 'dim small' }, 'Makes the web UI larger or smaller on this phone or PC only. The whole app changes as you pick.'),
       gridEl('display', 'Display size', cards),
       h('p', { class: 'small dim', style: 'margin-top:8px' }, SCALES.some(([id]) => id === cur) ? `Now ${Math.round(z * 100)}%.` : `Now ${Math.round(z * 100)}% (your earlier choice). Pick a size above to change it.`),
+      // 0.4.5 T1b: Layout - Auto / Roomy / Full (this phone or PC only)
+      h('h3', { style: 'margin-top:14px' }, 'Layout'),
+      h('p', { class: 'dim small' }, 'Roomy puts Devices behind a tab on the right edge and the Library on its rail, so Sound, the Queue and Now Playing get the width. Full is the classic layout. Auto picks Roomy on big high-DPI screens (like a 4K TV at 200%) and narrow windows.'),
+      h('div', { class: 'seg laylayout', role: 'radiogroup', 'aria-label': 'Layout' }, LAYOUTS.map(([id, nm, tip]) => { const on = loadLayout() === id; return h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: 'segbtn' + (on ? ' on' : ''), 'data-layout': id, title: tip, onclick: () => { saveLayout(id); draw(); } }, nm + (id === 'full' ? ' (default)' : '')); })),
+      h('p', { class: 'small dim', style: 'margin:6px 0 14px' }, 'Right now: ' + (document.querySelector('.desk')?.classList.contains('tight') || document.querySelector('.desk')?.classList.contains('roomy') ? 'Roomy' : 'Full') + '.'),
       // 0.3.3 G11: volume slider style (this phone or PC only)
       h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Volume slider style'), h('div', { class: 'small dim' }, 'Gradient blends your theme’s main and second colors. Flat uses the main color. Default: Gradient.')),
         h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Volume slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },

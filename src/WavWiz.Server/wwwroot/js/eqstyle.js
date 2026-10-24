@@ -72,6 +72,18 @@ export function eqTarget(zones = [], mine = null) {
   const outs = (zones || []).flatMap(z => (z.outputs || []).map(o => ({ ...o, zone: z.name, zoneId: z.id }))).filter(o => o.connected || o.active);
   return (mine && outs.find(o => o.zoneId === mine.id)) || outs.find(o => o.active) || outs[0] || null;
 }
+/** 0.4.3 #5: the default speaker the Home EQ adjusts: the first speaker (in zone order) of the Controlling zone that has a live output. Null when there is
+ * no Controlling zone or none of its speakers is online (callers fall back to eqTarget). Pure, unit-tested. */
+export function controllingTarget(zones = [], groups = [], cur = null) {
+  if (!cur || cur.kind !== 'zone') return null; const g = (groups || []).find(x => x.id === cur.id); if (!g) return null;
+  for (const z of (zones || []).filter(x => (g.deviceIds || []).includes(x.id))) {   // the order the Devices panel lists them
+    const outs = (z.outputs || []).filter(o => o.connected || o.active); const o = outs.find(x => x.active) || outs[0];
+    if (o) return { ...o, zone: z.name, zoneId: z.id };
+  }
+  return null;
+}
+/** 0.4.3 #5: short picker text: the speaker name, plus the output name only when that speaker has several outputs. */
+export const pickerLabel = (o, all = []) => (all.filter(x => x.zoneId === o.zoneId).length > 1 ? `${o.zone} · ${o.name}` : o.zone);
 /** U10: edits made on the Appearance page are kept in this speaker's own preset (never over a built-in or a shared preset). */
 export const ownEqName = speaker => `${String(speaker || 'This speaker').trim().slice(0, 30)} EQ`;
 /** U10: the one-line summary under the preview: preset, pre-gain, loudness (and Bypass / EQ off when set). */

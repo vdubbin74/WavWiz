@@ -12,6 +12,8 @@ public sealed class PlayerConfig
     public VirtualClock Clock { get; init; } = new();
     public double CardSkewPpm { get; init; }
     public int OutputRate { get; init; } = 48000;
+    /// <summary>0.4.9 F77: HELLO MaxRate (48000 = a pre-F77 player / 44.1-48 kHz device; 96000 = takes Studio Max).</summary>
+    public int MaxRate { get; init; } = 48000;
     public int PeriodFrames { get; init; } = 480;
     /// <summary>What WASAPI would report as the output pipeline latency (the engine knows this).</summary>
     public long ReportedLatencyUs { get; init; } = 20_000;
@@ -52,6 +54,7 @@ public sealed class SimPlayer : IStreamSubscriber
 
     public string Id => Cfg.Name;
     public int BufferDepthMs => Cfg.BufferDepthMs;
+    public int MaxRate => Cfg.MaxRate;
 
     public SimPlayer(SimKernel k, SimServer server, PlayerConfig cfg)
     {
@@ -90,7 +93,7 @@ public sealed class SimPlayer : IStreamSubscriber
         var payload = msg.AsSpan(Wire.HeaderSize, (int)h.PayloadLen);
         switch (h.Type)
         {
-            case MsgType.Epoch: Wire.TryDecodeEpoch(payload, out var e, out var start); Engine.OnEpoch(e, start); break;
+            case MsgType.Epoch: if (!Wire.TryDecodeEpoch(payload, out var e, out var start, out var rate)) throw new InvalidDataException("bad EPOCH"); Engine.OnEpoch(e, start, rate); break;
             case MsgType.Audio: if (Wire.TryDecodeAudio(payload, out var f, out _)) Engine.OnAudio(f!); break;
             case MsgType.StopAt: Wire.TryDecodeStopAt(payload, out var se, out var at); Engine.OnStopAt(se, at); break;
         }

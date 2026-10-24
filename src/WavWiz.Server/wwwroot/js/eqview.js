@@ -44,7 +44,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   } else {
     const cols = h('div', { class: 'eqa-cols' });
     EQ_BANDS.forEach((hz, i) => {
-      const val = h('span', { class: 'eqb-val' }), hzl = h('span', { class: 'eqb-hz' }, hzText(i));
+      const val = h('span', { class: 'eqb-val' }), hzl = h('span', { class: 'eqb-hz', title: hzText(i) }, EQ_LABELS[i], hz < 1000 ? h('span', { class: 'eqb-hzu' }, ' Hz') : null);   // 0.4.3 #3: the ' Hz' unit drops out when the graph is narrow
       let col;
       if (style === 'led') {
         const segs = h('div', { class: 'eqb-segs', 'aria-hidden': 'true' }, Array.from({ length: SEGS }, () => h('i')));

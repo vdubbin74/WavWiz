@@ -1,0 +1,1 @@
+import { chromium } from 'playwright'; const br=await chromium.launch(); const p=await br.newPage(); p.on('pageerror',e=>console.log('ERR',e.message)); p.on('console',m=>console.log('CON',m.text())); await p.goto('http://172.30.0.2:47800/mock049.html'); await p.waitForTimeout(800); await br.close();

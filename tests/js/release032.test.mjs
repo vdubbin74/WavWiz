@@ -52,7 +52,7 @@ test('F1/F5/F6/F17/F21 markup: mirrored rail, round master mute, dividers, 4-col
   assert.match(css, /\.libpanel \.prail-t\{transform:rotate\(180deg\)\}/);
   const d = src('devices.js');
   assert.match(d, /class: 'mutebtn mastermute'/); assert.doesNotMatch(d, /'Mute all'/);
-  assert.match(d, /class: 'pane-h dsec-h devs-h'/); assert.match(d, /class: 'pane-h dsec-h zones-h'/);
+  // 0.4.2 superseded by the zone tree (covered in release042 / ui042): assert.match(d, /class: 'pane-h dsec-h devs-h'/); assert.match(d, /class: 'pane-h dsec-h zones-h'/);
   assert.match(css, /\.devpanel\.expanded \.dexp-main\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(d, /h\('div', \{ class: 'dtagrow' \}, tags\)/); assert.match(d, /class: 'dtagrow ztagrow'/);
   assert.match(d, /class: 'dot zdot '/, 'zone cards carry the same dot so names line up');
@@ -87,6 +87,6 @@ test('F3: Mini player replaces Remote mode; F10/F11: versioned art URLs; F16: (i
   assert.match(src('menu.js'), /\['Mini player'/); assert.match(src('mini.js'), /send\(/);
   const art = await imp('art'); art.setArtCv('3.0.3.2'); assert.match(art.itemArtUrl({ kind: 'track', trackId: 5, refId: 5, id: 5 }) || '', /cv=3\.0\.3\.2/);
   assert.match(src('settingsui.js'), /class: 'infoi'|infoi/);
-  const a = await imp('about'); assert.equal(/^0\.3\.[3-9]$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
+  const a = await imp('about'); assert.equal(/^0\.(3\.[3-9]|4\.\d)$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
   assert.ok(!a.WHATS_NEW.some(([t]) => t === 'Remote mode'), 'retired feature not advertised');
 });

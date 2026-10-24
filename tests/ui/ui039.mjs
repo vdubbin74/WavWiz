@@ -46,34 +46,29 @@ await step('L55 mini player border is the panel border in every theme', async ()
 
 for (const [w, h, sc] of [[1920, 1080, 'normal'], [1366, 768, 'small']]) await step(`L51/L53/L54/L56 expanded Devices ${w} ${sc}`, async () => {
   const { ctx, p } = await page(w, h, ST.devexp, { scale: sc });
+  // 0.4.2: the cards/columns of 0.3.x-0.4.1 became the zone tree (see ui042); L53 (master row) is unchanged
   const m = await p.evaluate(() => { const R = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
-    const cols = [...document.querySelectorAll('.dexp-main > .ecol')].filter(e => e.getClientRects().length).map(e => e.className.split(' ')[0]); const card = document.querySelector('.scol .dc3.clickable'); const cb = card?.getBoundingClientRect(), r = s => card?.querySelector(s)?.getBoundingClientRect();
-    return { cols, znow: document.querySelectorAll('.znow .znow-tile').length, groups: document.querySelectorAll('.zlist .zc3').length, master: R('.dexp-top .dvol-master'), mall: R('.dexp-top .mallrow'), top: R('.dexp-top'), grid: getComputedStyle(document.querySelector('.scol .slist')).gridTemplateColumns.split(' ').length, card: cb && { x: cb.x, w: cb.width, r: cb.right }, bar: r('.vbar') && { w: r('.vbar').width, r: r('.vbar').right }, pct: r('.pct') && { x: r('.pct').x, r: r('.pct').right }, mute: r('.dc3foot .mutebtn') && { r: r('.dc3foot .mutebtn').right, b: r('.dc3foot .mutebtn').bottom }, foot: r('.dc3foot') && { b: r('.dc3foot').bottom }, out: !!card?.querySelector('.dc3out .dout'), zchips: document.querySelectorAll('.zlist .dc3mem').length, arrows: document.querySelectorAll('.dcard .dexpand, .zc3 .dexpand').length }; });
-  ok(`L51 ${w}: columns Scenes, Zones, Speakers`, JSON.stringify(m.cols) === JSON.stringify(['sscol', 'zcol', 'scol']), m.cols.join());
-  ok(`L51 ${w}: Now playing in each zone has one tile per zone`, m.znow === m.groups && m.znow > 0, `${m.znow}/${m.groups}`);
-  ok(`L51 ${w}: speaker cards are a 2-wide grid`, m.grid >= 2, m.grid);
+    const cols = [...document.querySelectorAll('.dexp-main > *')].filter(e => e.getClientRects().length).map(e => e.className.split(' ')[0]);
+    return { cols, boxes: document.querySelectorAll('.tcol42 .qb42').length, rows: document.querySelectorAll('.tcol42 .sp42').length, master: R('.dexp-top .dvol-master'), mall: R('.dexp-top .mallrow'), top: R('.dexp-top'), arrows: document.querySelectorAll('.dcard .dexpand, .zc3 .dexpand').length,
+      vol: [...document.querySelectorAll('.tcol42 .qb42 .vbar')].length }; });
+  ok(`L51 ${w}: columns Scenes, detail, tree`, JSON.stringify(m.cols) === JSON.stringify(['sscol', 'dcol42', 'tcol42']), m.cols.join());
+  ok(`L51 ${w}: one queue box per zone with its own volume`, m.boxes > 0 && m.vol >= m.boxes, `${m.boxes}/${m.vol}`);
   ok(`L53 ${w}: master slider capped, with a gap before All off / All on`, m.master && m.mall && m.master.w <= 660 && m.mall.x - m.master.r >= 16, JSON.stringify([m.master, m.mall]));
   ok(`L53 ${w}: master row is full width`, m.top && m.mall && m.mall.r <= m.top.r && m.top.w > w * 0.85, JSON.stringify(m.top));
-  ok(`L56 ${w}: volume bar edge to edge, % at its right end`, m.bar && m.card && m.bar.w > m.card.w * 0.6 && m.pct.x >= m.bar.r - 2 && m.pct.r <= m.card.r, JSON.stringify([m.bar, m.pct, m.card]));
-  ok(`L56 ${w}: mute is bottom right on the chip row; output device line shown`, m.mute && m.mute.r > m.card.r - 24 && m.mute.b <= m.foot.b + 1 && m.out, JSON.stringify([m.mute, m.foot]));
-  ok(`L54 ${w}: no expand arrow on speaker / zone cards`, m.arrows === 0, m.arrows); ok(`L51 ${w}: zone cards list their speakers`, m.zchips > 0);
+  ok(`L54 ${w}: no expand arrow on speaker / zone cards`, m.arrows === 0, m.arrows); ok(`L51 ${w}: zones list their speakers`, m.rows > 0);
   await p.screenshot({ path: `/workspace/screens/wavwiz-039-${ENG}-devexp-${w}-${sc}.png` });
-  // L54: a click on an empty part of the card opens Speaker Settings; the on/off pill does not
-  const card = p.locator('.scol .dc3.clickable').first(); const bb = await card.boundingBox(); const was = await card.evaluate(e => e.classList.contains('off'));
-  await card.locator('.onpill').click(); await p.waitForTimeout(500); ok('L54 the OFF|ON pill keeps its own action (no settings)', (await p.locator('.spcol .spkset').count()) === 0); await card.locator('.onpill').click(); await p.waitForTimeout(400);
-  await p.mouse.click(bb.x + bb.width - 6, bb.y + bb.height / 2); await p.waitForTimeout(900); ok('L54 click on empty card area opens Speaker Settings', (await p.locator('.spcol .spkset').count()) === 1);
-  await p.screenshot({ path: `/workspace/screens/wavwiz-039-${ENG}-l54-settings-${w}-${sc}.png` });
+  const row = p.locator('.tcol42 .sp42 .sp42-n').first(); await row.click(); await p.waitForTimeout(900); ok('L54 click on a speaker opens its settings in the detail pane', (await p.locator('.d42-pane .spkset').count()) === 1);
   await p.evaluate(async () => { const m = await import('/js/main.js'); m.showEq?.(); }); await ctx.close();
 });
 await step('L54 zone card click opens the zone', async () => {
-  const { ctx, p } = await page(1920, 1080, ST.devexp); const z = p.locator('.zlist .zc3.clickable').first(); const bb = await z.boundingBox(); await p.mouse.click(bb.x + bb.width - 8, bb.y + bb.height - 6); await p.waitForTimeout(700);
-  ok('L54 zone card click opens its settings in place', (await p.locator('.zinline').count()) === 1); await ctx.close();
+  const { ctx, p } = await page(1920, 1080, ST.devexp); const z = p.locator('.tcol42 .zwrap42 .zcard42').first(); await z.click(); await p.waitForTimeout(700);   // 0.4.1 (approved): a click on the card picks the zone; the pencil opens its settings
+  ok('L54 zone card click opens the zone pane', (await p.locator('.zpane42').count()) === 1); await ctx.close();
 });
 
 for (const [n, dsf] of [['100', 1], ['200', 2]]) await step('L57 mini ' + n, async () => {
-  const { ctx, p } = await page(420, 138, null, { dsf, url: '/mini.html' }); await p.waitForTimeout(1500);
+  const { ctx, p } = await page(420, 145, null, { dsf, url: '/mini.html' }); await p.waitForTimeout(1500);
   const r = await p.evaluate(() => { const R = s => { const b = document.querySelector(s)?.getBoundingClientRect(); return b ? { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom } : null; }; return { mp: R('.mp'), bar: R('.mp-vol .vbar'), pct: R('.mp-vol .pct'), mute: R('.mp-mute'), tr: R('.mp-tr'), sc: R('.mp-sc'), sh: document.documentElement.scrollHeight, ih: innerHeight, sw: document.documentElement.scrollWidth, iw: innerWidth }; });
-  ok(`L57 ${n}%: fits the 420x138 window, nothing clipped`, r.sh <= r.ih && r.sw <= r.iw && r.sc.b <= r.ih, JSON.stringify([r.sh, r.ih, r.sc]));
+  ok(`L57 ${n}%: fits the 420x145 window, nothing clipped`, r.sh <= r.ih && r.sw <= r.iw && r.sc.b <= r.ih, JSON.stringify([r.sh, r.ih, r.sc]));
   ok(`L57 ${n}%: volume bar is large with a visible percentage`, r.bar.w >= 250 && r.pct.w > 20 && r.pct.r <= r.mp.r, JSON.stringify([r.bar, r.pct]));
   ok(`L57 ${n}%: mute sits beside the transport controls`, r.mute && r.tr && r.mute.x >= r.tr.x && r.mute.r <= r.tr.r + 1 && Math.abs(r.mute.y - r.tr.y) < 20);
   const orig = await api(p, '/zones'); const on = orig.filter(z => z.enabled); const before = on.length ? Math.max(...on.map(z => z.volume)) : 0;

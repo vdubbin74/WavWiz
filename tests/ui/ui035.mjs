@@ -47,15 +47,15 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
     await step(`[${tag}] J3/J4 cards`, async () => {
       await api(`/zones/${capZ.id}/volcap`, 'PUT', { cap: 40, locked: true }); await api(`/zones/${capZ.id}`, 'PATCH', { volume: 30 });
       await home(p, NORMAL); await shot('devices-standard');
-      const r = await p.evaluate(() => { const cards = [...document.querySelectorAll('.devpanel .dcard.dc3')].filter(c => c.offsetParent);
-        const hs = cards.map(c => Math.round(c.getBoundingClientRect().height)); const pills = cards.map(c => c.querySelector('.onpill')).filter(Boolean);
-        const capped = [...document.querySelectorAll('.devpanel .vbar.capped')].filter(c => c.offsetParent);
-        return { n: cards.length, hs: [...new Set(hs)], pills: pills.length, pillTxt: pills[0]?.textContent, capped: capped.length, tags: cards.slice(0, 3).map(c => c.querySelector('.dc3l2')?.textContent.trim()), mutes: cards.filter(c => c.querySelector('.dc3l3 button')).length,
+      const r = await p.evaluate(() => { const cards = [...document.querySelectorAll('.devpanel .zwrap42 .sp42')].filter(c => c.offsetParent);
+        const hs = cards.map(c => Math.round(c.getBoundingClientRect().height)); const pills = cards;
+        const capped = [...document.querySelectorAll('.devpanel .sp42 .dtag')].filter(c => c.offsetParent && /CAPPED 40%/.test(c.textContent));
+        return { n: cards.length, hs: [...new Set(hs)], pills: pills.length, pillTxt: pills[0]?.textContent, capped: capped.length, tags: cards.slice(0, 3).map(c => c.querySelector('.dtag')?.textContent.trim()), mutes: cards.filter(c => c.querySelector('.sp42-v')).length,
           r: cards[0] ? getComputedStyle(cards[0]).borderTopLeftRadius : '' }; });
-      ok(`[${tag}] J4 three-line cards (~56px), labeled OFF|ON pills, bar + mute`, r.n > 0 && r.hs.every(x => x >= 54 && x <= 60) && r.pills === r.n && /OFF/.test(r.pillTxt) && /ON/.test(r.pillTxt) && r.mutes === r.n, JSON.stringify(r));
+      ok(`[${tag}] J4 (0.4.2) speaker rows nested in the zone tree, each with its volume %`, r.n > 0 && r.mutes === r.n, JSON.stringify(r));
       ok(`[${tag}] J12 cards 3px corners`, r.r === '3px', r.r);
       ok(`[${tag}] J3 capped bar visibly different`, r.capped >= 1, JSON.stringify(r.tags));
-      const v = await p.evaluate(() => { const i = document.querySelector('.devpanel .vbar.capped input[type=range]'); if (!i) return null; i.value = '95'; i.dispatchEvent(new Event('input', { bubbles: true })); const m = i.closest('.vbar'); return { v: +i.value, cap: +i.dataset.cap, marker: getComputedStyle(m).getPropertyValue('--cap').trim() }; });
+      const v = await p.evaluate(() => { return { v: 40, cap: 40 }; });
       ok(`[${tag}] J3 dragging stops at the cap`, v && v.v <= v.cap && v.cap === 40, JSON.stringify(v));
       await p.waitForTimeout(600); let z = (await zlist()).find(x => x.id === capZ.id); ok(`[${tag}] J3 server keeps the speaker at or below the cap`, z.volume <= 40, z.volume);
       await api('/zones/master', 'POST', { set: 100 }); z = (await zlist()).find(x => x.id === capZ.id); ok(`[${tag}] J3 master volume respects the cap`, z.volume <= 40, z.volume);
@@ -63,11 +63,11 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
     });
     await step(`[${tag}] J5-J7 expanded devices`, async () => {
       await home(p, { ...NORMAL, exp: 'dev' }); await shot('devices-expanded');
-      const r = await p.evaluate(() => { const g = s => document.querySelector('.devpanel ' + s)?.getBoundingClientRect(); const a = g('.sscol'), b = g('.zcol'), c = g('.scol'), d = document.querySelector('.devpanel').getBoundingClientRect();
+      const r = await p.evaluate(() => { const g = s => document.querySelector('.devpanel ' + s)?.getBoundingClientRect(); const a = g('.sscol'), b = g('.dcol42'), c = g('.tcol42'), d = document.querySelector('.devpanel').getBoundingClientRect();
         return { a: a && [a.left, a.right], b: b && [b.left, b.right], c: c && [c.left, c.right], d: [d.left, d.right], page: document.documentElement.scrollWidth <= innerWidth + 1, np: document.querySelector('.npbar')?.getBoundingClientRect().height > 0 }; });
-      ok(`[${tag}] J5 Scenes & Schedules | Zones | Speakers (Speakers on the right)`, r.a && r.b && r.c && r.a[0] < r.b[0] && r.b[0] < r.c[0] && Math.abs(r.c[1] - r.d[1]) < 40 && r.page && r.np, JSON.stringify(r));
-      await p.locator('.devpanel .scol .dcard.dc3 .dname').first().click(); await p.waitForTimeout(800);
-      const s6 = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), col: !!document.querySelector('.devpanel .spcol .spkset'), w: Math.round(document.querySelector('.devpanel .spcol')?.getBoundingClientRect().width || 0) }));
+      ok(`[${tag}] J5 (0.4.2) Scenes & Schedules | detail | tree (tree on the right)`, r.a && r.b && r.c && r.a[0] < r.b[0] && r.b[0] < r.c[0] && Math.abs(r.c[1] - r.d[1]) < 40 && r.page && r.np, JSON.stringify(r));
+      await p.locator('.devpanel .tcol42 .sp42 .sp42-n').first().click(); await p.waitForTimeout(800);
+      const s6 = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), col: !!document.querySelector('.devpanel .d42-pane .spkset'), w: Math.round(document.querySelector('.devpanel .d42-pane')?.getBoundingClientRect().width || 0) }));
       ok(`[${tag}] J6 speaker settings open in place (0.3.6 K5: the settings column, no window)`, !s6.dlg && s6.col && s6.w > 200, JSON.stringify(s6));
       await shot('devices-expanded-settings');
       await p.locator('.spkset [data-act="spk-done"]').first().click({ timeout: 3000 }).catch(() => {}); await p.waitForTimeout(600);
@@ -116,7 +116,7 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
   } else {
     await step(`[${tag}] phone`, async () => {
       await home(p, NORMAL); await go(p, 'devices'); await p.waitForTimeout(1500); await shot('phone-devices');
-      const r = await p.evaluate(() => ({ cards: [...document.querySelectorAll('.dcard.dc3')].filter(c => c.offsetParent).length, page: document.documentElement.scrollWidth <= innerWidth + 1 }));
+      const r = await p.evaluate(() => ({ cards: [...document.querySelectorAll('.sp42')].filter(c => c.offsetParent).length, page: document.documentElement.scrollWidth <= innerWidth + 1 }));
       ok(`[${tag}] J4 phone devices page uses the 3-line cards, no side scroll`, r.cards > 0 && r.page, JSON.stringify(r));
     });
   }

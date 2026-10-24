@@ -4,11 +4,7 @@ import { h } from './util.js';
 import { fmtDb } from './eqstyle.js';
 
 /** Preset names by purpose (situation / speaker type / music); anything else (the user's own) goes under "My sounds". */
-export const PRESET_GROUPS = [
-  ['Situation', ['Late Night', 'Party Loud', 'Background', 'Vocals / Podcasts', 'Movie Night']],
-  ['Speaker type', ['Bluetooth Speaker', 'Bookshelf', 'Tower', 'Subwoofer Zone', 'Headphones', 'Outdoor']],
-  ['Music', ['Hip-Hop', 'Rock / Metal', 'Acoustic / Jazz', 'Electronic', 'Classical']],
-];
+export const PRESET_GROUPS = [];   // 0.4.2: a flat list of 8 built-ins (no group headings); the user's own go under "My presets"
 export const LOCK_HINT = 'Locked - click the padlock to unlock the sound settings';
 /** Pure: how a preset list is grouped for the select. */
 export function groupPresets(presets) {
@@ -16,9 +12,10 @@ export function groupPresets(presets) {
   const out = [];
   const flat = byName.get('Flat'); if (flat) { out.push({ label: '', items: [flat] }); used.add('Flat'); }
   for (const [label, names] of PRESET_GROUPS) { const items = names.map(n => byName.get(n)).filter(Boolean); items.forEach(p => used.add(p.name)); if (items.length) out.push({ label, items }); }
-  const mine = presets.filter(p => !used.has(p.name) && p.source !== 'builtin'), other = presets.filter(p => !used.has(p.name) && p.source === 'builtin');
-  if (other.length) out.push({ label: 'Other built-in', items: other });
-  if (mine.length) out.push({ label: 'My sounds', items: mine });
+
+  const ordered = ['Bass Boost', 'Treble Boost', 'Vocal', 'Late Night', 'Movie Night', 'Bluetooth Speaker', 'Rock / Metal'].map(n => byName.get(n)).filter(p => p && !used.has(p.name)); ordered.forEach(p => used.add(p.name)); if (ordered.length) out.push({ label: '', items: ordered });
+  const mine2 = presets.filter(p => !used.has(p.name) && p.source !== 'builtin');
+  if (mine2.length) out.push({ label: 'My presets', items: mine2 });
   return out;
 }
 

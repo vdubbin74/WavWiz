@@ -1,6 +1,7 @@
 // WavWiz 0.3.0 §5: ONE "Scenes & Schedules" window (replaces the separate Scenes and Schedules pages). Same dialog shell and size as Settings
 // (up to 1200 px); a full-screen sheet on phones (< 900 px). Roles: View = read-only with disabled buttons + ADMIN tag; Control = Run scenes,
 // Run now / Skip next / Snooze / Stop; Admin = everything. The UI checks isAdmin before offering edit actions (the API requires Admin for them).
+import * as Z from './zones40.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { canControl, isAdmin, adminOnly } from './ui.js';
 import { undoToast } from './settingsui.js';
@@ -20,16 +21,16 @@ export function fmtHm(hm, locale) {
 /** Save allowed? At least one day, or a once-only date. */
 export const canSave = (days, onceDate) => !!onceDate || !!(days && days.length > 0);
 /** Plain one-line summary of what a schedule does. */
-export function summary(r, { scenes = [], stations = [], zones = [] } = {}) {
-  const p = r.payload || {}; const sc = id => scenes.find(s => s.id === id)?.name; const st = id => stations.find(s => s.id === id)?.name;
+export function summary(r, { scenes = [], stations = [], zones = [], groups = [], jb = null } = {}) {
+  const p = r.payload || {}; const zt = p.zoneKey ? ` · in ${Z.targetName(p.zoneKey, groups, jb)}` : ''; const sc = id => scenes.find(s => s.id === id)?.name; const st = id => stations.find(s => s.id === id)?.name;
   const where = p.sceneId ? ` · scene ${sc(p.sceneId) || '(deleted)'}` : (p.deviceIds || []).length ? ' · ' + p.deviceIds.map(id => zones.find(z => z.id === id)?.name || 'speaker').join(' + ') : '';
   switch (r.action) {
     case 'play': { const what = { playlist: 'playlist', album: 'album', track: 'song', radio: 'radio' }[p.source] || 'radio';
-      return `Play ${what}: ${p.name || (p.source === 'radio' ? st(p.id) : '') || '…'}${where}${p.fadeMin ? ` · fade ${p.fadeMin} min` : ''}`; }
-    case 'play_radio': return `Play radio: ${st(p.radioId) || '…'}${where}`;
+      return `Play ${what}: ${p.name || (p.source === 'radio' ? st(p.id) : '') || '…'}${where}${zt}${p.fadeMin ? ` · fade ${p.fadeMin} min` : ''}`; }
+    case 'play_radio': return `Play radio: ${st(p.radioId) || '…'}${where}${zt}`;
     case 'scene': return `Apply scene: ${sc(p.sceneId) || '(deleted)'}`;
     case 'volumes': return `Set volumes on ${(p.devices || []).length} speaker(s)`;
-    case 'stop': return 'Stop playback';
+    case 'stop': return 'Stop playback' + (p.zoneKey ? ` in ${Z.targetName(p.zoneKey, groups, jb)}` : '');
     case 'all_off': return 'All off · everything stops and speakers turn off';
   }
   return LABELS[r.action] || 'Schedule';
@@ -190,7 +191,14 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   const sceneSel = h('select', { 'aria-label': 'Scene' }, h('option', { value: '' }, '—'), (data.scenes || []).map(x => h('option', { value: x.id, selected: (p.sceneId) === x.id }, x.name)));
   const onWhat = h('select', { 'aria-label': 'Play on' }, h('option', { value: 'speakers', selected: !p.sceneId }, 'Speakers'), h('option', { value: 'scene', selected: !!p.sceneId }, 'A scene'));
   const chosen = new Set(p.deviceIds || []);
-  const chips = h('div', { class: 'row wrap ss-chips' }, (S.zones || []).map(z => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(chosen.has(z.id)), onclick: ev => { chosen.has(z.id) ? chosen.delete(z.id) : chosen.add(z.id); ev.currentTarget.setAttribute('aria-pressed', String(chosen.has(z.id))); preview(); } }, z.name)));
+  // 0.4.0: which zone's music (and speakers) the alarm / stop acts on; "Everything" = today's behavior
+  const zoneT = h('select', { 'aria-label': 'Zone', 'data-zone-target': '' }, h('option', { value: '' }, 'Everything (all linked zones)'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k, selected: p.zoneKey === k }, n)), p.zoneKey && !Z.targetKeys(S.groups, S.jb).some(([k]) => k === p.zoneKey) ? h('option', { value: p.zoneKey, selected: true }, '(deleted zone)') : null);
+  zoneT.addEventListener('change', () => preview());
+  // 0.4.2: alarms and schedules target ZONES only. The chips are zones; the stored deviceIds are the speakers of the chosen zones (an older alarm keeps any speaker it already had).
+  const zs = (S.groups || []).filter(g => (g.deviceIds || []).length), inZ = new Set(zs.flatMap(g => g.deviceIds)), legacy = [...chosen].filter(id => !inZ.has(id));
+  const zon = g => (g.deviceIds || []).every(id => chosen.has(id));
+  const chips = h('div', { class: 'row wrap ss-chips', 'data-zone-chips': '' }, zs.length ? zs.map(g => h('button', { type: 'button', class: 'chip', 'data-zone-chip': g.id, 'aria-pressed': String(zon(g)), onclick: ev => { const on = !zon(g); for (const id of g.deviceIds) on ? chosen.add(id) : chosen.delete(id); ev.currentTarget.setAttribute('aria-pressed', String(zon(g))); preview(); } }, g.name)) : [h('span', { class: 'small dim' }, 'Create a zone first.')]);
+  void legacy;
   const rng = (v, l) => h('input', { type: 'range', min: 0, max: 100, step: 1, 'data-coarse': 5, value: v, 'aria-label': l, oninput: () => preview() });
   const sv = rng(p.startVol ?? 10, 'Start volume'), ev2 = rng(p.endVol ?? 40, 'End volume');
   const fade = h('input', { type: 'range', min: 0, max: 30, step: 1, 'data-coarse': 5, value: p.fadeMin ?? 5, 'aria-label': 'Fade in over (minutes)', oninput: () => preview() });
@@ -222,9 +230,10 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   function drawFields() {
     segA.replaceChildren(ACTIONS.map(([k, t]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(action === k), class: action === k ? 'on' : '', onclick: () => { action = k; drawFields(); } }, t)));
     fields.replaceChildren(
-      action === 'play' ? [fld('Source', h('div', { class: 'row' }, src, pickQ, pick)), fld('On', h('div', { class: 'row' }, onWhat, onWhat.value === 'scene' ? sceneSel : chips)),
+      action === 'play' ? [fld('Source', h('div', { class: 'row' }, src, pickQ, pick)), (S.groups || []).length > 1 || S.jb?.own ? fld('Zone', zoneT) : null, fld('On', h('div', { class: 'row' }, onWhat, onWhat.value === 'scene' ? sceneSel : chips)),
         fld('Volume: start → end', h('div', { class: 'row' }, sv, h('span', null, '→'), ev2)), fld('Fade in over', h('div', { class: 'row' }, fade, fadeOut)),
         h('div', { class: 'row wrap' }, fld('Snooze', snooze), fld('Stop by itself', autoStop))] : null,
+      action === 'stop' && ((S.groups || []).length > 1 || S.jb?.own) ? fld('Zone', zoneT) : null,
       action === 'scene' ? fld('Scene', sceneSel) : null,
       action === 'volumes' ? [h('p', { class: 'small dim' }, 'Mouse wheel ±1, Shift ±5'), vols.map(v => h('label', { class: 'row ss-mem' }, h('span', { style: 'width:130px' }, v.z.name), v.r))] : null);
     onWhat.onchange = drawFields; preview();
@@ -236,14 +245,16 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   function payload() {
     if (action === 'play') { const opt = pick.selectedOptions[0]; const pl = { source: src.value, name: opt?.textContent || '', startVol: +sv.value, endVol: +ev2.value, fadeMin: +fade.value, snoozeMin: +snooze.value, autoStopMin: +autoStop.value };
       if (src.value === 'album') pl.ref = pick.value; else pl.id = +pick.value || undefined;
+      if (zoneT.value) pl.zoneKey = zoneT.value;
       if (onWhat.value === 'scene' && sceneSel.value) pl.sceneId = +sceneSel.value; else pl.deviceIds = [...chosen]; return pl; }
     if (action === 'scene') return { sceneId: +sceneSel.value || undefined };
     if (action === 'volumes') return { devices: vols.map(v => ({ deviceId: v.z.id, volume: +v.r.value })) };
+    if (action === 'stop' && zoneT.value) return { zoneKey: zoneT.value };
     return {};
   }
   function preview() {
     const when = once ? `on ${once}` : days.size === 7 ? 'every day' : [...days].sort().join('') === '12345' ? 'on weekdays' : [...days].sort().join('') === '06' ? 'on weekends' : 'on ' + [...days].sort().map(x => DAYS[+x]).join(', ');
-    sentence.textContent = `At ${fmtHm(time.value, navigator.language)} ${when}: ${summary({ action, payload: payload() }, { ...data, zones: S.zones || [] })}.`;
+    sentence.textContent = `At ${fmtHm(time.value, navigator.language)} ${when}: ${summary({ action, payload: payload() }, { ...data, zones: S.zones || [], groups: S.groups || [], jb: S.jb })}.`;
   }
   const testBtn = h('button', { class: 'btn sm', type: 'button', disabled: !r, title: r ? 'Runs it once now with a 10 s fade' : 'Save first, then Test now', onclick: async () => { try { await api(`/schedules/${r.id}/run?testFadeSec=10`, { method: 'POST' }); toast('Testing (10 s fade)…'); } catch (e) { toast(e.message, true); } } }, 'Test now');
   const form = h('div', { class: 'ss-editor' },
@@ -284,16 +295,18 @@ export function openSleep(S, done, anchor = null) {
   document.querySelector('.sleepmenu')?.remove();
   anchor = anchor || document.querySelector('.npsleep:not([hidden])') || document.getElementById('sleepchip');
   const zones = S.zones || []; const zoneSel = h('select', { 'aria-label': 'Which speakers' }, h('option', { value: '' }, 'All speakers'), zones.map(z => h('option', { value: z.id }, z.name)));
+  // 0.4.0: a timer for one zone stops that zone's music (and fades its speakers); "Everything" is the old behavior
+  const zoneT = Z.targetKeys(S.groups, S.jb).length > 1 ? h('select', { 'aria-label': 'Which zone', 'data-sleep-zone': '' }, h('option', { value: '' }, 'Every zone'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k }, n))) : null;
   const custom = h('input', { type: 'number', min: 1, max: 1440, value: 20, 'aria-label': 'Minutes', style: 'width:72px', hidden: true, onkeydown: ev => { if (ev.key === 'Enter') set('custom'); } });
   const close = () => { menu.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); };
   const out = ev => { if (!menu.contains(ev.target) && ev.target !== anchor && !anchor?.contains?.(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') close(); };
   const set = async v => {
-    const body = { zoneIds: zoneSel.value ? [+zoneSel.value] : [] };
+    const body = { zoneIds: zoneSel.value ? [+zoneSel.value] : [] }; if (zoneT?.value) body.zoneKey = zoneT.value;
     if (v === 'off' || v === 'song' || v === 'album') body.mode = v; else body.minutes = v === 'custom' ? +custom.value : v;
     try { const st = await api('/sleep', { method: 'POST', body }); close(); sleepChip(S, st); done?.(); } catch (e) { toast(e.message, true); }
   };
   const menu = h('div', { class: 'sleepmenu mpanel', role: 'menu', 'aria-label': 'Sleep timer' },
-    h('div', { class: 'small dim sm-h' }, 'Sleep timer · fades out over the last 30 s'), zoneSel,
+    h('div', { class: 'small dim sm-h' }, 'Sleep timer · fades out over the last 30 s'), zoneT, (S.groups || []).length ? null : zoneSel,
     ...SLEEP.map(([v, t]) => h('button', { type: 'button', role: 'menuitem', 'data-sleep': String(v), onclick: () => { if (v === 'custom' && custom.hidden) { custom.hidden = false; custom.focus(); return; } set(v); } }, t)), custom);
   document.body.append(menu);
   const z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1, r = anchor?.getBoundingClientRect?.(), mr = menu.getBoundingClientRect();
@@ -312,7 +325,7 @@ export function showAlarm(S, a) {
   const can = canControl(S), full = phone();
   const btn = (t, path, cls) => h('button', { class: 'btn ' + cls, type: 'button', disabled: !can, onclick: async () => { try { await api(path, { method: 'POST' }); alarmEl?.remove(); } catch (e) { toast(e.message, true); } } }, t);
   alarmEl = h('div', { class: full ? 'alarm-take' : 'alarm-banner', role: 'alertdialog', 'aria-label': 'Alarm' },
-    h('div', { class: 'alarm-time' }, new Date().toLocaleTimeString(navigator.language, { hour: 'numeric', minute: '2-digit' })), h('div', { class: 'alarm-name' }, a.name),
+    h('div', { class: 'alarm-time' }, new Date().toLocaleTimeString(navigator.language, { hour: 'numeric', minute: '2-digit' })), h('div', { class: 'alarm-name' }, a.name + (a.zoneName ? ' · ' + a.zoneName : '')),
     h('div', { class: 'alarm-fade small dim' }, `Fading in · ${Math.round((a.progress || 0) * 100)}%`),
     h('div', { class: 'alarm-btns' }, btn(`Snooze (${a.snoozeMin || 9} min)`, '/alarm/snooze', 'primary'), btn('Stop', '/alarm/stop', '')));
   document.body.append(alarmEl);
@@ -354,8 +367,9 @@ export function scenesColumn(S, { refresh } = {}) {
   const reload = () => { editing = null; load(true); refresh?.(); };
   function draw() {
     const next = data.rows.filter(r => r.enabled && r.nextRunAt).sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0];
-    const head = h('div', { class: 'pane-h dsec-h ssc-h' }, h('span', null, 'SCENES & SCHEDULES'), h('span', { class: 'grow' }),
-      h('span', { class: 'small dim ss-clock' }, `Times use the server PC’s clock (${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'})`));
+    // 0.4.3 #6: the header is the title alone (one line); the clock note is its own short line under it
+    const head = h('div', { class: 'pane-h dsec-h ssc-h' }, h('span', { class: 'ssc-title' }, 'SCENES & SCHEDULES'));
+    const clockLine = h('div', { class: 'small dim ss-clock ssc-clock', title: 'Times use the server PC’s clock' }, `Server PC clock: ${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'}`);
     const nextBar = next ? h('div', { class: 'ss-next ssc-next' }, h('span', { class: 'grow ell' }, h('b', null, 'Next up: '), `${next.name}, ${whenLabel(next.nextRunAt, data.now, locale)} (${countdown(next.nextRunAt, data.now)})`, h('span', { class: 'dim' }, ' · ' + summary(next, { ...data, zones: S.zones || [] }))),
       h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => skip(next) }, 'Skip next')) : h('p', { class: 'small dim' }, 'Nothing scheduled.');
     const sceneHost = h('div', { class: 'ss-cards ssc-scenes' });
@@ -375,18 +389,18 @@ export function scenesColumn(S, { refresh } = {}) {
     for (const r of data.rows) { const x = h('div', { class: 'ssc-slot' }, schedRow(r)); hosts.set(r.id, x); rowsHost.append(x); }
     if (!data.rows.length) rowsHost.append(h('p', { class: 'dim small' }, 'No schedules yet. Add an alarm to wake up to music, or a schedule to switch scenes.'));
     const last = data.rows.filter(r => r.lastRunAt).sort((a, b) => b.lastRunAt.localeCompare(a.lastRunAt))[0];
-    root.replaceChildren(head, nextBar, scHead, sceneHost, shHead, rowsHost, last ? h('div', { class: 'small dim ss-foot' }, `Last ran: ${last.name}, ${whenLabel(last.lastRunAt, data.now, locale)} · ${last.lastResult === 'OK' ? 'OK' : (last.lastResult || '')}`) : null);
+    root.replaceChildren(head, clockLine, nextBar, scHead, sceneHost, shHead, rowsHost, last ? h('div', { class: 'small dim ss-foot' }, `Last ran: ${last.name}, ${whenLabel(last.lastRunAt, data.now, locale)} · ${last.lastResult === 'OK' ? 'OK' : (last.lastResult || '')}`) : null);
     if (editing?.kind === 'sched') { const host = editing.id == null ? newHost : hosts.get(editing.id); const r = data.rows.find(x => x.id === editing.id) || null;
       if (host) openScheduleEditor(S, r, editing.kind2, data, reload, host, () => { editing = null; draw(); }); }
   }
   function openEdit(r, kind) { editing = { kind: 'sched', id: r ? r.id : null, kind2: kind }; draw(); root.querySelector('.ss-inline')?.scrollIntoView?.({ block: 'nearest' }); }
   function sceneRow(sc) {
-    const on = (sc.members || []).filter(m => m.enabled), used = data.rows.filter(r => r.payload?.sceneId === sc.id).length;
+    const on = (sc.members || []).filter(m => m.enabled), usedBy = data.rows.filter(r => r.payload?.sceneId === sc.id).map(r => r.name), used = usedBy.length;
     const names = on.map(m => (S.zones || []).find(z => z.id === m.deviceId)?.name).filter(Boolean);
     return h('div', { class: 'card ss-card ssc-scene' + (sc.active ? ' on' : ''), 'data-scene': sc.id },
       h('button', { type: 'button', class: 'ss-play', 'aria-label': `Run ${sc.name}`, disabled: !ctlOk, onclick: () => runScene(sc) }, '▶'),
       h('div', { class: 'grow ss-mid' }, h('div', { class: 'row' }, h('b', null, sc.name), sc.active ? h('span', { class: 'tag c dtag zplaying' }, 'ACTIVE') : null),
-        h('div', { class: 'small dim ell', title: names.join(' + ') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${on.some(m => m.profileId) ? ` · ${on.filter(m => m.profileId).length} with a profile` : ''}${used ? ` · used by ${used} schedule${used === 1 ? '' : 's'}` : ''}`)),
+        h('div', { class: 'small dim ss-sub', title: [names.length > 6 ? names.slice(0, 6).join(' + ') + ` + ${names.length - 6} more` : names.join(' + '), used ? 'Used by ' + usedBy.join(', ') : ''].filter(Boolean).join('\n') }, `${on.length} speaker${on.length === 1 ? '' : 's'}${on.length ? ' · ' + sceneRange(sc) : ''}${on.some(m => m.profileId) ? ` · ${on.filter(m => m.profileId).length} with a profile` : ''}`, used ? h('span', { class: 'ss-usedby' }, ` · used by ${usedBy.join(', ')}`) : null)),
       h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => runScene(sc) }, 'Run'),
       pencil(`Edit scene ${sc.name}`, admin, async () => { await freshProfiles(); editing = { kind: 'scene', id: sc.id }; draw(); }));
   }
@@ -428,9 +442,10 @@ export function scenesColumn(S, { refresh } = {}) {
       h('div', { class: 'row' }, h('div', { class: 'field grow' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Icon'), iconIn)),
       h('div', { class: 'row' }, h('span', { class: 'dlbl grow' }, 'SPEAKERS & VOLUMES'), h('button', { type: 'button', class: 'btn sm', onclick: () => { for (const m of members) { m.vol.value = String(Math.round(m.z.volume)); m.vol.dispatchEvent(new Event('input')); } } }, 'Use current volumes')),
       members.length ? members.map(m => m.row) : h('p', { class: 'small dim' }, 'No speakers yet.'), err,
-      h('div', { class: 'row ss-savebar' }, sc ? h('button', { type: 'button', class: 'btn sm danger', onclick: () => delScene(sc) }, 'Delete…') : null, sc ? h('button', { type: 'button', class: 'btn sm', onclick: () => dupScene(sc) }, 'Duplicate') : null,
-        sc ? h('button', { type: 'button', class: 'btn sm', title: 'Replace this scene with the speakers and volumes playing now', onclick: () => updateFromNow(sc) }, 'Update from current setup') : null,
-        h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { editing = null; draw(); } }, 'Cancel'), h('button', { class: 'btn primary', type: 'button', onclick: save }, 'Save')));
+      // 0.4.6 F47: "Update from current setup" gets its own full-width row; Delete / Duplicate left and Cancel / Save right on the row below (one line each, never clipped)
+      sc ? h('div', { class: 'row ss-updrow' }, h('button', { type: 'button', class: 'btn sm ss-upd', title: 'Replace this scene with the speakers and volumes playing now', onclick: () => updateFromNow(sc) }, 'Update from current setup')) : null,
+      h('div', { class: 'row ss-savebar' }, h('span', { class: 'ss-left' }, sc ? h('button', { type: 'button', class: 'btn sm danger', onclick: () => delScene(sc) }, 'Delete…') : null, sc ? h('button', { type: 'button', class: 'btn sm', onclick: () => dupScene(sc) }, 'Duplicate') : null),
+        h('span', { class: 'ss-right' }, h('button', { class: 'btn', type: 'button', onclick: () => { editing = null; draw(); } }, 'Cancel'), h('button', { class: 'btn primary', type: 'button', onclick: save }, 'Save'))));
     el.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); editing = null; draw(); } });
     return el;
   }

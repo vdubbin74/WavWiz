@@ -1410,7 +1410,7 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 /* ===== 0.2.3 U2: minimized Playlist title bar = "UP NEXT  [art] Title · Artist", centered on the Now Playing column ===== */
 .listpanel > .pane-h{position:relative}
 .plnext{display:none}
-.desk.listcollapsed .plnext:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;position:absolute;top:0;bottom:0;transform:translateX(-50%);min-width:0;white-space:nowrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
+.desk:is(.listcollapsed,.listexpanded) .plnext:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;position:absolute;top:0;bottom:0;transform:translateX(-50%);min-width:0;white-space:nowrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
 .pln-lbl{flex:none;font-size:11px;font-weight:800;letter-spacing:1.6px;color:var(--dim)}
 .pln-art{flex:none;width:24px;height:24px;border-radius:4px;overflow:hidden} .pln-art:empty{display:none}
 .pln-art .cover{width:100%!important;height:100%!important;border-radius:4px}
@@ -1642,14 +1642,14 @@ body.jb-kiosk #app{visibility:hidden}
 /* 0.3.0 §7.11: one visible focus ring on every control (keyboard only) */
 :focus-visible{outline:2px solid var(--accent) !important;outline-offset:2px}
 /* ===== 0.3.1 B7/B8: master volume = the device bar (.dvol: slider, % readout, Mute-button slot), Mute all on its own line ===== */
-.dmaster .dvol-master{gap:8px} .dmaster .dvol-master .pct{width:38px}
+.dmaster .dvol-master{gap:8px} .dmaster .dvol-master .pct{width:auto;min-width:38px}
 .dvol-slot{visibility:hidden;pointer-events:none}
 .devbody > .dmaster .dvol-master{padding:0 2px}   /* 0.3.1 B7: same inset as the device rows, so the bars line up exactly */
 .dmaster-mute{display:flex;justify-content:flex-start;margin-top:6px}
 .dmaster-mute .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;white-space:nowrap;border-radius:3px}
 .dmaster-mute .mutealls .ic svg{width:16px;height:16px}
 .dmaster-mute .mutealls.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
-.dexp-top .dmaster{flex-wrap:wrap} .dexp-top .dmaster .dvol-master{gap:10px} .dexp-top .dmaster .dvol-master .pct{width:36px} .dexp-top .dmaster-mute{flex-basis:100%}
+.dexp-top .dmaster{flex-wrap:wrap} .dexp-top .dmaster .dvol-master{gap:10px} .dexp-top .dmaster .dvol-master .pct{width:auto;min-width:36px} .dexp-top .dmaster-mute{flex-basis:100%}
 /* ===== 0.3.1 B9: compact Scenes & Schedules (Devices panel, under Zones) - styling per scenes-schedules.png ===== */
 .dss{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .dss-h{display:flex;align-items:center;gap:8px}
@@ -1904,9 +1904,26 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
   .desk.listexpanded .libpanel{grid-area:1/1/3/2} .desk.listexpanded .devpanel{grid-area:1/3/3/4}
 }
 /* G6: every volume bar stretches right up to its % readout (no dead gap) */
-.devpanel .dvol{display:grid!important;grid-template-columns:minmax(0,1fr) 38px 28px;gap:6px;align-items:center}
+.devpanel .dvol{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(38px,3.2em) 28px;gap:6px;align-items:center}
 .devpanel .dvol input[type=range]{width:100%;min-width:0;margin:0}
-.devpanel .dvol:has(.vlock){grid-template-columns:minmax(0,1fr) 14px 38px 28px}
+.devpanel .dvol:has(.vlock){grid-template-columns:minmax(0,1fr) 14px minmax(38px,3.2em) 28px}
+.devpanel .dvol .pct{width:auto;min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+/* 0.4.4 F16: master row = CONTROLLING chip + slider + % + mute (4 cells; the 3-col grid left the slider in the 38px % column) */
+.devpanel.expanded .dexp-top .dmaster .dvol-master{
+  display:grid!important;
+  grid-template-columns:auto minmax(120px,1fr) minmax(38px,3.2em) 28px;
+  gap:12px;align-items:center;
+  flex:0 1 640px;min-width:140px;
+}
+.devpanel.expanded .dexp-top .dmaster .dvol-master>.zs-master{max-width:none;margin-right:0}
+.devpanel.expanded .dexp-top .dmaster .dvol-master>input[type=range]{width:100%;min-width:120px}
+/* 0.4.4 F16: zone page VOLUME row = label + vbar + % + mute */
+.devpanel .zp42-row.dvol{
+  display:grid!important;
+  grid-template-columns:auto minmax(120px,1fr) minmax(38px,3.2em) 28px;
+  gap:8px;align-items:center;flex-wrap:nowrap;
+}
+.devpanel .zp42-row.dvol>.vbar{min-width:120px;width:auto}
 /* G10: slim standard Devices panel - one-line master, small subheads with counts, 2-line rows */
 .devpanel:not(.expanded) .dmaster{display:flex;align-items:center;gap:8px;padding:4px 2px 6px;margin:0}
 .devpanel:not(.expanded) .dmaster .dlbl{margin:0;white-space:nowrap} .devpanel:not(.expanded) .mvword{display:none}
@@ -2397,9 +2414,9 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .toast.undo{display:flex;align-items:center;gap:12px}
 .toast.undo .btn{min-height:24px;padding:0 10px}
 /* L16: the collapsed Queue bar's "Up next" row is centered exactly in the bar (one line box, no stray padding, box-centered) */
-.desk.listcollapsed .plnext:not([hidden]){top:0;bottom:0;height:100%;margin:0;padding:0;line-height:1;align-items:center}
-.desk.listcollapsed .plnext>*{line-height:1.15;display:flex;align-items:center;margin:0;padding:0}
-.desk.listcollapsed .plnext .pln-t1,.desk.listcollapsed .plnext .pln-t2{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk:is(.listcollapsed,.listexpanded) .plnext:not([hidden]){top:0;bottom:0;height:100%;margin:0;padding:0;line-height:1;align-items:center}
+.desk:is(.listcollapsed,.listexpanded) .plnext>*{line-height:1.15;display:flex;align-items:center;margin:0;padding:0}
+.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t1,.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t2{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* L6: Home Screen - the Now Playing bar sits in the CENTER column UNDER the queue (same width as the queue). Collapsed it is the narrow bar; opened it grows upward
    (the EQ above gives the height back) in the center column only. The Library and Devices sleeves run the full height and are never covered, resized or disrupted. */
 @media (min-width:901px){
@@ -2477,7 +2494,6 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
   .desk.libexpanded{row-gap:10px!important}
   .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .desk.libexpanded .minicol .mp{border:0;border-radius:var(--radius)}
-  .desk.libexpanded .listpanel .listcolwrap{display:none}
   .desk.libexpanded .listpanel .qtable col:first-child{width:34px!important}
 }
 /* 0.3.7 L10: Devices collapsed -> ONE small music-note button bottom right; hovering it floats the SAME mini player (shortcuts row + Home far right) to its left. No strip, no cover art. */
@@ -2577,7 +2593,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 /* L53: full-width bordered master row, capped slider, spaced All off / All on at the far right */
 .devpanel.expanded .dexp-top{border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:10px 16px;margin-bottom:10px;gap:20px}
 .devpanel.expanded .dexp-top .dmaster{flex:1 1 100%;flex-wrap:nowrap!important;gap:22px;align-items:center}
-.devpanel.expanded .dexp-top .dmaster .dvol-master{flex:0 1 640px;min-width:140px;gap:12px}
+.devpanel.expanded .dexp-top .dmaster .dvol-master{/* grid+columns set with F16 above */;flex:0 1 640px;min-width:140px;gap:12px}
 .devpanel.expanded .dexp-top .dmaster .mallrow{flex:0 0 auto;margin:0 0 0 auto;gap:10px}
 .devpanel.expanded .dexp-top .dmaster .mallrow .mall{min-width:84px;white-space:nowrap;padding:2px 14px}
 /* L51: Now playing in each zone */
@@ -2613,3 +2629,976 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 /* large zone cards: members as chips */
 .devpanel.expanded .e1 .dc3mem{display:grid;gap:4px} .devpanel.expanded .e1 .dc3mem .dlbl{margin:0;font-size:9px;letter-spacing:.1em;color:var(--dim)}
 .devpanel.expanded .e1 .dc3chips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ======== 0.4.0 Stage 2: zones that play their own music (3 px corners, theme colors only) ======== */
+/* the zone chip: CONTROLLING <zone> v  (Now Playing panel + bar, phone player strip, mini player) */
+.zsel{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:240px;padding:3px 10px;border:1px solid var(--accent);border-radius:3px;background:color-mix(in srgb,var(--accent) 14%,var(--panel2));color:var(--ink);font:inherit;font-size:12px;cursor:pointer;flex:none}
+.zsel[hidden]{display:none}
+.zsel:hover,.zsel[aria-expanded=true]{background:color-mix(in srgb,var(--accent) 26%,var(--panel2))}
+.zsel .zs-lbl{font-size:10px;letter-spacing:.12em;color:var(--dim);font-weight:600}
+.zsel .zs-name{color:var(--accent-text,var(--accent));font-size:13px;min-width:0}
+.zsel .zs-car{color:var(--dim);font-size:11px}
+.zs-panel{margin-left:10px}
+.npbar>.zs-bar{margin-right:10px}
+.mini>.zs-phone{flex:1 0 100%;order:-1;max-width:none;margin:0 0 6px;justify-content:flex-start}
+.mini{flex-wrap:wrap}
+.mp .mp-sc .zs-mini{margin-right:auto}
+.zmenu40{position:fixed;z-index:400;display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:calc(70vh / var(--z,1));overflow:auto}
+.zmenu40 .zm-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;border-radius:3px;color:var(--ink);padding:7px 8px;cursor:pointer;font:inherit;min-width:0}
+.zmenu40 .zm-item:hover,.zmenu40 .zm-item:focus-visible{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.zmenu40 .zm-item.on{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 24%,transparent)}
+.zmenu40 .zm-n{font-weight:700}.zmenu40 .zm-now{color:var(--dim);font-size:12px;max-width:55%}
+.zmenu40 .zm-link{color:var(--accent-text,var(--accent));display:inline-flex}.zmenu40 .zm-link svg{width:13px;height:13px}
+.zmenu40 .zm-head{padding:6px 8px;color:var(--dim);font-size:12px}
+.zmenu40 .zm-manage{margin-top:2px;border:0;border-top:1px solid var(--line);background:none;color:var(--dim);text-align:left;padding:8px;cursor:pointer;font:inherit;font-size:12px;border-radius:0 0 3px 3px}
+.zmenu40 .zm-manage:hover{color:var(--ink)}
+/* the queue panel names its zone */
+.qzone{color:var(--accent-text,var(--accent))}
+/* zone cards: selected zone, CONTROLLING tag, link badge, now-playing line, buttons */
+.zc3.zsel-on,.zcard.zsel-on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent),0 0 0 1px var(--accent)}
+.dtag.zctl{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dtag.zlink{display:inline-flex;align-items:center;gap:4px;color:var(--ok,var(--accent2,var(--accent)));border-color:currentColor;background:transparent}
+.dtag.zlink svg,.zlinkic svg,.znow-link svg{width:12px;height:12px}
+.dtag.zjb{color:var(--accent2,var(--accent));border-color:currentColor;background:transparent}
+.zlinkic,.znow-link{display:inline-flex;margin-left:6px;color:var(--accent-text,var(--accent));vertical-align:middle}
+.zc3.hasnow::after{display:none}
+.zl-now{display:flex;align-items:center;gap:8px;min-width:0;margin:6px 0 2px;padding:5px 8px;border:1px solid var(--line);border-radius:3px;background:var(--bg,var(--panel2));font-size:12px}
+.zl-now.tap{cursor:pointer}.zl-now.tap:hover{border-color:var(--accent)}
+.zl-now .zl-ico{color:var(--accent-text,var(--accent));font-size:10px;flex:none}
+.zl-now .zl-t{flex:1;min-width:0}.zl-now .zl-t b{font-weight:700}
+.zl-now .zl-bar{flex:0 0 22%;height:3px;border-radius:3px;background:var(--line);overflow:hidden}.zl-now .zl-bar i{display:block;height:100%;width:var(--p);background:var(--accent)}
+.zl-now .zl-time{flex:none;font-variant-numeric:tabular-nums}
+.zl-now.empty{color:var(--dim)}
+.zlinkbtn{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.zlinkbtn svg,.linkall svg{width:13px;height:13px}
+.mallrow .linkall{margin-left:auto}
+#p-zones .mallrow .linkall,.phonepage .mallrow .linkall{display:none}
+.zlinkmenu .zm-head:first-child{font-weight:700;color:var(--ink)}
+/* Jukebox zone card + speaker picker */
+.jbpick .jblist{margin-top:6px;max-height:min(calc(220px / var(--z,1)), calc(40vh / var(--z,1)));overflow:auto;border:1px solid var(--line);border-radius:3px;background:var(--bg,var(--panel2));padding:4px}
+.jbrow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:3px;cursor:pointer;min-width:0}
+.jbrow:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}.jbrow .jbn{flex:1;min-width:0}.jbrow:not(.on) .jbn{color:var(--dim)}
+.jbrow input{accent-color:var(--accent);margin:0}
+/* phone Devices: a now-playing row per zone + Split off / Link all */
+.zphone{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.zp-row{display:flex;align-items:center;gap:8px;min-width:0;padding:0;border-radius:3px}
+.zp-row.zsel-on{box-shadow:inset 3px 0 0 var(--accent)}
+.zp-row .zp-name{flex:none;max-width:45%;font-size:13px}
+.zp-row .zl-now{flex:1;margin:0;min-width:0}.zp-row .zl-bar{display:none}
+.zp-btns{display:flex;gap:8px}.zp-btns .btn{flex:1}.zp-btns .linkall{border-color:var(--accent2,var(--accent));color:var(--accent2,var(--accent))}
+.zchip.zsel-on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.znow-tile{cursor:pointer}.znow-tile.zsel-on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+/* drag to reorder: a full-height, 34 px grip along the card's left edge */
+.dc3[data-dkind],.zcard[data-dkind],.drow[data-dkind],.dcard[data-dkind]{position:relative;padding-left:34px}
+.dc3>.dgrip,.zc3>.dgrip,.zcard>.dgrip,.drow>.dgrip,.dcard>.dgrip{position:absolute;left:0;top:0;bottom:0;transform:none;width:34px;padding:0;display:flex;align-items:center;justify-content:center;opacity:.6;border-radius:3px 0 0 3px;cursor:grab;touch-action:none;z-index:2}
+.dgrip>i{font-style:normal;font-size:15px;letter-spacing:-3px;line-height:1;transform:rotate(0)}
+.dgrip:hover,.dgrip:focus-visible{opacity:1;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-text,var(--accent))}
+.dgrip:active,body.devdragging .dgrip{cursor:grabbing}
+body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
+.dragging{opacity:.92;position:relative;z-index:30;box-shadow:0 10px 24px rgba(0,0,0,.55),0 0 0 2px var(--accent);pointer-events:none}
+.dropbefore{box-shadow:0 -4px 0 0 var(--accent)}.dropafter{box-shadow:0 4px 0 0 var(--accent)}
+.np-ctlpanel.collapsed .zs-panel{display:none}
+@media (max-width:900px){
+  .np-ctlpanel>.pane-h{flex-wrap:wrap;height:auto}
+  .np-ctlpanel.collapsed>.pane-h{height:auto;min-height:54px}
+  .np-ctlpanel .zs-panel{order:-1;flex:1 0 100%;max-width:none;margin:0 0 6px}
+  .np-ctlpanel.collapsed .zs-panel{display:inline-flex}
+  .np-ctlpanel.collapsed .zs-panel[hidden]{display:none}
+}
+.dropx.dropbefore{box-shadow:-4px 0 0 0 var(--accent)}.dropx.dropafter{box-shadow:4px 0 0 0 var(--accent)}
+
+/* 0.4.0 Stage 4: phone casting (AirPlay / Spotify Connect) block in the zone editor */
+.zrecv { margin-top: 8px; }
+.zrecv .zsmember { align-items: center; }
+
+/* ================= 0.4.1 card cleanup ================= */
+/* three-dot grip in its own wide, high-contrast gutter (zone AND speaker cards) */
+.dc3[data-dkind],.zcard[data-dkind],.drow[data-dkind],.dcard[data-dkind]{padding-left:42px!important}
+.dc3>.dgrip,.zc3>.dgrip,.zcard>.dgrip,.drow>.dgrip,.dcard>.dgrip{width:30px;opacity:1;background:color-mix(in srgb,var(--bg,black) 70%,black);border-right:1px solid var(--line);color:var(--text);cursor:grab}
+.dgrip>i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 -9px 0 currentColor,0 9px 0 currentColor;font-size:0;letter-spacing:0}
+.dgrip:hover,.dgrip:focus-visible{background:color-mix(in srgb,var(--accent) 22%,var(--bg,black));color:var(--accent-text,var(--accent))}
+/* Split off / Link never overlaps the name: the name shrinks with an ellipsis, the buttons keep their size */
+.zc3 .dc3l1{flex-wrap:nowrap;min-width:0}.zc3 .dc3l1 .dname{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zc3 .dc3l1 .zkind{flex:none}.zc3 .dc3l1 .zlinkbtn,.zc3 .dc3l1 .zedit,.zc3 .dc3l1 .onoff,.zc3 .dc3l1 .pill{flex:none}
+.zc3 .dc3l1 .grow{min-width:4px}
+/* link icon chip */
+.dtag.zlink.zicon{padding:1px 6px}
+.dtag.zhere{color:var(--accent2,var(--accent));border-color:currentColor;background:transparent}
+.zchip.claimed{opacity:.5}.zchip .zc-in{font-weight:400}
+.dcard.claimed{opacity:.55}
+/* shared now-playing box of linked zones */
+.zshared{border:1px solid var(--accent);border-radius:3px;background:color-mix(in srgb,var(--accent) 5%,var(--panel));padding:6px;display:flex;flex-direction:column;gap:6px}
+.zsh-head{display:flex;align-items:center;gap:8px;color:var(--accent-text,var(--accent));font-size:12px;min-width:0}
+.zsh-head .zsh-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zsh-ico svg{width:14px;height:14px}
+.zsh-sync{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--dim)}
+.zsh-now .zl-now{margin:0 0 4px}.zsh-vol{display:flex;flex-direction:column;gap:2px}
+.zsh-members{display:flex;flex-direction:column;gap:6px}
+/* drag: bright insertion line (reorder) vs dashed blue box with a label (link) */
+.dropbefore{box-shadow:0 -4px 0 0 var(--accent),0 -10px 14px -6px var(--accent)}.dropafter{box-shadow:0 4px 0 0 var(--accent),0 10px 14px -6px var(--accent)}
+.zcard.droplink,.zc3.droplink{outline:3px dashed var(--accent);outline-offset:-3px;background:color-mix(in srgb,var(--accent) 16%,var(--panel));position:relative}
+.zcard.droplink::after,.zc3.droplink::after{display:block;content:attr(data-linklabel);position:absolute;left:52px;top:0;transform:translateY(-50%);z-index:60;pointer-events:none;background:var(--accent);color:black;font-weight:700;font-size:12px;padding:4px 10px;border-radius:3px;white-space:nowrap;box-shadow:0 0 0 2px var(--panel)}
+/* context menu */
+.ctxmenu{position:fixed;z-index:1200;min-width:190px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.55);padding:4px;display:flex;flex-direction:column}
+.ctxmenu .ctx-item{background:none;border:0;color:var(--text);text-align:left;padding:7px 10px;border-radius:3px;font:inherit;cursor:pointer}
+.ctxmenu .ctx-item:hover:not([disabled]),.ctxmenu .ctx-item:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
+.ctxmenu .ctx-item[disabled]{opacity:.4;cursor:not-allowed}.ctxmenu .ctx-item.danger{color:var(--accent-text,var(--accent))}
+.ctxmenu .ctx-sep{height:1px;background:var(--line);margin:4px 2px}
+.dc3[data-dkind]:not(.dset),.zc3[data-dkind]:not(.dset),.devpanel.expanded .e1 .ecol .dc3[data-dkind]:not(.dset),.devpanel.expanded .e1 .ecol .zc3[data-dkind]{padding-left:42px!important}
+.qzwrap{gap:8px;align-items:center;margin:0 8px}.qzpick{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:2px 6px;font:inherit;font-size:12px;max-width:200px}
+.qediting{color:var(--accent-text,var(--accent));font-weight:700}.listpanel.qviewing .pane-h{box-shadow:inset 0 -2px 0 var(--accent)}
+
+/* 0.4.1: the zone selector also lives in the master control panel (left end, next to master volume); the bar chip is unchanged. On narrow layouts it is a zone icon + dropdown. */
+.zs-ico{display:none}.zs-ico svg{width:15px;height:15px}
+.dvol-master>.zs-master{flex:none;max-width:46%;margin-right:4px}
+.dvol-master>.zs-master .zs-name{max-width:110px}
+.devbody>.dmaster .zs-master .zs-lbl,.devbody>.dmaster .zs-master .zs-name{display:none}.devbody>.dmaster .zs-master .zs-ico{display:inline-flex}
+@media (max-width:900px){.dvol-master>.zs-master .zs-lbl,.dvol-master>.zs-master .zs-name{display:none}.dvol-master>.zs-master .zs-ico{display:inline-flex}}
+
+/* 0.4.1 E: Add to Home Screen picture guide */
+.a2hs-card .a2hs-steps{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.a2hs-card .a2hs-step{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line,currentColor);border-radius:3px}
+.a2hs-card .a2hs-n{width:22px;height:22px;border-radius:3px;background:var(--accent);color:black;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.a2hs-card .a2hs-ic{color:var(--accent);flex:none;display:inline-flex}
+.remembered{margin:8px 0}
+
+/* 0.4.1 L62: Jukebox picker disclosure */
+.jbdisc>summary{cursor:pointer;margin-top:6px;font-size:12px;color:var(--accent);list-style:none}
+.jbdisc>summary::-webkit-details-marker{display:none}
+.jbdisc>summary::before{content:'▸ '}
+.jbdisc[open]>summary::before{content:'▾ '}
+.zjuke{padding-bottom:12px}
+
+/* 0.4.2 context menus: icons, submenus, no overflow */
+.ctxmenu{max-width:calc(calc(100vw / var(--z,1)) - 8px);overflow-y:auto;overscroll-behavior:contain}
+.ctxmenu .ctx-item{display:flex;align-items:center;gap:8px;white-space:nowrap;width:100%}
+.ctxmenu .ctx-ic{width:16px;height:16px;flex:0 0 16px;color:var(--accent-text,var(--accent))}
+.ctxmenu .ctx-l{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
+.ctxmenu .ctx-arrow{margin-left:auto;opacity:.7;font-size:16px;line-height:1}
+.ctxmenu .ctx-item.has-sub.cur{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.ctxmenu.ctx-sub{z-index:1201}
+
+/* ===== 0.4.2 zone tree: zones hold their speakers; Queue boxes; Unassigned; Expanded = Scenes | detail | tree ===== */
+.tree42{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tree42-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;max-width:100%}.tree42-n{font-weight:700;letter-spacing:.06em}
+.qb42{border:1px solid var(--line);border-radius:3px;background:var(--panel);min-width:0;position:relative}
+.qb42.linked{border:1.5px solid var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+.qb42.solo.ctl{border-left:4px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+.qb42-head{padding:8px 10px 6px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.qb42-t{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+.qb42.linked .qb42-t{color:var(--accent-text,var(--accent))}
+.qb42-vol{display:flex;align-items:center;gap:8px;min-width:0}.qb42-vol .vbar{flex:1 1 auto;min-width:0}
+.zwrap42{margin:6px 8px 8px;border:1px solid var(--line);border-radius:3px;min-width:0;background:color-mix(in srgb,var(--text) 3%,transparent)}
+.qb42.solo>.zwrap42{border:0;margin:0 0 0;padding:0 8px 8px;background:none}
+.zwrap42.ctl{border-left:4px solid var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.qb42.solo>.zwrap42.ctl{border-left:0;background:none}
+/* 0.4.3 #7: no inner dashed outline on the selected zone; the whole-box Controlling highlight is the only one */
+.zwrap42.dropping,.un42.dropping{outline:2px dashed var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.zcard42{padding:6px 8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.zc42-1{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.zc42-1 .zname{flex:1 1 auto;min-width:0;max-width:100%;text-align:left;font-weight:700}
+.zc42-1 .zacts{display:inline-flex;align-items:center;gap:8px;margin-left:auto;flex:0 0 auto}
+.zc42-1 .btn,.zc42-1 .onpill{flex:0 0 auto}
+.zc42-2{display:flex;flex-wrap:wrap;gap:4px;min-width:0}.zc42-2:empty{display:none}
+.zcard42.off .zname{opacity:.6}
+.zsp42{display:flex;flex-direction:column;padding:0 4px 4px 14px;gap:2px;min-width:0}
+.sp42{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-height:30px;padding:2px 6px;border-radius:3px;min-width:0;border:1px solid transparent}
+.sp42:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
+.sp42.sel{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent)}
+.sp42.off .sp42-n,.sp42.gone .sp42-n{opacity:.55}
+.sp42-n{flex:1 1 0;min-width:40px;text-align:left}
+.sp42-tags{display:flex;flex-wrap:wrap;gap:3px;flex:1 1 100%;order:9;min-width:0;padding-left:34px}.sp42-tags:empty{display:none}
+.sp42-v{flex:0 0 auto;min-width:34px;text-align:right}
+.sp42-menu{background:none;border:0;color:var(--dim);cursor:pointer;padding:0 4px;font-size:16px;line-height:1;border-radius:3px}.sp42-menu:hover,.sp42-menu:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--text)}
+.dgrip42{cursor:grab;touch-action:none;color:var(--dim);user-select:none;width:14px;text-align:center;flex:0 0 14px;line-height:1}.dgrip42.ro{opacity:.35;cursor:not-allowed}
+.drop42{padding:8px;text-align:center;font-size:12px;color:var(--dim);border:1px dashed var(--line);border-radius:3px;margin:2px 0}
+.un42{border:1.5px dashed var(--amber);border-radius:3px;padding:6px 8px 8px;min-width:0}
+.un42-h{padding:2px 0 6px}.un42-h b{color:var(--amber);letter-spacing:.06em}
+.un42 .sp42.un{min-height:34px}.un42 .saddzone{flex:0 0 auto}
+.un42.empty .drop42{border-color:transparent}
+.drag42-ghost{position:fixed;z-index:1300;pointer-events:none;padding:4px 10px;border:1px solid var(--accent);border-radius:3px;background:var(--panel);box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.tree42.dragging{cursor:grabbing;user-select:none;opacity:1;position:static;z-index:auto;box-shadow:none;pointer-events:auto}
+.tcol42s{min-width:0}
+/* Expanded: Scenes & Schedules | detail | tree */
+.devpanel.expanded .dexp-main.e42{display:grid!important;grid-template-columns:clamp(220px,21%,340px) minmax(0,1fr) clamp(300px,27%,440px)!important;column-gap:14px;align-items:start;min-height:0}
+.devpanel.expanded .dexp-main.e42>.ecol{min-width:0;display:flex;flex-direction:column;gap:8px;border-left:1px solid color-mix(in srgb,var(--accent) 45%,transparent);padding-left:12px;overflow:auto;max-height:calc(calc(100vh / var(--z,1)) - 190px);margin:0;flex:none;width:auto;opacity:1;pointer-events:auto}
+.devpanel.expanded .dexp-main.e42>.sscol{border-left:0;padding-left:0}
+.dpath42{font-size:15px}.dhint42{margin-top:-4px}
+.d42-pane{min-width:0}
+.d42-pane .spkset{max-width:100%}
+.zp42-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line);min-width:0}
+.zp42-row .zp42-name{flex:1 1 160px;min-width:0}
+.zp42-list{list-style:none;margin:0;padding:0;width:100%}.zp42-list li{display:flex;align-items:center;gap:8px;padding:3px 0}
+.zp42-spk{flex-direction:column;align-items:stretch}.zp42-acts{border-bottom:0}
+.spk-zonerow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0}
+.spk-presets{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.spk-pchip{border:1px solid var(--line);background:none;color:var(--text);border-radius:3px;padding:3px 9px;cursor:pointer;font:inherit;font-size:12px}
+.spk-pchip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.spk-eqctl{display:inline-flex;gap:8px;align-items:center;margin-left:auto}
+.spk-eqh{display:flex;align-items:center;gap:8px}
+.spk-tags{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+
+/* 0.4.2: the EQ header = picker + "All sound settings" on ONE line; the lock moved to the top-right icon group */
+.np-eqhead .eqallbtn{white-space:nowrap;flex:0 0 auto}
+.np-eqhead .np-eqname{white-space:nowrap}
+.np-eqhead .np-eqpick{min-width:0;max-width:30%}
+/* 0.4.2 phone: small EQ labels (125 / 250 / 500 Hz) stay centered under their band whatever their width */
+.eqb-hz{left:50%;right:auto;width:max-content;max-width:none;transform:translateX(-50%);white-space:nowrap;text-align:center}
+.calthorough{align-items:flex-start;gap:8px;flex-wrap:wrap}
+@media (max-width:900px){ .eqb-hz{font-size:9px;letter-spacing:-.2px} }
+.spk-zsel{width:auto;max-width:260px}.spk-zname{font-weight:700}
+.zp42-recv{display:block}.zp42-recv .zrecv{width:100%}
+.dgrip42{width:24px;flex:0 0 24px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:15px;border-radius:3px}.dgrip42:hover{background:color-mix(in srgb,var(--accent) 16%,transparent)}.dgrip42:active{cursor:grabbing}
+.pqwrap .qzpick{max-width:100%;width:100%;padding:8px 10px;font-size:14px}.qzone.dim{font-size:12px;margin-left:8px;letter-spacing:.04em}
+
+/* 0.4.3 #2: idle zone box: dimmed volume row (still usable) */
+.qb42.idle .qb42-vol{opacity:.45}.qb42.idle .qb42-vol:hover,.qb42.idle .qb42-vol:focus-within{opacity:.8}
+.spk-cal{margin:6px 0 2px;color:var(--ink2,var(--dim))}.spk-right .dsel.dsingle{opacity:.85}
+/* 0.4.3 #3: EQ labels never overlap. The speaker page goes to one column when it is too narrow for EQ + sliders side by side (any zoom: container units,
+   not the viewport), and the graph thins its own labels by its own width: drop " Hz", then smaller values, then every other frequency label. */
+.spkset{container:spkset/inline-size}
+@container spkset (max-width:820px){ .spkset .spk-body{grid-template-columns:1fr} }
+.eqarea{container:eqa/inline-size}
+.eqb-hz,.eqb-val{white-space:nowrap;overflow:hidden;text-overflow:clip}
+@container eqa (max-width:560px){ .eqb-hzu{display:none} }
+@container eqa (max-width:400px){ .eqb-val{font-size:9px;letter-spacing:-.3px} .eqb-hz{font-size:10px} }
+@container eqa (max-width:300px){ .eqb:nth-child(even) .eqb-hz{visibility:hidden} .eqb:nth-child(even) .eqb-val{visibility:hidden} .eqb.sel .eqb-hz,.eqb.sel .eqb-val{visibility:visible} }
+/* 0.4.3 #6: Scenes & Schedules header on one line; the short clock note sits on its own line under it */
+.ssc-h .ssc-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ssc-clock{display:block;margin:-4px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ---- 0.4.3 #9: the zone tree matches the render final042l-1 (panel): bold "Queue: X" + small status, boxed zone cards with a full-height
+   gutter, inline speaker-count badge, CONTROLLING / Queue from on line 2 with Link / Split off at its right, speaker rows as small boxes on a
+   tree line with tags inline when they fit. 3px corners, theme accent only. */
+.qb42-head{padding:8px 10px 8px;gap:8px}
+.qb42-t{font-size:13px;letter-spacing:0;text-transform:none;display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap}
+.qb42-t .qb42-name{color:var(--accent-text,var(--accent));font-weight:700;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.qb42-t .qb42-st{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--accent-text,var(--accent));flex:0 0 auto}
+.qb42-t .qb42-st.dim{color:var(--dim)}
+.qb42.solo.ctl{border:1px solid var(--accent);border-left:4px solid var(--accent)}
+.zwrap42{margin:0 8px 8px;padding:6px;background:none}
+.qb42.solo>.zwrap42{padding:0 8px 8px}
+.zcard42{flex-direction:row;align-items:stretch;gap:0;padding:0;border:1px solid var(--line);border-radius:3px;background:color-mix(in srgb,var(--text) 4%,var(--panel));min-height:40px}
+.zgut42{flex:0 0 22px;width:22px;align-self:stretch;display:flex;align-items:center;justify-content:center;border:0;border-right:1px solid var(--line);border-radius:3px 0 0 3px;
+  background:color-mix(in srgb,var(--text) 10%,var(--panel));color:var(--text);font:700 16px/1 system-ui,sans-serif;cursor:pointer;padding:0}
+.zgut42:hover,.zgut42:focus-visible{background:color-mix(in srgb,var(--accent) 22%,var(--panel))}
+/* 0.4.9 F69 fix: the zone ⋮ handle and the speaker ⋮ grip are drag handles - a touch on them never pans the page (the pan used to cancel the drag) */
+.zgut42,.dgrip42{touch-action:none}
+.qb42:not(.empty42):not(.off42) .zgut42{cursor:grab}
+.zc42-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px;padding:6px 8px 6px 10px}
+.zc42-1{flex-wrap:nowrap;gap:6px}
+.zc42-1 .zname{flex:0 1 auto;max-width:none}
+.zcount42{flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;height:18px;padding:0 5px;border:1px solid var(--line);border-radius:3px;font-size:11px;font-weight:700;color:var(--dim);line-height:1}
+.zcount42 .ic svg,.zcount42 svg{width:11px;height:11px}
+.zc42-1 .zacts{margin-left:auto}
+.zc42-2{align-items:center;gap:4px 6px;flex-wrap:wrap}
+.zc42-2 .zc42-q{font-size:12px}
+.zc42-2 .zc42-lb{margin-left:auto;flex:0 0 auto}
+.zsp42{position:relative;padding:4px 0 0 22px;gap:4px}
+.zsp42:has(.sp42)::before{content:"";position:absolute;left:11px;top:0;bottom:14px;border-left:1px solid var(--line)}
+.zsp42>.sp42{position:relative}
+.zsp42>.sp42::before{content:"";position:absolute;left:-11px;top:50%;width:10px;border-top:1px solid var(--line)}
+.sp42{flex-wrap:nowrap;gap:6px;min-height:28px;padding:0 8px 0 0;border:1px solid var(--line);background:color-mix(in srgb,var(--text) 4%,var(--panel))}
+.sp42 .dgrip42{flex:0 0 18px;width:18px;align-self:stretch;border-radius:3px 0 0 3px;background:color-mix(in srgb,var(--text) 10%,var(--panel));color:var(--text);font:700 15px/1 system-ui,sans-serif}
+.sp42-nt{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;padding:3px 0}
+.sp42-nt .sp42-n{flex:0 1 auto;min-width:40px;font-weight:700}
+.sp42-tags{flex:0 0 auto;order:0;padding-left:0;flex-wrap:nowrap}
+/* the ⋯ actions button is not in the render: it floats over the right end on hover / keyboard focus (always shown on touch) */
+.sp42{position:relative}
+.sp42-menu{position:absolute;right:2px;top:50%;transform:translateY(-50%);opacity:0;background:var(--panel);height:22px}
+.sp42:hover .sp42-menu,.sp42:focus-within .sp42-menu{opacity:1}
+@media (hover:none){.sp42-menu{position:static;transform:none;opacity:1}}
+.drop42{margin:2px 0 0;padding:8px 10px;border:1px dashed var(--line);border-radius:3px;color:var(--dim)}
+.zsp42>.drop42{margin-left:-22px}
+.un42{border:1px dashed var(--amber);background:color-mix(in srgb,var(--amber) 6%,var(--panel))}
+.un42-h b{color:var(--amber);letter-spacing:.1em}.un42-h .un42-n{font-weight:700;margin:0 4px}
+.un42 .sp42.un{border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
+/* 0.4.3 #1 + #9: the panel's master area = a full-width "CONTROLLING <Zone> ▾" chip, then ONE master row (MASTER, slider, %, mute), then All off / All on / Link all */
+.devpanel:not(.expanded) .dmaster{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px 10px;padding:6px 2px 8px}
+.devpanel:not(.expanded) .dmaster>.dvol-master{display:contents!important}
+/* 0.4.3 GO (a): no CONTROLLING chip in the normal Devices panel (render final042l); the expanded view keeps its master-row zone picker */
+.devpanel:not(.expanded) .dmaster>.dvol-master>.zs-master{display:none!important}
+.devpanel:not(.expanded) .dmaster>.dlbl{grid-column:1;grid-row:1}
+.devpanel:not(.expanded) .dmaster>.dvol-master>*:not(.zs-master){grid-row:1;min-width:0}
+.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(2){grid-column:2;width:100%}
+.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(3){grid-column:3}
+.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(4){grid-column:4}
+.devpanel:not(.expanded) .dmaster>.mallrow{grid-column:1/-1;grid-row:2;margin:0}
+.devpanel:not(.expanded) .tree42-h{margin:10px 0 8px;padding:0;border:0;min-height:26px;height:auto}
+.devpanel .tree42-h .zadd-new{width:26px;height:26px;min-height:26px;padding:0;border-color:var(--accent);color:var(--accent-text,var(--accent));font-size:16px}
+.dtagrow.ztagrow.zc42-2:not(:empty){display:flex}   /* line 2 also holds "Queue from X" and Link / Split off, not only tags */
+.drop42{text-align:left}
+.qb42.solo .qb42-t .qb42-name{color:var(--text)}   /* render: a solo box title is plain text; the linked set's title and the live status words are accent */
+.qb42.idle .qb42-head{border-bottom:1px solid var(--line);margin:0 0 8px}
+.devpanel:not(.expanded) .tree42>.pane-h.dsec-h.tree42-h{margin:10px 0 8px!important;padding:0!important;border:0!important;width:auto;max-width:100%}
+.sp42-nt .sp42-n{min-width:2ch}
+.devpanel:not(.expanded) .tree42-n{letter-spacing:.12em}
+.tree42-n .tree42-num{color:var(--dim)}
+
+/* 0.4.4 F1/F2/F3: Scenes & Schedules column layout */
+.devpanel .devbody .ssc-col>.pane-h.dsec-h{margin-left:0;margin-right:0}
+.devpanel.expanded .dexp-main>.sscol.ecol{overflow-x:hidden}
+.ssc-col .ssc-sched{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"tm mid pill ed" "tm when when when";column-gap:10px;row-gap:4px}
+.ssc-col .ssc-sched>.ss-tm{grid-area:tm;align-self:center}
+.ssc-col .ssc-sched>.ss-mid{grid-area:mid}
+.ssc-col .ssc-sched>.ss-mid>.row{flex-wrap:wrap;gap:4px 6px;min-width:0}
+.ssc-col .ssc-sched>.ss-when{grid-area:when;display:flex;align-items:center;justify-content:space-between;gap:2px 8px;flex-wrap:wrap;text-align:left;min-width:0}
+.ssc-col .ssc-sched>.ss-when>.small{white-space:nowrap}
+.ssc-col .ssc-sched>:nth-child(4){grid-area:pill;align-self:center}
+.ssc-col .ssc-sched>:nth-child(5){grid-area:ed;align-self:center}
+.ssc-col .ss-days{white-space:nowrap;letter-spacing:0}
+.ss-sub{white-space:normal;overflow-wrap:anywhere}
+/* 0.4.4 F18: every status tag one size (height, font, padding, 3px corners); lock is a small inline glyph */
+.dtag,.tag.dtag{display:inline-flex;align-items:center;gap:2px;box-sizing:border-box;height:17px;font-size:9px;font-weight:800;letter-spacing:.06em;line-height:1;padding:0 5px;border-radius:3px;vertical-align:middle}
+.dtag svg,.dtag .ic{width:9px!important;height:9px!important;flex:none;margin:0;vertical-align:0}
+/* 0.4.4 F7: collapsed Library rail count - vertical like LIBRARY (reads up), bottom-left, themed (no box) */
+.libpanel.israil .prail-n,.devpanel.israil .prail-n{writing-mode:vertical-rl;transform:rotate(180deg);align-self:flex-start;margin:auto 0 6px 6px;padding:0;border:0;background:none;max-width:none;max-height:none;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--accent-text,var(--accent));opacity:.85;text-shadow:none;white-space:nowrap}
+/* 0.4.8 F59: the Devices rail count shares the Library count rule above, mirrored for the right edge (reads DOWN like its DEVICES title) */
+.devpanel.israil .prail-n{transform:none;align-self:flex-end;margin:auto 6px 6px 0}
+/* 0.4.4 F6: preset pickers - themed list (dark scheme, accent highlight), My presets heading */
+select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]{color-scheme:dark;accent-color:var(--accent)}
+:is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) option{background:var(--panel);color:var(--ink)}
+:is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) option:checked{background:var(--accent-soft,color-mix(in srgb,var(--accent) 30%,transparent));color:var(--accent-text,var(--ink))}
+:is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) optgroup{background:var(--panel2);color:var(--dim);font-style:normal}
+
+/* 0.4.4 F20: speaker page preset dropdown (same look as the EQ view's picker) */
+.spk-presets{flex-wrap:nowrap}
+.spk-presets .spk-prelbl{margin:0}
+.spk-presel{flex:1 1 auto;min-width:0;max-width:260px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:3px 8px;font:inherit;font-size:12px}
+.spk-presel:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.spk-presets .btn{white-space:nowrap;flex:none}
+/* 0.4.4 F13: the collapsed Now Playing bar gets the same compact CONTROLLING chip, left of the art/title; zone name only when narrow */
+.np-ctlpanel.collapsed .zs-panel{display:inline-flex;flex:0 1 auto;min-width:0;max-width:260px;margin:0 10px 0 0;order:0}
+.np-ctlpanel.collapsed .zs-panel[hidden]{display:none}
+@media (max-width:1500px){.np-ctlpanel.collapsed .zs-panel .zs-lbl{display:none}.np-ctlpanel.collapsed .zs-panel{max-width:160px}}
+/* 0.4.4 F14: zone box title = select-this-zone target */
+.qb42-pick{cursor:pointer;border-radius:3px}
+.qb42-pick:hover .qb42-name{color:var(--accent-text,var(--accent))}
+.qb42-pick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 0.4.4 F19: tags that lead to their setting */
+.dtag.tagact{cursor:pointer}
+.dtag.tagact:hover{filter:brightness(1.25);box-shadow:0 0 0 1px currentColor}
+.dtag.tagact:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tagflash{outline:2px solid var(--accent)!important;outline-offset:2px;transition:outline-color .3s}
+/* 0.4.4 F9: Devices tree drag feedback */
+.tree42 .drag42-src{opacity:.4;outline:1px dashed var(--line);outline-offset:-1px}
+.drag42-ghost{display:flex;align-items:center;gap:6px;opacity:.88;font-weight:700;color:var(--ink);border:2px solid var(--accent)!important;box-shadow:0 10px 26px rgba(0,0,0,.55),0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)!important;transform:rotate(-1.5deg) translateY(-2px)}
+.drag42-ghost .drag42-gi{color:var(--accent)}
+.tree42.dragging .droppable{outline:2px dashed var(--accent);outline-offset:-2px}
+.tree42.dragging .zwrap42.dropping,.tree42.dragging .un42.dropping,.tree42.dragging .droppable.dropping{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tree42.dragging .dropping .zsp42{position:relative}
+.tree42.dragging .dropping .zsp42::after,.tree42.dragging .un42.dropping::after{content:"";display:block;height:3px;margin:3px 6px 2px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+/* 0.4.4 F8 (side panel): the Queue header strip takes Library drops (collapsed Queue) - outline + "Drop here" label while a song is over it */
+.listpanel>.pane-h.qdrop{outline:2px solid var(--accent);outline-offset:-2px;position:relative}
+.listpanel>.pane-h.qdrop::after{content:attr(data-droplabel);position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--accent);color:var(--bg);font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;pointer-events:none}
+/* 0.4.4 F25: per-speaker mute toggle - tree rows (right of the %) and the speaker page (right of the Volume bar) */
+.sp42 .sp42-mute{width:24px;height:24px;min-width:24px;padding:0;flex:none;margin-left:6px}
+.sp42 .sp42-mute svg{width:13px;height:13px}
+.spk-volline{display:flex;align-items:center;gap:8px;min-width:0}
+.spk-volline .spk-range{flex:1;min-width:0}
+.spk-volline .spk-mute{flex:none}
+/* 0.4.4 F13 + L50: with Shortcut pins on the collapsed bar the CONTROLLING chip goes compact (zone name only), and on a tight bar it steps aside
+   so the song, volume and pins never overlap (the zone picker stays on the open bar and in Devices) */
+.np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel .zs-lbl{display:none}
+.np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{max-width:118px}
+@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{display:none} }
+
+/* 0.4.5 F8: pointer-event drag (pdrag.js) */
+.dragghost.pdghost{pointer-events:none;z-index:10000}
+body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
+.item.ldrag,.tile.ldrag,.ldrag{cursor:grab}
+.ldrag.dragging,.ldrag:active{cursor:grabbing}
+/* 0.4.5 F27: "on Basement ▾" - the zone name in the now-playing text is the zone picker (accent text, small caret, ellipsized; no row of its own) */
+.zl-line{display:flex;align-items:baseline;gap:6px;min-width:0}
+.zl-line>:first-child{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zlink{display:inline-flex;align-items:baseline;gap:3px;min-width:0;max-width:min(60%,200px);flex:0 0 auto;padding:0 3px;margin:0;border:0;border-radius:3px;background:none;color:var(--muted,inherit);font:inherit;font-size:.92em;line-height:inherit;cursor:pointer;white-space:nowrap}
+.zlink[hidden]{display:none}
+.zlink .zl-on{flex:none}
+.zlink .zl-name{color:var(--accent);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zlink .zs-car{color:var(--accent);font-size:.8em;flex:none}
+.zlink:hover .zl-name,.zlink[aria-expanded=true] .zl-name{text-decoration:underline}
+.zlink:hover,.zlink[aria-expanded=true]{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.zlink:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ns-titles .zlink{margin-left:6px;flex:0 1 auto}
+.np-tabletitles .zlink,.np-meta .titles .zlink{max-width:100%;margin-top:2px;align-self:flex-start}
+/* 0.4.5 F29: calibration step strip, By ear lines, '? How calibration works' link and sheet (theme accent only, 3px corners) */
+.calguide-top{margin:-4px 0 4px}
+.calsteps{border:1px solid var(--line);border-radius:3px;padding:8px 10px;margin-bottom:10px;background:var(--panel2)}
+.calst-lbl{color:var(--accent);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px}
+.calst-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.calst{display:flex;gap:8px;align-items:flex-start;padding:6px;border-radius:3px;border:1px solid transparent;opacity:.78}
+.calst.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);opacity:1}
+.calst.done{opacity:.9}
+.calst-n{flex:none;width:22px;height:22px;border-radius:3px;display:grid;place-items:center;font-weight:700;font-size:12px;border:1px solid var(--accent);color:var(--accent)}
+.calst.on .calst-n,.calst.done .calst-n{background:var(--accent);color:var(--bg)}
+.calst-b{display:flex;flex-direction:column;gap:2px;min-width:0}
+.calst-b b{font-size:13px}
+.calear{margin:4px 0 8px;padding-left:20px}
+.calear li::marker{color:var(--accent);font-weight:700}
+.linkbtn.calhelp{background:none;border:0;padding:2px 4px;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;border-radius:3px;display:inline-flex;align-items:center;gap:2px}
+.linkbtn.calhelp:hover{text-decoration:underline}
+.linkbtn.calhelp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.calhelp-q{display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid var(--accent);border-radius:3px;font-weight:700;font-size:11px}
+.calguide-dlg .body{max-height:min(calc(70vh / var(--z,1)),640px);overflow:auto}
+.calguide-sheet{max-width:560px;display:flex;flex-direction:column;gap:10px}
+.calg-sec h4{margin:0 0 4px;color:var(--accent);font-size:13px;letter-spacing:.03em}
+.calg-sec ul,.calg-sec ol{margin:0;padding-left:20px}
+.calg-steps{font-size:13px}.calg-steps li{margin-bottom:4px}
+@media (max-width:600px){.calst-list{grid-template-columns:1fr}.calst-b span{font-size:12px}}
+/* 0.4.5 F26: Devices drags on the pointer engine - the ghost is a pinned copy of the row; zones that are not targets dim */
+.dragghost.pdpin{position:fixed;z-index:1300;pointer-events:none;margin:0;opacity:.92;border:2px solid var(--accent);border-radius:3px;background:var(--panel);box-shadow:0 10px 26px rgba(0,0,0,.55);box-sizing:border-box;overflow:hidden}
+.tree42.dragging .dropno,.tree42.dragging .zwrap42:not(.droppable):not(.dropping),.tree42.dragging .un42:not(.droppable):not(.dropping){opacity:.45;filter:saturate(.6)}
+/* 0.4.5 T1: adaptive tight-space layout (layout width < 1600 CSS px, see panels.js TIGHT_PX). Library on its rail, Devices behind a thin right-edge
+   tab that opens a full-height slide-over (accent edge, shadow, dim scrim); Sound / Queue / Now Playing take the width. Normal widths are unchanged. */
+.devtab,.devscrim{display:none}
+.desk.tight{--rightw:30px}
+.desk.tight .devtab{grid-area:1/3/4/4;display:flex;align-items:center;justify-content:center;min-width:0;padding:10px 0;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--accent);cursor:pointer;font:inherit;font-size:11px;font-weight:700;letter-spacing:.14em}
+.desk.tight .devtab:hover,.desk.tight.devopen .devtab{background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-color:var(--accent)}
+.desk.tight .devtab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.desk.tight .devtab-t{writing-mode:vertical-rl;white-space:nowrap}
+.desk.tight .devpanel{grid-area:auto;position:fixed;top:0;bottom:0;right:0;width:clamp(300px,calc(26vw / var(--z,1)),400px);max-width:calc(92vw / var(--z,1));z-index:900;border-left:3px solid var(--accent);border-radius:3px 0 0 3px;box-shadow:-14px 0 34px rgba(0,0,0,.55);transform:translateX(110%);visibility:hidden;transition:transform .22s ease,visibility 0s linear .22s}
+.desk.tight.devopen .devpanel{transform:none;visibility:visible;transition:transform .22s ease}
+.desk.tight.devopen .devscrim{display:block;position:fixed;inset:0;z-index:899;background:rgba(0,0,0,.45)}
+.desk.tight.devexpanded .devpanel{grid-area:1/2/2/4;position:static;transform:none;visibility:visible;width:auto;max-width:none;border-left:1px solid var(--line);box-shadow:none}
+.desk.tight.devexpanded .devtab{display:none}
+@media (prefers-reduced-motion:reduce){.desk.tight .devpanel{transition:none}}
+/* 0.4.5 F27 (chips dropped): title first, then the zone, then the artist gives way */
+.ns-titles{display:flex;align-items:baseline;min-width:0}
+.ns-titles .ns-t1{flex:0 1 auto;min-width:min(45%,9em)}
+.ns-titles .ns-t2{flex:0 3 auto;min-width:0}
+.ns-titles .zlink{flex:0 2 auto;min-width:4.5em;max-width:40%}
+.zl-line .zlink{flex:0 2 auto;min-width:4.5em}
+.zl-line>:first-child{flex:0 3 auto}
+/* 0.4.5 F28: the Editing picker never squeezes to a blank box (expanded Library / tight columns): it keeps room for a zone name; the label and
+   Copy button give way first */
+/* T1c: tight only - Full keeps the 0.4.4 Queue header */ .desk.tight .qzwrap{min-width:0;flex:0 1 auto}
+.desk.tight .qzwrap .qzpick{min-width:7.5em;flex:0 0 auto}
+.desk.tight .qzwrap .qsend{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk.tight.libexpanded .listpanel .qzwrap .qsend,.desk.tight.libexpanded .listpanel .qzwrap .qediting{display:none}
+.ns-titles .ns-t1{flex:0 1 auto;min-width:2.5em}
+.ns-titles .ns-t2{flex:0 8 auto;min-width:0}
+.ns-titles .zlink,.zl-line .zlink{flex:0 0 auto;min-width:0;max-width:45%}
+.ns-titles .ns-t2{flex:1 1 0;min-width:0}
+.zl-line>:first-child{flex:1 1 0}
+/* 0.4.5 T1b: Appearance > Layout (Auto / Roomy / Full) */
+.seg.laylayout{border-radius:3px}
+.laylayout .segbtn{background:var(--panel2);color:var(--ink);border:0;border-right:1px solid var(--line);padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
+.laylayout .segbtn:last-child{border-right:0}
+.laylayout .segbtn.on{background:var(--accent);color:var(--accent-ink,var(--bg));font-weight:700}
+.laylayout .segbtn:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* 0.4.6 F30: zones drag (card / box title) to reorder - grab cursor like the speaker grips; feedback as the speaker drag (F26) */
+.tree42 .zcard42 .zc42-body,.tree42 .zcard42 .zname,.tree42 .qb42-pick{cursor:grab;touch-action:pan-y}
+.tree42 .zcard42 .zc42-body :is(button:not(.zname),input,.zacts,.tagact){cursor:pointer}
+.tree42.zdrag .qb42.drag42-src{opacity:.45}
+.tree42.zdrag .zwrap42,.tree42.zdrag .un42{opacity:1;filter:none}
+.tree42.zdrag .un42{opacity:.45}
+.tree42.zdrag .qb42.droppable.dropping{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.tree42.zdrag .qb42.zins-before{box-shadow:0 -3px 0 0 var(--accent),0 -3px 8px var(--accent)}
+.tree42.zdrag .qb42.zins-after{box-shadow:0 3px 0 0 var(--accent),0 3px 8px var(--accent)}
+/* 0.4.6 F31 / F32: Roomy holds in the expanded Library - Library | Queue | the Devices strip (slide-over as usual); Now Playing is the full-width bar
+   along the bottom (never the column mini player squeezed into the strip), so the Queue keeps its full width and its Time column */
+@media (min-width:901px){
+  .desk.tight.libexpanded:not(.libdev){--qw:clamp(340px,calc(30vw / var(--z,1)),520px);grid-template-columns:minmax(0,1fr) var(--qw) 30px!important;grid-template-rows:minmax(0,1fr) auto!important;row-gap:10px!important}
+  .desk.tight.libexpanded:not(.libdev) .libpanel{grid-area:1/1/2/2!important}
+  .desk.tight.libexpanded:not(.libdev) .listpanel{grid-area:1/2/2/3!important;display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;min-width:0}
+  .desk.tight.libexpanded .devtab{grid-area:1/3/3/4}
+  .desk.tight.libexpanded .npbar{display:none!important}
+  .desk.tight.libexpanded:not(.libdev) .minicol{display:block!important;grid-area:2/2/3/3!important;min-width:0}   /* F36/F37: the condensed player under the Queue, as in Full */
+  .desk.tight.libexpanded:not(.libdev) .libpanel{grid-area:1/1/3/2!important}
+  .desk.tight.libexpanded .nowcol{display:none!important}
+  .desk.tight.libexpanded .devpanel{grid-area:auto!important;cursor:auto}
+  .desk.tight.libexpanded .devpanel :is(.devbody,.devtitle,.devcount,.devexp){display:revert!important}
+  .desk.tight.libexpanded .devpanel .devbody{display:block!important;overflow:auto}
+}
+/* 0.4.6 F33: the Roomy Devices strip label sits at the top, level with the Library rail's label (rail: 6 px padding + 30 px head + 21 px icon + 8 px gap),
+   same size / weight / color / letter-spacing; the strip stays full height */
+.desk.tight .devtab{align-items:flex-start;padding:calc(6px + 30px + 21px + 8px) 0 6px;font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--accent-text,var(--accent))}
+/* 0.4.6 F34: the side Library tabs are one row that fits the panel; "⋯" is a tab like the others (no native select) */
+.ctabwrap{min-width:0;max-width:100%;overflow:hidden}
+.tabs.ctabs{flex-wrap:nowrap;overflow:hidden;min-width:0;max-width:100%}
+.tabs.ctabs>button{flex:none}
+.tabs.ctabs>button[hidden]{display:none}
+.tabs.ctabs>.tabmore{margin-left:auto;padding-left:10px;padding-right:10px}
+/* 0.4.6 F32: Roomy + the Queue full screen - the Queue takes the middle, Now Playing is the full-width bar along the bottom (never in the strip) */
+@media (min-width:901px){
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded){grid-template-rows:minmax(0,1fr) auto!important}
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .listpanel{grid-area:1/2/2/3!important}
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .libpanel{grid-area:1/1/2/2!important}
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .devtab{grid-area:1/3/3/4}   /* 0.4.7: full height, as in 0.4.5 T1c */
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .nowcol{display:none!important}
+  .desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .npbar{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;grid-area:2/1/3/3!important}   /* 0.4.7: left + center only, never under the Devices strip */
+}
+/* 0.4.6 F35: the trunk is drawn per row (row top -> its elbow for the last row, the whole row otherwise), so it always ends exactly at the last
+   speaker's elbow whatever the row heights (a two-line name / tags) and whichever row is last after a drag in or out; no fixed 14 px offset */
+.zsp42:has(.sp42)::before{content:none}
+.zsp42>.sp42::after{content:"";position:absolute;left:-11px;top:-5px;bottom:-1px;border-left:1px solid var(--line);pointer-events:none}
+.zsp42>.sp42:not(:has(~ .sp42))::after{bottom:auto;height:calc(50% + 4px)}
+/* 0.4.6 F36: the full-screen Queue keeps the classic full-width player bar under the Queue (Full and Roomy); only the expanded Library shrinks
+   Now Playing to the mini player (Full only).
+   0.4.6 F37: the small corner 'Now playing' box (a shrunken Now Playing whose art never showed, opened a pop-up on hover) is removed in Full and Roomy;
+   the standalone mini player window (with Transparency) is unchanged. */
+  .desk.tight:not(.libexpanded) .minicol,.desk.listexpanded:not(.libexpanded) .minicol{display:none!important}
+@media (min-width:901px){
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight){grid-template-rows:minmax(0,1fr) auto!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .listpanel{grid-area:1/2/2/3!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .nowcol{display:none!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .npbar{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;grid-area:2/2/3/3!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .libpanel{grid-area:1/1/3/2!important}
+  /* 0.4.7: the Devices column runs full height down to the status bar again (as in 0.4.5 T1c); the player bar stays in the center column */
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .devpanel{grid-area:1/3/3/4!important}
+    place-items:center;cursor:pointer;border:1px solid var(--accent);border-radius:3px;background:var(--panel);overflow:visible}
+    box-shadow:0 8px 28px rgba(0,0,0,.55);opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+}
+/* 0.4.6 F38: the condensed player (expanded Library) wears the chosen Now Playing layout - same size and contents, that layout's art treatment
+   and control style, in the theme's colors */
+.minicol.pn-classic .mp .mp-art{border-radius:50%;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
+.minicol.pn-classic .mp .mp-ctl .mp-b{border-radius:50%}
+.minicol.pn-classic .mp .mp-tr{border:1px solid var(--line);border-radius:999px;padding:0 6px}
+.minicol.pn-center .mp .mp-art{border-radius:50%;background:radial-gradient(circle,var(--panel) 0 14%,color-mix(in srgb,var(--bg) 70%,black) 15% 100%);box-shadow:0 0 0 3px color-mix(in srgb,var(--bg) 70%,black),inset 0 0 0 1px color-mix(in srgb,var(--ink) 18%,transparent)}
+.minicol.pn-center .mp .mp-ctl .mp-b{border-radius:3px;border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,var(--panel))}
+.minicol.pn-center .mp .mp-seek{accent-color:var(--accent)}
+.minicol.pn-stack .mp .mp-art{border-radius:3px;box-shadow:inset 0 0 0 1px var(--line)}
+.minicol.pn-stack .mp .mp-ctl .mp-b{border-radius:3px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+.minicol.pn-stack .mp .mp-tr{font-family:ui-monospace,Consolas,monospace;color:var(--accent-text,var(--accent));letter-spacing:.06em;background:color-mix(in srgb,black 35%,var(--panel));border-radius:3px;padding:0 4px}
+.minicol.pn-horizon .mp .mp-art{border-radius:3px;box-shadow:0 0 calc(18px * var(--fx-glow,.5)) color-mix(in srgb,var(--accent) 70%,transparent);-webkit-box-reflect:below 2px linear-gradient(transparent 60%,rgba(0,0,0,calc(.35 * var(--fx-reflect,.5))))}
+.minicol.pn-horizon .mp .mp-ctl .mp-b{border-radius:50%;background:transparent;border:1.5px solid var(--accent)}
+.minicol.pn-horizon .mp .mp-seek{accent-color:var(--accent)}
+/* 0.4.6 F39: expanded Devices - the Library rail runs full height; the Now Playing bar is exactly as wide as the Devices area (left edges aligned) */
+@media (min-width:901px){
+  .desk.devexpanded:not(.libexpanded):not(.tight) .libpanel{grid-row:1/3!important}
+  .desk.devexpanded:not(.libexpanded):not(.tight) .npbar{grid-area:2/3/3/4!important}
+  .desk.tight.devexpanded:not(.libexpanded) .libpanel{grid-row:1/3!important}
+  .desk.tight.devexpanded:not(.libexpanded) .npbar{grid-area:2/2/3/4!important}
+}
+/* 0.4.6 F40: Library theme pass (side panel + expanded): every control follows the theme, never UA/Windows defaults. */
+.libpanel :is(input[type=search],input[type=text],input:not([type])),.lib :is(input[type=search],input[type=text],input:not([type])){background:var(--fld-bg)!important;color:var(--fld-ink)!important;border:1px solid var(--fld-line)!important;border-radius:3px!important}
+.libpanel input::placeholder,.lib input::placeholder{color:var(--fld-ph);opacity:.7}
+.libpanel input:focus,.lib input:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 1px var(--accent)}
+.libpanel button,.lib button,.wwdd{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px;font:inherit}
+.libpanel button:hover:not([disabled]),.lib button:hover:not([disabled]){border-color:var(--accent);color:var(--ink)}
+.libpanel button:focus-visible,.lib button:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.libpanel button[disabled],.lib button[disabled]{opacity:.45;cursor:not-allowed}
+.libpanel button.on,.lib button.on,.lib [aria-pressed=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+/* 0.4.7: the filled (accent) tabs and chips keep the theme's on-accent text color (F40 above recolored their text to the accent, invisible on the accent fill) */
+.libpanel .tabs button.on,.lib .tabs:not(.xtabs) button.on,.libpanel .chipbtn.on,.lib .chipbtn.on{color:var(--accent-ink)}
+.wwdd{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:2px 8px;cursor:pointer;font-size:12px;max-width:200px;white-space:nowrap}
+.wwdd .wwdd-t{overflow:hidden;text-overflow:ellipsis}.wwdd .wwdd-c{color:var(--accent-text,var(--accent));font-size:10px}
+.libpanel .lnk,.lib .lnk,.lib a{color:var(--accent-text,var(--accent))}
+.sheet .panel{border-radius:3px!important}.sheet button.act{border-radius:3px;color:var(--ink)}.sheet button.act:focus-visible{outline:1px solid var(--accent);background:var(--accent-soft)}
+/* 0.4.6 F41: the phone Devices views never run wider than the screen (390 px): every column may shrink, long rows wrap. */
+#p-zones,#p-zones .dgrid,#p-zones .pd42-wrap,#p-zones .pd42,#p-zones .tree42{max-width:100%;min-width:0;box-sizing:border-box}
+#p-zones{overflow-x:hidden}
+#p-zones .pd42 *{min-width:0;max-width:100%}
+#p-zones .pd42 :is(.row,.zrow,.dvol,.zp42-list li){flex-wrap:wrap}
+#p-zones .pd42 :is(input[type=range],.vbar){width:100%}
+/* 0.4.6 F41: the phone zone / speaker settings sheet */
+#p-zones .pd42-sheet{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--bg);border-top:3px solid var(--accent);padding-top:var(--safe-t);overflow:hidden}
+#p-zones .pd42-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+#p-zones .pd42-head .pd42-title{flex:1 1 auto;min-width:0;text-align:center;font-size:14px}
+#p-zones .pd42-head .btn{border-radius:3px;flex:none}
+#p-zones .pd42-head .pd42-done{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+#p-zones .pd42-sheet>.pd42{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:10px 10px calc(16px + var(--safe-b));overscroll-behavior:contain}
+html.pd42-open,html.pd42-open body{overflow:hidden}
+/* 0.4.6 F42: EQ card header - nothing overlaps the 4 view buttons on narrow screens: the name keeps row 1 (clear of the buttons), the preset picker and
+   All sound settings share row 2; on touch every control in the header + the view buttons is at least 44 px. */
+@media (max-width:760px){
+  .np-stage .np-eqhead,.np-eqhead{flex-wrap:wrap;padding-right:0!important;row-gap:6px}
+  .np-eqhead .np-eqname{flex:1 0 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;padding-right:var(--vbw,160px);box-sizing:border-box;line-height:28px;white-space:nowrap;display:block}
+  .np-eqhead .np-eqpick{flex:1 1 120px;max-width:none;min-width:0;width:auto}
+  .np-eqhead>.grow{display:none}
+  .np-eqhead .eqallbtn{flex:0 0 auto;margin-left:auto}
+}
+@media (pointer:coarse){
+  .np-stage .vbtns .ib{min-width:44px;min-height:44px}
+  .np-eqhead :is(button,select){min-height:44px!important}
+  .np-eqhead .np-eqname{--vbw:240px;line-height:44px}
+}
+/* 0.4.6 F43: phone theme + navigation pass - the drawer gets a Done, touch targets reach 44 px, phone sheets / pages scroll with momentum. */
+.drawer nav .drawer-close{min-height:44px;min-width:64px;background:var(--panel2);color:var(--accent-text,var(--accent));border:1px solid var(--accent);border-radius:3px;padding:0 12px;flex:none}
+@media (pointer:coarse){
+  .drawer nav button,.tabs.bottom button,nav.tabs button,.hamburger,dialog.page .dlg-foot button,dialog .dlg-x,.sheet button.act,.ctxmenu .ctx-item{min-height:44px}
+  .hamburger{min-width:44px}
+}
+@media (max-width:760px){
+  :is(dialog,.sheet .panel,.drawer nav,.pagebody,.ctxmenu,#p-zones .pd42){-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  dialog.page,dialog.page .pagebody{max-width:100%;overflow-x:hidden}
+  :where(select){background-color:var(--fld-bg);color:var(--fld-ink);border:1px solid var(--fld-line);border-radius:3px}
+  :where(input[type=checkbox],input[type=radio],input[type=range],progress){accent-color:var(--accent)}
+}
+/* 0.4.6 F45: Delay fine-tune -/+ */
+.spk-hasfine .spk-l{gap:4px}
+.spk-hasfine .spk-l>span:first-child{margin-right:auto}
+.spk-fine{min-width:24px;height:22px;padding:0 6px;line-height:1;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--accent-text,var(--accent));cursor:pointer;font:inherit;font-weight:700;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.spk-fine:hover{border-color:var(--accent)}.spk-fine:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+@media (pointer:coarse){.spkset .spk-fine{min-width:44px!important;height:44px!important;font-size:18px}}
+.spk-hasfine .spk-l{align-items:center}
+.spk-vhide{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.spk-num,input.spk-num{flex:none;width:5.5em;min-height:0;height:22px;padding:0 4px;text-align:right;background:var(--fld-bg);color:var(--accent-text,var(--accent));border:1px solid var(--fld-line);border-radius:3px;font-weight:700;font-size:12px}
+.spk-num:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+@media (pointer:coarse){input.spk-num{height:44px;width:5.5em;font-size:16px}}
+/* 0.4.6 F47: scene editor action rows */
+.ss-sceneedit .ss-updrow{display:flex;margin-top:8px}
+.ss-sceneedit .ss-upd{flex:1 1 100%;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-content:center}
+.ss-sceneedit .ss-savebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-top:6px}
+.ss-sceneedit .ss-savebar>.ss-left,.ss-sceneedit .ss-savebar>.ss-right{display:flex;gap:6px;flex-wrap:nowrap;min-width:0}
+.ss-sceneedit .ss-savebar>.ss-right{margin-left:auto}
+.ss-sceneedit .ss-savebar .btn,.ss-sceneedit .ss-updrow .btn{white-space:nowrap;flex:none;border-radius:3px}
+.ss-sceneedit .ss-updrow .btn{flex:1 1 100%}
+/* 0.4.8 F48: the full-screen Queue shows the real Now Playing bar (the same full-size, layout + theme bar as with the Queue collapsed), not the
+   legacy .npbar. The legacy bar stays only for the expanded Library / Devices views (F39). */
+@media (min-width:901px){
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .nowcol.np12{display:contents!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .nowcol.np12>:not(.np-ctlpanel){display:none!important}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded) .nowcol.np12>.np-ctlpanel{position:relative!important;width:auto!important;height:auto!important;overflow:visible!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;border:1px solid var(--line)!important;grid-area:2/2/3/3!important;align-self:end}
+  .desk.listexpanded:not(.libexpanded):not(.devexpanded):not(.tight) .npbar,.desk.tight.listexpanded:not(.libexpanded):not(.devexpanded) .npbar{display:none!important}
+}
+/* 0.4.8 F50: "QUEUE · <zone>" never clips at its left edge; a long zone name ellipsizes (tooltip on the title). The collapsed
+   Queue's Up next banner sits in the free gap (never over the zone picker); when tight the song name ellipsizes first. Standard / full screen: an
+   UP NEXT pill marks the next track's row. */
+.listpanel .pane-h>.qtitle{display:inline-flex;align-items:center;min-width:min(9em,40%);overflow:hidden;direction:ltr;text-align:left}
+.listpanel .pane-h>.qtitle .qlbl{flex:none}
+.listpanel .pane-h>.qtitle .qzone{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.listpanel .qzwrap .qzpick{text-overflow:ellipsis}
+.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t1{flex:0 1 auto;min-width:2em}.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t2{flex:0 4 auto;min-width:0}
+.qnextpill{display:inline-block;margin-right:6px;padding:0 5px;border:1px solid var(--accent);border-radius:3px;color:var(--accent-text,var(--accent));font-size:10px;font-weight:800;letter-spacing:.08em;line-height:14px;vertical-align:1px}
+.listpanel .pane-h{min-width:0}
+.listpanel .qzwrap{min-width:0;flex:0 1 auto}
+.listpanel .qzwrap .qzpick{min-width:5.5em;flex:0 1 auto}
+.listpanel .qzwrap .qsend{flex:0 1 auto;min-width:2.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.listpanel .pane-h>.qtitle{flex:1 1 auto;max-width:34%}
+.desk.listcollapsed .listpanel .pane-h>.qtitle{max-width:28%}
+.desk.listexpanded .plnext.wide .pln-lbl,.desk.listexpanded .plnext.wide .pln-t1,.desk.listexpanded .plnext.wide .pln-t2,.desk.listexpanded .plnext.wide .pln-dot{color:var(--accent-text,var(--accent))}
+.desk.listexpanded .plnext.wide .pln-lbl::after{content:':'}
+.desk.listexpanded .listpanel.nbshown .qnextpill{display:none}
+/* 0.4.8 F52: expanded Devices uses the side panel's + New zone button (size, accent border, bright plus, hover, focus) */
+.devpanel .tree42-h .zadd-new:hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
+.devpanel .tree42-h .zadd-new:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+/* 0.4.8 F52: no extra divider under the expanded column headers (ZONES · SPEAKERS, Scenes & Schedules, details) - as in the side panel */
+.devpanel .pane-h.dsec-h:is(.tree42-h,.ssc-h),.devpanel.expanded .pane-h.dsec-h{border-bottom:0!important}
+@media (max-width:1100px){ .listpanel .qzwrap .qediting{display:none} .listpanel .qzwrap{gap:4px;margin:0 4px} }
+/* 0.4.8 F49: Master volume mixer button (player bars, Devices MASTER row) */
+.mixbtn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)}
+.mixbtn:hover:not([disabled]){border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.mixbtn:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.mixbtn .ic svg{width:16px;height:16px}
+.np-volrow .mixbtn,.ns-vol .mixbtn,.npb-vol .mixbtn,.mp-vol .mixbtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2)}
+.mp-novol{justify-content:flex-start;gap:8px}
+.devpanel:not(.expanded) .dmaster{grid-template-columns:auto minmax(0,1fr) auto auto auto!important}
+.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(5){grid-column:5}
+.devpanel.expanded .dexp-top .dmaster .dvol-master{grid-template-columns:auto minmax(120px,1fr) minmax(38px,3.2em) 28px 28px!important}
+.dmaster .dmixbtn{width:28px;height:28px;padding:0}
+/* the mixer window: Settings-sized on PC, full screen with Done on the phone */
+dialog.mixer-dlg>.body{overflow:auto!important;display:block!important}
+.mv-body{display:flex;flex-direction:column;gap:14px;outline:none;min-width:0}
+.mv-master{border:1px solid var(--accent);border-radius:3px;padding:10px 12px;background:var(--panel2)}
+.mv-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.mv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
+.mv-card{border:1px solid var(--line);border-radius:3px;background:var(--panel2);padding:10px 12px;min-width:0}
+.mv-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,1.3fr) 3.2em 32px 26px;align-items:center;gap:10px;min-height:40px;min-width:0}
+.mv-mrow{grid-template-columns:minmax(0,9em) minmax(0,1fr) 3.2em}
+.mv-row.mv-zrow{grid-template-columns:minmax(0,1fr) minmax(90px,1.3fr) 3.2em 32px 26px}
+.mv-zrow{grid-template-columns:minmax(0,9em) minmax(0,1fr) 3.2em 32px 26px}
+.mv-row .n{display:flex;align-items:center;gap:6px;min-width:0;font-weight:600} .mv-row .n .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.mv-sub{margin-left:18px;border-left:1px solid var(--line);padding-left:10px;min-width:0} .mv-sub.flat{margin-left:0;border-left:0;padding-left:0}
+.mv-sub .mv-row .n{font-weight:400}
+.mv-pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--accent-text,var(--accent));font-weight:700}
+.mv-m{width:32px;height:32px;padding:0;border-radius:3px;display:inline-flex;align-items:center;justify-content:center}
+.mv-chev{width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--accent-text,var(--accent));cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.mv-chev .ic svg{width:14px;height:14px;transition:transform .15s} .mv-chev[aria-expanded=true]{border-color:var(--accent)} .mv-chev[aria-expanded=true] .ic svg{transform:rotate(180deg)}
+input.mv-s{width:100%;min-width:0;margin:0;accent-color:var(--accent)}
+input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
+.mv-tag{flex:none;padding:0 5px;border:1px solid var(--line);border-radius:3px;font-size:10px;font-weight:800;letter-spacing:.06em;line-height:15px;color:var(--dim)}
+.mv-tag.t-ref{border-color:var(--accent);color:var(--accent-text,var(--accent))} .mv-tag.t-muted{border-color:var(--amber);color:var(--amber)}
+.mv-off{opacity:.45} .mv-zmuted input.mv-vol{opacity:.6}
+.mv-grp{font-size:11px;letter-spacing:.08em;color:var(--dim);font-weight:800;margin-bottom:4px}
+.mv-drawer{margin:2px 0 8px;padding:8px 10px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:3px;background:var(--panel);display:flex;flex-direction:column;gap:6px;min-width:0}
+.mv-drawer[hidden]{display:none}
+.mv-drow{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr) auto;align-items:center;gap:10px;min-height:32px;min-width:0}
+.mv-numw{display:inline-flex;align-items:center;gap:4px}
+@media (max-width:760px){
+  dialog.mixer-dlg{width:100vw!important;max-width:100vw!important;height:100dvh!important;max-height:none!important;margin:0;border-radius:0;inset:0}
+  .mv-row,.mv-zrow,.mv-sub .mv-row{grid-template-columns:minmax(0,1fr) 3.2em 44px 36px;grid-template-areas:"n p m c" "s s s s";row-gap:4px;padding:6px 0}
+  .mv-mrow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s"}
+  .mv-row>.n{grid-area:n} .mv-row>.mv-pct{grid-area:p} .mv-row>.mv-m{grid-area:m;width:44px;height:44px} .mv-row>.mv-chev{grid-area:c;width:36px;height:36px} .mv-row>input{grid-area:s}
+  input.mv-s::-webkit-slider-thumb{width:30px;height:30px}
+  .mv-drow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "s s"} .mv-drow>.n{grid-area:n} .mv-drow>input{grid-area:s} .mv-drow>:last-child{grid-area:v}
+  .mv-sub{margin-left:8px;padding-left:8px}
+  .mv-grid{grid-template-columns:minmax(0,1fr)}
+}
+/* 0.4.8 F63: a narrow mixer card (the TV: 200 % + Display size 67 %) stacks each speaker row like the phone - name, %, mute, drawer on top, slider below */
+.mv-card{container-type:inline-size}
+@container (max-width:420px){
+  .mv-sub .mv-row{grid-template-columns:minmax(0,1fr) 3.2em 32px 26px;grid-template-areas:"n p m c" "s s s s";row-gap:2px;padding:4px 0}
+  .mv-sub .mv-row>.n{grid-area:n} .mv-sub .mv-row>.mv-pct{grid-area:p} .mv-sub .mv-row>.mv-m{grid-area:m} .mv-sub .mv-row>.mv-chev{grid-area:c} .mv-sub .mv-row>input{grid-area:s}
+}
+/* 0.4.8 F56: All sound settings - in place on PC, a full-screen sheet on the phone */
+.eqsheet-h{display:none}
+@media (max-width:760px){
+  .np-eqview .np-eqhead .btn.eqallbtn{padding:2px 8px!important;font-size:.78em;min-height:0!important;height:44px!important;line-height:1;position:relative;isolation:isolate;background:transparent!important;border-color:transparent!important}
+  /* 0.4.8: 44 px touch target, but the visible pill stays 28 px (drawn by ::before) */
+  .np-eqview .np-eqhead .btn.eqallbtn::before{content:"";position:absolute;left:0;right:0;top:8px;bottom:8px;z-index:-1;background:var(--panel2);border:1px solid var(--line);border-radius:3px;pointer-events:none}
+  .np-eqview .np-eqhead .btn.eqallbtn:hover::before,.np-eqview .np-eqhead .btn.eqallbtn.on::before,.np-eqview .np-eqhead .btn.eqallbtn:focus-visible::before{border-color:var(--accent)}
+  .np-eqview .np-eqhead .btn.eqallbtn:focus-visible{outline:none}
+  .np-eqview .np-eqhead .btn.eqallbtn:focus-visible::before{outline:2px solid var(--accent);outline-offset:1px}
+  .eqsheet.open{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;background:var(--bg,var(--panel));color:var(--text)}
+  .eqsheet-h{display:flex;align-items:center;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line,rgba(127,127,127,.25));flex:0 0 auto}
+  .eqsheet-h b{flex:1 1 auto;font-size:1.05em}
+  .eqsheet-x{width:34px;height:34px;border-radius:3px;border:1px solid var(--line,rgba(127,127,127,.3));background:transparent;color:var(--text);font-size:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .eqsheet-x:hover,.eqsheet-x:focus-visible{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+  .eqsheet-b{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 12px max(16px,env(safe-area-inset-bottom))}
+  .eqsheet-b .eqall{position:static;max-height:none;overflow:visible;inset:auto}
+  html.eqsheet-lock,html.eqsheet-lock body{overflow:hidden}
+  .np-eqview.allopen{overflow:visible}
+}
+/* 0.4.8 F49: speaker names win over the slider in narrow cards (tags never squeeze the name to one letter) */
+/* 0.4.8 F63: the name column only takes its text width (at least 6.5em) and each slider takes the rest of the row */
+.mv-row,.mv-row.mv-zrow{grid-template-columns:minmax(6.5em,auto) minmax(90px,1fr) 3.2em 32px 26px}
+.mv-row .n .mv-tag{flex:none}
+.mv-row .n .ell{flex:1 1 auto;min-width:3.5em}
+@media (max-width:760px){ .mv-row,.mv-row.mv-zrow,.mv-sub .mv-row{grid-template-columns:minmax(0,1fr) 3.2em 44px 36px} }
+.mv-row.mv-mrow{grid-template-columns:minmax(6.5em,auto) minmax(0,1fr) 3.2em}
+@media (max-width:760px){ .mv-row.mv-mrow{grid-template-columns:minmax(0,1fr) 3.2em} }
+
+/* 0.4.8 F60: "Queue: [zone ▾]" in every queue size (wide / standard / collapsed) - accent label, accent 3px picker, the zone named only once */
+.listpanel .pane-h>.qtitle.haspick{flex:0 1 auto;max-width:none;overflow:visible;gap:6px}
+.listpanel .qtitle.haspick .qlbl{color:var(--accent-text,var(--accent));font-weight:700;letter-spacing:.06em;text-transform:none;white-space:nowrap}
+.listpanel .qtitle.haspick .qzone{display:none}
+.listpanel .qtitle .qzpick{flex:0 1 auto;height:22px;min-height:0;padding:0 4px 0 6px;line-height:20px;box-sizing:border-box;min-width:5.5em;max-width:14em;border:1px solid var(--accent);border-radius:3px;font-weight:600;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.listpanel .qtitle .qzpick:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.desk.listcollapsed .listpanel .pane-h>.qtitle.haspick{max-width:none}
+/* the bar's "on <zone> ▾" repeats the zone the Queue picker already shows: hidden while they are the same zone (back when another queue is viewed) */
+@media (min-width:901px){.desk:has(.listpanel:not(.qviewing) .qtitle.haspick) :is(.np-ctlpanel,.npbar) .zlink{display:none}}
+.pqhead{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:nowrap}.pqhead .pqlbl{color:var(--accent-text,var(--accent));font-weight:700;font-size:16px;white-space:nowrap}
+.pqhead .pqwrap{flex:1 1 auto;min-width:0;margin:0}.pqhead .pqwrap .qzpick{border:1px solid var(--accent);border-radius:3px;font-weight:600}
+/* F60: a narrow header (200 %, side panels open) shrinks the Copy button / count text before anything scrolls; the picker keeps >= 4.5em */
+.listpanel .pane-h>.qtitle.haspick{min-width:calc(4.5em + 52px);flex:0 1 auto}
+.listpanel .qtitle .qzpick{min-width:4.5em}
+.listpanel .pane-h>.qzwrap{overflow:hidden;margin:0 4px}.listpanel .pane-h>.qzwrap .qsend{min-width:0}
+.listpanel .pane-h>.plmeta{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.listpanel .pane-h>.listcolwrap,.listpanel .pane-h>.plbtns,.listpanel .pane-h>.tpin{flex-shrink:0}
+/* 0.4.8 F62: shared marquee (js/marquee.js) - overflowing now-playing lines scroll; edges fade with a mask (no new colors); reduced motion = ellipsis */
+.mq{overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis;min-width:0;max-width:100%}
+.mq>.mq-in{white-space:nowrap}
+.mq.mq-on{text-overflow:clip!important;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 10px,#000 calc(100% - 10px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 10px,#000 calc(100% - 10px),transparent 100%)}
+.mq.mq-on>.mq-in{display:inline-block;will-change:transform;padding:0 1px}
+@media (prefers-reduced-motion:reduce){.mq.mq-on{text-overflow:ellipsis!important;-webkit-mask-image:none;mask-image:none}.mq.mq-on>.mq-in{display:inline}}
+/* F62b: in the one-line Now Playing strip (desktop collapsed + the phone's bar) a long title no longer squeezes the artist to 0 px - each keeps a
+   share and scrolls in it */
+.ns-titles .ns-t1.mq{flex:0 1 auto;max-width:62%;min-width:2.5em}
+.ns-titles .ns-t2.mq:not(:empty){flex:1 1 0;min-width:min(4em,30%)}
+/* 0.4.8 F53 (v2): expanded Devices (Full + Roomy) runs full height with NO player (Now Playing lives on the home page only); Scenes runs full height too
+   and is as wide as the Devices side panel */
+@media (min-width:901px){
+  .desk.devfull{row-gap:0!important}
+  .desk.devfull .npbar,.desk.devfull .minicol{display:none!important}
+  .desk.devfull .devpanel,.desk.tight.devfull .devpanel,.desk.roomy.devfull .devpanel{grid-row:1/3!important;display:flex;flex-direction:column}
+  .desk.devfull .devpanel>.devbody{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  .desk.devfull .devpanel>.devbody>.dexp-top{flex:0 0 auto}
+  .desk.devfull .devpanel .dexp-main.e42{grid-template-columns:clamp(250px,calc(22vw / var(--z,1)),380px) minmax(0,1fr) clamp(300px,27%,440px)!important;grid-template-rows:minmax(0,1fr);flex:1 1 auto;min-height:0;align-items:stretch}
+  .desk.devfull .dexp-main.e42>.ecol{max-height:none!important;min-height:0;overflow:auto}
+}
+
+/* 0.4.9 F65: Roomy - the Devices bar stays Full's narrow collapsed bar in the grid; opened from it, the panel slides out over the right side
+   (full height, accent edge, shadow, dim scrim) instead of widening the column. Expanded Devices is unchanged (.roomyopen is never set then). */
+.desk.roomy.roomyopen{--rightw:46px}
+@media (min-width:901px){ .desk.roomy.roomyopen{--rightw:30px} }
+.desk.roomy.roomyopen .devpanel{grid-area:auto;position:fixed;top:0;bottom:0;right:0;width:clamp(300px,calc(26vw / var(--z,1)),400px);max-width:calc(92vw / var(--z,1));z-index:900;border-left:3px solid var(--accent);border-radius:3px 0 0 3px;box-shadow:-14px 0 34px rgba(0,0,0,.55);animation:wwDevSlide .22s ease both}
+.desk.roomy.roomyopen .devscrim{display:block;position:fixed;inset:0;z-index:899;background:rgba(0,0,0,.45)}
+@keyframes wwDevSlide{from{transform:translateX(110%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.desk.roomy.roomyopen .devpanel{animation:none}}
+
+/* 0.4.9 F66: every zone and speaker slider in a mixer card has the same track (left edge, width, center): one name column per card (--mvn, the
+   speaker rows' column is shorter by their indent --mvi), the slider 1fr, then the same fixed % / mute / drawer columns. Stacked (narrow card or
+   phone): zones stack too, and every slider is a full-width row that reaches back over the speaker indent. Whole-Home is untouched. */
+.mv-card{--mvn:clamp(8em,37cqi,16em)}
+.mv-card .mv-sub{--mvi:29px} .mv-card .mv-sub.flat{--mvi:0px}
+.mv-card .mv-row.mv-zrow,.mv-card .mv-row.mv-spk{grid-template-columns:var(--mvn) minmax(0,1fr) 3.2em 32px 26px}
+.mv-card .mv-sub .mv-row.mv-spk{grid-template-columns:calc(var(--mvn) - var(--mvi)) minmax(0,1fr) 3.2em 32px 26px}
+@container (max-width:420px){
+  .mv-card .mv-row.mv-zrow,.mv-card .mv-row.mv-spk,.mv-card .mv-sub .mv-row.mv-spk{grid-template-columns:minmax(0,1fr) 3.2em 32px 26px;grid-template-areas:"n p m c" "s s s s";row-gap:2px;padding:4px 0}
+  .mv-card .mv-row.mv-zrow>.n,.mv-card .mv-row.mv-spk>.n{grid-area:n} .mv-card .mv-row>.mv-pct{grid-area:p} .mv-card .mv-row>.mv-m{grid-area:m} .mv-card .mv-row>.mv-chev{grid-area:c}
+  .mv-card .mv-row.mv-zrow>input,.mv-card .mv-row.mv-spk>input{grid-area:s}
+  .mv-card .mv-sub .mv-row.mv-spk>input{width:calc(100% + var(--mvi));max-width:none;margin-left:calc(-1 * var(--mvi))}
+}
+@media (max-width:760px){
+  .mv-card .mv-sub{--mvi:17px} .mv-card .mv-sub.flat{--mvi:0px}
+  .mv-card .mv-row.mv-zrow,.mv-card .mv-row.mv-spk,.mv-card .mv-sub .mv-row.mv-spk{grid-template-columns:minmax(0,1fr) 3.2em 44px 36px;grid-template-areas:"n p m c" "s s s s";row-gap:4px;padding:6px 0}
+  .mv-card .mv-row.mv-zrow>input,.mv-card .mv-row.mv-spk>input{grid-area:s}
+  .mv-card .mv-sub .mv-row.mv-spk>input{width:calc(100% + var(--mvi));max-width:none;margin-left:calc(-1 * var(--mvi))}
+}
+
+/* 0.4.9 F67: phone Now Playing - no EQ ("Adjusting") panel and no visualizer; the control buttons (lock / swap / looks / full screen) stay as a slim
+   row above the Now Playing card. EQ stays on Settings and the EQ button. Desktop is unchanged. */
+@media (max-width:760px){
+  .nowcol .np-vizpanel .np-eqhost,.nowcol .np-vizpanel .stagecover,.nowcol .np-vizpanel .stage canvas,.nowcol .np-vizpanel .vname,.nowcol .np-vizpanel .vizhost{display:none!important}
+  .nowcol .np-vizpanel{flex:none!important}
+  .nowcol .np-vizpanel .np-stage,.nowcol.np12 .np-vizpanel .np-stage{height:auto!important;min-height:0!important;max-height:none!important;flex:none!important;background:none!important;overflow:visible}
+  /* slim, borderless row right-aligned above the card - no frame, no empty height */
+  .nowcol .np-vizpanel{border:0!important;background:none!important;box-shadow:none!important;padding:0!important;min-height:0!important}
+  .nowcol .np-vizpanel .stage{border:0!important;box-shadow:none!important;padding:0!important}
+  .nowcol .np-vizpanel .stage .vbtns{position:static;display:flex;justify-content:flex-end;margin:0 0 4px auto;padding:0;background:none;border:0;border-radius:3px}
+}
+
+/* 0.4.9 F68: phone Now Playing is a full-screen remote - zone pill + slim button row on top, big art, big title / artist / album,
+   a wide progress bar, big transport (play ~80px), a full-width zone volume with mute and the mixer, the extras as round buttons,
+   Up next as one line. Same controls and handlers as the desktop panel (grid areas over display:contents); desktop is unchanged. */
+.np-phvol,.np-album{display:none}
+@media (max-width:760px){
+  /* 0.4.9 F81: scoped to the Now page - the F68 clip and forced display:flex left Devices / Library unscrollable */
+  .desk[data-view=now]:has(>.nowcol:not([hidden])){overflow:hidden}
+  .desk[data-view=now]>.nowcol{height:100%;min-height:0;box-sizing:border-box;margin:0 -6px!important;padding:4px 2px calc(4px + env(safe-area-inset-bottom,0px))!important;gap:6px!important;display:flex!important;flex-direction:column;overflow:hidden}
+  .nowcol .np-vizpanel .stage .vbtns{gap:4px}
+  .nowcol .np-vizpanel .stage .vbtns .ib{width:38px;height:38px;min-width:38px;min-height:38px}
+  .nowcol .np-vizpanel{position:relative;z-index:2;align-self:flex-end;width:max-content;margin:0!important}
+  .nowcol .np-vizpanel .stage .vbtns{margin:0}
+  .nowcol>.np-ctlpanel{flex:1 1 auto!important;min-height:0!important;margin-top:-44px!important;border:0!important;background:none!important;box-shadow:none!important;display:flex;flex-direction:column;overflow:visible!important}
+  .nowcol>.np-ctlpanel>.pane-h{display:none!important}
+  .nowcol>.np-ctlpanel>.np-ctlbody{flex:1 1 auto;min-height:0;max-height:none!important;display:flex!important;padding:0!important;overflow:visible!important}
+  .nowcol .np-ctlpanel .np-tablemain{flex:1;min-height:0;width:100%;display:grid!important;padding:0!important;margin:0!important;
+    grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:44px minmax(0,1fr) auto auto auto auto 84px 48px 52px;
+    grid-template-areas:"zone zone zone . ." "art art art art art" "t1 t1 t1 t1 t1" "t2 t2 t2 t2 t2" "aa aa aa aa aa" "seek seek seek seek seek" "sh pr pl nx rp" "vol vol vol vol vol" "x1 x2 x3 x4 x5";
+    row-gap:4px;column-gap:6px;align-items:center;justify-items:center}
+  .nowcol .np-ctlpanel :is(.np-tablemeta,.pn-titlerow,.np-tabletitles,.pn-ctl,.np-tablexport,.np-tablevol,.np-volrow,.np-vol,.np-times){display:contents!important}
+  .nowcol .np-ctlpanel :is(.pn-pill,.pn-refl,.np-tablemeta>.np-heartslot,.np-volrow>.mutebtn,.np-times .pn-aa){display:none!important}
+  /* each Now Playing theme keeps its own signature, sized for the phone: Classic = progress ring around the cover; Center = record out of the
+     sleeve + waveform seek; Stack = LCD clock + LED-block seek; Horizon = cover glow + ring buttons (from the theme's own rules) */
+  .nowcol .np-ctlpanel:not(.pn-classic) :is(.pn-ring,.pn-ringdot),.nowcol .np-ctlpanel:not(.pn-center) .pn-disc,.nowcol .np-ctlpanel:not(.pn-center) .pn-wave,
+  .nowcol .np-ctlpanel:not(.pn-stack) :is(.pn-clock,.pn-lcdrow,.pn-led){display:none!important}
+  .nowcol .np-ctlpanel :is(.pn-wave,.pn-led){grid-area:seek;align-self:start;width:100%;margin:0!important}
+  .nowcol .np-ctlpanel.pn-center .pn-wave{height:20px!important;margin-top:2px!important} .nowcol .np-ctlpanel.pn-stack .pn-led{height:12px;margin-top:6px!important}
+  .nowcol .np-ctlpanel:is(.pn-center,.pn-stack) .np-tableseek .prog{display:none!important}
+  .nowcol .np-ctlpanel.pn-center .np-tableseek{padding-top:24px!important;box-sizing:border-box}
+  .nowcol .np-ctlpanel.pn-stack .pn-lcdrow{grid-area:seek;align-self:start;width:100%;margin:24px 0 0!important}
+  .nowcol .np-ctlpanel.pn-stack .np-tableseek{visibility:hidden}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2{display:block!important}
+  .nowcol .np-ctlpanel .np-tableseek :is(.np-elv,.np-rev){display:block!important}
+  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.t2{grid-area:t1;align-self:end;justify-self:start;width:auto;max-width:60%;text-align:left;font-size:14px}
+  .nowcol .np-ctlpanel.pn-stack .pn-clock{grid-area:t1;justify-self:end;font-size:26px}
+  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.t1{grid-area:t2;justify-self:start;text-align:left;width:60%}
+  .nowcol .np-ctlpanel.pn-center .pn-art{overflow:visible;max-width:58vw;max-height:58vw;justify-self:start;margin-left:max(0px,calc(50% - 41.8vw))!important}   /* sleeve + record centered as one group, record inside the screen */
+  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.np-album{justify-self:start;text-align:left}
+  .nowcol .np-ctlpanel .pn-art{grid-area:art;height:100%!important;width:auto!important;max-width:70vw;max-height:70vw;aspect-ratio:1;min-height:0;padding:0!important;margin:0!important;cursor:default}
+  .nowcol .np-ctlpanel .pn-art .pn-cover{position:absolute;inset:0;width:100%!important;height:100%!important}
+  .nowcol .np-ctlpanel .pn-art .pn-cover .cover{width:100%!important;height:100%!important;border-radius:3px;font-size:64px}
+  .nowcol .np-ctlpanel .np-tabletitles>.t1{grid-area:t1;width:100%;text-align:center;font-size:22px;font-weight:700;line-height:1.25}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2{grid-area:t2;width:100%;text-align:center;font-size:16px;line-height:1.3}
+  .nowcol .np-ctlpanel .np-tabletitles>.np-album{display:block;grid-area:aa;width:100%;text-align:center;font-size:14px;color:var(--dim);min-height:1.2em}
+  .nowcol .np-ctlpanel .np-tabletitles>.mq .mq-in{margin:0 auto}
+  .nowcol .np-ctlpanel .zl-ov{grid-area:zone;justify-self:start;align-self:center;max-width:100%;min-height:40px;padding:0 14px;border:1px solid var(--accent);border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);font-size:15px;display:inline-flex;align-items:center;gap:4px}
+  .nowcol .np-ctlpanel .np-tableseek{grid-area:seek;width:100%;display:grid!important;grid-template-columns:auto 1fr auto;grid-template-areas:"bar bar bar" "el . rv";row-gap:2px;margin:0!important}
+  .nowcol .np-ctlpanel .np-tableseek .prog{grid-area:bar;height:24px;width:100%;margin:0}
+  .nowcol .np-ctlpanel .np-tableseek .np-elv{grid-area:el;font:12px var(--mono)} .nowcol .np-ctlpanel .np-tableseek .np-rev{grid-area:rv;font:12px var(--mono)}
+  .nowcol .np-ctlpanel .np-tablexport>.np-xheart{display:contents} .nowcol .np-ctlpanel .np-xheart>*{grid-area:x3}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn{width:56px!important;height:56px!important;min-width:56px}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn svg,.nowcol .np-ctlpanel .np-tablexport>.tbtn .ic{width:26px!important;height:26px!important}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn:nth-child(2){grid-area:sh} .nowcol .np-ctlpanel .np-tablexport>.tbtn:nth-child(3){grid-area:pr}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn:nth-child(5){grid-area:nx} .nowcol .np-ctlpanel .np-tablexport>.tbtn:nth-child(6){grid-area:rp}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn.play{grid-area:pl;width:80px!important;height:80px!important;min-width:80px}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn.play svg{width:36px!important;height:36px!important}
+  .nowcol .np-ctlpanel .np-phvol{display:contents}
+  .nowcol .np-ctlpanel .np-zvolw{grid-area:vol;width:100%;display:flex;align-items:center;gap:6px}
+  .nowcol .np-ctlpanel .np-phvol>.np-zmute{grid-area:x1}
+  .nowcol .np-ctlpanel .np-zvolw .np-zvol{flex:1;min-width:0;height:32px;accent-color:var(--accent);margin:0}
+  .nowcol .np-ctlpanel .np-zvolw .np-zpct{font:12px var(--mono);width:34px;flex:none;text-align:right}
+  .nowcol .np-ctlpanel .np-volrow>.mixbtn{grid-area:x2} .nowcol .np-ctlpanel .np-vol>.eqbtn{grid-area:x4} .nowcol .np-ctlpanel .np-volrow>.npsleep{grid-area:x5}
+  .nowcol .np-ctlpanel :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){width:48px!important;height:48px!important;min-width:48px;min-height:48px;border-radius:50%;padding:0!important;display:inline-flex;align-items:center;justify-content:center}
+  .nowcol .np-ctlpanel .np-volrow>.npsleep{font-size:11px;border:1px solid var(--line)}
+  .nowcol .np-ctlpanel.pn-stack :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-radius:8px}
+  .nowcol .np-ctlpanel.pn-horizon :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+  .nowcol .np-ctlpanel.pn-center :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+  .nowcol>.np-upnext{flex:none;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:22px}
+}
+
+/* 0.4.9 F69: Devices - active zones first (manual order), inactive / empty zones are one compact row (still a drop target while a speaker is dragged); settings pages have an accent Back */
+.tree42 .qb42.empty42{padding:0}
+.tree42 .zempty42{border:1px dashed var(--line);border-radius:3px;padding:4px 6px}
+.tree42 .ze42-row{display:flex;align-items:center;gap:8px;min-height:32px}
+.tree42 .ze42-row .zname{flex:0 1 auto;min-width:0}
+.tree42 .ze42-note{flex:none}
+.tree42 .zempty42 .ze42-drop{display:none}
+.tree42.dragging .zempty42 .ze42-drop{display:block;margin-top:4px}
+.tree42 .qb42.empty42.ctl .zempty42{border-color:var(--accent)}
+#p-zones .pd42-head .pd42-close{border-color:var(--accent);color:var(--accent-text,var(--accent));font-weight:600}
+
+.d42-back{color:var(--accent-text,var(--accent));border-color:var(--accent);border-radius:3px;margin-right:8px} .dpath42{display:flex;align-items:center}
+/* 0.4.9 F70: expanded Devices - master bar lined up with the middle column's setting bars (devices.js alignMaster sets the inset and widths) */
+.dexp-top .dmaster.f70 .dvol{flex:none} .dexp-top .dmaster.f70 .mallrow{margin-left:auto}
+/* F70b: the % and the Mute / mixer buttons get their own space right of the (JS-sized) track instead of the F16 grid cells it overflowed into */
+.devpanel.expanded .dexp-top .dmaster.f70 .dvol-master{display:flex!important;grid-template-columns:none!important;flex:none!important;align-items:center}
+.devpanel.expanded .dexp-top .dmaster.f70 .dvol-master>*{flex:none}
+.dcol42 .spkset .spk-row{padding-right:36px} .dcol42 .spk-volline{position:relative} .dcol42 .spk-volline .spk-range{flex:none;width:100%} .dcol42 .spk-volline .spk-mute{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%)}
+
+/* F70b: regular Devices panel - MASTER on its own line, the track exactly over the zone volume bars (devices.js sets --f70l / --f70w), then %, Mute, mixer */
+.devpanel:not(.expanded) .dmaster.f70p{grid-template-columns:var(--f70w) auto auto auto!important;column-gap:5px;row-gap:4px;padding-left:var(--f70l)!important;padding-right:0}
+.devpanel:not(.expanded) .dmaster.f70p>.dlbl{grid-column:1/-1;grid-row:1}
+.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>*:not(.zs-master){grid-row:2}
+.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(2){grid-column:1;width:100%;margin:0}
+.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(3){grid-column:2;min-width:0;width:auto}
+.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(4){grid-column:3}
+.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(5){grid-column:4}
+.devpanel:not(.expanded) .dmaster.f70p>.mallrow{grid-row:3;margin-left:calc(-1 * var(--f70l))!important}
+/* F70b: the controlling zone's 4 px accent edge (others 1 px) must not push its volume bar 3 px right of the others */
+.tree42 .qb42.solo.ctl{border-left-width:1px;box-shadow:inset 3px 0 0 var(--accent)}
+/* 0.4.9 F72: no page scrollbar (and no Devices shift) while the Queue slides open or closed */
+.desk.flip72{overflow:clip}
+
+/* 0.4.9 F74: page y overflow clipped while a slide / expand / collapse runs (motion.js holdPage) - no scrollbar flash, Devices stays put */
+html.hold74,html.hold74 body{overflow-y:clip!important}
+
+/* 0.4.9 F76: Jukebox speaker picker (Settings > Jukebox, Start Jukebox…), the empty Jukebox row's Settings, kiosk exit choice, Return to Jukebox */
+.jbspk76{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow:auto;min-width:220px;padding:4px;border:1px solid var(--line);border-radius:3px;background:var(--panel2,var(--panel))}
+.jbspk76-r{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:3px;cursor:pointer;min-width:0}
+.jbspk76-r.on{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.jbspk76-r input{accent-color:var(--accent);margin:0}
+.jbstart76{display:flex;flex-direction:column;gap:6px} .jbwarn76{margin:4px 0}
+.tree42 .jb42 .jb42-set{margin-left:auto;border-radius:3px}
+.jb-exit76 p{max-width:360px;margin:8px 0 12px}
+.jb-exit76-b{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.jbreturn76{border-radius:3px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff);font-weight:700;margin:0 6px;white-space:nowrap}
+
+/* 0.4.9 F77: Settings > Playback > Streaming quality */
+.sq77{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.sq77-opt{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);cursor:pointer}
+.sq77-opt:hover{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+.sq77-opt.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
+.sq77-opt input{accent-color:var(--accent);margin:2px 0 0}
+.sq77-txt{display:flex;flex-direction:column;gap:2px}
+.sq77-opt.on .sq77-t{color:var(--accent-text,var(--accent))}
+.sq77-foot{margin-top:6px}
+.sq77-opt .savedok{white-space:nowrap;margin-left:auto;align-self:center}
+/* 0.4.9 F78: "Casting: AirPlay Everywhere" bar on top of the Devices panel (Classic, Roomy, Full, expanded, phone) and the AIRPLAY zone tag */
+.cast42{display:flex;align-items:center;gap:8px;min-width:0;margin:0 0 6px;padding:4px 6px 4px 8px;border:1px solid var(--accent);border-radius:3px;background:color-mix(in srgb,var(--accent) 14%,var(--panel));font-size:12px;line-height:1.3}
+.cast42-ico{display:inline-flex;color:var(--accent);flex:none}.cast42-ico svg{width:14px;height:14px}
+.cast42{flex-wrap:wrap;row-gap:2px}.cast42-what{flex:1 1 auto;min-width:0}.cast42-sub{flex:1 0 100%;min-width:0;padding-left:22px}
+.cast42-stop{flex:none;margin-left:auto;border-radius:3px}
+.dtag.zcast{color:var(--accent);border-color:currentColor;background:transparent}
+
+/* 0.4.9 F79: one column of zone cards (F63's two columns undone) so every slider is long; a speaker's status tags (REF, OFFLINE, BT, MUTED) sit on
+   their own small row under the full name and never reach the slider. Rows without tags keep the same track (F66); a tagged row is just taller. */
+.mv-grid{grid-template-columns:minmax(0,1fr)}
+.mv-card{--mvn:clamp(8em,26cqi,15em)}
+.mv-row .n{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0}
+.mv-row .n .ell{display:block;max-width:100%;flex:none}
+.mv-tags{display:flex;flex-wrap:wrap;gap:4px;min-width:0;max-width:100%}
+.mv-mrow .n{flex-direction:row;align-items:center}
+
+/* 0.4.9 F80: the grab hand only where a drag can start - the ⋮ handles (zone .zgut42 on an active zone, speaker .dgrip42). The zone card and its
+   name open the zone (pointer), the queue box title picks the zone (pointer); grabbing everywhere only while a drag is on. */
+.tree42 .zcard42 .zc42-body,.tree42 .zcard42 .zname,.tree42 .qb42-pick{cursor:pointer}
+.tree42.zdrag,.tree42.zdrag *{cursor:grabbing!important}
+.qb42:not(.empty42):not(.off42) .zgut42:active{cursor:grabbing}
+
+/* 0.4.9 F83: beside the expanded Library the queue column has ONE show / hide control (no expand-upward there), and its header drops the
+   Up next chip so the zone picker, pin, Copy and the count fit without overlapping */
+@media (min-width:901px){
+  .desk.libexpanded:not(.listcollapsed) .listpanel .listup{display:none}
+  .desk.libexpanded .listpanel .plnext{display:none!important}
+  .desk.libexpanded .listpanel>.pane-h{flex-wrap:nowrap;min-width:0;overflow:hidden}
+  .desk.libexpanded .listpanel>.pane-h>*{min-width:0}
+  .desk.libexpanded .listpanel>.pane-h .listcolwrap{flex:none;margin-left:auto}
+  .desk.libexpanded .listpanel>.pane-h>.qtitle.haspick{flex:none;min-width:0;max-width:none;overflow:visible}
+  .desk.libexpanded .listpanel>.pane-h>.qtitle>.qlbl{display:none}
+  .desk.libexpanded .listpanel .qtitle .qzpick{flex:none;min-width:0;width:6.5em;max-width:6.5em}
+  .desk.libexpanded .listpanel>.pane-h>:is(.tpin,.plbtns){flex:none}
+  .desk.libexpanded .listpanel>.pane-h>.qzwrap{flex:0 1 auto;min-width:2.4em;overflow:hidden;margin:0 4px}
+  .desk.libexpanded .listpanel>.pane-h .qsend{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .desk.libexpanded .listpanel>.pane-h>.plmeta{flex:0 1 auto;min-width:4.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

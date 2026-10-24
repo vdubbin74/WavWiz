@@ -181,7 +181,7 @@ public class Release037Tests
     [Fact]
     public void L7_the_purpose_based_presets_replace_the_generic_ones_and_every_one_is_legal()
     {
-        Assert.Equal(17, WavWiz.Server.Dsp.DspService.PurposePresets.Length);   // Flat + 16
+        Assert.Equal(8, WavWiz.Server.Dsp.DspService.PurposePresets.Length);   // 0.4.2: Flat + 7 (the picker was cut to 8)
         foreach (var (grp, name, p) in WavWiz.Server.Dsp.DspService.PurposePresets)
         {
             var n = p.Normalize(); Assert.Equal(p.GraphicDb.Select(x => x).ToArray(), n.GraphicDb);   // nothing needed clamping
@@ -190,7 +190,7 @@ public class Release037Tests
         using var t = new TempDir(); var db = new Db(t.File("w.db")); db.Migrate();
         var d = new WavWiz.Server.Dsp.DspService(db);
         var names = d.Presets().Where(x => x.Source == "builtin").Select(x => x.Name).ToList();
-        Assert.Contains("Late Night", names); Assert.Contains("Subwoofer Zone", names); Assert.Contains("Classical", names);
+        Assert.Contains("Late Night", names); Assert.Contains("Bass Boost", names); Assert.DoesNotContain("Subwoofer Zone", names); Assert.DoesNotContain("Classical", names);
         Assert.DoesNotContain("Bass boost", names); Assert.DoesNotContain("Vocal / speech", names);
     }
 

@@ -107,7 +107,7 @@ https://acoustid.org/chromaprint
 ============================================================
 AirPlay receiver (0.1.1): shairplay - wavwiz-airplay.exe
 ============================================================
-The AirPlay speaker "WavWiz - Whole House" uses shairplay by Juho Vähä-Herttua and contributors (https://github.com/juhovh/shairplay,
+The AirPlay speaker "WavWiz - Everywhere" uses shairplay by Juho Vähä-Herttua and contributors (https://github.com/juhovh/shairplay,
 commit 096b61ad14c90169f438e690d096e3fcf87e504e), unmodified, built by the WavWiz project for Windows x64 together with a small
 WavWiz front end (wavwiz-airplay.c, MIT) into wavwiz-airplay.exe. It runs as a SEPARATE PROGRAM started by the WavWiz server; it is not
 linked into WavWiz. Licenses (see LICENSE-shairplay.txt): shairplay library - GNU Lesser General Public License v2.1 or later

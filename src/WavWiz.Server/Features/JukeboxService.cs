@@ -13,12 +13,17 @@ public sealed class JukeboxService
     private readonly Db _db; private readonly Playback.Conductor _cond; private readonly EventHub _ev; private readonly object _l = new();
     public Func<DateTime> Clock { get; set; } = () => DateTime.UtcNow;
     public JukeboxService(Db db, Playback.Conductor cond, EventHub ev) { _db = db; _cond = cond; _ev = ev; }
+    /// <summary>0.4.0: the Jukebox's own zone (its picked speakers) once there is one; else the house group, like 0.3.9.</summary>
+    public Func<Playback.Conductor?>? Zone { get; set; }
+    private Playback.Conductor Cond => Zone?.Invoke() ?? _cond;
 
     public sealed class Config
     {
         public string Style { get; set; } = "modern"; public List<string> Folders { get; set; } = new(); public List<long> Playlists { get; set; } = new();
         public int PerGuest { get; set; } = 3; public bool VoteSkip { get; set; } = true; public int VotesNeeded { get; set; } = 3; public bool ExplicitFilter { get; set; }
         public int ArtistCooldownMin { get; set; } public AutoFill Autofill { get; set; } = new(); public int Beat { get; set; } = 50; public bool CdSound { get; set; }
+        /// <summary>0.4.9 F76: the Jukebox zone's default speakers (device ids; null = none saved yet) and whether the Jukebox zone shows in Devices when it is not running.</summary>
+        public List<long>? DefaultSpeakers { get; set; } public bool ShowInDevices { get; set; } = true;
     }
     public sealed class AutoFill { public string Kind { get; set; } = "playlist"; public long? Id { get; set; } public string Genre { get; set; } = ""; }
     private static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
@@ -40,6 +45,7 @@ public sealed class JukeboxService
         Config c; try { c = node.Deserialize<Config>(J)!; } catch { return "Some Jukebox options are not valid."; }
         if (c.Style is not ("modern" or "retro")) return "Pick Modern or Retro CD.";
         c.PerGuest = Math.Clamp(c.PerGuest, 1, 20); c.VotesNeeded = Math.Clamp(c.VotesNeeded, 1, 50); c.ArtistCooldownMin = Math.Clamp(c.ArtistCooldownMin, 0, 240); c.Beat = Math.Clamp(c.Beat, 0, 100);
+        if (c.DefaultSpeakers != null) c.DefaultSpeakers = c.DefaultSpeakers.Where(x => x > 0).Distinct().Take(200).ToList();   // 0.4.9 F76
         _db.SetSetting("jukebox.config", JsonSerializer.Serialize(JsonSerializer.Serialize(c, J)));
         _ev.Publish("jukebox", State()); return null;
     }
@@ -47,6 +53,13 @@ public sealed class JukeboxService
 
     // ---- session state ----
     public bool Running { get; private set; }
+    /// <summary>0.4.9 F76 fix: hands the borrowed speakers back to their own zones (set by the host; runs after Stop).</summary>
+    public Action? Release;
+    private volatile bool _starting;
+    /// <summary>0.4.9 F76 fix: running, or starting (speakers being borrowed) - while false, no speaker may stay in the Jukebox zone.</summary>
+    public bool Active => Running || _starting;
+    /// <summary>0.4.9 F76 fix: borrows these speakers (device ids) into the Jukebox zone for this session.</summary>
+    public Action<List<long>>? Borrow;
     public string? Code { get; private set; }
     public bool Locked { get; private set; }
     private readonly Dictionary<long, (string Guest, string Name)> _req = new();   // queue item id -> requester
@@ -57,26 +70,28 @@ public sealed class JukeboxService
     public object State() => new { running = Running, locked = Locked, style = Cfg().Style, code = Running ? Code : null };
     /// <summary>The host's look (theme colors) so the guest page matches the big screen. Only #RRGGBB values are kept.</summary>
     public Dictionary<string, string> Theme { get; private set; } = new();
-    public string Start(JsonElement? theme = null)
+    public string Start(JsonElement? theme = null, List<long>? speakers = null)
     {
         var t = new Dictionary<string, string>();
         if (theme is { ValueKind: JsonValueKind.Object } th)
             foreach (var k in new[] { "accent", "accent2", "hl", "bg", "ink" })
                 if (th.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String && System.Text.RegularExpressions.Regex.IsMatch(v.GetString()!, "^#[0-9a-fA-F]{6}$")) t[k] = v.GetString()!;
-        Theme = t; return StartCore();
+        Theme = t; return StartCore(speakers);
     }
-    private string StartCore()
+    private string StartCore(List<long>? speakers = null)
     {
         lock (_l)
         {
             // 0.3.5 J13: start with an EMPTY playlist so guest picks play promptly; the host's playlist is kept and comes back on Stop
+            // 0.4.9 F76 fix: borrow the picked speakers first (Active while starting), so the Jukebox zone is the queue set aside below
+            if (speakers != null) { _starting = true; try { Borrow?.Invoke(speakers); } catch { } }
             if (!Running)
             {
-                var q = _cond.Queue(); var now = _cond.Now();
+                var q = Cond.Queue(); var now = Cond.Now();
                 _saved = q.Count > 0 ? (q.ToList(), Math.Clamp(now.Index, 0, q.Count - 1)) : null;
-                if (q.Count > 0) _cond.Clear();
+                if (q.Count > 0) Cond.Clear();
             }
-            Running = true; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); _filler.Clear();
+            Running = true; _starting = false; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); _filler.Clear();
         }
         _ev.Publish("jukebox", State()); return Code!;
     }
@@ -91,16 +106,17 @@ public sealed class JukeboxService
             var sv = _saved; _saved = null; _filler.Clear();
             if (sv is { } s0 && s0.Items.Count > 0)
             {
-                var now = _cond.Now(); var q = _cond.Queue();
+                var now = Cond.Now(); var q = Cond.Queue();
                 if (now.Item != null && now.State != "stopped")
                 {
-                    for (int i = q.Count - 1; i >= 0; i--) if (q[i].Id != now.Item.Id) _cond.Remove(i);
-                    _cond.Insert(s0.Items.Skip(s0.Index), 1);
-                    _cond.Insert(s0.Items.Take(s0.Index), 0);
+                    for (int i = q.Count - 1; i >= 0; i--) if (q[i].Id != now.Item.Id) Cond.Remove(i);
+                    Cond.Insert(s0.Items.Skip(s0.Index), 1);
+                    Cond.Insert(s0.Items.Take(s0.Index), 0);
                 }
-                else { _cond.Clear(); _cond.Add(s0.Items, false); }
+                else { Cond.Clear(); Cond.Add(s0.Items, false); }
             }
         }
+        try { Release?.Invoke(); } catch { }   // 0.4.9 F76 fix: Exit Jukebox returns every borrowed speaker to its zone
         _ev.Publish("jukebox", State()); _ev.Publish("queue");
     }
     private (List<QueueItem> Items, int Index)? _saved;
@@ -142,7 +158,7 @@ public sealed class JukeboxService
     public object Picks(int n = 5)
     {
         var (w, ps) = Allowed(Cfg()); n = Math.Clamp(n, 1, 10);
-        var queued = _cond.Queue().Where(x => x.Kind == "track").Select(x => x.RefId).ToHashSet();
+        var queued = Cond.Queue().Where(x => x.Kind == "track").Select(x => x.RefId).ToHashSet();
         var rows = _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} ORDER BY random() LIMIT {n + Math.Min(40, queued.Count)}",
             r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, ps);
         return rows.Where(x => !queued.Contains(x.id)).Take(n).ToList();
@@ -160,19 +176,19 @@ public sealed class JukeboxService
             if (_banned.Contains(guest)) return "Requests from this phone are turned off by the host.";
             var c = Cfg();
             if (!IsAllowed(trackId)) return "That song isn't available here.";
-            var q = _cond.Queue(); var now = _cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
+            var q = Cond.Queue(); var now = Cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
             if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
             var mine = Waiting(guest);
             if (mine >= c.PerGuest) return $"You already have {mine} song{(mine == 1 ? "" : "s")} waiting. Add more once one has played.";
-            var items = _cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
+            var items = Cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
             var it = items[0];
             if (c.ArtistCooldownMin > 0 && _artistAt.TryGetValue(it.Artist, out var at) && Clock() - at < TimeSpan.FromMinutes(c.ArtistCooldownMin)) return $"{it.Artist} played a moment ago. Try another artist for now.";
             // 0.3.5 J13: guest picks always go before random filler
             var before = q.Select(x => x.Id).ToHashSet(); var pos = -1;
             for (int i = Math.Max(0, now.Index + 1); i < q.Count; i++) if (_filler.Contains(q[i].Id)) { pos = i; break; }
-            if (pos >= 0) _cond.Insert(items, pos); else _cond.Add(items, false);
-            var qn = _cond.Queue(); var added = qn.FirstOrDefault(x => !before.Contains(x.Id));
-            if (_cond.State == Playback.PlayState.Stopped && added != null) _cond.Jump(qn.ToList().FindIndex(x => x.Id == added.Id));
+            if (pos >= 0) Cond.Insert(items, pos); else Cond.Add(items, false);
+            var qn = Cond.Queue(); var added = qn.FirstOrDefault(x => !before.Contains(x.Id));
+            if (Cond.State == Playback.PlayState.Stopped && added != null) Cond.Jump(qn.ToList().FindIndex(x => x.Id == added.Id));
             if (added != null) _req[added.Id] = (guest, string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim()[..Math.Min(24, name.Trim().Length)]);
             _artistAt[it.Artist] = Clock();
             _ev.Publish("queue"); return null;
@@ -183,7 +199,7 @@ public sealed class JukeboxService
     /// so the guest page's "N available plays" always matches what the server allows. A play comes back once that pick has played or is removed.</summary>
     private int Waiting(string guest)
     {
-        var q = _cond.Queue(); var now = _cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
+        var q = Cond.Queue(); var now = Cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
         if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
         return _req.Count(kv => kv.Value.Guest == guest && upcoming.Contains(kv.Key));
     }
@@ -193,10 +209,10 @@ public sealed class JukeboxService
         lock (_l)
         {
             var c = Cfg(); if (!Running) return (0, 0, false, "The Jukebox is closed."); if (!c.VoteSkip) return (0, 0, false, "Vote to skip is off.");
-            var cur = _cond.Now().Item; if (cur == null) return (0, c.VotesNeeded, false, "Nothing is playing.");
+            var cur = Cond.Now().Item; if (cur == null) return (0, c.VotesNeeded, false, "Nothing is playing.");
             if (_voteItem != cur.Id) { _votes.Clear(); _voteItem = cur.Id; }
             _votes.Add(guest);
-            if (_votes.Count >= c.VotesNeeded) { _votes.Clear(); _cond.Next(); _ev.Publish("now"); return (c.VotesNeeded, c.VotesNeeded, true, null); }
+            if (_votes.Count >= c.VotesNeeded) { _votes.Clear(); Cond.Next(); _ev.Publish("now"); return (c.VotesNeeded, c.VotesNeeded, true, null); }
             return (_votes.Count, c.VotesNeeded, false, null);
         }
     }
@@ -205,7 +221,7 @@ public sealed class JukeboxService
     /// 0.3.4: <paramref name="me"/> = the asking phone's guest id; only its own picks get mine = true.
     public object Board(bool host = false, string? me = null)
     {
-        var now = _cond.Now(); var q = _cond.Queue(); var c = Cfg();
+        var now = Cond.Now(); var q = Cond.Queue(); var c = Cfg();
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
         int? left = null; if (!string.IsNullOrEmpty(me)) lock (_l) left = Math.Max(0, c.PerGuest - Waiting(me));
         return new { running = Running, locked = Locked, style = c.Style, playsLeft = left, filler = now.Item != null && _filler.Contains(now.Item.Id), voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
@@ -218,7 +234,7 @@ public sealed class JukeboxService
     {
         if (!Running) return;
         var c = Cfg();
-        var now = _cond.Now(); var q = _cond.Queue();
+        var now = Cond.Now(); var q = Cond.Queue();
         bool dry = q.Count == 0 || now.Index >= q.Count - 1 && (now.State == "stopped" || now.DurationMs > 0 && now.DurationMs - now.PositionMs < 15_000);
         if (!dry) return;
         if (q.Count > 0 && now.Index < q.Count - 1) return;
@@ -230,13 +246,13 @@ public sealed class JukeboxService
         var id = _db.Scalar($"SELECT id FROM track WHERE {w}{src}{notRecent} ORDER BY random() LIMIT 1", ps.Append(("$g", (object?)c.Autofill.Genre)).ToArray())
               ?? _db.Scalar($"SELECT id FROM track WHERE {w}{src} ORDER BY random() LIMIT 1", ps.Append(("$g", (object?)c.Autofill.Genre)).ToArray());
         if (id == null) return;
-        var items = _cond.TracksToItems(new[] { Convert.ToInt64(id) }); if (items.Count == 0) return;
+        var items = Cond.TracksToItems(new[] { Convert.ToInt64(id) }); if (items.Count == 0) return;
         lock (_l)
         {
             if (!Running) return;
-            var before = _cond.Queue().Select(x => x.Id).ToHashSet();
-            _cond.Add(items, false); var added = _cond.Queue().FirstOrDefault(x => !before.Contains(x.Id)); if (added != null) _filler.Add(added.Id);
-            if (_cond.State == Playback.PlayState.Stopped) _cond.Jump(_cond.Queue().Count - 1);
+            var before = Cond.Queue().Select(x => x.Id).ToHashSet();
+            Cond.Add(items, false); var added = Cond.Queue().FirstOrDefault(x => !before.Contains(x.Id)); if (added != null) _filler.Add(added.Id);
+            if (Cond.State == Playback.PlayState.Stopped) Cond.Jump(Cond.Queue().Count - 1);
         }
         _ev.Publish("queue");
     }

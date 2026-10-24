@@ -5,6 +5,7 @@ namespace WavWiz.Server.Tests;
 
 /// <summary>0.2.0 Must-haves on the server: admin elevation on the same token (31), permissions split (28), master volume rules (10),
 /// the house reference speaker (30), calibration pause/resume (29), user agents that follow the version (18).</summary>
+[Collection("serial")]   // 0.4.4 H3
 public class Release020Tests
 {
     private static async Task<(ServerFixture f, HttpClient admin, FakePc a, FakePc b, long ida, long idb)> TwoPcs()
@@ -109,7 +110,8 @@ public class Release020Tests
         var (f, admin, a, b, ida, idb) = await TwoPcs(); await using var _f = f; await using var _a = a; await using var _b = b;
         Assert.Equal(0, (await admin.GetJson("/api/v1/calibration/reference")).GetProperty("zoneId").GetInt64());
         (await admin.PutAsJsonAsync("/api/v1/calibration/reference", new { zoneId = idb })).EnsureSuccessStatusCode();
-        Assert.Equal("{\"zoneId\":" + idb + ",\"name\":\"Garage\",\"connected\":true}", (await (await admin.GetAsync("/api/v1/calibration/reference")).Content.ReadAsStringAsync()));
+        string refJson = ""; for (var swR = System.Diagnostics.Stopwatch.StartNew(); swR.ElapsedMilliseconds < 10000; await Task.Delay(50)) { refJson = await (await admin.GetAsync("/api/v1/calibration/reference")).Content.ReadAsStringAsync(); if (refJson.Contains("\"connected\":true")) break; }   // 0.4.4 H3: poll
+        Assert.Equal("{\"zoneId\":" + idb + ",\"name\":\"Garage\",\"connected\":true}", refJson);
         var zs = await admin.GetJson("/api/v1/zones");
         Assert.True(zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == idb).GetProperty("reference").GetBoolean());
         Assert.False(zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == ida).GetProperty("reference").GetBoolean());
@@ -118,6 +120,7 @@ public class Release020Tests
         Assert.Equal(idb, s.GetProperty("referenceZoneId").GetInt64());
         var id = s.GetProperty("id").GetString();
         var end = await (await admin.PostAsync($"/api/v1/calibration/sessions/{id}/end", null)).Json(); Assert.False(end.GetProperty("resumed").GetBoolean());   // nothing was playing
+        for (var swE = System.Diagnostics.Stopwatch.StartNew(); f.Server.S.Cal.OpenSessions != 0 && swE.ElapsedMilliseconds < 10000;) await Task.Delay(50);   // 0.4.4 H3: the session ends asynchronously
         Assert.Equal(0, f.Server.S.Cal.OpenSessions);
         // a regular user cannot pick another reference when the house has one
         var control = f.As(f.Token(Role.Control, "guest"));

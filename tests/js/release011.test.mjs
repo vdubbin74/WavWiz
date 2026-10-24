@@ -75,7 +75,7 @@ test('0.1.1 AirPlay / Spotify UI: live sources show LIVE, no seeking, source lab
   assert.equal(art.isLive({ kind: 'airplay' }), true); assert.equal(art.isLive({ kind: 'spotify' }), true); assert.equal(art.isLive({ kind: 'track' }), false);
   assert.equal(art.sourceLabel({ kind: 'airplay' }), 'AirPlay'); assert.equal(art.itemArtUrl({ kind: 'spotify', artist: 'a', album: 'b' }), null);
   assert.equal(art.itemArtUrl({ kind: 'airplay', artUrl: '/api/v1/live/art/airplay?v=2' }), '/api/v1/live/art/airplay?v=2');
-  const s = src('settings.js'); assert.match(s, /'spotify\.enabled'/); assert.match(s, /'Requires Spotify Premium\.'/); assert.match(s, /WavWiz – Whole House/);
+  const s = src('settings.js'); assert.match(s, /'spotify\.enabled'/); assert.match(s, /'Requires Spotify Premium\.'/); assert.match(s, /WavWiz – Everywhere/);
   for (const f of ['settings.js', 'about.js', 'now.js', 'rip.js']) assert.doesNotMatch(src(f), /untested/i, f);
   assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.(1\.[2-9]|[2-9]\.\d)'/); // 0.2.0: What's new moved on
 });

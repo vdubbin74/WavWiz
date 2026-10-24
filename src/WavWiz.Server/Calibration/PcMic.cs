@@ -74,17 +74,17 @@ public sealed class PcMicBroker
     public void RefreshList(PlayerSession mic) => mic.SendJson(MsgType.CalCmd, new CalCmd("mic-list", "list", 0));
 }
 
-/// <summary>One step of a measurement plan (the same plan as the phone: reference x3, each speaker x3, reference again for the drift check).</summary>
+/// <summary>One step of a measurement plan. Thorough = reference x3, each speaker x3, reference again for the drift check. 0.4.1 Quick (the default) = ONE test per speaker (the reference once, each speaker once, no drift check on the PC's own mic).</summary>
 public sealed record PlanStep(long ZoneId, string Kind, string Label);
 
 public static class CalPlan
 {
-    public static List<PlanStep> Build(long referenceZoneId, string referenceName, IEnumerable<(long Id, string Name)> speakers, int runs = 3)
+    public static List<PlanStep> Build(long referenceZoneId, string referenceName, IEnumerable<(long Id, string Name)> speakers, int runs = 3, bool driftCheck = true)
     {
         var plan = new List<PlanStep>();
         for (int i = 0; i < runs; i++) plan.Add(new PlanStep(referenceZoneId, "ref", $"{referenceName} (reference, {i + 1}/{runs})"));
         foreach (var (id, name) in speakers) if (id != referenceZoneId) for (int i = 0; i < runs; i++) plan.Add(new PlanStep(id, "dev", $"{name} ({i + 1}/{runs})"));
-        plan.Add(new PlanStep(referenceZoneId, "ref-end", $"{referenceName} again (drift check)"));
+        if (driftCheck) plan.Add(new PlanStep(referenceZoneId, "ref-end", $"{referenceName} again (drift check)"));
         return plan;
     }
 }

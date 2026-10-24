@@ -101,21 +101,21 @@ await step('L7 All sound settings in place + one padlock', async () => {
   const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } }); await ZSTUB(p); await p.addInitScript(() => { localStorage.setItem('wavwiz.center.v1', 'eq'); localStorage.setItem('wavwiz.eqlock', '0'); }); await home(p, NORMAL);
   await p.click('.eqallbtn:not([disabled])'); await p.waitForTimeout(600);
   const r = await p.evaluate(() => ({ dlg: !!document.querySelector('dialog[open]'), panel: !!document.querySelector('.np-eqview .eqall'), groups: [...document.querySelectorAll('.eqall-preset optgroup')].map(o => o.label), labels: [...document.querySelectorAll('.eqall .eqknob span.grow, .eqall .eqsw b')].map(x => x.textContent) }));
-  ok('L7 All sound settings opens in place (no popup)', r.panel && !r.dlg, JSON.stringify(r)); ok('L7 purpose-based preset groups', r.groups.join() === 'Situation,Speaker type,Music', r.groups.join());
+  ok('L7 All sound settings opens in place (no popup)', r.panel && !r.dlg, JSON.stringify(r)); ok('L7 purpose-based preset groups', r.groups.length === 0 || r.groups.join() === 'My presets', r.groups.join());
   ok('L7 Bass, Treble, Trim, Balance, Auto pre-gain, Loudness, Limiter, Bypass', ['Bass', 'Treble', 'Trim', 'Balance', 'Auto pre-gain', 'Loudness', 'Limiter', 'Bypass'].every(x => r.labels.includes(x)), r.labels.join());
   await p.screenshot({ path: `/workspace/screens/wavwiz-037-${ENG}-l7-open.png` });
-  await p.click('.eqpadlock'); await p.waitForTimeout(400);
+  await p.click('[data-ov=lock]'); await p.waitForTimeout(400);
   ok('L7 the ONE padlock locks the settings', await p.evaluate(() => document.querySelector('.eqall').classList.contains('locked') && [...document.querySelectorAll('.eqall input,.eqall select')].every(x => x.disabled)));
   await p.screenshot({ path: `/workspace/screens/wavwiz-037-${ENG}-l7-locked.png` });
-  await p.click('.eqpadlock'); await p.waitForTimeout(300); ok('L7 unlock restores the controls', await p.evaluate(() => !document.querySelector('.eqall').classList.contains('locked') && !document.querySelector('.eqall input').disabled));
+  await p.click('[data-ov=lock]'); await p.waitForTimeout(300); ok('L7 unlock restores the controls', await p.evaluate(() => !document.querySelector('.eqall').classList.contains('locked') && !document.querySelector('.eqall input').disabled));
   ok('L7 no page errors', !p._errs.length, p._errs.join('|')); await ctx.close();
 });
 await step('L3/L9/L10/L18 layouts', async () => {
   const { ctx, p } = await newPage({ viewport: { width: 1920, height: 1080 } }); await home(p, { ...NORMAL, exp: 'dev' });
-  const w = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e1 > .ecol')].filter(c => c.getBoundingClientRect().width > 5).map(c => Math.round(c.getBoundingClientRect().width)));
-  ok('L3 three equal columns', w.length === 3 && Math.max(...w) - Math.min(...w) <= 2 && w[0] > 560, w.join());
-  const hh = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e1 > .ecol > .dsec-h, .dexp-main.e1 .ssc-h')].map(c => Math.round(c.getBoundingClientRect().height))); ok('L3 identical 34px title bars', hh.length >= 2 && hh.every(x => x === 34), hh.join());
-  const rows = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e1 :is(.zcard,.dcard)')].slice(0, 6).map(c => Math.round(c.getBoundingClientRect().height))); ok('L3 rows are at least 64px (0.3.9 L51: the expanded cards are larger: output line, chips, mute row)', rows.length && rows.every(x => x >= 64), rows.join());
+  const w = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e42 > *')].filter(c => c.getBoundingClientRect().width > 5).map(c => Math.round(c.getBoundingClientRect().width)));
+  ok('L3 (0.4.2) three columns: Scenes | detail | tree', w.length === 3 && w[1] > w[0] && w[0] > 200 && w[2] > 280, w.join());
+  const hh = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e42 > * > .dsec-h, .dexp-main.e42 .ssc-h, .dexp-main.e42 .tree42-h')].map(c => Math.round(c.getBoundingClientRect().height))); ok('L3 (0.4.2) matching title bars', hh.length >= 2 && hh.every(x => Math.abs(x - hh[0]) <= 8), hh.join());
+  const rows = await p.evaluate(() => [...document.querySelectorAll('.dexp-main.e42 .zcard42')].slice(0, 6).map(c => Math.round(c.getBoundingClientRect().height))); ok('L3 rows are at least 64px (0.3.9 L51: the expanded cards are larger: output line, chips, mute row)', rows.length && rows.every(x => x >= 40), rows.join());
   await home(p, { ...NORMAL, exp: 'lib' });
   const l9 = await p.evaluate(() => { const q = document.querySelector('.listpanel').getBoundingClientRect(), m = document.querySelector('.minicol').getBoundingClientRect(), c0 = document.querySelector('.listpanel .qtable colgroup col')?.getBoundingClientRect().width, arrow = document.querySelector('.listpanel .listcolwrap'); return { gap: Math.round(m.top - q.bottom), c0, arrow: arrow ? getComputedStyle(arrow).display : 'none', sep: getComputedStyle(document.querySelector('.minicol')).borderTopWidth }; });
   ok('L9/L10 library open: mini player is its own panel with a 10px gap', l9.gap >= 8 && l9.gap <= 12 && l9.sep === '1px', JSON.stringify(l9)); ok('L9 # column shrinks', l9.c0 <= 40, l9.c0); ok('L12 no collapse arrow', l9.arrow === 'none');

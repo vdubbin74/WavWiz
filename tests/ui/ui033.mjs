@@ -38,7 +38,7 @@ const clean = () => p.evaluate(() => { document.querySelectorAll('.phone-unlock'
 await step('smoke', async () => {
   await home(); await clean(); await shot(p, 'smoke-desktop');
   ok('smoke: app loads without script errors', errs.length === 0, errs.slice(0, 3).join(' | '));
-  const v = await api('/status'); ok('smoke: server reports the build version', JSON.stringify(v).includes(process.env.WW_EXPECT_VERSION || '0.3.9'), String(v.version || ''));
+  const v = await api('/status'); ok('smoke: server reports the build version', JSON.stringify(v).includes(process.env.WW_EXPECT_VERSION || '0.4.0'), String(v.version || ''));
 });
 
 if (want('g1')) await step('g1', async () => {
@@ -151,7 +151,7 @@ if (want('g14')) await step('g14', async () => {
 });
 
 if (want('mini')) await step('mini', async () => {
-  for (const [w, hh, n] of [[420, 138, 'main'], [300, 48, 'slim']]) for (const t of ['default', 'pepecoin']) {
+  for (const [w, hh, n] of [[420, 145, 'main'], [300, 48, 'slim']]) for (const t of ['default', 'pepecoin']) {
     const mc = await cb.newContext({ viewport: { width: w, height: hh } }); await mc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
     await mc.addInitScript(id => { localStorage.setItem('wavwiz.theme', JSON.stringify({ preset: id })); }, t);
     const mp = await mc.newPage(); const me = []; mp.on('pageerror', e => me.push(e.message)); await mp.goto(B + '/mini.html'); await mp.waitForTimeout(2500);

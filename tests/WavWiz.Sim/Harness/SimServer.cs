@@ -11,6 +11,7 @@ public sealed class RampSource : ISampleSource
     public const int Mod = 1 << 20;
     private long _n;
     public long TotalFrames { get; init; } = long.MaxValue;
+    public int Rate { get; init; } = 48000;
     public bool Ended => _n >= TotalFrames;
     public int Read(Span<float> dst, int frames)
     {

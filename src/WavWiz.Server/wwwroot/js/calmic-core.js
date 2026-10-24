@@ -48,7 +48,8 @@ async function afterStream({ win, log, steps, stream, rawAsked }) {
 }
 
 /** The measurement plan, same as the PC-mic run: reference x3, each speaker x3, the reference again (drift check). */
-export function buildPlan(plan, runs = 3) {
+/** 0.4.1: Quick (the default) = one test per speaker; the phone keeps the drift check (its clock is the one that drifts). Thorough = 3 per speaker. */
+export function buildPlan(plan, runs = (plan && plan.quality === 'thorough' ? 3 : 1)) {
   const out = []; const ref = plan && plan.reference; if (!ref) return out;
   for (let i = 0; i < runs; i++) out.push({ kind: 'ref', zone: ref.id, label: `${ref.name} (reference, ${i + 1}/${runs})` });
   for (const z of plan.speakers || []) if (z.id !== ref.id) for (let i = 0; i < runs; i++) out.push({ kind: 'dev', zone: z.id, label: `${z.name} (${i + 1}/${runs})` });

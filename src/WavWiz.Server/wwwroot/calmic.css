@@ -16,3 +16,7 @@ ul.fix{padding-left:20px;margin:6px 0} .notes{font-size:14px;color:var(--dim);ma
 .spk{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .spk span{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:14px}
 .deny{font-weight:700;border-left:3px solid var(--accent);padding:6px 10px;margin:8px 0} .diag{opacity:.75;margin-top:12px;word-break:break-word;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .guide{margin:12px 0}.guide .row{gap:10px}
+.a2hs-card .a2hs-steps{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.a2hs-card .a2hs-step{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid currentColor;border-radius:3px}
+.a2hs-card .a2hs-n{width:22px;height:22px;border-radius:3px;background:var(--accent,orange);color:black;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.a2hs-card .a2hs-ic{color:var(--accent,orange);flex:none;display:inline-flex}

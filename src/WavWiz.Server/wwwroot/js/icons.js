@@ -33,7 +33,9 @@ const P = {
   checklist: '<path d="M4 6.5l1.6 1.6L8.5 5M4 12.5l1.6 1.6 2.9-3.1M4 18.5l1.6 1.6 2.9-3.1M12 6.5h8M12 12.5h8M12 18.5h8"/>',
   unlock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
+  mixer: '<path d="M6 4v16M12 4v16M18 4v16"/><rect x="4" y="13" width="4" height="3" rx=".5" fill="currentColor"/><rect x="10" y="7" width="4" height="3" rx=".5" fill="currentColor"/><rect x="16" y="11" width="4" height="3" rx=".5" fill="currentColor"/>',
   // 0.3.6 K2: thin chevrons (1.6 stroke) for every expand / collapse; each points where the panel will move
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   chevL: '<path d="M14.5 6.5l-5.5 5.5 5.5 5.5"/>', chevR: '<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>', chevU: '<path d="M6.5 14.5l5.5-5.5 5.5 5.5"/>', chevDn: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',   // 0.2.3 U9: Lock EQ
   wave: '<path d="M3 12h1.5M6.5 8v8M10 5v14M13.5 9v6M17 7v10M20.5 11v2"/>',

@@ -11,10 +11,15 @@ public sealed class SleepService
     public DateTime? EndsAt { get; private set; }
     public string Mode { get; private set; } = "off";
     public List<long>? ZoneIds { get; private set; }
+    /// <summary>0.4.0: the zone this timer is for ("g:3" / "jukebox"); null = everything like before.</summary>
+    public string? ZoneKey { get; private set; }
+    public Func<string?, Playback.Conductor>? CondFor { get; set; }
+    public Func<string?, List<long>?>? DevicesOf { get; set; }
+    private Playback.Conductor Cond(string? key) => CondFor?.Invoke(key) ?? _cond;
     private Dictionary<long, double>? _saved;
     public SleepService(Zones.ZoneManager zones, Playback.Conductor cond, EventHub ev) { _zones = zones; _cond = cond; _ev = ev; }
 
-    public object State() { lock (_l) return new { mode = Mode, endsAt = EndsAt?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), remainingSec = EndsAt is DateTime e ? Math.Max(0, (int)(e - Clock()).TotalSeconds) : 0, zoneIds = ZoneIds }; }
+    public object State() { lock (_l) return new { mode = Mode, endsAt = EndsAt?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), remainingSec = EndsAt is DateTime e ? Math.Max(0, (int)(e - Clock()).TotalSeconds) : 0, zoneIds = ZoneIds, zoneKey = ZoneKey }; }
 
     /// <summary>Milliseconds left in the current song, and to the end of the current album (consecutive queue items with the same album).</summary>
     public static (long Song, long Album) Remaining(IReadOnlyList<Media.QueueItem> q, int index, long posMs, long durMs)
@@ -26,23 +31,23 @@ public sealed class SleepService
         return (song, album);
     }
 
-    public string? Set(string? mode, double? minutes, List<long>? zoneIds)
+    public string? Set(string? mode, double? minutes, List<long>? zoneIds, string? zoneKey = null)
     {
         lock (_l)
         {
             Restore();
             var now = Clock();
-            if (mode == "off" || (mode == null && (minutes ?? 0) <= 0)) { EndsAt = null; Mode = "off"; ZoneIds = null; Publish(); return null; }
+            if (mode == "off" || (mode == null && (minutes ?? 0) <= 0)) { EndsAt = null; Mode = "off"; ZoneIds = null; ZoneKey = null; Publish(); return null; }
             double ms;
             if (mode is "song" or "album")
             {
-                var np = _cond.Now(); var q = _cond.Queue();
+                zoneKey = string.IsNullOrWhiteSpace(zoneKey) ? null : zoneKey; var tc = Cond(zoneKey); var np = tc.Now(); var q = tc.Queue();
                 if (np.Item == null || np.State == "stopped") return "Nothing is playing.";
                 if (Playback.Conductor.IsLive(np.Item.Kind)) return "End of song doesn't work for radio. Pick a time instead.";
                 var (song, album) = Remaining(q, np.Index, np.PositionMs, np.DurationMs); ms = mode == "song" ? song : album;
             }
             else { if (minutes is not double m || m <= 0 || m > 24 * 60) return "Pick 1 minute to 24 hours."; ms = m * 60_000; mode = "minutes"; }
-            EndsAt = now.AddMilliseconds(ms); Mode = mode!; ZoneIds = zoneIds is { Count: > 0 } ? zoneIds : null; Publish(); return null;
+            EndsAt = now.AddMilliseconds(ms); Mode = mode!; ZoneIds = zoneIds is { Count: > 0 } ? zoneIds : null; ZoneKey = string.IsNullOrWhiteSpace(zoneKey) ? null : zoneKey; Publish(); return null;
         }
     }
 
@@ -52,11 +57,12 @@ public sealed class SleepService
         {
             if (EndsAt is not DateTime e) return;
             var left = (e - Clock()).TotalSeconds;
-            var targets = (ZoneIds ?? _zones.Zones().Where(z => z.Enabled).Select(z => z.Id).ToList());
+            var targets = ZoneIds ?? (ZoneKey != null ? DevicesOf?.Invoke(ZoneKey) : null) ?? _zones.Zones().Where(z => z.Enabled).Select(z => z.Id).ToList();
             if (left <= 0)
             {
-                if (ZoneIds == null) _cond.Stop(); else foreach (var z in ZoneIds) _zones.Patch(z, null, null, null, false);
-                Restore(); EndsAt = null; Mode = "off"; ZoneIds = null; _ev.Publish("zones"); Publish(); return;
+                if (ZoneKey != null) Cond(ZoneKey).Stop();      // a zone's timer stops that zone's music (its speakers keep their on / off state)
+                else if (ZoneIds == null) _cond.Stop(); else foreach (var z in ZoneIds) _zones.Patch(z, null, null, null, false);
+                Restore(); EndsAt = null; Mode = "off"; ZoneIds = null; ZoneKey = null; _ev.Publish("zones"); Publish(); return;
             }
             if (left <= FadeSec)
             {

@@ -308,8 +308,19 @@ public sealed class MiniPlayerForm : Form
         var (x, y) = MiniPlayer.Place((wa.X, wa.Y, wa.Width, wa.Height), w, h, s.MiniX, s.MiniY, Screen.AllScreens.Select(sc => (sc.WorkingArea.X, sc.WorkingArea.Y, sc.WorkingArea.Width, sc.WorkingArea.Height)));
         Bounds = new Rectangle(x, y, w, h);
         Load += async (_, _) => await InitAsync();
+        Activated += (_, _) => { try { _web.Focus(); } catch { } };
+        DpiChanged += (_, _) => ApplyContentSize();   // 0.4.2: moved to a screen with another scale: the same CSS size needs another pixel size
         ResizeEnd += (_, _) => Remember(); Move += (_, _) => WebUiForm.NotifyParentMoved(_web);
         FormClosing += (_, _) => Remember();
+    }
+    private double _cssW, _cssH;
+    /// <summary>0.4.2: size the window to exactly the page's content (CSS px x the window's current scale): no padding, no empty strip, nothing clipped. Borderless, so client size = window size.</summary>
+    private void ApplyContentSize()
+    {
+        if (_cssW < 1 || _cssH < 1 || IsDisposed) return;
+        var sz = MiniPlayer.SizeFor(_cssW, _cssH, DeviceDpi / 96.0); if (sz is not { } s2) return;
+        MinimumSize = Size.Empty; MaximumSize = Size.Empty;
+        if (ClientSize.Width != s2.W || ClientSize.Height != s2.H) { var wa = Screen.FromControl(this).WorkingArea; ClientSize = new Size(s2.W, s2.H); if (Right > wa.Right) Left = Math.Max(wa.Left, wa.Right - Width); if (Bottom > wa.Bottom) Top = Math.Max(wa.Top, wa.Bottom - Height); WebUiForm.NotifyParentMoved(_web); }
     }
     private void Remember()
     {
@@ -326,7 +337,9 @@ public sealed class MiniPlayerForm : Form
             cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version + " WavWizMini";
             cw.Settings.AreDefaultContextMenusEnabled = false; cw.Settings.IsStatusBarEnabled = false;
             cw.WebMessageReceived += (_, e) => OnMessage(e.WebMessageAsJson);
-            cw.Navigate(MiniPlayer.Url(WebUiForm.UiAddress(_set)));
+            cw.Settings.IsZoomControlEnabled = false; cw.Settings.IsPinchZoomEnabled = false; cw.Settings.IsSwipeNavigationEnabled = false;   // 0.4.2: the window is sized from the page's CSS size, so no zoom may change it
+            cw.NavigationCompleted += (_, _) => { try { _web.Focus(); } catch { } };   // 0.4.2: keys (Space, arrows, M, Esc...) go to the page, not to the empty form
+            cw.Navigate(MiniPlayer.Url(WebUiForm.UiAddress(_set), _set.MiniSlim));
         }
         catch { Close(); }
     }
@@ -369,6 +382,7 @@ public sealed class MiniPlayerForm : Form
                     if (r.TryGetProperty("save", out var sv) && sv.TryGetDouble(out var svv)) { var keep = MiniPlayer.ClampOpacity(svv); if (Math.Abs(keep - _set.MiniOpacity) > 0.001) { _set.MiniOpacity = keep; _set.Save(); } }
                     else if (r.TryGetProperty("value", out var o1) && o1.TryGetDouble(out var ov1) && ov1 < 1) { _set.MiniOpacity = MiniPlayer.ClampOpacity(ov1); _set.Save(); }
                     break;
+                case "size": if (r.TryGetProperty("w", out var cw0) && r.TryGetProperty("h", out var ch0) && cw0.TryGetDouble(out var cwv) && ch0.TryGetDouble(out var chv)) { var sl = r.TryGetProperty("slim", out var sl0) && sl0.ValueKind == System.Text.Json.JsonValueKind.True; (_cssW, _cssH) = MiniPlayer.ContentSize(cwv, chv, sl); ApplyContentSize(); } break;   // 0.4.9 F75: never below the design width; 0.4.2
                 case "menu": ShowMenu(); break;   // 0.3.5 J17: right-click menu with a labeled Transparency submenu
                 case "osd": WebUiForm.ShowOsd(json); break;
                 case "full": _openFull(); break;

@@ -17,6 +17,8 @@ public sealed partial class LibraryService
         { ".flac", ".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav", ".aif", ".aiff", ".wma", ".alac", ".ape", ".wv" };
     private readonly Db _db;
     public LibraryService(Db db) { _db = db; }
+    /// <summary>0.4.4 F24: read access for the art cache (album-folder checks).</summary>
+    public Db Db => _db;
     public object? Scalar(string sql, params (string, object?)[] p) => _db.Scalar(sql, p);
     public bool Scanning { get; private set; }
     public (int Done, int Total, string Root)? Progress { get; private set; }
@@ -84,6 +86,9 @@ public sealed partial class LibraryService
                 var existing = _db.Query("SELECT path,size,mtime FROM track WHERE root_id=$r", r => (Path: r.GetString(0), Size: r.GetInt64(1), Mtime: r.GetInt64(2)), ("$r", root.Id))
                     .ToDictionary(x => x.Path, x => (x.Size, x.Mtime), StringComparer.Ordinal);
                 var upgrade = _db.Query("SELECT path FROM track WHERE root_id=$r AND folder=''", r => r.GetString(0), ("$r", root.Id)).ToHashSet(StringComparer.Ordinal);   // rows from a 0.0.1 database: re-read once so tags, art and folder fill in
+                // 0.4.4 F24: songs read as "Unknown Artist" by older builds are re-read once (album-artist-only tags, "Artist - Title" file names)
+                if (_db.Setting("library.f24reread") == null)
+                    foreach (var p in _db.Query("SELECT path FROM track WHERE root_id=$r AND artist='Unknown Artist'", r => r.GetString(0), ("$r", root.Id))) upgrade.Add(p);
                 var seen = new HashSet<string>(StringComparer.Ordinal);
                 var files = new List<FileInfo>();
                 try
@@ -115,7 +120,7 @@ public sealed partial class LibraryService
                 Db.Exec(c, "UPDATE library_root SET last_scan_at=$t, last_error=NULL WHERE id=$i", null, ("$t", DateTimeOffset.UtcNow.ToString("O")), ("$i", root.Id));
             }
         }
-        finally { Thread.CurrentThread.Priority = oldPriority; Scanning = false; Progress = null; }
+        finally { Thread.CurrentThread.Priority = oldPriority; Scanning = false; Progress = null; if (!ct.IsCancellationRequested) try { _db.SetSetting("library.f24reread", "true"); } catch { } }
         ScanProgress?.Invoke(new { done = 0, total = 0, root = "", finished = true });
         return new ScanResult(added, updated, same, missing, errors, sw.Elapsed, msgs);
     }
@@ -138,6 +143,14 @@ public sealed partial class LibraryService
             dur = (long)tf.Properties.Duration.TotalMilliseconds; sr = tf.Properties.AudioSampleRate; ch = tf.Properties.AudioChannels; br = tf.Properties.AudioBitrate;
             if (!string.IsNullOrWhiteSpace(tf.Properties.Description)) codec = tf.Properties.Description;
         }
+        // 0.4.4 F24: "Unknown Artist" only when nothing names the artist (the missing-tag flag stays, so Fix tags still offers to write it). Files tagged with just an album artist (TPE2 / "Album Artist", common
+        // from some rippers and stores) and untagged files named "Artist - Title" used to read as Unknown Artist.
+        if ((flags & TagFlags.Artist) != 0)
+        {
+            if (!string.IsNullOrWhiteSpace(albumArtist) && albumArtist != "Unknown Artist") { artist = albumArtist; }
+            else if (FromFileName(Path.GetFileNameWithoutExtension(f.Name)) is var (fa, ft) && fa != null)
+            { artist = fa; albumArtist = fa; if ((flags & TagFlags.Title) != 0) title = ft!; }
+        }
         string rawArtist = artist, rawAlbumArtist = albumArtist;
         if (aliases.TryGetValue(artist, out var ca)) artist = ca; if (aliases.TryGetValue(albumArtist, out var cb)) albumArtist = cb;
         var search = string.Join(' ', title, artist, albumArtist, album, genre).ToLowerInvariant();
@@ -148,6 +161,15 @@ public sealed partial class LibraryService
               sample_rate=$sr,channels=$ch,bitrate=$br,genre=$ge,year=$ye,missing=0,search=$se,raw_artist=$ra,raw_album_artist=$rb,folder=$fo,has_art=$hx,tag_flags=$tg
             """, null, ("$p", f.FullName), ("$r", rootId), ("$s", f.Length), ("$m", mtime), ("$ti", title), ("$ar", artist), ("$aa", albumArtist), ("$al", album), ("$tn", trackNo), ("$dn", disc),
             ("$du", dur), ("$co", codec), ("$sr", sr), ("$ch", ch), ("$br", br), ("$ge", genre), ("$ye", year), ("$ad", DateTimeOffset.UtcNow.ToString("O")), ("$se", search), ("$ra", rawArtist), ("$rb", rawAlbumArtist), ("$fo", f.DirectoryName ?? ""), ("$hx", art), ("$tg", flags));
+    }
+
+    /// <summary>0.4.4 F24: "Artist - Title" (also "01 - Artist - Title", "01. Artist - Title") from a file name; (null, null) when it does not look like that.</summary>
+    public static (string? Artist, string? Title) FromFileName(string stem)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(stem ?? "", @"^\s*(?:\d{1,3}\s*[-.)_]\s*)?(?<a>[^-]*?\S)\s+-\s+(?<t>.*\S)\s*$");
+        if (!m.Success) return (null, null);
+        var a = m.Groups["a"].Value.Trim(); if (a.Length == 0 || a.All(char.IsDigit)) return (null, null);
+        return (a, m.Groups["t"].Value.Trim());
     }
 
     // ---------- queries ----------

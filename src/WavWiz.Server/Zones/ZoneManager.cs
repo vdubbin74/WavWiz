@@ -45,17 +45,22 @@ public static class ZoneVolume
 /// </summary>
 public sealed class ZoneManager
 {
-    private readonly Db _db; private readonly AudioHost _host; private readonly Conductor _cond; private readonly EventHub _ev; private readonly DspService _dsp;
+    private readonly Db _db; private readonly AudioHost _host; private readonly ConductorRegistry _reg; private readonly EventHub _ev; private readonly DspService _dsp;
     private readonly object _l = new();
     private readonly Dictionary<string, string> _lastHealth = new();
     public Action<string>? Log { get => _log; set { _log = value; Rooms.Log = value; } }
     public Action? AfterOutputsChanged;
+    /// <summary>0.4.0 Stage 2: maps zones to playback groups (set by the host after construction).</summary>
+    public ZoneLinks? Links;
     private Action<string>? _log;
     public readonly RoomHealth Rooms = new();
 
-    public ZoneManager(Db db, AudioHost host, Conductor cond, EventHub ev, DspService dsp)
+    /// <summary>Tests and single-group hosts: one Conductor = the default playback group.</summary>
+    public ZoneManager(Db db, AudioHost host, Conductor cond, EventHub ev, DspService dsp) : this(db, host, ConductorRegistry.Single(cond), ev, dsp) { }
+
+    public ZoneManager(Db db, AudioHost host, ConductorRegistry reg, EventHub ev, DspService dsp)
     {
-        _db = db; _host = host; _cond = cond; _ev = ev; _dsp = dsp;
+        _db = db; _host = host; _reg = reg; _ev = ev; _dsp = dsp;
         host.OnConnected = OnConnected; host.OnDisconnected = OnDisconnected; host.OnOutputs = OnOutputs; host.OnStatus = OnStatus;
         dsp.DeviceChanged += key => { foreach (var s in _host.Sessions) if (ActiveDeviceKey(s) == key) PushDsp(s); _ev.Publish("zones"); };
     }
@@ -96,7 +101,8 @@ public sealed class ZoneManager
         Rooms.Connected(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.Hello.LinkType, s.Remote.ToString());
         var z = ZoneRow(s.Id)!;
         PushZone(s); PushDsp(s);
-        if (z.Enabled) _cond.Subscribe(s);
+        Links?.Apply(s.Id);
+        if (z.Enabled) _reg.Subscribe(s);      // the device listens to its playback group (the house group unless it was split off)
         _ev.Publish("zones");
         return Task.CompletedTask;
     }
@@ -104,7 +110,7 @@ public sealed class ZoneManager
     private void OnDisconnected(PlayerSession s)
     {
         Rooms.Disconnected(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.EndReason ?? "connection closed");
-        _cond.Unsubscribe(s.Id);
+        _reg.Disconnected(s.Id);
         _db.Exec("UPDATE output_endpoint SET connected=0 WHERE player_id=$p", ("$p", s.Id));
         _db.Exec("UPDATE player SET last_seen_at=$t WHERE id=$p", ("$t", DateTimeOffset.UtcNow.ToString("O")), ("$p", s.Id));
         _ev.Publish("zones");
@@ -113,13 +119,14 @@ public sealed class ZoneManager
     private void OnStatus(PlayerSession s, PlayerStatus st)
     {
         // health transitions are events; the 1 Hz status itself is not broadcast (the UI polls /zones every 2 s while visible)
-        Rooms.Status(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, st, StreamPlaying);
-        string h = Health(s) + Rooms.State(s.Id, true, st, StreamPlaying, StreamAgeMs).State;
+        Rooms.Status(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, st, StreamPlayingFor(s.Id));
+        string h = Health(s) + Rooms.State(s.Id, true, st, StreamPlayingFor(s.Id), StreamAgeMsFor(s.Id)).State;
         if (!_lastHealth.TryGetValue(s.Id, out var prev) || prev != h) { _lastHealth[s.Id] = h; _ev.Publish("zones"); }
     }
 
-    public bool StreamPlaying => _cond.State == PlayState.Playing && _cond.Engine.Playing;
-    public long StreamAgeMs => _cond.Engine.Playing ? (_cond.Clock.NowUs - _cond.Engine.EpochStartUs) / 1000 : 0;
+    /// <summary>The device's own playback group is streaming (a split-off device is judged by its group, not by the house stream).</summary>
+    public bool StreamPlayingFor(string playerId) => _reg.Playing(playerId);
+    public long StreamAgeMsFor(string playerId) => _reg.StreamAgeMs(playerId);
 
     public static string Health(PlayerSession s)
     {
@@ -285,7 +292,7 @@ public sealed class ZoneManager
             // chosen output known but not connected right now -> amber "Output unavailable" (only meaningful while the PC itself is online)
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
-                (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlaying, StreamAgeMs), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
+                (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlayingFor(z.PlayerId), StreamAgeMsFor(z.PlayerId)), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
                 IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
         }
         return res;
@@ -316,7 +323,7 @@ public sealed class ZoneManager
         if (s != null)
         {
             PushZone(s);
-            if (enabled == true) _cond.Subscribe(s); else if (enabled == false) _cond.Unsubscribe(s.Id);
+            if (enabled == true) _reg.Subscribe(s); else if (enabled == false) _reg.Unsubscribe(s.Id);
         }
         _ev.Publish("zones"); return null;
     }
@@ -416,7 +423,7 @@ public sealed class ZoneManager
         var s = _host.Get(z.PlayerId); if (s == null) return $"{z.Name} is not connected right now.";
         if (!z.Enabled) return $"{z.Name} is switched off - switch it on first.";
         if (s.Outputs.FirstOrDefault(o => o.Active) == null) return $"{z.Name} has no speaker selected - choose an output for it first.";
-        s.SendJson(MsgType.CalCmd, new CalCmd("test-tone", "test", _cond.Clock.NowUs + 800_000, -18, z.Name));
+        s.SendJson(MsgType.CalCmd, new CalCmd("test-tone", "test", _reg.Clock.NowUs + 800_000, -18, z.Name));
         Rooms.Note(z.PlayerId, "test sound requested"); return null;
     }
 
@@ -447,7 +454,13 @@ public sealed class ZoneManager
     {
         if (!double.IsFinite(target)) return (null, "volume must be a number");
         var g = Groups().FirstOrDefault(x => x.Id == groupId); if (g == null) return (null, "zone not found");
-        var ids = g.DeviceIds.ToArray(); if (ids.Length == 0) return (0, null);
+        return DevicesVolume(groupId, g.DeviceIds, target);
+    }
+    /// <summary>0.4.0: the zone slider for any set of devices (a zone, or the Jukebox zone with key -1): moves them together keeping their offsets.</summary>
+    public (double? Level, string? Err) DevicesVolume(long key, IEnumerable<long> deviceIds, double target)
+    {
+        if (!double.IsFinite(target)) return (null, "volume must be a number"); long groupId = key;
+        var ids = deviceIds.ToArray(); if (ids.Length == 0) return (0, null);
         var vol = _db.Query("SELECT id,volume FROM zone", r => (Id: r.GetInt64(0), V: r.GetDouble(1))).ToDictionary(x => x.Id, x => x.V);
         var actual = ids.Select(i => vol[i]).ToList();
         var virt = _zoneVirt.TryGetValue(groupId, out var m) && m.Ids.SequenceEqual(ids) && ZoneVolume.Valid(m.Virt, actual) ? m.Virt : actual.ToArray();
@@ -463,6 +476,7 @@ public sealed class ZoneManager
         foreach (var id in g.DeviceIds) Patch(id, null, null, muted, null);
         return null;
     }
+    public void DevicesMute(IEnumerable<long> deviceIds, bool muted) { foreach (var id in deviceIds) Patch(id, null, null, muted, null); }
 
     private static string? CheckName(ref string? name)
     {
@@ -482,7 +496,28 @@ public sealed class ZoneManager
         if (devices == null) return;
         _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g", ("$g", group));
         foreach (var d in devices.Distinct())
-            if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone WHERE id=$i", ("$i", d))) > 0) _db.Exec("INSERT OR IGNORE INTO zone_group_member(group_id,device_id) VALUES($g,$d)", ("$g", group), ("$d", d));
+            if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone WHERE id=$i", ("$i", d))) > 0)
+            {   // 0.4.2: a speaker belongs to exactly ONE zone: putting it here takes it out of any other zone (it moves)
+                _db.Exec("DELETE FROM zone_group_member WHERE device_id=$d AND group_id<>$g", ("$d", d), ("$g", group));
+                _db.Exec("INSERT OR IGNORE INTO zone_group_member(group_id,device_id) VALUES($g,$d)", ("$g", group), ("$d", d));
+            }
+    }
+
+    public const string ModelKey = "zones.model", PreMigrationKey = "zones.premigration.v041";
+    /// <summary>0.4.2: flatten the 0.4.1 overlapping zones (one speaker in several zones, "smaller zone wins") to one zone per speaker: a speaker stays in the SMALLEST zone it was in (tie: the first by order); speakers in no zone stay Unassigned. The old memberships and claims are saved in the setting <see cref="PreMigrationKey"/> first. Runs once; returns how many speakers were moved out of extra zones.</summary>
+    public int MigrateSingleMembership()
+    {
+        if (_db.Setting(ModelKey) == "2") return 0;
+        var rows = _db.Query("SELECT m.group_id,m.device_id,g.sort FROM zone_group_member m JOIN zone_group g ON g.id=m.group_id", r => (G: r.GetInt64(0), D: r.GetInt64(1), Sort: r.GetInt64(2))).ToList();
+        var size = rows.GroupBy(x => x.G).ToDictionary(x => x.Key, x => x.Count()); int moved = 0;
+        try { _db.SetSetting(PreMigrationKey, System.Text.Json.JsonSerializer.Serialize(new { members = rows.Select(x => new { group = x.G, device = x.D }), links = _db.Setting("zone.links"), claims = _db.Setting("zone.claims") })); } catch { }
+        foreach (var dev in rows.GroupBy(x => x.D).Where(x => x.Count() > 1))
+        {
+            var keep = dev.OrderBy(x => size[x.G]).ThenBy(x => x.Sort).ThenBy(x => x.G).First().G;
+            foreach (var x in dev.Where(x => x.G != keep)) { _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g AND device_id=$d", ("$g", x.G), ("$d", x.D)); moved++; }
+        }
+        try { _db.DeleteSetting("zone.claims"); } catch { }
+        _db.SetSetting(ModelKey, "2"); return moved;
     }
 
     public string? UpdateGroup(long id, string? name, IEnumerable<long>? devices)
@@ -494,15 +529,15 @@ public sealed class ZoneManager
             if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group WHERE name=$n COLLATE NOCASE AND id<>$i", ("$n", name), ("$i", id))) > 0) return "there is already a zone with that name";
             _db.Exec("UPDATE zone_group SET name=$n WHERE id=$i", ("$n", name), ("$i", id));
         }
-        SetMembers(id, devices); _ev.Publish("zones"); return null;
+        SetMembers(id, devices); Links?.Apply(); _ev.Publish("zones"); return null;
     }
 
     /// <summary>Removes a zone (the group and its membership list). The devices stay; they just fall back to Unassigned. Playback is stopped first if this zone is the one playing.</summary>
     public string? DeleteGroup(long id)
     {
         var g = Groups().FirstOrDefault(x => x.Id == id); if (g == null) return "zone not found";
-        if (g.Active && _cond.State != PlayState.Stopped) _cond.Stop();
-        _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g", ("$g", id)); _db.Exec("DELETE FROM zone_group WHERE id=$g", ("$g", id));
+        if (g.Active && _reg.Default.State != PlayState.Stopped) _reg.Default.Stop();
+        _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g", ("$g", id)); _db.Exec("DELETE FROM zone_group WHERE id=$g", ("$g", id)); Links?.Forget(id);
         _ev.Publish("zones"); return null;
     }
 
@@ -541,7 +576,7 @@ public sealed class ZoneManager
         foreach (var zid in _db.Query("SELECT id FROM zone WHERE player_id=$p", r => r.GetInt64(0), ("$p", playerId))) _db.Exec("DELETE FROM zone_group_member WHERE device_id=$d", ("$d", zid));
         _db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", playerId));
         _host.Get(playerId)?.CloseUnauthorized();
-        _cond.Unsubscribe(playerId);
+        _reg.Forget(playerId);
         _db.Exec("DELETE FROM zone WHERE player_id=$p", ("$p", playerId));
         _db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", playerId));
         _db.Exec("DELETE FROM output_endpoint WHERE player_id=$p", ("$p", playerId));

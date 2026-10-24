@@ -41,5 +41,5 @@ test('H4-H7 jukebox helpers', async () => {
   assert.doesNotMatch(css + src('settingsui.js'), /vinyl/i, 'no Vinyl style');
 });
 test('0.3.4 What\'s new and version', async () => {
-  const a = await imp('about'); assert.ok(['0.3.4', '0.3.5', '0.3.6', '0.3.7', '0.3.8', '0.3.9'].includes(a.WHATS_NEW_VERSION)); /* 0.3.5 moved on */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox styles'));
+  const a = await imp('about'); assert.ok(['0.3.4', '0.3.5', '0.3.6', '0.3.7', '0.3.8', '0.3.9', '0.4.0', '0.4.1', '0.4.2', '0.4.3', '0.4.4', '0.4.5', '0.4.6'].includes(a.WHATS_NEW_VERSION)); /* 0.3.5 moved on */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox styles'));
 });

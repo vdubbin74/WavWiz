@@ -1,0 +1,30 @@
+import * as pw from 'playwright'; const chromium = pw[process.env.BR || 'chromium'];
+import { readFileSync } from 'node:fs';
+const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim();
+const DPR = +(process.env.DPR || 1), OUT = process.env.OUT || '/tmp/p8';
+const br = await chromium.launch();
+const ctx = await br.newContext({ viewport: { width: 1920 / DPR, height: 1080 / DPR }, deviceScaleFactor: DPR });
+await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addInitScript(([LIST, LIB]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1');
+  localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: LIB, dev: 'normal', exp: null, list: LIST, ctl: 'collapsed' })); }, [process.env.LIST || 'open', process.env.LIB || 'normal']);
+const p = await ctx.newPage();
+p.on('pageerror', e => console.log('PAGEERR', e.message));
+await p.goto(B + '/'); await p.waitForTimeout(2500);
+await p.evaluate(() => document.querySelectorAll('dialog[open],.phone-unlock').forEach(e => e.close?.() || e.remove()));
+if (process.env.PRE) await p.evaluate(process.env.PRE); await p.waitForTimeout(800); if (process.env.NAV) await p.evaluate(process.env.NAV); await p.waitForTimeout(1200);
+await p.screenshot({ path: OUT + '-0.png' });
+const info = await p.evaluate(() => { const L = document.querySelector('.libpanel'); const d = [...L.querySelectorAll('[draggable=true]')]; return { html: L.innerText.slice(0, 600), drag: d.length, first: d[0]?.outerHTML.slice(0, 300), q: document.querySelectorAll('.listpanel tr[data-i]').length }; });
+console.log(JSON.stringify(info, null, 1));
+if (info.drag) {
+  await p.evaluate(() => { window.__ev = []; for (const t of ['dragstart', 'dragover', 'drop', 'dragend']) document.addEventListener(t, e => window.__ev.push(t + ':' + (e.target.className || e.target.tagName) + ':' + e.defaultPrevented), true); });
+  const src = p.locator('.libpanel [draggable=true]').first(), dst = p.locator(process.env.DST || '.listpanel .qwrap');
+  await src.scrollIntoViewIfNeeded(); await p.waitForTimeout(300); const s = await src.boundingBox(), d = await dst.boundingBox();
+  await p.mouse.move(s.x + s.width / 2, s.y + s.height / 2); await p.mouse.down();
+  for (let i = 1; i <= 12; i++) await p.mouse.move(s.x + s.width / 2 + (d.x + d.width / 2 - s.x - s.width / 2) * i / 12, s.y + s.height / 2 + (d.y + d.height / 2 - s.y - s.height / 2) * i / 12);
+  await p.screenshot({ path: OUT + '-1drag.png' });
+  await p.mouse.up(); await p.waitForTimeout(1500);
+  const ev = await p.evaluate(() => [...new Set(window.__ev)].slice(0, 20));
+  console.log('events', ev, 'queue after', await p.evaluate(() => document.querySelectorAll('.listpanel tr[data-i]').length), await p.evaluate(() => document.querySelector('.toast')?.textContent));
+  await p.screenshot({ path: OUT + '-2after.png' });
+}
+await br.close();

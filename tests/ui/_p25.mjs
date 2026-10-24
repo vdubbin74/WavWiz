@@ -1,0 +1,13 @@
+import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
+const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), OUT = process.env.OUT || '/tmp/p25', DPR = +(process.env.DPR || 1);
+const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const zones = await api('/zones'); const kl = zones.find(z => z.name === 'Kitchen-Left'); await api('/zones/' + kl.id, 'PATCH', { muted: true });
+const br = await chromium.launch();
+const c = await br.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: DPR, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
+const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(3000);
+await p.evaluate(() => document.querySelectorAll('dialog[open],.phone-unlock').forEach(e => e.close?.() || e.remove()));
+await p.screenshot({ path: OUT + '-home.png' });
+console.log(await p.evaluate(() => [...document.querySelectorAll('select, [role=combobox], .zpick, button')].filter(e => e.offsetParent).map(e => (e.className || e.tagName) + ':' + e.textContent.trim().slice(0, 30)).join(' | ')));
+await br.close();

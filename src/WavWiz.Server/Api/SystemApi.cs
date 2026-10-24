@@ -14,7 +14,7 @@ public static class SystemApi
     };
     private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt" };
     private static readonly HashSet<string> StringSettings = new() { "server.name", "acoustid.apiKey" };
-    private static readonly Dictionary<string, string[]> ChoiceSettings = new() { ["playback.replayGain"] = Media.Loudness.Modes, ["calibration.micDefault"] = new[] { "pc", "phone", "ear" } };     // 0.1.3
+    private static readonly Dictionary<string, string[]> ChoiceSettings = new() { ["playback.replayGain"] = Media.Loudness.Modes, ["calibration.micDefault"] = new[] { "pc", "phone", "ear" }, ["playback.streamRate"] = new[] { "48000", "96000" } };     // 0.4.9 F77     // 0.1.3
 
     public static object StatusDto(Services s) => new
     {
@@ -71,7 +71,7 @@ public static class SystemApi
         g.MapPost("/library/nas/test", async (HttpContext c) => { var b = await c.Request.Body(); var err = s.Nas?.EnsureFor(b.Str("share") ?? "", true); return Results.Json(new { ok = err == null, error = err }); }).Req(Role.Admin);
 
         // ---- settings ----
-        g.MapGet("/settings", () => Results.Json(s.Db.Query("SELECT key,value_json FROM setting WHERE key NOT LIKE 'admin.%' ORDER BY key", r => (K: r.GetString(0), V: r.GetString(1))).ToDictionary(x => x.K, x => JsonDocument.Parse(x.V).RootElement.Clone()))).Req(Role.View);
+        g.MapGet("/settings", () => Results.Json(s.Db.Query("SELECT key,value_json FROM setting WHERE key NOT LIKE 'admin.%' ORDER BY key", r => (K: r.GetString(0), V: r.GetString(1))).Select(x => (x.K, V: TryJson(x.V))).Where(x => x.V.HasValue).ToDictionary(x => x.K, x => x.V!.Value))).Req(Role.View);
         g.MapPut("/settings", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); if (b.ValueKind != JsonValueKind.Object) return Ext.Bad("expected an object of settings");
@@ -93,9 +93,22 @@ public static class SystemApi
 
         // ---- 0.1.1: AirPlay / Spotify Connect ----
         g.MapGet("/receivers", () => Results.Json(ReceiversDto(s))).Req(Role.View);
+        // 0.4.9 F78: the Devices "Casting" bar - a phone is sending to "WavWiz – Everywhere" (house AirPlay or Spotify Connect); Stop ends it
+        g.MapGet("/cast", () => Results.Json(CastDto(s))).Req(Role.View);
+        g.MapPost("/cast/stop", () => { s.AirPlay?.StopCast(); s.Spotify?.StopCast(); s.Events.Publish("zones"); return Results.Json(CastDto(s)); }).Req(Role.Control);
+        // 0.4.0 Stage 4: one AirPlay / Spotify Connect name per zone ("WavWiz – <zone>"); off by default per zone
+        g.MapGet("/receivers/zones", () => Results.Json(new { zones = s.ZoneRecv?.View() ?? new List<object>() })).Req(Role.View);
+        g.MapPut("/receivers/zones/{id:long}", async (long id, HttpContext c) =>
+        {
+            if (s.ZoneRecv == null) return Ext.Bad("receivers are not available", 409);
+            var b = await c.Request.Body();
+            bool? Flag(string k) => b.TryGetProperty(k, out var v) && v.ValueKind is JsonValueKind.True or JsonValueKind.False ? v.GetBoolean() : null;
+            var err = s.ZoneRecv.Set(id, Flag("airplay"), Flag("spotify")); if (err != null) return Ext.Bad(err, 404);
+            return Results.Json(new { ok = true, zones = s.ZoneRecv.View() });
+        }).Req(Role.Admin);
         g.MapGet("/live/art/{kind}", (string kind) =>
         {
-            var a = kind == "airplay" ? s.AirPlay?.Art : kind == "spotify" ? s.Spotify?.Art : null;
+            var a = kind == "airplay" ? s.AirPlay?.Art : kind == "spotify" ? s.Spotify?.Art : s.ZoneRecv?.ArtOf(kind);
             return a is { } x ? Results.Bytes(x.Bytes, x.Type) : Results.NotFound();
         }).Req(Role.View);
 
@@ -176,9 +189,20 @@ public static class SystemApi
         });
     }
 
+    public static object CastDto(Services s)
+    {
+        string? kind = s.AirPlay is { InSession: true } ? "airplay" : s.Spotify is { InSession: true } ? "spotify" : null;
+        if (kind == null) return new { active = false };
+        var sender = kind == "airplay" ? s.AirPlay!.LastSender : null; if (sender != null && System.Text.RegularExpressions.Regex.IsMatch(sender, "^[0-9A-Fa-f]{8,}$")) sender = null;   // a DACP id is not a name
+        var (title, artist) = kind == "airplay" ? (s.AirPlay!.Title, s.AirPlay.Artist) : (s.Spotify!.Meta?.Title, s.Spotify.Meta?.Artist);
+        var zones = new List<long>(); try { foreach (var (id, _) in s.Links.ZoneList()) if (s.Links.PlaybackId(id) == Playback.Conductor.DefaultGroupId) zones.Add(id); } catch { }
+        return new { active = true, kind, name = kind == "airplay" ? Receivers.AirPlayReceiver.Name : Receivers.SpotifyReceiver.Name, sender, title, artist, zones };
+    }
     public static object ReceiversDto(Services s) => new
     {
         airplay = new { name = Receivers.AirPlayReceiver.Name, enabled = s.Cfg.AirPlay, installed = s.AirPlay?.Installed ?? false, running = s.AirPlay?.Running ?? false, ready = s.AirPlay?.Ready ?? false, port = s.Cfg.AirPlayPort, inSession = s.AirPlay?.InSession ?? false, title = s.AirPlay?.Title, lastSender = s.AirPlay?.LastSender, levelDb = s.AirPlay?.LevelDb ?? 0, lastError = s.AirPlay?.LastError, restarts = s.AirPlay?.Restarts ?? 0 },
         spotify = new { name = Receivers.SpotifyReceiver.Name, enabled = s.Spotify?.Enabled ?? false, installed = s.Spotify?.Installed ?? false, running = s.Spotify?.Running ?? false, port = s.Cfg.SpotifyPort, inSession = s.Spotify?.SessionActive ?? false, title = s.Spotify?.Title, user = s.Spotify?.User, levelDb = s.Spotify?.LevelDb ?? 0, zeroconfFallback = s.Spotify?.ZeroconfFallback ?? false, lastError = s.Spotify?.LastError, restarts = s.Spotify?.Restarts ?? 0 },
     };
+    /// <summary>One bad stored value must not break GET /settings.</summary>
+    static JsonElement? TryJson(string v) { try { return JsonDocument.Parse(v).RootElement.Clone(); } catch (JsonException) { return null; } }
 }

@@ -33,7 +33,7 @@ public sealed partial class LibraryService
         if (!string.IsNullOrWhiteSpace(q)) { w.Add("(LOWER(album) LIKE $q ESCAPE '\\' OR LOWER(album_artist) LIKE $q ESCAPE '\\')"); ps.Add(("$q", Like(q!))); }
         var order = sort switch { "name" => "album COLLATE NOCASE", "year" => "MAX(year) DESC, album COLLATE NOCASE", "recent" => "MAX(added_at) DESC", _ => "album_artist COLLATE NOCASE, MAX(year), album COLLATE NOCASE" };
         return _db.Query($"SELECT album_artist, album, MAX(year), COUNT(*), SUM(duration_ms), MIN(id), MAX(added_at), MIN(NULLIF(genre,'')) FROM track WHERE {string.Join(" AND ", w)} GROUP BY album_artist, album ORDER BY {order} LIMIT {Math.Clamp(limit, 1, 20000)} OFFSET {Math.Max(0, offset)}",
-            r => new AlbumRow(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetInt32(2), r.GetInt32(3), r.IsDBNull(4) ? 0 : r.GetInt64(4), r.GetInt64(5), r.GetString(6), r.IsDBNull(7) ? null : r.GetString(7)), ps.ToArray());
+            r => new AlbumRow(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetInt32(2), r.GetInt32(3), r.IsDBNull(4) ? 0 : r.GetInt64(4), OnlineArt.IsUnknown(r.GetString(1)) ? 0 : r.GetInt64(5), r.GetString(6), r.IsDBNull(7) ? null : r.GetString(7)), ps.ToArray());
     }
 
     // ---- 0.2.0 item 14: favorites (hearts) stored on the server, so they follow you to every browser. kind = track | album.
@@ -59,7 +59,7 @@ public sealed partial class LibraryService
             var i = r.IndexOf('\u001f'); if (i < 0) continue;
             var ar = r[..i]; var al = r[(i + 1)..];
             var row = _db.Query("SELECT album_artist, album, MAX(year), COUNT(*), SUM(duration_ms), MIN(id), MAX(added_at), MIN(NULLIF(genre,'')) FROM track WHERE missing=0 AND album_artist=$ar AND album=$al GROUP BY album_artist, album",
-                x => new AlbumRow(x.GetString(0), x.GetString(1), x.IsDBNull(2) ? null : x.GetInt32(2), x.GetInt32(3), x.IsDBNull(4) ? 0 : x.GetInt64(4), x.GetInt64(5), x.GetString(6), x.IsDBNull(7) ? null : x.GetString(7)), ("$ar", ar), ("$al", al));
+                x => new AlbumRow(x.GetString(0), x.GetString(1), x.IsDBNull(2) ? null : x.GetInt32(2), x.GetInt32(3), x.IsDBNull(4) ? 0 : x.GetInt64(4), OnlineArt.IsUnknown(x.GetString(1)) ? 0 : x.GetInt64(5), x.GetString(6), x.IsDBNull(7) ? null : x.GetString(7)), ("$ar", ar), ("$al", al));
             albums.AddRange(row);
         }
         return (tracks, albums);

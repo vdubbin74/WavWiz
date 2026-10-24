@@ -1,12 +1,14 @@
 import { speakerRegistry } from './speakerreg.js';
 import { h, api, toast, dialog } from './util.js';
 import { MSG, FrameParser, encodeJson, decodeJson, decodeAudio, decodeEpoch } from './wire.js';
-import { OffsetEstimator, pairClocks, ctxTimeFor, FrameScheduler, roomHealth, volumeToGain } from './roomsched.js';
+import { OffsetEstimator, pairClocks, pairClocksEdge, outputDelaySec, ctxTimeFor, FrameScheduler, roomHealth, volumeToGain, retimeFrames } from './roomsched.js';
+import { makeChirpPattern, scheduleChirpOnScheduler } from './chirppattern.js';
 import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
 import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
 import { phoneRole, setPhoneRole } from './calmic-core.js';
 import { isRemote } from './remotemode.js';
+import { EqChain, eqPlan } from './roomeq.js';
 export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -39,17 +41,41 @@ export class PhoneRoom {
     if (!env.hasCtx) throw new Error('This browser has no Web Audio, so it cannot play audio as a device.');
     this.ctx = sharedCtx();
     this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination); this.applyGain();
-    this._onCtx = () => this.emit(); this.ctx.addEventListener?.('statechange', this._onCtx);
+    this.eq = new EqChain(this.ctx, this.gain); this.applyEq();      // 0.4.3 #10: the speaker's EQ (music only; the test chime stays dry)
+    this._onCtx = () => { this.emit(); const st = this.ctx.state; if (st === 'running' && this._lastSt && this._lastSt !== 'running') this.resync('ctx ' + this._lastSt + '>running'); this._lastSt = st; }; this._lastSt = this.ctx.state; this.ctx.addEventListener?.('statechange', this._onCtx);   // 0.4.6 F44: suspended / interrupted -> running re-measures
     this.running = true;
-    this.vis = () => { this.emit(); if (!document.hidden && this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); if (!document.hidden) this.kickNet(); };
+    this.vis = () => { this.emit(); if (!document.hidden && this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); if (!document.hidden) { this.kickNet(); this.resync('visible'); } };   // 0.4.6 F44: back from the background re-measures
     document.addEventListener('visibilitychange', this.vis);
     this.timer = setInterval(() => { this.pairNow(); this.watchdog(); this.sendStatus(); this.emit(); }, 1000);
     this.clockTimer = setInterval(() => this.pingClock(), 1000);
-    await this.syncClock(); await this.connect();
+    await this.syncClock(); await this.connect(); this.resync('start');   // F44: the full re-measure runs in the background (start stays as fast as before)
   }
   get audioReady() { return this.ctx?.state === 'running'; }
 
-  pairNow() { const reads = []; for (let i = 0; i < 6; i++) reads.push({ ctxSec: this.ctx.currentTime, perfMs: performance.now() }); this.pair = pairClocks(reads); }
+  pairNow() { const reads = []; for (let i = 0; i < 6; i++) reads.push({ ctxSec: this.ctx.currentTime, perfMs: performance.now() }); const p = pairClocks(reads);
+    if (!this.pair?.edge || this.ctx.state !== 'running') { this.pair = p; return; }
+    // 0.4.6 F44: keep the edge-accurate pairing; only re-anchor when the cheap read disagrees by more than one IO step (the context was restarted)
+    const drift = (p.perfUs - this.pair.perfUs) / 1000 - (p.ctxSec - this.pair.ctxSec) * 1000; if ((drift < -2 || drift > 45) && !this._pe) { this._pe = this.pairEdge().finally(() => { this._pe = null; }); }   // audio vs system clock drift: re-pair only (no reset, no gap)
+  }
+  /** 0.4.6 F44: edge-accurate pairing - polls currentTime for up to ~80 ms and pairs on the moment it steps. */
+  async pairEdge() { const reads = [], t0 = performance.now(); while (performance.now() - t0 < 80) { reads.push({ ctxSec: this.ctx.currentTime, perfMs: performance.now() }); if (reads.length % 50 === 0) await new Promise(r => setTimeout(r, 0)); }
+    this.pair = pairClocksEdge(reads); return this.pair; }
+  /** 0.4.6 F44: every start / resume / wake re-measures (clock offset from fresh samples, edge pairing, output delay) and restarts the schedule,
+   *  so the delay the user set stays the same launch after launch. The measurements are logged (console + the last 10 in localStorage). */
+  async resync(why = 'start') {
+    if (this._rs) return this._rs;
+    this._rs = (async () => { try {
+      this.est.reset(); for (let i = 0; i < 12; i++) { this.pingClock(); await sleep(60); } await sleep(150);
+      if (this.ctx.state === 'running') await this.pairEdge(); else this.pairNow();
+      this.dropAudio?.(); this.sched?.reset(); this.epoch = null;
+      const d = { at: new Date().toISOString(), why, offsetUs: Math.round(this.est.offsetUs ?? NaN), rttUs: Math.round(this.est.rttUs ?? NaN), samples: this.est.samples.map(x => [Math.round(x.off), Math.round(x.rtt)]),
+        baseLatencyMs: +((this.ctx.baseLatency || 0) * 1000).toFixed(2), outputLatencyMs: +((this.ctx.outputLatency || 0) * 1000).toFixed(2), appliedOutMs: +(outputDelaySec(this.ctx) * 1000).toFixed(2),
+        pairEdge: !!this.pair?.edge, pairErrMs: this.pair?.errMs ?? null, state: this.ctx.state, sampleRate: this.ctx.sampleRate, userDelayMs: this.zone.latencyMs };
+      this.diag = d; try { console.info('[WavWiz sync]', JSON.stringify(d)); const k = 'wavwiz.sync.log', L = JSON.parse(localStorage.getItem(k) || '[]'); L.push(d); localStorage.setItem(k, JSON.stringify(L.slice(-10))); } catch { /* no storage */ }
+      this.emit();
+    } finally { this._rs = null; } })();
+    return this._rs;
+  }
 
   async syncClock() {
     let ws;
@@ -89,9 +115,9 @@ export class PhoneRoom {
     switch (f.type) {
       case MSG.Welcome: this.welcome = decodeJson(f.payload); this.emit(); break;
       case MSG.Audio: this.onAudio(decodeAudio(f.payload)); break;
-      case MSG.Epoch: { const e = decodeEpoch(f.payload); if (e.epoch !== this.epoch) { this.epoch = e.epoch; this.dropAudio(); this.sched.reset(); } break; }
-      case MSG.StopAt: { const s = decodeEpoch(f.payload); this.stopAtUs = s.us; this.stopSoon(s.us); break; }
-      case MSG.ZoneUpdate: { const z = decodeJson(f.payload); this.zone = { volume: z.volume ?? 1, muted: !!z.muted, enabled: z.enabled !== false, latencyMs: z.latencyMs ?? 0, source: z.latencySource, notCalibrated: !!z.notCalibrated }; this.applyGain(); this.emit(); break; }
+      case MSG.Epoch: { const e = decodeEpoch(f.payload); if (e.epoch !== this.epoch || e.us !== this.epochStartUs) { this.epoch = e.epoch; this.epochStartUs = e.us; this.dropAudio(); this.sched.reset(); } break; }  // 0.4.4 F12: another group's epoch can carry the same number - the start time tells them apart
+      case MSG.StopAt: { const s = decodeEpoch(f.payload); if (s.epoch !== this.epoch) break; this.stopAtUs = s.us; this.stopSoon(s.us); break; }  // 0.4.4 F12: ignore STOP_AT from a group we just left
+      case MSG.ZoneUpdate: { const z = decodeJson(f.payload); const prevLat = this.zone.latencyMs; this.zone = { volume: z.volume ?? 1, muted: !!z.muted, enabled: z.enabled !== false, latencyMs: z.latencyMs ?? 0, source: z.latencySource, notCalibrated: !!z.notCalibrated }; this.applyGain(); this.applyEq(); if (this.zone.latencyMs !== prevLat) this.retime(); this.emit(); break; }
       case MSG.CalCmd: { const c = decodeJson(f.payload); this.onCal(c); break; }
       case MSG.Bye: {
         const b = decodeJson(f.payload); this.emit({ error: b.reason });
@@ -100,35 +126,99 @@ export class PhoneRoom {
         if (/^unauthorized/i.test(b?.reason || '')) { this.removed = true; this.stop().then(() => this.onState({ state: 'stopped', text: 'Removed from WavWiz' })); }
         break;
       }
-      default: break;      // Outputs/DspConfig: not used by a phone speaker (no EQ in this beta)
+      case MSG.DspConfig: { this.dsp = decodeJson(f.payload); this.applyEq(); this.emit(); break; }      // 0.4.3 #10: saved EQ, preview and revert
+      default: break;      // Outputs: not used by a phone speaker
     }
   }
+  /** 0.4.3 #10: rebuild the filters only when the plan changes (loudness follows the volume). */
+  applyEq() { if (!this.eq) return; const plan = eqPlan(this.dsp, this.zone.volume), key = JSON.stringify(plan); if (key === this._eqKey) return; this._eqKey = key; this.eq.set(plan); }
   applyGain() { if (this.gain) this.gain.gain.value = this.zone.enabled && !this.zone.muted ? volumeToGain(this.zone.volume) : 0; }
 
   onAudio(a) {
-    if (!this.pair || !this.zone.enabled || this.ctx.state !== 'running') return;      // not unlocked yet: the next tap starts the sound
+    if (!this.pair || this.est.offsetUs == null || !this.zone.enabled || this.ctx.state !== 'running') return;      // not unlocked yet / re-measuring (F44): the next tap starts the sound
     if (a.epoch !== this.epoch) { this.epoch = a.epoch; this.dropAudio(); this.sched.reset(); }
-    const startCtx = ctxTimeFor(a.playAtUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: this.ctx.outputLatency || 0 });
+    const startCtx = ctxTimeFor(a.playAtUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: outputDelaySec(this.ctx) });
     const now = this.ctx.currentTime, p = this.sched.plan(startCtx, now, a.epoch);
     this.buffered = Math.max(0, (this.sched.next ?? now) - now) * 1000;
     if (p.action === 'drop') { this.stats.late++; return; }
     const buf = this.ctx.createBuffer(2, a.count, 48000); buf.copyToChannel(a.l, 0); buf.copyToChannel(a.r, 1);
-    const src = this.ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = p.rate; src.connect(this.gain); src.start(p.start);
+    const src = this.ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = p.rate; src.connect(this.eq?.input || this.gain); src.start(p.start); src._ww = { playAtUs: a.playAtUs, buf, start: p.start, epoch: a.epoch };
     this.sources.push(src); src.onended = () => { const i = this.sources.indexOf(src); if (i >= 0) this.sources.splice(i, 1); try { src.disconnect(); } catch { /* gone */ } };
     this.stats.frames++;
   }
-  dropAudio() { for (const s of this.sources) { try { s.onended = null; s.stop(); s.disconnect(); } catch { /* already finished */ } } this.sources = []; this.buffered = 0; }
+  /** 0.4.4 F22: a new delay (Delay slider / calibration save) moves the already-queued frames now, without a restart. */
+  retime() {
+    if (!this.ctx || !this.pair || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime, keep = [], move = [];
+    for (const s of this.sources) (s._ww && s._ww.start > now + 0.03 ? move : keep).push(s);
+    if (!move.length) return;
+    for (const s of move) { try { s.onended = null; s.stop(); s.disconnect(); } catch { /* ended */ } }
+    const computeStart = us => ctxTimeFor(us, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: outputDelaySec(this.ctx) });
+    const plans = retimeFrames(move.map(s => s._ww), { nowCtx: now, computeStart, sched: this.sched, epoch: this.epoch });
+    this.sources = keep;
+    for (const p of plans) {
+      if (p.action === 'drop') continue;
+      const src = this.ctx.createBufferSource(); src.buffer = p.item.buf; src.playbackRate.value = p.rate; src.connect(this.eq?.input || this.gain); src.start(p.start);
+      src._ww = { ...p.item, start: p.start }; this.sources.push(src);
+      src.onended = () => { const i = this.sources.indexOf(src); if (i >= 0) this.sources.splice(i, 1); try { src.disconnect(); } catch { /* gone */ } };
+    }
+    this.stats.retimes = (this.stats.retimes || 0) + 1;
+  }
+  dropAudio() { for (const s of this.sources) { try { s.onended = null; s.stop(); s.disconnect(); } catch { /* already finished */ } } this.sources = []; this.buffered = 0; for (const s of this._calSources || []) { try { s.onended = null; s.stop(); s.disconnect(); } catch { /* ended */ } } this._calSources = []; }
   stopSoon(atUs) {
-    if (!this.pair) return; const at = ctxTimeFor(atUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: this.ctx.outputLatency || 0 });
+    if (!this.pair) return; const at = ctxTimeFor(atUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: outputDelaySec(this.ctx) });
     for (const s of this.sources) { try { s.stop(Math.max(this.ctx.currentTime, at)); } catch { /* ended */ } }
   }
 
   onCal(c) {
-    if (c.action === 'test-tone') { this.chime(c.atUs); this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'ok', note: null }); }
-    else this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'unsupported', note: 'A phone page cannot play the calibration chirps precisely enough. Set this device\'s delay by ear (Devices > this phone > Delay).' });
+    if (c.action === 'test-tone') { this.chime(c.atUs); this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'ok', note: null }); return; }
+    // 0.4.4 F22: play-pattern on the same synced FrameScheduler path as music (server timestamp, saved offset 0, EQ bypassed)
+    if (c.action === 'play-pattern') { this.playPattern(c); return; }
+    if (typeof c.action === 'string' && c.action.startsWith('mic-')) return; // PC-mic actions are for Windows Player only
+    this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'unsupported', note: 'This browser cannot handle calibration action ' + c.action });
+  }
+  /**
+   * 0.4.4 F22: schedule the chirp pattern as 20 ms frames through FrameScheduler + ctxTimeFor (latencyMs = 0 so the mic
+   * measures phone/Bluetooth output delay). Mirrors WavWiz.PlayerCore play-pattern ack (ok / no-clock / late / locked).
+   */
+  playPattern(c) {
+    const clockOk = !!(this.est?.ready && this.pair && this.est.offsetUs != null);
+    const audioOk = this.ctx?.state === 'running';
+    let leadMs = 0;
+    if (clockOk) {
+      const nowServerUs = performance.now() * 1000 + this.est.offsetUs;
+      leadMs = (c.atUs - nowServerUs) / 1000;
+    }
+    const ack = !clockOk ? 'no-clock' : !audioOk ? 'locked' : leadMs < 150 ? `late=${Math.round(leadMs)}` : `ok;lead=${Math.round(leadMs)}`;
+    if (c.req) this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'pattern-ack', note: ack, req: c.req });
+    if (!this.ctx || !this.pair || !clockOk) return;
+    if (!audioOk) { try { this.ctx.resume?.(); } catch { /* gesture needed */ } showUnlock('Tap to unlock sound so calibration chirps can play'); return; }
+    try {
+      const pat = makeChirpPattern(Number.isFinite(c.levelDb) ? c.levelDb : -20);
+      // dry path (EQ bypassed); test volume when provided, else zone gain
+      if (!this._calGain) { this._calGain = this.ctx.createGain(); this._calGain.connect(this.ctx.destination); }
+      const tv = Number(c.testVolume);
+      this._calGain.gain.value = tv >= 0 ? volumeToGain(tv) : (this.zone.enabled && !this.zone.muted ? volumeToGain(this.zone.volume) : volumeToGain(85));
+      this.calSched ??= new FrameScheduler();
+      // stop prior cal sources
+      for (const s of this._calSources || []) { try { s.onended = null; s.stop(); s.disconnect(); } catch { /* ended */ } }
+      this._calSources = [];
+      const outLat = this.ctx.outputLatency || 0; // align first sample to DAC like the Player; BT/speaker path still measured by the mic
+      const r = scheduleChirpOnScheduler(this.ctx, pat.signal, c.atUs, {
+        pair: this.pair, offsetUs: this.est.offsetUs, outputLatencySec: outLat, latencyMs: 0,
+        sched: this.calSched, ctxTimeFor, gainNode: this._calGain
+      });
+      this._calSources = r.sources;
+      for (const src of r.sources) src.onended = () => { const i = this._calSources.indexOf(src); if (i >= 0) this._calSources.splice(i, 1); try { src.disconnect(); } catch { /* gone */ } };
+      this.stats.frames = (this.stats.frames || 0) + r.played;
+      this.stats.late = (this.stats.late || 0) + r.dropped;
+      this._lastCal = { atUs: c.atUs, played: r.played, dropped: r.dropped, nFrames: r.nFrames, ack, lengthMs: pat.lengthMs };
+    } catch (e) {
+      if (c.req) this.send(MSG.CalResult, { sessionId: c.sessionId, status: 'pattern-ack', note: 'error=' + (e.message || 'play'), req: c.req });
+    }
   }
   chime(atUs) {
-    const when = this.pair ? Math.max(this.ctx.currentTime + 0.02, ctxTimeFor(atUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: this.ctx.outputLatency || 0 })) : this.ctx.currentTime + 0.1;
+    const when = this.pair ? Math.max(this.ctx.currentTime + 0.02, ctxTimeFor(atUs, { pair: this.pair, offsetUs: this.est.offsetUs, latencyMs: this.zone.latencyMs, outputLatencySec: outputDelaySec(this.ctx) })) : this.ctx.currentTime + 0.1;
     [[659.25, 0], [880, 0.28]].forEach(([f, dt]) => { const o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, when + dt); g.gain.linearRampToValueAtTime(0.35, when + dt + 0.02); g.gain.exponentialRampToValueAtTime(0.001, when + dt + 0.5); o.connect(g); g.connect(this.gain); o.start(when + dt); o.stop(when + dt + 0.55); });
   }
 
@@ -143,7 +233,7 @@ export class PhoneRoom {
     this.running = false; clearInterval(this.timer); clearInterval(this.clockTimer); clearTimeout(this._nrt); clearTimeout(this._crt); document.removeEventListener('visibilitychange', this.vis); this.ctx?.removeEventListener?.('statechange', this._onCtx);
     try { this.send(MSG.Bye, { reason: 'closed by the user' }); } catch { /* socket gone */ }
     try { this.ws?.close(); } catch { /* ok */ } try { this.cws?.close(); } catch { /* ok */ }
-    this.dropAudio(); try { this.gain?.disconnect(); } catch { /* ok */ }      // the shared AudioContext stays open for the next start (never closed: iOS)
+    this.dropAudio(); this.eq?.disconnect(); this.eq = null; this._eqKey = undefined; try { this.gain?.disconnect(); } catch { /* ok */ }      // the shared AudioContext stays open for the next start (never closed: iOS)
     this.onState({ state: 'stopped', text: 'Stopped' });
   }
 }

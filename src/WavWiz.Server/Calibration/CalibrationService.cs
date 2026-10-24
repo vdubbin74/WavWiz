@@ -12,11 +12,16 @@ public sealed record Proposal(long ZoneId, string ZoneName, string DeviceId, dou
 
 public sealed class CalSession
 {
+    public bool Quick;
     public string Id = Guid.NewGuid().ToString("N")[..16];
     public DateTime Created = DateTime.UtcNow;
     public string Mode = "phone";               // phone | same-recording | ear | pc-mic (0.2.0: the by-ear helper also opens a session so music is paused)
     /// <summary>0.2.0 item 29: music was playing when calibration started (or someone pressed Play mid-session): resume it when the session ends.</summary>
     public bool ResumeAfter;
+    /// <summary>0.4.0 Stage 4: the playback groups this session paused (only the groups of the speakers it measures - other zones keep playing).</summary>
+    public readonly List<Playback.Conductor> PausedConds = new();
+    /// <summary>Group ids still paused when the session ended (the page offers Resume for each).</summary>
+    public List<string> ResumeGroupIds = new();
     public bool Ended;
     /// <summary>0.2.0 item 28: a regular user's session may only measure/save their own device (null = admin, no limit).</summary>
     public long? OnlyZoneId;
@@ -26,9 +31,10 @@ public sealed class CalSession
     public readonly List<(long Zone, string Kind, double Raw, double Conf)> Runs = new();
     public readonly List<string> Notes = new();
     /// <summary>0.3.7 L24: speakers that stayed silent after every retry (name), and the per-attempt measurements (L25: snr / peak / rms) for the log and the live meter.</summary>
+    public readonly HashSet<long> Touched = new();   // 0.4.9 F71: zones that played a test sound (restored when the session ends)
     public readonly List<string> Silent = new(); public readonly List<object> Attempts = new();
     /// <summary>0.3.7 L20: the test sound's own volume (percent); each speaker's max-volume lock caps it.</summary>
-    public double TestVolume = 85;
+    public double TestVolume = 100;   // 0.4.9 F71: full volume by default; caps are bypassed for the test sound only
     public long RunSeq;
     public List<Proposal>? Proposals;
     public readonly object L = new();
@@ -66,7 +72,25 @@ public sealed class CalibrationService
     public const double PairGapSec = 5.0;
 
     private readonly Playback.Conductor? _cond;
-    public CalibrationService(Db db, IMonotonicClock clock, ZoneManager zones, AudioHost host, EventHub ev, Playback.Conductor? cond = null) { _db = db; _clock = clock; _zones = zones; _host = host; _ev = ev; _cond = cond; }
+    public CalibrationService(Db db, IMonotonicClock clock, ZoneManager zones, AudioHost host, EventHub ev, Playback.Conductor? cond = null) { _db = db; _clock = clock; _zones = zones; _host = host; _ev = ev; _cond = cond;
+        // 0.4.9 F71: the server stopped mid-calibration - tell those speakers to put their own volume back once they are reachable again
+        var left = CalMarker(); if (left.Count > 0) _ = Task.Run(async () => { for (int i = 0; i < 12 && left.Count > 0; i++) { await Task.Delay(5000); left = left.Where(z => !SendRestore(z)).ToList(); } SetMarker(new()); }); }
+
+    // ---- 0.4.9 F71: a "calibrating" marker (zone ids that played a test sound) so a restart still restores; the stored volume and cap are never changed
+    public const string MarkerKey = "cal.active";
+    public List<long> CalMarker() { try { return System.Text.Json.JsonSerializer.Deserialize<List<long>>(_db.Setting(MarkerKey) ?? "[]") ?? new(); } catch { return new(); } }
+    private void SetMarker(List<long> ids) { try { _db.SetSetting(MarkerKey, System.Text.Json.JsonSerializer.Serialize(ids.Distinct().ToList())); } catch { } }
+    private void Mark(CalSession s, long zoneId) { lock (s.L) s.Touched.Add(zoneId); lock (_markL) { var m = CalMarker(); if (!m.Contains(zoneId)) { m.Add(zoneId); SetMarker(m); } } }
+    private readonly object _markL = new();
+    /// <summary>Tell one zone's player to end the test sound now and restore its volume, mute and EQ. False when it is not reachable.</summary>
+    private bool SendRestore(long zoneId) { try { var pid = _zones.ZonePlayer(zoneId); var ps = pid == null ? null : _host.Get(pid); if (ps == null) return false; ps.SendJson(MsgType.CalCmd, new CalCmd("restore", "restore", 0)); return true; } catch { return false; } }
+    /// <summary>Restore every speaker this session touched (finish, cancel, failure, timeout). Safe to call more than once.</summary>
+    public void RestoreVolumes(CalSession s)
+    {
+        List<long> ids; lock (s.L) { ids = s.Touched.ToList(); s.Touched.Clear(); }
+        foreach (var z in ids) SendRestore(z);
+        lock (_markL) { var others = _sessions.Values.Where(x => x != s && !x.Ended).SelectMany(x => { lock (x.L) return x.Touched.ToList(); }).ToHashSet(); SetMarker(CalMarker().Where(z => !ids.Contains(z) || others.Contains(z)).ToList()); }
+    }
 
     public CalSession? Get(string id) { Purge(); return _sessions.TryGetValue(id, out var s) ? s : null; }
     private void Purge() { foreach (var k in _sessions.Where(x => x.Value.Created < DateTime.UtcNow.AddHours(-1)).Select(x => x.Key).ToList()) if (_sessions.TryGetValue(k, out var old)) End(old, "expired"); }
@@ -75,19 +99,43 @@ public sealed class CalibrationService
     public void Quiet(CalSession s)
     {
         if (_cond == null || s.Ended) return;
-        if (_cond.State == Playback.PlayState.Playing) { _cond.Pause(); lock (s.L) s.ResumeAfter = true; s.Notes.Add("music paused for the measurement"); }
+        // 0.4.0 Stage 4: pause ONLY the playback groups of the speakers this session plays test sounds on (and the reference). Another zone's music is left alone.
+        foreach (var c in InvolvedConds(s))
+            if (c.State == Playback.PlayState.Playing)
+            {
+                c.Pause();
+                lock (s.L) { s.ResumeAfter = true; if (!s.PausedConds.Contains(c)) s.PausedConds.Add(c); s.Notes.Add(Registry == null || Registry.Live().Count <= 1 ? "music paused for the measurement" : $"music in {(Registry.NameOf(c.GroupId))} paused for the measurement"); }
+            }
+    }
+    /// <summary>The registry that maps a speaker (player) to its playback group. Null = a single group (tests, old wiring).</summary>
+    public Playback.ConductorRegistry? Registry { get; set; }
+    /// <summary>Speakers this session touches: the reference, the single device a regular user may measure, the plan's devices and every device with a pending test sound.</summary>
+    internal List<Playback.Conductor> InvolvedConds(CalSession s)
+    {
+        var ids = new HashSet<long>(); if (s.ReferenceZoneId != 0) ids.Add(s.ReferenceZoneId); if (s.OnlyZoneId is { } o) ids.Add(o);
+        List<PlanStep>? plan; lock (s.L) plan = s.Plan?.ToList(); if (plan != null) foreach (var p in plan) ids.Add(p.ZoneId);
+        foreach (var p in s.Pending.Values) ids.Add(p.ZoneId);
+        var r = new List<Playback.Conductor>();
+        foreach (var id in ids)
+        {
+            var pid = _zones.ZonePlayer(id); if (pid == null) continue;
+            var c = Registry?.ForPlayer(pid) ?? _cond!; if (!r.Contains(c)) r.Add(c);
+        }
+        if (r.Count == 0) r.Add(_cond!);
+        return r;
     }
 
     /// <summary>Ends a session (finish, save, cancel or failure). Returns true when calibration paused the music and it is still paused (the page offers Resume). Safe to call more than once.</summary>
     public bool End(CalSession s, string why = "ended")
     {
         bool resume;
-        lock (s.L) { if (s.Ended) return false; s.Ended = true; resume = s.ResumeAfter; s.ResumeAfter = false; if (s.Phase is "running" or "ready") s.Phase = "canceled"; }
+        lock (s.L) { if (s.Ended) return false; s.Ended = true; resume = s.ResumeAfter; s.ResumeAfter = false; if (s.Phase is "running" or "ready") s.Phase = "canceled"; s.ResumeGroupIds = s.PausedConds.Where(c => c.State == Playback.PlayState.Paused).Select(c => c.GroupId).ToList(); }
         try { s.Cancel.Cancel(); } catch { }
+        try { RestoreVolumes(s); } catch { }   // 0.4.9 F71
         _sessions.TryRemove(s.Id, out _);
         if (s.MicPlayerId != null || s.LinkToken != null) _ev.Publish("calmics");
         // 0.3.7 L21: the music stays paused after calibration; the page OFFERS Resume (canResume) instead of starting it by itself
-        return resume && _cond != null && _cond.State == Playback.PlayState.Paused;
+        return resume && s.ResumeGroupIds.Count > 0;
     }
 
     public int OpenSessions => _sessions.Count(x => !x.Value.Ended);
@@ -148,7 +196,7 @@ public sealed class CalibrationService
                         var rating = cres.Ok ? CalQuality.Rate(cres.PeakDb, cres.Confidence) : "quiet";
                         Report(s, log: $"{grp.Name}: check {rating}: snr {cres.SnrDb:0.0} dB, mic peak {cres.PeakDb:0.0} dBFS, rms {cres.RmsDb:0.0} dBFS, quality {CalQuality.Pct(cres.Confidence)}%");
                         if (rating == "good") break;
-                        var capped = _zones.VolCapOf(grp.ZoneId) is { Locked: true, Cap: double cp } && cp < s.TestVolume - 0.01 ? $" This speaker's max volume is locked at {cp:0}%, which limits the test sound." : "";
+                        var capped = "";   // 0.4.9 F71: the max-volume cap no longer limits the test sound
                         var guide = (rating == "weak" ? $"{grp.Name}: the test sound is weak at the microphone ({cres.SnrDb:0} dB above the room noise). Move the microphone closer to the speaker (about 3 ft), or raise the test volume." : $"{grp.Name}: the test sound is too quiet to measure (mic peak {cres.PeakDb:0} dBFS, {cres.SnrDb:0} dB above the room noise). Move the microphone closer to the speaker, raise the test volume, raise the mic's input level in Windows (Sound settings > Input > Properties > Levels), or check that this speaker is on and turned up.") + capped;
                         var ans = await WaitReady(s, new GuidePrompt(gi + 1, groups.Count, grp.ZoneId, grp.Name, rating, guide, grp.Kind == "dev"), ct);
                         if (ans == "skip" && grp.Kind == "dev") { lock (s.L) s.Skipped.Add(grp.ZoneId); Report(s, phase: "running", step: i += grp.Steps.Count, log: $"{grp.Name}: skipped (delay unchanged)"); skipGroup = true; break; }
@@ -324,13 +372,15 @@ public sealed class CalibrationService
         return (at, null);
     }
 
-    /// <summary>0.3.7 L20: the volume the test sound plays at on this zone: the session's test volume, never above the zone's locked max-volume cap (said once in the notes).</summary>
+    /// <summary>0.3.7 L20 / 0.4.9 F71: the volume the test sound plays at on this zone: the session's test volume (full by default). The speaker's
+    /// max-volume cap and the zone / master volume do NOT limit it (a low cap made the sound inaudible to the mic); the stored cap is untouched and
+    /// the player restores its own volume afterwards. Marks the zone for the restore.</summary>
     public double EffectiveTestVolume(CalSession s, long zoneId)
     {
-        double want = Math.Clamp(s.TestVolume, 0, 100), v = VolumeCap.Apply(want, _zones.VolCapOf(zoneId));
-        if (v < want - 0.01) { var note = $"{_zones.Zone(zoneId)?.Name ?? "A speaker"}'s max volume is locked at {v:0}%, so its test sound cannot be louder than that. Raise the lock, or move the microphone closer."; lock (s.L) if (!s.Notes.Contains(note)) s.Notes.Add(note); }
-        return v;
+        Mark(s, zoneId);
+        return TestVolumeFor(s.TestVolume);
     }
+    public static double TestVolumeFor(double want) => double.IsFinite(want) ? Math.Clamp(want, 0, 100) : 100;
 
     /// <summary>Same-recording mode: reference at T, device at T + gap, one recording.</summary>
     public (long AtUs, double GapSec, string? Error) PlayPair(CalSession s, long deviceZoneId, double levelDb = -20)
@@ -419,7 +469,7 @@ public sealed class CalibrationService
             if (rm.Verdict == MeasureVerdict.NotFound) { msgs.Add("the reference speaker was not heard - nothing can be calibrated without it"); return (props, msgs); }
             if (rm.Verdict == MeasureVerdict.Noisy) msgs.Add("reference: " + rm.Note);
             double refEndMs = refEnd.Count > 0 ? LatencyMath.Median(refEnd).RawLatencyMs : rm.RawLatencyMs;
-            if (refEnd.Count == 0) msgs.Add("the reference was not re-checked at the end of the session; phone timing drift could not be ruled out");
+            if (refEnd.Count == 0 && !s.Quick) msgs.Add("the reference was not re-checked at the end of the session; phone timing drift could not be ruled out");
             foreach (var g in runs.Where(r => r.Kind == "dev").GroupBy(r => r.Zone))
             {
                 var m = LatencyMath.Median(g.Select(r => r.Raw).ToList());
@@ -461,7 +511,7 @@ public sealed class CalibrationService
         {
             var p = proposals.FirstOrDefault(x => x.ZoneId == id); if (p == null) continue;
             var z = _zones.Zone(id); if (z == null) continue; var act = z.Outputs.FirstOrDefault(o => o.Active); if (act == null) continue;
-            Save(act.DeviceId, z.PlayerId, p.ProposedLatencyMs, s.Mode == "same-recording" ? "mic" : "mic", p.Confidence, act, s, p.OffsetMs);
+            Save(act.DeviceId, z.PlayerId, p.ProposedLatencyMs, s.Mode == "same-recording" ? "mic" : "mic", p.Confidence, act, s, p.OffsetMs, s.Quick ? "quick" : "thorough");   // 0.4.3 #8: the speaker page shows Quick / Thorough
         }
         return null;
     }

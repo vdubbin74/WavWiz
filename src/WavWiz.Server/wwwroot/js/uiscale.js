@@ -6,7 +6,8 @@ const SCALE_KEY = 'wavwiz.uiscale';
 // 0.3.1 B16: three presets - Small 75 %, Default 100 % (stays the default), Large 125 % (the maximum). Earlier saved choices are kept:
 // Small, Compact (now "Default") and Large keep their names; Medium (112 %) stays as it was until another size is picked; Extra large (TV)
 // becomes Large, the new maximum.
-export const SCALES = [['small', 'Small', 0.75], ['compact', 'Default', 1], ['large', 'Large', 1.25]];
+// 0.4.5 T2: a 67 % card before Small (for big TVs at 200 % Windows scaling); no 50 %.
+export const SCALES = [['tiny', 'Extra small', 0.67], ['small', 'Small', 0.75], ['compact', 'Default', 1], ['large', 'Large', 1.25]];
 export const LEGACY_SCALES = { medium: 1.12 };
 export const scaleFactor = id => (SCALES.find(([x]) => x === id)?.[2]) ?? LEGACY_SCALES[id] ?? 1;
 /** A saved value from any earlier version -> today's id ('medium' kept as is). Pure. */

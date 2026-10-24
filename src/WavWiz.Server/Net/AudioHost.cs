@@ -31,6 +31,8 @@ public sealed class PlayerSession : IStreamSubscriber
     public CancellationTokenSource Cts { get; } = new();
     public ChannelReader<byte[]> Reader => _out.Reader;
     public string LinkType => Hello.LinkType;
+    /// <summary>0.4.9 F77: 96 kHz only for players that offered it in HELLO (web speakers and older players get the 48 kHz copy).</summary>
+    public int MaxRate => IsWeb ? Wire.SampleRate : Wire.NormalizeRate(Hello.MaxRate);
 
     public PlayerSession(Hello h, IPAddress remote)
     {
@@ -58,12 +60,16 @@ public sealed class AudioHost : IAsyncDisposable
     public Func<PlayerSession, Task>? OnConnected; public Action<PlayerSession>? OnDisconnected;
     public Action<PlayerSession, OutputsMsg>? OnOutputs; public Action<PlayerSession, CalResult>? OnCalResult; public Action<PlayerSession, PlayerStatus>? OnStatus;
     public Action<string>? Log;
+    /// <summary>0.4.9 F77: Settings > Playback > Streaming quality (48000 or 96000).</summary>
+    public Func<int> StreamRate { get; set; } = () => Wire.SampleRate;
 
     public AudioHost(ServerConfig cfg, AuthService auth, IMonotonicClock clock, ClockHost clockHost) { _cfg = cfg; _auth = auth; _clock = clock; _clockHost = clockHost; }
 
     public IReadOnlyCollection<PlayerSession> Sessions => _sessions.Values.ToList();
     public PlayerSession? Get(string playerId) => _sessions.TryGetValue(playerId, out var s) ? s : null;
     public int Port => _listener == null ? 0 : ((IPEndPoint)_listener.LocalEndpoint).Port;
+
+    private int SafeRate() { try { return Wire.NormalizeRate(StreamRate()); } catch { return Wire.SampleRate; } }
 
     public void Start()
     {
@@ -125,7 +131,7 @@ public sealed class AudioHost : IAsyncDisposable
                 var key = RandomNumberGenerator.GetBytes(32); clockSession = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
                 _clockHost.Register(clockSession, key); clockKey = Convert.ToBase64String(key);
             }
-            var welcome = new Welcome(Guid.NewGuid().ToString("N")[..12], "pcm24", Wire.SampleRate, Wire.Channels, 24, Wire.FrameSamples, _clock.NowUs, sess.BufferDepthMs,
+            var welcome = new Welcome(Guid.NewGuid().ToString("N")[..12], "pcm24", Math.Min(sess.MaxRate, SafeRate()), Wire.Channels, 24, Wire.FrameSamplesAt(Math.Min(sess.MaxRate, SafeRate())), _clock.NowUs, sess.BufferDepthMs,
                 WavWizInfo.Version, WavWizInfo.Channel, clockSession, clockKey, webUser != null ? 0 : (_clockHost.Port != 0 ? _clockHost.Port : _cfg.ClockPort));
             await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Welcome, 0, welcome), CancellationToken.None);
             Log?.Invoke($"player {sess.Id} ({hello.Name}) connected from {remote}, link {hello.LinkType}{(sess.IsWeb ? ", web page" : "")}");

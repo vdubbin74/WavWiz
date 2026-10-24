@@ -3,14 +3,30 @@ namespace WavWiz.PlayerCore;
 /// <summary>0.3.2 F3: the mini player window (replaces Remote mode). Pure placement / address helpers so they can be tested off Windows.</summary>
 public static class MiniPlayer
 {
-    public const int Width = 420, Height = 138, SlimWidth = 300, SlimHeight = 48;
+    // 0.4.9 F86: the Player window is two rows (about 89 CSS px): the window opens at this height and the page's size report fine-tunes it
+    public const int Width = 420, Height = 90, SlimWidth = 300, SlimHeight = 48;
     /// <summary>0.3.7 L31: what opening the mini player does. From the app's own menu it is always on top and the main window is minimized; from the tray or anywhere else the saved Keep-on-top choice rules and the main window stays.</summary>
     public static (bool TopMost, bool MinimizeMain) OpenPlan(bool fromAppMenu, bool savedPinned) => (fromAppMenu || savedPinned, fromAppMenu);
     /// <summary>The page the mini window loads: /mini.html on the same server as the full window.</summary>
-    public static string Url(string uiAddress)
+    public static string Url(string uiAddress, bool slim = false)
     {
         if (string.IsNullOrWhiteSpace(uiAddress)) return "";
-        try { return new Uri(new Uri(uiAddress), "/mini.html").ToString(); } catch { return ""; }
+        try { return new Uri(new Uri(uiAddress), slim ? "/mini.html?slim=1" : "/mini.html").ToString(); } catch { return ""; }
+    }
+    /// <summary>0.4.2: the window's client size in physical pixels for the content size the page reported (CSS px) at the window's current DPI scale (DeviceDpi / 96.0).
+    /// Clamped to a sane range so a broken report can never make the window tiny or huge; null when the report is unusable (the window keeps its size).</summary>
+    public static (int W, int H)? SizeFor(double cssW, double cssH, double scale)
+    {
+        if (!double.IsFinite(cssW) || !double.IsFinite(cssH) || !double.IsFinite(scale) || cssW < 1 || cssH < 1 || scale <= 0) return null;
+        scale = Math.Clamp(scale, 0.5, 4.0);
+        return ((int)Math.Clamp(Math.Ceiling(cssW * scale), 120, 1200), (int)Math.Clamp(Math.Ceiling(cssH * scale), 36, 600));
+    }
+    /// <summary>0.4.9 F75: the CSS size the window must have for a reported content size: never narrower than the design width (420 / slim 300),
+    /// so a window that opened too narrow (device px taken for DIPs, another monitor's scale) grows back instead of locking at that width.</summary>
+    public static (double W, double H) ContentSize(double cssW, double cssH, bool slim)
+    {
+        var min = slim ? SlimWidth : Width;
+        return (double.IsFinite(cssW) ? Math.Max(cssW, min) : min, slim && double.IsFinite(cssH) ? Math.Max(cssH, SlimHeight) : cssH);
     }
     /// <summary>Where the window goes: the saved spot if it is still (mostly) on a screen, else parked top-center of the work area.
     /// Rects are (x, y, w, h) in physical pixels.</summary>

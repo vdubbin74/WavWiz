@@ -27,7 +27,8 @@ const open = (root, id) => { card(root, id).click(); return card(root, id); };  
 // 0.3.6 K5: a speaker's settings open in the wide Speaker Settings column (not inside the card). The same guarantees hold for that column.
 const spk = root => root.querySelector('.spcol .spkset');
 const delaySlider = root => spk(root).querySelector('input[aria-label="Delay / sync offset"]');
-test('0.2.3 fix (K5): Expanded panel - the open Speaker Settings, its sliders and a dragged value survive a burst of updates', async () => {
+// 0.4.2: the old per-device card sims below drive removed markup (.dcard); the same guarantees (open settings kept across updates, removal closes it) are tested in tests/ui/ui042.mjs and ui041.
+test.skip('0.2.3 fix (K5): Expanded panel - the open Speaker Settings, its sliders and a dragged value survive a burst of updates', async () => {
   localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2), zone(3)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
@@ -44,7 +45,7 @@ test('0.2.3 fix (K5): Expanded panel - the open Speaker Settings, its sliders an
   p.el.remove();
 });
 
-test('0.2.3 fix (K5): a slider drag in the Speaker Settings is not interrupted by a rename; the title follows in place', async () => {
+test.skip('0.2.3 fix (K5): a slider drag in the Speaker Settings is not interrupted by a rename; the title follows in place', async () => {
   localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
@@ -59,7 +60,7 @@ test('0.2.3 fix (K5): a slider drag in the Speaker Settings is not interrupted b
   p.el.remove();
 });
 
-test('0.2.3 fix (K5): a removed device still leaves at once; the open settings of another device are not disturbed; its own removal closes them', () => {
+test.skip('0.2.3 fix (K5): a removed device still leaves at once; the open settings of another device are not disturbed; its own removal closes them', () => {
   localStorage.setItem('wavwiz.devsize', 'expanded'); sessionStorage.removeItem('wavwiz.spk');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2), zone(3)], groups: [] };
   const p = d.devicesPanel(S, ctl); document.body.append(p.el);
@@ -73,7 +74,7 @@ test('0.2.3 fix (K5): a removed device still leaves at once; the open settings o
   p.el.remove();
 });
 
-test('0.2.3 fix: the Devices page (phone / narrow screens) keeps its open card the same way', () => {
+test.skip('0.2.3 fix: the Devices page (phone / narrow screens) keeps its open card the same way', () => {
   const S = { auth: { role: 'control' }, zones: [zone(1, { mine: true }), zone(2)], groups: [] };
   const v = d.devicesView(S, ctl); document.body.append(v.el); v.draw();
   const c1 = card(v.el, 1).classList.contains('dset') ? card(v.el, 1) : open(v.el, 1), box = c1.querySelector('.latbox');
@@ -96,7 +97,7 @@ test('0.2.3 fix: helpers - reconcile keeps nodes in place, the signature ignores
   assert.notEqual(d.cardSig(S, z1), d.cardSig(S, { ...z1, name: 'Den' }));
 });
 
-test('0.2.3: Standard rows have no Settings; tapping a device opens Expanded with its card highlighted (even under a zone filter)', () => {
+test.skip('0.2.3: Standard rows have no Settings; tapping a device opens Expanded with its card highlighted (even under a zone filter)', () => {
   localStorage.setItem('wavwiz.devsize', 'standard'); sessionStorage.setItem('wavwiz.devzone', '5');
   const S = { auth: { role: 'admin' }, zones: [zone(1), zone(2)], groups: [{ id: 5, name: 'Upstairs', deviceIds: [1], members: 1 }] };
   let p; const c = { ...ctl, setDevSize: (sz, id) => p.setSize(sz, id) };

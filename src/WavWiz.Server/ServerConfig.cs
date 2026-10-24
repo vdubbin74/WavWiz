@@ -23,7 +23,7 @@ public sealed class ServerConfig
     /// <summary>0.2.1 F13: look up missing album covers (Cover Art Archive) and artist photos (MusicBrainz / Wikidata) online, cached on this PC.
     /// The admin setting "library.onlineArt" can switch it off too.</summary>
     public bool OnlineArt { get; set; } = true;
-    /// <summary>0.1.1: AirPlay speaker "WavWiz – Whole House" (always on unless switched off here) and its RTSP port; Spotify Connect zeroconf port (the add-on itself is an admin setting, off by default).</summary>
+    /// <summary>0.1.1: AirPlay speaker "WavWiz – Everywhere" (always on unless switched off here) and its RTSP port; Spotify Connect zeroconf port (the add-on itself is an admin setting, off by default).</summary>
     public bool AirPlay { get; set; } = true;
     public int AirPlayPort { get; set; } = 47804;
     public int SpotifyPort { get; set; } = 47805;

@@ -71,7 +71,7 @@ public sealed class OnlineArt : IDisposable
     /// <summary>Cached picture bytes for an album / artist, or null. When nothing is cached (and no recent miss / transient back-off), a background lookup is queued.</summary>
     public byte[]? Album(string artist, string album) => Get("album", artist, album);
     public byte[]? Artist(string name) => Get("artist", name, "");
-    public string? CacheKey(string kind, string a, string b = "") { var k = Key(kind, a, b); return File.Exists(PathOf(k)) ? k : null; }
+    public string? CacheKey(string kind, string a, string b = "") { if (IsUnknown(a) || (kind == "album" && IsUnknown(b))) return null; var k = Key(kind, a, b); return File.Exists(PathOf(k)) ? k : null; }
 
     private byte[]? Get(string kind, string a, string b)
     {
@@ -108,7 +108,8 @@ public sealed class OnlineArt : IDisposable
         var t = TransientFirst.TotalMilliseconds * Math.Pow(2, Math.Clamp(attempts - 1, 0, 16));
         return TimeSpan.FromMilliseconds(Math.Min(t, TransientMax.TotalMilliseconds));
     }
-    private static bool IsUnknown(string s) => Norm(s) is "" or "unknown" or "unknown artist" or "unknown album" or "various artists" or "various";
+    /// <summary>0.4.4 F24: generic / unknown names - never a picture key (public so the art cache and the library share one rule).</summary>
+    public static bool IsUnknown(string? s) => Norm(s ?? "") is "" or "unknown" or "unknown artist" or "unknown album" or "various artists" or "various";
 
     /// <summary>0.2.2 T4e: what Settings > Library shows.</summary>
     public sealed record KindStatus(int Found, int NotFound, int Pending);

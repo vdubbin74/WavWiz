@@ -14,7 +14,7 @@ const rule = sel => { const i = css.lastIndexOf(sel + '{'); assert.ok(i >= 0, 'c
 
 test('B18: EQ mode = Lock, swap, Looks, full screen; viz mode adds power + pop-out; no style button', async () => {
   const L = await imp('looks');
-  assert.deepEqual(L.overlayButtons('eq'), ['swap', 'looks', 'full']);
+  assert.deepEqual(L.overlayButtons('eq'), ['lock', 'swap', 'looks', 'full']);   // 0.4.2
   assert.deepEqual(L.overlayButtons('viz'), ['popout', 'power', 'lock', 'swap', 'looks', 'full']);
   assert.deepEqual(L.overlayButtons('viz', { popout: false }), ['power', 'lock', 'swap', 'looks', 'full']);
   assert.deepEqual(L.looksRows('eq').map(r => r[1]), ['Glow', 'Overlay opacity', 'Button transparency']);
@@ -74,7 +74,7 @@ test('B5: both rails put the chevron at the top and center icon + vertical title
 });
 test('B7/B8: master bar uses the device-row structure (slider, %, Mute slot) and Mute all is on its own line', () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: the slot now holds the round master mute
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: the slot now holds the round master mute
   assert.match(d, /h\('div', \{ class: 'dvol' \}, vol, pct, mute\)/, 'device rows: slider, %, round mute');
 });
 test('B9: compact Scenes & Schedules: next event + countdown + Skip, Run chips, Open, + for admins only', async () => {
@@ -114,7 +114,7 @@ test('B13-B16: one Appearance grid - per-row counts, 16:10 cards up to 170 px, 1
 });
 test('B16: Small 75 %, Default 100 % (default), Large 125 % (max); earlier saved choices are kept', async () => {
   const U = await imp('uiscale');
-  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['small', 0.75], ['compact', 1], ['large', 1.25]]);
+  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['tiny', 0.67], ['small', 0.75], ['compact', 1], ['large', 1.25]]);
   assert.equal(U.migrateScale('compact'), 'compact'); assert.equal(U.migrateScale('large'), 'large'); assert.equal(U.migrateScale('small'), 'small');
   assert.equal(U.migrateScale('medium'), 'medium'); assert.equal(U.scaleFactor('medium'), 1.12, 'kept until another size is picked');
   assert.equal(U.migrateScale('xlarge'), 'large', 'capped at the new maximum'); assert.equal(U.migrateScale('junk'), 'compact');
@@ -128,7 +128,7 @@ test('B2: center-panel EQ scales to the stage - no fixed plot height, no scroll 
 // ---- B3 guided calibration
 test('B3 guided groups: reference, each speaker, reference again; only speakers skippable', async () => {
   const { guideGroups, guideText, buildPlan, skipNote } = await imp('calmic-core');
-  const g = guideGroups(buildPlan({ reference: { id: 1, name: 'Den' }, speakers: [{ id: 1, name: 'Den' }, { id: 2, name: 'Kitchen' }, { id: 3, name: 'Patio' }] }));
+  const g = guideGroups(buildPlan({ quality: 'thorough', reference: { id: 1, name: 'Den' }, speakers: [{ id: 1, name: 'Den' }, { id: 2, name: 'Kitchen' }, { id: 3, name: 'Patio' }] }));
   assert.deepEqual(g.map(x => [x.name, x.kind, x.steps.length, x.canSkip]), [['Den', 'ref', 3, false], ['Kitchen', 'dev', 3, true], ['Patio', 'dev', 3, true], ['Den', 'ref-end', 1, false]]);
   assert.equal(guideText('Kitchen'), 'Walk to Kitchen, hold the mic about 3 ft in front of it, then tap Ready');
   assert.match(skipNote('Patio'), /Skipped Patio: its delay is unchanged/);

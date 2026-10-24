@@ -34,7 +34,7 @@ try:
     # items 2/3: Settings > Network card
     close_dialogs(); e.go('settings:network'); time.sleep(1.5)
     txt = ev("document.querySelector('#sec-airplay')?.innerText || ''")
-    check('WavWiz – Whole House' in txt and 'AirPlay' in txt, 'item 2: Settings shows the AirPlay speaker name')
+    check('WavWiz – Everywhere' in txt and 'AirPlay' in txt, 'item 2: Settings shows the AirPlay speaker name')
     check(ev("!!document.querySelector('#spotify-enabled') && document.querySelector('#spotify-enabled').checked === false"), 'item 3: Spotify Connect toggle, off by default')
     check(ev("document.querySelector('#spotify-enabled')?.closest('label')?.innerText.includes('Requires Spotify Premium.')"), 'item 3: "Requires Spotify Premium." next to the toggle')
     ev("document.querySelector('#spotify-enabled').click()"); time.sleep(1.0)

@@ -106,3 +106,42 @@ public sealed class VizHub
         }
     }
 }
+
+/// <summary>
+/// 0.4.3 #10: one visualizer feed per playback group. Since 0.4.1 every zone plays in its own group ("zg:&lt;id&gt;"), but only the house group's
+/// engine fed the single VizHub, so the visualizer and the EQ view's live meters went flat during zone playback. Every Conductor's engine now feeds
+/// the hub of its own group (the tap runs only inside the engine's pump, so an idle group does no analysis). /ws/viz?zoneId= reads the zone's group;
+/// without a zoneId it reads the house group, else whichever group is playing now.
+/// </summary>
+public sealed class VizHubs
+{
+    private readonly object _l = new();
+    private readonly Dictionary<string, VizHub> _hubs = new();
+    private readonly Dictionary<string, Conductor> _conds = new();
+    public VizHub For(string? groupId)
+    {
+        var g = string.IsNullOrEmpty(groupId) ? Conductor.DefaultGroupId : groupId;
+        lock (_l) { if (!_hubs.TryGetValue(g, out var h)) _hubs[g] = h = new VizHub(); return h; }
+    }
+    public VizHub Default => For(Conductor.DefaultGroupId);
+    /// <summary>Hook a Conductor's engine to its group's hub.</summary>
+    public Conductor Attach(Conductor c) { c.Engine.FrameTap = For(c.GroupId).OnFrame; lock (_l) _conds[c.GroupId] = c; return c; }
+    /// <summary>The engine buffers audio seconds ahead, so after Stop/Pause the hub still holds windows past the stop time: those are never heard.</summary>
+    private bool Silenced(string g, long serverUs)
+    {
+        Conductor? c; lock (_l) _conds.TryGetValue(g, out c);
+        if (c == null) return false;
+        var e = c.Engine; return !e.Playing || serverUs >= e.StopAtUs;
+    }
+    private byte[]? Heard(string g, long serverUs) => Silenced(g, serverUs) ? null : For(g).At(serverUs);
+    /// <summary>The window heard at <paramref name="serverUs"/> in a group (null = that group is silent). With no group: the house group, else any group that is playing.</summary>
+    public byte[]? At(string? groupId, long serverUs)
+    {
+        if (groupId != null) return Heard(groupId, serverUs);
+        var w = Heard(Conductor.DefaultGroupId, serverUs); if (w != null) return w;
+        List<string> all; lock (_l) all = _hubs.Keys.ToList();
+        foreach (var g in all) { w = Heard(g, serverUs); if (w != null) return w; }
+        return null;
+    }
+    public int Count { get { lock (_l) return _hubs.Count; } }
+}

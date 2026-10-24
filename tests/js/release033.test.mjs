@@ -51,9 +51,9 @@ test('G6-G10: Speakers wording, output line, groups, highlight, zone on, slim ro
   assert.deepEqual(d.speakerGroups(zs, gs).unassigned.map(z => z.id), [3]); assert.deepEqual(d.speakerGroups(zs, []).unassigned, []);
   assert.deepEqual([...d.zoneHighlight(gs, 9)], [1, 2]); assert.equal(d.zoneHighlight(gs, 'all'), null);
   assert.equal(d.zoneOn(zs, gs[0]), true); assert.equal(d.zoneOn(zs, { deviceIds: [2, 3] }), false);
-  const s = src('devices.js'); assert.match(s, /'\+ Add to zone'/); assert.match(s, /' · not in any zone'/); assert.match(s, /reconcile\(emain, \[sscol, zcol, spcol, scol\]\)/   /* 0.3.5 J5 B */);
-  assert.match(s, /ro\(h\('button', \{ type: 'button', class: 'btn sm saddzone'[^]*isAdmin\(S\)\)/, 'Add to zone is read-only for non-admins');
-  assert.match(css, /\.devpanel \.dvol\{display:grid!important;grid-template-columns:minmax\(0,1fr\) 38px 28px/);
+  // 0.4.2 superseded by the zone tree (covered in release042 / ui042): const s = src('devices.js'); assert.match(s, /'\+ Add to zone'/); assert.match(s, /' · not in any zone'/); assert.match(s, /reconcile\(emain
+  // 0.4.2 superseded by the zone tree (covered in release042 / ui042): assert.match(s, /ro\(h\('button', \{ type: 'button', class: 'btn sm saddzone'[^]*isAdmin\(S\)\)/, 'Add to zone is read-only for non-admins')
+  assert.match(css, /\.devpanel \.dvol\{display:grid!important;grid-template-columns:minmax\(0,1fr\) minmax\(38px,3\.2em\) 28px/);
   assert.match(css, /\.dexp-main\.e1\{display:grid!important;grid-template-columns:340px minmax\(0,1fr\) 330px/);
 });
 test('G11: volume slider style - Gradient (default, theme colors) or Flat (primary), everywhere', async () => {
@@ -74,7 +74,7 @@ test('G12: reorder (multi-select block), server moves, undo, insertion index, au
   const rows = [{ top: 0, bottom: 20 }, { top: 20, bottom: 40 }]; assert.equal(q.dropIndex(rows, 5), 0); assert.equal(q.dropIndex(rows, 25), 1); assert.equal(q.dropIndex(rows, 99), 2);
   assert.ok(q.edgeScroll(2, 0, 300) < 0); assert.ok(q.edgeScroll(298, 0, 300) > 0); assert.equal(q.edgeScroll(150, 0, 300), 0);
   assert.deepEqual(q.nextSelection([1], 3, { ctrl: true }), [1, 3]); assert.deepEqual(q.nextSelection([1, 3], 3, { ctrl: true }), [1]); assert.deepEqual(q.nextSelection([], 4, { shift: true }, 1), [1, 2, 3, 4]);
-  const l = src('listtable.js'); assert.match(l, /api\('\/queue\/add', \{ method: 'POST', body: \{ \.\.\.JSON\.parse\(ref\), at: sort \? \(t < order\.length \? order\[t\] : S\.queue\.length\) : t \} \}\)/); assert.match(l, /if \(dragging\) return;/); assert.match(l, /ev\.key\.toLowerCase\(\) === 'z'/);
+  const l = src('listtable.js'); assert.match(l, /qapi\('\/queue\/add', \{ method: 'POST', body \}\)/); assert.match(l, /const body = \{ \.\.\.JSON\.parse\(ref\), at: sort/); assert.match(l, /if \(dragging\) return;/); assert.match(l, /ev\.key\.toLowerCase\(\) === 'z'/);
   assert.match(src('ui.js'), /Play next/);
 });
 test('G13: Jukebox dialogs use object buttons (keep on Start / Stop), non-admin toast, no array-form dialog() anywhere', () => {
@@ -92,5 +92,5 @@ test('G14: glow slider - no save / rebuild while dragging, save on change, Live 
   const a = src('appearance.js').match(/'data-eqglow': '1',\s*oninput: ev => \{[^\n]*/)[0]; assert.doesNotMatch(a, /saveEqPrefs/);
 });
 test('0.3.3 What\'s new and version', async () => {
-  const a = await imp('about'); assert.equal(/^0\.3\.[3-9]$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox starts again'));
+  const a = await imp('about'); assert.equal(/^0\.(3\.[3-9]|4\.\d)$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox starts again'));
 });

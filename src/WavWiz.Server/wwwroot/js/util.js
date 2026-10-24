@@ -18,7 +18,19 @@ export function h(tag, attrs, ...kids) {
 
 export class ApiError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 
+// 0.4.0: the zone this page controls. Playback calls (/stream, /queue, saving the queue as a playlist) carry ?zoneId=<playback group> when it is not the house group,
+// so every existing call site (buttons, hotkeys, media keys, menus, the mini player) acts on the selected zone without being touched.
+let apiZone = null;
+export function setApiZone(id) { apiZone = id || null; }
+export const getApiZone = () => apiZone;
+export function withZone(path, opts = {}, zone = apiZone) {
+  if (!zone || /[?&]zoneId=/.test(path)) return path;
+  const play = /^\/(stream|queue)(\/|\?|$)/.test(path) && !path.startsWith('/stream/zones'), save = /^\/playlists(\/|\?|$)/.test(path) && opts.body && opts.body.fromQueue === true;
+  return play || save ? path + (path.includes('?') ? '&' : '?') + 'zoneId=' + encodeURIComponent(zone) : path;
+}
+
 export async function api(path, opts = {}) {
+  path = withZone(path, opts);
   const init = { method: opts.method || 'GET', headers: {}, credentials: 'same-origin' };
   if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
   if (opts.raw) { init.body = opts.raw; init.headers['Content-Type'] = 'application/octet-stream'; }
@@ -30,8 +42,13 @@ export async function api(path, opts = {}) {
 }
 
 export function toast(msg, bad = false, ms = 4500) {
-  const t = h('div', { class: 'toast' + (bad ? ' bad' : ''), role: bad ? 'alert' : 'status' }, msg);
-  document.getElementById('toasts').append(t); setTimeout(() => t.remove(), ms);
+  // 0.4.1: the same message is shown once (its timer restarts), and at most 3 toasts stack, so a repeating error can never flood the screen
+  const box = document.getElementById('toasts'); if (!box) return;
+  const same = [...box.children].find(t => t.classList?.contains('toast') && !t.classList.contains('undo') && t.dataset.msg === String(msg) && t.classList.contains('bad') === !!bad);
+  if (same) { clearTimeout(same._t); same._t = setTimeout(() => same.remove(), ms); return; }
+  const t = h('div', { class: 'toast' + (bad ? ' bad' : ''), role: bad ? 'alert' : 'status', 'data-msg': String(msg) }, msg);
+  box.append(t); t._t = setTimeout(() => t.remove(), ms);
+  while (box.children.length > 3) box.firstElementChild.remove();
 }
 
 /** 0.3.7 L14: a short toast with an Undo button (6 s). */

@@ -25,8 +25,8 @@ export const stepPct = (v, dir, shift) => pct(pct(v) + (shift ? 10 : 1) * (dir >
 /** Which buttons the group shows, left to right (B18). No visualizer-style button: the style is chosen in Settings. */
 export function overlayButtons(mode, { popout = true } = {}) {
   // 0.3.6 K12: the group is right-anchored; Pop out and Power go on the LEFT so lock / swap / looks / full keep the exact same x in both modes
-  // 0.3.8 L35: in EQ mode the title-bar padlock is the only lock (no overlay lock); the visualizer keeps its own lock
-  return mode === 'viz' ? [...(popout ? ['popout'] : []), 'power', 'lock', 'swap', 'looks', 'full'] : ['swap', 'looks', 'full'];
+  // 0.4.2: the lock sits in the top-right icon group in both modes (the EQ header keeps only the picker + All sound settings)
+  return mode === 'viz' ? [...(popout ? ['popout'] : []), 'power', 'lock', 'swap', 'looks', 'full'] : ['lock', 'swap', 'looks', 'full'];   // 0.4.2: the EQ lock lives in this top-right group, same x as in the visualizer
 }
 /** The Looks popover rows for a mode: [key, label]. */
 export function looksRows(mode) {

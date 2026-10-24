@@ -10,7 +10,11 @@ public static class JukeboxApi
         g.MapGet("/jukebox/config", () => Results.Json(jb.CfgDto())).Req(Role.View);
         g.MapPut("/jukebox/config", async (HttpContext c) => { var b = await c.Request.Body(); if (b.ValueKind != JsonValueKind.Object) return Ext.Bad("expected an object"); var err = jb.Update(b); return err != null ? Ext.Bad(err) : Results.Json(jb.CfgDto()); }).Req(Role.Admin);
         g.MapGet("/jukebox", () => Results.Json(jb.State())).Req(Role.View);
-        g.MapPost("/jukebox/start", async (HttpContext c) => { var b = await c.Request.Body(); var code = jb.Start(b.ValueKind == JsonValueKind.Object && b.TryGetProperty("theme", out var th) ? th : null); return Results.Json(new { ok = true, code }); }).Req(Role.Admin);
+        g.MapPost("/jukebox/start", async (HttpContext c) => { var b = await c.Request.Body();
+            // 0.4.9 F76 fix: borrow the speakers picked in Start Jukebox (deviceIds), else the saved default speakers, for this session only
+            var ids = b.ValueKind == JsonValueKind.Object ? b.LongList("deviceIds") : null; ids ??= jb.Cfg().DefaultSpeakers;
+            if (ids != null) { var e0 = s.Links.CheckDevices(ids); if (e0 != null) return Ext.Bad(e0); }
+            var code = jb.Start(b.ValueKind == JsonValueKind.Object && b.TryGetProperty("theme", out var th) ? th : null, ids); return Results.Json(new { ok = true, code }); }).Req(Role.Admin);
         // leaving the kiosk: admin, or the host PIN typed on the locked screen
         g.MapPost("/jukebox/stop", async (HttpContext c) =>
         {

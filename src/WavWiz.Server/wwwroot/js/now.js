@@ -1,8 +1,10 @@
+import { holdPage } from './motion.js';
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
 import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg, setChev } from './icons.js';
+import { mixerButton } from './mixer.js';
 import { shortcutsRow } from './shortcuts.js';
 import { canControl, thisDevice } from './ui.js';
 import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
@@ -11,6 +13,8 @@ import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
 import { mountMini } from './mini.js';
 import { loadPanels, savePanels } from './panels.js';
+import { scaleTo, changed, groupLevel, members } from './mixer-core.js';   // 0.4.9 F68: the phone remote's zone volume scales like the Volume Mixer's zone slider
+import { zoneLink, current as currentZone } from './zones40.js';   // 0.4.5 F27: the inline "on <zone> ▾" is the only Controlling picker in Now Playing views
 import { loadEqLock, saveEqLock } from './eqstyle.js';
 import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, resetLooks, stepPct, ovSvg } from './looks.js';
 
@@ -52,6 +56,7 @@ export function createNow(S, ctl) {
   const volPct = h('span', { class: 'volpct small dim' }, '');
   const genre = h('div', { class: 'np-genre' }, h('span', { class: 'np-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')), t3line);
   // 0.2.1 F10: no three-dot menu and no Stop - Sound (EQ) is a regular panel button next to Mute (one click), styled like Shuffle / Repeat
+  const mkMix = () => mixerButton('tbtn');   // 0.4.8 F49
   const mkEq = () => h('button', { class: 'tbtn eqbtn', 'aria-label': 'Sound (EQ)', title: 'Sound (EQ)', onclick: () => ctl.openEq() }, icon('eq'));
   const eqBtn = mkEq();
   const upnext = h('div', { class: 'upnext np-upnext', 'aria-label': 'Up next' });
@@ -60,7 +65,7 @@ export function createNow(S, ctl) {
   const prev = h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), next = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
   // 0.1.2 panel hotfix: controls live in their own SOLID panel below a separate visualizer panel (same chrome as Library / Devices / Playlist).
   // Control layout is unchanged: title/times | transport | master volume, device dots underneath.
-  const ovT1 = h('div', { class: 't1' }, 'Nothing playing'), ovT2 = h('div', { class: 't2' }, ' '), ovAA = h('span', { class: 'pn-aa ell' });   // 0.3.6 K21: artist - album on the time line (Center style)
+  const ovAl = h('div', { class: 'np-album ell' }), ovT1 = h('div', { class: 't1' }, 'Nothing playing'),   /* 0.4.9 F68: album line (phone remote only) */ ovT2 = h('div', { class: 't2' }, ' '), ovAA = h('span', { class: 'pn-aa ell' });   // 0.3.6 K21: artist - album on the time line (Center style)
   // 0.2.0 item 8: four panel styles (Classic default, Center, Stack, Horizon) share one set of controls; CSS (.pn-<style>) shows each
   // style's art + seek treatment. Art LEFT, one matching button style per panel, volume = speaker icon + slider + %, then Mute and More.
   const seekFrac = f => { if (!canControl(S) || !S.now?.item || isLive(S.now.item) || !S.now.durationMs) return; act('/stream/seek', { ms: Math.round(Math.min(1, Math.max(0, f)) * S.now.durationMs) }); };
@@ -85,16 +90,49 @@ export function createNow(S, ctl) {
   const ledFill = h('div', { class: 'pn-ledfill' });
   const pnLed = h('div', { class: 'pn-led', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnLed, ev)) }, ledFill);
   const tableMeta = h('div', { class: 'np-tablemeta pn-meta' },
-    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2), npHeart, pnClock),
+    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2, ovAl, zoneLink('zl-ov')), npHeart, pnClock),
     h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave,
     h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, ovAA, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
-    h('div', { class: 'np-volrow' }, icon('volume'), vol, volPct, muteBtn, h('div', { class: 'np-vol' }, eqBtn), mkSleep()));
+    h('div', { class: 'np-volrow' }, muteBtn, mkMix(), h('div', { class: 'np-vol' }, eqBtn), mkSleep()),   /* 0.4.8 F54: no volume slider in the play bars - the mixer button is in its place */
+    zoneVolRow());   // 0.4.9 F68: phone only (CSS) - full-width volume of the zone being controlled
+  // 0.4.9 F68: phone remote - one volume + mute for the zone in the "on <zone>" picker; same scaling (scaleTo / caps) as the Volume Mixer's zone slider
+  function zoneGroup() { const c = currentZone(); return c?.kind === 'zone' ? (S.groups || []).find(g => g.id === c.id) || null : null; }
+  function zoneMembers() { const g = zoneGroup(); return g ? members(S.zones, g).filter(z => z.enabled !== false) : []; }
+  function zoneVolRow() {
+    let base = null; const timers = new Map();
+    const send = (z, body) => { clearTimeout(timers.get(z.id)); timers.set(z.id, setTimeout(() => act(`/zones/${z.id}`, body, 'PATCH'), 90)); };
+    const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: 0, class: 'np-zvol', 'aria-label': 'Zone volume' });
+    const pct = h('span', { class: 'np-zpct' }, '—');
+    const mute = h('button', { type: 'button', class: 'tbtn tog np-zmute', 'aria-label': 'Mute this zone', 'aria-pressed': 'false', onclick: () => {
+      const g = zoneGroup(), zs = zoneMembers(); if (!g || !canControl(S)) return; const m = !(zs.length && zs.every(z => z.muted)); for (const z of zs) z.muted = m;
+      api(`/groups/${g.id}/mute`, { method: 'POST', body: { muted: m } }).catch(e => toast(e.message, true)); drawZoneVol(); } }, icon('volume'));
+    r.addEventListener('pointerdown', () => { base = null; });
+    r.addEventListener('input', () => {
+      const zs = zoneMembers(); if (!zs.length || !canControl(S)) return;
+      if (!base) base = { zs, vols: zs.map(z => z.volume) };
+      const next = scaleTo(base.vols, +r.value, base.zs.map(z => z.volCap ?? 100));
+      for (const [i, v] of changed(base.vols, next)) { const z = base.zs[i]; z.volume = v; send(z, { volume: Math.round(v) }); }
+      pct.textContent = r.value + '%'; r.style.setProperty('--v', r.value + '%'); });
+    r.addEventListener('change', () => { base = null; });
+    E.zoneVol = { r, pct, mute };
+    return h('div', { class: 'np-phvol', role: 'group', 'aria-label': 'Zone volume' }, mute, h('div', { class: 'np-zvolw' }, r, pct));
+  }
+  function drawZoneVol() {
+    const zv = E.zoneVol; if (!zv) return; const zs = zoneMembers(), v = Math.round(groupLevel(zs.map(z => z.volume))), muted = !!zs.length && zs.every(z => z.muted);
+    zv.r.disabled = zv.mute.disabled = !canControl(S) || !zs.length;
+    if (document.activeElement !== zv.r) { zv.r.value = String(v); zv.r.style.setProperty('--v', v + '%'); }
+    zv.pct.textContent = zs.length ? v + '%' : '—';
+    zv.mute.classList.toggle('on', muted); zv.mute.setAttribute('aria-pressed', String(muted)); setIcon(zv.mute, muted ? 'mute' : 'volume'); zv.mute.setAttribute('aria-label', muted ? 'Unmute this zone' : 'Mute this zone');
+  }
   // Collapse arrow = the same `plus listcol` toggle the Playlist uses (˅ / ˄, themed accent). Collapsing the control panel
   // slides it down to its header strip and the visualizer panel grows into the freed space. Saved per device.
-  let ctlCollapsed = loadPanels().ctl === 'collapsed';   // 0.3.0 §6: one key for all panels
+  // 0.4.9 F67: on the phone the EQ / visualizer no longer take the space, so the card starts expanded unless the user folded it themselves
+  const P0 = loadPanels(), phoneNp = typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
+  // 0.4.9 F68: on the phone Now Playing IS the remote - never folded (the fold button is hidden there)
+  let ctlCollapsed = P0.ctl === 'collapsed' && !phoneNp;   // 0.3.0 §6: one key for all panels
   const ctlColBtn = h('button', { class: 'plus listcol np-ctlcol', 'aria-label': 'Collapse or expand the playback controls', 'aria-expanded': String(!ctlCollapsed), title: 'Collapse / expand the controls', onclick: () => toggleCtl() }); setChev(ctlColBtn, ctlCollapsed ? 'u' : 'd');
   const ctlNow = h('span', { class: 'np-ctlnow small dim ell' }, '');
   // 0.2.3 U1 (replaces 0.2.2 T3): collapsed = ONE line - thumbnail, title · artist over a progress bar with elapsed / total, then every
@@ -114,9 +152,9 @@ export function createNow(S, ctl) {
   const sProg = h('div', { class: 'ns-prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(sProg, ev)) },
     h('div', { class: 'bar' }), sFill, sKnob, h('div', { class: 'ns-led', 'aria-hidden': 'true' }, sLedFill), h('div', { class: 'ns-wave', 'aria-hidden': 'true' }, sWaveBase, sWaveClip));
   const ctlStrip = h('div', { class: 'np-strip', role: 'group', 'aria-label': 'Now playing (compact)' },
-    h('div', { class: 'ns-song' }, sArt, h('div', { class: 'ns-main' }, h('div', { class: 'ns-titles' }, sT1, h('span', { class: 'ns-dot', 'aria-hidden': 'true' }, '·'), sT2), h('div', { class: 'ns-seek' }, sElv, sProg, sDur))),
+    h('div', { class: 'ns-song' }, sArt, h('div', { class: 'ns-main' }, h('div', { class: 'ns-titles' }, sT1, h('span', { class: 'ns-dot', 'aria-hidden': 'true' }, '·'), sT2, zoneLink('zl-strip')), h('div', { class: 'ns-seek' }, sElv, sProg, sDur))),
     h('div', { class: 'ns-x', role: 'group', 'aria-label': 'Transport' }, sHeart, sShuffle, sPrev, sPlay, sNext, sRepeat),
-    h('div', { class: 'ns-vol' }, icon('volume'), sVol, sPct, sMute, sEq));
+    h('div', { class: 'ns-vol' }, sMute, mkMix(), sEq));
   // U2: with the Playlist minimized its title bar shows only "Up next: Title · Artist", centered on the Now Playing column (main.js places it)
   const nxArt = h('div', { class: 'pln-art' }), nxT1 = h('span', { class: 'pln-t1 ell' }, ''), nxT2 = h('span', { class: 'pln-t2 ell' }, '');
   const nextBlock = h('div', { class: 'plnext', 'aria-label': 'Up next', hidden: true }, h('span', { class: 'pln-lbl' }, 'UP NEXT'), nxArt, nxT1, h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·'), nxT2);
@@ -132,7 +170,7 @@ export function createNow(S, ctl) {
   panelTpl = ctlPanel;
   applyNpStyle(); window.addEventListener('wavwiz:npstyle', applyNpStyle);
   window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') applyNpStyle(); });
-  function toggleCtl(force) {
+  function toggleCtl(force) { holdPage();   // 0.4.9 F74: page held BEFORE the change (the scrollbar shows in the very first frame)
     ctlCollapsed = force ?? !ctlCollapsed;
     ctlPanel.classList.toggle('collapsed', ctlCollapsed);
     el.classList.toggle('ctlcollapsed', ctlCollapsed);
@@ -153,13 +191,13 @@ export function createNow(S, ctl) {
   const el = h('section', { class: 'nowcol np8 np12' + (ctlCollapsed ? ' ctlcollapsed' : ''), id: 'p-now', 'aria-label': 'Now playing' },
     h('h2', { class: 'sr-only' }, 'Now playing'), vizPanel,
     h('div', { class: 'np-row' },
-      h('div', { class: 'np-meta' }, art, h('div', { class: 'titles' }, t1, t2, genre, t3))),
+      h('div', { class: 'np-meta' }, art, h('div', { class: 'titles' }, t1, t2, zoneLink('zl-meta'), genre, t3))),
     ctlPanel, upnext, strip, checklist);
   E.ovTitles = ovTitles;
 
   const miniCover = h('div'), miniT = h('div', { class: 't1 ell' }, 'Nothing playing'), miniS = h('div', { class: 't2 ell' });
   const miniPlay = h('button', { class: 'tbtn play mini-play', 'aria-label': 'Play or pause', onclick: ev => { ev.stopPropagation(); play.click(); } }, icon('play'));
-  const mini = h('div', { class: 'mini', onclick: () => ctl.go('now') }, miniCover, h('div', { class: 'grow' }, miniT, miniS), miniPlay);
+  const mini = h('div', { class: 'mini', onclick: () => ctl.go('now') }, miniCover, h('div', { class: 'grow' }, miniT, h('div', { class: 'zl-line' }, miniS, zoneLink('zl-phone'))), miniPlay);
 
   // 0.2.0 items 16 + 27: full-width Now Playing bar for the expanded Library / Devices views (art, titles, transport, seek + times,
   // this-device volume, Mute, More). Same Classic button style as the panel.
@@ -170,15 +208,16 @@ export function createNow(S, ctl) {
   const barVol = mkVol(), barMute = mkMute(), barPct = h('span', { class: 'volpct small dim' }, '');
   const barEq = mkEq();
   const npbar = h('section', { class: 'npbar', 'aria-label': 'Now playing (compact)' },
-    barCover, h('div', { class: 'npb-titles' }, barT1, barT2), barHeart,
+    barCover, h('div', { class: 'npb-titles' }, barT1, h('div', { class: 'zl-line' }, barT2, zoneLink('zl-bar'))), barHeart,
     h('div', { class: 'transport npb-x', role: 'group', 'aria-label': 'Transport' }, h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev')), barPlay, h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'))),
     h('div', { class: 'npb-seek' }, barElv, barProg, barRev),
-    h('div', { class: 'npb-vol' }, mkSleep(), icon('volume'), barVol, barPct, barMute, barEq), mkSc('npb-sc'));
+    h('div', { class: 'npb-vol' }, mkSleep(), barMute, mkMix(), barEq), mkSc('npb-sc'));
   function syncVol(v, from) { for (const r of [vol, barVol, sVol]) if (r !== from && document.activeElement !== r) r.value = v; volPct.textContent = barPct.textContent = sPct.textContent = Math.round(v) + '%'; }
   /** This device's volume / mute on the panel, the mini bar and the header tag. */
   function drawMine() {
     const z = me(), can = canControl(S) && !!z;
     for (const r of [vol, barVol, sVol]) { r.disabled = !can; r.title = z ? `Volume of this device (${z.name})` : 'This page is not playing as a speaker yet'; }
+    drawZoneVol();
     syncVol(z ? z.volume : 0); if (!z) volPct.textContent = barPct.textContent = sPct.textContent = '—';
     for (const b of [muteBtn, barMute, sMute]) { b.disabled = !can; b.classList.toggle('on', !!z?.muted); b.setAttribute('aria-pressed', String(!!z?.muted)); setIcon(b, z?.muted ? 'mute' : 'volume'); b.title = z?.muted ? 'Unmute this device' : 'Mute this device'; }
   }
@@ -309,7 +348,7 @@ export function createNow(S, ctl) {
     t1.textContent = it ? (radio ? (n.liveTitle || it.title) : it.title) : 'Nothing playing';
     t2.textContent = it ? (radio ? (n.liveTitle ? it.title : 'Internet radio') : (it.artist || ' ')) : 'Pick something from the library';
     if (E.ovTitles) { E.ovTitles.children[0].textContent = t1.textContent; E.ovTitles.children[1].textContent = t2.textContent; }
-    { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; }
+    { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; ovAl.textContent = it2 && it2.kind !== 'radio' ? it2.album || '' : ''; }
     ctlNow.textContent = it ? [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' — ') : '';
     // genre line (mockup: "Ambient • Electronica"); falls back to album • year when the file has no genre tag
     const genres = it?.genre ? String(it.genre).split(/\s*[;/,|]\s*/).filter(Boolean).slice(0, 3) : [];
@@ -351,7 +390,9 @@ export function createNow(S, ctl) {
     setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
       seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') });
     // Up next
-    const qi = n.index ?? -1; const nxt = (qi >= 0 && S.queue && qi + 1 < S.queue.length) ? S.queue[qi + 1] : null;
+    // 0.4.9 F73: the server says what really plays next (shuffle pick, Repeat All wrap, Repeat One); the list neighbour only for an older server
+    const qi = n.index ?? -1; const nxt = 'nextIndex' in n ? (n.nextIndex >= 0 ? (S.queue?.[n.nextIndex]?.id === n.nextTrack?.id && S.queue?.[n.nextIndex] || n.nextTrack || null) : null)
+      : (qi >= 0 && S.queue && qi + 1 < S.queue.length) ? S.queue[qi + 1] : null;
     upnext.replaceChildren(h('span', { class: 'np-uplbl' }, 'Up next'),
       nxt ? h('span', { class: 'ell np-uptitle' }, `${nxt.title}${nxt.artist ? ' - ' + nxt.artist : ''}${nxt.durationMs ? ' • ' + fmtDur(nxt.durationMs) : (nxt.kind === 'radio' ? ' • LIVE' : '')}`) : null,
       h('span', { class: 'np-upline', 'aria-hidden': 'true' }));

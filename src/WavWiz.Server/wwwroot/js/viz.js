@@ -64,10 +64,20 @@ let progress = null; export function setVizProgress(f) { progress = f; }
 const feed = { subs: new Set(), live: null, win: null, extra: null, audible: false, lastData: 0, frames: 0 };
 function feedSub(v) {
   feed.subs.add(v);
-  if (!feed.live) feed.live = liveSocket('/ws/viz?delayMs=0', { binary: true, pingText: null, silentMs: 1e9,
+  if (!feed.live) openFeed();
+}
+/** 0.4.3 #10: since 0.4.1 every zone plays in its own group, so the feed names the zone this page controls (the zone picker's key, "g:<id>" / "jukebox").
+ * No zone picked: the server shows the house group, else whichever group is playing. */
+export const vizUrl = key => '/ws/viz?delayMs=0' + (key ? '&zoneId=' + encodeURIComponent(key) : '');
+const selZone = () => { try { return globalThis.localStorage?.getItem('wavwiz.zone') || null; } catch { return null; } };
+function openFeed() {
+  feed.key = selZone();
+  feed.live = liveSocket(vizUrl(feed.key), { binary: true, pingText: null, silentMs: 1e9,
     onMessage: ev => { const u = new Uint8Array(ev.data); if (u[0] === 1 && u.length >= 1025) { feed.win = u.subarray(1, 1025).slice(); feed.extra = u.length >= 1029 ? u.subarray(1025, 1029).slice() : null; feed.bands = u.length >= 1039 ? u.subarray(1029, 1039).slice() : null;  /* 0.3.6 K11: ten octave-band levels from the server's 8192-point FFT */  feed.audible = true; feed.lastData = performance.now(); feed.frames++; } else if (u[0] === 0) { feed.audible = false; feed.win = null; feed.extra = null; } for (const s of feed.subs) s.kick(); },
     onClose: () => { feed.audible = false; } });
 }
+/** The zone picker moved to another zone: follow its music. */
+try { globalThis.addEventListener?.('wavwiz:zone', () => { if (!feed.live || selZone() === feed.key) return; feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; if (feed.subs.size) openFeed(); }); } catch { /* no window */ }
 function feedUnsub(v) { feed.subs.delete(v); if (!feed.subs.size && feed.live) { feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; } }
 /** 0.2.1 F12: the Sound (EQ) spectrum glow reads the same shared feed. onFrame(waveBytes|null, audible); returns an unsubscribe function. */
 export function spectrumTap(onFrame) { const sub = { kick: () => onFrame(feed.win, feed.audible, feed.bands) }; feedSub(sub); return () => feedUnsub(sub); }

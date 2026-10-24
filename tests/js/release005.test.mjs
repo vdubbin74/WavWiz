@@ -26,7 +26,7 @@ test('0.0.5/0.1.2 themes: Midnight Neon default; charcoal/steel/midnight removed
 });
 
 test('0.0.5 display sizes', () => {
-  assert.deepEqual(uiscale.SCALES.map(x => x[0]), ['small', 'compact', 'large']);   // 0.3.1 B16: Small / Default / Large
+  assert.deepEqual(uiscale.SCALES.map(x => x[0]), ['tiny', 'small', 'compact', 'large']);   // 0.3.1 B16: Small / Default / Large
   assert.equal(uiscale.loadScale(), 'compact');
 });
 

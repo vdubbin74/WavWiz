@@ -1,3 +1,4 @@
+import { dndMode, pointerDragSource, pointerDropTarget } from './pdrag.js';
 import { h, api, toast, dialog } from './util.js';
 
 export const canControl = S => S.auth && S.auth.role !== 'view';
@@ -66,7 +67,7 @@ export async function pickPlaylist(S, ref, title = 'Add to playlist') {
 
 /** Makes a row work everywhere: click = open/play (caller), "..." = menu, right-click = menu, long-press on touch = menu, drag (desktop) = add to a playlist/queue. */
 /** 0.3.5 J11: what is being dragged from the Library (the playlist's drop line says "Drop here: 17 songs at #4"). */
-export const dragInfo = { count: null, title: '', kind: '' };
+export const dragInfo = { count: null, title: '', kind: '', ref: null };  // 0.4.4 F8: ref stashed so WebKit/TV dragover (no custom MIME in types) still accepts
 export const songsLabel = n => `${n} song${n === 1 ? '' : 's'}`;
 /** "Drop here: 17 songs at #4" (pure; no count known -> "Drop here at #4"). */
 export const dropLabel = (count, at) => `Drop here${count != null ? ': ' + songsLabel(count) : ''} at #${at + 1}`;
@@ -78,12 +79,19 @@ export function attachItem(S, el, ref, title, { menu = [], more = true, count = 
   if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(); } }, '⋯'));
   el.addEventListener('contextmenu', ev => { ev.preventDefault(); openMenu(); });
   longPress(el, openMenu);
+  if (canControl(S)) {   // 0.4.5 F8: pointer-event drag too (touch / pen everywhere; every input in the WavWiz Player window, where HTML5 DnD did not reach the queue)
+    el.classList.add('ldrag');   // 0.4.5: grab cursor on every draggable Library row / tile (songs and categories)
+    const mode = dndMode(), mkGhost = () => { const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); return h('div', { class: 'dragghost' }, h('div', { class: 'dg-t' }, h('b', { class: 'ell' }, title), h('span', { class: 'small dim' }, [kind, n != null ? songsLabel(n) : null].filter(Boolean).join(' · '))), n != null ? h('span', { class: 'dgbadge' }, String(n)) : null); };
+    pointerDragSource(el, () => ({ lib: true, ref, title }), { mode, ghost: mkGhost,
+      onStart: () => { dragInfo.count = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.title = title; dragInfo.kind = kind; dragInfo.ref = ref; },
+      onEnd: () => { dragInfo.count = null; dragInfo.title = ''; dragInfo.kind = ''; dragInfo.ref = null; } });
+    if (mode === 'pointer') return el; }
   if (canControl(S)) { el.draggable = true; el.addEventListener('dragstart', ev => { ev.dataTransfer.setData(MIME, JSON.stringify(ref)); ev.dataTransfer.setData('text/plain', title); ev.dataTransfer.effectAllowed = 'copy'; el.classList.add('dragging');
-    const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.count = n; dragInfo.title = title; dragInfo.kind = kind;
+    const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.count = n; dragInfo.title = title; dragInfo.kind = kind; dragInfo.ref = ref;
     // 0.3.5 J11: a small ghost - title, kind · N songs, and a count badge
     try { const g = h('div', { class: 'dragghost' }, h('div', { class: 'dg-t' }, h('b', { class: 'ell' }, title), h('span', { class: 'small dim' }, [kind, n != null ? songsLabel(n) : null].filter(Boolean).join(' · '))), n != null ? h('span', { class: 'dgbadge' }, String(n)) : null);
       document.body.append(g); ev.dataTransfer.setDragImage?.(g, 14, 14); setTimeout(() => g.remove(), 0); } catch { /* old browsers: default ghost */ } });
-    el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragInfo.count = null; dragInfo.title = ''; }); }
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragInfo.count = null; dragInfo.title = ''; dragInfo.kind = ''; dragInfo.ref = null; }); }
   return el;
 }
 
@@ -98,6 +106,7 @@ export function longPress(el, fn, ms = 520) {
 }
 
 export function dropTarget(el, onRef, accept = ev => ev.dataTransfer?.types?.includes(MIME)) {
+  pointerDropTarget(el, { accept: p => !!p?.lib, over: () => el.classList.add('dragover'), leave: () => el.classList.remove('dragover'), drop: p => { el.classList.remove('dragover'); return onRef(p.ref); } });   // 0.4.5 F8
   el.addEventListener('dragover', ev => { if (accept(ev)) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; el.classList.add('dragover'); } });
   el.addEventListener('dragleave', () => el.classList.remove('dragover'));
   el.addEventListener('drop', ev => { el.classList.remove('dragover'); const raw = ev.dataTransfer.getData(MIME); if (!raw) return; ev.preventDefault(); try { onRef(JSON.parse(raw), ev); } catch { /* bad payload */ } });

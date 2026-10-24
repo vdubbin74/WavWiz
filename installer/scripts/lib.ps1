@@ -284,17 +284,17 @@ function Get-ServerUdpPorts($Config) {
 }
 # 0.1.1: AirPlay receiver (RTSP TCP + RTP/control/timing UDP on ports it picks) and Spotify Connect (librespot zeroconf TCP + its own mDNS on UDP 5353).
 # Same style: Private profile, local subnet only, each rule scoped to that one bundled program. Delete-then-add = idempotent.
+# 0.4.9 fix: the TCP rules are program-only (any port) - the per-zone receivers (0.4.0) use their own RTSP / zeroconf ports, which a
+# localport=47804 / 47805 rule blocked; shairplay's UDP audio / control / timing ports are random, so UDP was already program-only.
 $script:ReceiverFirewallNames = @('WavWiz AirPlay receiver', 'WavWiz AirPlay receiver (UDP)', 'WavWiz Spotify Connect', 'WavWiz Spotify Connect (mDNS)')
 function Set-ReceiverFirewall([string]$ServerExe, $Config) {
     $net = Get-SystemTool 'netsh.exe'; $rdir = Join-Path (Split-Path -Parent $ServerExe) 'receivers'
-    $ap = 47804; if ($Config.Contains('airPlayPort') -and [int]$Config['airPlayPort'] -gt 0) { $ap = [int]$Config['airPlayPort'] }
-    $sp = 47805; if ($Config.Contains('spotifyPort') -and [int]$Config['spotifyPort'] -gt 0) { $sp = [int]$Config['spotifyPort'] }
     foreach ($n in $script:ReceiverFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete old receiver rule' -AllowFail -TimeoutSec 30) }
     $airplay = Join-Path $rdir 'wavwiz-airplay.exe'; $librespot = Join-Path $rdir 'librespot.exe'
     $common = @('dir=in', 'action=allow', 'profile=private', 'remoteip=localsubnet', 'enable=yes')
-    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[0]), 'protocol=TCP', "localport=$ap", "program=$airplay") + $common) -Label 'netsh add AirPlay TCP rule' -TimeoutSec 30)
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[0]), 'protocol=TCP', "program=$airplay") + $common) -Label 'netsh add AirPlay TCP rule' -TimeoutSec 30)
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[1]), 'protocol=UDP', "program=$airplay") + $common) -Label 'netsh add AirPlay UDP rule' -TimeoutSec 30)
-    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[2]), 'protocol=TCP', "localport=$sp", "program=$librespot") + $common) -Label 'netsh add Spotify Connect rule' -TimeoutSec 30)
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[2]), 'protocol=TCP', "program=$librespot") + $common) -Label 'netsh add Spotify Connect rule' -TimeoutSec 30)
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[3]), 'protocol=UDP', 'localport=5353', "program=$librespot") + $common) -Label 'netsh add Spotify Connect mDNS rule' -TimeoutSec 30)
 }
 function Remove-ServerFirewall {

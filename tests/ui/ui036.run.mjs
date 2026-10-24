@@ -173,7 +173,7 @@ const labels = (p, sel) => p.evaluate(s => [...document.querySelectorAll(s)].fil
     const al = await p.evaluate(() => ({ dev: document.getElementById('desk').classList.contains('devexpanded'), editor: !!document.querySelector('.devpanel .ss-inline') }));
     ok('K17 New > Alarm jumps to the alarm editor in expanded Devices', al.dev && al.editor, JSON.stringify(al));
     await p.keyboard.press('Escape'); await home(p, NORMAL);
-    for (const [key, sel, name] of [['Control+Shift+KeyS', '.devpanel .ss-sceneedit', 'scene'], ['Control+Shift+KeyH', '.devpanel .ss-inline', 'schedule'], ['Control+Shift+KeyZ', '.devpanel .zone-inline, .devpanel .zinline, .devpanel [data-edit], .devpanel .zedit-form', 'zone']]) {
+    for (const [key, sel, name] of [['Control+Shift+KeyS', '.devpanel .ss-sceneedit', 'scene'], ['Control+Shift+KeyH', '.devpanel .ss-inline', 'schedule'], ['Control+Shift+KeyZ', 'dialog[open], .devpanel .zone-inline, .devpanel .zinline', 'zone']]) {
       await home(p, NORMAL); await p.locator('body').click({ position: { x: 5, y: 300 } }); await p.keyboard.press(key); await p.waitForTimeout(1100);
       const r = await p.evaluate(s => ({ dev: document.getElementById('desk').classList.contains('devexpanded'), el: !!document.querySelector(s) }), sel);
       ok(`K17 ${key} opens New ${name}`, r.dev && r.el, JSON.stringify(r));
@@ -190,7 +190,7 @@ const labels = (p, sel) => p.evaluate(s => [...document.querySelectorAll(s)].fil
     const zs = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Zones submenu ends with New…', zs.at(-1)?.startsWith('New'), zs.join('|'));
     await p.screenshot({ path: `/workspace/screens/wavwiz-036-${ENG}-k18-zones.png` }); await p.keyboard.press('Escape');
     await hoverItem(p, 'Devices', 'Scenes'); const sc = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Scenes submenu ends with New…', sc.at(-1)?.startsWith('New'), sc.join('|')); await p.keyboard.press('Escape');
-    await hoverItem(p, 'Devices', 'Devices'); const dv = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Devices submenu lists devices', dv.length >= 1, dv.length); 
+    await hoverItem(p, 'Devices', 'Speakers'); const dv = await labels(p, '.menubar .msub.open > .mpanel button'); ok('K18 Speakers submenu lists devices', dv.length >= 1, dv.length); 
     ok('K18 no Start buttons in the Devices menu', !(await labels(p, '.menubar .mgroup.open .mpanel button')).some(t => /^Start\b/.test(t) && !/Jukebox/.test(t)));
     await p.locator('.menubar .msub.open > .mpanel button').first().click(); await p.waitForTimeout(900);
     ok('K18 picking a device jumps to expanded Devices', await p.evaluate(() => document.getElementById('desk').classList.contains('devexpanded')));

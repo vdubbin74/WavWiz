@@ -62,9 +62,16 @@ public sealed class ScheduleService
     /// <summary>Resolves a play source to queue items (wired to PlaybackApi.ResolveItems). Tests inject a fake.</summary>
     public Func<JsonElement, List<QueueItem>>? Resolve { get; set; }
     public Func<DateTime> Clock { get; set; } = () => DateTime.Now;
+    /// <summary>0.4.0: the Conductor a zone key ("g:3" / "jukebox" / null = everything) plays in, the key's devices, its name, and "stop every group". Wired by the server; tests may leave them (house group).</summary>
+    public Func<string?, Playback.Conductor>? CondFor { get; set; }
+    public Func<string?, List<long>?>? DevicesOf { get; set; }
+    public Func<string?, string?>? KeyName { get; set; }
+    public Action? StopAll { get; set; }
+    private Playback.Conductor CondOf(string? key) => CondFor?.Invoke(key) ?? _cond;
+    private static string? KeyIn(string payloadJson) { try { using var d = JsonDocument.Parse(string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson); var k = d.RootElement.Str("zoneKey"); return string.IsNullOrWhiteSpace(k) ? null : k; } catch { return null; } }
 
     public sealed class Ringing { public long Id; public string Name = ""; public DateTime StartedAt; public double StartVol, EndVol, FadeSec; public List<long> Zones = new();
-        public int SnoozeMin = 9; public int AutoStopMin = 30; public DateTime? SnoozedUntil; public string Payload = "{}"; public double Progress; }
+        public int SnoozeMin = 9; public int AutoStopMin = 30; public DateTime? SnoozedUntil; public string Payload = "{}"; public double Progress; public string? ZoneKey; }
     public Ringing? Active { get; private set; }
 
     public ScheduleService(Db db, Zones.ZoneManager zones, Playback.Conductor cond, EventHub ev) { _db = db; _zones = zones; _cond = cond; _ev = ev; }
@@ -80,18 +87,18 @@ public sealed class ScheduleService
         var now = Clock();
         return Rows().Select(r =>
         {
-            var next = ScheduleMath.NextRun(r.Enabled, r.Days, r.Time, r.OnceDate, Dt(r.SkipUntil), now);
+            var next = ScheduleMath.NextRun(r.Enabled, r.Days, r.Time, r.OnceDate, Dt(r.SkipUntil), now); var zk = KeyIn(r.Payload);
             var skippedAt = Dt(r.SkipUntil) is DateTime su && su > now ? ScheduleMath.NextRun(r.Enabled, r.Days, r.Time, r.OnceDate, null, now) : null;
             return new { id = r.Id, name = r.Name, enabled = r.Enabled, days = r.Days, time = r.Time, action = r.Action, actionLabel = ScheduleMath.Label(r.Action),
                 payload = JsonDocument.Parse(string.IsNullOrWhiteSpace(r.Payload) ? "{}" : r.Payload).RootElement.Clone(), lastRunAt = r.LastRunAt, createdAt = r.CreatedAt,
-                onceDate = r.OnceDate, skipUntil = r.SkipUntil, lastResult = r.LastResult, alarm = r.Action == "play",
+                zoneKey = zk, zoneName = KeyName?.Invoke(zk), onceDate = r.OnceDate, skipUntil = r.SkipUntil, lastResult = r.LastResult, alarm = r.Action == "play",
                 nextRunAt = next?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), skippedRunAt = skippedAt?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) };
         }).OrderBy(x => x.nextRunAt ?? "9999").ThenBy(x => x.id).ToList();
     }
 
     public object ClockDto() => new { now = Clock().ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), server = Environment.MachineName };
     public object AlarmState() => Active is { } a ? new { id = a.Id, name = a.Name, ringing = a.SnoozedUntil == null, snoozedUntil = a.SnoozedUntil?.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture),
-        startedAt = a.StartedAt.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), progress = Math.Round(a.Progress, 3), snoozeMin = a.SnoozeMin, endVol = a.EndVol } : null!;
+        zoneKey = a.ZoneKey, zoneName = KeyName?.Invoke(a.ZoneKey), startedAt = a.StartedAt.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture), progress = Math.Round(a.Progress, 3), snoozeMin = a.SnoozeMin, endVol = a.EndVol } : null!;
 
     private static string? Validate(JsonElement b, bool create, out string? days, out string? once)
     {
@@ -160,11 +167,11 @@ public sealed class ScheduleService
         lock (_l)
         {
             if (Active is not { } a) return "No alarm is ringing.";
-            a.SnoozedUntil = Clock().AddMinutes(Math.Clamp(a.SnoozeMin, 1, 60)); _cond.Stop();
+            a.SnoozedUntil = Clock().AddMinutes(Math.Clamp(a.SnoozeMin, 1, 60)); CondOf(a.ZoneKey).Stop();
             _ev.Publish("alarm", AlarmState()); return null;
         }
     }
-    public string? StopAlarm() { lock (_l) { if (Active == null) return "No alarm is ringing."; Active = null; _cond.Stop(); _ev.Publish("alarm", new { stopped = true }); return null; } }
+    public string? StopAlarm() { lock (_l) { if (Active == null) return "No alarm is ringing."; var k = Active.ZoneKey; Active = null; CondOf(k).Stop(); _ev.Publish("alarm", new { stopped = true }); return null; } }
 
     private DateTime _lastMinute = DateTime.MinValue;
     /// <summary>Called every second by the server timer (and by tests with a fake time).</summary>
@@ -207,7 +214,7 @@ public sealed class ScheduleService
             _ev.Publish("alarm", AlarmState()); return;
         }
         var sec = (now - a.StartedAt).TotalSeconds;
-        if (a.AutoStopMin > 0 && sec >= a.AutoStopMin * 60) { Active = null; _cond.Stop(); _ev.Publish("alarm", new { stopped = true, auto = true }); return; }
+        if (a.AutoStopMin > 0 && sec >= a.AutoStopMin * 60) { var k = a.ZoneKey; Active = null; CondOf(k).Stop(); _ev.Publish("alarm", new { stopped = true, auto = true }); return; }
         var v = ScheduleMath.Ramp(a.StartVol, a.EndVol, a.FadeSec, sec); a.Progress = a.FadeSec <= 0 ? 1 : Math.Clamp(sec / a.FadeSec, 0, 1);
         if (a.FadeSec > 0 && sec <= a.FadeSec + 1) { foreach (var z in a.Zones) _zones.Patch(z, null, v, null, null); _ev.Publish("zones"); }
     }
@@ -215,18 +222,18 @@ public sealed class ScheduleService
     private string Run(long id, string name, string action, string payloadJson, DateTime now, double? testFadeSec)
     {
         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(payloadJson) ? "{}" : payloadJson);
-        var p = doc.RootElement; string result = "OK";
+        var p = doc.RootElement; string result = "OK"; var zkey = KeyIn(payloadJson); var cond = CondOf(zkey);
         switch (action)
         {
-            case "stop": _cond.Stop(); break;
+            case "stop": cond.Stop(); break;   // 0.4.0: only the target zone's music when the schedule names one
             case "all_off":
-                _cond.Stop();
+                if (StopAll != null) StopAll(); else _cond.Stop();   // everything off stops every playback group
                 foreach (var z in _zones.Zones()) _zones.Patch(z.Id, null, null, null, false);
                 break;
             case "play_radio":
             {
                 var rid = p.Long("radioId");
-                if (rid != null) { var it = _cond.StationToItem(rid.Value); if (it != null) _cond.PlayItems(new[] { it }); else result = "Station not found"; }
+                if (rid != null) { var it = cond.StationToItem(rid.Value); if (it != null) cond.PlayItems(new[] { it }); else result = "Station not found"; }
                 break;
             }
             case "scene":
@@ -247,7 +254,7 @@ public sealed class ScheduleService
             {
                 var a = new Ringing { Id = id, Name = name, StartedAt = now, Payload = payloadJson,
                     StartVol = Math.Clamp(p.Num("startVol") ?? 10, 0, 100), EndVol = Math.Clamp(p.Num("endVol") ?? 40, 0, 100),
-                    FadeSec = testFadeSec ?? Math.Clamp(p.Num("fadeMin") ?? 0, 0, 30) * 60, SnoozeMin = (int)Math.Clamp(p.Num("snoozeMin") ?? 9, 1, 60), AutoStopMin = (int)Math.Clamp(p.Num("autoStopMin") ?? 30, 0, 24 * 60) };
+                    FadeSec = testFadeSec ?? Math.Clamp(p.Num("fadeMin") ?? 0, 0, 30) * 60, SnoozeMin = (int)Math.Clamp(p.Num("snoozeMin") ?? 9, 1, 60), AutoStopMin = (int)Math.Clamp(p.Num("autoStopMin") ?? 30, 0, 24 * 60), ZoneKey = zkey };
                 result = StartPlay(payloadJson, a, now);
                 Active = a; _ev.Publish("alarm", AlarmState());
                 break;
@@ -263,7 +270,10 @@ public sealed class ScheduleService
         if (p.Long("sceneId") is long sc) new SceneService(_db, _zones, _ev).Apply(sc);
         var zones = p.LongList("deviceIds") ?? new List<long>();
         if (zones.Count == 0 && p.Long("sceneId") is long sc2) zones = _db.Query("SELECT device_id FROM scene_member WHERE scene_id=$s AND enabled=1", r => r.GetInt64(0), ("$s", sc2));
-        if (zones.Count > 0 && p.Long("sceneId") == null) foreach (var z in _zones.Zones()) _zones.Patch(z.Id, null, null, null, zones.Contains(z.Id));
+        // 0.4.0: an alarm for one zone rings in that zone only: its speakers come on, every other zone keeps its own music
+        var tz = a.ZoneKey != null ? DevicesOf?.Invoke(a.ZoneKey) : null;
+        if (zones.Count == 0 && tz is { Count: > 0 }) zones = tz;
+        if (zones.Count > 0 && p.Long("sceneId") == null && a.ZoneKey == null) foreach (var z in _zones.Zones()) _zones.Patch(z.Id, null, null, null, zones.Contains(z.Id));
         a.Zones = zones.Count > 0 ? zones : _zones.Zones().Where(z => z.Enabled).Select(z => z.Id).ToList();
         foreach (var z in a.Zones) _zones.Patch(z, null, a.FadeSec > 0 ? a.StartVol : a.EndVol, null, true);
         var src = p.Str("source") ?? "radio";
@@ -277,6 +287,6 @@ public sealed class ScheduleService
         }
         var items = Resolve?.Invoke(JsonSerializer.SerializeToElement(q)) ?? new();
         if (items.Count == 0) return "Nothing to play (the source is gone)";
-        _cond.PlayItems(items); return "OK";
+        CondOf(a.ZoneKey).PlayItems(items); return "OK";
     }
 }

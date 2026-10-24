@@ -26,21 +26,26 @@ public sealed class WavWizServer : IAsyncDisposable
         var ffmpeg = cfg.ResolveFfmpeg();
         var events = new EventHub(); var auth = new AuthService(db);
         var lib = new Library.LibraryService(db);
-        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs }; cond.EnablePersistence();   // 0.3.7 L15
+        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs };
+        // 0.4.0: playback groups. "default" is the house group = this Conductor (today's behavior); split-off groups are created lazily and share its clock. Last queues (0.3.7 L15) are saved per group.
+        // 0.4.3 #10: every group's engine feeds its own visualizer hub (0.4.1 moved zones into their own groups, which were never tapped)
+        var viz = new Playback.VizHubs(); viz.Attach(cond);
+        var registry = new Playback.ConductorRegistry(cond, gid => viz.Attach(new Playback.Conductor(db, events, ffmpeg, cond.Clock, gid) { LeadMs = cfg.LeadMs }), db, events); registry.EnablePersistence();
         var clockHost = new Net.ClockHost(cfg, cond.Clock); clockHost.Start();
-        var audio = new Net.AudioHost(cfg, auth, cond.Clock, clockHost) { Log = u._log.Write }; audio.Start();
+        var audio = new Net.AudioHost(cfg, auth, cond.Clock, clockHost) { Log = u._log.Write, StreamRate = cond.StreamRateSetting }; audio.Start();
         var dsp = new Dsp.DspService(db);
-        var zones = new Zones.ZoneManager(db, audio, cond, events, dsp) { Log = u._log.Write };
+        var zones = new Zones.ZoneManager(db, audio, registry, events, dsp) { Log = u._log.Write };
         var cal = new Calibration.CalibrationService(db, cond.Clock, zones, audio, events, cond);
+        cal.Registry = registry;      // 0.4.0 Stage 4: calibration pauses only the groups it measures
         cal.Mics = new Calibration.PcMicBroker(events); audio.OnCalResult = cal.Mics.OnCalResult;      // 0.2.5 PC-mic calibration
         var ca = new Tls.LocalCa(cfg.DataDir);
         // 0.2.4: unison-root-ca.crt -> wavwiz-root-ca.crt; a root that still says "Unison" (0.0.1/0.0.2 betas) is replaced by a WavWiz one (phones re-trust it)
         try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
         catch (Exception e) { u._log.Write("TLS: certificate rename/migration failed (" + e.Message + "); the old certificate stays in use"); }
-        var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
+        var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live
-        u.S = s; cond.Engine.FrameTap = s.Viz.OnFrame;
+        u.S = s; s.Vizs = viz;
         s.Scenes = new Features.SceneService(db, zones, events);
         s.Schedules = new Features.ScheduleService(db, zones, cond, events);
         s.Schedules.Resolve = q => Api.PlaybackApi.ResolveItems(s, q, out _);      // 0.3.0: alarms play a playlist/album/song/radio
@@ -48,7 +53,12 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Profiles = new Features.DeviceProfileService(db, zones, dsp, cal, events);
         s.Scenes.Profiles = s.Profiles;
         s.Backup = new Features.BackupService(db, events, Path.Combine(cfg.DataDir, "backups"));
-        s.Jukebox = new Features.JukeboxService(db, cond, events);
+        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd();   // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
+        s.Schedules.CondFor = s.Links.CondFor; s.Schedules.DevicesOf = s.Links.DevicesOf; s.Schedules.KeyName = s.Links.KeyName; s.Schedules.StopAll = s.Links.StopAll;      // 0.4.0 Stage 3: alarms / sleep timer target a zone
+        s.Sleep.CondFor = s.Links.CondFor; s.Sleep.DevicesOf = s.Links.DevicesOf;
+        s.Jukebox = new Features.JukeboxService(db, cond, events) { Zone = s.Links.JukeboxConductor };
+        // 0.4.9 F76 fix: the Jukebox only borrows speakers while it runs; on exit (and here at startup, when it never runs) they go back to their zones
+        s.Links.JukeboxRunning = () => s.Jukebox.Active; s.Jukebox.Borrow = ids => s.Links.SetJukeboxDevices(ids); s.Jukebox.Release = () => { var jc = s.Links.JukeboxConductor(); s.Links.Apply(); try { jc?.Stop(); } catch { } events.Publish("zones"); }; s.Links.Apply();
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
         s.TagFix = new Features.TagFixService(db, lib, s.Art, events, ffmpeg);
@@ -59,9 +69,10 @@ public sealed class WavWizServer : IAsyncDisposable
         // 0.1.1: AirPlay (always on) + Spotify Connect (admin add-on, off by default), both advertised by our own mDNS responder where needed
         s.Nas = new Library.NasLogon(db); _ = Task.Run(() => { try { s.Nas.EnsureAll(true); } catch { } });     // 0.1.3: connect saved NAS shares early
         s.AirPlay = new Receivers.AirPlayReceiver(s, u._log.Write); s.Spotify = new Receivers.SpotifyReceiver(s, u._log.Write);
-        s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!);
+        s.ZoneRecv = new Receivers.ZoneReceivers(s, u._log.Write); s.Links.Applied += () => s.ZoneRecv.Sync();
+        s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!).Concat(s.ZoneRecv.MdnsGroups(host, ip).Select(g => g.ToList()));
         s.Discovery.Start();
-        if (!System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(cfg.BindAddress.Trim('[', ']'))) || cfg.TestTreatAllClientsAsRemote) { s.AirPlay.Start(); s.Spotify.Apply(); }
+        if (!System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(cfg.BindAddress.Trim('[', ']'))) || cfg.TestTreatAllClientsAsRemote) { s.AirPlay.Start(); s.Spotify.Apply(); s.ZoneRecv.Sync(); }
         _ = Task.Run(async () => { for (int i = 0; i < 20 && !(s.AirPlay?.Ready ?? true); i++) await Task.Delay(500); if (s.AirPlay?.Ready == true) s.Discovery?.AnnounceSoon(); });
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args ?? Array.Empty<string>(), ContentRootPath = AppContext.BaseDirectory });
@@ -169,9 +180,9 @@ public sealed class WavWizServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose();
+        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
-        await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Conductor.Dispose(); S.Art.Online?.Dispose();
+        await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();
     }
 }

@@ -101,6 +101,10 @@ public sealed class Db
         CREATE UNIQUE INDEX ux_device_profile_name ON device_profile(name COLLATE NOCASE);
         ALTER TABLE scene_member ADD COLUMN profile_id INTEGER;
         """,
+        // v8 (0.4.2): a scene also remembers the zone layout (which speakers are in which zone) and the links between zones. NULL = an older scene: applying it leaves the layout alone.
+        """
+        ALTER TABLE scene ADD COLUMN layout TEXT;
+        """,
     };
 
     public SqliteConnection Open()
@@ -171,5 +175,6 @@ public sealed class Db
     public long Insert(string sql, params (string, object?)[] p) { using var c = Open(); Exec(c, sql, null, p); return Convert.ToInt64(Scalar(c, "SELECT last_insert_rowid()")); }
 
     public string? Setting(string key) => Scalar("SELECT value_json FROM setting WHERE key=$k", ("$k", key)) as string;
+    public void DeleteSetting(string key) => Exec("DELETE FROM setting WHERE key=$k", ("$k", key));
     public void SetSetting(string key, string json) => Exec("INSERT INTO setting(key,value_json) VALUES($k,$v) ON CONFLICT(key) DO UPDATE SET value_json=$v", ("$k", key), ("$v", json));
 }

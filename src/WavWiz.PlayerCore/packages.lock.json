@@ -8,7 +8,7 @@
       "wavwiz.dsp": {
         "type": "Project",
         "dependencies": {
-          "WavWiz.Core": "[0.2.0, )"
+          "WavWiz.Core": "[0.4.9, )"
         }
       },
       "wavwiz.measure": {

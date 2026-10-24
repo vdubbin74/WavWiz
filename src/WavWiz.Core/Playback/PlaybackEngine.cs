@@ -24,8 +24,10 @@ public sealed class PlaybackEngine
 {
     private sealed class EpochState
     {
-        public EpochState(uint id, long startUs) { Id = id; StartUs = startUs; }
+        public EpochState(uint id, long startUs, int rate) { Id = id; StartUs = startUs; Rate = rate; FrameSamples = Wire.FrameSamplesAt(rate); }
         public readonly uint Id; public readonly long StartUs;
+        /// <summary>0.4.9 F77: this epoch's stream rate (48 or 96 kHz). All sample-index math uses it, so the timeline (server µs) is the same at any rate.</summary>
+        public readonly int Rate, FrameSamples;
         public readonly JitterBuffer Jitter = new();
         public long StopAtUs = long.MaxValue;
     }
@@ -40,7 +42,6 @@ public sealed class PlaybackEngine
     private IAudioProcessor _processor = new PassThroughProcessor();
     private volatile EpochState? _state;
     private long _latencyUs;           // saved device latency offset (spec 7.5), microseconds, may be negative
-    private double _baseRatio;         // source samples per output frame at nominal rates
     private int _rate;
 
     // audio-thread state
@@ -78,7 +79,7 @@ public sealed class PlaybackEngine
     /// <summary>The device's mix rate (44.1/48/96 kHz). Call while the sink is stopped (output switch).</summary>
     public void SetOutputRate(int rate)
     {
-        _rate = rate; _baseRatio = (double)Wire.SampleRate / rate;
+        _rate = rate;   // 0.4.9 F77: source samples per output frame = epoch rate / this, worked out per block
         _fadeFrames = Math.Max(1, (int)(_o.FadeMs * rate / 1000));
     }
     public int OutputRate => _rate;
@@ -90,19 +91,21 @@ public sealed class PlaybackEngine
     public double DeviceLatencyMs => Interlocked.Read(ref _latencyUs) / 1000.0;
 
     // ---------- network thread ----------
-    public void OnEpoch(uint epoch, long startUs)
+    public void OnEpoch(uint epoch, long startUs, int rate = Wire.SampleRate)
     {
         var cur = _state;
-        if (cur != null && cur.Id == epoch && cur.StartUs == startUs) return;
-        _state = new EpochState(epoch, startUs);
+        if (cur != null && cur.Id == epoch && cur.StartUs == startUs && cur.Rate == rate) return;
+        _state = new EpochState(epoch, startUs, rate);
     }
+    /// <summary>0.4.9 F77: the rate of the epoch being played (48000 when idle).</summary>
+    public int StreamRate => _state?.Rate ?? Wire.SampleRate;
 
     public bool OnAudio(AudioFrame f)
     {
         var st = _state;
         if (st == null || f.Epoch != st.Id) return false; // stale or unknown epoch: drop (spec 6.1)
-        long idx = (long)Math.Round((f.PlayAtUs - st.StartUs) * (Wire.SampleRate / 1e6));
-        return st.Jitter.Put(idx, f.Samples, f.SampleCount);
+        long idx = (long)Math.Round((f.PlayAtUs - st.StartUs) * (st.Rate / 1e6));
+        return st.Jitter.Put(idx, f.Samples, f.SampleCount, st.FrameSamples);
     }
 
     public void OnStopAt(uint epoch, long atUs)
@@ -146,20 +149,21 @@ public sealed class PlaybackEngine
             return frames;
         }
         var proc = Volatile.Read(ref _processor);
+        int sr = st.Rate, fs = st.FrameSamples; double baseRatio = (double)sr / _rate;
         long latUs = Interlocked.Read(ref _latencyUs) + proc.LatencyUs;
         double serverUs = _clock.ToServerUsExact(dacLocalUs) + latUs;
-        double target = (serverUs - st.StartUs) * (Wire.SampleRate / 1e6);   // source-sample index that should be at the DAC
-        double stopPos = st.StopAtUs == long.MaxValue ? double.PositiveInfinity : (st.StopAtUs - st.StartUs) * (Wire.SampleRate / 1e6);
-        double ratio = _baseRatio;
+        double target = (serverUs - st.StartUs) * (sr / 1e6);   // source-sample index that should be at the DAC
+        double stopPos = st.StopAtUs == long.MaxValue ? double.PositiveInfinity : (st.StopAtUs - st.StartUs) * (sr / 1e6);
+        double ratio = baseRatio;
         int first = 0;
         bool clean = true;
 
         if (_mode == Mode.Idle)
         {
-            double lastTarget = target + (frames - 1) * _baseRatio;
+            double lastTarget = target + (frames - 1) * baseRatio;
             if (lastTarget < 0) { LastBlock = (0, 0, false); return frames; }   // lead time not over yet
-            first = target >= 0 ? 0 : (int)Math.Ceiling(-target / _baseRatio);
-            _pos = target + first * _baseRatio;
+            first = target >= 0 ? 0 : (int)Math.Ceiling(-target / baseRatio);
+            _pos = target + first * baseRatio;
             _mode = Mode.Playing; _integ = 0;
             _fadeInTotal = _fadeInLeft = _fadeFrames;
             clean = false;
@@ -167,20 +171,20 @@ public sealed class PlaybackEngine
         else if (_mode == Mode.Playing)
         {
             double err = _pos - target;                       // + : playing ahead of where we should be
-            ErrorMs = err / (Wire.SampleRate / 1000.0);
+            ErrorMs = err / (sr / 1000.0);
             if (Math.Abs(ErrorMs) > _o.HardResyncMs)
             {
                 _mode = Mode.FadingOut; HardResyncs++;
             }
             else
             {
-                double dt = (double)frames / _rate, eS = err / Wire.SampleRate;
+                double dt = (double)frames / _rate, eS = err / sr;
                 double tau = _o.SettleSeconds, max = _o.MaxRatioPpm * 1e-6;
                 double newInteg = _integ + eS * dt;
                 double adj = -(2.0 / tau * eS + newInteg / (tau * tau));
                 if (Math.Abs(adj) <= max) _integ = newInteg;  // anti-windup
                 else adj = Math.Clamp(adj, -max, max);
-                ratio = _baseRatio * (1 + adj);
+                ratio = baseRatio * (1 + adj);
                 RatioPpm = adj * 1e6;
             }
         }
@@ -199,7 +203,7 @@ public sealed class PlaybackEngine
         {
             if (p >= stopPos) { stopped = true; clean = false; break; }
             int before = missing;
-            Sample(st.Jitter, p, out float l, out float r, ref missing);
+            Sample(st.Jitter, fs, p, out float l, out float r, ref missing);
             if (missing != before)
             {
                 // data not there (outage, radio stall): decay the last sample to silence over ~10 ms instead of cutting off
@@ -216,7 +220,7 @@ public sealed class PlaybackEngine
             if (_fadeInLeft > 0) { g = 1f - (float)_fadeInLeft / _fadeInTotal; _fadeInLeft--; }
             if (fading) g *= 1f - (float)(i - first + 1) / fadeOutLen;
             double toStop = stopPos - p;
-            if (toStop < _fadeFrames * 2 * _baseRatio) { g *= (float)Math.Max(0, toStop / (_fadeFrames * 2 * _baseRatio)); clean = false; }
+            if (toStop < _fadeFrames * 2 * baseRatio) { g *= (float)Math.Max(0, toStop / (_fadeFrames * 2 * baseRatio)); clean = false; }
             dst[i * 2] = l * g; dst[i * 2 + 1] = r * g;
             p += ratio;
         }
@@ -227,27 +231,27 @@ public sealed class PlaybackEngine
         {
             // next block starts at the current target, fading in
             _mode = Mode.Playing;
-            _pos = target + frames * _baseRatio;   // first frame of the next block should be here
+            _pos = target + frames * baseRatio;   // first frame of the next block should be here
             _integ = 0; _fadeInTotal = _fadeInLeft = _fadeFrames;
         }
         if (missing > 0) { Underruns++; if (!_prevMissing) UnderrunEvents++; _prevMissing = true; clean = false; } else _prevMissing = false;
-        BufferMs = Math.Max(0, (st.Jitter.HighWater - _pos) / (Wire.SampleRate / 1000.0));
+        BufferMs = Math.Max(0, (st.Jitter.HighWater - _pos) / (sr / 1000.0));
         LastBlock = (startPos, p, clean && _fadeInLeft == 0);
         proc.Process(dst, frames);
         return frames;
     }
 
-    private static void Sample(JitterBuffer jb, double p, out float l, out float r, ref int missing)
+    private static void Sample(JitterBuffer jb, int fs, double p, out float l, out float r, ref int missing)
     {
         long i = (long)Math.Floor(p);
         float x = (float)(p - i);
-        bool h1 = jb.TryGet(i, out float l1, out float r1);
-        bool h2 = jb.TryGet(i + 1, out float l2, out float r2);
+        bool h1 = jb.TryGet(i, out float l1, out float r1, fs);
+        bool h2 = jb.TryGet(i + 1, out float l2, out float r2, fs);
         if (!h1 && !h2) { l = r = 0; if (i >= 0) missing++; return; }
         if (!h1) { l1 = l2; r1 = r2; missing++; }
         if (!h2) { l2 = l1; r2 = r1; }
-        if (!jb.TryGet(i - 1, out float l0, out float r0)) { l0 = l1; r0 = r1; }
-        if (!jb.TryGet(i + 2, out float l3, out float r3)) { l3 = l2; r3 = r2; }
+        if (!jb.TryGet(i - 1, out float l0, out float r0, fs)) { l0 = l1; r0 = r1; }
+        if (!jb.TryGet(i + 2, out float l3, out float r3, fs)) { l3 = l2; r3 = r2; }
         l = Hermite(l0, l1, l2, l3, x); r = Hermite(r0, r1, r2, r3, x);
     }
 

@@ -56,7 +56,7 @@ test('0.2.5 A: the phone page never joins as a speaker and never plays', () => {
 
 test('0.2.5 A: plan, code and page mode (pure)', async () => {
   const c = await imp('calmic-core');
-  const plan = c.buildPlan({ reference: { id: 1, name: 'Living Room' }, speakers: [{ id: 1, name: 'Living Room' }, { id: 2, name: 'Kitchen' }, { id: 3, name: 'Patio' }] });
+  const plan = c.buildPlan({ quality: 'thorough', reference: { id: 1, name: 'Living Room' }, speakers: [{ id: 1, name: 'Living Room' }, { id: 2, name: 'Kitchen' }, { id: 3, name: 'Patio' }] });
   assert.deepEqual(plan.map(s => s.kind + s.zone), ['ref1', 'ref1', 'ref1', 'dev2', 'dev2', 'dev2', 'dev3', 'dev3', 'dev3', 'ref-end1']);
   assert.deepEqual(c.buildPlan({ speakers: [] }), []);
   assert.equal(c.calCode('?cal=ab12cd'), 'AB12CD'); assert.equal(c.calCode('?cal=x'), null); assert.equal(c.calCode(''), null);
@@ -84,7 +84,8 @@ test('0.2.5 A: PC mic - level meter, PC pick, Bluetooth warns but never blocks; 
   assert.ok(s.includes('Bluetooth mics add their own delay, so results may be off. A wired or USB mic is recommended.'));
   assert.ok(s.indexOf('pcMicCard(') < s.indexOf('phoneMicCard(') || s.indexOf('pcMicCard(S') >= 0);
   const body = s.slice(s.indexOf('function openCalibration'));
-  assert.match(body, /body\.replaceChildren\(speakersBox\(\), pcCard\.el, usePhone \? phoneCard\.el : null, earCard,/, 'PC mic, then phone, then by ear');
+  // 0.4.4 F22 may insert unlock/BT notes after speakersBox; order stays speakers → (notes) → PC mic → phone → by ear
+  assert.match(body, /body\.replaceChildren\(speakersBox\(\), (?:unlockNote, btNote, )?pcCard\.el, usePhone \? phoneCard\.el : null, earCard,/, 'PC mic, then phone, then by ear');
   assert.ok(s.includes('No microphone found on this PC. Plug in a USB or headset mic (or use your phone instead).'));
 });
 
@@ -142,7 +143,7 @@ test('0.2.5 C: Settings - Appearance sections are sub-tabs under the main tabs, 
 
 test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; CHANGELOG has 0.2.5 above 0.2.4 with the iPhone root cause in words', async () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.5|3\.\d)'/);
+  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.5|[34]\.\d)'/);
   const i25 = a.indexOf('Calibrate with your PC’s mic'), i24 = a.indexOf('Phone set-up page fixed');
   assert.ok(i25 > 0 && i24 > i25, '0.2.5 first, 0.2.4 kept');
   for (const x of ['iPhone calibration fixed', 'Phone: speaker or mic', 'Cleaner device cards', 'Wider Settings']) assert.ok(a.includes(x), x);
@@ -156,4 +157,11 @@ test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; 
 test('device card More menu stays closed until More is tapped (display:flex must not override [hidden])', () => {
   assert.match(css, /\.dmenu\[hidden\]\s*\{\s*display:\s*none/);
   assert.match(src('devices.js'), /class: 'dmenu'[^\n]*hidden: true|hidden: true[^\n]*class: 'dmenu'/);
+});
+
+test('0.4.1 D: Quick (the default) is one test per speaker, Thorough keeps three plus the drift check', async () => {
+  const c = await imp('calmic-core');
+  const plan = { reference: { id: 1, name: 'Den' }, speakers: [{ id: 1, name: 'Den' }, { id: 2, name: 'Kitchen' }] };
+  const quick = c.buildPlan(plan); assert.deepEqual(quick.map(s => s.kind), ['ref', 'dev', 'ref-end']);
+  assert.equal(c.buildPlan({ ...plan, quality: 'thorough' }).filter(s => s.kind === 'dev').length, 3);
 });

@@ -44,7 +44,7 @@ for (const [w, h] of [[1920, 1080], [1366, 768]]) {
 }
 await step('L35 one padlock; Speaker Settings padlock', async () => {
   const { ctx, p } = await page(1920, 1080, NORMAL); await p.evaluate(async () => (await import('/js/main.js')).go('eq')).catch(() => {}); await p.waitForTimeout(800);
-  ok('L35 no overlay lock in EQ mode', (await p.locator('.np-stage .vbtns .ov-lock').count()) === 0); ok('L35 exactly one title-bar padlock', (await p.locator('.np-eqhead .eqpadlock').count()) === 1, await p.locator('.eqpadlock').count());
+  ok('L35 (0.4.2) the EQ lock is in the top-right icon group, not the header', (await p.locator('.np-stage [data-ov=lock]').count()) === 1 && (await p.locator('.np-eqhead [data-ov=lock]').count()) === 0); ok('L35 exactly one EQ padlock', (await p.locator('[data-ov=lock]').count()) === 1, await p.locator('[data-ov=lock]').count());
   await ctx.close();
 });
 await step('L37 one-click title pin', async () => {
@@ -69,8 +69,8 @@ await step('L46/L40 master row and drag', async () => {
   await p.screenshot({ path: `/workspace/screens/wavwiz-038-${ENG}-l46-std.png` }); await ctx.close();
   const e = await page(1920, 1080, { lib: 'normal', dev: 'expanded', exp: 'dev', list: 'open', ctl: 'open' }); const q = e.p;
   ok('L46 expanded master row has All off / All on', await q.locator('.dexp-top .alloff').count() === 1);
-  const gr = await q.locator('.scol .dc3[data-zone-id]').count(); ok('L40 cards have grips', gr >= 2 && await q.locator('.scol .dc3 .dgrip').count() >= 2, gr);
-  if (gr >= 2) { const first = await q.locator('.scol .slist .dc3').first().getAttribute('data-zone-id'); const second = await q.locator('.scol .slist .dc3').nth(1).getAttribute('data-zone-id');
+  const gr = await q.locator('.tcol42 .sp42').count(); ok('L40 cards have grips', gr >= 2 && await q.locator('.tcol42 .dgrip42').count() >= 2, gr);
+  if (false /* 0.4.2: card drag-reorder retired; speakers drag between zones (ui042 T6) */) { const first = await q.locator('.scol .slist .dc3').first().getAttribute('data-zone-id'); const second = await q.locator('.scol .slist .dc3').nth(1).getAttribute('data-zone-id');
     await q.evaluate(() => localStorage.removeItem('wavwiz.devorder.v1'));
     const g = q.locator('.scol .slist .dc3').first().locator('.dgrip'), t = q.locator('.scol .slist .dc3').nth(1); await g.hover(); await q.mouse.down(); const tb = await t.boundingBox(); await q.mouse.move(tb.x + 30, tb.y + tb.height * 0.8, { steps: 8 }); await q.mouse.up(); await q.waitForTimeout(800);
     const o = await q.evaluate(() => localStorage.getItem('wavwiz.devorder.v1')); ok('L40 drag saved an order', !!o && JSON.parse(o).z.length >= 2, o); const now1 = await q.locator('.scol .slist .dc3').first().getAttribute('data-zone-id'); ok('L40 first card changed', now1 !== first || ENG === 'webkit', `${first} ${second} -> ${now1}`); }
@@ -78,7 +78,7 @@ await step('L46/L40 master row and drag', async () => {
 });
 await step('L38 locks follow theme (10 themes)', async () => {
   for (const th of THEMES) { const { ctx, p } = await page(1920, 1080, NORMAL, th); await p.evaluate(() => localStorage.setItem('wavwiz.eqlock.v1', '1')); await p.evaluate(async () => (await import('/js/main.js')).go('eq')); await p.waitForTimeout(500); await p.evaluate(() => window.dispatchEvent(new CustomEvent('wavwiz:eqlock')));
-    const r = await p.evaluate(() => { const b = document.querySelector('.eqpadlock'); if (!b) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); const d = document.createElement('i'); d.style.color = acc; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return { col: getComputedStyle(b).color, acc: c, on: b.classList.contains('on') }; });
+    const r = await p.evaluate(() => { const b = document.querySelector('[data-ov=lock]'); if (!b) return null; const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); const d = document.createElement('i'); d.style.color = acc; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return { col: getComputedStyle(b).color, acc: c, on: b.classList.contains('on') }; });
     ok('L38 lock on = accent in ' + th, r && r.on && (r.col === r.acc || /rgb/.test(r.col)), JSON.stringify(r));
     await p.evaluate(() => localStorage.setItem('wavwiz.eqlock.v1', '0')); await ctx.close(); }
 });

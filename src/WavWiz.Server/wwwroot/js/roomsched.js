@@ -12,10 +12,14 @@ export class OffsetEstimator {
     this.samples.push({ rtt, off }); if (this.samples.length > this.keep) this.samples.shift();
     const best = [...this.samples].sort((a, b) => a.rtt - b.rtt).slice(0, Math.max(1, Math.ceil(this.samples.length / 4)));
     const target = best.reduce((s, x) => s + x.off, 0) / best.length;
-    if (this.offsetUs == null || Math.abs(target - this.offsetUs) > 5000) this.offsetUs = target;           // first sample / big jump: take it
+    // 0.4.6 F44: while warming up (the first 8 samples after a start / resume) follow the best-RTT target directly - the first replies after a launch
+    // or a wake often carry Wi-Fi power-save delay on ONE leg, and slewing away from that at 0.1 ms/s left a different error on every launch.
+    if (this.offsetUs == null || this.samples.length <= 8 || Math.abs(target - this.offsetUs) > 5000) this.offsetUs = target;
     else this.offsetUs += Math.max(-100, Math.min(100, (target - this.offsetUs) * 0.5));                  // otherwise slew gently (no audible jumps)
     this.rttUs = best[0].rtt; return true;
   }
+  /** 0.4.6 F44: forget everything (start / resume / back from the background): the next samples rebuild the offset from scratch. */
+  reset() { this.samples = []; this.offsetUs = null; this.rttUs = null; }
   get ready() { return this.samples.length >= 4 && this.offsetUs != null; }
   get jitterUs() { if (this.samples.length < 3) return null; const o = this.samples.map(s => s.off), m = o.reduce((a, b) => a + b, 0) / o.length; return Math.sqrt(o.reduce((a, b) => a + (b - m) ** 2, 0) / o.length); }
 }
@@ -30,6 +34,21 @@ export function pairClocks(reads) {   // reads: [{ctxSec, perfMs}]
   for (const r of reads) { const v = r.perfMs - r.ctxSec * 1000; if (v < bv) { bv = v; best = r; } }
   return { ctxSec: best.ctxSec, perfUs: best.perfMs * 1000 };
 }
+
+/**
+ * 0.4.6 F44: pairs on an EDGE of currentTime. iOS advances currentTime once per hardware IO buffer (up to ~20-40 ms), so a read can sit anywhere inside
+ * that step; the old min(perf - ctx) over 6 back-to-back reads (all inside one step) carried up to a whole step of error, different each launch.
+ * reads come from a short polling loop; the first read whose ctxSec differs from the previous one marks the moment the step happened. Falls back
+ * to pairClocks when no edge was seen.
+ */
+export function pairClocksEdge(reads) {
+  let best = null;
+  for (let i = 1; i < reads.length; i++) if (reads[i].ctxSec !== reads[i - 1].ctxSec) { const gap = reads[i].perfMs - reads[i - 1].perfMs; if (!best || gap < best.gap) best = { gap, r: reads[i] }; }
+  if (!best) return pairClocks(reads);
+  return { ctxSec: best.r.ctxSec, perfUs: (best.r.perfMs - best.gap / 2) * 1000, edge: true, errMs: best.gap / 2 };
+}
+/** 0.4.6 F44: the output path delay the browser reports: outputLatency when given (> 0), else baseLatency (Safari has no outputLatency), in seconds. */
+export function outputDelaySec(ctx) { const o = +ctx?.outputLatency || 0, b = +ctx?.baseLatency || 0; return o > 0 ? o : b > 0 ? b : 0; }
 
 /** server microseconds -> AudioContext seconds, for the audio that must be HEARD at serverUs. */
 export function ctxTimeFor(serverUs, { pair, offsetUs, latencyMs = 0, outputLatencySec = 0 }) {
@@ -77,3 +96,13 @@ export function roomHealth({ wsOpen, ctxState, hidden, bufferMs, clockReady }) {
 
 /** Same log taper as the Windows player (100 = 0 dB, every 10 points = 5 dB down, 0 = silence). */
 export const volumeToGain = percent => !(percent > 0) ? 0 : Math.pow(10, -(100 - Math.min(100, percent)) * 0.5 / 20);
+
+/**
+ * 0.4.4 F22: the Delay slider applies live. Frames already queued on the AudioContext (seconds of buffer) are re-planned with the new
+ * delay instead of waiting for the buffer to drain: items = [{ playAtUs, ... }] still in the future; computeStart(playAtUs) uses the NEW latency.
+ * Re-anchors the scheduler (no restart, same epoch, nothing re-sent by the server). Returns [{ item, action, start, rate }].
+ */
+export function retimeFrames(items, { nowCtx, computeStart, sched, epoch }) {
+  sched.next = null;
+  return [...items].sort((a, b) => a.playAtUs - b.playAtUs).map(item => ({ item, ...sched.plan(computeStart(item.playAtUs), nowCtx, epoch) }));
+}

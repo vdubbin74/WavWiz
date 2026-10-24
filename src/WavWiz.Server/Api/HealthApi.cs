@@ -20,7 +20,7 @@ public static class HealthApi
             if (p.Dead) list.Add(new("player", p.Id, Name(p), "the connection is closed but it was never cleaned up"));
             else if (since.TotalSeconds > 30 && (now - p.ConnectedAt.UtcDateTime).TotalSeconds > 30) list.Add(new("player", p.Id, Name(p), $"no word from this player for {Ago(since)}"));
         }
-        foreach (var sub in s.Conductor.Subscribers())
+        foreach (var sub in s.Registry.Subscribers())
         {
             var live = s.Audio.Get(sub.Id);
             if (live == null || !ReferenceEquals(live, sub) || live.Dead) list.Add(new("stream", sub.Id, sub is Net.PlayerSession ps ? Name(ps) : sub.Id, "the house stream is still sending to a player that has gone"));
@@ -42,8 +42,8 @@ public static class HealthApi
             {
                 switch (o.Kind)
                 {
-                    case "player": if (s.Audio.Get(o.Id) is { } p) { p.EndReason = "cleared from Diagnostics (it had stopped responding)"; p.Close(); } s.Conductor.Unsubscribe(o.Id); n++; break;
-                    case "stream": s.Conductor.Unsubscribe(o.Id); n++; break;
+                    case "player": if (s.Audio.Get(o.Id) is { } p) { p.EndReason = "cleared from Diagnostics (it had stopped responding)"; p.Close(); } s.Registry.Unsubscribe(o.Id); n++; break;
+                    case "stream": s.Registry.Unsubscribe(o.Id); n++; break;
                     case "airplay": s.AirPlay?.EndStaleSession(); n++; break;
                     case "live": s.Conductor.EndLive(o.Id); n++; break;
                 }

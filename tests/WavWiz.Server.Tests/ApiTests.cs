@@ -11,7 +11,7 @@ public class ApiTests
         await using var f = await ServerFixture.StartAsync();
         var st = await f.Http.GetJson("/api/v1/auth/state");
         Assert.True(st.GetProperty("setupRequired").GetBoolean()); Assert.True(st.GetProperty("beta").GetBoolean()); Assert.Equal("BETA", st.GetProperty("channel").GetString());
-        Assert.Matches(@"^0\.[0-3]\.\d+$", st.GetProperty("appVersion").GetString());
+        Assert.Matches(@"^0\.[0-4]\.\d+$", st.GetProperty("appVersion").GetString());
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.GetAsync("/api/v1/status")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.GetAsync("/api/v1/zones")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await f.Http.GetAsync("/api/v1/does-not-exist")).StatusCode);
@@ -122,7 +122,7 @@ public class ApiTests
         for (int i = 0; i < 100; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() == 2) break; await Task.Delay(100); }
         var hits = await admin.GetJson("/api/v1/library/search?q=beta"); Assert.Equal(1, hits.GetArrayLength()); Assert.Equal("Beta Song", hits[0].GetProperty("title").GetString());
         var tree = await admin.GetJson("/api/v1/library/tree"); Assert.Equal(4, tree.GetProperty("nodes").GetArrayLength());
-        Assert.Matches(@"^0\.[0-3]\.\d+$", (await admin.GetJson("/api/v1/status")).GetProperty("appVersion").GetString());
+        Assert.Matches(@"^0\.[0-4]\.\d+$", (await admin.GetJson("/api/v1/status")).GetProperty("appVersion").GetString());
     }
 
     [Fact]

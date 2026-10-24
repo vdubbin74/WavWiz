@@ -5,10 +5,16 @@ import { pulse } from './motion.js';
 import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist, songsLabel } from './ui.js';
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
+import { openCtx } from './ctxmenu.js';
 
 const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio']];
 // 0.3.5 J9: Playlists + Radio tabs (were popups); the tools are tabs of the expanded Library only (next-j9-lib-*.png)
-export const TOOL_TABS = [['rip', 'CD ripper'], ['tags', 'Tag & cover fix'], ['cleanup', 'Tidy up library']];
+const ALL_TOOL_TABS = [['rip', 'CD ripper'], ['tags', 'Tag & cover fix'], ['cleanup', 'Tidy up library']];
+// 0.4.8 F57: the CD ripper only exists in the PC app (this machine, not a phone/remote browser) - decided by client type, not screen width
+let ripOk = false;
+export function setRipAllowed(auth, ua = navigator.userAgent) { ripOk = !!auth?.thisMachine && !/iPhone|iPad|iPod|Android|Mobile/i.test(ua); document.documentElement.dataset.rip = ripOk ? '1' : '0'; TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip' || ripOk); return ripOk; }
+export const ripAllowed = () => ripOk;
+export let TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip');
 export const EXTRA_TABS = new Set(['playlists', 'radio', 'rip', 'tags', 'cleanup']);
 /** Which tabs the Library shows (pure): the narrow panel = row 1 + row 2 (Playlists, Radio); expanded = everything + Tools. */
 export function libTabs(expanded) {
@@ -76,13 +82,50 @@ export function libraryView(S, opts = {}) {
   const pick = k => { if (TOOL_TABS.some(t => t[0] === k) && !expanded) k = 'artists'; st.tab = k; if (compact) S.libTabC = k; else S.libTab = k; st.stack = []; st.q = ''; search.value = ''; draw(); };
   const tname = k => (TABS.find(t => t[0] === k) || TOOL_TABS.find(t => t[0] === k))[1];
   const tabBtn = (k, cls = '') => h('button', { role: 'tab', 'data-tab': k, class: ((st.tab === k && !st.stack.length) ? 'on ' : '') + cls, 'aria-selected': String(st.tab === k), onclick: () => pick(k) }, compact && !expanded ? tname(k).toUpperCase() : tname(k));
-  const moreSel = keys => h('select', { 'aria-label': 'More ways to browse', class: 'moresel' + (keys.includes(st.tab) ? ' on' : ''), onchange: ev => ev.target.value && pick(ev.target.value) }, h('option', { value: '' }, '⋯'),
-    keys.map(k => h('option', { value: k, selected: st.tab === k }, tname(k).replace('♥ ', ''))));
+  // 0.4.6 F40: no native <select> in the Library (WebView2 draws its open list in Windows colors): themed dropdown buttons that open the themed menu.
+  const ddBtn = (cls, label, txt, opts, cur, onpick) => { const b = h('button', { type: 'button', class: 'wwdd ' + cls, 'aria-label': label, 'aria-haspopup': 'menu', title: label },
+      h('span', { class: 'wwdd-t' }, txt), h('span', { class: 'wwdd-c', 'aria-hidden': 'true' }, '▾'));
+    b.onclick = () => { const r = b.getBoundingClientRect(); openCtx(r.left, r.bottom + 2, opts.map(([v, t]) => ({ id: 'dd:' + v, label: (v === cur ? '✓ ' : '') + t, onclick: () => onpick(v) })), { label, from: b }); };
+    return b; };
+  const moreSel = keys => ddBtn('moresel' + (keys.includes(st.tab) ? ' on' : ''), 'More ways to browse', '⋯', keys.map(k => [k, tname(k).replace('♥ ', '')]), st.tab, k => pick(k));
+  // 0.4.6 F34: the side panel's tabs are ONE row that always fits the panel: tabs that do not fit at this width / scaling / theme go into the "⋯"
+  // overflow, a tab-style button (themed like the tabs, never a native select) that opens the themed menu with them + Years / Recently added /
+  // Favorites. Re-fitted whenever the panel changes size.
+  const ctabRow = T => {
+    const keys = [...T.main, ...T.row2], btns = keys.map(k => tabBtn(k));
+    const more = h('button', { type: 'button', class: 'tabmore', role: 'tab', 'aria-haspopup': 'menu', 'aria-label': 'More ways to browse', title: 'More ways to browse' }, '⋯');
+    const row = h('div', { class: 'tabs ctabs', role: 'tablist' }, btns, more), wrap = h('div', { class: 'ctabwrap' }, row);
+    const hiddenKeys = () => keys.filter((k, i) => btns[i].hidden);
+    const paintMore = () => { const inMore = [...hiddenKeys(), ...T.more].includes(st.tab) && !st.stack.length; more.classList.toggle('on', inMore); more.setAttribute('aria-selected', String(inMore)); };
+    // 0.4.7: fit against the space the panel gives the row (the wrap), measured after layout. Not laid out yet (hidden panel, width 0, cold
+    // load before the grid settles): show every tab and wait for the next measure, never push every tab into the overflow.
+    // 0.4.9: the wrap is a content-sized flex item in the header, so once tabs were hidden (e.g. mid-way through the reopen-from-collapsed
+    // animation) it stayed that narrow and never resized again: watch the panel itself, whose width does change, and re-fit on that too.
+    let panelObs = false, ro = null;
+    const fit = () => {
+      if (!row.isConnected) return;
+      if (!panelObs && ro) { const pan = wrap.closest('.libpanel'); if (pan) { ro.observe(pan); panelObs = true; } }
+      btns.forEach(b => { b.hidden = false; });
+      const room = wrap.clientWidth;
+      if (!(room > 0) || !row.offsetParent) { paintMore(); return; }
+      for (let i = btns.length - 1; i >= 0 && row.scrollWidth > row.clientWidth + 0.5; i--) btns[i].hidden = true;
+      if (btns.length && btns.every(b => b.hidden)) btns[0].hidden = false;   // always keep at least the first tab on the row
+      paintMore();
+    };
+    let fitQ = 0; const refit = () => { if (fitQ) return; fitQ = requestAnimationFrame(() => { fitQ = 0; if (!wrap.isConnected) { off(); return; } fit(); }); };
+    const off = () => { ro?.disconnect(); window.removeEventListener('wavwiz:relayout', refit); window.removeEventListener('wavwiz:uiscale', refit); window.removeEventListener('resize', refit); };
+    window.addEventListener('wavwiz:relayout', refit); window.addEventListener('wavwiz:uiscale', refit); window.addEventListener('resize', refit);
+    try { document.fonts?.ready?.then(refit); document.fonts?.addEventListener?.('loadingdone', refit); } catch { /* no font API */ }
+    more.onclick = () => { const r = more.getBoundingClientRect(), mk = k => ({ id: 'tab:' + k, label: (st.tab === k ? '✓ ' : '') + tname(k).replace('♥ ', ''), onclick: () => pick(k) });
+      openCtx(r.left, r.bottom + 2, [...hiddenKeys().map(mk), ...(hiddenKeys().length ? [{ sep: true }] : []), ...T.more.map(mk), { sep: true }, { id: 'tools', label: 'Tools in Expanded view', disabled: true }], { label: 'More ways to browse', from: more }); };
+    try { ro = new ResizeObserver(() => refit()); ro.observe(wrap); ro.observe(row); } catch { /* old browser: the events above re-fit */ }
+    try { const io = new IntersectionObserver(() => refit()); io.observe(wrap); } catch { /* old browser */ }
+    requestAnimationFrame(refit);
+    return wrap;
+  };
   const tabs = () => {
     const T = libTabs(expanded);
-    if (compact && !expanded) return h('div', { class: 'ctabwrap' },
-      h('div', { class: 'tabs ctabs', role: 'tablist' }, T.main.map(k => tabBtn(k)), moreSel(T.more)),
-      h('div', { class: 'tabs ctabs row2', role: 'tablist' }, T.row2.map(k => tabBtn(k)), h('span', { class: 'small dim libtoolhint' }, 'Tools in Expanded view')));
+    if (compact && !expanded) return ctabRow(T);
     return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)), moreSel(T.more),
       T.tools.length ? [h('span', { class: 'tabsep small dim', 'aria-hidden': 'true' }, 'TOOLS'), ...T.tools.map(k => tabBtn(k, 'tooltab'))] : null);
   };
@@ -249,7 +292,7 @@ export function libraryView(S, opts = {}) {
   /** Sort select + A-Z / Z-A flip + grid/list (+ count when expanded). Remembered per tab per browser. */
   function drawTools(kind) {
     if (!kind || !SORTS[kind]) { tools.replaceChildren(expanded ? h('span', { class: 'grow' }) : '', expanded && st.count != null ? h('span', { class: 'small dim' }, `${st.count} results`) : ''); return; }
-    const sel = h('select', { class: 'libsort', 'aria-label': 'Sort', onchange: ev => { P.sort[kind] = ev.target.value; save(); draw(); } }, SORTS[kind].map(([v, t]) => h('option', { value: v, selected: P.sort[kind] === v }, t)));
+    const sel = ddBtn('libsort', 'Sort', (SORTS[kind].find(([v]) => v === P.sort[kind]) || SORTS[kind][0])[1], SORTS[kind], P.sort[kind], v => { P.sort[kind] = v; save(); draw(); });
     const flip = h('button', { type: 'button', class: 'chipbtn libflip' + (P.flip[kind] ? ' on' : ''), 'aria-pressed': String(P.flip[kind]), title: P.flip[kind] ? 'Reversed - tap for the normal order' : 'Tap to reverse the order', onclick: () => { P.flip[kind] = !P.flip[kind]; save(); draw(); } }, P.flip[kind] ? 'Z–A ↑' : 'A–Z ↓');
     const canGrid = expanded ? VIEW_TABS.includes(kind) : GRID_KINDS.has(kind) || kind === 'albums', cur = gridOn(kind) ? 'grid' : 'list';
     const gl = canGrid ? h('span', { class: 'seg libview', role: 'group', 'aria-label': 'Tiles or list' },

@@ -7,13 +7,16 @@ public sealed record RoleRequirement(Role Need, bool Public = false);
 public sealed class Services
 {
     public required ServerConfig Cfg; public required Db Db; public required AuthService Auth; public required EventHub Events;
-    public required Library.LibraryService Library; public required Playback.Conductor Conductor; public required Net.AudioHost Audio; public required Net.ClockHost Clock;
+    public required Library.LibraryService Library; public required Playback.Conductor Conductor; public required Playback.ConductorRegistry Registry;   // Conductor = the default (house) group; Registry = every playback group (0.4.0)
+     public required Net.AudioHost Audio; public required Net.ClockHost Clock;
     public required Zones.ZoneManager Zones; public required Dsp.DspService Dsp; public required Calibration.CalibrationService Cal; public required Tls.LocalCa Ca;
     public DateTime Started = DateTime.UtcNow; public string FfmpegPath = "";
     public volatile bool Scanning; public Library.ScanResult? LastScan; public CancellationTokenSource Stop = new();
     public required Library.ArtService Art;
-    public Playback.VizHub Viz = new();
+    public Playback.VizHubs Vizs = new();      // 0.4.3 #10: one feed per playback group
+    public Playback.VizHub Viz => Vizs.Default;
     public string ServerId = ""; public Net.DiscoveryHost? Discovery;
+    public Zones.ZoneLinks Links = null!;      // 0.4.0 Stage 2: zones <-> playback groups, Jukebox zone
     public Features.SceneService Scenes = null!;
     public Features.ScheduleService Schedules = null!;
     public Features.SleepService Sleep = null!;
@@ -24,7 +27,7 @@ public sealed class Services
     public Features.RadioFinderService RadioFinder = null!;
     public Features.TagFixService TagFix = null!;
     public Features.CdRipService CdRip = null!;
-    public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify;
+    public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv;      // 0.4.0 Stage 4: one name per zone
     public Library.NasLogon? Nas;      // 0.1.3
     public WavWiz.Core.Discovery.ServerBeacon Beacon() => new(ServerId, ServerName ?? Environment.MachineName, System.Net.IPAddress.TryParse(Cfg.BindAddress, out var ip) && !System.Net.IPAddress.IsLoopback(ip) ? Cfg.BindAddress : "", Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
     public string? ServerName => Db.Setting("server.name") is string s ? JsonSerializer.Deserialize<string>(s) : null;

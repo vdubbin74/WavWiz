@@ -117,7 +117,7 @@ test('0.0.8 item 12: no Adjust button on the Visualizer page', () => {
 
 // ---- item 9: display size zooms the whole UI
 test('0.0.8 item 9: Display size factors and the CSS zoom rule; viewport units compensate the zoom', () => {
-  assert.deepEqual(ui.SCALES.map(s => s[2]), [0.75, 1, 1.25]);   // 0.3.1 B16
+  assert.deepEqual(ui.SCALES.map(s => s[2]), [0.67, 0.75, 1, 1.25]);   // 0.3.1 B16
   assert.equal(ui.scaleFactor('large'), 1.25); assert.equal(ui.scaleFactor('nope'), 1);
   assert.match(css, /html\{zoom:var\(--z,1\)\}/);
   const raw = css.replace(/\d+(\.\d+)?d?v[hw] \/ var\(--z,1\)/g, '').match(/\d+(\.\d+)?d?v[hw]\b/g) || [];
@@ -177,8 +177,8 @@ test('0.0.8/0.1.2 item 14: Now Playing visualizer panel + control panel', () => 
   assert.match(n, /openEq/); assert.match(n, /Master volume/);   // volume and Sound stay reachable (0.2.1 F10: Stop is gone from the panel; Play/Pause covers it)
 });
 
-test('0.0.8 version strings (0.3.9 now)', () => {
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.3\.9'/);
-  const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8'); assert.match(props, /<WavWizVersion>0\.3\.9</);
-  const iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8'); assert.match(iss, /#define AppVersion "0\.3\.9"/);
+test('0.0.8 version strings (0.4.6 now)', () => {
+  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.4\.6'/);
+  const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8'); assert.match(props, /<WavWizVersion>0\.4\.6</);
+  const iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8'); assert.match(iss, /#define AppVersion "0\.4\.6"/);
 });

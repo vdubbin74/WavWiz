@@ -5,17 +5,38 @@ using System.Text;
 using WavWiz.Core.Discovery;
 using WavWiz.Server.Api;
 using WavWiz.Server.Media;
+using WavWiz.Server.Playback;
 namespace WavWiz.Server.Receivers;
 
 /// <summary>
-/// 0.1.1: optional Spotify Connect device "WavWiz – Whole House" (OFF by default; Settings > Network, admin). librespot.exe (MIT) runs as a separate
+/// 0.1.1: optional Spotify Connect device "WavWiz – Everywhere" (OFF by default; Settings > Network, admin). librespot.exe (MIT) runs as a separate
 /// process with the pipe backend: it appears in the Spotify app on this network (zeroconf), the person who picks it signs in with their own Spotify
 /// Premium on their phone, and the decoded audio comes here and plays in every zone. WavWiz holds no Spotify account or credentials
 /// (--disable-credential-cache). Track title/artist/artwork arrive through librespot's --onevent hook (wavwiz-hook.exe, a one-datagram forwarder).
 /// </summary>
 public sealed class SpotifyReceiver : IDisposable
 {
-    public const string Name = "WavWiz – Whole House";
+    public const string Name = "WavWiz – Everywhere";
+    /// <summary>0.4.0: the name this instance shows in the Spotify app (a zone's own receiver is "WavWiz – Kitchen").</summary>
+    public string DisplayName { get; private set; } = Name;
+    private readonly ZoneReceiverTarget? _zt; private Conductor? _regCond; private bool _rebinding;
+    private string? _key => _zt?.Key;
+    private Conductor Cond => _zt?.Cond() ?? _s.Conductor;
+    private string ArtPath => "/api/v1/live/art/" + (_key ?? "spotify");
+    public void Bind()
+    {
+        var c = Cond; if (ReferenceEquals(c, _regCond)) return;
+        if (_regCond != null && _live && _zt != null && _s.Links is { Carrying: true } l && l.ZoneCasting(_zt.Id))
+        { _regCond.EndLive("spotify", _key); _regCond.UnregisterFeed(_key ?? "spotify", Feed); c.RegisterFeed("spotify", Feed, _key); _regCond = c; { var m = _meta ?? ("Spotify", "", ""); c.BeginLive("spotify", m.Title, m.Artist, m.Album, null, _key); } return; }   // 0.4.9: Everywhere moved this casting zone - keep its cast
+        if (_regCond != null) { _rebinding = true; try { End(); } finally { _rebinding = false; } _regCond.UnregisterFeed(_key ?? "spotify", Feed); }
+        c.RegisterFeed("spotify", Feed, _key); _regCond = c;
+    }
+    /// <summary>The zone was renamed: librespot takes the name on its command line, so a running receiver restarts with the new one.</summary>
+    /// <summary>0.4.9 F78: the Devices "Casting" bar.</summary>
+    public bool InSession => _live;
+    public (string Title, string Artist, string Album)? Meta => _meta;
+    public void StopCast() { if (!_live) return; End(); if (Running) { _proc.Stop(); _proc.Start(); } }
+    public void Rename(string name) { if (name == DisplayName) return; DisplayName = name; if (Running) { End(); _proc.Stop(); _proc.Start(); } }
     private readonly Services _s; private readonly ReceiverProcess _proc; private readonly PcmAssembler _pcm = new(4); private readonly Action<string>? _log;
     public readonly LiveFeed Feed = new() { TargetMs = 1000 };
     private readonly string _token = Convert.ToHexString(RandomNumberGenerator.GetBytes(12)); private UdpClient? _hookSock; private string? _hookExe;
@@ -28,14 +49,14 @@ public sealed class SpotifyReceiver : IDisposable
     public string? User { get; private set; }
     public string? Title => _meta?.Title;
 
-    public SpotifyReceiver(Services s, Action<string>? log)
+    public SpotifyReceiver(Services s, Action<string>? log, ZoneReceiverTarget? zone = null)
     {
-        _s = s; _log = log; Port = s.Cfg.SpotifyPort;
+        _s = s; _log = log; _zt = zone; Port = zone?.Port ?? s.Cfg.SpotifyPort; if (zone != null) DisplayName = zone.Name;
         var dir = Path.Combine(AppContext.BaseDirectory, "receivers");
-        _proc = new ReceiverProcess("spotify", Path.Combine(dir, OperatingSystem.IsWindows() ? "librespot.exe" : "librespot"), Args,
+        _proc = new ReceiverProcess(_zt != null ? "spotify-" + _zt.Id : "spotify", Path.Combine(dir, OperatingSystem.IsWindows() ? "librespot.exe" : "librespot"), Args,
             (b, n) => _pcm.Push(b, n, f => { Feed.WriteS16(f, 44100); if (!_live) Begin(); }), OnLine, log)
         { Exited = () => End() };
-        s.Conductor.RegisterFeed("spotify", Feed);
+        Bind();
         ApplyLevelGain();
     }
 
@@ -59,7 +80,7 @@ public sealed class SpotifyReceiver : IDisposable
         ApplyLevelGain();
     }
 
-    public bool Enabled => _s.Db.Setting("spotify.enabled") == "true";
+    public bool Enabled => _zt != null ? _zt.Enabled() : _s.Db.Setting("spotify.enabled") == "true";
     public bool Installed => _proc.Installed;
     public bool Running => _proc.Running;
     public string? LastError => _proc.LastError;
@@ -68,13 +89,13 @@ public sealed class SpotifyReceiver : IDisposable
     /// <summary>Start or stop to match the admin setting.</summary>
     public void Apply()
     {
-        if (Enabled) { EnsureHook(); _proc.Start(); }
+        if (Enabled) { Bind(); EnsureHook(); _proc.Start(); }
         else { _proc.Stop(); End(); ZeroconfFallback = false; }
     }
 
     private IEnumerable<string> Args()
     {
-        var a = new List<string> { "--name", Name, "--backend", "pipe", "--format", "S16", "--bitrate", "320", "--device-type", "speaker", "--initial-volume", "100",
+        var a = new List<string> { "--name", DisplayName, "--backend", "pipe", "--format", "S16", "--bitrate", "320", "--device-type", "speaker", "--initial-volume", "100",
             "--zeroconf-port", Port.ToString(), "--disable-audio-cache", "--disable-credential-cache" };
         if (IPAddress.TryParse(_s.Cfg.BindAddress, out var ip) && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any)) { a.Add("--zeroconf-interface"); a.Add(ip.ToString()); }
         if (_hookExe != null && _hookSock != null) { a.Add("--onevent"); a.Add($"{_hookExe} {((IPEndPoint)_hookSock.Client.LocalEndPoint!).Port} {_token}"); }
@@ -121,14 +142,14 @@ public sealed class SpotifyReceiver : IDisposable
         return d;
     }
 
-    internal void OnEvent(Dictionary<string, string> e)
+    public void OnEvent(Dictionary<string, string> e)
     {
         switch (e.GetValueOrDefault("PLAYER_EVENT"))
         {
             case "track_changed":
                 var title = e.GetValueOrDefault("NAME") ?? "Spotify"; var artist = (e.GetValueOrDefault("ARTISTS") ?? e.GetValueOrDefault("SHOW_NAME") ?? "").Replace("\t", ", "); var album = e.GetValueOrDefault("ALBUM") ?? "";
                 _meta = (title, artist, album);
-                _s.Conductor.UpdateLive("spotify", q => q with { Title = title, Artist = artist, Album = album });
+                Cond.UpdateLive("spotify", q => q with { Title = title, Artist = artist, Album = album }, _key);
                 var cover = (e.GetValueOrDefault("COVERS") ?? "").Split('\t', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
                 if (cover != null && cover != _artSrc && cover.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) { _artSrc = cover; _ = FetchArt(cover); }
                 break;
@@ -144,25 +165,31 @@ public sealed class SpotifyReceiver : IDisposable
         {
             var bytes = await Http.GetByteArrayAsync(url); if (bytes.Length < 16 || bytes.Length > 4_000_000 || url != _artSrc) return;
             _art = bytes; _artType = bytes[0] == 0x89 ? "image/png" : "image/jpeg"; var v = Interlocked.Increment(ref _artVer);
-            _s.Conductor.UpdateLive("spotify", q => q with { ArtUrl = $"/api/v1/live/art/spotify?v={v}" });
+            Cond.UpdateLive("spotify", q => q with { ArtUrl = $"{ArtPath}?v={v}" }, _key);
         }
         catch (Exception ex) { _log?.Invoke("spotify art: " + ex.Message); }
     }
 
     private void Begin()
     {
+        if (_zt != null && !_live) try { _s.Links?.ZoneCastBegin(_zt.Id); Bind(); } catch (Exception ex) { _log?.Invoke("spotify: zone cast: " + ex.Message); }   // 0.4.9: see AirPlayReceiver
         _live = true; Feed.Flush(); ApplyLevelGain();
+        if (_zt == null) try { _s.Events.Publish("zones"); } catch { }
+        if (_zt == null) try { _s.Links?.EverywhereBegin(); } catch (Exception ex) { _log?.Invoke("spotify: link all zones failed: " + ex.Message); }   // 0.4.9: see AirPlayReceiver
         var m = _meta ?? ("Spotify", "", "");
-        _s.Conductor.BeginLive("spotify", m.Title, m.Artist, m.Album, _art != null ? $"/api/v1/live/art/spotify?v={_artVer}" : null);
+        Cond.BeginLive("spotify", m.Title, m.Artist, m.Album, _art != null ? $"{ArtPath}?v={_artVer}" : null, _key);
     }
 
     private void End()
     {
         if (!_live) return;
-        _live = false; Feed.Flush(); _s.Conductor.EndLive("spotify");
+        _live = false; Feed.Flush(); (_regCond ?? Cond).EndLive("spotify", _key);
+        if (_zt == null) try { _s.Links?.EverywhereEnd(); } catch { }
+        else try { _s.Links?.ZoneCastEnd(_zt.Id, !_rebinding); } catch { }
+        if (_zt == null) try { _s.Events.Publish("zones"); } catch { }
     }
 
-    internal void OnLine(string line)
+    public void OnLine(string line)
     {
         if (line.Contains("libmdns error", StringComparison.OrdinalIgnoreCase) || line.Contains("dns_sd error", StringComparison.OrdinalIgnoreCase))
         { if (!ZeroconfFallback) { ZeroconfFallback = true; _log?.Invoke("spotify: librespot mDNS failed; WavWiz advertises the device instead"); _s.Discovery?.AnnounceSoon(); } }
@@ -173,7 +200,7 @@ public sealed class SpotifyReceiver : IDisposable
     public List<DnsWire.Record>? MdnsRecords(string host, IPAddress ip)
     {
         if (!ZeroconfFallback || !Running) return null;
-        var svc = "_spotify-connect._tcp.local"; var inst = Name + "." + svc;
+        var svc = "_spotify-connect._tcp.local"; var inst = DisplayName + "." + svc;
         return new() { DnsWire.Ptr(svc, inst), DnsWire.Srv(inst, host, Port), DnsWire.Txt(inst, new[] { "VERSION=1.0", "CPath=/" }), DnsWire.A(host, ip) };
     }
 

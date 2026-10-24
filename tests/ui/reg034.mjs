@@ -53,23 +53,41 @@ await step('art', async () => {
   ok('art: art images load in the UI', imgs.length > 0 && imgs.every(i => i.ok), `${imgs.length} imgs`);
 });
 await step('eqlock', async () => {
-  await home(); await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(500);
-  const r = await p.evaluate(() => { const b = document.querySelector('.np-eqhead .eqpadlock'); const eq = document.querySelector('.eqpanel,.eq,.eqwrap,canvas'); return { pressed: b.getAttribute('aria-pressed'), col: getComputedStyle(b).color, op: eq ? getComputedStyle(eq).opacity : '1', filt: eq ? getComputedStyle(eq).filter : '' }; });
+  await home(); await p.click('[data-ov=lock]'); await p.waitForTimeout(500);
+  const r = await p.evaluate(() => { const b = document.querySelector('[data-ov=lock]'); const eq = document.querySelector('.eqpanel,.eq,.eqwrap,canvas'); return { pressed: b.getAttribute('aria-pressed'), col: getComputedStyle(b).color, op: eq ? getComputedStyle(eq).opacity : '1', filt: eq ? getComputedStyle(eq).filter : '' }; });
   ok('EQ lock: locks, button turns red, EQ not dimmed', r.pressed === 'true' && r.op === '1' && !/brightness|grayscale/.test(r.filt), JSON.stringify(r)); await shot('eqlock');
-  await p.click('.np-eqhead .eqpadlock'); await p.waitForTimeout(300);
+  await p.click('[data-ov=lock]'); await p.waitForTimeout(300);
 });
 await step('mini', async () => {
-  const m = await ctx.newPage(); const me = []; m.on('pageerror', e => me.push(e.message)); await m.setViewportSize({ width: 420, height: 160 }); await m.goto(B + '/mini.html'); await m.waitForTimeout(3000);
+  const m = await ctx.newPage(); const me = []; m.on('pageerror', e => me.push(e.message)); await m.setViewportSize({ width: 420, height: 145 }); await m.goto(B + '/mini.html'); await m.waitForTimeout(3000);
   const t = await m.evaluate(() => document.body.innerText.slice(0, 120)); await m.screenshot({ path: '/workspace/screens/wavwiz-034-reg-mini.png' });
-  ok('mini player: loads, shows the song, no errors', /Song \d+/.test(t) && me.length === 0, t.replace(/\n/g, ' | ') + ' ' + me.join('|'));
+  ok('mini player: loads, shows the song (or Nothing playing), Transparency button, zone chip, no errors', /(Song \d+|Nothing playing)/.test(t) && /Transparency/.test(t) && /CONTROLLING/i.test(t) && me.length === 0, t.replace(/\n/g, ' | ') + ' ' + me.join('|'));
   const v = m.locator('input[type=range]').first(); ok('mini player: has a volume bar', await v.count() > 0); await m.close();
 });
 await step('dragdrop', async () => {
-  await home(); const before = (await api('/queue')); const items = before.items || before.queue || before; const t0 = items[1]?.title, t3 = items[3]?.title;
-  const rows = p.locator('.qtable tbody tr'); const src = rows.nth(1), dst = rows.nth(4); const grip = src.locator('.grip, .qgrip, td.num').first();
-  const a = await grip.boundingBox(), b = await dst.boundingBox(); await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await p.mouse.down(); await p.mouse.move(a.x + 5, a.y + 20, { steps: 5 }); await p.mouse.move(b.x + 40, b.y + b.height - 3, { steps: 12 }); await p.waitForTimeout(200); await p.mouse.up(); await p.waitForTimeout(1500);
-  const after = await api('/queue'); const it2 = after.items || after.queue || after; ok('drag and drop: playlist row moved', it2[1]?.title !== t0 && it2.some(x => x.title === t0), JSON.stringify([t0, it2.slice(0, 6).map(x => x.title)]));
-  await shot('dragdrop'); await p.keyboard.press('Control+z'); await p.waitForTimeout(1200); const un = await api('/queue'); const it3 = un.items || un.queue || un; ok('drag and drop: Ctrl+Z undoes', it3[1]?.title === t0, it3.slice(0, 6).map(x => x.title).join(','));
+  // 0.4.4 H1: seed ≥6 queue rows (current seeds can be thinner), wait for row 5, grip = td.num .qgrip; assert via API
+  await home();
+  const tracks = await api('/library/tracks'); const ids = (Array.isArray(tracks) ? tracks : tracks.tracks || tracks.items || []).map(x => x.id).filter(Boolean).slice(0, 8);
+  if (ids.length >= 6) { await api('/queue/clear', 'POST', {}); await api('/queue/add', 'POST', { kind: 'tracks', ids }); await p.waitForTimeout(800); }
+  const before = (await api('/queue')); const items = before.items || before.queue || before;
+  ok('drag and drop: queue has ≥5 rows to reorder', (items?.length || 0) >= 5, items?.length);
+  const t0 = items[1]?.title;
+  await p.waitForSelector('.qtable tbody tr[data-i]:nth-child(5)', { timeout: 10000 });
+  const rows = p.locator('.qtable tbody tr[data-i]'); const src = rows.nth(1), dst = rows.nth(4);
+  const grip = src.locator('td.num .qgrip, .qgrip, td.num').first();
+  await grip.waitFor({ state: 'visible', timeout: 10000 });
+  const a = await grip.boundingBox(), b = await dst.boundingBox();
+  ok('drag and drop: grip and target have boxes', !!(a && b), JSON.stringify({ a, b }));
+  if (a && b) {
+    await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await p.mouse.down();
+    await p.mouse.move(a.x + 5, a.y + 20, { steps: 5 }); await p.mouse.move(b.x + 40, b.y + b.height - 3, { steps: 12 });
+    await p.waitForTimeout(200); await p.mouse.up(); await p.waitForTimeout(1500);
+  }
+  const after = await api('/queue'); const it2 = after.items || after.queue || after;
+  ok('drag and drop: playlist row moved', it2[1]?.title !== t0 && it2.some(x => x.title === t0), JSON.stringify([t0, it2.slice(0, 6).map(x => x.title)]));
+  await shot('dragdrop'); await p.keyboard.press('Control+z'); await p.waitForTimeout(1200);
+  const un = await api('/queue'); const it3 = un.items || un.queue || un;
+  ok('drag and drop: Ctrl+Z undoes', it3[1]?.title === t0, it3.slice(0, 6).map(x => x.title).join(','));
 });
 await step('settings', async () => {
   for (const tab of ['general', 'appearance', 'playback', 'devices', 'library', 'network', 'jukebox']) {

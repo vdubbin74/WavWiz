@@ -3,8 +3,9 @@
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly } from './ui.js';
 import { jbPreview } from './jukebox-preview.js';
+import { speakerPicker, applyJukeboxSpeakers, initialPick } from './jbspeakers.js';   // 0.4.9 F76
 
-export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub'];
+export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub', 'wavwiz.layout'];
 export const ROLE_NAMES = [['view', 'View', 'can browse and see what plays'], ['control', 'Control', 'can play, pause and change volume'], ['admin', 'Admin', 'can change every setting']];
 
 /** §7.4: "Saved ✓" right beside the changed control, fading after ~1.5 s. */
@@ -112,7 +113,7 @@ export function calibrationExtras(S, settings, { admin, put, go }) {
 }
 
 // ---------------------------------------------------------------- §1.7 Jukebox tab (admin)
-export const JB_DEFAULTS = { style: 'modern', folders: [], playlists: [], perGuest: 3, voteSkip: true, votesNeeded: 3, explicitFilter: false, artistCooldownMin: 0, autofill: { kind: 'playlist', id: null, genre: '' }, beat: 50, cdSound: false, hasPin: false };
+export const JB_DEFAULTS = { style: 'modern', folders: [], playlists: [], perGuest: 3, voteSkip: true, votesNeeded: 3, explicitFilter: false, artistCooldownMin: 0, autofill: { kind: 'playlist', id: null, genre: '' }, beat: 50, cdSound: false, showInDevices: true, defaultSpeakers: null, hasPin: false };
 export function jukeboxPane(S, settings, { admin }) {
   const box = h('div', { class: 'jbset' });
   let cfg = { ...JB_DEFAULTS }, roots = [], playlists = [];
@@ -139,6 +140,12 @@ export function jukeboxPane(S, settings, { admin }) {
             (() => { const out = h('span', { class: 'jbbeatv' }, (cfg.beat ?? 50) + '%'); return [A(h('input', { type: 'range', min: 0, max: 100, step: 1, value: cfg.beat ?? 50, class: 'jbbeat', 'aria-label': 'Bubble light pulse', oninput: ev => { out.textContent = ev.target.value + '%'; }, onchange: ev => save({ beat: +ev.target.value }, ev.target) })), out]; })()),
           h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'CD-changer sound'), h('div', { class: 'small dim' }, 'A soft click and whirr between songs. Off by default.')), h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg.cdSound, 'aria-label': 'CD-changer sound', onchange: ev => save({ cdSound: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })))),
         h('p', { class: 'small dim' }, 'The big screen and the guest page use this style and your theme colors.')),
+      // 0.4.9 F76: the Jukebox zone - its default speakers (also applied to the zone now) and whether Devices lists it when the Jukebox is not running
+      h('div', { class: 'card', id: 'sec-jbzone' }, h('h3', null, 'Jukebox zone ', admin ? null : adminTag()),
+        h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Show Jukebox zone in Devices'), h('div', { class: 'small dim' }, 'While the Jukebox is running it always shows.')),
+          h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: cfg.showInDevices !== false, 'aria-label': 'Show Jukebox zone in Devices', 'data-act': 'jb-show', onchange: ev => save({ showInDevices: ev.target.checked }, ev.target).then(() => window.dispatchEvent(new CustomEvent('wavwiz:zones-changed'))) })), h('span', { 'aria-hidden': 'true' }))),
+        h('div', { class: 'setrow', style: 'align-items:flex-start' }, h('div', { class: 'grow' }, h('div', null, 'Default speakers'), h('div', { class: 'small dim' }, 'The Jukebox plays on these. Start Jukebox… starts with them picked.')),
+          speakerPicker(S.zones || [], initialPick(cfg.defaultSpeakers, S.jb?.deviceIds, S.zones), async ids => { if (!admin) return; await save({ defaultSpeakers: ids }, box.querySelector('#sec-jbzone .jbspk76')); try { await applyJukeboxSpeakers(ids); } catch (e) { toast(e.message, true); } }, { disabled: !admin, label: 'Default speakers' }))),
       h('div', { class: 'card', id: 'sec-jbsources' }, h('h3', null, 'Allowed music ', admin ? null : adminTag()), learn('Guests can only search and add songs from these folders and playlists. Nothing ticked means the whole library.'),
         h('div', { class: 'row wrap', style: 'align-items:flex-start;gap:20px' }, h('div', null, h('b', { class: 'small' }, 'Folders'), multi(roots, 'folders', 'Folders', r => r.path, r => r.path)), h('div', null, h('b', { class: 'small' }, 'Playlists'), multi(playlists, 'playlists', 'Playlists', p => p.id, p => p.name)))),
       h('div', { class: 'card', id: 'sec-jbrules' }, h('h3', null, 'Rules ', admin ? null : adminTag()),

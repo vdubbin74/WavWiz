@@ -55,6 +55,13 @@ public static class LibraryApi
             var n = oa.RetryMissing(L.Artists().Select(a => a.Name)); s.Events.Publish("art", new { kind = "retry" });
             return Results.Json(new { ok = true, queued = n });
         }).Req(Role.Admin);
+        // 0.4.4 F24: Settings > Library "Rebuild album art" (admin): clears the cover cache and rebuilds it; browsers get new picture URLs
+        g.MapPost("/library/art/rebuild", () =>
+        {
+            var removed = s.Art.Rebuild(); s.Events.Publish("art", new { kind = "rebuild", cv = Library.ArtService.UrlVersion });
+            return Results.Json(new { ok = true, removed, artCv = Library.ArtService.UrlVersion });
+        }).Req(Role.Admin);
+        g.MapGet("/library/art/rebuild", () => Results.Json(new { rebuilding = s.Art.Rebuilding, artCv = Library.ArtService.UrlVersion })).Req(Role.View);
         g.MapGet("/art/radio/{id:long}", async (long id, int? size, HttpContext c) =>
         {
             var logo = s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string;

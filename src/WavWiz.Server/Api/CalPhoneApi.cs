@@ -125,7 +125,7 @@ public static class CalPhoneApi
             var speakers = zs.Where(z => z.Id != refId && (l.ByAdmin || z.Id == l.OwnerZoneId)).Select(z => new { id = z.Id, name = z.Name }).ToList();
             var host = PhoneApi.PhoneHost(c, s);
             return Results.Json(new { reference = rz == null ? null : new { id = rz.Id, name = rz.Name, connected = rz.Connected }, speakers, allSpeakers = l.ByAdmin, device = l.Device,
-                https = s.Ca.Enabled, secureUrl = SecureUrl(host, s.Cfg.HttpsPort, l.Token), host, httpPort = s.Cfg.HttpPort, httpsPort = s.Cfg.HttpsPort, patternMs = new WavWiz.Measure.ChirpPattern().LengthMs });
+                https = s.Ca.Enabled, secureUrl = SecureUrl(host, s.Cfg.HttpsPort, l.Token), host, httpPort = s.Cfg.HttpPort, httpsPort = s.Cfg.HttpsPort, patternMs = new WavWiz.Measure.ChirpPattern().LengthMs, quality = "quick" });
         }).Req(Role.Control);
 
         // 0.2.5: "Stop using as mic" (Devices > Calibration mic line, or the PC's Calibrate screen): the phone page stops, its code stops working

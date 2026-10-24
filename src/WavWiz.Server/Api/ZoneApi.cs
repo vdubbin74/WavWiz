@@ -50,7 +50,15 @@ public static class ZoneApi
         g.MapPost("/players/{id}/forget", (string id) => { s.Zones.RemovePlayer(id); return Results.Json(new { ok = true }); }).Req(Role.Admin);
 
         // ---- zones = optional groups of devices (0.0.3) ----
-        g.MapGet("/groups", () => Results.Json(s.Zones.Groups())).Req(Role.View);
+        g.MapGet("/groups", () => Results.Json(s.Links.Decorate(s.Zones.Groups()))).Req(Role.View);
+        // 0.4.0 Stage 2: link zones (they play the same music) / split a zone off (its own music) / link all. Control, like switching zones; the jukebox picker is admin-only.
+        g.MapPost("/groups/{id:long}/link", async (long id, HttpContext c) => { var b = await c.Request.Body(); var w = b.Long("with"); if (w == null) return Ext.Bad("with (the zone to link with) is required"); var err = s.Links.Link(id, w.Value); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
+        g.MapPost("/groups/{id:long}/split", (long id) => { var note = s.Links.SplitNote(id); if (note != null) return Ext.Bad(note, 409); var err = s.Links.SplitOff(id); return err != null ? Ext.Bad(err, 404) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
+        g.MapPost("/groups/link-all", async (HttpContext c) => { var b = await c.Request.Body(); s.Links.LinkAll(b.Long("into")); return Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
+        g.MapGet("/jukebox/zone", () => Results.Json(JbView(s))).Req(Role.View);
+        g.MapPost("/jukebox/zone/volume", async (HttpContext c) => { var b = await c.Request.Body(); var (lvl, err) = s.Zones.DevicesVolume(-1, s.Links.JukeboxDeviceIds(), b.Num("set") ?? double.NaN); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true, level = lvl }); }).Req(Role.Control);
+        g.MapPost("/jukebox/zone/mute", async (HttpContext c) => { var b = await c.Request.Body(); s.Zones.DevicesMute(s.Links.JukeboxDeviceIds(), b.Bool("muted") ?? true); return Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapPut("/jukebox/zone", async (HttpContext c) => { var b = await c.Request.Body(); var err = PutJukeboxSpeakers(s, b.LongList("deviceIds") ?? new()); return err != null ? Ext.Bad(err) : Results.Json(JbView(s)); }).Req(Role.Admin);
         g.MapPost("/groups", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); var (id, err) = s.Zones.CreateGroup(b.Str("name"), b.LongList("deviceIds"));
@@ -65,7 +73,7 @@ public static class ZoneApi
         // 0.3.2 F4: zone volume (keeps the members' offsets) and zone mute. Control, like device volume / mute.
         g.MapPost("/groups/{id:long}/volume", async (long id, HttpContext c) => { var b = await c.Request.Body(); var (lvl, err) = s.Zones.GroupVolume(id, b.Num("set") ?? double.NaN); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, level = lvl, groups = s.Zones.Groups() }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/mute", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Zones.GroupMute(id, b.Bool("muted") ?? true); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, groups = s.Zones.Groups() }); }).Req(Role.Control);
-        g.MapPost("/groups/{id:long}/activate", (long id) => { var err = s.Zones.ActivateGroup(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Zones.Groups()); }).Req(Role.Control);
+        g.MapPost("/groups/{id:long}/activate", (long id) => { var err = s.Zones.ActivateGroup(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
 
         // ---- manual / by-ear delay ----
         g.MapPut("/outputs/{deviceId}/latency", async (string deviceId, HttpContext c) =>
@@ -169,7 +177,8 @@ public static class ZoneApi
                 var picked = all.Where(z => z.Id != sess.ReferenceZoneId && (only == null ? (want == null || want.Contains(z.Id)) : z.Id == only)).Select(z => (z.Id, z.Name)).ToList();
                 if (picked.Count == 0) { s.Cal.End(sess, "nothing to measure"); return Ext.Bad("Choose at least one speaker to calibrate (the reference speaker is the one the others are measured against).", 400); }
                 var refName = s.Zones.Zone(sess.ReferenceZoneId)?.Name ?? "Reference";
-                var plan = Calibration.CalPlan.Build(sess.ReferenceZoneId, refName, picked, (int)Math.Clamp(b.Long("runs") ?? 3, 1, 3));
+                var qual = b.Str("quality"); bool quick = qual == "quick" || (qual == null && b.Long("runs") == null); sess.Quick = quick;       // 0.4.1: Quick = one test per speaker (default); Thorough = 3 tests per speaker + drift check
+                var plan = Calibration.CalPlan.Build(sess.ReferenceZoneId, refName, picked, quick ? 1 : (int)Math.Clamp(b.Long("runs") ?? 3, 1, 3), driftCheck: !quick);
                 s.Events.Publish("calmics");
                 if (b.Num("testVolume") is double tv) sess.TestVolume = Math.Clamp(tv, 0, 100);
                 _ = Task.Run(() => s.Cal.RunPcMic(sess, plan, Math.Clamp(b.Num("levelDb") ?? Calibration.CalibrationService.DefaultLevelDb, -40, -6)));
@@ -279,7 +288,7 @@ public static class ZoneApi
             var b = await c.Request.Body(); var ids = b.Prop("zoneIds") is JsonElement a && a.ValueKind == JsonValueKind.Array ? a.EnumerateArray().Select(x => x.GetInt64()).ToList() : props.Where(p => p.Commit).Select(p => p.ZoneId).ToList();
             int skipped = 0;
             if (sess.OnlyZoneId != null) { skipped = ids.Count(x => x != sess.OnlyZoneId); ids = ids.Where(x => x == sess.OnlyZoneId).ToList(); }    // regular user: own device only
-            s.Cal.Commit(sess, ids, props); var canResume = s.Cal.End(sess, "saved"); s.Events.Publish("zones"); return Results.Json(new { ok = true, saved = ids.Count, skipped, canResume });
+            s.Cal.Commit(sess, ids, props); var canResume = s.Cal.End(sess, "saved"); s.Events.Publish("zones"); return Results.Json(new { ok = true, saved = ids.Count, skipped, canResume, resumeGroups = sess.ResumeGroupIds });
         }).Req(Role.Control);
 
         // 0.2.0 item 29: end (finish, cancel or failure) - resumes the music if calibration paused it
@@ -287,7 +296,7 @@ public static class ZoneApi
         {
             var sess = s.Cal.Get(id); if (sess == null) return Results.Json(new { ok = true, resumed = false, canResume = false });
             if (CalPhoneApi.LinkOf(c) is { } ml && sess.LinkToken != ml.Token) return Ext.Bad("not this phone's calibration", 403);
-            return Results.Json(new { ok = true, resumed = false, canResume = s.Cal.End(sess, "ended") });   // 0.3.7 L21: offer Resume, never auto-resume
+            var cr = s.Cal.End(sess, "ended"); return Results.Json(new { ok = true, resumed = false, canResume = cr, resumeGroups = sess.ResumeGroupIds });   // 0.3.7 L21: offer Resume, never auto-resume
         }).Req(Role.Control);
 
         // 0.2.0 item 30: the house reference speaker (setting calibration.referenceZoneId). Everyone can read it; only an admin can change it.
@@ -318,5 +327,20 @@ public static class ZoneApi
     private static bool MineByPlayer(Services s, HttpContext c, string playerId)
     {
         var z = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(x => x.PlayerId == playerId); return z?.Mine == true;
+    }
+    /// <summary>0.4.9 F76 fix: while the Jukebox runs, the picked speakers are borrowed now; otherwise they only become its default speakers
+    /// (borrowed at the next Start), so an idle Jukebox never holds a speaker away from its zone.</summary>
+    public static string? PutJukeboxSpeakers(Services s, List<long> ids)
+    {
+        ids = ids.Distinct().ToList(); var err = s.Links.CheckDevices(ids); if (err != null) return err;
+        if (s.Jukebox.Running) return s.Links.SetJukeboxDevices(ids);
+        using var d = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new { defaultSpeakers = ids })); return s.Jukebox.Update(d.RootElement.Clone());
+    }
+    /// <summary>0.4.9 F76: the Jukebox zone + whether Devices shows it (Settings > Jukebox switch; always while the Jukebox runs) and its default speakers.</summary>
+    public static System.Text.Json.Nodes.JsonObject JbView(Services s)
+    {
+        var n = System.Text.Json.JsonSerializer.SerializeToNode(s.Links.JukeboxView(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!.AsObject(); var c = s.Jukebox.Cfg();
+        n["running"] = s.Jukebox.Running; n["showInDevices"] = c.ShowInDevices; n["defaultSpeakers"] = c.DefaultSpeakers == null ? null : new System.Text.Json.Nodes.JsonArray(c.DefaultSpeakers.Select(x => (System.Text.Json.Nodes.JsonNode?)x).ToArray());
+        return n;
     }
 }

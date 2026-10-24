@@ -17,14 +17,18 @@ public sealed class ArtService
     private static readonly string[] Exts = { ".jpg", ".jpeg", ".png", ".webp" };
     public static readonly int[] Sizes = { 96, 192, 384, 768 };
 
-    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); if (UpgradeCache(_cache)) _none.Clear(); }
+    public ArtService(LibraryService lib, string dataDir, string ffmpeg) { _lib = lib; _cache = Path.Combine(dataDir, "artcache"); _ffmpeg = ffmpeg; Directory.CreateDirectory(_cache); if (UpgradeCache(_cache)) _none.Clear(); _gen = ReadGen(); }
+    private int ReadGen() { try { var g = Path.Combine(_cache, "rebuild.gen"); return File.Exists(g) && int.TryParse(File.ReadAllText(g).Trim(), out var n) ? n : 0; } catch { return 0; } }
 
     // ---- 0.3.1 B19: corrupted (magenta/green striped) thumbnails. The decoder used to conceal damaged / unsupported data and the result was cached
     // forever. Now: sniff the format, decode strictly (any decode error = no picture), normalize to 8-bit RGB with even sizes, re-check the JPEG we
     // made, and reject striped noise. A rejected picture is "no art": the web UI shows its themed initials tile. The cache is rebuilt once on upgrade.
-    public const int CacheVersion = 4;   // 0.3.6 K4: 4 = stale thumbnails from older builds are cleared once. 0.3.2 F10/F11: 3 F10/F11: 3 = rebuilt after the 0.3.1 validator rejected every picture
+    public const int CacheVersion = 5;   // 0.4.4 F24: 5 = thumbnails cached under a shared folder picture (one cover on most songs) are cleared once.
+    // (was 4)   // 0.3.6 K4: 4 = stale thumbnails from older builds are cleared once. 0.3.2 F10/F11: 3 F10/F11: 3 = rebuilt after the 0.3.1 validator rejected every picture
     /// <summary>0.3.2 F10: art URL version sent to the web UI (&amp;cv=) so pictures the browser / WebView2 cached from older builds are never reused.</summary>
-    public static string UrlVersion => CacheVersion + "." + WavWiz.Core.WavWizInfo.Version;
+    public static string UrlVersion => CacheVersion + "." + WavWiz.Core.WavWizInfo.Version + (_gen > 0 ? "." + _gen : "");
+    /// <summary>0.4.4 F24: bumped by "Rebuild album art" (kept in artcache/rebuild.gen) so browsers never reuse a picture they cached before the rebuild.</summary>
+    private static int _gen;
     /// <summary>0.3.2 F11: validator problems (could not check a thumbnail; the thumbnail is kept). Newest last, max 50.</summary>
     public static readonly ConcurrentQueue<string> ValidatorLog = new();
     /// <summary>0.3.2 F11: test hook - replaces the thumbnail check (throwing = a validator failure).</summary>
@@ -89,14 +93,61 @@ public sealed class ArtService
         try
         {
             var fi = new FileInfo(t.Path); if (!fi.Exists) return null;
-            string? dirImage = FolderImage(fi.DirectoryName) ?? FolderImage(fi.Directory?.Parent?.FullName, onlyIfSiblingDisc: fi.Directory?.Name);
-            // embedded art wins (it is what the tagger chose for this exact file)
+            // embedded art wins (it is what the tagger chose for this exact file); its key is this file
             if (HasEmbedded(t)) return ("emb|" + t.Path + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks, () => ReadEmbedded(t.Path));
-            if (dirImage != null) { var di = new FileInfo(dirImage); return ("dir|" + dirImage + "|" + di.Length + "|" + di.LastWriteTimeUtc.Ticks, () => File.ReadAllBytes(dirImage)); }
+            // 0.4.4 F24: a folder picture belongs to ONE real album. It is used only when the track's folder holds exactly one known album and the
+            // track is that album (or has no album tag). A mixed folder (a flat "Music" folder, a downloads folder, a library root with a folder.jpg)
+            // gives no folder picture at all, so one album's cover never spreads over the library; those songs show the themed placeholder.
+            var folderAlbum = FolderAlbum(fi.DirectoryName);
+            if (folderAlbum == null) return null;
+            if (!OnlineArt.IsUnknown(t.Album) && folderAlbum.Value.Album.Length > 0 && !SameAlbum(folderAlbum.Value, t)) return null;
+            string? dirImage = FolderImage(fi.DirectoryName) ?? FolderImage(fi.Directory?.Parent?.FullName, onlyIfSiblingDisc: fi.Directory?.Name);
+            if (dirImage != null) { var di = new FileInfo(dirImage); return ("dir|" + dirImage + "|" + di.Length + "|" + di.LastWriteTimeUtc.Ticks + "|" + OnlineArt.Norm(folderAlbum.Value.Artist) + "\u001f" + OnlineArt.Norm(folderAlbum.Value.Album), () => File.ReadAllBytes(dirImage)); }
         }
         catch { }
         return null;
     }
+
+    static bool SameAlbum((string Artist, string Album) a, TrackRow t) => OnlineArt.Norm(a.Album) == OnlineArt.Norm(t.Album);
+    /// <summary>0.4.4 F24: the one real album (album artist, album) of the tracks in this folder, ("", "") when it holds only untagged songs (the folder is their album), or null when it
+    /// holds more than one (a mixed folder). Library roots never count as an album folder.</summary>
+    public (string Artist, string Album)? FolderAlbum(string? dir)
+    {
+        if (string.IsNullOrEmpty(dir)) return null;
+        try
+        {
+            if (Convert.ToInt32(_lib.Scalar("SELECT COUNT(*) FROM library_root WHERE path=$p OR path=$q", ("$p", dir), ("$q", dir + Path.DirectorySeparatorChar))) > 0) return null;
+            var albums = _lib.Db.Query("SELECT DISTINCT album FROM track WHERE missing=0 AND folder=$f", r => r.GetString(0), ("$f", dir))
+                .Where(a => !OnlineArt.IsUnknown(a)).Select(a => a.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToList();
+            if (albums.Count == 0) return ("", "");      // only untagged songs in a (non-root) folder: treat the folder as their album
+            if (albums.Count != 1) return null;
+            var artist = _lib.Db.Query("SELECT album_artist FROM track WHERE missing=0 AND folder=$f AND album=$a LIMIT 1", r => r.GetString(0), ("$f", dir), ("$a", albums[0])).FirstOrDefault() ?? "";
+            return (artist, albums[0]);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>0.4.4 F24: "Rebuild album art" - clears every cached thumbnail and "no picture" answer, bumps the art URL version (browsers
+    /// fetch fresh pictures) and rebuilds one cover per album in the background. Returns how many cached files were removed.</summary>
+    public int Rebuild(CancellationToken ct = default)
+    {
+        int removed = 0;
+        foreach (var pat in new[] { "*.jpg", "*.none", "*.neg", "*.tmp" })
+            foreach (var f in Directory.EnumerateFiles(_cache, pat)) { try { File.Delete(f); removed++; } catch { } }
+        _none.Clear(); _gen = ReadGen() + 1; try { File.WriteAllText(Path.Combine(_cache, "rebuild.gen"), _gen.ToString()); } catch { }
+        Rebuilding = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var ids = _lib.Db.Query("SELECT MIN(id) FROM track WHERE missing=0 GROUP BY folder, album_artist, album", r => r.GetInt64(0));
+                foreach (var id in ids) { if (ct.IsCancellationRequested) break; var t = _lib.Track(id); if (t != null) try { await GetAsync(t, 192, ct); } catch { } }
+            }
+            finally { Rebuilding = false; }
+        }, ct);
+        return removed;
+    }
+    public bool Rebuilding { get; private set; }
 
     private bool HasEmbedded(TrackRow t) => Convert.ToInt32(_lib.Scalar("SELECT has_art FROM track WHERE id=$i", ("$i", t.Id))) != 0;
 

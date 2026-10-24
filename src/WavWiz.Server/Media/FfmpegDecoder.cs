@@ -13,13 +13,13 @@ public sealed class FfmpegDecoder : IPcmDecoder, IReaderDone
     public string? Error { get; private set; }
     public string Path { get; }
 
-    public FfmpegDecoder(string ffmpeg, string path, long startMs = 0, int stallSeconds = 20)
+    public FfmpegDecoder(string ffmpeg, string path, long startMs = 0, int stallSeconds = 20, int rate = 48000)
     {
         Path = path;
         var psi = new ProcessStartInfo(ffmpeg) { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false, CreateNoWindow = true };
         foreach (var a in new[] { "-nostdin", "-hide_banner", "-loglevel", "error" }) psi.ArgumentList.Add(a);
         if (startMs > 0) { psi.ArgumentList.Add("-ss"); psi.ArgumentList.Add((startMs / 1000.0).ToString("F3", System.Globalization.CultureInfo.InvariantCulture)); }
-        foreach (var a in new[] { "-i", path, "-vn", "-sn", "-dn", "-f", "f32le", "-ac", "2", "-ar", "48000", "pipe:1" }) psi.ArgumentList.Add(a);
+        foreach (var a in new[] { "-i", path, "-vn", "-sn", "-dn", "-f", "f32le", "-ac", "2", "-ar", rate.ToString(System.Globalization.CultureInfo.InvariantCulture), "pipe:1" }) psi.ArgumentList.Add(a);
         try { _p = Process.Start(psi) ?? throw new InvalidOperationException("ffmpeg did not start"); }
         catch (Exception e) { Error = "cannot start ffmpeg: " + e.Message; _eof = true; _p = null!; _t = null!; return; }
         _p.StandardInput.Close();

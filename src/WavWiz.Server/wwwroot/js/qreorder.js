@@ -17,15 +17,16 @@ export function attachReorder(list, opts) {
   const place = () => { const bs = rows().map(r => r.getBoundingClientRect()), lr = list.getBoundingClientRect(); t = dropIndex(bs, y); const ly = bs.length ? (t < bs.length ? bs[t].top : bs[bs.length - 1].bottom) : lr.top; line.hidden = false; line.style.top = (ly - lr.top + list.scrollTop - 1) + 'px'; line.dataset.at = String(t); };
   list.addEventListener('pointerdown', ev => {
     const g = ev.target.closest?.('.qgrip'); if (!g || !canDragRows({ can: opts.can?.() ?? true, locked: opts.locked?.() })) return;
-    const row = g.closest('[data-i]'); if (!row) return; from = +row.dataset.i; y = ev.clientY; row.classList.add('dragging'); g.setPointerCapture?.(ev.pointerId); ev.preventDefault(); place();
-    const move = e => { y = e.clientY; place(); const lr = list.getBoundingClientRect(), v = edgeScroll(y, lr.top, lr.bottom); cancelAnimationFrame(raf); if (v) raf = requestAnimationFrame(function s() { list.scrollTop += v; place(); raf = requestAnimationFrame(s); }); };
+    const row = g.closest('[data-i]'); if (!row) return; from = +row.dataset.i; y = ev.clientY; const y0 = ev.clientY; let moved = false;   // F46: a press without a real drag never moves row.classList.add('dragging'); g.setPointerCapture?.(ev.pointerId); ev.preventDefault(); place();
+    const move = e => { y = e.clientY; if (Math.abs(y - y0) >= 5) moved = true; place(); const lr = list.getBoundingClientRect(), v = edgeScroll(y, lr.top, lr.bottom); cancelAnimationFrame(raf); if (v) raf = requestAnimationFrame(function s() { list.scrollTop += v; place(); raf = requestAnimationFrame(s); }); };
     const up = async e => {
       g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); cancelAnimationFrame(raf);
       line.hidden = true; row.classList.remove('dragging'); const f = from; from = -1;
-      if (e.type === 'pointercancel') return;
+      removeEventListener('resize', cancel); if (e.type === 'pointercancel' || !moved) return;
       if (opts.sorted?.()) { await opts.onSorted?.(); return; }
       const mv = moveFor(f, t, rows().length); if (mv) await opts.onMove(mv);
     };
+    const cancel = () => up({ type: 'pointercancel' }); addEventListener('resize', cancel);   // F46: a resize mid-drag cancels it
     g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
   });
   return { destroy: () => line.remove() };

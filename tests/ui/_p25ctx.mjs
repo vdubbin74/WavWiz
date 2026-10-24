@@ -1,0 +1,20 @@
+import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
+const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), OUT = process.env.OUT || '/tmp/p25ctx', TOUCH = !!process.env.TOUCH;
+const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const kl = (await api('/zones')).find(z => z.name === 'Kitchen-Left'); await api('/zones/' + kl.id, 'PATCH', { muted: true });
+const br = await chromium.launch();
+const c = await br.newContext(TOUCH ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1920, height: 1080 } });
+await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); });
+const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(3000);
+await p.evaluate(() => document.querySelectorAll('dialog[open],.phone-unlock').forEach(e => e.close?.() || e.remove()));
+if (TOUCH) { await p.evaluate(() => [...document.querySelectorAll('button')].filter(e => e.offsetParent && /Devices$/.test(e.textContent.trim())).pop()?.click()); await p.waitForTimeout(1200); }
+const row = p.locator('.sp42[data-device="Kitchen-Left"]').first(); await row.scrollIntoViewIfNeeded();
+if (TOUCH) { await row.evaluate(r => { const t = r.querySelector('.dot') || r; const b = t.getBoundingClientRect(); t.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, clientX: b.x + 2, clientY: b.y + 2 })); }); await p.waitForTimeout(800); } else await row.click({ button: 'right' });
+await p.waitForTimeout(500); await p.screenshot({ path: OUT + '-menu.png' });
+const items = await p.evaluate(() => [...document.querySelectorAll('.ctxmenu [role=menuitem], .ctxmenu button')].map(e => e.textContent.trim()));
+console.log('menu', items);
+await p.locator('.ctxmenu [role=menuitem], .ctxmenu button', { hasText: /^Unmute$/ }).first().click({ timeout: 5000 }).catch(e => console.log('click', e.message));
+await p.waitForTimeout(1200);
+console.log('muted after', (await api('/zones')).find(z => z.id === kl.id).muted);
+await p.screenshot({ path: OUT + '-after.png' }); await br.close();

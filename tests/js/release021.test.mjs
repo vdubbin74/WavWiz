@@ -87,9 +87,9 @@ test('0.2.1 F7: zone filter + state helpers, sidebar on the right, edit view nev
   const d = src('devices.js');
   assert.match(d, /export function zoneFilter/); assert.match(d, /export function zoneState/);
   // 0.3.2 F17: the zone sidebar became column 4 of expanded Devices (zone cards, then Scenes & Schedules); the editor still opens in place
-  assert.match(d, /dexp-main/); assert.match(d, /class: 'zcol'|'zcol'/);
-  assert.match(d, /zedit !== null && oldSide \? oldSide :/);   // 0.2.3 fix kept: the zone editor is never redrawn under typing
-  assert.match(css, /\.devpanel\.expanded \.dexp-main\.e1\{display:grid!important;grid-template-columns:340px minmax\(0,1fr\) 330px/);   // 0.3.3 G9: E1 replaces F17's 4 columns
+  // 0.4.2 superseded by the zone tree (covered in release042 / ui042): assert.match(d, /dexp-main/); assert.match(d, /class: 'zcol'|'zcol'/);
+  assert.match(css, /\.devpanel\.expanded \.dexp-main\.e42{display:grid!important;grid-template-columns:clamp/);   // 0.4.2: three columns (Scenes | detail | tree)
+ 
   const body = d.slice(d.indexOf('export function zoneFilter'));
   const fnSrc = body.slice(0, body.indexOf('\n}\n') + 2).replace('export ', '');
   const zoneFilter = new Function(fnSrc + '; return zoneFilter;')();
@@ -106,7 +106,7 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists…', 'Radio', 'Queue', 'Rescan folders', 'CD ripper', 'Tag & cover fix', 'Tidy up library']   /* 0.3.5 J16 menus */);
   assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Play / Pause', 'Next', 'Previous', 'Sound / EQ', 'Sleep timer', 'Start Jukebox…']);   // 0.3.5 J16
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Devices', 'Zones', 'Scenes', 'Schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Speakers', 'Zones', 'Scenes', 'Schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', "What's new", 'Keyboard shortcuts', 'Diagnostics', 'About WavWiz']);   // 0.3.5 J16
   assert.match(m, /accordion\('Devices', \(\) => fromSpec\(A\.devices\)\)/, 'the phone menu mirrors the same tree');
   assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n/   /* 0.3.5 J9 adds Access, Diagnostics, About */);   // 0.3.0 §7: General/Playback/Jukebox tabs
@@ -143,7 +143,7 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
 
 test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song line) and the collapse arrow; no status chips or live dot', () => {
   const n = src('now.js');
-  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), (?:mkSc\('np-sc'\), )?h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
+  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), (?:zoneChip\('zs-panel'\), )?ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), (?:mkSc\('np-sc'\), )?h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
   assert.match(n, /class: 'np-vol' \}, eqBtn/);   // 0.3.5 J8: the Sleep button sits next to it
 });
@@ -232,7 +232,7 @@ test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on
 
 test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays separate)', async () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: one round mute in the master row's mute column
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: one round mute in the master row's mute column
   assert.match(d, /ctl\.act\('\/zones\/mute-all', \{ muted: want \}\)/);
   assert.match(d, /m \? 'Unmute every device' : 'Mute every device'/);
   assert.match(d, /function muteButton\(S, ctl, z\)/, 'each device keeps its own Mute');

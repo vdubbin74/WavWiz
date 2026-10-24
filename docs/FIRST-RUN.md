@@ -125,7 +125,7 @@ An admin can give any device a **max volume** in its Settings and lock it. While
 
 AirPlay discovery uses your **local** network (multicast / mDNS). Many **VPN** clients, “kill switches,” or “network isolation” modes hide LAN devices.
 
-If **WavWiz – Whole House** does not appear on iPhone, iPad, or Mac:
+If **WavWiz – Everywhere** does not appear on iPhone, iPad, or Mac:
 
 1. Confirm the phone/Mac is on the **same home Wi-Fi** as the server (not guest Wi-Fi).
 2. Pause or disconnect the **VPN** (or allow LAN access in the VPN app).

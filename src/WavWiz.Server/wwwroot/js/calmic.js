@@ -3,6 +3,7 @@
 // the microphone is open. The Start tap sets the audio session to play-and-record, asks for the microphone, and only then creates a capture-only
 // AudioContext. The speakers play the test sounds; this phone only listens and uploads what it heard.
 import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine, guideGroups, guideText, guideStep, countdownOn, setCountdown, skipNote, COUNTDOWN_S } from './calmic-core.js';
+import { mountA2hs, rememberedNote } from './a2hs.js';
 import { CalError, environment, classifyMicError, describe, detailsText, rms } from './calerrors.js';
 import { OffsetEstimator, pairClocks } from './roomsched.js';
 
@@ -14,6 +15,7 @@ function h(tag, attrs, ...kids) {
   for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(String(k)));
   return e;
 }
+{ const hd = document.querySelector('#app > header'); if (hd) { const ho = document.createElement('div'); hd.after(ho); mountA2hs(ho); } }   // 0.4.1 E: shown on every state of this page (also the secure-connection one)
 const env = environment();
 const log = []; const track = m => { log.push(`${(performance.now() / 1000).toFixed(2)} ${m}`); if (log.length > 300) log.shift(); };
 window.__wwCalMic = { log, order: [] };                      // read by the browser tests (order of mic / audio / network steps)
@@ -307,7 +309,7 @@ function results(fin, failed, retry) {
   save.addEventListener('click', async () => {
     save.disabled = true;
     try { const r = await call(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...pick].filter(([, v]) => v).map(([k]) => k) } }); sid = null;
-      releaseMic(); show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' })));
+      releaseMic(); show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' }), rememberedNote({ calibrated: r.saved > 0, named: true, mic: true })));
       state = 'left'; hello(state); clearInterval(helloTimer);
     } catch (e) { save.disabled = false; save.textContent = 'Save all (try again)'; save.title = e.message; lastErr = e; const dg = $('diag'); if (dg) dg.textContent = diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: e }); }
   });

@@ -25,6 +25,21 @@ public static class SyncAnalysis
 
     public sealed record PairStats(string A, string B, int Points, double MeanMs, double MaxAbsMs, double P95AbsMs);
 
+    /// <summary>0.4.9 F77: like <see cref="Compare"/> but over stream SECONDS, for players at different stream rates (96 kHz vs the 48 kHz fallback).</summary>
+    public static PairStats CompareSec(SimPlayer a, int rateA, SimPlayer b, int rateB, long fromTrueUs, double fromSec, double toSec, double stepSec = 1)
+    {
+        var sa = Build(a, fromTrueUs); var sb = Build(b, fromTrueUs);
+        var d = new List<double>();
+        for (double t = fromSec; t < toSec; t += stepSec)
+        {
+            var ta = AudibleAt(sa, t * rateA); var tb = AudibleAt(sb, t * rateB);
+            if (ta is double x && tb is double y) d.Add((x - y) / 1000.0);
+        }
+        if (d.Count == 0) return new PairStats(a.Id, b.Id, 0, double.NaN, double.NaN, double.NaN);
+        var abs = d.Select(Math.Abs).OrderBy(v => v).ToArray();
+        return new PairStats(a.Id, b.Id, d.Count, d.Average(), abs[^1], abs[(int)(abs.Length * 0.95)]);
+    }
+
     /// <summary>Signed offset (A audible time - B audible time), sampled every <paramref name="stepSamples"/> over the stream window.</summary>
     public static PairStats Compare(SimPlayer a, SimPlayer b, long fromTrueUs, double fromS, double toS, double stepSamples = 48000)
     {

@@ -8,6 +8,7 @@ import { aboutBody } from './about.js';
 import { appearancePane } from './appearance.js';
 import { npPreview, npStyleThumb } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
+import { setArtCv } from './art.js';   // 0.4.4 F24
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -36,7 +37,7 @@ export const GROUPS = [
 export const RESET = {
   general: { 'ui.checklistDismissed': false },
   appearance: {},
-  playback: { 'playback.crossfadeSec': 0, 'playback.replayGain': 'auto' },
+  playback: { 'playback.crossfadeSec': 0, 'playback.replayGain': 'auto', 'playback.streamRate': '48000' },
   devices: { 'bt.defaultLatencyMs': 200, 'wired.defaultLatencyMs': 0, 'tls.redirect': false, 'calibration.testLevelDb': -20 },
   library: { 'library.onlineArt': true },
   network: { 'airplay.levelDb': 0, 'spotify.levelDb': 0 },
@@ -146,7 +147,7 @@ export async function openSettings(S, refresh, nav, section) {
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
     panes.library.push(admin ? nasCard() : h('div', { class: 'card', id: 'sec-nas' }, h('h3', null, 'Network share logins (NAS) ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add share logins.')));
     panes.library.push(onlineArtCard(settings, admin));
-    panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings));
+    panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings), streamQualityCard(settings, admin));
     panes.library.push(acoustIdCard(settings));
 
     // Network
@@ -175,7 +176,7 @@ export async function openSettings(S, refresh, nav, section) {
     const apLv = typeof settings['airplay.levelDb'] === 'number' ? settings['airplay.levelDb'] : (rc?.airplay?.levelDb ?? 0);
     const spLv = typeof settings['spotify.levelDb'] === 'number' ? settings['spotify.levelDb'] : (rc?.spotify?.levelDb ?? 0);
     panes.network.push(h('div', { class: 'card', id: 'sec-airplay' }, h('h3', null, 'AirPlay & Spotify Connect'),
-      h('p', null, h('b', null, 'AirPlay: '), '“WavWiz – Whole House” is always on. On an iPhone, iPad or Mac, pick it in Control Center > AirPlay (or the AirPlay button in any app); it plays in every zone. ', h('span', { class: 'dim small' }, apState)),
+      h('p', null, h('b', null, 'AirPlay: '), '“WavWiz – Everywhere” is always on. On an iPhone, iPad or Mac, pick it in Control Center > AirPlay (or the AirPlay button in any app); it plays in every zone. ', h('span', { class: 'dim small' }, apState)),
       levelRow('airplay.levelDb', 'AirPlay level', apLv),
       admin
         ? h('label', { class: 'row', style: 'margin-top:12px' }, h('input', { type: 'checkbox', id: 'spotify-enabled', checked: settings['spotify.enabled'] === true, onchange: ev => putSettings({ 'spotify.enabled': ev.target.checked }) }), h('b', null, 'Spotify Connect'), h('span', { class: 'dim small' }, 'Requires Spotify Premium.'))
@@ -299,7 +300,9 @@ export function onlineArtCard(settings, admin) {
     admin ? h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Look up covers and photos online'),
       h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: on, 'aria-label': 'Look up covers and photos online', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'library.onlineArt': ev.target.checked } }); toast('Saved'); load(); } catch (e) { toast(e.message, true); } } }), h('span', { 'aria-hidden': 'true' }))) : null,
     stat,
-    admin ? h('div', { class: 'row', style: 'margin-top:8px;gap:8px' }, h('button', { class: 'btn', id: 'oa-retry', onclick: async () => { try { const r = await api('/library/online-art/retry', { method: 'POST' }); toast(`Looking again for ${r.queued} artist photo${r.queued === 1 ? '' : 's'}.`); load(); } catch (e) { toast(e.message, true); } } }, 'Retry missing photos')) : null,
+    admin ? h('div', { class: 'row', style: 'margin-top:8px;gap:8px' }, h('button', { class: 'btn', id: 'oa-retry', onclick: async () => { try { const r = await api('/library/online-art/retry', { method: 'POST' }); toast(`Looking again for ${r.queued} artist photo${r.queued === 1 ? '' : 's'}.`); load(); } catch (e) { toast(e.message, true); } } }, 'Retry missing photos'),
+      // 0.4.4 F24: one wrong cover on many songs -> clear the cover cache and build it again from each song's own picture / its album folder
+      h('button', { class: 'btn', id: 'art-rebuild', title: 'Clears every saved cover and builds them again from each song and its album folder', onclick: async ev => { const b = ev.currentTarget; b.disabled = true; try { const r = await api('/library/art/rebuild', { method: 'POST' }); setArtCv(r.artCv); toast('Album art is being rebuilt. Covers refresh as you browse.'); } catch (e) { toast(e.message, true); } finally { b.disabled = false; } } }, 'Rebuild album art')) : null,
     h('p', { class: 'small dim', style: 'margin-top:8px' }, 'Sources: MusicBrainz, Cover Art Archive, Wikidata and Wikimedia Commons, and TheAudioDB (theaudiodb.com). Pictures belong to their owners.'));
   load();
   return box;
@@ -332,6 +335,23 @@ function replayGainCard(settings) {
   return h('div', { class: 'card', id: 'sec-replaygain' }, h('h3', null, 'Volume leveling (ReplayGain)'),
     h('p', { class: 'dim small' }, 'Uses the ReplayGain or R128 loudness tags in your files (taggers such as foobar2000 or MusicBrainz Picard add them). Songs without tags play unchanged. It never makes a song clip.'),
     h('div', { class: 'row wrap' }, sel));
+}
+
+/** 0.4.9 F77: the house stream's rate. Studio (24-bit / 48 kHz) by default; Studio Max (24-bit / 96 kHz) for music files. Players that can't take
+ * 96 kHz (older players, web speakers, a 44.1/48 kHz output) get a 48 kHz copy and stay in sync. Applies from the next song, seek or play. */
+export function streamQualityCard(settings, admin) {
+  const cur = String(settings['playback.streamRate'] ?? '48000') === '96000' ? '96000' : '48000';
+  const opt = (v, title, note) => h('label', { class: 'sq77-opt' + (v === cur ? ' on' : ''), 'data-rate': v },
+    h('input', { type: 'radio', name: 'sq77', value: v, checked: v === cur, disabled: !admin, onchange: async ev => {
+      const box = ev.target.closest('.sq77'); box.querySelectorAll('.sq77-opt').forEach(o => o.classList.toggle('on', o.dataset.rate === v));
+      try { await api('/settings', { method: 'PUT', body: { 'playback.streamRate': v } }); savedMark(ev.target.closest('label')); } catch (e) { toast('Not saved. ' + e.message, true); } } }),
+    h('span', { class: 'sq77-txt' }, h('span', { class: 'sq77-t' }, title), note ? h('span', { class: 'sq77-note small dim' }, note) : null));
+  return h('div', { class: 'card', id: 'sec-streamquality' }, h('h3', null, 'Streaming quality ', admin ? null : adminTag()),
+    h('p', { class: 'dim small' }, 'How WavWiz sends music to your speakers. A change applies from the next song, seek or play.'),
+    h('div', { class: 'sq77', role: 'radiogroup', 'aria-label': 'Streaming quality' },
+      opt('48000', 'Studio (24-bit / 48 kHz)', 'Default. Works on every speaker.'),
+      opt('96000', 'Studio Max (24-bit / 96 kHz)', 'Uses about twice the network bandwidth. Best on wired or strong Wi-Fi.')),
+    h('p', { class: 'small dim sq77-foot' }, 'Speakers that can’t play 96 kHz (web speakers, older players, or an output set to 44.1/48 kHz) get 48 kHz and stay in sync with the rest. Radio, AirPlay and Spotify always stream at 48 kHz.'));
 }
 
 /** 0.1.3: logins for password-protected network shares. Stored encrypted (Windows DPAPI); the password is never shown again. */

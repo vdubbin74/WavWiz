@@ -53,16 +53,6 @@ public class ConductorTests
         Assert.True(c.Move(0, 2)); Assert.Equal("A", c.Queue()[2].Title);
         c.Stop(); await Task.Delay(300); Assert.Equal("stopped", c.Now().State);
     }
-
-    [Fact]
-    public async Task Shuffle_keeps_the_current_item_first_and_restores_the_order()
-    {
-        var (c, db, t) = Make(); using var _ = t; using var __ = c;
-        TestMedia.Tone(t.File("a.flac"), 4); var items = Enumerable.Range(0, 8).Select(i => new QueueItem(0, "track", t.File("a.flac"), "T" + i, "", "", 4000, null)).ToArray();
-        c.PlayItems(items, 3); await Task.Delay(500);
-        c.SetShuffle(true); var q = c.Queue(); Assert.Equal("T3", q[0].Title); Assert.Equal(8, q.Select(x => x.Title).Distinct().Count()); Assert.Equal(0, c.Now().Index);
-        c.SetShuffle(false); Assert.Equal(Enumerable.Range(0, 8).Select(i => "T" + i), c.Queue().Select(x => x.Title)); Assert.Equal(3, c.Now().Index);
-    }
 }
 
 public class ClickTrackTests

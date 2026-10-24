@@ -100,6 +100,7 @@ public sealed class PlayerClient : IAsyncDisposable
             _activeOutput = endpointId;
             sink.Faulted += why => OnSinkFaulted(sink, endpointId, why);
             _engine.SetOutputRate(sink.MixRate);
+            if (_tcp != null && OfferedRate(sink.MixRate) != _helloRate) { Say($"output mixes at {sink.MixRate} Hz: reconnecting to get the {OfferedRate(sink.MixRate) / 1000} kHz stream"); try { _tcp?.Client.Shutdown(System.Net.Sockets.SocketShutdown.Both); } catch { } }   // F77: renegotiate the rate
             if (_zoneCache.TryGetValue(endpointId, out var z)) ApplyZone(z, fromCache: true);   // saved delay is applied before the first sample
             _sink = sink; sink.Start();
             Publish(s => s with { ActiveOutputId = endpointId, Error = null });
@@ -183,7 +184,7 @@ public sealed class PlayerClient : IAsyncDisposable
         try { tcp.Client.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.KeepAlive, true); } catch { }
         _tcp = tcp;
         var net = tcp.GetStream();
-        await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Hello, 0, new Hello(_o.PlayerId, _o.Token(), WavWizInfo.Version, new[] { "pcm24" }, 48000, _o.LinkType, _o.Name, Environment.MachineName)), ct);
+        await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Hello, 0, new Hello(_o.PlayerId, _o.Token(), WavWizInfo.Version, new[] { "pcm24" }, _helloRate = OfferedRate(_engine.OutputRate), _o.LinkType, _o.Name, Environment.MachineName)), ct);
         using var hsCts = CancellationTokenSource.CreateLinkedTokenSource(ct); hsCts.CancelAfter(_o.ConnectTimeoutMs);
         var (h, p) = await FrameIO.ReadAsync(net, hsCts.Token);
         if (h.Type == MsgType.Bye) throw new InvalidOperationException("server refused: " + Wire.DecodeJson<Bye>(p)?.Reason);
@@ -211,6 +212,10 @@ public sealed class PlayerClient : IAsyncDisposable
         throw new IOException("server closed the connection");
     }
     private bool _everConnected;
+    private volatile int _helloRate = Wire.SampleRate;
+    /// <summary>0.4.9 F77: the stream rate this player offers in HELLO. 96 kHz only when the output device mixes at 88.2 kHz or more; a 48/44.1 kHz
+    /// device gets the server's 48 kHz copy (no 2:1 downsampling on the player, which would alias). Same timeline either way, so sync is unchanged.</summary>
+    public static int OfferedRate(int deviceMixRate) => deviceMixRate >= 88_200 ? Wire.MaxStreamRate : Wire.SampleRate;
 
     private async Task WatchdogAsync(CancellationToken ct)
     {
@@ -232,7 +237,7 @@ public sealed class PlayerClient : IAsyncDisposable
             Interlocked.Exchange(ref _lastRxMs, NowMs); Interlocked.Exchange(ref _lastTcpMs, NowMs);
             switch (h.Type)
             {
-                case MsgType.Epoch: if (Wire.TryDecodeEpoch(p, out var e, out var st)) _engine.OnEpoch(e, st); break;
+                case MsgType.Epoch: if (Wire.TryDecodeEpoch(p, out var e, out var st, out var er)) _engine.OnEpoch(e, st, er); break;
                 case MsgType.Audio: if (Wire.TryDecodeAudio(p, out var f, out _)) _engine.OnAudio(f!); break;
                 case MsgType.StopAt: if (Wire.TryDecodeStopAt(p, out var se, out var at)) _engine.OnStopAt(se, at); break;
                 case MsgType.ZoneUpdate: ApplyZone(Wire.DecodeJson<ZoneUpdate>(p)!, fromCache: false); break;
@@ -246,7 +251,7 @@ public sealed class PlayerClient : IAsyncDisposable
     // ---------- server -> player updates ----------
     private void ApplyZone(ZoneUpdate z, bool fromCache)
     {
-        _dsp.SetMuted(z.Muted); _dsp.SetVolume(z.Volume);
+        if (!_calVol.Hold(z.Volume, z.Muted)) { _dsp.SetMuted(z.Muted); _dsp.SetVolume(z.Volume); }   // 0.4.9 F71: held while the calibration sound plays
         _engine.SetDeviceLatencyMs(z.LatencyMs);
         if (!z.Enabled) _engine.Flush();
         Publish(s => s with { Volume = z.Volume, Muted = z.Muted, ZoneEnabled = z.Enabled, LatencyMs = z.LatencyMs, LatencySource = z.LatencySource, NotCalibrated = z.NotCalibrated, RecheckDue = z.RecheckDue });
@@ -280,23 +285,26 @@ public sealed class PlayerClient : IAsyncDisposable
             _ = Task.Delay(TimeSpan.FromSeconds(8), tcts.Token).ContinueWith(t => { if (!t.IsCanceled) _engine.ClearTestSignal(); });
             return;
         }
+        if (c.Action == "restore") { _calRestore?.Cancel(); RestoreAfterPattern(); return; }   // 0.4.9 F71: the session ended (finish, cancel, failure, restart)
         if (c.Action != "play-pattern") return;
         _calRestore?.Cancel();
         var pat = new ChirpPattern(c.LevelDb);
         // 0.3.7 L24: remember the real EQ-bypass setting once - a second pattern within 20 s used to read the bypass the FIRST pattern had set and leave the EQ off for good
-        if (!_patternActive) { _bypassBefore = _dsp.Preset.Bypass; _volBefore = c.TestVolume >= 0 ? _dsp.VolumePercent : -1; _mutedBefore = _dsp.Muted; _patternActive = true; }
-        if (c.TestVolume >= 0) { _dsp.SetMuted(false); _dsp.SetVolume(c.TestVolume); }      // L20: the test sound has its own volume, never the (maybe tiny) zone volume
+        if (!_patternActive) { _bypassBefore = _dsp.Preset.Bypass; _patternActive = true; }
+        if (c.TestVolume >= 0) _calVol.Begin(c.TestVolume);   // L20 / 0.4.9 F71: its own volume (full by default), cap bypassed; restored by the guard      // L20: the test sound has its own volume, never the (maybe tiny) zone volume
         _dsp.SetBypass(true);                         // EQ off for the click test; trim + limiter stay (spec 8.5)
         // 0.3.7 L24: say whether this Player can really play it: the clock must be synced (without it the engine never plays the sound) and the start must still be ahead
         bool clockOk = _clock.IsValid; long leadMs = clockOk ? (c.AtUs - _clock.ToServerUs(_o.Clock.NowUs)) / 1000 : 0;
         string ack = !clockOk ? "no-clock" : leadMs < 150 ? $"late={leadMs}" : $"ok;lead={leadMs}";
         _engine.PlayTestSignal(pat.Signal, c.AtUs);
         var cts = _calRestore = new CancellationTokenSource();
-        _ = Task.Delay(TimeSpan.FromSeconds(20), cts.Token).ContinueWith(t => { if (!t.IsCanceled) { _engine.ClearTestSignal(); _dsp.SetBypass(_bypassBefore); if (_volBefore >= 0) { _dsp.SetVolume(_volBefore); _dsp.SetMuted(_mutedBefore); } _patternActive = false; } });
+        _ = Task.Delay(TimeSpan.FromSeconds(20), cts.Token).ContinueWith(t => { if (!t.IsCanceled) RestoreAfterPattern(); });   // safety net: restore even if the server never says "restore"
         Say($"calibration pattern scheduled ({c.Label}): {ack}");
         if (c.Req != null) _ = SendCalAsync(new CalResult(c.SessionId, "pattern-ack", ack, c.Req));
     }
-    private bool _patternActive, _bypassBefore, _mutedBefore; private double _volBefore = -1;
+    private bool _patternActive, _bypassBefore;
+    private CalVolumeGuard? _calVolG; private CalVolumeGuard _calVol => _calVolG ??= new(() => _dsp.VolumePercent, () => _dsp.Muted, v => _dsp.SetVolume(v), m => _dsp.SetMuted(m));
+    private void RestoreAfterPattern() { _engine.ClearTestSignal(); if (_patternActive) _dsp.SetBypass(_bypassBefore); _calVol.End(); _patternActive = false; }
 
     // ---------- player -> server ----------
     public Task SendOutputsAsync(string reason)

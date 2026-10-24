@@ -24,7 +24,13 @@ public static class Wire
     public const byte ProtocolVersion = 1;
     public const int HeaderSize = 16;
     public const uint MaxPayload = 1 << 20; // 1 MiB: refuse absurd lengths from a confused or hostile peer
+    /// <summary>The base rate: calibration, test sounds and every pre-0.4.9 player. 0.4.9 F77: the house stream may run at <see cref="MaxStreamRate"/>
+    /// instead (Settings > Playback > Streaming quality); frames stay 20 ms long, so a frame has <see cref="FrameSamplesAt"/> samples.</summary>
     public const int SampleRate = 48000;
+    public const int MaxStreamRate = 96000;
+    public static int FrameSamplesAt(int rate) => rate / 50;
+    /// <summary>0.4.9 F77: the only stream rates (48 kHz = Studio, 96 kHz = Studio Max).</summary>
+    public static int NormalizeRate(int rate) => rate >= MaxStreamRate ? MaxStreamRate : SampleRate;
     public const int FrameSamples = 960;
     public const int Channels = 2;
 
@@ -104,13 +110,28 @@ public static class Wire
     }
 
     // ---- EPOCH: u32 epoch | i64 startUs ----
-    public static byte[] EncodeEpoch(uint seq, uint epoch, long startUs)
+    // 0.4.9 F77: + u32 sampleRate when the epoch is NOT 48 kHz (only sent to players that offered that rate in HELLO; a 12-byte EPOCH = 48 kHz)
+    public static byte[] EncodeEpoch(uint seq, uint epoch, long startUs, int rate = SampleRate)
     {
-        var buf = new byte[HeaderSize + 12];
-        WriteHeader(buf, MsgType.Epoch, seq, 12);
+        int len = rate == SampleRate ? 12 : 16;
+        var buf = new byte[HeaderSize + len];
+        WriteHeader(buf, MsgType.Epoch, seq, (uint)len);
         BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(HeaderSize), epoch);
         BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(HeaderSize + 4), startUs);
+        if (len == 16) BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(HeaderSize + 12), (uint)rate);
         return buf;
+    }
+
+    public static bool TryDecodeEpoch(ReadOnlySpan<byte> p, out uint epoch, out long startUs, out int rate)
+    {
+        rate = SampleRate;
+        if (p.Length == 16)
+        {
+            int r = (int)BinaryPrimitives.ReadUInt32LittleEndian(p[12..]);
+            if (r != SampleRate && r != MaxStreamRate) { epoch = 0; startUs = 0; return false; }
+            rate = r; p = p[..12];
+        }
+        return TryDecodeEpoch(p, out epoch, out startUs);
     }
 
     public static bool TryDecodeEpoch(ReadOnlySpan<byte> p, out uint epoch, out long startUs)

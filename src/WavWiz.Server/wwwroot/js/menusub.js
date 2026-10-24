@@ -1,5 +1,6 @@
 // WavWiz 0.3.6 K16-K19: the data behind the menu flyouts (hover submenus). Each builder returns a menu spec (same tuples menu.js uses) and never throws -
 // a failed fetch gives an empty list, so the menu still opens. Items that only choose from a list live here; the actions stay in main.js (ctl.*).
+import { groupPresets } from './eqsettings.js';   // 0.4.4 F6
 import { api, toast } from './util.js';
 import { SLEEP, sleepChip } from './scenesched.js';
 import { eqTarget } from './eqstyle.js';
@@ -32,11 +33,14 @@ export { SLEEP };
 export async function eqSpec(S, ctl) {
   const presets = (await safe(() => api('/dsp/presets'))) || [];
   const o = eqTarget(S.zones, thisDevice(S));
-  const items = presets.map(p => [cap(p.name) + (p.source === 'builtin' ? '' : ' ★'), async () => {
+  const groups = groupPresets(presets);   // 0.4.4 F6: same list as every picker - 8 built-ins, a rule, then My presets
+  const one = p => [cap(p.name) + (p.source === 'builtin' ? '' : ' ★'), async () => {
     if (!o) { ctl.go('eq'); return; }
     try { await api(`/dsp/assignments/${encodeURIComponent(o.deviceId)}`, { method: 'PUT', body: { presetId: p.id, enabled: true, bypass: false } });
       window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: o.deviceId } })); toast(`Sound: ${p.name}`); ctl.go('eq'); } catch (e) { toast(e.message, true); }
-  }]);
+  }];
+  const builtin = groups.filter(g => !g.label).flatMap(g => g.items).map(one), mine = groups.filter(g => g.label).flatMap(g => g.items).map(one);
+  const items = [...builtin, ...(builtin.length && mine.length ? ['hr'] : []), ...mine];
   return [...items, ...(items.length ? ['hr'] : []), ['Open the EQ', () => ctl.go('eq')]];
 }
 

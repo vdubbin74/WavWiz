@@ -1,6 +1,9 @@
 import { viewForMode } from './viewmode.js';
+import './marquee.js';   // 0.4.8 F62: shared now-playing marquee (main app + phone)
+import { libCountLabel } from './libcount.js';   // 0.4.4 F7
 import './sliderstyle.js';   // 0.3.3 G11
-import './pwa.js';   // 0.3.4 H1
+import './pwa.js';
+import './a2hs.js';   // 0.4.1 E   // 0.3.4 H1
 import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
 import { applyTheme, loadTheme } from './theme.js';
@@ -14,10 +17,12 @@ import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
 import { loadLayout, saveLayout, setLocked } from './plcols.js';
 import { installMiniTargets, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
-import { GLIDE, glide, pulse, pulseSel, reduced } from './motion.js';
+import { GLIDE, glide, holdFor, holdPage, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
+import { NP_STYLES, loadNpPrefs, npVars } from './npstyle.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
-import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
+import { setRipAllowed, ripAllowed } from './library.js';
+import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, isTight, devTabText, loadLayout as loadLayoutMode, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
 import { retireRemote } from './remotemode.js';
 import { installTvMode } from './tv.js';
@@ -40,8 +45,11 @@ import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
+import * as Z from './zones40.js';
+import { isDevDragging } from './devorder.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
+import { openMixer } from './mixer.js';   // 0.4.8 F49
 import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
@@ -52,6 +60,10 @@ installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightwe
 export const S = { auth: null, now: null, queue: [], zones: [], groups: [], radio: [], status: null, view: null, ws: null, localPos: 0, localAt: 0 };
 const app = document.getElementById('app');
 const VERSION_LABEL = () => `BETA ${S.auth?.appVersion ?? ''}`.trim();
+/** 0.4.6: every version label on the page has data-wwv="<template with {v}>" and is painted from ONE value - the running server's build version
+ *  (S.auth.appVersion, Directory.Build.props). It is refreshed from the WebSocket hello on every (re)connect, so a page that outlived a server
+ *  upgrade / restart never keeps showing the old number in some views. */
+export function paintVersion(root = document) { const v = S.auth?.appVersion ?? ''; for (const e of root.querySelectorAll('[data-wwv]')) e.textContent = e.dataset.wwv.replace('{v}', v).trim(); if (/^WavWiz BETA/.test(document.title)) document.title = `WavWiz BETA ${v}`; }
 const wide = () => !matchMedia('(max-width:900px)').matches;
 
 // ---------------------------------------------------------------- boot
@@ -62,6 +74,7 @@ const CAL = (() => { try { const q = new URLSearchParams(location.search), cal =
 async function boot() {
   if (CAL.cal || window.__wwCalRedirect) { location.replace('/calmic.html?cal=' + (CAL.cal || '')); return; }   // 0.2.5: calibration links go to the mic-only page; never join here
   try { S.auth = await api('/auth/state'); } catch (e) { return fatal(e.message); }
+  setRipAllowed(S.auth);   // 0.4.8 F57: the CD ripper is a PC-only tool (never on the phone / remote clients)
   setArtCv(S.auth.artCv);   // 0.3.2 F10
   document.title = `WavWiz BETA ${S.auth.appVersion}`;
   if (S.auth.setupRequired) return renderSetup();
@@ -77,7 +90,7 @@ async function boot() {
 
 function topbar(extra, lead) {
   return h('header', { class: 'topbar' }, lead || null,
-    brandMark(), h('span', { class: 'beta', title: 'This is a BETA version' }, VERSION_LABEL()),
+    brandMark(), h('span', { class: 'beta', title: 'This is a BETA version', 'data-wwv': 'BETA {v}' }, VERSION_LABEL()),
     h('span', { class: 'grow' }), extra);
 }
 
@@ -128,19 +141,29 @@ const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 
 const views = {};
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
 /** 0.3.6 K14 / K22: the real mini player lives in the right-hand column while the Library or the Playlist is expanded (and is not running otherwise). */
-function syncMini() {
+function syncMini() { holdPage();
   if (!desk || !minicol) return;
-  const need = wide() && (desk.classList.contains('libexpanded') || (desk.classList.contains('listexpanded') && !desk.classList.contains('devexpanded')));
+  const need = wide() && desk.classList.contains('libexpanded');   // 0.4.6 F36/F37: only the expanded Library (Full and Roomy) shrinks Now Playing to the column mini player
+  desk.classList.toggle('devfull', wide() && desk.classList.contains('devexpanded') && !desk.classList.contains('libexpanded'));   // 0.4.8 F53 v2: expanded Devices = no player at all, every column full height
   if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, run: runShortcut, home: goHome }); minicol.append(miniInst.rail); }
   else if (!need && miniInst) { miniInst.destroy(); miniInst = null; minicol.replaceChildren(h('div', { class: 'mp embedded-host' })); }
-  desk.classList.toggle('minishown', need);
+  desk.classList.toggle('minishown', need); paintMiniStyle();
 }
+/** 0.4.6 F38: the condensed player under the Queue (expanded Library) is a small version of the chosen Now Playing layout: minicol gets the same
+ *  pn-<style> class and effect variables as the Now Playing panel, and follows changes at once. */
+function paintMiniStyle() {
+  if (!minicol) return; const p = loadNpPrefs();
+  for (const [id] of NP_STYLES) minicol.classList.toggle('pn-' + id, p.style === id);
+  for (const [k, v] of Object.entries(npVars(p))) minicol.style.setProperty(k, v); minicol.dataset.style = p.style;
+}
+window.addEventListener('wavwiz:npstyle', () => paintMiniStyle());
+window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') paintMiniStyle(); });
 
 async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
-  const ctl = { act, refreshAll, showInLibrary: (t, q) => showInLibrary(t, q), go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
+  const ctl = { openQueue: () => openQueue(), act, refreshAll, showInLibrary: (t, q) => showInLibrary(t, q), go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
   views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
   views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
@@ -169,7 +192,10 @@ async function startMain() {
   libpanel.addEventListener('dragenter', () => { if (libpanel.classList.contains('israil')) setPanels(railClick(P6, 'lib'), 'lib'); });
   statusbar = h('footer', { class: 'statusbar', 'aria-label': 'Status' });
   minicol = h('section', { class: 'minicol', 'aria-label': 'Mini player' }, h('div', { class: 'mp embedded-host' }));
-  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : P6.list === 'expanded' ? ' listexpanded' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar, minicol);
+  // 0.4.5 T1: in the tight layout Devices is a thin right-edge tab that opens a full-height slide-over (scrim click / Esc close it)
+  devTab = h('button', { type: 'button', class: 'devtab', 'aria-expanded': 'false', title: 'Open Devices', onclick: () => devOpen(!desk.classList.contains('devopen')) }, h('span', { class: 'devtab-t' }, devTabText(0)));
+  devScrim = h('div', { class: 'devscrim', 'aria-hidden': 'true', onclick: () => desk?.classList.contains('roomyopen') ? toggleDev(true) : devOpen(false) });
+  desk = h('div', { class: 'desk' + (P6.list === 'collapsed' ? ' listcollapsed' : P6.list === 'expanded' ? ' listexpanded' : ''), id: 'desk', 'data-view': S.view }, libpanel, content, nowc.el, devp.el, listt.el, nowc.npbar, minicol, devTab, devScrim);
   desk.addEventListener('transitionend', ev => { if (ev.target === desk && /grid-template/.test(ev.propertyName)) { nowc.viz?.resize?.(); placeNext(); } });   // §6: the viz resizes once the move has finished
   listt.setCollapsed?.(P6.list);
   wireNextBlock();
@@ -218,6 +244,7 @@ async function startMain() {
     ev.preventDefault(); togglePinFor(id);
   });
   // 0.3.8 L44: the approved global shortcuts (one table in hotkeys.js)
+  window.addEventListener('wavwiz:mixer', () => openMixer(S, { act, refreshAll: () => refreshZones() }));   // 0.4.8 F49: player bar / Devices / Alt+V / phone
   installHotkeys(id => {
     switch (id) {
       case 'playpause': return act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/play', S.now?.state === 'playing' ? undefined : {});
@@ -226,6 +253,7 @@ async function startMain() {
       case 'mute': return [...document.querySelectorAll('.mutebtn')].find(b => b.getClientRects().length && !b.disabled)?.click();
       case 'mini': try { if (window.chrome?.webview) { window.chrome.webview.postMessage({ cmd: 'mini', toggle: true }); return; } } catch { /* browser */ } return openMini();
       case 'home': return goHome();
+      case 'mixer': return window.dispatchEvent(new CustomEvent('wavwiz:mixer'));
       case 'settings': return runShortcut('settings');
       default: return runShortcut(id);
     }
@@ -256,20 +284,44 @@ async function startMain() {
 function toggleLib(force) { if (force === true) return setPanels({ ...P6, lib: 'rail', exp: P6.exp === 'lib' ? null : P6.exp }, 'lib'); if (force === false) return setPanels(railClick(P6, 'lib'), 'lib'); setPanels(chevron(P6, 'lib'), 'lib'); }
 function toggleLibExpanded(force) { if (force === true && P6.exp === 'lib') { pulse(libpanel); return; }   // K15: already open -> pulse it
   setPanels(expand(P6, 'lib', force ?? P6.exp !== 'lib'), 'lib'); }
-function toggleDev(force) { if (force === true) return setPanels({ ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); if (force === false) return setPanels(railClick(P6, 'dev'), 'dev'); setPanels(chevron(P6, 'dev'), 'dev'); }
-function toggleDevExpanded(force) { if (force === true && P6.exp === 'dev') { pulse(devp.el); return; }   // K15
+function toggleDev(force) { holdPage(); if (desk?.classList.contains('tight') && !P6.exp) return devOpen(force === false ? true : force === true ? false : !desk.classList.contains('devopen'));   // 0.4.5 T1: the slide-over's own chevron / ] key
+  if (force === true) return setPanels({ ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); if (force === false) return setPanels(railClick(P6, 'dev'), 'dev'); setPanels(chevron(P6, 'dev'), 'dev'); }
+function toggleDevExpanded(force) { holdPage(); if (force === true && P6.exp === 'dev') { pulse(devp.el); return; }   // K15
   setPanels(expand(P6, 'dev', force ?? P6.exp !== 'dev'), 'dev'); }
 /** 0.3.5 J11 (option A): with the Library expanded the right column shows the playlist; "Devices ›" swaps the Devices panel in, "‹ Playlist" back. */
-function libSwap(v) { if (!desk) return; desk.classList.toggle('libdev', !!v); devp.setSize(v ? 'standard' : (desk.classList.contains('devcollapsed') ? 'collapsed' : 'standard')); listt.relayout?.(); }
+function libSwap(v) { holdPage(); if (!desk) return; desk.classList.toggle('libdev', !!v); devp.setSize(v ? 'standard' : (desk.classList.contains('devcollapsed') ? 'collapsed' : 'standard')); listt.relayout?.(); }
 function setDevSize(sz, highlight = null) { devHl = highlight; setPanels(sz === 'expanded' ? expand(P6, 'dev', true) : sz === 'collapsed' ? { ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp } : { ...P6, dev: 'normal', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); }
-let P6 = null, lastOpened = null, devHl = null, libWasExp = false;
-function setPanels(n, opened = null) { P6 = savePanels(normPanels(n)); lastOpened = opened; applyPanels(); }
+let P6 = null, lastOpened = null, devHl = null, libWasExp = false, devTab = null, devScrim = null, tightLib = false, roomyDev = false;
+const pageZoom = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+function paintDevTab() { if (!devTab) return; const n = (S.groups || []).length, t = devTabText(n); devTab.firstChild.textContent = t; devTab.setAttribute('aria-label', `${t}. Open Devices`); }
+function devOpen(v) { holdPage();
+  if (!desk) return; v = !!v && desk.classList.contains('tight'); const was = desk.classList.contains('devopen'); desk.classList.toggle('devopen', v); devTab?.setAttribute('aria-expanded', String(v));
+  if (v && !was) { setTimeout(() => devp.el.querySelector('button, [tabindex="0"]')?.focus?.({ preventScroll: true }), 50); } else if (!v && was) devTab?.focus?.({ preventScroll: true });
+}
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && desk?.classList.contains('roomyopen') && !document.querySelector('dialog[open], .zmenu40, .ctxmenu') && !document.body.classList.contains('pdragging')) { ev.preventDefault(); toggleDev(true); return; }
+  if (ev.key === 'Escape' && desk?.classList.contains('devopen') && !document.querySelector('dialog[open], .zmenu40, .ctxmenu') && !document.body.classList.contains('pdragging')) { ev.preventDefault(); devOpen(false); } });
+window.addEventListener('wavwiz:zonesync', paintDevTab);
+// 0.4.5 T1b: recompute on Appearance > Layout and on a DPR change (window moved to another monitor / Windows scaling changed); resize + Display size already call applyPanels
+window.addEventListener('wavwiz:layout', () => applyPanels());
+(function watchDpr() { try { const mq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`); mq.addEventListener('change', () => { applyPanels(); watchDpr(); }, { once: true }); } catch { /* old browser */ } })();
+// 0.4.9 F83: expanding the Library shows the queue in the right column (a collapsed one opens); collapsing it puts the queue back as it was,
+// unless the user changed it meanwhile with the column's show / hide control
+let libListWas = null;
+function setPanels(n, opened = null) { holdPage(); const wasLib = P6.exp === 'lib'; P6 = savePanels(normPanels(n)); lastOpened = opened; if (opened === 'lib') tightLib = P6.lib !== 'rail'; applyPanels();
+  if (!wasLib && P6.exp === 'lib') { libListWas = P6.list; if (P6.list !== 'open') setList('open'); }
+  else if (wasLib && P6.exp !== 'lib' && libListWas != null) { const w = libListWas; libListWas = null; if (w !== P6.list) setList(w); } }
 /** Paint the layout for this width (auto-rail is applied here only, never saved). */
 function applyPanels(first = false) {
   if (!desk) return;
-  const e = effective(P6, window.innerWidth, { opened: lastOpened }), ls = shown(e, 'lib'), ds = shown(e, 'dev');
+  const mode = loadLayoutMode(), wantTight = isTight(window.innerWidth, pageZoom(), window.devicePixelRatio || 1, mode), roomy = wantTight && mode === 'roomy', tight = wantTight && !roomy && !P6.exp && P6.list !== 'expanded';   desk.classList.toggle('tight', tight); desk.classList.toggle('roomy', roomy); if (!tight) devOpen(false);   // 0.4.8 F58: Roomy uses Classic's (Full's) own Devices panel / collapsed bar - no .tight overrides; only Auto on a narrow window keeps the T1 tab   // 0.4.6 F31: Roomy (the user's choice) holds in the expanded Library / Queue / Devices views too; Auto keeps the T1 opt-out.   // an expanded Library / Devices view keeps its own layout if (!tight) devOpen(false);
+  // 0.4.5 T1: tight = the Library on its rail (until opened from it), Devices behind the right-edge tab; Sound / Queue / Now Playing take the width
+  if (lastOpened === 'dev') roomyDev = P6.dev !== 'rail';
+  const e = roomy ? (P6.exp ? { ...P6, auto: false } : { ...P6, lib: tightLib ? P6.lib : 'rail', dev: roomyDev ? P6.dev : 'rail', auto: false })   // F58: Roomy = Library on its rail, Devices folded to Full's collapsed bar (until opened from them)
+    : tight ? (P6.exp ? { ...P6, auto: false } : { ...P6, lib: tightLib ? P6.lib : 'rail', dev: 'normal', auto: false }) : effective(P6, window.innerWidth, { opened: lastOpened }), ls = shown(e, 'lib'), ds = shown(e, 'dev');
+  paintDevTab();
   desk.classList.toggle('libcollapsed', ls === 'rail'); desk.classList.toggle('libexpanded', ls === 'expanded');
   desk.classList.toggle('devcollapsed', ds === 'rail'); desk.classList.toggle('devexpanded', ds === 'expanded');
+  desk.classList.toggle('roomyopen', roomy && ds === 'normal');   // 0.4.9 F65: Roomy keeps Full's narrow Devices bar in the grid; opened from it, Devices slides out over the side (as the 0.4.5-0.4.7 slide-over did)
   desk.classList.toggle('autorail', !!e.auto);
   libpanel.classList.toggle('israil', ls === 'rail'); libpanel.title = ls === 'rail' ? 'Open the Library panel ( [ )' : '';
   const b = libpanel.querySelector('.libcol'); setChev(b, chevronDir(e, 'lib')); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
@@ -280,6 +332,8 @@ function applyPanels(first = false) {
   if (ls !== 'rail' && !first) libC.reload();
   syncMini();
   if (first) setTimeout(() => nowc.viz?.resize?.(), 0);
+  // 0.4.7: panels shown / pinned / Roomy-Full / display size changed: anything that fits itself to a panel (the Library tab row) re-measures after layout
+  requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('wavwiz:relayout')));
 }
 /** 0.1.1: the bottom Playlist slides down to its header strip (Library > Playlist toggles it on desktop); saved per device. */
 /** 0.2.3 U2: with the Playlist minimized, its title bar shows "Up next: Title · Artist" centered on the Now Playing column (the line
@@ -292,14 +346,18 @@ function wireNextBlock() {
   const place = () => {
     raf = 0;
     desk.classList.toggle('npcollapsed', nowc.ctlPanel.classList.contains('collapsed'));
-    const on = desk.classList.contains('listcollapsed') && !window.matchMedia('(max-width:900px)').matches;
-    nb.hidden = !on;
+    const wide = desk.classList.contains('listexpanded') && !desk.classList.contains('libexpanded') && !desk.classList.contains('devexpanded');
+    const on = (desk.classList.contains('listcollapsed') || wide) && !desk.classList.contains('libexpanded') && !window.matchMedia('(max-width:900px)').matches;   // 0.4.9 F83: not in the narrow column beside the expanded Library
+    nb.hidden = !on; nb.classList.toggle('wide', wide); listt.el.classList.toggle('nbshown', false);
     if (!on || !desk.isConnected) return;
     const col = nowc.ctlPanel.getBoundingClientRect(), hd = listt.head.getBoundingClientRect();
     if (!col.width) return;
-    const c = col.left + col.width / 2, room = Math.min(c - (listt.leftEdge() + 16), listt.rightEdge() - 16 - c);
-    nb.style.left = Math.round(c - hd.left) + 'px'; nb.style.maxWidth = Math.max(0, Math.round(room * 2)) + 'px';
-    nb.classList.toggle('tight', room * 2 < 300); nb.hidden = room * 2 < 110;
+    // 0.4.8 F50: centered on the Now Playing column when it fits, otherwise slid into the free gap between the title and the right-hand
+    // controls (zone picker included) - never over either of them
+    const L = listt.leftEdge() + 16, Rr = listt.rightEdge() - 16, gap = Rr - L, c = col.left + col.width / 2;
+    nb.classList.toggle('tight', gap < 300); const zf = pageZoom(); nb.style.maxWidth = Math.max(0, Math.round(gap / zf)) + 'px';   // rects are zoomed, styles are not (Display size)
+    const w = Math.min((nb.scrollWidth * pageZoom()) || gap, gap), x = wide ? L + w / 2 : Math.min(Math.max(c, L + w / 2), Rr - w / 2);   // wide Queue: starts right after the title
+    nb.style.left = Math.round((x - hd.left) / zf) + 'px'; nb.hidden = gap < (wide ? 160 : 110) * zf; listt.el.classList.toggle('nbshown', !nb.hidden);   // too tight: hidden, the row pill shows instead
   };
   const later = () => { if (!raf) raf = requestAnimationFrame(place); };
   placeNext = () => { later(); setTimeout(later, 360); };
@@ -308,20 +366,24 @@ function wireNextBlock() {
   new MutationObserver(ms => { if (ms.some(m => !nb.contains(m.target))) later(); }).observe(listt.head, { childList: true, subtree: true, characterData: true });
   later();
 }
-function toggleList(force) { const c = force ?? !desk.classList.contains('listcollapsed'); setList(c ? 'collapsed' : 'open'); }
+function toggleList(force) { libListWas = null; const c = force ?? !desk.classList.contains('listcollapsed'); setList(c ? 'collapsed' : 'open'); }
 /** 0.3.2 F13: collapsed · open · expanded (rises over the EQ / visualizer at center-column width; Now Playing stays visible below). */
 // 0.3.3 G5: expanding the Playlist slides Now Playing up with it to the top of the center column (covering the EQ / visualizer, which stop
 // rendering while covered); collapsing reverses it. Both move with the Playlist's timing (FLIP: measure, switch, animate from the old spot).
 export const LIST_ANIM = GLIDE;   // 0.3.6 K8: the one shared glide (motion.js)
-function flipList(change) {
+function flipList(change) { holdPage();
   const els = [nowc.el, listt.el].filter(Boolean), before = els.map(e => e.getBoundingClientRect().top);
   change();
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  els.forEach((e, i) => { const dy = before[i] - e.getBoundingClientRect().top; if (Math.abs(dy) < 1 || !e.animate) return; e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: LIST_ANIM.ms, easing: LIST_ANIM.ease }); });
+  // 0.4.9 F72: the slide would push the translated panel past the bottom of the desk for a few frames; the page then grew a scrollbar,
+  // which narrowed the viewport and shifted Devices left (the right-edge flash). Clip the desk while the slide runs.
+  const anims = [];
+  els.forEach((e, i) => { const dy = before[i] - e.getBoundingClientRect().top; if (Math.abs(dy) < 1 || !e.animate) return; anims.push(e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: LIST_ANIM.ms, easing: LIST_ANIM.ease })); });
+  holdFor(anims, LIST_ANIM.ms);   // 0.4.9 F74: the shared page hold (motion.js) replaces F72's desk-only clip
 }
 function setList(st) { const was = desk.classList.contains('listexpanded'); flipList(() => { desk.classList.toggle('listcollapsed', st === 'collapsed'); desk.classList.toggle('listexpanded', st === 'expanded'); });
   if (was !== (st === 'expanded')) window.dispatchEvent(new CustomEvent('wavwiz:listcover', { detail: { covered: st === 'expanded' } })); P6 = savePanels({ ...P6, list: st }); listt.setCollapsed?.(st); syncMini(); placeNext(); if (st !== 'collapsed') setTimeout(() => { listt.relayout?.(); nowc.viz?.resize?.(); }, 340); }
-function listStepUi(dir) { setList(listStep(P6, dir).list); }
+function listStepUi(dir) { if (P6.exp === 'lib') { libListWas = null; return setList(dir === 'up' ? 'open' : 'collapsed'); } setList(listStep(P6, dir).list); }   // 0.4.9 F83: beside the Library only shown / hidden
 /** Desktop: everything that is not Now Playing / Library opens as a page on top of the layout. Phone: the 0.0.2 views. */
 function openPage(k) {
   const v = views[k]; if (!v) return;
@@ -353,7 +415,7 @@ export function openNew(kind) {
   if (!wide()) { if (kind === 'zone') return editZone(S, null, refreshAll); return openScenesSchedules(S, refreshAll, kind === 'alarm' ? { at: 'alarm' } : {}); }
   const was = P6.exp === 'dev'; if (!was) toggleDevExpanded(true);
   const run = () => {
-    if (kind === 'zone') { document.querySelector('.devpanel .zadd-new')?.click(); pulseSel('.devpanel .zones-h'); }
+    if (kind === 'zone') { document.querySelector('.devpanel .zadd-new')?.click(); pulseSel('.devpanel .tree42-h'); }
     else { const c = document.querySelector('.devpanel .ssc-col'); c?._open?.(kind); setTimeout(() => pulseSel(document.querySelector('.devpanel .ss-inline') || c), 60); }
   };
   if (was) run(); else setTimeout(run, GLIDE.ms + 140);
@@ -426,6 +488,7 @@ export function go(k, force) {
     // 0.3.5 J9: Playlists / Radio are Library tabs; the tools are tabs of the expanded Library
     if (k === 'playlists') { toggleLib(false); libC.showTab('playlists'); return; }
     if (k === 'radio') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab('radio'); return; }
+    if (k === 'rip' && !ripAllowed()) return;   // 0.4.8 F57
     if (k === 'rip' || k === 'tags' || k === 'cleanup') { if (!desk.classList.contains('libexpanded')) toggleLibExpanded(true); libC.showTab(k); return; }
     if (k === 'eq') return showEq();     // Playback > Sound / EQ = the center EQ panel (0.3.7: one function for every EQ entry point)
     if (k === 'queue') return openQueue();
@@ -448,12 +511,16 @@ const checklistGo = a => go(a);
  *  It never joins as a speaker, so opening or closing it never changes the streams (F2). */
 export function openMini() {
   try { window.chrome?.webview?.postMessage({ cmd: 'mini' }); if (window.chrome?.webview) return; } catch { /* not the Player */ }
-  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=138');
+  window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=145');
 }
 
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
+// 0.4.0: the selected zone (Now Playing bar, Queue, mini, hotkeys) - Z.init wires the API zone; a change redraws what shows a zone
+Z.init(S, { refreshNow: () => refreshNow(), manage: () => { if (wide()) setDevSize('expanded'); else go('devices'); } });
+window.addEventListener('wavwiz:zone', () => { devv.draw(); devp.draw(); nowc.draw(); listt.draw(); });
+let zonesSoon = 0; const refreshZonesSoon = () => { clearTimeout(zonesSoon); zonesSoon = setTimeout(refreshZones, 150); };   // 0.4.8 F61: was 500 ms; device cards follow a track change in well under 1 s
 async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
-async function refreshZones() { try { const [z, g] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups)]); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
+async function refreshZones() { try { const [z, g, jb, cast] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast)]); S.jb = jb; S.cast = cast;   /* 0.4.9 F78 */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
   nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); } catch (e) { handleErr(e); } }
@@ -473,11 +540,12 @@ function connectWs() {
     onUnauthorized: () => location.reload(),
     onMessage: ev => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.type === 'now' || m.type === 'queue') refreshNow(); else if (m.type === 'zones') { refreshZones(); refreshStatus(); }
+      if (m.type === 'now' || m.type === 'queue') { refreshNow(); refreshZonesSoon(); } else if (m.type === 'zones') { refreshZones(); refreshStatus(); }
       else if (m.type === 'favorites') window.dispatchEvent(new CustomEvent('wavwiz:favorites'));   // 0.2.0 item 14
       else if (m.type === 'library') { refreshStatus(); window.dispatchEvent(new CustomEvent('wavwiz:library')); nowc.drawChecklist(); }
       else if (m.type === 'tick') { if (S.now?.state === 'playing') refreshNow(); if (S.view === 'devices' || wide() || S.view === 'now') refreshZones(); }
       else if (m.type === 'notice') toast(m.data.message, true);
+      else if (m.type === 'hello' && m.data?.appVersion && S.auth && m.data.appVersion !== S.auth.appVersion) { S.auth.appVersion = m.data.appVersion; paintVersion(); toast(`WavWiz was updated to ${m.data.appVersion}. Reload the page to use it.`); }   // 0.4.6
       else if (m.type === 'schedules' || m.type === 'scenes') window.dispatchEvent(new CustomEvent('wavwiz:schedules'));
       else if (m.type === 'sleep') { sleepChip(S, m.data); window.dispatchEvent(new CustomEvent('wavwiz:sleep', { detail: m.data })); }
       else if (m.type === 'alarm') showAlarm(S, m.data);
@@ -498,7 +566,7 @@ function drawStatus() {
   const tracks = S.status?.library?.tracks;
   // 0.3.6 K3: the count badges on the collapsed Library / Devices bars
   const lb = document.querySelector('.libpanel .prail-n'), db = document.querySelector('.devpanel .prail-n');
-  if (lb) lb.textContent = tracks != null ? String(tracks) : ''; if (db) db.textContent = `${online}/${S.zones.length}`;
+  if (lb) { const n = libCountLabel(tracks); lb.textContent = n.text; lb.title = n.title; } if (db) db.textContent = `${online}/${S.zones.length}`;
   statusbar.replaceChildren(
     // 0.2.2 T10: the top-right indicator is the one home of "Connected"; the status bar speaks up only when the connection drops
     S.connected === false ? h('span', { class: 'sb sbconn', role: 'status' }, h('span', { class: 'dot bad' }), 'Reconnecting…') : null,
@@ -507,7 +575,7 @@ function drawStatus() {
     bad.length ? h('span', { class: 'sb warn', title: bad.map(z => `${z.name}: ${z.room.text}`).join('\n') }, '⚠ ' + bad.map(z => `${z.name} ${z.room.state}`).join(', ')) : null,
     h('span', { class: 'grow' }), tracks != null ? h('span', { class: 'sb' }, `${tracks} song${tracks === 1 ? '' : 's'} in the library`) : null,
     S.setupLeft ? h('button', { class: 'sb link', onclick: () => openSetup() }, `Getting started: ${S.setupLeft} to go`) : null,
-    h('button', { class: 'sb link', onclick: () => go('about'), title: 'About, credits and licenses' }, `WavWiz BETA ${S.auth?.appVersion ?? ''}`));
+    h('button', { class: 'sb link', onclick: () => go('about'), title: 'About, credits and licenses', 'data-wwv': 'WavWiz BETA {v}' }, `WavWiz BETA ${S.auth?.appVersion ?? ''}`));
 }
 /** 0.2.0 items 11 + 24: the one Getting started dialog (Help > Getting started, the status-bar link, and first run). */
 let setupDlg = null;
@@ -546,12 +614,18 @@ function drawQueue() {
     return rowEl;
   });
   const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
-  root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow', style: 'margin:0' }, 'Queue'), h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
+  root.replaceChildren(h('div', { class: 'row wrap' }, ...(pp => pp ? [h('h2', { class: 'pqhead row', style: 'margin:0' }, h('span', { class: 'pqlbl' }, 'Queue:'), pp)] : [h('h2', { class: 'grow', style: 'margin:0' }, 'Queue', h('span', { class: 'qzone dim', 'data-qzone': '' }, Z.queueSuffixNow()))])(phonePick()) /* 0.4.8 F60: "Queue: [zone ▾]", the zone named once */, h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
     can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear'), lockBtn] : null),
     S.queue.length ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
   qReorder?.destroy(); qReorder = null;
   const list = root.querySelector('.qlist');
   if (list) qReorder = attachReorder(list, { can: () => canControl(S), locked: () => !!loadLayout(true).locked, onMove: async mv => { await act('/queue/move', mv); } });
+}
+/** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
+function phonePick() {
+  const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;
+  const sel = h('select', { class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
+  sel.value = cur?.key || ''; return h('span', { class: 'qzwrap pqwrap' }, sel);
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
   const root = views.queue.el; root.querySelector('.qsave')?.remove();

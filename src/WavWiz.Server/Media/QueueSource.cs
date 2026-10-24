@@ -37,9 +37,14 @@ public sealed class QueueSource : ISampleSource, IDisposable
     }
 
     private IPcmDecoder Open(int index, long startMs) => _open(_items[index], startMs);
-    private int? NextIndex(int i) => _repeat == RepeatMode.One ? i : i + 1 < _items.Count ? i + 1 : _repeat == RepeatMode.All ? 0 : null;
+    /// <summary>0.4.2: shuffle. When set, the song after <c>i</c> is whatever the picker says (a random not-yet-played song of the queue; null = nothing left). The queue list itself is never reordered.</summary>
+    private Func<int, int?>? _picker;
+    public Func<int, int?>? Picker { get => _picker; set { _picker = value; var n = _next; _next = null; _nextIndex = -1; n?.Dispose(); } }
+    private int? NextIndex(int i) => _repeat == RepeatMode.One ? i : _picker != null ? _picker(i) : i + 1 < _items.Count ? i + 1 : _repeat == RepeatMode.All ? 0 : null;
 
     public bool Ended => _ended;
+    /// <summary>0.4.9 F77: the rate every decoder of this source was opened at (48 or 96 kHz).</summary>
+    public int Rate { get; init; } = 48000;
     public int CurrentIndex { get { lock (_l) return _index; } }
 
     public int Read(Span<float> dst, int frames)
@@ -81,14 +86,14 @@ public sealed class QueueSource : ISampleSource, IDisposable
         int ms; try { ms = Math.Clamp(CrossfadeMs(), 0, 12_000); } catch { ms = 0; }
         if (ms <= 0 || _repeat == RepeatMode.One) return;
         var it = _items[_index]; if (it.DurationMs <= 0 || it.Kind != "track") return;
-        long remainMs = it.DurationMs - (_curFrames * 1000 / 48000) - CurStartMs();
+        long remainMs = it.DurationMs - (_curFrames * 1000 / Rate) - CurStartMs();
         if (remainMs > ms || remainMs < 200) return;
         if (NextIndex(_index) is not int nx || nx == _index) return;
         if (SameAlbumGapless(it, _items[nx]) && (nx == _index + 1)) return;
         if (it.Kind != "track" || _items[nx].Kind != "track") return;
         var dec = _next != null && _nextIndex == nx ? _next : SafeOpen(nx);
         if (ReferenceEquals(dec, _next)) { _next = null; _nextIndex = -1; } else { var old = _next; _next = null; _nextIndex = -1; old?.Dispose(); }
-        _xf = dec; _xfPos = 0; _xfTotal = Math.Max(1, remainMs * 48);
+        _xf = dec; _xfPos = 0; _xfTotal = Math.Max(1, remainMs * (Rate / 1000));
         lock (_l) { _index = nx; Boundaries.Add((_frames + 0, nx, 0)); }   // Now Playing moves to the incoming track as the fade starts
     }
     private long CurStartMs() { lock (_l) { var b = Boundaries.LastOrDefault(); return b.Index == _index ? b.StartOffsetMs : 0; } }
@@ -129,7 +134,7 @@ public sealed class QueueSource : ISampleSource, IDisposable
         {
             var b = Boundaries.LastOrDefault(x => x.StartFrame <= Math.Max(0, frame));
             if (b == default && Boundaries.Count == 0) return (0, 0);
-            return (b.Index, b.StartOffsetMs + (Math.Max(0, frame) - b.StartFrame) * 1000 / 48000);
+            return (b.Index, b.StartOffsetMs + (Math.Max(0, frame) - b.StartFrame) * 1000 / Rate);
         }
     }
 

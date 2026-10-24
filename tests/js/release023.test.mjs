@@ -142,7 +142,7 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
 
 test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.[3-9]|3\.\d)'/);   // 0.2.4: What's new moved on to the 0.2.4 list; the 0.2.3 changes stay in the CHANGELOG
+  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.[3-9]|[34]\.\d)'/);   // 0.2.4: What's new moved on to the 0.2.4 list; the 0.2.3 changes stay in the CHANGELOG
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
@@ -154,7 +154,7 @@ test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has th
 test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no skipped redraw keeps it, a forgotten browser speaker does not rejoin', () => {
   const d = src('devices.js');
   // side panel (Standard + Expanded + zones sidebar): a skipped redraw is retried, and a card whose device is gone forces the redraw
-  assert.match(d, /const removedShown = \(\) => \[\.\.\.body\.querySelectorAll\('\[data-zone-id\]'\)\]\.some\(el => !S\.zones\.some\(z => String\(z\.id\) === el\.dataset\.zoneId\)\)/);
+  // 0.4.2 superseded by the zone tree (covered in release042 / ui042): assert.match(d, /const removedShown = \(\) => \[\.\.\.body\.querySelectorAll\('\[data-zone-id\]'\)\]\.some\(el => !S\.zones\.some\(z => Stri
   assert.match(d, /if \(!force && removedShown\(\)\) force = true;/);
   const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('export function devicesView'));
   assert.match(panel, /if \(!force && body\.querySelector\('\.dmenu:not\(\[hidden\]\)'\)\) return later\(\);/);
@@ -167,7 +167,7 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   // the "zones" push redraws every view (side panel, page, strip) from fresh /zones + /groups - nothing cached
   const m = src('main.js');
   assert.match(m, /m\.type === 'zones'\) \{ refreshZones\(\);/);
-  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; (if \(idsChanged\) \{ )?devv\.draw\(\); devp\.draw\(\);/);
+  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g(?:, jb)?\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; (?:Z\.sync\(\); if \(isDevDragging\(\)\) \{[^}]*\} else )?(if \(idsChanged\) \{ )?devv\.draw\(\); devp\.draw\(\);/);
   // a browser speaker told "unauthorized" (forgotten / revoked) stops instead of reconnecting straight back onto the list
   const r = src('room.js');
   assert.match(r, /if \(\/\^unauthorized\/i\.test\(b\?\.reason \|\| ''\)\) \{ this\.removed = true; this\.stop\(\)/);
@@ -183,7 +183,8 @@ test('0.2.3 U11: the panel logic - a removed device is detected even while a sli
   assert.equal(removedShown([], []), false);
 });
 
-test('0.2.3 U12: device cards open their settings with a themed chevron Expand control (was •••), in place, on the Expanded cards only', () => {
+// 0.4.2: the per-device expanded cards are gone (zone tree + inline speaker page); covered by tests/ui/ui042.mjs.
+test.skip('0.2.3 U12: device cards open their settings with a themed chevron Expand control (was •••), in place, on the Expanded cards only', () => {
   const d = src('devices.js');
   assert.doesNotMatch(d, /'•••'|dsback|'‹ Back'/, 'the ••• flip and its Back button are gone');
   assert.match(d, /export function settingsToggle\(name, open, onToggle\) \{\n  return h\('button', \{ type: 'button', class: 'dexpand' \+ \(open \? ' on' : ''\), 'aria-expanded': String\(open\)/);

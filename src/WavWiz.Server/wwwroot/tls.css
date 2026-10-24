@@ -20,3 +20,4 @@ header img{border-radius:9px} h1{font-size:22px;margin:0} h2{font-size:19px;marg
 #advice ul{padding-left:20px;margin:6px 0}
 .spin{display:inline-block;width:16px;height:16px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.a2hs-pic{vertical-align:middle;margin-right:8px}

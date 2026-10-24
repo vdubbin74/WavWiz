@@ -97,6 +97,7 @@ export function artistCover(name, ids = [], cls = 'lg rnd', size = 384) {
 /** 0.2.2 T4b: the server found a picture - swap it into every open tile / row of that artist (album covers reload through their track art). */
 export function artPushed(d) {
   if (!d) return;
+  if (d.kind === 'rebuild') { if (d.cv) setArtCv(d.cv); return; }   // 0.4.4 F24: new picture URLs after "Rebuild album art"
   if (d.kind === 'artist' && d.artist) {
     const want = String(d.artist).trim().toLowerCase().replace(/\s+/g, ' ');
     document.querySelectorAll('.acover[data-artist]').forEach(el => { if (el.dataset.artist.trim().toLowerCase().replace(/\s+/g, ' ') === want && el._wwReload) el._wwReload(); });

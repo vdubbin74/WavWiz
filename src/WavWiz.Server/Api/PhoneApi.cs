@@ -20,6 +20,16 @@ public static class PhoneApi
 
     public static void Map(WebApplication app, Services s)
     {
+        // 0.4.1 E: a per-device manifest. The Home Screen icon starts at "/?wr=<device id>", so the Home Screen app (separate storage on iOS) comes up as the SAME device
+        // and finds its saved name / calibration / mic settings on the server.
+        app.MapGet("/api/v1/phone/manifest", (HttpContext c, string? wr) =>
+        {
+            var id = !string.IsNullOrEmpty(wr) && System.Text.RegularExpressions.Regex.IsMatch(wr, "^[A-Za-z0-9._-]{6,80}$") ? wr : null;
+            var start = id == null ? "/" : "/?wr=" + id;
+            var json = "{\"id\":\"/\",\"name\":\"WavWiz\",\"short_name\":\"WavWiz\",\"description\":\"Play your music in sync on every speaker in the house.\",\"start_url\":\"" + start + "\",\"scope\":\"/\",\"display\":\"standalone\",\"background_color\":\"#000614\",\"theme_color\":\"#FF3C00\",\"icons\":[{\"src\":\"/assets/logo-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\",\"purpose\":\"any\"},{\"src\":\"/assets/logo-512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\",\"purpose\":\"any\"},{\"src\":\"/assets/logo-maskable-512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\",\"purpose\":\"maskable\"}]}";
+            c.Response.Headers.CacheControl = "no-store";
+            return Results.Content(json, "application/manifest+json");
+        }).Anon();
         app.MapGet("/tls/setup", (HttpContext c) => Results.Content(Page(c, s, "setup"), "text/html; charset=utf-8")).Anon();
         app.MapGet("/tls/check", (HttpContext c) => Results.Content(Page(c, s, "check"), "text/html; charset=utf-8")).Anon();
         app.MapGet("/tls/qr.svg", (HttpContext c, string? to, string? code) =>
@@ -54,6 +64,7 @@ public static class PhoneApi
         {
             if (!c.WebSockets.IsWebSocketRequest) return Results.StatusCode(400);
             int delayMs = int.TryParse(c.Request.Query["delayMs"], out var dm) ? Math.Clamp(dm, 0, 3000) : 0;
+            string? zid = c.Request.Query["zoneId"]; zid = string.IsNullOrWhiteSpace(zid) ? null : zid.Trim();      // 0.4.3 #10: the zone whose music to show
             using var ws = await c.WebSockets.AcceptWebSocketAsync();
             var recv = Task.Run(async () => { var b = new byte[256]; try { while (ws.State == WebSocketState.Open) { var r = await ws.ReceiveAsync(b, CancellationToken.None); if (r.MessageType == WebSocketMessageType.Close) break; } } catch { } });
             var msg = new byte[1 + VizHub1.Window + Playback.VizHub.Extra]; bool idleSent = false;
@@ -62,7 +73,9 @@ public static class PhoneApi
                 using var tick = new PeriodicTimer(TimeSpan.FromMilliseconds(33));
                 while (await tick.WaitForNextTickAsync(c.RequestAborted) && ws.State == WebSocketState.Open && !recv.IsCompleted)
                 {
-                    var w = s.Viz.At(s.Conductor.Clock.NowUs - delayMs * 1000L);
+                    // the zone's group is looked up every tick: linking / splitting a zone moves its music to another group
+                    var gid = zid == null ? null : (s.Links?.ResolveZone(zid, false) ?? Playback.Conductor.DefaultGroupId);
+                    var w = s.Vizs.At(gid, s.Conductor.Clock.NowUs - delayMs * 1000L);
                     if (w == null) { if (!idleSent) { idleSent = true; await ws.SendAsync(new byte[] { 0 }, WebSocketMessageType.Binary, true, c.RequestAborted); } continue; }
                     idleSent = false; msg[0] = 1; Buffer.BlockCopy(w, 0, msg, 1, Math.Min(w.Length, msg.Length - 1));
                     await ws.SendAsync(msg, WebSocketMessageType.Binary, true, c.RequestAborted);
@@ -131,8 +144,8 @@ public static class PhoneApi
         }
         // 0.3.7 L28: Add to Home Screen - the app already ships a manifest (display: standalone), icons and a service worker (0.3.4 H1); this is the phone-friendly flow
         h.Append("<section class='card dev dev-ios' id=a2hs-ios><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (iPhone / iPad, in <b>Safari</b>).</p><ol class='steps a2hs'>")
-         .Append("<li><h3>Tap Share</h3><p>The square with an arrow, at the bottom (iPhone) or top (iPad) of Safari.</p></li>")
-         .Append("<li><h3>Add to Home Screen</h3><p>Scroll down the list, tap <b>Add to Home Screen</b>, then <b>Add</b>.</p></li></ol></section>");
+         .Append("<li><svg class=a2hs-pic viewBox=\"0 0 24 24\" width=32 height=32 fill=none stroke=currentColor stroke-width=1.8 stroke-linecap=round stroke-linejoin=round aria-hidden=true><path d=\"M12 15V3M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1\"/></svg><h3>Tap Share</h3><p>The square with an arrow, at the bottom (iPhone) or top (iPad) of Safari.</p></li>")
+         .Append("<li><svg class=a2hs-pic viewBox=\"0 0 24 24\" width=32 height=32 fill=none stroke=currentColor stroke-width=1.8 stroke-linecap=round stroke-linejoin=round aria-hidden=true><rect x=3.5 y=3.5 width=17 height=17 rx=3 /><path d=\"M12 8v8M8 12h8\"/></svg><h3>Add to Home Screen</h3><p>Scroll down the list, tap <b>Add to Home Screen</b>, then <b>Add</b>.</p></li></ol></section>");
         h.Append("<section class='card dev dev-android' id=a2hs-android><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (Android, in <b>Chrome</b>).</p>")
          .Append("<p><button class=btn id=a2hsInstall hidden>Install WavWiz</button></p><ol class='steps a2hs'>")
          .Append("<li><h3>Open the Chrome menu</h3><p>The three dots at the top right.</p></li>")

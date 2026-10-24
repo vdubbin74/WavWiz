@@ -59,7 +59,7 @@ public class WireTests
     [Fact]
     public void Version_comes_from_one_place_and_is_beta_0_0_x()
     {
-        Assert.Matches(@"^0\.[0-3]\.\d+$", WavWizInfo.Version);          // BETA 0.0.x, then 0.1.x (0.1.1)
+        Assert.Matches(@"^0\.[0-4]\.\d+$", WavWizInfo.Version);          // BETA 0.0.x, then 0.1.x (0.1.1)
         Assert.Equal("BETA", WavWizInfo.Channel);
         Assert.Equal($"WavWiz {WavWizInfo.Version} BETA", WavWizInfo.DisplayName);
     }

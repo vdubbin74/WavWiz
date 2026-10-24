@@ -38,6 +38,29 @@ export const chevronDir = (p, k) => (chevronGlyph(p, k) === '‹' ? 'l' : 'r');
 export function chevronLabel(p, k) { const name = k === 'lib' ? 'Library' : 'Devices', s = shown(p, k); return s === 'rail' ? `Open the ${name} panel` : `Fold the ${name} panel to a rail`; }
 /** Layout for this width: the saved state, but (temporarily, not saved) the other side folds to a rail when Now Playing would drop under 420 px,
  *  and an expanded panel falls back to normal for this load when the window is phone-sized. */
+/** 0.4.5 T1: the adaptive tight-space layout (no setting). On when the page is a desktop layout (> 900 px) but its layout width - the window's CSS
+ *  width divided by the Display size zoom - is under 1600 px. Why 1600: the Player window opens at a 1280 x 820 CSS design size, and a 4K TV at
+ *  250 % Windows scaling is only 1536 CSS px wide even maximized, so the user's TV lands well below; a 4K TV at 200 % (1920 x 1080 CSS) and every
+ *  1920+ monitor stay above it and keep the normal three-column layout. Display size counts: Large 125 % on 1920 = 1536 -> tight; 67 % on 1280 = 1910 -> normal. */
+export const TIGHT_PX = 1600;
+export const layoutWidth = (innerW, z = 1) => innerW / (z > 0 ? z : 1);
+/** 0.4.5 T1b: a high-DPI screen (Windows 175 %+, e.g. a 4K TV at 200 % = 1920 CSS px) is tight up to 2000 CSS px; plain 1920 monitors at 100 % stay normal. */
+export const TIGHT_HIDPI_PX = 2000, HIDPI = 1.75;
+/** Appearance > Layout: auto (the rule above), roomy (always tight), full (never tight). Saved per device like Display size. */
+export const LAYOUT_KEY = 'wavwiz.layout';
+export const LAYOUTS = [['full', 'Full', 'Library, Now Playing and Devices side by side'], ['roomy', 'Roomy', 'Devices behind a tab, Library on its rail'], ['auto', 'Auto', 'Roomy on big high-DPI screens and narrow windows']];
+export const DEFAULT_LAYOUT = 'full';   // 0.4.5 T1c: the 0.4.4 layout unless the user picks Roomy / Auto
+export const normLayout = v => (LAYOUTS.some(([id]) => id === v) ? v : DEFAULT_LAYOUT);
+export function loadLayout(store = globalThis.localStorage) { try { return normLayout(store?.getItem(LAYOUT_KEY)); } catch { return DEFAULT_LAYOUT; } }
+export function saveLayout(v, store = globalThis.localStorage) { const n = normLayout(v); try { store?.setItem(LAYOUT_KEY, n); } catch { /* private mode */ } try { globalThis.dispatchEvent?.(new CustomEvent('wavwiz:layout', { detail: n })); } catch { /* node */ } return n; }
+export const isTight = (innerW, z = 1, dpr = 1, mode = DEFAULT_LAYOUT) => {
+  if (innerW <= 900) return false;   // phone layout
+  if (mode === 'roomy') return true; if (mode === 'full') return false;
+  const w = layoutWidth(innerW, z);
+  return w < TIGHT_PX || (dpr >= HIDPI && w < TIGHT_HIDPI_PX);
+};
+/** Pure: the Devices tab text, "DEVICES · 4 ZONES". */
+export const devTabText = n => `DEVICES · ${n} ZONE${n === 1 ? '' : 'S'}`;
 export function effective(p, width, { opened = null } = {}) {
   const e = { ...p };
   if (width <= 900) return { ...e, exp: null, auto: false };

@@ -61,13 +61,13 @@ public class Release011Tests
     public void The_mDNS_responder_answers_AirPlay_raop_questions_and_still_answers_WavWiz()
     {
         var beacon = new ServerBeacon("id1", "MEDIA-PC", "192.168.1.20", 47800, 47443, 47801, "0.1.1"); var ip = IPAddress.Parse("192.168.1.20");
-        Func<string, IPAddress, IEnumerable<List<DnsWire.Record>>> extra = (host, a) => new[] { new List<DnsWire.Record> { DnsWire.Ptr("_raop._tcp.local", "AABBCCDDEEFF@WavWiz – Whole House._raop._tcp.local"), DnsWire.Srv("AABBCCDDEEFF@WavWiz – Whole House._raop._tcp.local", host, 47804), DnsWire.Txt("AABBCCDDEEFF@WavWiz – Whole House._raop._tcp.local", new[] { "et=0,1" }), DnsWire.A(host, a) } };
+        Func<string, IPAddress, IEnumerable<List<DnsWire.Record>>> extra = (host, a) => new[] { new List<DnsWire.Record> { DnsWire.Ptr("_raop._tcp.local", "AABBCCDDEEFF@WavWiz – Everywhere._raop._tcp.local"), DnsWire.Srv("AABBCCDDEEFF@WavWiz – Everywhere._raop._tcp.local", host, 47804), DnsWire.Txt("AABBCCDDEEFF@WavWiz – Everywhere._raop._tcp.local", new[] { "et=0,1" }), DnsWire.A(host, a) } };
         var ans = DiscoveryHost.Answer(DnsWire.Query("_raop._tcp.local", DnsWire.TypePtr), beacon, ip, extra);
         Assert.NotNull(ans); Assert.True(DnsWire.TryParse(ans, out var m));
-        var srv = m!.Records.Single(r => r.Type == DnsWire.TypeSrv); Assert.Equal(47804, DnsWire.SrvOf(srv.Data).Port); Assert.Contains("Whole House", srv.Name);
+        var srv = m!.Records.Single(r => r.Type == DnsWire.TypeSrv); Assert.Equal(47804, DnsWire.SrvOf(srv.Data).Port); Assert.Contains("Everywhere", srv.Name);
         Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("_unison._tcp.local", DnsWire.TypePtr), beacon, ip, extra));
         Assert.Null(DiscoveryHost.Answer(DnsWire.Query("_googlecast._tcp.local", DnsWire.TypePtr), beacon, ip, extra));
-        Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("AABBCCDDEEFF@WavWiz – Whole House._raop._tcp.local", DnsWire.TypeSrv), beacon, ip, extra));
+        Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("AABBCCDDEEFF@WavWiz – Everywhere._raop._tcp.local", DnsWire.TypeSrv), beacon, ip, extra));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class Release011Tests
     {
         await using var f = await ServerFixture.StartAsync(); var ck = await f.SetupAdmin(); var admin = f.As(f.Token(WavWiz.Server.Role.Admin));
         var st = await admin.GetFromJsonAsync<JsonElement>("/api/v1/receivers");
-        Assert.False(st.GetProperty("spotify").GetProperty("enabled").GetBoolean()); Assert.Equal("WavWiz – Whole House", st.GetProperty("airplay").GetProperty("name").GetString());
+        Assert.False(st.GetProperty("spotify").GetProperty("enabled").GetBoolean()); Assert.Equal("WavWiz – Everywhere", st.GetProperty("airplay").GetProperty("name").GetString());
         Assert.Equal(47804, st.GetProperty("airplay").GetProperty("port").GetInt32());
         (await admin.PutAsJsonAsync("/api/v1/settings", new Dictionary<string, object> { ["spotify.enabled"] = true })).EnsureSuccessStatusCode();
         st = await admin.GetFromJsonAsync<JsonElement>("/api/v1/receivers"); Assert.True(st.GetProperty("spotify").GetProperty("enabled").GetBoolean());

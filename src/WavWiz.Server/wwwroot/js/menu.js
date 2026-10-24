@@ -1,3 +1,4 @@
+import { ripAllowed } from './library.js';
 // Top menu: File / Library / Playback / Devices / Help. 0.2.1 F8: menus DO things, Settings SETS things - every item has exactly one home.
 // The View menu is gone: Theme, Visualizer, Now Playing style and Display size all live on Settings > Appearance. Phone hamburger reuses the same tree.
 import { h, api, toast, dialog } from './util.js';
@@ -10,6 +11,7 @@ import { changePhoneRole } from './room.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 import { NEW_KEYS, sleepSpec, eqSpec, playlistsSpec, zonesSpec, scenesSpec, deviceListSpec, runSpec } from './menusub.js';
 import { icon } from './icons.js';
+import { shouldOffer, a2hsCard, rememberedNote, boot as a2hsBoot } from './a2hs.js';
 import { keysFor, shortcutsBody } from './hotkeys.js';
 import { pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { importSettings, restoreBackup, exportSettings, backUpNow } from './backupflow.js';
@@ -65,7 +67,7 @@ function menuActions(S, ctl, desktop = false) {
       ['Queue', listPanel, null, null, { pin: 'queue', kbd: keysFor('queue') }],
       'hr',
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
-      ['CD ripper', () => go('rip'), () => !admin()],
+      ...(ripAllowed() ? [['CD ripper', () => go('rip'), () => !admin()]] : []),   // 0.4.8 F57: PC app only
       ['Tag & cover fix', () => go('tags'), () => !admin()],
       ['Tidy up library', () => go('cleanup'), () => !admin()],
     ],
@@ -82,7 +84,7 @@ function menuActions(S, ctl, desktop = false) {
     devices: [
       ['Devices & zones', devPanel, null, null, { pin: 'devices' }],
       // 0.3.6 K18: hover submenus listing devices, zones and scenes (click jumps to it), each ending with New… (no Start buttons: File > Run is the one place to start)
-      ['Devices', devPanel, null, null, { sub: () => deviceListSpec(S, { ...ctl, canAdmin: admin }) }],
+      ['Speakers', devPanel, null, null, { sub: () => deviceListSpec(S, { ...ctl, canAdmin: admin }) }],
       ['Zones', devPanel, null, null, { sub: () => zonesSpec(S, { ...ctl, canAdmin: admin }) }],
       ['Scenes', () => go('scenes'), null, null, { sub: () => scenesSpec(S, { ...ctl, canAdmin: admin }) , pin: 'scenes' }],
       ['Schedules & alarms', () => go('schedules'), null, null, { pin: 'alarms' }],
@@ -198,7 +200,8 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
   const A = menuActions(S, ctl);
   const nav = h('nav', { 'aria-label': 'Menu' });
   nav.append(h('div', { class: 'row', style: 'padding:4px 8px 10px;gap:8px' },
-    h('b', null, 'WavWiz'), h('span', { class: 'beta' }, versionLabel || 'BETA')));
+    h('b', null, 'WavWiz'), h('span', { class: 'beta', 'data-wwv': 'BETA {v}' }, versionLabel || 'BETA'), h('span', { class: 'grow' }),
+    h('button', { type: 'button', class: 'drawer-close', 'data-act': 'drawer-close', 'aria-label': 'Close the menu', onclick: () => onClose?.() }, 'Done')));   // 0.4.6 F43: a clear way out
 
   function close() { onClose?.(); }
   function leaf(label, run, opts = {}) {
@@ -244,12 +247,19 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
     return sub;
   }
 
+  a2hsBoot();
+  if (shouldOffer({})) nav.append(h('button', { type: 'button', class: 'a2hs-entry', onclick: () => { close(); dialog('Add to Home Screen', a2hsCard(), [{ text: 'Close', cls: 'primary' }]); } }, 'Add to Home Screen'), h('hr'));
+  // 0.4.9 F67: the phone menu is seven plain items (no submenus, no File / Playback / Mini player, no shortcut labels), each opening an existing view:
+  // Devices & Zones holds devices, zones, pairing and calibrate; Settings holds EQ / sound, phone role, away-from-home access and help / about.
+  void accordion; void A;
   nav.append(
-    accordion('File', () => fromSpec(A.file)),
-    accordion('Library', () => fromSpec(A.library)),
-    accordion('Playback', () => fromSpec(A.playback)),
-    accordion('Devices', () => fromSpec(A.devices)),
-    accordion('Help', () => fromSpec(A.help)),
+    leaf('Now Playing', () => ctl.go?.('now')),
+    leaf('Queue', () => (ctl.openQueue ? ctl.openQueue() : ctl.go?.('queue'))),
+    leaf('Volume Mixer', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))),
+    leaf('Library', () => ctl.go?.('library')),
+    leaf('Devices & Zones', () => ctl.go?.('devices')),
+    leaf('Scenes & Alarms', () => ctl.go?.('scenes')),
+    leaf('Settings', () => openSettings(S, ctl.refreshAll, ctl.go)),
   );
   return nav;
 }
