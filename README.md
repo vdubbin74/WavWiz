@@ -14,7 +14,7 @@ WavWiz turns an always-on Windows PC into a multi-zone music server for homes, s
 
 > **Public beta.** Expect rough edges and frequent updates. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
-**Latest:** v0.4.9 Beta (Oct 23, 2026) · **Download:** [WavWiz-Setup-0.4.9.exe from the latest release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Website:** [wavwiz.com](https://wavwiz.com) · **Repo:** [github.com/vdubbin74/WavWiz](https://github.com/vdubbin74/WavWiz)
+**Latest:** v0.4.9 Beta (Oct 24, 2026) · **Download:** [WavWiz-Setup-0.4.9.exe from the latest release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Website:** [wavwiz.com](https://wavwiz.com) · **Repo:** [github.com/vdubbin74/WavWiz](https://github.com/vdubbin74/WavWiz)
 
 ---
 
