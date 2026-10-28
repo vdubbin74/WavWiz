@@ -39,14 +39,13 @@ test('0.2.3 U2: minimized Playlist shows "Up next: Title · Artist" centered on 
 });
 
 test('0.2.3 U3: the one-line bar wears the selected panel style (all four) in the theme colors', () => {
-  for (const st of ['classic', 'center', 'stack', 'horizon']) assert.match(css, new RegExp(`\\.pn-${st} \\.(np-strip|ns-)`), st);
-  assert.match(css, /\.pn-classic \.ns-art\{[^}]*conic-gradient\(var\(--accent\) calc\(var\(--ns-frac,0\) \* 1turn\)/);   // ring around the thumb
-  assert.match(css, /\.pn-center \.ns-wave\{display:block\}/);                                                              // waveform seek
-  assert.match(css, /\.pn-stack \.ns-led\{display:block;/);                                                                 // LED blocks
-  assert.match(css, /\.pn-horizon \.ns-prog \.bar\{background:linear-gradient\(90deg,var\(--accent\),var\(--line\) 40%\)\}/); // line from the cover
+  // 0.5.0 F95: the line follows the Track bar + Buttons picks
+  for (const st of ['btn-round', 'btn-soft', 'btn-square', 'btn-ring']) assert.match(css, new RegExp(`\\.pn-${st} \\.np-strip`), st);
+  assert.match(css, /\.pn-seek-wave \.ns-wave,\.pn-seek-eq \.ns-eq\{display:block\}/);
+  assert.match(css, /\.pn-seek-led \.ns-led\{display:block;/);
   // effects follow the panel's 0-100 % sliders (inherited --fx-* custom properties), colors only from theme variables
   const block = css.slice(css.indexOf('0.2.3 U1:'), css.lastIndexOf('0.2.3 U2:'));
-  assert.match(block, /var\(--fx-glow\)/); assert.match(block, /var\(--fx-motion\)/);
+  assert.match(block, /var\(--fx-glow\)/);   // F95: --fx-motion only drove the dropped Center disc spin
   assert.doesNotMatch(block.replace(/#08090A|#000\b/g, ''), /#[0-9a-f]{3,6}\b/i);
   const n = src('now.js');
   assert.match(n, /for \(const box of \[waveBase, waveTop, sWaveBase, sWaveTop\]\)/);

@@ -5,19 +5,19 @@ import { migrateKey } from './phonejoin.js';
 // zone bar + count, NEW chips, selected node / tooltip borders). Main stays on Play, primary buttons and sliders. Unset = Main.
 // 0.2.1 F15: picker order is the object order below (Custom colors stays last).
 export const PRESETS = {
-  default:  { name: 'Midnight Neon', accent: '#FF3C00', accent2: '#19C3B1', hl: '#F5C542', bg: '#14171A', ink: '#E8EDF0' },
+  default:  { name: 'Midnight Neon', accent: '#FF3C00', accent2: '#12D6C2', hl: '#FFCB3D', bg: '#14171A', ink: '#E8EDF0' },
   pepecoin: { name: 'Pepecoin',      accent: '#269B4D', accent2: '#208241', hl: '#C07A4E', bg: '#212121', ink: '#FFFFFF' },   // all brand-kit colors
   ember:    { name: 'Ember',         accent: '#FF5A1F', accent2: '#FFB347', hl: '#4FC3F7', bg: '#160E0A', ink: '#E8EDF0' },
   arctic:   { name: 'Arctic',        accent: '#3BA7FF', accent2: '#A8E6FF', hl: '#6EF7B2', bg: '#0B1218', ink: '#E8EDF0' },
   violet:   { name: 'Violet Pulse',  accent: '#A855F7', accent2: '#C084FC', hl: '#2EE6D6', bg: '#1A1028', ink: '#F5F3FF' },
-  mono:     { name: 'Monochrome',    accent: '#E8EDF0', accent2: '#9AA6AE', hl: '#FF5A5F', bg: '#0E1012', ink: '#E8EDF0' },
-  daylight: { name: 'Daylight',      accent: '#E03500', accent2: '#0E8F82', hl: '#6B4EE6', bg: '#F3F1EE', ink: '#1A1D21' },
+  mono:     { name: 'Monochrome',    accent: '#E8EDF0', accent2: '#8FB0C4', hl: '#FF4D57', bg: '#0E1012', ink: '#E8EDF0' },
+  daylight: { name: 'Daylight',      accent: '#D63A12', accent2: '#0B7A6E', hl: '#5B3FD4', bg: '#EDE9E3', ink: '#14171C' },   // F114: deeper hues on a warmer cream (no white-on-white)
   nebula:   { name: 'Nebula',        accent: '#8B5CF6', accent2: '#2DD4BF', hl: '#F472B6', bg: '#0F0B1A', ink: '#EDE9FE' },
-  steel:    { name: 'Blue Steel',    accent: '#A9BCCF', accent2: '#5F7488', hl: '#E0B15A', bg: '#18202A', ink: '#E3EAF2' },
-  lime:     { name: 'Lime Circuit',  accent: '#A3E635', accent2: '#22D3EE', hl: '#F472D0', bg: '#0B120E', ink: '#ECFCCB' },
+  crimson:  { name: 'Crimson Lounge', accent: '#E84A5F', accent2: '#D4A574', hl: '#F5E6C8', bg: '#1A0C10', ink: '#F8EDE8' },   // F114
+  ocean:    { name: 'Ocean Abyss',   accent: '#2EC4B6', accent2: '#3D8BFF', hl: '#FF8A5B', bg: '#07151F', ink: '#E6F1F8' },   // F114
 };
 /** 0.3.6 K13: the "hot" color of each theme (the VU meter's 0..+3 zone, peak LEDs, level-bar top). Pepecoin: brand copper only. */
-export const HOT = { default: '#C62F22', pepecoin: '#C07A4E', ember: '#C62F22', arctic: '#E5533D', violet: '#D9298B', mono: '#C62F22', daylight: '#C62F22', nebula: '#D9298B', steel: '#C62F22', lime: '#C62F22' };
+export const HOT = { default: '#C62F22', pepecoin: '#C07A4E', ember: '#C62F22', arctic: '#E5533D', violet: '#D9298B', mono: '#C62F22', daylight: '#C62F22', nebula: '#D9298B', crimson: '#C62F22', ocean: '#E5533D' };
 /** 0.3.6 K11: LED bar ramp (low, middle, top). Midnight Neon: green, amber, copper-red; Pepecoin: brand green, green, copper (brand colors only); others: second color, main color, hot color. */
 export function ledColors(t, accent, accent2) {
   if (t.preset === 'default') return { '--led-lo': '#3DDC84', '--led-mid': '#F5C542', '--led-hi': '#D9552B' };
@@ -29,8 +29,8 @@ export const DEFAULT_THEME_ID = 'default';
 const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
 const migrate = () => { try { migrateKey(localStorage, 'unison.theme.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
 /** Preset ids removed in 0.1.2 theme slim-down — migrate to Midnight Neon. */
-// 0.2.0: 'steel' and 'mono' are presets again (Blue Steel, Monochrome), so they no longer migrate.
-const REMOVED = new Set(['charcoal', 'midnight', 'forest', 'synthwave', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown']);
+// 0.2.0 restored 'steel' and 'mono'; F114 (0.5.0) drops Blue Steel ('steel') and Lime Circuit ('lime') again -> Midnight Neon. 'mono' stays.
+const REMOVED = new Set(['charcoal', 'midnight', 'forest', 'synthwave', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown', 'steel', 'lime']);
 
 export const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 export function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -129,5 +129,7 @@ export function applyTheme(t) {
   for (const [k, v] of Object.entries(vars)) st.setProperty(k, v);
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t.bg);
   document.documentElement.dataset.theme = t.preset || 'custom';
-  st.colorScheme = luminance(t.bg) > 0.35 ? 'light' : 'dark';
+  const scheme = luminance(t.bg) > 0.35 ? 'light' : 'dark';
+  st.colorScheme = scheme;
+  document.documentElement.dataset.scheme = scheme;   // F114: CSS hook for light-theme overrides ([data-scheme=light])
 }

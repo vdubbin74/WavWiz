@@ -8,12 +8,13 @@
       "wavwiz.dsp": {
         "type": "Project",
         "dependencies": {
-          "WavWiz.Core": "[0.4.9, )"
+          "WavWiz.Core": "[0.5.0, )"
         }
       },
       "wavwiz.measure": {
         "type": "Project"
       }
-    }
+    },
+    "net10.0/win-x64": {}
   }
 }

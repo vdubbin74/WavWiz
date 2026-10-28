@@ -1,4 +1,4 @@
-// 0.4.9 F66: Master volume mixer - every zone and speaker slider (assigned and unassigned, Whole-Home excluded) in one column of cards has the same
+// 0.4.9 F66: Master volume mixer - every zone and speaker slider (assigned and unassigned, All zones excluded) in one column of cards has the same
 // track: left edge, width and center within 1 px, so 50 % is at the same spot on every row. 100 %, 200 % + Display size tiny (TV), phone. SH=1 TAG=before|after.
 import { chromium } from 'playwright'; import { readFileSync, mkdirSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), SH = !!process.env.SH, TAG = process.env.TAG || 'after', OUT = '/workspace/screens/049-mixer'; let pass = 0, fail = 0;

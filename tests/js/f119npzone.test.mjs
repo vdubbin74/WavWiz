@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const now = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/now.js', import.meta.url), 'utf8');
+assert.ok(!/\.np-ctlpanel[^{}]*\.zlink\{display:none\}/.test(css), 'np-ctlpanel .zlink must not be hidden');
+assert.ok(!css.includes('qtitle.haspick) :is(.np-ctlpanel,.npbar) .zlink'));
+assert.match(now, /zoneLink/);
+assert.match(css, /\.zl-ov/);
+assert.match(css, /grid-area:zone/);
+console.log('ok f119');

@@ -27,6 +27,9 @@ public sealed class ServerConfig
     public bool AirPlay { get; set; } = true;
     public int AirPlayPort { get; set; } = 47804;
     public int SpotifyPort { get; set; } = 47805;
+    /// <summary>0.5.0: AirPlay speakers as outputs. AirPlay 2 speakers are experimental (off by default); buffered AAC uses FfmpegPath, realtime ALAC otherwise.</summary>
+    public bool AirPlay2Experimental { get; set; }
+    public bool AirPlay2Buffered { get; set; } = true;
     /// <summary>Tests only: behave as if every client were another PC (not serialized). Lets a loopback test exercise the 'other device' paths such as the https redirect and pairing codes.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool TestTreatAllClientsAsRemote { get; set; }
 

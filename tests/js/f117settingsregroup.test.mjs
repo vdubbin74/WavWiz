@@ -1,0 +1,15 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const js = n => readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/' + n, import.meta.url), 'utf8');
+const set = js('settings.js'), menu = js('menu.js');
+const g = set.match(/export const GROUPS = \[([\s\S]*?)\];/)[1];
+const ids = [...g.matchAll(/\['(\w+)',/g)].map(m => m[1]);
+assert.deepEqual(ids, ['general', 'appearance', 'playback', 'library', 'devices', 'network', 'jukebox', 'diagnostics', 'about']);
+assert.ok(!/^\s*access:/m.test(set.match(/export const RESET = \{([\s\S]*?)\};/)[1]) && !/\baccess: \{\}/.test(set), 'RESET has no access key');
+assert.match(set, /section === 'remote' \|\| section === 'access' \? 'network'/);
+assert.match(set, /panes\.network\.push\(h\('div', \{ class: 'card setpage', id: 'sec-remote' \}/);
+assert.match(set, /panes\.general\.push\(h\('div', \{ class: 'card', id: 'sec-adminpw' \}, h\('h3', null, 'Administrator password'\)/);
+assert.ok(!/panes\.access/.test(set) && !/active = 'access'/.test(set));
+assert.match(menu, /\['Settings', \(\) => openSettings\(S, refreshAll, go\), null, null, \{[^\n]*sub: \(\) => GROUPS\.map\(\(\[id, label\]\) => \[label, \(\) => openSettings\(S, refreshAll, go, id\)\]\)/);
+assert.match(menu, /\['Away-from-home access', \(\) => openSettings\(S, refreshAll, go, 'remote'\)/);
+console.log('f117settingsregroup: ok');

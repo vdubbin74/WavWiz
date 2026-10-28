@@ -1,0 +1,27 @@
+import { chromium } from 'playwright'; import fs from 'fs'; import path from 'path';
+const S=fs.readFileSync('/workspace/ww-mkt/sess','utf8').trim(), B='http://172.30.0.2:47900', W='/workspace/wavwiz-public/src/WavWiz.Server/wwwroot', O='/workspace/screens/050/f103';
+const types={'.js':'text/javascript','.css':'text/css'}; const b=await chromium.launch();
+const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
+const now='2026-10-26T01:12:00';
+const scenes=[{id:1,name:'Alarm',icon:'🎛',members:[{deviceId:1,enabled:true,volume:19},{deviceId:2,enabled:true,volume:28}]},{id:2,name:'Wind Down',icon:'🎛',members:[{deviceId:1,enabled:true,volume:15},{deviceId:2,enabled:true,volume:15}]}];
+const rows=[{id:9,name:'Alarm',enabled:true,days:'0',time:'06:00',action:'play',alarm:true,payload:{source:'track',name:'Lose Yourself · Eminem',sceneId:1,zoneKey:'g:77',fadeMin:5},nextRunAt:'2026-10-27T06:00:00'}];
+const fx={'/api/v1/scenes':scenes,'/api/v1/schedules':rows,'/api/v1/schedules/clock':{now,server:now},'/api/v1/sleep':{mode:'off'}};
+async function open(phone){ const ctx=await b.newContext(phone?{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:UA}:{viewport:{width:1600,height:1000},deviceScaleFactor:1});
+  await ctx.addCookies([{name:'unison_session',value:S,url:B}]);
+  await ctx.route('**/*', r => { const u=new URL(r.request().url()); if (u.origin===B && fx[u.pathname]) return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(fx[u.pathname])});
+    const f=path.join(W,u.pathname); const ext=path.extname(f);
+    if (u.origin===B && types[ext] && fs.existsSync(f) && fs.statSync(f).isFile()) return r.fulfill({status:200,contentType:types[ext],body:fs.readFileSync(f)});
+    if (u.origin===B && (u.pathname==='/'||u.pathname==='/index.html')) return r.fulfill({status:200,contentType:'text/html',body:fs.readFileSync(W+'/index.html')}); return r.continue(); });
+  await ctx.addInitScript(()=>{const s=(k,v)=>localStorage.setItem(k,v);s('wavwiz.whatsnew','9.9.9');s('wavwiz.gettingStarted.shown','1');s('wavwiz.checklist.dismissed','1');s('wavwiz.webRoom.autojoin','0');s('wavwiz.phoneRole','speaker');});
+  const p=await ctx.newPage(); await p.goto(B+'/'); await p.waitForTimeout(3500);
+  await p.evaluate(async()=>{ document.querySelectorAll('dialog[open]').forEach(d=>d.close()); const m=await import('/js/scenesched.js'); m.openScenesSchedules({auth:{role:'admin'},zones:[{id:1,name:'Den'},{id:2,name:'Kitchen'},{id:3,name:'Deck'},{id:4,name:'Office'}],groups:[],jb:null},()=>{}); });
+  await p.waitForTimeout(1500); return [ctx,p]; }
+let [c,p]=await open(true);
+const rep=await p.evaluate(()=>{const R=e=>e?.getBoundingClientRect(); const fab=document.querySelector('.ss-fab'); const x=document.querySelector('dialog.ss-dlg header .iconbtn'); const ic=R(document.querySelector('.ss-nx-ic')),tx=R(document.querySelector('.ss-nx-txt'));
+  return {fab:fab?getComputedStyle(fab).display:'none-in-dom', close:[Math.round(R(x).width),Math.round(R(x).height)], iconTextGap:Math.round(tx.left-ic.right), nextR:getComputedStyle(document.querySelector('.ss-next')).borderRadius, cardR:getComputedStyle(document.querySelector('.ss-card')).borderRadius, btnH:[...document.querySelectorAll('.ss-card .ss-a .btn')].map(b=>Math.round(R(b).height)), sum:document.querySelector('.ss-nx-sum').textContent};});
+console.log('phone',JSON.stringify(rep));
+const dlg=p.locator('dialog.ss-dlg'); await p.screenshot({path:`${O}/phone-ss-f103-scenes.png`});
+await p.locator(".ss-seg button").nth(1).click();await p.waitForTimeout(300);console.log("ROW",JSON.stringify(await p.evaluate(()=>{const r=document.querySelector(".ss-row");return [getComputedStyle(r).gridTemplateAreas,[...r.children].map(c=>Math.round(c.getBoundingClientRect().width)+"@"+Math.round(c.getBoundingClientRect().top))]})));await p.locator(".ss-seg button").nth(0).click();await p.waitForTimeout(300);
+await p.locator('.ss-next').screenshot({path:`${O}/phone-ss-f103-nextup.png`});
+await p.locator('.ss-seg button').nth(1).click(); await p.waitForTimeout(400); await p.screenshot({path:`${O}/phone-ss-f103-schedules.png`}); await c.close();
+[c,p]=await open(false); await p.screenshot({path:`${O}/pc-ss-f103.png`}); await c.close(); await b.close();

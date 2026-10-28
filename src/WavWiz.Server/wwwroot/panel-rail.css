@@ -1,0 +1,22 @@
+/* 0.5.0 F106: one panel-rail family. The collapsed Library rail and the collapsed Devices rail (Full)
+   wear the same soft-tab chrome as the tight/Auto Devices tab (.devtab): panel bg, 1px line border, 3px radius,
+   accent text, soft accent wash + accent border on hover/open.
+   0.5.0 F106c: !important throughout so the K3 glow edge (::before), inset hover bloom, panel box-shadow/sheen
+   and the israil pane-h/chevron can never win again. One label-top token lines LIBRARY (reads UP) and
+   DEVICES (reads DOWN) up at the same distance from the top. */
+:root{--rail-bg:var(--panel);--rail-line:var(--line);--rail-radius:3px;--rail-ink:var(--accent-text,var(--accent));--rail-wash:color-mix(in srgb,var(--accent) 14%,var(--panel));--rail-label-top:65px}
+@media (min-width:901px){
+  .desk.tight .devtab,.libpanel.israil,.devpanel.israil{background:var(--rail-bg)!important;background-image:none!important;border:1px solid var(--rail-line)!important;border-radius:var(--rail-radius)!important;box-shadow:none!important;color:var(--rail-ink);cursor:pointer;transition:background-color var(--glide,160ms) var(--glide-ease,ease),border-color var(--glide,160ms) var(--glide-ease,ease)!important}
+  .desk.tight .devtab:hover,.desk.tight.devopen .devtab,.libpanel.israil:hover,.devpanel.israil:hover{background:var(--rail-wash)!important;border-color:var(--accent)!important;box-shadow:none!important}
+  .libpanel.israil::before,.devpanel.israil::before,.libpanel.israil::after,.devpanel.israil::after{content:none!important;display:none!important;box-shadow:none!important}
+  /* Devices tab has no header/chevron — Library rail must match. Click on the rail still expands. */
+  .israil .pane-h,.israil .pchev,.israil .devhead{display:none!important}
+  /* Same top inset as .devtab: tab = 1px border + --rail-label-top padding; rails = 1px border + 0 pad + prail pad. */
+  .desk.tight .devtab{align-items:flex-start!important;padding:var(--rail-label-top) 0 6px!important}
+  .libpanel.israil,.devpanel.israil{padding:0!important;align-items:center}
+  .libpanel.israil .prail,.devpanel.israil .prail{justify-content:flex-start!important;gap:0!important;padding:var(--rail-label-top) 0 6px!important;margin:0!important;order:0}
+  .israil .prail-ic,.israil .prail-n{display:none!important}
+  .desk.tight .devtab-t,.israil .prail-t{writing-mode:vertical-rl;white-space:nowrap;font-size:12px!important;font-weight:700!important;letter-spacing:.14em!important;color:var(--rail-ink)!important;text-shadow:none!important;line-height:1}
+  .libpanel.israil .prail-t{transform:rotate(180deg)}   /* Library reads UP */
+  .devpanel.israil .prail-t{transform:none}             /* Devices reads DOWN */
+}

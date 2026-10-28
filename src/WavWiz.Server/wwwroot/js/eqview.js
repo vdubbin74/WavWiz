@@ -15,6 +15,7 @@ const hzText = i => (EQ_BANDS[i] >= 1000 ? EQ_LABELS[i] : EQ_LABELS[i] + ' Hz');
 const valCls = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'zero');
 /** 0.3.6 K11: LED bar colors per theme (CSS --led-lo / --led-mid / --led-hi, set in theme.js derive()); parsed once per look. */
 const hexRgb = c => { c = String(c || '').trim(); const m = /^#([0-9a-f]{6})$/i.exec(c); if (m) { const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; } const r = /rgba?\((\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(c); return r ? [+r[1], +r[2], +r[3]] : [61, 220, 132]; };
+const satBoost = (c, k = 1.15) => { const m = (c[0] + c[1] + c[2]) / 3; return c.map(v => Math.max(0, Math.min(255, Math.round(m + (v - m) * k)))); };   // F108: punch theme mid/hi
 const ledRamp = (lo, mid, hi, u) => { const [a, b, t] = u < 0.62 ? [lo, mid, u / 0.62] : [mid, hi, (u - 0.62) / 0.38]; return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`; };
 
 export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50, interactive = true, locked = false, onChange = () => {}, onSelect = () => {} } = {}) {
@@ -22,14 +23,15 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   let g = gains.slice(), sel = -1, glowLvl = glow, untap = null, meter = new Float64Array(10), peaks = new Float64Array(10), peakAt = new Float64Array(10), ledKey = '', ramp = null;
   const leds = [], mkLed = i => { const c = h('canvas', { class: 'eqled', 'aria-hidden': 'true', 'data-led': i }); leds.push(c); return c; };
   const xOf = style === 'curve' ? hz => logX(hz) : hz => colX(hz);
+  const flatChip = h('span', { class: 'eqa-flat', hidden: true, title: 'All bands at 0 dB' }, 'Flat');   // F107
   const live = h('span', { class: 'eqa-live', hidden: true }, h('i', { 'aria-hidden': 'true' }), 'Live music');
   // 0.2.3 U9: small padlock shown on the area while Lock EQ is on
   const lockMark = h('span', { class: 'eqa-lock', title: 'Lock EQ is on - uncheck it to change the EQ', hidden: true }); lockMark.innerHTML = iconSvg('lock');
-  const head = h('div', { class: 'eqa-h' }, h('b', null, TITLES[style][0]), h('span', { class: 'small dim' }, TITLES[style][1]), h('span', { class: 'grow' }), live, lockMark);
+  const head = h('div', { class: 'eqa-h' }, h('b', null, TITLES[style][0]), h('span', { class: 'small dim' }, TITLES[style][1]), h('span', { class: 'grow' }), flatChip, live, lockMark);
   const grid = h('div', { class: 'eqa-grid', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('i', { class: db === 0 ? 'zero' : '', style: `top:${dbToFrac(db) * 100}%` })));
   const scale = h('div', { class: 'eqa-scale', 'aria-hidden': 'true' }, [12, 6, 0, -6, -12].map(db => h('span', { style: `top:${dbToFrac(db) * 100}%` }, db === 0 ? '0 dB' : (db > 0 ? '+' : '') + db)));
   const curve = svg('svg', { class: 'eqa-curve', viewBox: '0 0 1000 1000', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
-  const path = svg('path', { 'vector-effect': 'non-scaling-stroke' }); curve.append(path);
+  const under = svg('path', { class: 'eqa-under' }), path = svg('path', { class: 'eqa-line', 'vector-effect': 'non-scaling-stroke' }); curve.append(under, path);   // F107: soft under-fill to 0 dB
   const tip = h('div', { class: 'eqa-tip', hidden: true, role: 'status', 'aria-live': 'polite' });
   const field = h('div', { class: 'eqa-field' }, grid);
   const bandEls = [];
@@ -87,8 +89,11 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
     const x = style === 'curve' ? logX(EQ_BANDS[sel]) : (sel + 0.5) / 10;
     tip.style.left = `clamp(60px, ${x * 100}%, calc(100% - 60px))`; tip.style.top = dbToFrac(g[sel]) * 100 + '%';
   }
-  function setGains(n) { g = n.map(snapDb); g.forEach((_, i) => paintBand(i)); paintTip(); }
-  function set(i, db, fire = true) { db = snapDb(db); if (db === g[i]) return; g[i] = db; paintBand(i); paintTip(); if (fire) onChange(i, db); }
+  // F107: flat state = quiet chip + thin 0-line; any moved band drops it
+  function paintFlat() { const flat = g.every(v => Math.abs(v) < 0.05); flatChip.hidden = !flat; el.classList.toggle('isflat', flat); }
+  function setGains(n) { g = n.map(snapDb); g.forEach((_, i) => paintBand(i)); paintTip(); paintFlat(); setResponse(null); }
+  // F107 A: redraw the local approxResponse right away so the line follows the drag; the server /dsp/response replaces it when it lands
+  function set(i, db, fire = true) { db = snapDb(db); if (db === g[i]) return; g[i] = db; paintBand(i); paintTip(); paintFlat(); setResponse(null); if (fire) onChange(i, db); }
   function select(i) { const was = sel; sel = i; if (was >= 0) paintBand(was); if (i >= 0) paintBand(i); paintTip(); onSelect(i); }
   function setResponse(r) {
     if (!r?.hz?.length) r = approxResponse(g);
@@ -96,6 +101,8 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
     const pg = Number(r.preGainDb) || 0;
     let d = ''; r.hz.forEach((hz, k) => { const x = xOf(hz); if (style !== 'curve' && (x < 0 || x > 1)) return; d += (d ? 'L' : 'M') + (Math.max(0, Math.min(1, x)) * 1000).toFixed(1) + ' ' + (dbToFrac(r.db[k] - pg) * 1000).toFixed(1); });
     path.setAttribute('d', d);
+    const z0 = (dbToFrac(0) * 1000).toFixed(1), m = d.match(/^M([\d.]+)/), e = d.match(/L?([\d.]+) [\d.]+$/);
+    under.setAttribute('d', d && m && e ? `M${m[1]} ${z0}L${d.slice(1)}L${e[1]} ${z0}Z` : '');
   }
 
   // --- interaction --------------------------------------------------------------------------------------------------
@@ -121,7 +128,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   // with a peak-hold dot that falls slowly and a soft glow (the look's Glow setting). The spectrum glow behind the EQ is gone.
   function colors() {
     const cs = getComputedStyle(el), lo = cs.getPropertyValue('--led-lo'), mid = cs.getPropertyValue('--led-mid'), hi = cs.getPropertyValue('--led-hi'), key = lo + mid + hi;
-    if (key !== ledKey || !ramp) { ledKey = key; const L = hexRgb(lo), M = hexRgb(mid), H = hexRgb(hi); ramp = Array.from({ length: LEDS }, (_, k) => ledRamp(L, M, H, k / (LEDS - 1))); }
+    if (key !== ledKey || !ramp) { ledKey = key; const L = hexRgb(lo), M = satBoost(hexRgb(mid)), H = satBoost(hexRgb(hi), 1.2); ramp = Array.from({ length: LEDS }, (_, k) => ledRamp(L, M, H, k / (LEDS - 1))); }
     return ramp;
   }
   function drawGlow() { paintMeters(); }   // kept for the callers that redraw after a resize / glow change: it repaints the bars now
@@ -133,7 +140,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
       const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, hh);
       const gap = Math.max(1, hh / 260), segH = (hh - (LEDS - 1) * gap) / LEDS, lit = Math.round(meter[i] * LEDS), pk = peaks[i] > 0.02 ? Math.min(LEDS - 1, Math.max(0, Math.round(peaks[i] * LEDS) - 1)) : -1, inset = Math.max(0, w * 0.12);
       for (let k = 0; k < LEDS; k++) {
-        const y = hh - (k + 1) * segH - k * gap, on = k < lit; x.fillStyle = cols[k]; x.globalAlpha = on ? 1 : 0.16;
+        const y = hh - (k + 1) * segH - k * gap, on = k < lit; x.fillStyle = cols[k]; x.globalAlpha = on ? 1 : 0.1;
         if (on && glowK > 0) { x.shadowColor = cols[k]; x.shadowBlur = 7 * glowK; } else x.shadowBlur = 0;
         x.fillRect(inset, y, w - 2 * inset, Math.max(1, segH));
       }
@@ -164,7 +171,7 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   function stopLive() { untap?.(); untap = null; }   // 0.3.1 B15: off-screen previews stop listening
   function destroy() { untap?.(); untap = null; ro?.disconnect(); }
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => paintMeters()) : null; ro?.observe(field);
-  setGains(g); setResponse(null); if (interactive) setLocked(isLocked);
+  setGains(g); if (interactive) setLocked(isLocked);
   if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(paintMeters); }
   return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, stopLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
 }

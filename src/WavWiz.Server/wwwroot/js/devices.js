@@ -81,15 +81,20 @@ const stateText = z => !z.enabled ? 'Off' : !z.connected ? 'Offline' : ({ ok: 'P
 /** A phone playing as a speaker (a browser zone named after a phone). */
 export const isPhoneZone = z => !!z?.isWeb && /iPhone|iPad|Android|phone|tablet/i.test(z.name || '');
 /** Up to two tags right of the name: OFFLINE, REF, MUTED, NO DELAY, and a phone's SPEAKER role chip (pure). No BROWSER / THIS DEVICE badges. */
+// 0.5.0: the output type as the first tag (HDMI, TOSLINK, BLUETOOTH, USB, ANALOG); unknown/other shows nothing
+const OUT_TAG = { hdmi: 'HDMI', spdif: 'TOSLINK', bluetooth: 'BLUETOOTH', usb: 'USB', analog: 'ANALOG', wired: 'ANALOG' };
+export function outputTag(z) {
+  const o = z && chosenOutput(z), text = o && OUT_TAG[o.kind]; if (!text) return null;
+  return { k: 'otype' + (o.kind === 'bluetooth' ? ' bt' : ''), text, title: o.kind === 'bluetooth' ? 'Bluetooth output: its delay can change when it reconnects. A wired speaker makes a steadier reference.' : `Output: ${outputLabel(o)}` };
+}
 export function cardTags(z) {
-  const t = [], o = chosenOutput(z);
+  const t = [], o = chosenOutput(z), ot = outputTag(z);
   if (!z.connected) t.push({ k: 'offline', text: 'OFFLINE', title: 'Not connected right now' });
-  if (isBluetooth(z)) t.push({ k: 'bt', text: 'BLUETOOTH', title: 'Bluetooth output: its delay can change when it reconnects. A wired speaker makes a steadier reference.' });   // 0.3.1 B1
   if (z.reference) t.push({ k: 'ref', text: 'REF', title: 'Reference speaker - other delays are measured against this one' });
   if (z.muted) t.push({ k: 'muted', text: 'MUTED', title: 'Muted - press the round button to unmute' });
   if (z.connected && !z.reference && o && o.notCalibrated) t.push({ k: 'nodelay', text: 'NO DELAY', title: 'The delay is not set yet: Settings › Delay › Calibrate' });
   if (isPhoneZone(z)) t.push({ k: 'role', text: 'SPEAKER', title: 'This phone plays music. On the phone: Devices › Phone role to use it as a calibration mic instead' });
-  return t.slice(0, 2);
+  return ot ? [ot, ...t.slice(0, 2)] : t.slice(0, 2);
 }
 // ---- 0.3.1 B1: Bluetooth outputs - a tag on the row, and a one-time "Bluetooth reconnected - recalibrate?" hint when one reconnects or the output changes
 export function isBluetooth(z) { const o = z && chosenOutput(z); return !!(o && o.kind === 'bluetooth'); }
@@ -187,7 +192,7 @@ function onSwitch(S, ctl, z) {
 function outputLine(z) {
   if (!showOutputLine(z)) return null;
   if (z.outputUnavailable) return h('div', { class: 'doutline warn', role: 'status' }, '⚠ Output unavailable');
-  const o = chosenOutput(z); return o ? h('div', { class: 'doutline small dim ell' }, h('span', { 'aria-hidden': 'true' }, kindGlyph(o) + ' '), outputLabel(o)) : null;
+  const o = chosenOutput(z); return o ? h('div', { class: 'doutline small dim ell' }, (o.name || '').trim() || outputLabel(o)) : null;   // 0.5.0: the type is the tag now
 }
 // 0.4.9 F70: Expanded Devices - the master bar lines up with the setting bars of the middle column (Volume, Max volume, Delay, Balance, Bass, Treble):
 // the master slider's track gets the same left and right edges (the label / zone chip sit just left of it; All off / All on / Link all stay on the right),
@@ -1120,13 +1125,13 @@ export function zoneCap(zones, g) {
 export const clampToCap = (v, cap) => (cap != null && v > cap ? cap : v);
 /** J4: the one tag row of a speaker card - OFF, OFFLINE, REF, MUTED, NO DELAY, BT, CAPPED n%, a phone's SPEAKER role (pure, all of them, in this order). */
 export function cardTags3(z) {
-  const t = [], o = chosenOutput(z), cap = capOf(z);
+  const t = [], o = chosenOutput(z), cap = capOf(z), ot = outputTag(z);
+  if (ot) t.push(ot);
   if (!z.enabled) t.push({ k: 'off', text: 'OFF', title: 'Switched off' });
   if (!z.connected) t.push({ k: 'offline', text: 'OFFLINE', title: 'Not connected right now' });
   if (z.reference) t.push({ k: 'ref', text: 'REF', title: 'Reference speaker - other delays are measured against this one' });
   if (z.muted) t.push({ k: 'muted', text: 'MUTED', title: 'Muted - press the mute button to unmute' });
   if (z.connected && !z.reference && o && o.notCalibrated) t.push({ k: 'nodelay', text: 'NO DELAY', title: 'The delay is not set yet: Settings › Delay › Calibrate' });
-  if (isBluetooth(z)) t.push({ k: 'bt', text: 'BT', title: 'Bluetooth output: its delay can change when it reconnects.' });
   if (cap != null) t.push({ k: 'capped', text: `CAPPED ${Math.round(cap)}%`, title: `Max volume locked at ${Math.round(cap)}%`, lock: true });
   if (isPhoneZone(z)) t.push({ k: 'role', text: 'SPEAKER', title: 'This phone plays music.' });
   return t;
@@ -1156,6 +1161,14 @@ export function tagFocusTarget(kind, pane) {
   return null;
 }
 const tagNav = { panel: null, page: null };
+/** 0.5.0 F109: open one speaker's settings (desktop: Devices panel expands to that speaker; phone: Devices page + its settings sheet).
+ *  Callers outside Devices dispatch `wavwiz:openspk` {detail: zoneId}; main.js routes it here (after go('devices') on the phone). */
+export function openSpeakerSettings(zoneId, phone = false) {
+  const id = +zoneId; if (!id) return false;
+  if (phone) { try { sessionStorage.setItem('wavwiz.spk.phone', String(id)); } catch { /* private mode */ } if (tagNav.page) { tagNav.page.spk(id); return true; } return false; }
+  if (tagNav.panel) { tagNav.panel.spk(id); return true; }
+  return false;
+}
 function focusLater(kind, find) { let n = 0; const t = () => { const el = find(); const f = el && tagFocusTarget(kind, el); if (f) { f.scrollIntoView?.({ block: 'center' }); f.focus?.({ preventScroll: true }); f.classList.add('tagflash'); setTimeout(() => f.classList.remove('tagflash'), 1500); } else if (n++ < 20) setTimeout(t, 100); }; setTimeout(t, 60); }
 function onTagAct(ev) {
   const tag = ev.target.closest?.('.dtag.tagact'); if (!tag) return;

@@ -11,6 +11,7 @@ button,input,select,textarea{font:inherit;color:inherit;max-width:100%}
 /* 0.0.8 item 2: app-wide safety net. Any button without its own styling follows the theme instead of the browser's white default
    (zero specificity, so every class rule still wins). Native controls (number boxes, selects, checkboxes, scrollbars) render dark. */
 :root{color-scheme:dark}
+:root[data-scheme=light]{color-scheme:light}
 :where(button){background-color:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:3px}
 :where(button:hover:not(:disabled)){border-color:var(--accent)}
 :root{--fld-h:40px;--fld-h-sm:28px;--fld-pad:9px 11px;--fld-pad-sm:2px 8px;--fld-radius:3px;--fld-fs:inherit;--fld-fs-sm:12px;--fld-bg:var(--bg);--fld-line:color-mix(in srgb,var(--line) 65%,var(--ink));--fld-ink:var(--ink);--fld-ph:color-mix(in srgb,var(--dim) 90%,transparent);--fld-focus:var(--hl,var(--accent))}   /* 0.3.8 L43: ONE field style */
@@ -166,7 +167,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 @media (min-width:901px){.sheet{align-items:center}.sheet .panel{border-radius:4px;border:1px solid var(--line);border-top:3px solid var(--accent)}}
 
 /* now playing */
-.stage{position:relative;flex:none;width:100%;height:clamp(130px,calc(31vh / var(--z,1)),560px);border-radius:3px;overflow:hidden;background:radial-gradient(ellipse at center,#0d1526,#050811)}
+.stage{position:relative;flex:none;width:100%;height:clamp(130px,calc(31vh / var(--z,1)),560px);border-radius:3px;overflow:hidden;background:var(--np-stage)}
 .stage .stagecover{position:absolute;inset:0;display:flex;justify-content:center}
 .stage .stagecover .cover{position:relative;height:100%;width:auto;aspect-ratio:1/1;border-radius:0;font-size:60px}
 .stage .vizhost{position:absolute;inset:0;display:none}
@@ -207,7 +208,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .ctlrow .volrow{flex:0 1 300px;min-width:180px}
 .small-only{display:none}
 .volpct{min-width:34px;text-align:right}
-.vizcanvas{background:#050811}
+.vizcanvas{background:transparent}
 .titles{text-align:center;min-width:0}
 .titles .t1{font-size:21px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .titles .t2{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -252,7 +253,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .vh{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
 /* ---- 0.0.3 additions ---- */
-.tbtn.play{box-shadow:0 0 0 3px rgba(255,60,0,.18),0 0 18px rgba(255,60,0,.35)}
+.tbtn.play{box-shadow:0 0 0 3px var(--np-play-ring),0 0 var(--np-play-blur) var(--np-play-glow)}
 .tabs.ctabs{gap:4px;flex-wrap:nowrap;overflow:hidden}
 .tabs.ctabs button{padding:5px 9px;font-size:11px;letter-spacing:.8px;border-radius:7px}
 .moresel{width:auto!important;min-height:30px!important;padding:2px 6px!important;border-radius:7px!important;flex:none}
@@ -291,7 +292,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .qtable th .grip::after{content:"";position:absolute;left:auto;right:4px;top:20%;bottom:20%;width:1px;background:var(--line)}
 .qtable th .grip:hover::after,.qtable th .grip.on::after,.qtable th .grip:focus::after{background:var(--accent);width:2px;right:3px}
 .qtable td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
-.qtable td.num,.qtable th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono);position:relative}
+.qtable td.num,.qtable th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono)} .qtable td.dur{position:relative}
 .qtable tr:hover td{background:var(--accent-soft)} .qtable tr.cur td{background:var(--accent-soft);color:var(--ink);font-weight:700;box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
 .qtable tr.cur td.num{color:var(--accent-text,var(--accent))}
 .qtable td.empty,.qtable tr.empty td{color:var(--dim);cursor:default;white-space:normal}
@@ -458,12 +459,12 @@ html{overflow-x:hidden;touch-action:manipulation;-ms-touch-action:manipulation}
 .transport.pod .tbtn.tog.on{color:var(--accent-text,var(--accent));filter:drop-shadow(0 0 6px var(--accent))}
 .transport.pod .tbtn.tog.on::after{content:'';position:absolute;width:4px;height:4px;border-radius:50%;background:var(--accent);margin-top:34px;box-shadow:0 0 6px var(--accent)}
 .transport.pod .tbtn.tog{position:relative}
-.transport.pod .tbtn.play,.tbtn.play{width:64px;height:64px;border-radius:50%;background:var(--accent);border:0;color:var(--accent-ink);box-shadow:0 0 0 4px var(--accent-soft),0 0 22px var(--accent),0 0 46px var(--accent-soft)}
+.transport.pod .tbtn.play,.tbtn.play{width:64px;height:64px;border-radius:50%;background:var(--accent);border:0;color:var(--accent-ink);box-shadow:0 0 0 4px var(--np-play-ring),0 0 calc(22px * var(--np-k)) var(--np-play-hi),0 0 calc(46px * var(--np-k)) var(--np-play-glow)}
 .tbtn.play .ic svg{width:28px;height:28px}
 .tbtn.play.playing{animation:wwglow 2.4s ease-in-out infinite}
-@keyframes wwglow{0%,100%{box-shadow:0 0 0 4px var(--accent-soft),0 0 18px var(--accent),0 0 40px var(--accent-soft)}50%{box-shadow:0 0 0 6px var(--accent-soft),0 0 28px var(--accent),0 0 60px var(--accent-soft)}}
+@keyframes wwglow{0%,100%{box-shadow:0 0 0 4px var(--np-play-ring),0 0 calc(18px * var(--np-k)) var(--np-play-hi),0 0 calc(40px * var(--np-k)) var(--np-play-glow)}50%{box-shadow:0 0 0 6px var(--np-play-ring),0 0 calc(28px * var(--np-k)) var(--np-play-hi),0 0 calc(60px * var(--np-k)) var(--np-play-glow)}}   /* F94: follows Color intensity */
 .tbtn.play:active{transform:scale(.92)}
-.mini .tbtn.mini-play{width:42px;height:42px;animation:none;box-shadow:0 0 12px var(--accent)}
+.mini .tbtn.mini-play{width:42px;height:42px;animation:none;box-shadow:0 0 calc(12px * var(--np-k)) var(--np-play-hi)}
 .mini .tbtn.mini-play .ic svg{width:20px;height:20px}
 .volrow .volico{color:var(--accent2-text,var(--accent2));display:inline-flex}
 .volrow .tbtn.ico{width:38px;height:38px;border-radius:50%;background:var(--panel2);color:var(--dim)}
@@ -558,7 +559,7 @@ input[type=range]:disabled{opacity:.45}
 .nowcol.np8 > *{order:0}
 .nowcol.np8 .np-row > *,.nowcol.np8 .np-strip > *{order:0}
 .nowcol.np8 .np-transport .transport.pod .tbtn{flex:none}
-.nowcol.np8 .np-stage{flex:1 1 0;height:auto;min-height:190px;max-height:620px;border:1px solid var(--line);border-radius:6px;background:radial-gradient(ellipse at 50% 40%,color-mix(in srgb,var(--panel2) 70%,#000),color-mix(in srgb,var(--bg) 80%,#000))}
+.nowcol.np8 .np-stage{flex:1 1 0;height:auto;min-height:190px;max-height:620px;border:1px solid var(--line);border-radius:6px;background:var(--np-stage-np8)}
 .nowcol.np8 .np-stage .vizhost,.nowcol.np8 .np-stage .stagecover{inset:0 0 58px 0}
 .np-vlabel{position:absolute;left:16px;top:12px;z-index:2;color:var(--accent-text,var(--accent));font-weight:800;font-size:13px;letter-spacing:1.2px;text-transform:uppercase;text-shadow:0 1px 3px rgba(0,0,0,.8);pointer-events:none;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nowcol.np8 .np-stage .vname{bottom:64px;left:16px}
@@ -591,7 +592,7 @@ input[type=range]:disabled{opacity:.45}
 .nowcol.np8 .np-transport .transport.pod .tbtn{width:44px;height:44px;color:var(--ink)}
 .nowcol.np8 .np-transport .transport.pod .tbtn.tog{color:color-mix(in srgb,var(--ink) 80%,transparent);filter:none}
 .nowcol.np8 .np-transport .transport.pod .tbtn.tog.on{color:var(--accent-text,var(--accent));filter:drop-shadow(0 0 5px var(--accent))}
-.nowcol.np8 .np-transport .transport.pod .tbtn.play{width:66px;height:66px;box-shadow:0 0 0 3px var(--accent-soft),0 0 16px color-mix(in srgb,var(--accent) 45%,transparent)}
+.nowcol.np8 .np-transport .transport.pod .tbtn.play{width:66px;height:66px;box-shadow:0 0 0 3px var(--np-play-ring),0 0 calc(16px * var(--np-k)) var(--np-play-hi)}
 .nowcol.np8 .np-transport .transport.pod .tbtn.play.playing{animation:none}
 .nowcol.np8 .np-transport .tbtn .ic svg{width:26px;height:26px} .nowcol.np8 .np-transport .tbtn.play .ic svg{width:28px;height:28px}
 .nowcol.np8 .np-upnext{display:flex;align-items:center;gap:12px;padding:0;background:none;border:0;font-size:14px;color:var(--dim);min-width:0}
@@ -840,71 +841,91 @@ html.tv *{transition:none!important;animation:none!important}
 .pn-meta > *{min-width:0}
 .pn-titlerow{display:flex;align-items:center;gap:10px;min-width:0} .pn-titlerow .np-tabletitles{flex:1;min-width:0}
 .pn-clock,.pn-lcdrow,.pn-led,.pn-pill,.pn-wave{display:none}
-/* --- Classic: progress ring around the cover (drag to seek), time pill, round buttons --- */
-.pn-classic .pn-art{cursor:grab;padding:5px;width:104px;height:104px}
-.pn-classic .pn-ring{display:block;position:absolute;inset:0;z-index:3;pointer-events:none}
+/* --- 0.5.0 F95: one clean layout (art | meta + seek | controls). Track bar (.pn-seek-*) and Buttons (.pn-btn-*) mix freely;
+   the old package chrome (ring around the cover, sliding disc, LCD clock, reflection) is gone. --- */
 .pn-ring svg{width:100%;height:100%;overflow:visible}
 .pn-ring rect{fill:none;stroke-width:3;vector-effect:non-scaling-stroke}
-.pn-ring .trk{stroke:var(--line)} .pn-ring .val{stroke:var(--accent);stroke-dasharray:100;stroke-dashoffset:100;stroke-linecap:round;filter:drop-shadow(0 0 calc(8px * var(--fx-glow)) var(--accent));transition:stroke-dashoffset .4s linear}
-.pn-classic .pn-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:4px;margin-top:6px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;font:12px var(--mono);color:var(--ink);background:var(--panel2)}
-.pn-classic .pn-pill i{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 calc(6px * var(--fx-glow)) var(--accent)}
-.pn-classic .pn-pel{color:var(--accent-text,var(--accent));font-weight:600}
-.pn-classic .np-tableseek{display:none}
-.pn-classic .np-tablexport .tbtn{border-radius:50%!important}
-.pn-classic .np-tablexport .tbtn.play{box-shadow:0 0 calc(18px * var(--fx-glow)) color-mix(in srgb,var(--accent) 70%,transparent)!important}
-/* --- Center: record slides out of the sleeve, full-width waveform seek, soft ghost buttons --- */
-.pn-center .np-tablemain{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto}
-.pn-center .pn-art{grid-row:1 / span 2;margin-right:calc(10px + 34px * var(--fx-motion))}
-.pn-center .pn-disc{display:block;position:absolute;z-index:1;top:4%;left:4%;width:92%;height:92%;border-radius:50%;
-  background:repeating-radial-gradient(circle,#111 0 2px,#1c1c1c 2px 4px);box-shadow:0 0 0 1px #000,0 2px 10px rgba(0,0,0,.6)}
-.pn-center .pn-disc i{position:absolute;inset:36%;border-radius:50%;background:var(--accent)}
-.pn-center .pn-disc i::after{content:'';position:absolute;inset:42%;border-radius:50%;background:var(--bg)}
-.pn-center .pn-disc{translate:12% 0;transition:translate .8s cubic-bezier(.2,.8,.2,1)}
-.pn-center.playing .pn-disc{translate:calc(14% + 34% * var(--fx-motion)) 0;animation:pnspin calc(6s / (0.2 + var(--fx-motion))) linear infinite}
 @keyframes pnspin{from{rotate:0deg}to{rotate:360deg}}
-.pn-center .pn-wave{display:block;position:relative;height:34px;margin-top:6px;cursor:pointer}
+/* --- 0.5.0 F96: Album art axis (.pn-art-square | .pn-art-disc | .pn-art-sleeve), cover treatment only; seek stays the Track bar --- */
+.pn-art-square .pn-art{padding:5px;box-sizing:border-box}
+.pn-art-square .pn-ring{display:block;position:absolute;inset:0;z-index:3;pointer-events:none}
+.pn-ring .trk{stroke:color-mix(in srgb,var(--ink) 14%,transparent)} .pn-ring .val{stroke:var(--accent);stroke-dasharray:100;stroke-dashoffset:100;stroke-linecap:round;filter:drop-shadow(0 0 calc(8px * var(--fx-glow,.5)) var(--accent));transition:stroke-dashoffset .4s linear}
+.pn-art-disc .pn-cover,.pn-art-disc .pn-cover .cover{border-radius:50%!important}
+.pn-art-disc .pn-cover{box-shadow:0 0 0 2px #000,0 4px 14px rgba(0,0,0,.55)}
+.pn-art-disc .pn-cover::after{content:'';position:absolute;z-index:3;left:50%;top:50%;width:16%;height:16%;translate:-50% -50%;border-radius:50%;background:var(--bg);box-shadow:0 0 0 3px color-mix(in srgb,#000 60%,transparent),0 0 0 5px var(--accent)}
+.pn-art-disc .pn-cover::before{content:'';position:absolute;z-index:3;inset:0;border-radius:50%;pointer-events:none;background:repeating-radial-gradient(circle,transparent 0 3px,rgba(0,0,0,.10) 3px 4px)}
+.pn-art-disc.playing .pn-cover{animation:pnspin calc(6s / (0.2 + var(--fx-motion,.5))) linear infinite}
+.pn-art-sleeve .pn-art{overflow:visible}
+.pn-art-sleeve .pn-disc{display:block;position:absolute;z-index:1;top:4%;left:4%;width:92%;height:92%;border-radius:50%;
+  background:repeating-radial-gradient(circle,#111 0 2px,#1c1c1c 2px 4px);box-shadow:0 0 0 1px #000,0 2px 10px rgba(0,0,0,.6);
+  translate:calc(4% + 44% * var(--np-frac,0)) 0;transition:translate .4s linear}
+.pn-art-sleeve .pn-disc i{position:absolute;inset:36%;border-radius:50%;background:var(--accent)}
+.pn-art-sleeve .pn-disc i::after{content:'';position:absolute;inset:42%;border-radius:50%;background:var(--bg)}
+.pn-art-sleeve .pn-cover{z-index:2;box-shadow:4px 0 12px rgba(0,0,0,.5)}
+.np-ctlpanel.pn-art-sleeve .np-tablemain{column-gap:calc(var(--gap,16px) + 44px)}
+@media (prefers-reduced-motion:reduce){ .pn-art-disc.playing .pn-cover{animation:none} .pn-ring .val,.pn-art-sleeve .pn-disc{transition:none} }
+/* --- 0.5.0 F97: Album art Cassette (.pn-art-cassette) - opaque classic shell (side grips, corner screws, bottom notches), cover art in the label strip,
+   gold meta bar, white sprocket hubs at ~29 % / 71 % that spin while playing (Motion speed), brown tape discs BEHIND the hubs: left shrinks / right grows with --np-frac --- */
+.pn-cass{display:none}
+.np-ctlpanel.pn-art-cassette .pn-art{width:auto!important;aspect-ratio:1.52/1!important;justify-self:start;border-radius:7%/10%;padding:0!important}
+.pn-art-cassette .pn-cass{display:block;position:absolute;inset:0;z-index:1;border-radius:7%/10%;container-type:size;
+  background:linear-gradient(180deg,#3a3d44,#26282d 60%,#1d1f23);box-shadow:inset 0 0 0 1.5px #55596180,inset 0 1px 0 #ffffff26,0 4px 14px rgba(0,0,0,.55)}
+.pn-art-cassette .pn-cover{position:absolute!important;z-index:2;left:9%!important;top:10%!important;width:82%!important;height:22%!important;inset:auto!important;border-radius:3px 3px 0 0!important;box-shadow:none!important;animation:none!important}
+.pn-art-cassette .pn-cover .cover{border-radius:0!important;font-size:14px!important}
+.pn-art-cassette .pn-cover::before,.pn-art-cassette .pn-cover::after{display:none!important}
+.pc-meta{position:absolute;left:9%;right:9%;top:32%;height:7%;display:flex;align-items:center;justify-content:space-between;padding:0 3%;box-sizing:border-box;border-radius:0 0 3px 3px;
+  background:linear-gradient(180deg,#d6b46a,#b8944a);color:#2a1f0e;font:700 6.2cqh/1 system-ui,sans-serif;letter-spacing:.06em;white-space:nowrap;overflow:hidden}
+.pc-meta span{font-weight:500;opacity:.8}
+.pc-grip{position:absolute;top:36%;width:2.4%;height:20%;background:#121316;box-shadow:inset 0 0 0 1px #000}
+.pc-gl{left:0;border-radius:0 3px 3px 0} .pc-gr{right:0;border-radius:3px 0 0 3px}
+.pc-scr{position:absolute;width:3.2%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#2a2c30 0 18%,#c9ced6 22% 60%,#7c828b 64%);box-shadow:0 0 0 1px #000}
+.pc-tl{left:3.4%;top:4.4%} .pc-tr{right:3.4%;top:4.4%} .pc-bl{left:3.4%;bottom:6%} .pc-br{right:3.4%;bottom:6%}
+.pc-notch{position:absolute;left:38%;right:38%;bottom:0;height:9%;display:flex;justify-content:space-evenly;align-items:center;background:#16171a;border-radius:3px 3px 0 0;box-shadow:inset 0 1px 0 #ffffff14}
+.pc-notch i{width:16%;height:45%;background:#2b2e34;border-radius:1px}
+.pc-well{position:absolute;left:18%;right:18%;top:44%;height:29%;border-radius:8%/20%;background:#111215;box-shadow:inset 0 0 0 1px #000,0 0 0 1px #ffffff12}
+.pc-sp{position:absolute;top:50%;width:21%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;background:#050506;box-shadow:inset 0 0 0 1px #2f3238}
+.pc-l{left:17.9%} .pc-r{left:82.1%}   /* = 29 % / 71 % of the shell */
+.pc-tape{position:absolute;left:50%;top:50%;translate:-50% -50%;aspect-ratio:1;border-radius:50%;
+  background:repeating-radial-gradient(circle,#6b4424 0 1.5px,#8a5a32 1.5px 2.5px,#5a381c 2.5px 3.5px);box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);transition:width .4s linear}
+.pc-l .pc-tape{width:calc(50% + 46% * (1 - var(--np-frac,0)))} .pc-r .pc-tape{width:calc(50% + 46% * var(--np-frac,0))}
+.pc-hub{position:absolute;inset:27%;z-index:2;border-radius:50%;
+  background:radial-gradient(circle,#2a2e32 0 22%,transparent 24%),repeating-conic-gradient(#f2f4f6 0deg 22deg,#8f98a2 22deg 30deg,#f2f4f6 30deg 45deg);box-shadow:0 0 0 1px #2a2e32}
+.pc-bridge{position:absolute;left:18%;right:18%;top:50%;height:7%;translate:0 -50%;background:linear-gradient(180deg,#5a381c,#7b4f2a 50%,#5a381c);opacity:.85}
+.pn-art-cassette.playing .pc-hub{animation:pnspin calc(3s / (0.2 + var(--fx-motion,.5))) linear infinite}
+.pn-art-cassette.playing .pc-r .pc-hub{animation-direction:reverse}
+@media (prefers-reduced-motion:reduce){ .pn-art-cassette.playing .pc-hub{animation:none} .pc-tape{transition:none} }
 .pn-wbars{position:absolute;inset:0;display:flex;align-items:center;gap:2px;width:100%}
 .pn-wbars i{flex:1;min-width:1px;border-radius:1px;background:color-mix(in srgb,var(--ink) 25%,transparent)}
 .pn-wbars.on i{background:var(--accent);box-shadow:0 0 calc(6px * var(--fx-glow)) color-mix(in srgb,var(--accent) 60%,transparent)}
 .pn-wclip{position:absolute;inset:0;clip-path:inset(0 100% 0 0)}
-.pn-center .np-tableseek .prog{display:none}
-.pn-center .pn-ctl{grid-column:2;justify-content:flex-end}
-.pn-center .np-tablexport .tbtn:not(.play){border-radius:50%!important;border-color:transparent!important;background:color-mix(in srgb,var(--ink) 8%,transparent)!important}
-/* --- Stack: LCD window with a segment clock (ghost 8s), TRACK no., LED-block seek; controls centered in the free gap --- */
-.pn-stack .pn-meta{background:#08090A;border:1px solid color-mix(in srgb,var(--line) 70%,#000);border-radius:8px;padding:8px 12px;box-shadow:inset 0 0 14px rgba(0,0,0,.7);max-width:340px}
-.pn-stack .pn-clock{display:block;position:relative;font:700 30px/1 var(--mono);letter-spacing:2px;flex:none}
-.pn-cghost{color:color-mix(in srgb,var(--accent) 12%,transparent)}
-.pn-cval{position:absolute;right:0;top:0;color:var(--accent-text,var(--accent));text-shadow:0 0 calc(10px * var(--fx-glow)) var(--accent)}
-.pn-stack .pn-lcdrow{display:flex;justify-content:space-between;font:600 10px var(--mono);letter-spacing:1.5px;color:var(--ink);margin:6px 0 4px}
-.pn-stack .pn-lrev{color:var(--dim)}
-.pn-stack .pn-led{display:block;position:relative;height:9px;cursor:pointer;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 7px,transparent 7px 10px)}
 .pn-ledfill{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(90deg,var(--accent) 0 7px,transparent 7px 10px);filter:drop-shadow(0 0 calc(4px * var(--fx-glow)) var(--accent))}
-.pn-stack .np-tableseek{display:none}
-.pn-stack .pn-ctl{flex-direction:column;align-items:center;justify-self:center;gap:10px}
-.pn-stack .np-tablemain{grid-template-columns:auto minmax(200px,340px) minmax(0,1fr)}
-.pn-stack .np-tablexport .tbtn{border-radius:8px!important}
-.pn-stack .np-volrow .mutebtn,.pn-stack .np-volrow .np-volbtn{border-radius:8px!important}
-/* --- Horizon: cover glow + reflection, seek line from the cover edge, ring buttons --- */
-.pn-horizon .pn-cover{box-shadow:0 0 calc(26px * var(--fx-glow)) color-mix(in srgb,var(--accent) 55%,transparent)}
-.pn-horizon .pn-refl{display:block;position:absolute;left:0;right:0;top:100%;height:40%;margin-top:3px;overflow:hidden;transform:scaleY(-1);opacity:calc(.55 * var(--fx-reflect));
-  -webkit-mask-image:linear-gradient(to top,#000,transparent);mask-image:linear-gradient(to top,#000,transparent);border-radius:8px}
-.pn-horizon .pn-refl .cover{height:250%!important;margin-top:-150%}
-.pn-horizon .np-tablemain{column-gap:0;padding-bottom:20px}
-.pn-horizon .pn-meta{padding-left:16px}
-.pn-horizon .np-tableseek{margin-left:-16px} .pn-horizon .np-times{padding-left:16px}
-.pn-horizon .np-tableseek .prog .bar{background:linear-gradient(90deg,var(--accent),var(--line) 40%)}
-.pn-horizon .pn-ctl{flex-direction:column;align-items:flex-end;gap:8px;padding-left:14px}
-.pn-horizon .np-tablexport .tbtn{border-radius:50%!important;background:transparent!important;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)!important}
-.pn-horizon .np-tablexport .tbtn.play{border-color:var(--accent)!important;background:var(--accent)!important}
-@media (prefers-reduced-motion:reduce){ .pn-center.playing .pn-disc{animation:none} .pn-ring .val{transition:none} }
+/* EQ bars (new): even-width bars standing on the baseline, varying heights, played part lit - unlike the thin centered waveform */
+.pn-eq{display:none}
+.pn-eqbars{position:absolute;inset:4px 6px;display:flex;align-items:flex-end;gap:5px}
+.pn-eqbars i{flex:1;min-width:3px;border-radius:0;background:color-mix(in srgb,var(--ink) 16%,var(--panel))}
+.pn-eqbars.on i{background:var(--accent);box-shadow:0 0 calc(5px * var(--fx-glow)) color-mix(in srgb,var(--accent) 45%,transparent)}
+/* Track bar: line = the normal .prog; the other three replace it (times stay underneath) */
+.pn-seek-wave .pn-wave{display:block;position:relative;height:34px;margin-top:6px;cursor:pointer}
+.pn-seek-led .pn-led{display:block;position:relative;height:9px;margin:12px 0 4px;cursor:pointer;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 7px,transparent 7px 10px)}
+.pn-seek-eq .pn-eq{display:block;position:relative;height:34px;margin-top:6px;cursor:pointer;border-radius:3px;background:color-mix(in srgb,#000 45%,var(--panel))}
+.pn-eq .pn-eqclip{inset:0}
+:is(.pn-seek-wave,.pn-seek-led,.pn-seek-eq) .np-tableseek .prog{display:none}
+:is(.pn-wave,.pn-led,.pn-eq):focus-visible{outline:1px solid var(--accent);outline-offset:3px}
+/* Buttons */
+.pn-btn-round .np-tablexport .tbtn{border-radius:50%!important}
+.pn-btn-round .np-tablexport .tbtn.play{box-shadow:0 0 calc(18px * var(--fx-glow) * var(--np-k)) var(--np-play-hi)!important}
+.pn-btn-soft .np-tablexport .tbtn{border-radius:50%!important}
+.pn-btn-soft .np-tablexport .tbtn:not(.play){border-color:transparent!important;background:color-mix(in srgb,var(--ink) 8%,transparent)!important}
+.pn-btn-square .np-tablexport .tbtn{border-radius:8px!important}
+.pn-btn-square .np-volrow :is(.mutebtn,.np-volbtn,.mixbtn,.npsleep){border-radius:8px!important}
+.pn-btn-ring .np-tablexport .tbtn{border-radius:50%!important;background:transparent!important;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)!important}
+.pn-btn-ring .np-tablexport .tbtn.play{border-color:var(--accent)!important;background:var(--accent)!important}
 /* phones: stacked variant of each style (art + titles, then seek, then controls) */
 @media (max-width:900px){
   .nowcol.np12 > .np-row{display:none!important}
-  .np-ctlpanel .np-tablemain,.pn-center .np-tablemain,.pn-stack .np-tablemain{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;min-height:0}
-  .np-ctlpanel .pn-art{width:76px;height:76px} .pn-classic .pn-art{width:84px;height:84px}
-  .pn-center .pn-art{grid-row:auto;margin-right:calc(8px + 18px * var(--fx-motion))}
-  .np-ctlpanel .pn-ctl,.pn-center .pn-ctl,.pn-stack .pn-ctl,.pn-horizon .pn-ctl{grid-column:1 / -1;flex-direction:column;align-items:stretch;padding:0}
-  .pn-stack .pn-meta{max-width:none} .pn-stack .pn-clock{font-size:22px}
+  .np-ctlpanel .np-tablemain{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;min-height:0}
+  .np-ctlpanel .pn-art{width:76px;height:76px}
+  .np-ctlpanel .pn-ctl{grid-column:1 / -1;flex-direction:column;align-items:stretch;padding:0}
   .np-ctlpanel .np-tablevol{min-width:0}
 }
 /* 0.2.0 item 4-7: Pepecoin note - bigger logo (76px), logo wraps above the text on narrow screens */
@@ -974,7 +995,7 @@ html.tv .nowcol.np12{justify-content:center}
 html.tv .np-ctlpanel{flex:1 1 auto} html.tv .np-ctlpanel .np-ctlbody{flex:1 1 auto;justify-content:center;max-height:none}
 html.tv .np-ctlpanel .np-tablemain{padding:40px 60px;gap:28px 48px;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto}
 html.tv .np-ctlpanel .pn-ctl{grid-column:1 / -1;justify-content:center;gap:48px}
-html.tv .np-ctlpanel .pn-art,html.tv .pn-classic .pn-art{width:clamp(180px,calc(34vh / var(--z,1)),420px);height:clamp(180px,calc(34vh / var(--z,1)),420px)}
+html.tv .np-ctlpanel .pn-art{width:clamp(180px,calc(34vh / var(--z,1)),420px);height:clamp(180px,calc(34vh / var(--z,1)),420px)}
 html.tv .np-ctlpanel .np-tabletitles .t1{font-size:2.2rem} html.tv .np-ctlpanel .np-tabletitles .t2{font-size:1.4rem}
 html.tv .np-ctlpanel .np-tablexport .tbtn{width:64px!important;height:64px!important} html.tv .np-ctlpanel .np-tablexport .tbtn.play{width:84px!important;height:84px!important}
 html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
@@ -1087,11 +1108,12 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .np-ctlpanel .np-volrow .eqbtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;flex:none}
 .np-ctlpanel .np-volrow .eqbtn .ic svg{width:15px;height:15px}
 .np-ctlpanel .np-volrow .eqbtn:hover,.npbar .eqbtn:hover{color:var(--accent-text,var(--accent));border-color:var(--accent)}
-.pn-stack .np-volrow .eqbtn{border-radius:8px!important}
-.pn-horizon .np-volrow .eqbtn{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+.pn-btn-square .np-volrow .eqbtn{border-radius:8px!important}
+.pn-btn-ring .np-volrow :is(.eqbtn,.mutebtn,.mixbtn){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+.pn-btn-soft .np-volrow :is(.eqbtn,.mutebtn:not(.on),.mixbtn){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
 .np-xheart{display:none}
-.np-ctlpanel.pn-classic .np-xheart{display:contents}
-.np-ctlpanel.pn-classic .pn-titlerow .np-heartslot{display:none}
+.np-ctlpanel .np-xheart{display:contents}   /* F95: the heart is a transport button in every mix */
+.np-ctlpanel .pn-titlerow .np-heartslot{display:none}
 .heart.tbtn.ico{padding:0;font-size:0;line-height:0}
 .heart.tbtn.ico svg{width:17px;height:17px}
 .heart.tbtn.ico.on{color:var(--hl,var(--accent));border-color:var(--hl,var(--accent))}
@@ -1104,13 +1126,13 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
   .np-ctlpanel .np-tablevol{min-width:0}
   .np-ctlpanel .np-volrow{gap:5px}
   .np-ctlpanel .np-volrow input[type=range]{min-width:48px}
-  .np-ctlpanel.pn-classic .np-tablemain{grid-template-columns:auto minmax(96px,1fr) auto}
-  .np-ctlpanel.pn-classic .np-tablexport.transport{gap:5px}
+  .np-ctlpanel .np-tablemain{grid-template-columns:auto minmax(96px,1fr) auto}
+  .np-ctlpanel .np-tablexport.transport{gap:5px}
 }
 @container npctl (max-width:720px){
-  .np-ctlpanel.pn-classic .pn-art{width:84px;height:84px}
-  .np-ctlpanel.pn-classic .np-tablexport.transport .tbtn{width:30px;height:30px}
-  .np-ctlpanel.pn-classic .np-tablexport.transport .tbtn.play{width:44px;height:44px}
+  .np-ctlpanel .pn-art{width:84px;height:84px}
+  .np-ctlpanel .np-tablexport.transport .tbtn{width:30px;height:30px}
+  .np-ctlpanel .np-tablexport.transport .tbtn.play{width:44px;height:44px}
 }
 /* 0.2.1 F12: Sound (EQ) - three looks share header, lower card and footer; tight 4-6 px corners; theme colors only */
 dialog.eqdialog{width:min(780px,calc(calc(100vw / var(--z,1)) - 16px))}
@@ -1377,29 +1399,21 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .np-strip .tbtn.play{width:36px;height:36px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .np-strip .tbtn svg{width:14px;height:14px} .np-strip .tbtn.play svg{width:16px;height:16px} .np-strip .heart.tbtn.ico svg{width:15px;height:15px}
 .np-strip .np-heartslot{display:inline-flex} .np-strip .np-heartslot > *{width:30px;height:30px}
-/* U3 Classic: progress ring around the thumbnail (like the ring around the cover), glowing round Play, round buttons */
-.pn-classic .ns-art{padding:2px;background:conic-gradient(var(--accent) calc(var(--ns-frac,0) * 1turn),var(--line) 0);box-shadow:0 0 calc(8px * var(--fx-glow)) color-mix(in srgb,var(--accent) 45%,transparent)}
-.pn-classic .np-strip .tbtn.play{box-shadow:0 0 calc(14px * var(--fx-glow)) color-mix(in srgb,var(--accent) 70%,transparent)}
-/* U3 Center: soft ghost buttons and the waveform seek */
-.pn-center .np-strip .tbtn:not(.play):not(.on){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
-.pn-center .ns-prog{height:16px} .pn-center .ns-prog > .bar,.pn-center .ns-prog > .fill,.pn-center .ns-prog > .knob{display:none}
-.pn-center .ns-wave{display:block}
-.pn-center .ns-art{border-radius:50%} .pn-center .ns-art .cover{border-radius:50%}
-.pn-center.playing .ns-art .cover{animation:pnspin calc(6s / (0.2 + var(--fx-motion))) linear infinite}
-/* U3 Stack: a small LCD window (glowing elapsed, LED-block seek) and squared buttons */
-.pn-stack .ns-main{background:#08090A;border:1px solid color-mix(in srgb,var(--line) 70%,#000);border-radius:4px;padding:3px 8px;box-shadow:inset 0 0 10px rgba(0,0,0,.7)}
-.pn-stack .ns-elv{text-shadow:0 0 calc(8px * var(--fx-glow)) var(--accent)}
-.pn-stack .ns-prog{height:8px} .pn-stack .ns-prog > .bar,.pn-stack .ns-prog > .fill,.pn-stack .ns-prog > .knob{display:none}
-.pn-stack .ns-led{display:block;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 6px,transparent 6px 8px)}
+/* 0.5.0 F95: the collapsed line follows the Track bar + Buttons picks (no package thumbnail treatments) */
+.ns-eq{display:none;position:absolute;inset:0}
+.pn-btn-round .np-strip .tbtn.play{box-shadow:0 0 calc(14px * var(--fx-glow) * var(--np-k)) var(--np-play-hi)}
+.pn-btn-soft .np-strip .tbtn:not(.play):not(.on){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.pn-btn-square .np-strip .tbtn,.pn-btn-square .np-strip .np-heartslot > *{border-radius:6px}
+.pn-btn-ring .np-strip .tbtn{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+.pn-btn-ring .np-strip .tbtn.play,.pn-btn-ring .np-strip .tbtn.mutebtn.on{background:var(--accent);border-color:var(--accent)}
+.pn-btn-ring .np-strip .tbtn.tog.on{border-color:var(--accent)}
+:is(.pn-seek-wave,.pn-seek-eq) .ns-prog{height:16px}
+:is(.pn-seek-wave,.pn-seek-eq,.pn-seek-led) .ns-prog > :is(.bar,.fill,.knob){display:none}
+.pn-seek-wave .ns-wave,.pn-seek-eq .ns-eq{display:block}
+.ns-eq .pn-eqbars{gap:2px;inset:1px 2px}
+.pn-seek-led .ns-prog{height:8px}
+.pn-seek-led .ns-led{display:block;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 6px,transparent 6px 8px)}
 .ns-ledfill{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 8px);filter:drop-shadow(0 0 calc(4px * var(--fx-glow)) var(--accent))}
-.pn-stack .np-strip .tbtn,.pn-stack .np-strip .np-heartslot > *{border-radius:6px}
-/* U3 Horizon: glowing thumbnail, the seek line flowing out of it, outline ring buttons */
-.pn-horizon .ns-art .cover{box-shadow:0 0 calc(16px * var(--fx-glow)) color-mix(in srgb,var(--accent) 55%,transparent)}
-.pn-horizon .ns-prog .bar{background:linear-gradient(90deg,var(--accent),var(--line) 40%)}
-.pn-horizon .np-strip .tbtn{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
-.pn-horizon .np-strip .tbtn.play,.pn-horizon .np-strip .tbtn.mutebtn.on{background:var(--accent);border-color:var(--accent)}
-.pn-horizon .np-strip .tbtn.tog.on{border-color:var(--accent)}
-@media (prefers-reduced-motion:reduce){ .pn-center.playing .ns-art .cover{animation:none} }
 /* scaled to fit: the line gives up the least important pieces first as the column narrows */
 @container npctl (max-width:860px){ .ns-vol .volpct{display:none} .np-ctlpanel.collapsed .np-strip{gap:10px} }
 @container npctl (max-width:720px){ .ns-vol > .ic,.ns-vol input[type=range]{display:none} .ns-dur{display:none} .ns-x,.ns-vol{gap:4px} }
@@ -1410,7 +1424,7 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 /* ===== 0.2.3 U2: minimized Playlist title bar = "UP NEXT  [art] Title · Artist", centered on the Now Playing column ===== */
 .listpanel > .pane-h{position:relative}
 .plnext{display:none}
-.desk:is(.listcollapsed,.listexpanded) .plnext:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;position:absolute;top:0;bottom:0;transform:translateX(-50%);min-width:0;white-space:nowrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
+.desk .plnext:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;position:absolute;top:0;bottom:0;transform:translateX(-50%);min-width:0;white-space:nowrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px}
 .pln-lbl{flex:none;font-size:11px;font-weight:800;letter-spacing:1.6px;color:var(--dim)}
 .pln-art{flex:none;width:24px;height:24px;border-radius:4px;overflow:hidden} .pln-art:empty{display:none}
 .pln-art .cover{width:100%!important;height:100%!important;border-radius:4px}
@@ -1465,6 +1479,7 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .phone-role .btn.big{width:100%;padding:14px;font-size:17px}
 .mic-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel,#1b1f23);border:1px solid var(--accent,#FF3C00);border-radius:6px;padding:10px 12px}
 .mic-banner .grow{flex:1;min-width:180px}
+.phone-role .card > .btn.big:not(:first-of-type){margin-top:6px} .phone-role .btn.current{outline:2px solid var(--hl,var(--accent));outline-offset:1px}
 
 /* 0.2.5 Calibrate speakers: three ways in order (this PC's mic, phone, by ear), live level, run progress */
 .calx{display:flex;flex-direction:column;gap:10px;min-width:min(640px,calc(86vw / var(--z,1)))}
@@ -1598,7 +1613,9 @@ dialog.ss-dlg header .ss-clock{font-weight:400;margin-right:6px}
 body.jb-kiosk #app{visibility:hidden}
 .jbhost{gap:6px;padding:4px 0;border-bottom:1px solid var(--line)}
 /* 0.3.0 §2: remote mode banner, theme Highlight color */
-.remote-banner{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--hl);color:var(--hl-ink);font-weight:600;font-size:13px}
+/* F92: one .remote-banner rule (phone remote + legacy remote mode): Highlight-filled, pinned above the safe area */
+.remote-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;border-radius:3px;display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--hl,var(--accent));color:var(--hl-ink,var(--accent-ink));font-weight:600;font-size:13px}
+.remote-banner .grow{flex:1}
 .remote-banner .btn{min-height:28px;padding:2px 10px;background:transparent;color:inherit;border-color:currentColor}
 .remote-choice{gap:8px;align-items:flex-start;margin:8px 0}
 /* 0.3.0 §3: EQ in the center panel (default), music glow behind it */
@@ -2268,6 +2285,10 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .qtable th .sortar{font-size:8px;margin-left:5px;color:var(--accent-text,var(--accent))}
 .qtable th.coldrag{opacity:.55} .qtable th.coldrop{box-shadow:inset 3px 0 0 var(--accent)}
 body.plcol-dragging{cursor:grabbing;user-select:none}
+/* 0.5.0 F113: queue rows are grabbed (pointer reorder); no text selection on the rows, grabbing while a row drag runs */
+.qtable tbody tr[data-i]{cursor:grab;user-select:none;-webkit-user-select:none}
+.qtable td.num .qgrip{touch-action:none}
+body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
 .qtable th .grip.off{cursor:default;pointer-events:none;opacity:.35}
 /* the lock: theme-colored like the speaker-card status tags (.dtag.role) when unlocked; red (copper in Pepecoin) glow when locked */
 .listpanel .plus.pllock{border-color:var(--line);color:var(--dim);background:transparent}
@@ -2304,10 +2325,6 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 
 /* K21: Center style - artist (and album) sit on the time line under the waveform; the title row keeps only the song title (about 13px shorter, EQ taller) */
 .pn-aa{display:none}
-.pn-center .pn-aa{display:block;flex:0 1 auto;min-width:0;text-align:center;color:var(--accent2-text,var(--accent2));font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:12px}
-.pn-center .np-tabletitles .t2{display:none}
-.pn-center .np-times .np-elv,.pn-center .np-times .np-rev{flex:0 0 auto}
-.pn-center .np-times{justify-content:space-between}
 /* K14 / K22: the real mini player (embedded) in the right-hand column */
 .minicol{display:none}
 .mp.embedded{height:auto;min-height:74px;box-sizing:border-box;width:100%}
@@ -2414,9 +2431,9 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .toast.undo{display:flex;align-items:center;gap:12px}
 .toast.undo .btn{min-height:24px;padding:0 10px}
 /* L16: the collapsed Queue bar's "Up next" row is centered exactly in the bar (one line box, no stray padding, box-centered) */
-.desk:is(.listcollapsed,.listexpanded) .plnext:not([hidden]){top:0;bottom:0;height:100%;margin:0;padding:0;line-height:1;align-items:center}
-.desk:is(.listcollapsed,.listexpanded) .plnext>*{line-height:1.15;display:flex;align-items:center;margin:0;padding:0}
-.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t1,.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t2{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk .plnext:not([hidden]){top:0;bottom:0;height:100%;margin:0;padding:0;line-height:1;align-items:center}
+.desk .plnext>*{line-height:1.15;display:flex;align-items:center;margin:0;padding:0}
+.desk .plnext .pln-t1,.desk .plnext .pln-t2{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* L6: Home Screen - the Now Playing bar sits in the CENTER column UNDER the queue (same width as the queue). Collapsed it is the narrow bar; opened it grows upward
    (the EQ above gives the height back) in the center column only. The Library and Devices sleeves run the full height and are never covered, resized or disrupted. */
 @media (min-width:901px){
@@ -2449,7 +2466,7 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .schome{color:var(--accent)}
 .scpop{position:fixed;z-index:3000;display:flex;flex-direction:column;gap:2px;padding:4px;border:1px solid var(--line);border-radius:3px;background:var(--panel)}
 .scpop .btn{text-align:left;white-space:nowrap}
-.mpin{margin-left:auto;padding-left:10px;opacity:.35;font-size:11px;cursor:pointer}.mpanel button:hover .mpin,.mpin.on{opacity:.95}.mpanel button{display:flex;align-items:center}
+.mpin{margin-left:auto;padding:2px 5px;border-radius:4px;opacity:.6;color:var(--dim);background:transparent;font-size:11px;cursor:pointer}.mpanel button:hover .mpin{opacity:1;color:var(--ink)}.mpin.on,.mpanel button:hover .mpin.on{opacity:1;color:var(--accent-ink,#fff);background:var(--accent)}.mpanel button{display:flex;align-items:center}
 .np-ctlpanel .pane-h .scrow{margin-left:auto;margin-right:6px}
 .npbar .npb-sc{margin-left:8px}
 /* 0.3.7 L7: All sound settings (in place under the EQ) + the one padlock */
@@ -2530,8 +2547,9 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
 .pane-h .tpin{color:var(--dim);border-color:var(--line);background:transparent;margin-left:auto}
 .pane-h .tpin + .plus,.pane-h .tpin + .row{margin-left:4px}
 .pane-h .tpin .ic,.pane-h .tpin svg{width:14px;height:14px}
-.pane-h .tpin:hover{color:var(--ink);border-color:var(--accent)}
-.pane-h .tpin.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft)}
+.pane-h .tpin:hover{color:var(--ink);border-color:var(--accent);background:transparent}
+.pane-h .tpin.on{color:var(--accent-ink,#fff);border-color:var(--accent);background:var(--accent)}
+.pane-h .tpin.on:hover{color:var(--accent-ink,#fff);background:var(--accent);filter:brightness(1.05)}
 .scmore{font-weight:800;letter-spacing:.05em}
 .spk-eqh{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .spk-eqh .eqpadlock{width:26px;height:26px;padding:0;display:inline-grid;place-items:center}
@@ -2580,10 +2598,10 @@ body.plcol-dragging{cursor:grabbing;user-select:none}
    the pins keep their size and paint above the strip, and the strip clips instead of spilling over them. */
 .np-ctlpanel.collapsed .np-strip{overflow:hidden}
 .np-ctlpanel .pane-h .scrow{flex:none;position:relative;z-index:2}
-@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) .ns-vol .volpct{display:none} .np-ctlpanel.collapsed:has(.scrow .scbtn) .np-strip{gap:10px} }
-@container npctl (max-width:940px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-vol > .ic,.ns-vol input[type=range]){display:none} }
-@container npctl (max-width:820px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-x .np-heartslot,.ns-x .tog){display:none} .np-ctlpanel.collapsed:has(.scrow .scbtn) .ns-art{width:34px;height:34px} }
-@container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.scrow .scbtn) :is(.ns-art,.ns-vol,.ns-x){display:none} }
+@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .ns-vol .volpct{display:none} .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .np-strip{gap:10px} }
+@container npctl (max-width:940px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-vol > .ic,.ns-vol input[type=range]){display:none} }
+@container npctl (max-width:820px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-x .np-heartslot,.ns-x .tog){display:none} .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .ns-art{width:34px;height:34px} }
+@container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-art,.ns-vol,.ns-x){display:none} }
 
 /* ===== 0.3.9 L51 / L53 / L54 / L56: expanded Devices view (layout B, approved render) ===== */
 /* L54: the whole speaker / zone card is the click target */
@@ -2955,6 +2973,7 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .devpanel.israil .prail-n{transform:none;align-self:flex-end;margin:auto 6px 6px 0}
 /* 0.4.4 F6: preset pickers - themed list (dark scheme, accent highlight), My presets heading */
 select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]{color-scheme:dark;accent-color:var(--accent)}
+:root[data-scheme=light] select.eqall-preset,:root[data-scheme=light] .eqdialog select[aria-label=Preset],:root[data-scheme=light] .spkset select[aria-label=Preset]{color-scheme:light}
 :is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) option{background:var(--panel);color:var(--ink)}
 :is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) option:checked{background:var(--accent-soft,color-mix(in srgb,var(--accent) 30%,transparent));color:var(--accent-text,var(--ink))}
 :is(select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-label=Preset]) optgroup{background:var(--panel2);color:var(--dim);font-style:normal}
@@ -2997,9 +3016,9 @@ select.eqall-preset,.eqdialog select[aria-label=Preset],.spkset select[aria-labe
 .spk-volline .spk-mute{flex:none}
 /* 0.4.4 F13 + L50: with Shortcut pins on the collapsed bar the CONTROLLING chip goes compact (zone name only), and on a tight bar it steps aside
    so the song, volume and pins never overlap (the zone picker stays on the open bar and in Devices) */
-.np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel .zs-lbl{display:none}
-.np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{max-width:118px}
-@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{display:none} }
+.np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel .zs-lbl{display:none}
+.np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{max-width:118px}
+@container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn~.scbtn~.scbtn~.scbtn) .zs-panel{display:none} }
 
 /* 0.4.5 F8: pointer-event drag (pdrag.js) */
 .dragghost.pdghost{pointer-events:none;z-index:10000}
@@ -3071,8 +3090,7 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
    Copy button give way first */
 /* T1c: tight only - Full keeps the 0.4.4 Queue header */ .desk.tight .qzwrap{min-width:0;flex:0 1 auto}
 .desk.tight .qzwrap .qzpick{min-width:7.5em;flex:0 0 auto}
-.desk.tight .qzwrap .qsend{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.desk.tight.libexpanded .listpanel .qzwrap .qsend,.desk.tight.libexpanded .listpanel .qzwrap .qediting{display:none}
+.desk.tight.libexpanded .listpanel .qzwrap .qediting{display:none}
 .ns-titles .ns-t1{flex:0 1 auto;min-width:2.5em}
 .ns-titles .ns-t2{flex:0 8 auto;min-width:0}
 .ns-titles .zlink,.zl-line .zlink{flex:0 0 auto;min-width:0;max-width:45%}
@@ -3149,18 +3167,11 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 }
 /* 0.4.6 F38: the condensed player (expanded Library) wears the chosen Now Playing layout - same size and contents, that layout's art treatment
    and control style, in the theme's colors */
-.minicol.pn-classic .mp .mp-art{border-radius:50%;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
-.minicol.pn-classic .mp .mp-ctl .mp-b{border-radius:50%}
-.minicol.pn-classic .mp .mp-tr{border:1px solid var(--line);border-radius:999px;padding:0 6px}
-.minicol.pn-center .mp .mp-art{border-radius:50%;background:radial-gradient(circle,var(--panel) 0 14%,color-mix(in srgb,var(--bg) 70%,black) 15% 100%);box-shadow:0 0 0 3px color-mix(in srgb,var(--bg) 70%,black),inset 0 0 0 1px color-mix(in srgb,var(--ink) 18%,transparent)}
-.minicol.pn-center .mp .mp-ctl .mp-b{border-radius:3px;border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,var(--panel))}
-.minicol.pn-center .mp .mp-seek{accent-color:var(--accent)}
-.minicol.pn-stack .mp .mp-art{border-radius:3px;box-shadow:inset 0 0 0 1px var(--line)}
-.minicol.pn-stack .mp .mp-ctl .mp-b{border-radius:3px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
-.minicol.pn-stack .mp .mp-tr{font-family:ui-monospace,Consolas,monospace;color:var(--accent-text,var(--accent));letter-spacing:.06em;background:color-mix(in srgb,black 35%,var(--panel));border-radius:3px;padding:0 4px}
-.minicol.pn-horizon .mp .mp-art{border-radius:3px;box-shadow:0 0 calc(18px * var(--fx-glow,.5)) color-mix(in srgb,var(--accent) 70%,transparent);-webkit-box-reflect:below 2px linear-gradient(transparent 60%,rgba(0,0,0,calc(.35 * var(--fx-reflect,.5))))}
-.minicol.pn-horizon .mp .mp-ctl .mp-b{border-radius:50%;background:transparent;border:1.5px solid var(--accent)}
-.minicol.pn-horizon .mp .mp-seek{accent-color:var(--accent)}
+.minicol.pn-btn-round .mp .mp-ctl .mp-b{border-radius:50%}
+.minicol.pn-btn-soft .mp .mp-ctl .mp-b{border-radius:50%;border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,var(--panel))}
+.minicol.pn-btn-square .mp .mp-ctl .mp-b{border-radius:3px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+.minicol.pn-btn-ring .mp .mp-ctl .mp-b{border-radius:50%;background:transparent;border:1.5px solid var(--accent)}
+.minicol .mp .mp-seek{accent-color:var(--accent)}
 /* 0.4.6 F39: expanded Devices - the Library rail runs full height; the Now Playing bar is exactly as wide as the Devices area (left edges aligned) */
 @media (min-width:901px){
   .desk.devexpanded:not(.libexpanded):not(.tight) .libpanel{grid-row:1/3!important}
@@ -3179,6 +3190,11 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 .libpanel button.on,.lib button.on,.lib [aria-pressed=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 /* 0.4.7: the filled (accent) tabs and chips keep the theme's on-accent text color (F40 above recolored their text to the accent, invisible on the accent fill) */
 .libpanel .tabs button.on,.lib .tabs:not(.xtabs) button.on,.libpanel .chipbtn.on,.lib .chipbtn.on{color:var(--accent-ink)}
+/* 0.5.0 F116: pane-h Expand/Collapse (+ fold) keep accent — F40's .libpanel button reset was washing them to ink/white */
+.libpanel .pane-h .plus{background:var(--panel2);border:1px solid var(--accent);color:var(--accent-text,var(--accent))}
+.libpanel .pane-h .plus:hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
+.libpanel .pane-h .plus.chv{background:transparent}
+.libpanel .pane-h .plus.chv:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .wwdd{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:2px 8px;cursor:pointer;font-size:12px;max-width:200px;white-space:nowrap}
 .wwdd .wwdd-t{overflow:hidden;text-overflow:ellipsis}.wwdd .wwdd-c{color:var(--accent-text,var(--accent));font-size:10px}
 .libpanel .lnk,.lib .lnk,.lib a{color:var(--accent-text,var(--accent))}
@@ -3257,12 +3273,11 @@ html.pd42-open,html.pd42-open body{overflow:hidden}
 .listpanel .pane-h>.qtitle .qlbl{flex:none}
 .listpanel .pane-h>.qtitle .qzone{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .listpanel .qzwrap .qzpick{text-overflow:ellipsis}
-.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t1{flex:0 1 auto;min-width:2em}.desk:is(.listcollapsed,.listexpanded) .plnext .pln-t2{flex:0 4 auto;min-width:0}
+.desk .plnext .pln-t1{flex:0 1 auto;min-width:2em}.desk .plnext .pln-t2{flex:0 4 auto;min-width:0}
 .qnextpill{display:inline-block;margin-right:6px;padding:0 5px;border:1px solid var(--accent);border-radius:3px;color:var(--accent-text,var(--accent));font-size:10px;font-weight:800;letter-spacing:.08em;line-height:14px;vertical-align:1px}
 .listpanel .pane-h{min-width:0}
 .listpanel .qzwrap{min-width:0;flex:0 1 auto}
 .listpanel .qzwrap .qzpick{min-width:5.5em;flex:0 1 auto}
-.listpanel .qzwrap .qsend{flex:0 1 auto;min-width:2.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .listpanel .pane-h>.qtitle{flex:1 1 auto;max-width:34%}
 .desk.listcollapsed .listpanel .pane-h>.qtitle{max-width:28%}
 .desk.listexpanded .plnext.wide .pln-lbl,.desk.listexpanded .plnext.wide .pln-t1,.desk.listexpanded .plnext.wide .pln-t2,.desk.listexpanded .plnext.wide .pln-dot{color:var(--accent-text,var(--accent))}
@@ -3364,14 +3379,12 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 .listpanel .qtitle .qzpick{flex:0 1 auto;height:22px;min-height:0;padding:0 4px 0 6px;line-height:20px;box-sizing:border-box;min-width:5.5em;max-width:14em;border:1px solid var(--accent);border-radius:3px;font-weight:600;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
 .listpanel .qtitle .qzpick:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .desk.listcollapsed .listpanel .pane-h>.qtitle.haspick{max-width:none}
-/* the bar's "on <zone> ▾" repeats the zone the Queue picker already shows: hidden while they are the same zone (back when another queue is viewed) */
-@media (min-width:901px){.desk:has(.listpanel:not(.qviewing) .qtitle.haspick) :is(.np-ctlpanel,.npbar) .zlink{display:none}}
 .pqhead{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:nowrap}.pqhead .pqlbl{color:var(--accent-text,var(--accent));font-weight:700;font-size:16px;white-space:nowrap}
 .pqhead .pqwrap{flex:1 1 auto;min-width:0;margin:0}.pqhead .pqwrap .qzpick{border:1px solid var(--accent);border-radius:3px;font-weight:600}
 /* F60: a narrow header (200 %, side panels open) shrinks the Copy button / count text before anything scrolls; the picker keeps >= 4.5em */
 .listpanel .pane-h>.qtitle.haspick{min-width:calc(4.5em + 52px);flex:0 1 auto}
 .listpanel .qtitle .qzpick{min-width:4.5em}
-.listpanel .pane-h>.qzwrap{overflow:hidden;margin:0 4px}.listpanel .pane-h>.qzwrap .qsend{min-width:0}
+.listpanel .pane-h>.qzwrap{overflow:hidden;margin:0 4px}
 .listpanel .pane-h>.plmeta{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .listpanel .pane-h>.listcolwrap,.listpanel .pane-h>.plbtns,.listpanel .pane-h>.tpin{flex-shrink:0}
 /* 0.4.8 F62: shared marquee (js/marquee.js) - overflowing now-playing lines scroll; edges fade with a mask (no new colors); reduced motion = ellipsis */
@@ -3396,6 +3409,14 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
   .desk.devfull .dexp-main.e42>.ecol{max-height:none!important;min-height:0;overflow:auto}
 }
 
+/* 0.5.0 stage 10 (WIP): AirPlay speakers card - 3px corners, theme accent */
+#sec-airplay-out .apo-sw{gap:10px;align-items:center;margin:8px 0}
+#sec-airplay-out .apo-hint{display:block}
+#sec-airplay-out .apo-list{margin:10px 0 4px;display:flex;flex-direction:column;gap:6px}
+#sec-airplay-out .apo-out{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;padding:6px 10px}
+#sec-airplay-out .apo-fw summary{cursor:pointer;color:var(--accent)}
+#sec-airplay-out .apo-fw pre{white-space:pre-wrap;word-break:break-all;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:6px 8px;margin:4px 0}
+
 /* 0.4.9 F65: Roomy - the Devices bar stays Full's narrow collapsed bar in the grid; opened from it, the panel slides out over the right side
    (full height, accent edge, shadow, dim scrim) instead of widening the column. Expanded Devices is unchanged (.roomyopen is never set then). */
 .desk.roomy.roomyopen{--rightw:46px}
@@ -3407,7 +3428,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 
 /* 0.4.9 F66: every zone and speaker slider in a mixer card has the same track (left edge, width, center): one name column per card (--mvn, the
    speaker rows' column is shorter by their indent --mvi), the slider 1fr, then the same fixed % / mute / drawer columns. Stacked (narrow card or
-   phone): zones stack too, and every slider is a full-width row that reaches back over the speaker indent. Whole-Home is untouched. */
+   phone): zones stack too, and every slider is a full-width row that reaches back over the speaker indent. All zones is untouched. */
 .mv-card{--mvn:clamp(8em,37cqi,16em)}
 .mv-card .mv-sub{--mvi:29px} .mv-card .mv-sub.flat{--mvi:0px}
 .mv-card .mv-row.mv-zrow,.mv-card .mv-row.mv-spk{grid-template-columns:var(--mvn) minmax(0,1fr) 3.2em 32px 26px}
@@ -3458,23 +3479,24 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
     row-gap:4px;column-gap:6px;align-items:center;justify-items:center}
   .nowcol .np-ctlpanel :is(.np-tablemeta,.pn-titlerow,.np-tabletitles,.pn-ctl,.np-tablexport,.np-tablevol,.np-volrow,.np-vol,.np-times){display:contents!important}
   .nowcol .np-ctlpanel :is(.pn-pill,.pn-refl,.np-tablemeta>.np-heartslot,.np-volrow>.mutebtn,.np-times .pn-aa){display:none!important}
-  /* each Now Playing theme keeps its own signature, sized for the phone: Classic = progress ring around the cover; Center = record out of the
-     sleeve + waveform seek; Stack = LCD clock + LED-block seek; Horizon = cover glow + ring buttons (from the theme's own rules) */
-  .nowcol .np-ctlpanel:not(.pn-classic) :is(.pn-ring,.pn-ringdot),.nowcol .np-ctlpanel:not(.pn-center) .pn-disc,.nowcol .np-ctlpanel:not(.pn-center) .pn-wave,
-  .nowcol .np-ctlpanel:not(.pn-stack) :is(.pn-clock,.pn-lcdrow,.pn-led){display:none!important}
-  .nowcol .np-ctlpanel :is(.pn-wave,.pn-led){grid-area:seek;align-self:start;width:100%;margin:0!important}
-  .nowcol .np-ctlpanel.pn-center .pn-wave{height:20px!important;margin-top:2px!important} .nowcol .np-ctlpanel.pn-stack .pn-led{height:12px;margin-top:6px!important}
-  .nowcol .np-ctlpanel:is(.pn-center,.pn-stack) .np-tableseek .prog{display:none!important}
-  .nowcol .np-ctlpanel.pn-center .np-tableseek{padding-top:24px!important;box-sizing:border-box}
-  .nowcol .np-ctlpanel.pn-stack .pn-lcdrow{grid-area:seek;align-self:start;width:100%;margin:24px 0 0!important}
-  .nowcol .np-ctlpanel.pn-stack .np-tableseek{visibility:hidden}
+  /* 0.5.0 F95: phone shows the picked Track bar under the titles; package chrome (ring, disc, LCD) is not shown */
+  .nowcol .np-ctlpanel :is(.pn-ringdot,.pn-clock,.pn-lcdrow){display:none!important}
+  /* 0.5.0 F96: phone keeps the picked Album art (ring / spinning disc / sliding vinyl) */
+  .nowcol .np-ctlpanel:not(.pn-art-square) .pn-ring,.nowcol .np-ctlpanel:not(.pn-art-sleeve) .pn-disc{display:none!important}
+  .nowcol .np-ctlpanel.pn-art-square .pn-art{padding:6px!important;box-sizing:border-box}
+  .nowcol .np-ctlpanel.pn-art-square .pn-art .pn-cover{inset:6px;width:calc(100% - 12px)!important;height:calc(100% - 12px)!important}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-art{translate:-14% 0}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-disc{translate:calc(4% + 26% * var(--np-frac,0)) 0}
+  /* 0.5.0 F97: phone cassette - wider than tall, keeps the label cover inside the shell */
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art{aspect-ratio:1.52/1!important;width:auto!important;max-width:88vw!important;max-height:58vw!important;justify-self:center}
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art .pn-cover{left:9%!important;top:10%!important;width:82%!important;height:22%!important}
+  .nowcol .np-ctlpanel:not(.pn-seek-wave) .pn-wave,.nowcol .np-ctlpanel:not(.pn-seek-led) .pn-led,.nowcol .np-ctlpanel:not(.pn-seek-eq) .pn-eq{display:none!important}
+  .nowcol .np-ctlpanel :is(.pn-wave,.pn-led,.pn-eq){grid-area:seek;align-self:start;width:100%;margin:0!important}
+  .nowcol .np-ctlpanel.pn-seek-wave .pn-wave,.nowcol .np-ctlpanel.pn-seek-eq .pn-eq{height:20px!important;margin-top:2px!important} .nowcol .np-ctlpanel.pn-seek-led .pn-led{height:12px;margin-top:6px!important}
+  .nowcol .np-ctlpanel:is(.pn-seek-wave,.pn-seek-led,.pn-seek-eq) .np-tableseek .prog{display:none!important}
+  .nowcol .np-ctlpanel:is(.pn-seek-wave,.pn-seek-led,.pn-seek-eq) .np-tableseek{padding-top:24px!important;box-sizing:border-box}
   .nowcol .np-ctlpanel .np-tabletitles>.t2{display:block!important}
   .nowcol .np-ctlpanel .np-tableseek :is(.np-elv,.np-rev){display:block!important}
-  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.t2{grid-area:t1;align-self:end;justify-self:start;width:auto;max-width:60%;text-align:left;font-size:14px}
-  .nowcol .np-ctlpanel.pn-stack .pn-clock{grid-area:t1;justify-self:end;font-size:26px}
-  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.t1{grid-area:t2;justify-self:start;text-align:left;width:60%}
-  .nowcol .np-ctlpanel.pn-center .pn-art{overflow:visible;max-width:58vw;max-height:58vw;justify-self:start;margin-left:max(0px,calc(50% - 41.8vw))!important}   /* sleeve + record centered as one group, record inside the screen */
-  .nowcol .np-ctlpanel.pn-stack .np-tabletitles>.np-album{justify-self:start;text-align:left}
   .nowcol .np-ctlpanel .pn-art{grid-area:art;height:100%!important;width:auto!important;max-width:70vw;max-height:70vw;aspect-ratio:1;min-height:0;padding:0!important;margin:0!important;cursor:default}
   .nowcol .np-ctlpanel .pn-art .pn-cover{position:absolute;inset:0;width:100%!important;height:100%!important}
   .nowcol .np-ctlpanel .pn-art .pn-cover .cover{width:100%!important;height:100%!important;border-radius:3px;font-size:64px}
@@ -3501,9 +3523,9 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
   .nowcol .np-ctlpanel .np-volrow>.mixbtn{grid-area:x2} .nowcol .np-ctlpanel .np-vol>.eqbtn{grid-area:x4} .nowcol .np-ctlpanel .np-volrow>.npsleep{grid-area:x5}
   .nowcol .np-ctlpanel :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){width:48px!important;height:48px!important;min-width:48px;min-height:48px;border-radius:50%;padding:0!important;display:inline-flex;align-items:center;justify-content:center}
   .nowcol .np-ctlpanel .np-volrow>.npsleep{font-size:11px;border:1px solid var(--line)}
-  .nowcol .np-ctlpanel.pn-stack :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-radius:8px}
-  .nowcol .np-ctlpanel.pn-horizon :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
-  .nowcol .np-ctlpanel.pn-center :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+  .nowcol .np-ctlpanel.pn-btn-square :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-radius:8px}
+  .nowcol .np-ctlpanel.pn-btn-ring :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
+  .nowcol .np-ctlpanel.pn-btn-soft :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
   .nowcol>.np-upnext{flex:none;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:22px}
 }
 
@@ -3586,11 +3608,10 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
 .tree42.zdrag,.tree42.zdrag *{cursor:grabbing!important}
 .qb42:not(.empty42):not(.off42) .zgut42:active{cursor:grabbing}
 
-/* 0.4.9 F83: beside the expanded Library the queue column has ONE show / hide control (no expand-upward there), and its header drops the
-   Up next chip so the zone picker, pin, Copy and the count fit without overlapping */
+/* 0.4.9 F83: beside the expanded Library the queue column has ONE show / hide control (no expand-upward there); its header items shrink so
+   the zone picker, pin, icons and the count fit. F137b: the Up next chip is no longer forced off here (gap-based hide in main.js) */
 @media (min-width:901px){
   .desk.libexpanded:not(.listcollapsed) .listpanel .listup{display:none}
-  .desk.libexpanded .listpanel .plnext{display:none!important}
   .desk.libexpanded .listpanel>.pane-h{flex-wrap:nowrap;min-width:0;overflow:hidden}
   .desk.libexpanded .listpanel>.pane-h>*{min-width:0}
   .desk.libexpanded .listpanel>.pane-h .listcolwrap{flex:none;margin-left:auto}
@@ -3599,6 +3620,506 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
   .desk.libexpanded .listpanel .qtitle .qzpick{flex:none;min-width:0;width:6.5em;max-width:6.5em}
   .desk.libexpanded .listpanel>.pane-h>:is(.tpin,.plbtns){flex:none}
   .desk.libexpanded .listpanel>.pane-h>.qzwrap{flex:0 1 auto;min-width:2.4em;overflow:hidden;margin:0 4px}
-  .desk.libexpanded .listpanel>.pane-h .qsend{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .desk.libexpanded .listpanel>.pane-h>.plmeta{flex:0 1 auto;min-width:4.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+/* F137b: libexpanded open Queue - title row keeps its icons; Up next wraps to its own slim second line (main.js adds .nb2) */
+@media (min-width:901px){
+  .desk.libexpanded .listpanel>.pane-h.nb2{flex-wrap:wrap;height:auto;row-gap:0}
+  .desk.libexpanded .listpanel>.pane-h.nb2>.plnext:not([hidden]){position:static;transform:none;order:99;flex:1 0 100%;max-width:none;height:24px;justify-content:flex-start;border-top:1px solid var(--line);margin:0 -10px;padding:0 10px;font-size:12px;overflow:hidden}
+  .desk.libexpanded .listpanel>.pane-h.nb2>.plnext .pln-t1{min-width:0}
+  .desk.libexpanded .listpanel>.pane-h.nb2{align-content:flex-start;padding-top:4px}
+  .desk.libexpanded .listpanel>.pane-h.nb2>.plmeta{flex:1 1 0;min-width:0;text-align:right}
+  .desk.libexpanded .listpanel>.pane-h.nb2>.listcolwrap{margin-left:0}
+}
+/* 0.5.0 F89 (lifted in F137b): title-bar Up next shows in the narrow Queue column beside the expanded Library too, hidden only when the gap is too tight */
+
+/* 0.5.0 F93: phone hamburger is a true square (44x44 on touch, 38x38 otherwise) with three CSS bars centered, not the off-center glyph. */
+.iconbtn.hamburger{box-sizing:border-box;width:38px;height:38px;min-width:38px;min-height:38px;padding:0;align-items:center;justify-content:center;flex:none;line-height:0}
+.hamburger .hb-bars{display:flex;flex-direction:column;justify-content:space-between;width:18px;height:14px}
+.hamburger .hb-bars i{display:block;height:2px;border-radius:1px;background:currentColor}
+@media (pointer:coarse){ .iconbtn.hamburger{width:44px;height:44px;min-width:44px;min-height:44px} .hamburger .hb-bars{width:20px;height:16px} }
+
+/* ---- 0.5.0 F94: Now Playing Color intensity (html[data-npcolor] = subtle | spicy | max, default spicy). Theme accent only. ---- */
+:root{--np-wash:32%;--np-edge:8%;--np-ring:22%;--np-glow:30%;--np-hi:70%;--np-k:1;--np-play-blur:18px}
+:root[data-npcolor="subtle"]{--np-wash:4%;--np-edge:0%;--np-ring:6%;--np-glow:5%;--np-hi:14%;--np-k:.35;--np-play-blur:6px}   /* F94b: nearly plain */
+:root[data-npcolor="max"]{--np-wash:88%;--np-edge:34%;--np-ring:70%;--np-glow:85%;--np-hi:100%;--np-k:2.4;--np-play-blur:44px}   /* F94b: unmistakable */
+:root{
+  --np-stage:radial-gradient(ellipse at center,color-mix(in srgb,var(--accent) var(--np-wash),color-mix(in srgb,var(--panel2) 60%,#000)),color-mix(in srgb,var(--accent) var(--np-edge),color-mix(in srgb,var(--bg) 85%,#000)));
+  --np-stage-np8:radial-gradient(ellipse at 50% 40%,color-mix(in srgb,var(--accent) var(--np-wash),color-mix(in srgb,var(--panel2) 70%,#000)),color-mix(in srgb,var(--accent) var(--np-edge),color-mix(in srgb,var(--bg) 80%,#000)));
+  --np-play-ring:color-mix(in srgb,var(--accent) var(--np-ring),transparent);
+  --np-play-glow:color-mix(in srgb,var(--accent) var(--np-glow),transparent);
+  --np-play-hi:color-mix(in srgb,var(--accent) var(--np-hi),transparent)}
+.npcolor{--n:3;max-width:420px;margin:6px 0 4px;padding:10px 14px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.npcolor-rail{position:relative;height:22px}
+.npcolor-rail::before{content:"";position:absolute;left:9px;right:9px;top:9px;height:4px;border-radius:2px;background:var(--line)}
+.npcolor-fill{position:absolute;left:9px;top:9px;height:4px;border-radius:2px;background:var(--accent);width:calc((100% - 18px) * var(--stop) / (var(--n) - 1))}
+.npcolor-tick{position:absolute;top:6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--panel);border:1px solid var(--line);left:calc(9px + (100% - 18px) * var(--i) / (var(--n) - 1))}
+.npcolor-range{position:absolute;inset:0;width:100%;margin:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;accent-color:var(--accent)}
+.npcolor-range::-webkit-slider-runnable-track{background:transparent;height:22px}
+.npcolor-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:2px;border-radius:50%;background:var(--accent);border:2px solid var(--ink);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 50%,transparent)}
+.npcolor-range::-moz-range-track{background:transparent}
+.npcolor-range::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--ink)}
+.npcolor-range:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+.npcolor-labs{display:flex;justify-content:space-between;margin-top:4px}
+.npcolor-lab{background:none;border:0;padding:2px 0;color:var(--dim,var(--ink));font-size:12px;letter-spacing:.6px;cursor:pointer;opacity:.75}
+.npcolor-lab.on{color:var(--accent);font-weight:700;opacity:1}
+/* F94: phone Now Playing has no stage plate (cover only), so the intensity wash sits behind the whole column */
+@media (max-width:760px){ body .nowcol.np12{background:radial-gradient(ellipse 90% 60% at 50% 32%,color-mix(in srgb,var(--accent) var(--np-wash),transparent),transparent 75%)} }
+
+/* ---- 0.5.0 F95: Appearance > Now Playing pickers (Track bar 4, Buttons 4) - small CSS thumbs in the theme colors ---- */
+.npmix-live{border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--bg);margin:4px 0 2px}
+.npmix-live .npthumb{position:relative;inset:auto;width:100%;overflow:hidden;contain:paint}
+.npmix-live .npthumb>.np-ctlpanel{position:absolute;left:0;top:0;transform-origin:0 0;margin:0;max-height:none;max-width:none}
+.appsub .pgrid.pgrid-npseek,.appsub .pgrid.pgrid-npbtn,.pgrid-npseek,.pgrid-npbtn{grid-template-columns:repeat(4,minmax(0,200px))!important}
+.appsub .pgrid.pgrid-npart,.pgrid-npart{grid-template-columns:repeat(4,minmax(0,200px))!important}   /* F97: 4 art cards */
+.pgrid-npseek>[role=radio],.pgrid-npart>[role=radio],.pgrid-npbtn>[role=radio]{aspect-ratio:auto;max-height:none}
+.pgrid-npseek .pg-prev,.pgrid-npart .pg-prev,.pgrid-npbtn .pg-prev{flex:none;height:64px;display:grid;place-items:center;background:var(--panel)}
+.pgrid-npseek>[role=radio][aria-checked=true],.pgrid-npart>[role=radio][aria-checked=true],.pgrid-npbtn>[role=radio][aria-checked=true]{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+.npmini{width:84%}
+.npm-s{position:relative;height:22px}
+.npm-s-line .bar{position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--line)}
+.npm-s-line .fill{position:absolute;left:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--accent)}
+.npm-s-line .knob{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.npm-s-led{height:9px;margin:6px 0 7px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 18%,transparent) 0 6px,transparent 6px 9px)}
+.npm-s-led .pn-ledfill{background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 9px)}
+.npm-s-eq{background:color-mix(in srgb,#000 45%,var(--panel));border-radius:3px}
+.npm-s-eq .pn-eqbars{gap:3px;inset:2px 3px}
+.npm-times{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--dim);margin-top:3px}
+.npmini-btn{display:flex;align-items:center;justify-content:center;gap:6px}
+.npm-b{width:22px;height:22px;display:inline-grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+.npm-b svg{width:11px;height:11px} .npm-b.play{width:30px;height:30px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .npm-b.play svg{width:13px;height:13px}
+.npm-btn-round .npm-b.play{box-shadow:0 0 calc(12px * var(--np-k,1)) var(--np-play-hi,var(--accent))}
+.npm-btn-soft .npm-b:not(.play){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.npm-btn-square .npm-b{border-radius:6px}
+.npm-a{position:relative;width:48px;height:48px;margin:0 auto}
+.npm-cov{position:absolute;inset:0;z-index:2;display:grid;place-items:center;border-radius:5px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 30%,#000));color:var(--accent-ink);font-size:18px}
+.npm-ring{position:absolute;inset:-5px;z-index:3} .npm-ring svg{width:100%;height:100%;overflow:visible}
+.npm-ring rect{fill:none;stroke-width:3;vector-effect:non-scaling-stroke} .npm-ring .trk{stroke:color-mix(in srgb,var(--ink) 14%,transparent)} .npm-ring .val{stroke:var(--accent);stroke-dasharray:100;stroke-linecap:round}
+.npm-art-disc .npm-cov{border-radius:50%;box-shadow:0 0 0 2px #000} .npm-art-disc .npm-cov i{position:absolute;left:50%;top:50%;width:9px;height:9px;translate:-50% -50%;border-radius:50%;background:var(--bg);box-shadow:0 0 0 2px var(--accent)}
+.npm-spin{animation:pnspin 6s linear infinite}
+.npm-art-sleeve .npm-a{translate:-10px 0}
+.npm-vinyl{position:absolute;z-index:1;inset:3px;border-radius:50%;background:repeating-radial-gradient(circle,#111 0 2px,#1c1c1c 2px 4px);box-shadow:0 0 0 1px #000;translate:calc(44% * var(--np-frac)) 0}
+.npm-vinyl i{position:absolute;inset:36%;border-radius:50%;background:var(--accent)}
+.npm-art-cassette .npm-a{width:74px;height:48px}
+.npm-cass{position:absolute;inset:0;border-radius:5px;background:linear-gradient(180deg,#3a3d44,#1d1f23);box-shadow:inset 0 0 0 1px #555961,0 2px 6px rgba(0,0,0,.5)}
+.npm-clab{position:absolute;left:8%;right:8%;top:10%;height:26%;border-radius:2px;background:linear-gradient(180deg,var(--accent) 0 72%,#c9a65a 72%)}
+.npm-cwell{position:absolute;left:17%;right:17%;top:46%;height:34%;border-radius:4px;background:#111215}
+.npm-sp{position:absolute;top:50%;width:13px;height:13px;translate:-50% -50%;border-radius:50%;background:#050506} .npm-sp-l{left:18%} .npm-sp-r{left:82%}
+.npm-tape{position:absolute;left:50%;top:50%;translate:-50% -50%;width:calc(50% + 46% * var(--t));aspect-ratio:1;border-radius:50%;background:#7b4f2a}
+.npm-hub{position:absolute;inset:28%;border-radius:50%;background:radial-gradient(circle,#2a2e32 0 22%,transparent 24%),repeating-conic-gradient(#f2f4f6 0deg 30deg,#8f98a2 30deg 45deg)}
+@media (prefers-reduced-motion:reduce){ .npm-spin{animation:none} }
+.npm-btn-ring .npm-b{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)} .npm-btn-ring .npm-b.play{background:var(--accent);border-color:var(--accent)}
+@media (max-width:760px){ .appsub .pgrid.pgrid-npseek,.appsub .pgrid.pgrid-npbtn,.appsub .pgrid.pgrid-npart,.pgrid-npseek,.pgrid-npbtn,.pgrid-npart{grid-template-columns:repeat(2,minmax(0,1fr))!important} }
+/* ---- 0.5.0 F98: Album art axis on the small players (npart.js .npa-box): condensed + standalone mini (.mp-artbox), the collapsed Now Playing
+   strip (.ns-art), the full-width bar (.npb-art) and the phone .mini strip. Same .pn-art-<id> markup as the panel, drawn small. ---- */
+.npa-box{position:relative;flex:none;--npa:56px;width:var(--npa);height:var(--npa)}
+.npa-box.pn-art-cassette{width:calc(var(--npa) * 1.52);height:var(--npa);aspect-ratio:1.52/1}
+.npa-box .pc-sp,.npa-box .pc-hub,.npa-box .pc-tape{aspect-ratio:1!important}
+.npa-box .pc-sp,.npa-box .pc-tape{height:auto!important}
+.npa-box.pn-art-sleeve{margin-right:calc(var(--npa) * .3)}
+:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box.npa-box > .pn-art{position:relative!important;inset:auto!important;translate:none!important;grid-area:auto!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;aspect-ratio:auto!important;margin:0!important;border-radius:4px;cursor:inherit}
+:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box:not(.pn-art-cassette) > .pn-art > .pn-cover{position:relative!important;inset:auto!important;width:100%!important;height:100%!important;border-radius:4px}
+:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box.pn-art-square > .pn-art{padding:3px!important;box-sizing:border-box}
+:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box:not(.pn-art-square) .pn-ring,:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box:not(.pn-art-sleeve) .pn-disc,:is(.np-ctlpanel,.npbar,.mini,.mp,body) .npa-box:not(.pn-art-cassette) .pn-cass{display:none!important}
+.npa-box .pn-ring rect{stroke-width:2}
+.npa-box .pn-cover .cover,.npa-box .pn-cover .mp-art{width:100%!important;height:100%!important;border-radius:3px;font-size:16px;display:flex;box-sizing:border-box}
+.npa-box.pn-art-disc .pn-cover::after{box-shadow:0 0 0 1px #000,0 0 0 2px var(--accent)}
+.npa-box.pn-art-disc .pn-cover::before{background:repeating-radial-gradient(circle,transparent 0 2px,rgba(0,0,0,.12) 2px 3px)}
+.npa-box.pn-art-sleeve .pn-disc{translate:calc(4% + 34% * var(--np-frac,0)) 0!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 28%,transparent),0 2px 6px rgba(0,0,0,.6)!important;background:repeating-radial-gradient(circle,#1a1a1a 0 1.5px,#2a2a2a 1.5px 3px)!important}
+.npa-box.pn-art-sleeve{margin-right:calc(var(--npa) * .36)}
+.npa-box.pn-art-cassette .pc-scr,.npa-box.pn-art-cassette .pc-notch{display:none}
+.npa-box.pn-art-cassette .pn-cass{border-radius:4px;box-shadow:inset 0 0 0 1px #55596180,0 2px 6px rgba(0,0,0,.5)}
+.npa-box.pn-art-cassette .pn-cover{top:9%!important;height:28%!important;left:8%!important;width:84%!important;border-radius:2px!important}
+.npa-box.pn-art-cassette .pc-well{top:44%;height:40%;left:14%;right:14%}
+.npa-box.pn-art-cassette .pc-sp{width:30%}
+/* sizes per host */
+.mp .mp-artbox{--npa:56px;cursor:grab}
+body.minibody .mp:not(.slim) .mp-artbox{--npa:44px}
+.mp.slim .mp-artbox{--npa:38px}
+body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-cassette) .mp-txt{flex-basis:calc(100% - 74px)}
+body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:calc(100% - 64px)}
+.ns-art{width:auto!important;height:auto!important;border-radius:0} .ns-art .npa-box{--npa:40px}
+.npbar .npb-art .npa-box{--npa:46px}
+.mini-art{flex:none;display:flex} .mini .npa-box{--npa:40px}
+.np-ctlpanel .ns-art .npa-box.pn-art-disc.playing .pn-cover,.npa-box.pn-art-disc.playing .pn-cover{animation:pnspin calc(6s / (0.2 + var(--fx-motion,.5))) linear infinite}
+@media (prefers-reduced-motion:reduce){ .npa-box.pn-art-disc.playing .pn-cover,.npa-box.pn-art-cassette.playing .pc-hub{animation:none} }
+
+/* ---- 0.5.0 F100: phone Settings - no sideways scroll, title never eaten by search, left labels visible ---- */
+@media (max-width:900px){
+  dialog.settings-dlg{overflow-x:hidden}
+  dialog.settings-dlg>header{flex-wrap:wrap;row-gap:6px}
+  dialog.settings-dlg>header .grow{flex:1 1 auto;min-width:0;white-space:nowrap}
+  dialog.settings-dlg>header .setsearch-w{order:10;flex:1 1 100%;width:100%}
+  dialog.settings-dlg>.body,dialog.settings-dlg .settings-body,dialog.settings-dlg .settings-scroll,dialog.settings-dlg .settings-sec{min-width:0;max-width:100%;overflow-x:hidden}
+  dialog.settings-dlg .settings-sec>*,dialog.settings-dlg .card,dialog.settings-dlg .setrow,dialog.settings-dlg .row{min-width:0;max-width:100%;box-sizing:border-box}
+  dialog.settings-dlg .settings-sec,dialog.settings-dlg .devsubsec{grid-template-columns:minmax(0,1fr)!important}
+  dialog.settings-dlg table{display:block;max-width:100%;overflow-x:auto}
+}
+
+/* F101: phone Now Playing keeps Up next; hide decorative rule */
+@media (max-width:760px){.nowcol .np-upnext .np-upline{display:none!important;width:0!important;min-width:0!important;flex:none!important;height:0!important;background:none!important}}   /* F102b */
+@media (max-width:760px){.nowcol .upnext.np-upnext,.nowcol>.np-upnext{border:0!important;background:none!important;padding-inline:0!important;border-radius:0!important;box-shadow:none!important}}   /* F102c: drop old phone card chrome on Up next */
+
+/* ---- 0.5.0 F102: phone Now Playing "wow" - no dead overlay buttons (lock / swap / looks / fullscreen only drove the hidden stage), hero art
+   with a soft cover bloom, clearer titles, more air, and Color intensity that visibly punches the play glow + square progress edge. Desktop unchanged. ---- */
+@media (max-width:760px){
+  .nowcol>.np-vizpanel{display:none!important}
+  .nowcol>.np-ctlpanel{margin-top:0!important}
+  .desk[data-view=now]>.nowcol{position:relative;isolation:isolate;gap:8px!important}
+  .nowcol.np12::before{content:"";position:absolute;z-index:-1;left:50%;top:4%;width:min(110vw,64dvh);aspect-ratio:1;translate:-50% 0;pointer-events:none;
+    background:var(--np-bloom,none) center/cover no-repeat,radial-gradient(circle,color-mix(in srgb,var(--accent) calc(var(--np-wash) + 20%),transparent),transparent 70%);
+    filter:blur(48px) saturate(1.5);opacity:calc(.22 + .14 * var(--np-k));border-radius:50%;transition:opacity .4s}
+  .nowcol .np-ctlpanel .np-tablemain{grid-template-rows:44px minmax(0,1fr) auto auto auto auto 88px 48px 52px!important;row-gap:8px!important}
+  .nowcol .np-ctlpanel .pn-art{width:min(78vw,42dvh)!important;height:auto!important;max-width:min(78vw,42dvh)!important;max-height:100%!important;align-self:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 calc(26px * var(--np-k)) color-mix(in srgb,var(--accent) var(--np-glow),transparent);border-radius:6px}
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art{width:min(88vw,calc(42dvh * 1.52))!important;max-width:88vw!important;height:auto!important}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-art,.nowcol .np-ctlpanel.pn-art-disc .pn-art{box-shadow:none}
+  .nowcol .np-ctlpanel.pn-art-square .pn-ring rect{stroke-width:calc(3px + 1.5px * var(--np-k));filter:drop-shadow(0 0 calc(5px * var(--np-k)) var(--accent))}
+  .nowcol .np-ctlpanel .np-tabletitles>.t1{font-size:25px!important;line-height:1.15!important;letter-spacing:-.2px;font-weight:800;margin-top:4px}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2{font-size:16px!important;color:var(--accent2,var(--accent));font-weight:600;opacity:.95}
+  .nowcol .np-ctlpanel .np-tabletitles>.np-album{font-size:13px!important;opacity:.7;margin-bottom:6px}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn.play{box-shadow:0 0 0 calc(3px + 2px * var(--np-k)) var(--np-play-ring),0 0 calc(22px * var(--np-k)) var(--np-play-hi),0 0 calc(50px * var(--np-k)) var(--np-play-glow)!important}
+  .nowcol .np-ctlpanel .np-tableseek .prog{filter:drop-shadow(0 0 calc(4px * var(--np-k)) color-mix(in srgb,var(--accent) var(--np-glow),transparent))}
+  .remote-banner{padding-block:3px!important;font-size:12px!important;flex:none;max-height:30px}
+}
+
+/* ---- 0.5.0 F102d: phone NP matches the wow renders - hero art var(--np-art), visible cover bloom (opacity floors per Color intensity),
+   26-28px titles, Max clearly hotter than Spicy. Overrides the F102 block; desktop unchanged. ---- */
+:root{--np-bloom-o:.40;--np-hot:1}
+:root[data-npcolor="subtle"]{--np-bloom-o:.28;--np-hot:.5}
+:root[data-npcolor="max"]{--np-bloom-o:.62;--np-hot:2.2}
+@media (max-width:760px){
+  /* spec size min(88vw,48dvh), capped so the stack below (titles / seek / transport / volume / extras / Up next) never overlaps on short phones */
+  .nowcol{--np-art:min(88vw,48dvh,calc(100dvh - 580px));--np-artc:min(92vw,calc(48dvh * 1.52),calc((100dvh - 580px) * 1.52))}
+  .desk[data-view=now]>.nowcol{padding-top:2px!important}
+  .nowcol.np12::before{top:2%;width:min(120vw,70dvh);filter:blur(60px) saturate(1.7)!important;opacity:var(--np-bloom-o)!important;
+    background:var(--np-bloom,none) center/cover no-repeat,radial-gradient(circle,color-mix(in srgb,var(--accent) 55%,transparent),transparent 70%)}
+  .nowcol .np-ctlpanel .np-tablemain{grid-template-rows:44px auto auto auto auto auto 86px 46px 50px!important;row-gap:6px!important;align-content:start}
+  .nowcol .np-ctlpanel .pn-art{width:var(--np-art)!important;max-width:var(--np-art)!important;height:var(--np-art)!important;max-height:none!important;aspect-ratio:1!important;
+    box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 calc(18px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(30% * var(--np-hot)),transparent),0 0 calc(44px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(18% * var(--np-hot)),transparent)!important;border-radius:10px}
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art{width:var(--np-artc)!important;max-width:92vw!important;height:calc(var(--np-artc) / 1.52)!important;max-height:none!important;aspect-ratio:1.52/1!important}
+  .nowcol .np-ctlpanel:is(.pn-art-disc,.pn-art-sleeve,.pn-art-cassette) .pn-art{box-shadow:none!important}
+  .nowcol .np-ctlpanel:is(.pn-art-disc,.pn-art-sleeve) .pn-cover{box-shadow:0 0 calc(22px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(28% * var(--np-hot)),transparent)}
+  .nowcol .np-ctlpanel.pn-art-square .pn-ring rect{stroke-width:calc(3px + 1.6px * var(--np-hot))!important;filter:drop-shadow(0 0 calc(6px * var(--np-hot)) var(--accent))!important}
+  .nowcol .np-ctlpanel .np-tabletitles>.t1{font-size:27px!important;font-weight:800!important;line-height:1.12!important;margin-top:2px!important;text-shadow:0 2px 12px rgba(0,0,0,.55)}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2{font-size:18px!important;color:var(--accent)!important;font-weight:600}
+  .nowcol .np-ctlpanel .np-tabletitles>.np-album{font-size:14px!important;opacity:.62!important;margin-bottom:8px!important}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn.play{box-shadow:0 0 0 calc(2px + 2px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(22% * var(--np-hot)),transparent),0 0 calc(20px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(40% * var(--np-hot)),transparent),0 0 calc(48px * var(--np-hot)) color-mix(in srgb,var(--accent) calc(28% * var(--np-hot)),transparent)!important}
+}
+
+/* ---- 0.5.0 F102e: free phone chrome so hero art is >=320px on 390x844 - album folds into the artist line (Artist · Album), tighter gaps,
+   72px play, 40px extras; Subtle bloom actually quiet. ---- */
+@media (max-width:760px){
+  :root[data-npcolor="subtle"]{--np-wash:2%}   /* F102f: phone only - desktop Subtle stays F94b */
+  .nowcol{--np-art:min(88vw,48dvh,calc(100dvh - 490px));--np-artc:min(92vw,calc(48dvh * 1.52),calc((100dvh - 490px) * 1.52))}
+  .nowcol .np-ctlpanel .np-tablemain{grid-template-rows:40px auto auto auto 0 auto 76px 40px 44px!important;row-gap:5px!important}
+  .nowcol .np-ctlpanel .np-tabletitles>.np-album{display:none!important}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2{font-size:17px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .nowcol .np-ctlpanel .np-tabletitles>.t2:not([data-album=""])::after{content:" · " attr(data-album);color:var(--ink);opacity:.55;font-weight:400}
+  .nowcol .np-ctlpanel .np-tabletitles>.t1{margin-top:0!important;font-size:26px!important}
+  .nowcol .np-ctlpanel .zl-ov{min-height:36px!important}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn.play{width:72px!important;height:72px!important;min-width:72px!important}
+  .nowcol .np-ctlpanel .np-tablexport>.tbtn:not(.play){width:50px!important;height:50px!important;min-width:50px!important}
+  .nowcol .np-ctlpanel :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}
+  .nowcol .np-ctlpanel .np-tableseek{row-gap:0!important}
+  .nowcol .np-ctlpanel .np-zvolw .np-zvol{height:26px!important}
+  :root[data-npcolor="subtle"] .nowcol.np12{background:none!important}
+}
+
+/* ---- 0.5.0 F102f: phone Up next spans the full column; title fills to the right edge (no 55% cap). Desktop unchanged. ---- */
+@media (max-width:760px){
+  .nowcol>.np-upnext,.nowcol .upnext.np-upnext{width:100%!important;max-width:100%!important;align-self:stretch!important;box-sizing:border-box;display:flex!important;min-width:0}
+  .nowcol .np-upnext .np-uplbl{flex:none!important}
+  .nowcol .np-upnext .np-uptitle{flex:1 1 auto!important;max-width:none!important;min-width:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
+/* ---- 0.5.0 F102g: Up next centers when short (phone + desktop), long lines still ellipsize at the edge; Square art corners match the
+   ring (SVG rect rx=9 in a 100 viewBox = 9% of the box) on phone and PC. ---- */
+.nowcol .np-upnext,.nowcol>.np-upnext{justify-content:safe center!important}
+.nowcol .np-upnext .np-uplbl{flex:none!important}
+.nowcol .np-upnext .np-uptitle{flex:0 1 auto!important;max-width:100%!important;min-width:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowcol .np-upnext .np-upline{display:none!important}
+.pn-art-square .pn-art{border-radius:9%!important}
+.pn-art-square .pn-art .pn-cover,.pn-art-square .pn-art .pn-cover .cover,.pn-art-square .pn-art .pn-cover img{border-radius:7.5%!important;overflow:hidden!important}
+.npa-box.pn-art-square .pn-cover,.npa-box.pn-art-square .pn-cover .cover{border-radius:7.5%!important;overflow:hidden!important}
+@media (max-width:760px){
+  .nowcol .np-upnext .np-uptitle{flex:0 1 auto!important}
+  .desk[data-view=now]>.nowcol{border-radius:var(--radius)!important;overflow:hidden!important}
+}
+
+/* ---- 0.5.0 F104: premium Matte Tape (art: cassette) + Jacket (art: sleeve). IDs unchanged; picker labels Tape / Jacket.
+   Tape: matte charcoal shell drawn on .pn-art, cover fills a big recessed label window, the tape window (hubs + tape tracking --np-frac)
+   sits over the label, tiny recessed screws, trapezoid bottom with holes. No grips / gold TYPE I bar.
+   Jacket: full cover = paper jacket (slight radius, spine edge, soft shadow); black grooved vinyl with a rim highlight and a circular
+   cover-crop center label slides right with --np-frac (idle peek ~12 %, full ~38 %). ---- */
+.pc-grip,.pc-meta{display:none!important}
+.pn-art-cassette .pn-art{background:radial-gradient(120% 90% at 30% 0%,#3a3c41 0%,#222327 45%,#17181b 100%)!important;border-radius:5%/7.6%!important;
+  box-shadow:inset 0 0 0 1px #ffffff14,inset 0 1px 0 #ffffff1f,inset 0 -2px 6px #0008,0 10px 28px rgba(0,0,0,.55)!important;overflow:hidden}
+.pn-art-cassette .pn-cass{background:none!important;box-shadow:none!important;z-index:3!important;border-radius:inherit}
+.pn-art-cassette .pn-cover{z-index:1!important;left:6%!important;right:6%!important;width:88%!important;top:7.5%!important;height:66%!important;border-radius:2.4%/3.6%!important;overflow:hidden!important}
+.pn-art-cassette .pn-cover .cover,.pn-art-cassette .pn-cover img{width:100%!important;height:100%!important;object-fit:cover;border-radius:0!important}
+.pc-lbl{position:absolute;left:6%;right:6%;top:7.5%;height:66%;border-radius:2.4%/3.6%;box-shadow:inset 0 0 0 1.5px #0009,inset 0 2px 5px #000a,0 0 0 1px #ffffff12;pointer-events:none}
+.pn-art-cassette .pc-well{left:27%!important;right:27%!important;top:30%!important;height:23%!important;border-radius:999px!important;background:linear-gradient(180deg,#0d0e10,#1a1b1e)!important;
+  box-shadow:inset 0 0 0 1px #000,inset 0 2px 6px #000c,0 0 0 2px #2a2c31,0 0 0 3px #0007!important}
+.pn-art-cassette .pc-sp{width:27%!important;background:#0a0a0b!important}
+.pn-art-cassette .pc-l{left:16%!important} .pn-art-cassette .pc-r{left:84%!important}
+.pn-art-cassette .pc-hub{inset:24%!important;background:radial-gradient(circle,#1d1f22 0 26%,transparent 28%),repeating-conic-gradient(#d9dde2 0deg 24deg,#6c737c 24deg 30deg,#d9dde2 30deg 60deg)!important;box-shadow:0 0 0 1px #111,inset 0 0 0 2px #0006!important}
+.pn-art-cassette .pc-bridge{left:28%!important;right:28%!important;height:40%!important;background:linear-gradient(180deg,#3b2614,#5e3d22 50%,#3b2614)!important;opacity:.9!important;border-radius:2px}
+.pn-art-cassette .pc-scr{width:2.6%!important;background:radial-gradient(circle,#111 0 14%,#4a4d53 18% 55%,#2a2c30 60%)!important;box-shadow:inset 0 1px 1px #000,0 1px 0 #ffffff14!important}
+.pn-art-cassette .pc-tl{left:2.6%!important;top:3.6%!important} .pn-art-cassette .pc-tr{right:2.6%!important;top:3.6%!important}
+.pn-art-cassette .pc-bl{left:2.6%!important;bottom:4.6%!important} .pn-art-cassette .pc-br{right:2.6%!important;bottom:4.6%!important}
+.pc-bc{display:none} .pn-art-cassette .pc-bc{display:block;left:48.7%;bottom:17%}
+.pn-art-cassette .pc-notch{left:20%!important;right:20%!important;height:20%!important;background:linear-gradient(180deg,#202125,#16171a)!important;clip-path:polygon(7% 0,93% 0,100% 100%,0 100%);border-radius:0!important;box-shadow:inset 0 1px 0 #ffffff12!important;justify-content:space-around!important;padding:0 10%;box-sizing:border-box}
+.pn-art-cassette .pc-notch i{width:7%!important;height:auto!important;aspect-ratio:1;border-radius:50%!important;background:#08090a!important;box-shadow:inset 0 1px 2px #000,0 1px 0 #ffffff10}
+/* Jacket */
+.pn-art-sleeve .pn-cover{border-radius:clamp(2px,1.5%,8px)!important;overflow:hidden!important;
+  box-shadow:inset 2px 0 0 #ffffff22,inset 3px 0 0 #0005,6px 0 16px rgba(0,0,0,.55),0 10px 26px rgba(0,0,0,.45)!important}
+.pn-art-sleeve .pn-cover .cover{border-radius:inherit!important}
+.pn-art-sleeve .pn-disc{top:3%!important;left:3%!important;width:94%!important;height:94%!important;
+  background:radial-gradient(circle,transparent 0 33%,#0b0b0c 33.5%),repeating-radial-gradient(circle,#0c0c0d 0 1px,#19191b 1px 2px,#0e0e0f 2px 3px)!important;
+  box-shadow:0 0 0 1px #000,inset 0 0 0 2px #2b2b2e,inset 0 0 0 3px #000,0 6px 18px rgba(0,0,0,.6)!important;
+  translate:calc(16% + 32% * var(--np-frac,0)) 0!important}
+.pn-art-sleeve .pn-disc::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 30deg,transparent 0 40deg,#ffffff14 60deg,transparent 90deg 210deg,#ffffff10 235deg,transparent 260deg);pointer-events:none}
+.pn-art-sleeve .pn-disc i{inset:33%!important;background:var(--np-cover,none) center/cover,var(--accent)!important;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #0006}
+.pn-art-sleeve .pn-disc i::after{inset:45%!important;background:#0b0b0c!important}
+.npa-box.pn-art-sleeve .pn-disc{translate:calc(10% + 24% * var(--np-frac,0)) 0!important}
+.npa-box.pn-art-sleeve .pn-disc::before{display:none}
+.npa-box.pn-art-cassette .pc-scr,.npa-box.pn-art-cassette .pc-notch,.npa-box.pn-art-cassette .pc-lbl{display:none!important}
+.npa-box.pn-art-cassette .pn-cover{left:6%!important;width:88%!important;top:7%!important;height:66%!important}
+@media (max-width:760px){
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art .pn-cover{left:6%!important;top:7.5%!important;width:88%!important;height:66%!important}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-art{translate:-16% 0!important}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-disc{translate:calc(16% + 32% * var(--np-frac,0)) 0!important}
+}
+@media (prefers-reduced-motion:reduce){ .pn-art-sleeve .pn-disc,.pn-art-cassette .pc-tape{transition:none!important} .pn-art-cassette.playing .pc-hub{animation:none!important} }
+@media (max-width:760px){
+  /* F104: Jacket leaves room on the right for the vinyl to slide out without clipping */
+  .nowcol .np-ctlpanel.pn-art-sleeve{--np-art:min(64vw,40dvh,calc(100dvh - 490px))}
+  .nowcol .np-ctlpanel.pn-art-sleeve .pn-art{translate:-18% 0!important}
+}
+
+/* ---- 0.5.0 F104b: Jacket - the vinyl's cover label sits toward the disc's right (peeked) edge so it reads in the visible crescent as
+   --np-frac rises (mid: mostly visible, end: fully visible). Grooves / rim unchanged; small peek bump. ---- */
+.pn-art-sleeve .pn-disc i{inset:auto!important;left:66%!important;top:36%!important;width:28%!important;height:28%!important}
+.pn-art-sleeve .pn-disc{translate:calc(16% + 36% * var(--np-frac,0)) 0!important}
+.npa-box.pn-art-sleeve .pn-disc{translate:calc(14% + 30% * var(--np-frac,0)) 0!important}
+.npa-box.pn-art-sleeve .pn-disc i{left:64%!important;width:30%!important;top:35%!important;height:30%!important}
+@media (max-width:760px){ .nowcol .np-ctlpanel.pn-art-sleeve .pn-disc{translate:calc(16% + 36% * var(--np-frac,0)) 0!important} }
+
+/* ===== 0.5.0 F105: Library premium makeover (phone + PC). Tokens shared w/ F103: art 12px, rows 10-12px, artists round. ===== */
+.lib{--lib-r-art:12px;--lib-r-row:12px;--lib-r-thumb:10px;--lib-gap-y:20px;--lib-gap-x:16px;
+  --lib-shadow:0 10px 26px color-mix(in srgb,#000 38%,transparent);--lib-wash:color-mix(in srgb,var(--accent) 11%,transparent)}
+/* tiles: soft 12px art, gentle playing ring, soft play/heart chips */
+.lib .tilegrid{gap:var(--lib-gap-y) var(--lib-gap-x)}
+.lib .tile .tileart,.lib.expanded .tile .tileart{border-radius:var(--lib-r-art);border:0;box-shadow:0 4px 14px color-mix(in srgb,#000 28%,transparent)}
+.lib .tile .tileart .cover{border-radius:inherit}
+.lib .tile .tileart.rnd,.lib .tile .tileart.rnd .cover{border-radius:50%}
+.lib .tile.playing .tileart{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 80%,transparent),0 8px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
+.lib .tile .t1{margin-top:9px;font-size:14px;font-weight:650;letter-spacing:.1px}
+.lib .tile .t2{margin-top:2px;opacity:.85}
+.lib .tile .tileplay{width:40px;height:40px;right:10px;bottom:10px;box-shadow:0 6px 18px color-mix(in srgb,#000 45%,transparent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.lib .tile .heart{top:8px;right:8px;width:32px;height:32px;background:color-mix(in srgb,#000 42%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:0}
+.lib .tile .tilebadge{left:8px;bottom:8px;border-radius:999px;padding:3px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.lib .tile .tcount{border-radius:999px;border-color:color-mix(in srgb,var(--accent) 55%,transparent);padding:1px 8px}
+.lib .tile .gblock,.lib .tile .gblock.j10{border-radius:var(--lib-r-art);border-left:0}
+.lib .tile .gblock.j10 .gname,.lib .tile .gblock.j10 .gcount{border-radius:6px}
+.lib .tile .gcollage .cover{border-radius:8px}
+.lib .tile .fmosaic{border-radius:var(--lib-r-art);overflow:hidden} .lib .tile .fmosaic .fbadge{border-radius:8px}
+.lib.expanded .tile{border-radius:14px;padding:8px;margin:-8px}
+.lib.expanded .tile:hover,.lib.expanded .tile:focus-within{transform:translateY(-3px);background:color-mix(in srgb,var(--panel2) 85%,transparent);box-shadow:var(--lib-shadow)}
+.lib.expanded .tile:hover .tileart{box-shadow:0 8px 22px color-mix(in srgb,#000 36%,transparent)}
+.lib.expanded .tilegrid{gap:24px 18px;padding:6px 4px 16px}
+/* list rows: rounded rows + rounded thumbs, soft playing wash */
+.lib .list .item{border-radius:var(--lib-r-row);padding:9px 8px;gap:12px}
+.lib .list .item .cover.sm{border-radius:var(--lib-r-thumb);box-shadow:0 2px 8px color-mix(in srgb,#000 25%,transparent)}
+.lib .list .item .cover.sm{overflow:hidden} .lib .list .item .cover.sm.rnd,.lib .list .item .cover.sm.rnd .amosaic{border-radius:50%!important}
+.lib .list .item .t1{font-weight:600} .lib .list .item .t2{margin-top:2px}
+.lib .list .item.cur,.lib .list .item.playing{outline:0;background:var(--lib-wash);box-shadow:inset 3px 0 0 color-mix(in srgb,var(--accent) 70%,transparent)}
+.lib .list .item:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.lib .list .item .heart{border-radius:50%;border:0;background:transparent}
+.lib .list .item .more{border-radius:50%}
+/* toolbar + tabs */
+.lib .libtools{gap:8px;margin:2px 0 12px}
+.lib .libtools .wwdd,.lib .libtools .libflip{border-radius:10px}
+.lib .libtools .seg{border-radius:10px;border-color:color-mix(in srgb,var(--line) 80%,transparent)}
+.lib .libtools .seg button{border-radius:0}
+.lib .libsearch input{border-radius:12px}
+.lib .tabs:not(.xtabs) button,.lib .tabs.ctabs button{border-radius:3px}
+/* album page: softer dominant header, bigger cover, airy title stack */
+.lib .albhead{border-radius:16px;padding:26px 24px 22px;gap:26px;
+  background:radial-gradient(120% 90% at 18% 0%,color-mix(in srgb,var(--dom) 42%,transparent) 0%,transparent 70%),linear-gradient(180deg,color-mix(in srgb,var(--dom) 26%,var(--panel)) 0%,var(--panel) 100%)}
+.lib .albhead .cover.albcover{border-radius:14px;box-shadow:0 18px 44px color-mix(in srgb,#000 45%,transparent),0 0 60px color-mix(in srgb,var(--dom) 28%,transparent)}
+.lib.expanded .albhead .cover.albcover{width:min(260px,32%)}
+.lib .albmeta{gap:8px} .lib .albkind{opacity:.7}
+.lib .albacts{gap:14px;margin-top:12px}
+.lib .albacts .chipbtn,.lib .albacts button:not(.tbtn){border-radius:999px}
+.lib .albcols{border-bottom-color:color-mix(in srgb,var(--line) 60%,transparent);padding:8px 12px}
+.lib .albpage .list .item,.albpage .list .item{padding:11px 12px}
+/* PC side panel (compact): same tokens, tighter */
+.lib.compact{--lib-r-art:10px;--lib-gap-y:14px;--lib-gap-x:12px}
+.lib.compact .tile .t1{font-size:13px;margin-top:7px}
+.lib.compact .list .item{padding:7px 6px;border-radius:10px} .lib.compact .list .item .cover.sm{border-radius:8px}
+.lib.compact .tile .tileplay{width:34px;height:34px;right:7px;bottom:7px}
+.lib.compact .tile .heart{width:28px;height:28px;top:6px;right:6px}
+@media (pointer:fine){ .lib.expanded .tile .heart{width:36px;height:36px} }
+
+/* ---- phone full Library page ---- */
+@media (max-width:760px){
+  .view .lib:not(.compact){padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .view .lib .libsearch{margin:6px 0 14px} .view .lib .libsearch input{height:46px;font-size:15px;padding:0 16px;border-radius:12px;width:100%}
+  .view .lib .libhead .tabs,.view .lib .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 0 12px;padding:0 0 2px;-webkit-overflow-scrolling:touch}
+  .view .lib .tabs::-webkit-scrollbar{display:none}
+  .view .lib .tabs button{flex:none;min-height:40px;padding:0 16px;font-size:14px;font-weight:600;border-color:transparent;background:color-mix(in srgb,var(--panel2) 75%,transparent)}
+  .view .lib .tabs button.on{background:color-mix(in srgb,var(--accent) 88%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .view .lib .tabs .wwdd{flex:none;border-radius:3px;min-height:40px}
+  .view .lib .libtools{flex-wrap:nowrap;gap:8px;margin:0 0 16px}
+  .view .lib .libtools > *{min-height:38px}
+  .view .lib .libtools .seg button{min-width:44px;min-height:38px}
+  .view .lib .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 16px}
+  .view .lib .tile .tileplay{width:44px;height:44px}
+  .view .lib .tile .t1{font-size:15px}
+  .view .lib .list .item{padding:10px 8px;gap:14px}
+  .view .lib .list .item .cover.sm{width:54px;height:54px}
+  .view .lib .list .item .t1{font-size:16px}
+  .view .lib .list .item .heart,.view .lib .list .item .more{min-width:40px;min-height:40px}
+  .view .lib .albhead{padding:22px 18px 20px;gap:16px;align-items:center;text-align:center;margin:0 0 10px}
+  .view .lib .albhead .cover.albcover{width:min(64vw,250px);margin:0 auto}
+  .view .lib .albmeta{align-items:center;width:100%}
+  .view .lib .albtitle{font-size:26px}
+  .view .lib .albacts{justify-content:center}
+  .view .lib .crumbs{gap:10px;margin:0 0 12px}
+  .view .lib .crumbs button{border-radius:999px;min-height:40px;padding:0 14px}
+}
+
+/* F114: Daylight / light-scheme pass - dark-theme white-alpha borders and white labels on light panels use theme vars */
+:root[data-scheme=light] .devbody .drow,:root[data-scheme=light] .qtable td,:root[data-scheme=light] .rcv{border-bottom-color:var(--line)}
+:root[data-scheme=light] .scsep{background:var(--line)}
+:root[data-scheme=light] .inlineform{background:var(--panel2)}
+:root[data-scheme=light] .calpc:not(.none) .calnum,:root[data-scheme=light] .tag-rec{color:var(--bg)}
+:root[data-scheme=light] input,:root[data-scheme=light] select,:root[data-scheme=light] textarea{color:var(--ink)}
+
+/* 0.5.0 F128: phone Sound / EQ sheet (showEq on !wide(), max-width:900px) reuses the F56 .eqsheet chrome */
+@media (max-width:900px){
+  .eqsheet.npeqsheet{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;background:var(--bg,var(--panel));color:var(--text)}
+  .npeqsheet .eqsheet-h{display:flex;align-items:center;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line,rgba(127,127,127,.25));flex:0 0 auto}
+  .npeqsheet .eqsheet-h b{flex:1 1 auto;font-size:1.05em}
+  .npeqsheet .eqsheet-x{width:34px;height:34px;border-radius:3px;border:1px solid var(--line,rgba(127,127,127,.3));background:transparent;color:var(--text);font-size:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+  .npeqsheet .eqsheet-b{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 12px max(16px,env(safe-area-inset-bottom))}
+  html.eqsheet-lock,html.eqsheet-lock body{overflow:hidden}
+}
+/* ---- 0.5.0 F126: phone NP art shrinks to fit the whole stack (zone / art / titles / seek / transport / volume / extras / Up next).
+   Supersedes the F102e height chase (490px chrome budget): art gets the leftover minmax(0,1fr) grid row and never exceeds its cell.
+   Fit > art size. No NP scroll; Up next stays visible. Desktop unchanged. ---- */
+@media (max-width:760px){
+  .nowcol{--np-art:min(88vw,40dvh,calc(100dvh - 560px - env(safe-area-inset-bottom,0px)));
+    --np-artc:min(92vw,calc(40dvh * 1.52),calc((100dvh - 560px - env(safe-area-inset-bottom,0px)) * 1.52))}
+  .desk[data-view=now]>.nowcol{display:flex!important;flex-direction:column!important;min-height:0}
+  .nowcol>.np-upnext,.nowcol .upnext.np-upnext{flex:none!important}
+  .nowcol .np-ctlpanel{flex:1 1 auto!important;min-height:0!important}
+  .nowcol .np-ctlpanel .np-tablemain{grid-template-rows:40px minmax(0,1fr) auto auto 0 auto 76px 40px 44px!important;min-height:0;height:100%;align-content:stretch}
+  .nowcol .np-ctlpanel .pn-art{width:min(var(--np-art),100%)!important;max-width:min(88vw,100%)!important;height:auto!important;max-height:100%!important;aspect-ratio:1!important;min-height:0!important;align-self:center;justify-self:center}
+  .nowcol .np-ctlpanel.pn-art-cassette .pn-art{width:min(var(--np-artc),100%)!important;max-width:min(92vw,100%)!important;height:auto!important;max-height:100%!important;aspect-ratio:1.52/1!important}
+  .nowcol .np-ctlpanel.pn-art-sleeve{--np-art:min(64vw,34dvh,calc(100dvh - 560px - env(safe-area-inset-bottom,0px)))}
+}
+
+/* ── 0.5.0 F130: flat desktop Now Playing + Shortcuts side icon strip. Theme tokens only (no preset hex). Phone (≤760px) untouched. ── */
+.np-ctlpanel .np-aaline{display:none}
+.np-ctlpanel > .pane-h .sctoggle{flex:none;margin-left:auto;margin-right:6px}
+.np-ctlpanel > .pane-h .sctoggle.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+.np-scside[hidden]{display:none!important}
+@media (min-width:761px){
+  .np-ctlpanel.np-flat{position:relative}
+  .np-ctlpanel.np-flat .np-scside{position:absolute;top:0;right:0;bottom:0;width:48px;z-index:3;display:flex;flex-direction:column;align-items:center;padding:8px 0;background:var(--panel2,var(--panel));border-left:1px solid var(--line);border-bottom-right-radius:var(--radius)}
+  .np-ctlpanel.np-flat .np-scside .scrow{flex-direction:column;margin:0;gap:6px;height:100%}
+  .np-ctlpanel.np-flat .np-scside .scsep{width:20px;height:1px;background:var(--line);margin:2px 0}
+  .np-ctlpanel.np-flat .np-scside .schome{margin-top:auto;color:var(--accent-text,var(--accent))}
+  /* flat grid: art | titles + labeled artist/album + thin progress | transport over mute/mixer/EQ/Sleep + zone */
+  .np-ctlpanel.np-flat .np-tablemain{grid-template-columns:auto minmax(150px,1fr) auto;min-height:0;padding:12px 14px;gap:8px 18px;align-items:center}
+  .np-ctlpanel.np-flat .pn-art{width:clamp(76px,7vw,92px);height:clamp(76px,7vw,92px)}
+  .np-ctlpanel.np-flat .np-tabletitles>.t1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .np-ctlpanel.np-flat .np-tabletitles>:is(.t2,.np-album){display:none}
+  .np-ctlpanel.np-flat .np-aaline{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;line-height:1.3;color:var(--ink)}
+  .np-ctlpanel.np-flat .np-aapart{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
+  .np-ctlpanel.np-flat .np-aapart[hidden],.np-ctlpanel.np-flat .np-aal[hidden]{display:none}
+  .np-ctlpanel.np-flat .np-aal{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);flex:none}
+  .np-ctlpanel.np-flat .np-aav{font-size:13px;color:var(--ink);opacity:.9;min-width:0}
+  .np-ctlpanel.np-flat .np-aadot{color:var(--dim)}
+  .np-ctlpanel.np-flat .np-times .pn-aa{display:none}
+  .np-ctlpanel.np-flat .pn-ctl{flex-direction:column;align-items:flex-end;gap:8px}
+  .np-ctlpanel.np-flat .np-tablevol{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}
+  .np-ctlpanel.np-flat .np-tablevol>.zl-ov{flex:none;margin:0;align-self:center;color:var(--accent-text,var(--accent));border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--accent-soft,var(--panel2))}
+  .np-ctlpanel.np-flat .np-tablevol>.zl-ov:hover{border-color:var(--accent)}
+}
+@media (max-width:760px){ .np-ctlpanel .np-aaline,.np-ctlpanel .np-scside,.np-ctlpanel .sctoggle{display:none!important} }
+/* F130 amendments: every NP size — Display size (zoom), narrow container widths, collapsed strip, condensed player; tokens only */
+@media (min-width:761px){ @container npctl (max-width:900px){ .np-ctlpanel.np-flat:not(.collapsed) .pn-art{width:76px;height:76px} .np-ctlpanel.np-flat .np-tablevol{flex-wrap:wrap;row-gap:6px} } }   /* F136: desktop-only, phone keeps F102/F126 */
+@media (min-width:761px){ @container npctl (max-width:560px){ .np-ctlpanel.np-flat:not(.collapsed) .np-tablemain{grid-template-columns:auto minmax(0,1fr)} .np-ctlpanel.np-flat .pn-ctl{grid-column:1 / -1;align-items:stretch} .np-ctlpanel.np-flat .np-tablevol{justify-content:space-between} .np-ctlpanel.np-flat .np-aaalb{display:none} } }   /* F136: desktop-only, phone keeps F102/F126 */
+@media (min-width:761px){
+  .np-ctlpanel.np-flat.pn-art-cassette .pn-art{height:clamp(76px,7vw,92px)!important;width:auto!important}
+  .np-ctlpanel.np-flat.pn-art-sleeve .np-tablemain{column-gap:calc(18px + 30px)}
+  .np-ctlpanel.np-flat .np-scside .scrow{overflow:hidden;min-height:0}
+  .np-ctlpanel.np-flat.collapsed .ns-t2{color:var(--dim)}
+}
+/* 0.5.0 F130b: expanded flat NP matches the locked render — layout only (no style change). Transport stays beside art + titles above the phone breakpoint (only a truly narrow container <=560px wraps); full "on <zone> ▾" pill; denser row. */
+@media (min-width:761px){
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablemain{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto;padding:10px 14px;gap:6px 16px}
+  .np-ctlpanel.np-flat:not(.collapsed) .pn-ctl{grid-column:auto;flex-direction:column;align-items:flex-end;gap:6px;padding:0}
+  .np-ctlpanel.np-flat .np-tablevol{flex-wrap:nowrap}
+  .np-ctlpanel.np-flat .np-tablevol>.zl-ov{max-width:none;flex:none;white-space:nowrap}
+  .np-ctlpanel.np-flat .np-tablevol>.zl-ov .zl-name{overflow:visible;text-overflow:clip}
+}
+@media (min-width:761px){   /* F136: desktop-only */
+@container npctl (max-width:900px){
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablemain{grid-template-columns:auto minmax(0,1fr) auto;gap:6px 12px}
+  .np-ctlpanel.np-flat:not(.collapsed) .pn-ctl{grid-column:auto}
+}
+}
+@media (min-width:761px){   /* F136: desktop-only */
+@container npctl (max-width:560px){
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablemain{grid-template-columns:auto minmax(0,1fr)}
+  .np-ctlpanel.np-flat:not(.collapsed) .pn-ctl{grid-column:1 / -1;align-items:stretch}
+  .np-ctlpanel.np-flat .np-tablevol{flex-wrap:wrap}
+}
+}
+/* 0.5.0 F132: mute / mixer / EQ / Sleep on the same line as "on <zone> ▾" (layout only). Base .np-tablevol is column; flat desktop NP is a single row. Phone unchanged. */
+@media (min-width:761px){
+  .np-ctlpanel.np-flat .np-tablevol{flex-direction:row;align-items:center;flex-wrap:nowrap}
+  .np-ctlpanel.np-flat .np-tablevol>.np-volrow{flex:none}
+}
+@media (min-width:761px){ @container npctl (max-width:900px){ .np-ctlpanel.np-flat .np-tablevol{flex-wrap:nowrap} } }   /* F136: desktop-only, phone keeps F102/F126 */
+/* 0.5.0 F133: Shortcuts side strip scrolls instead of clipping (layout only, no restyle). */
+@media (min-width:761px){
+  .np-ctlpanel.np-flat .np-scside{overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;overscroll-behavior:contain}
+  .np-ctlpanel.np-flat .np-scside .scrow{overflow:visible;height:auto;min-height:100%;flex:0 0 auto}
+  .np-ctlpanel.np-flat .np-scside .scrow > *{flex:0 0 auto}
+  .np-ctlpanel.np-flat .np-scside::-webkit-scrollbar{width:4px}
+  .np-ctlpanel.np-flat .np-scside::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+  .np-ctlpanel.np-flat.collapsed .np-scside{overflow-x:hidden;overflow-y:auto}
+}
+/* 0.5.0 F134: flat desktop NP — slightly bigger art (~+16%) + transport one step up (sizes only; pn-btn-* shapes/theme untouched). Phone unchanged. */
+@media (min-width:761px){
+  .np-ctlpanel.np-flat:not(.collapsed) .pn-art{width:clamp(88px,8vw,108px);height:clamp(88px,8vw,108px)}
+  .np-ctlpanel.np-flat.pn-art-cassette:not(.collapsed) .pn-art{height:clamp(88px,8vw,108px)!important;width:auto!important}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport{gap:10px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn{width:52px;height:52px;font-size:20px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.tog{width:56px;height:40px;font-size:12px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play{width:74px;height:74px;font-size:30px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn .ic svg{width:22px;height:22px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play .ic svg{width:28px;height:28px}
+}
+@media (min-width:761px){ @container npctl (max-width:900px){ .np-ctlpanel.np-flat:not(.collapsed) .pn-art{width:88px;height:88px} } }   /* F136: desktop-only, phone keeps F102/F126 */
+/* 0.5.0 F135d: Shortcuts = HORIZONTAL pin row overlay that slides in leftward from the right over the NP controls (expanded + collapsed). Never a vertical column, never hangs below/above, never pushes layout. Collapsed: inside the bar (top:0;bottom:0), left of the pin toggle + chevron. Expanded (F135e): one band flush on the title bar (.pane-h) just left of the pin toggle + chevron. Many pins -> overflow-x:auto inside the strip. Reorder (drag + right-click) unchanged. Tokens only; phone untouched. */
+@keyframes np-scslide{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0 0 0 0)}}
+@media (min-width:761px){
+  .np-ctlpanel.np-flat .np-scside{position:absolute;left:auto;width:auto;max-width:min(60%,420px);height:auto;max-height:none;z-index:20;display:flex;flex-direction:row;align-items:center;padding:0 10px;gap:6px;border:1px solid var(--line);border-right:0;border-radius:var(--radius) 0 0 var(--radius);background:var(--panel2,var(--panel));box-shadow:-8px 0 18px color-mix(in srgb,var(--bg) 55%,transparent);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;animation:np-scslide .16s ease-out}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-scside{top:0;bottom:auto;right:var(--np-schw,82px);height:var(--np-hdh,30px);transform:none;border-top:0;border-radius:0 0 0 var(--radius)}
+  .np-ctlpanel.np-flat.collapsed .np-scside{top:0;bottom:0;right:var(--np-schw,82px);border-top:0;border-bottom:0;border-radius:0;overflow-x:auto;overflow-y:hidden}
+  .np-ctlpanel.np-flat .np-scside .scrow{flex-direction:row;align-items:center;flex-wrap:nowrap;height:auto;min-height:0;margin:0;gap:6px;overflow:visible}
+  .np-ctlpanel.np-flat .np-scside .scrow > *{flex:0 0 auto}
+  .np-ctlpanel.np-flat .np-scside .scsep{width:1px;height:20px;margin:0 2px}
+  .np-ctlpanel.np-flat .np-scside .schome{margin-top:0}
+  .np-ctlpanel.np-flat .np-scside::-webkit-scrollbar{height:4px}
+  .np-ctlpanel.np-flat > .pane-h .sctoggle,.np-ctlpanel.np-flat > .pane-h .listcolwrap{position:relative;z-index:21}
+}
+@media (prefers-reduced-motion:reduce){ .np-ctlpanel.np-flat .np-scside,.mp .mp-scside{animation:none} }

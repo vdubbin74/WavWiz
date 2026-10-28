@@ -135,7 +135,7 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s);
+        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();
@@ -180,7 +180,7 @@ public sealed class WavWizServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose();
+        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
         await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();

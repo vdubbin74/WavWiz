@@ -3,7 +3,7 @@ export function wordmark(cls = 'wordmark') {
   const el = document.createElement('span');
   el.className = cls;
   el.setAttribute('role', 'img');
-  el.setAttribute('aria-label', 'WavWiz - Whole-home music, in sync.');
+  el.setAttribute('aria-label', 'WavWiz - Multi-zone music, in sync.');
   const wav = document.createElement('span'); wav.className = 'wm-wav'; wav.textContent = 'Wav';
   const wiz = document.createElement('span'); wiz.className = 'wm-wiz'; wiz.textContent = 'Wiz';
   el.append(wav, wiz);

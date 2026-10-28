@@ -1,0 +1,30 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>F130 live mount — real createNow ctlPanel</title><link rel="stylesheet" href="/app.css"/>
+<style>body{margin:0;padding:16px;background:var(--bg)}#stage{width:860px;}#err{color:#f66;font:12px monospace;white-space:pre-wrap}</style></head>
+<body><div id="stage"></div><div id="err"></div>
+<script type="module">
+const err=m=>document.getElementById('err').textContent+=m+'\n';
+window.addEventListener('error',e=>err('ERR '+e.message));window.addEventListener('unhandledrejection',e=>err('REJ '+(e.reason?.message||e.reason)));
+const q=new URLSearchParams(location.search), mode=q.get('mode')||'expanded'; document.getElementById('stage').style.width=(q.get('w')||860)+'px';
+localStorage.setItem('wavwiz.scside.v1', q.get('sc')==='0'?'0':'1');
+try{
+const { applyTheme, PRESETS } = await import('./js/theme.js'); applyTheme({ ...PRESETS.violet, preset:'violet' });
+const { savePins } = await import('./js/shortcuts.js'); savePins(['library','eq','scenes']);
+const { loadPanels, savePanels } = await import('./js/panels.js'); savePanels({ ...loadPanels(), ctl: mode==='collapsed'?'collapsed':'open', ctlSet:true });
+const S = null;
+const St = S || { auth:null, queue:[], zones:[], groups:[], radio:[] };
+St.auth = St.auth || { role:'admin', canControl:true };
+St.zones=[{id:'z1',name:'Basement',enabled:true,volume:60,muted:false}]; St.groups=[];
+St.now={ state:'playing', index:0, positionMs:95000, durationMs:257000, shuffle:false, repeat:'off', item:{ id:'t1', kind:'track', title:'Is This the End', artist:'Creed', album:'Human Clay', year:1999 } };
+St.queue=[St.now.item]; St.localPos=95000; St.localAt=performance.now();
+St.groups=[{id:'g1',name:'Basement',playbackId:'default',linked:[],zones:['z1']},{id:'g2',name:'Kitchen',playbackId:'p2',linked:[],zones:['z2']}];
+localStorage.setItem('wavwiz.zone','g1');
+try{ const z=await import('./js/zones40.js'); z.init(St,{act:()=>{}}); }catch(e){ err('zones: '+e.message); }
+const { createNow } = await import('./js/now.js');
+const nc = createNow(St, { act:()=>{}, runShortcut:()=>{}, goHome:()=>{} });
+document.getElementById('stage').append(nc.ctlPanel);
+try{ nc.draw(); nc.drawMine?.(); St.now.state='paused'; nc.tickPos?.(); }catch(e){ err('draw: '+e.message); }
+if(mode==='collapsed') nc.ctlPanel.classList.add('collapsed');
+document.body.dataset.ready='1';
+}catch(e){ err('mount: '+e.message+'\n'+e.stack); }
+</script></body></html>

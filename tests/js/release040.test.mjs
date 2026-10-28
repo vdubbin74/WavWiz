@@ -43,7 +43,7 @@ test('dropTarget: before the first card, between cards, after the last', async (
 test('Stage 3: zone targets for alarms / sleep timer, summary names the zone', async () => {
   const Z = await imp('zones40'); const jb = { own: true, zoneId: 'jukebox' };
   assert.deepEqual(Z.targetKeys(groups, jb).map(x => x[0]), ['g:1', 'g:3', 'g:4', 'jukebox']); assert.deepEqual(Z.targetKeys(groups, null).length, 3);
-  assert.equal(Z.targetName('g:3', groups, jb), 'Basement'); assert.equal(Z.targetName('jukebox', groups, jb), 'Jukebox'); assert.equal(Z.targetName('g:77', groups, jb), '(deleted zone)'); assert.equal(Z.targetName('', groups, jb), '');
+  assert.equal(Z.targetName('g:3', groups, jb), 'Basement'); assert.equal(Z.targetName('jukebox', groups, jb), 'Jukebox'); assert.equal(Z.targetName('g:77', groups, jb), 'zone unavailable'); assert.equal(Z.targetName('', groups, jb), '');
   const S = await imp('scenesched');
   assert.match(S.summary({ action: 'play', payload: { source: 'radio', name: 'KEXP', zoneKey: 'g:3' } }, { groups }), /in Basement/);
   assert.match(S.summary({ action: 'stop', payload: { zoneKey: 'jukebox' } }, { groups, jb }), /Stop playback in Jukebox/);

@@ -1,0 +1,10 @@
+import fs from 'node:fs'; import assert from 'node:assert';
+const css = fs.readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const mini = fs.readFileSync(new URL('../../src/WavWiz.Server/wwwroot/mini.css', import.meta.url), 'utf8');
+const f = css.slice(css.indexOf('F133:'));
+assert.match(f, /\.np-ctlpanel\.np-flat \.np-scside\{[^}]*overflow-y:auto/);
+assert.match(f, /\.np-scside \.scrow\{[^}]*overflow:visible/);
+assert.doesNotMatch(f, /overflow:hidden(?![^{]*-x)/.source ? /\.scrow\{[^}]*overflow:hidden/ : /x/);
+assert.match(f, /collapsed \.np-scside\{[^}]*overflow-y:auto/);
+assert.match(mini.slice(mini.indexOf('F133')), /\.mp-scside\{[^}]*overflow-y:auto/);
+console.log('f133sidescroll ok');

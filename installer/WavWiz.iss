@@ -63,6 +63,8 @@ Name: "player"; Description: "WavWiz Player (a PC with speakers; can be the same
 [Tasks]
 Name: "autostart"; Description: "Start WavWiz Player when I sign in to Windows"; GroupDescription: "Player:"; Components: player
 Name: "desktopicon"; Description: "Create a desktop shortcut for the WavWiz web page"; GroupDescription: "Extras:"; Flags: unchecked; Components: server
+; F122: Player desktop shortcut (checked by default)
+Name: "playerdesktop"; Description: "Create a desktop shortcut for WavWiz Player"; GroupDescription: "Extras:"; Components: player
 
 [Files]
 Source: "{#DistDir}\server\*"; DestDir: "{app}\Server"; Excludes: "*.pdb"; Flags: recursesubdirs ignoreversion; Components: server
@@ -85,14 +87,18 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Icons]
 Name: "{group}\WavWiz Player (BETA)"; Filename: "{app}\Player\wavwiz-player.exe"; IconFilename: "{app}\wavwiz.ico"; Components: player
+Name: "{autodesktop}\WavWiz Player (BETA)"; Filename: "{app}\Player\wavwiz-player.exe"; IconFilename: "{app}\wavwiz.ico"; Tasks: playerdesktop; Components: player
 Name: "{group}\WavWiz logs and settings folder"; Filename: "{commonappdata}\WavWiz"
 Name: "{group}\What next (read me first)"; Filename: "{app}\docs\FIRST-RUN.txt"; IconFilename: "{app}\wavwiz.ico"
 Name: "{group}\Uninstall WavWiz (BETA)"; Filename: "{uninstallexe}"; IconFilename: "{app}\wavwiz.ico"
 
 [Run]
-Filename: "{code:FirstRunUrl}"; Description: "Open WavWiz in my browser to finish set-up (choose the administrator password)"; Flags: postinstall shellexec skipifsilent; Check: HasFirstRun
-; 0.2.2: no extra start when setup already restarted a Player that was running before (T11); this launch opens the window (T7)
-Filename: "{app}\Player\wavwiz-player.exe"; Description: "Start WavWiz Player now"; Flags: postinstall nowait skipifsilent runasoriginaluser; Components: player; Check: not PlayerRestarted
+; F121: Player first for set-up when the Player is installed; the browser is optional
+Filename: "{app}\Player\wavwiz-player.exe"; Description: "{code:PlayerRunDesc}"; Flags: postinstall nowait skipifsilent runasoriginaluser; Components: player; Check: WantPlayer
+Filename: "{code:FirstRunUrl}"; Description: "Open WavWiz in my browser instead"; Flags: postinstall shellexec skipifsilent unchecked; Check: HasFirstRun and WantPlayer
+Filename: "{code:FirstRunUrl}"; Description: "Open WavWiz in my browser to finish set-up (choose the administrator password)"; Flags: postinstall shellexec skipifsilent; Check: HasFirstRun and not WantPlayer
+; F122: offer the official WebView2 evergreen bootstrapper when it is missing (user opens it; never silent)
+Filename: "https://go.microsoft.com/fwlink/p/?LinkId=2124703"; Description: "Download Microsoft Edge WebView2 (recommended for WavWiz Player)"; Flags: postinstall shellexec skipifsilent; Components: player; Check: WantPlayer and WebView2Missing
 Filename: "{app}\docs\FIRST-RUN.txt"; Description: "Read the plain-language ""what next"" page"; Flags: postinstall shellexec skipifsilent unchecked
 
 [UninstallRun]
@@ -114,6 +120,8 @@ var
   SetupFailed: Boolean;
   UninstPurgeFlag: Boolean;
   { 0.2.2 T11: what was running before setup closed it (started again after the install) }
+  PrivTip: TNewStaticText;
+  PubNet: String;
   ServiceWasRunning, PlayerWasRunning, PlayerRestartedFlag: Boolean;
   CloseFailure: String;
 
@@ -204,6 +212,40 @@ begin
   S := Copy(S, P + 1, 200); Q := Pos('"', S); if Q = 0 then Exit;
   Result := Copy(S, 1, Q - 1);
   if not IsIPv4(Result) then Result := '';
+end;
+
+{ F122: WebView2 runtime check (registry, same keys as install-player.ps1) + flag file written by install-player.ps1 }
+function WebView2Missing: Boolean;
+var K, Pv: String;
+begin
+  if FileExists(ExpandConstant('{commonappdata}\WavWiz\webview2-missing.txt')) then begin Result := True; Exit; end;
+  K := 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+  Result := True;
+  if RegQueryStringValue(HKLM32, K, 'pv', Pv) then if (Pv <> '') and (Pv <> '0.0.0.0') then Result := False;
+  if Result and IsWin64 then if RegQueryStringValue(HKLM64, K, 'pv', Pv) then if (Pv <> '') and (Pv <> '0.0.0.0') then Result := False;
+  if Result then if RegQueryStringValue(HKCU, K, 'pv', Pv) then if (Pv <> '') and (Pv <> '0.0.0.0') then Result := False;
+end;
+
+{ F122: Private-network warning. Registry only (NetworkList Profiles Category: 0=Public 1=Private 2=Domain) - no CIM/WMI. Never changes the profile. }
+function PublicNetworkName: String;
+var Names: TArrayOfString; I: Integer; Cat: Cardinal; K, N: String;
+begin
+  Result := '';
+  K := 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles';
+  try
+    if RegGetSubkeyNames(HKLM64, K, Names) or RegGetSubkeyNames(HKLM, K, Names) then
+      for I := 0 to GetArrayLength(Names) - 1 do
+        if RegQueryDWordValue(HKLM64, K + '\' + Names[I], 'Category', Cat) or RegQueryDWordValue(HKLM, K + '\' + Names[I], 'Category', Cat) then
+          if Cat = 0 then
+          begin
+            N := '';
+            if not RegQueryStringValue(HKLM64, K + '\' + Names[I], 'ProfileName', N) then RegQueryStringValue(HKLM, K + '\' + Names[I], 'ProfileName', N);
+            if N = '' then N := '(unnamed network)';
+            Result := N; Exit;
+          end;
+  except
+    Result := '';
+  end;
 end;
 
 function FirstRunUrl(Param: String): String;
@@ -298,6 +340,9 @@ begin
   L.Caption := 'Phones and other PCs reach WavWiz at this PC''s home-network address, usually like 192.168.1.20. WavWiz listens ONLY on the address you choose here - never on "all interfaces" - and only answers devices on your own network.' + #13#10#13#10 +
                'The box is filled in automatically when the address can be found. If it is empty or wrong, type the address of this PC (see Windows Settings > Network). 127.0.0.1 means "this PC only": phones then cannot connect.';
   LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(0, ScaleY(110), ScaleX(200), ScaleY(23));
+  { F122: Private-network tip (static) + amber warning when a Public profile is found }
+  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(142), NetPage.SurfaceWidth, ScaleY(60));
+  PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
   HostPage := CreateCustomPage(NetPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
   L := TNewStaticText.Create(HostPage); L.Parent := HostPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, HostPage.SurfaceWidth, ScaleY(70));
   L.Caption := 'Enter the home-network address (for example 192.168.1.20) or the name of the PC that has WavWiz Server installed. You can leave it empty and enter it later in the player (tray icon > Server).';
@@ -324,6 +369,13 @@ begin
     WizardForm.NextButton.Enabled := False;
     WizardForm.Update;
     DetectLan;
+    PubNet := PublicNetworkName;
+    if PubNet <> '' then
+    begin
+      Log('NOTE: Windows lists the network "' + PubNet + '" as Public. WavWiz needs Private for phones and discovery. Setup does not change it.');
+      PrivTip.Font.Color := $0060C0;
+      PrivTip.Caption := 'Warning: Windows lists the network "' + PubNet + '" as Public. Phones and discovery may fail. Open Windows Settings > Network & internet > your Wi-Fi/Ethernet and set the network profile to Private. (Setup will not change this for you; you can continue.)';
+    end;
     WizardForm.NextButton.Enabled := True;
   end;
   if CurPageID = wpFinished then
@@ -368,7 +420,7 @@ end;
 function FirstRunText: String;
 begin
   Result := 'WavWiz (BETA) {#AppVersion} - what next' + #13#10#13#10 +
-    '1. On the PC that runs WavWiz Server, open the web page (the last installer page offered it). Choose the administrator password there. Nothing was generated for you.' + #13#10 +
+    '1. On the PC that runs WavWiz Server, open WavWiz Player (or the web page; the last installer page offered both). Choose the administrator password there. Nothing was generated for you.' + #13#10 +
     '2. In Settings > Music folders add your music folder (a local drive or a network share the Windows service can read).' + #13#10 +
     '3. On each PC with speakers, start WavWiz Player. It finds this server by itself (it is listed as "WavWiz on <this PC>"); just type the 6-digit code from Settings > Pair a phone or a PC player. You never type an address, a scheme or a port. (If it is not listed, use "My server isn''t listed" and type only the address, like 192.168.1.20.)' + #13#10 +
     '   Each device has a Test sound button, and a Dropped / Buffering / Reconnecting indicator. Menu > Diagnostics explains problems in plain English.' + #13#10 +
@@ -379,6 +431,13 @@ begin
 end;
 
 function PlayerRestarted: Boolean; begin Result := PlayerRestartedFlag; end;
+
+{ F121: finish-page Player wording (first run vs upgrade) }
+function PlayerRunDesc(Param: String): String;
+begin
+  if HasFirstRun then Result := 'Open WavWiz Player to finish set-up (choose the administrator password)'
+  else Result := 'Open WavWiz Player now';
+end;
 
 { 0.2.2 T11: close a running WavWiz before any file is replaced. close-wavwiz.ps1 (hidden, elevated) stops the service, asks every Player to exit and
   ends it after a timeout, ends leftovers from the install folder (receivers, ffmpeg) and retries until no file is locked. The wizard shows a friendly
@@ -454,6 +513,12 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  { F122: silent installs get no dialog - log a NOTE only }
+  if WizardSilent and WantServer then
+  begin
+    PubNet := PublicNetworkName;
+    if PubNet <> '' then Log('NOTE: Windows lists the network "' + PubNet + '" as Public; set it to Private for phones and discovery. Setup does not change it.');
+  end;
   Result := '';
   { 0.2.2 T11: always close a running WavWiz first (not only the service): an open Player or receiver locks its files. /NOCLOSE skips it (tests). }
   if (not BoolParam('NOCLOSE', False)) and (DirExists(ExpandConstant('{app}')) or RegKeyExists(HKLM64, 'SYSTEM\CurrentControlSet\Services\WavWizServer')) then

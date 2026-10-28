@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ sel: m[1].trim(), body: m[2] }));
+const base = rules.filter(r => r.sel.split(',').some(s => s.trim().replace(/\/\*[\s\S]*?\*\//g,'').trim() === '.libpanel .pane-h .plus'));
+assert.ok(base.length, 'missing .libpanel .pane-h .plus rule');
+assert.ok(base.some(r => /(^|;)\s*color:[^;]*accent/.test(r.body)), 'color must use accent');
+assert.ok(base.some(r => /border:[^;]*accent/.test(r.body)), 'border must use accent');
+assert.ok(rules.some(r => /\.libpanel button,\.lib button,\.wwdd/.test(r.sel)), 'F40 .libpanel button rule missing');
+console.log('f116libcollapseaccent: ok');

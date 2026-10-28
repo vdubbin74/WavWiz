@@ -3,8 +3,8 @@
 import { h } from './util.js';
 
 /** Cards per row and the card width cap for each Appearance grid (1200 px Settings window). */
-export const GRID_COLS = Object.freeze({ theme: 5, viz: 4, eq: 3, np: 2, display: 3 });
-export const GRID_MAX = Object.freeze({ theme: 200, viz: 270, eq: 272, np: 272, display: 272 });
+export const GRID_COLS = Object.freeze({ theme: 5, viz: 4, eq: 3, np: 2, npseek: 4, npbtn: 4, npart: 4, display: 3 });
+export const GRID_MAX = Object.freeze({ theme: 200, viz: 270, eq: 272, np: 272, npseek: 200, npbtn: 200, npart: 200, display: 272 });
 export const CARD_RATIO = 16 / 10, CARD_MAX_H = 170, GRID_GAP = 12;
 
 /** The grid element for kind (sets --pg-cols / --pg-max). */

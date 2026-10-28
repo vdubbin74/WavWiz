@@ -4,7 +4,7 @@ namespace WavWiz.PlayerCore;
 public static class MiniPlayer
 {
     // 0.4.9 F86: the Player window is two rows (about 89 CSS px): the window opens at this height and the page's size report fine-tunes it
-    public const int Width = 420, Height = 90, SlimWidth = 300, SlimHeight = 48;
+    public const int Width = 420, Height = 128, SlimWidth = 300, SlimHeight = 48;
     /// <summary>0.3.7 L31: what opening the mini player does. From the app's own menu it is always on top and the main window is minimized; from the tray or anywhere else the saved Keep-on-top choice rules and the main window stays.</summary>
     public static (bool TopMost, bool MinimizeMain) OpenPlan(bool fromAppMenu, bool savedPinned) => (fromAppMenu || savedPinned, fromAppMenu);
     /// <summary>The page the mini window loads: /mini.html on the same server as the full window.</summary>
@@ -20,6 +20,14 @@ public static class MiniPlayer
         if (!double.IsFinite(cssW) || !double.IsFinite(cssH) || !double.IsFinite(scale) || cssW < 1 || cssH < 1 || scale <= 0) return null;
         scale = Math.Clamp(scale, 0.5, 4.0);
         return ((int)Math.Clamp(Math.Ceiling(cssW * scale), 120, 1200), (int)Math.Clamp(Math.Ceiling(cssH * scale), 36, 600));
+    }
+    /// <summary>0.5.0: the scale (physical px per CSS px) to size the window with. The page's devicePixelRatio is what WebView2 actually renders at,
+    /// so CSS height x dpr is exactly the physical height the content needs; DeviceDpi / 96 is only the fallback (no report yet, or just moved to another screen).
+    /// Using DeviceDpi alone clipped the bottom row at 200 % when it disagreed with the WebView's scale.</summary>
+    public static double ScaleFor(double pageDpr, int deviceDpi)
+    {
+        if (double.IsFinite(pageDpr) && pageDpr >= 0.5 && pageDpr <= 4.0) return pageDpr;
+        return deviceDpi > 0 ? deviceDpi / 96.0 : 1.0;
     }
     /// <summary>0.4.9 F75: the CSS size the window must have for a reported content size: never narrower than the design width (420 / slim 300),
     /// so a window that opened too narrow (device px taken for DIPs, another monitor's scale) grows back instead of locking at that width.</summary>

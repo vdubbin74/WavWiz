@@ -10,8 +10,9 @@ import { applyTheme, loadTheme } from './theme.js';
 import { icon, setIcon } from './icons.js';
 import { itemArtUrl, setArtCv } from './art.js';
 import { fmtTime } from './util.js';
-import { loadNpPrefs, waveBars, NP_KEY } from './npstyle.js';   // 0.4.9 F85b
-import { shortcutsRow, sendToMain, writePending } from './shortcuts.js';
+import { loadNpPrefs, waveBars, eqBars, NP_KEY, applyNpClasses, applyNpColor } from './npstyle.js';   // 0.4.9 F85b
+import { npArtBox } from './npart.js';   // 0.5.0 F98: Album art axis in the mini players
+import { shortcutsSide, sendToMain, writePending } from './shortcuts.js';
 import { installHotkeys } from './hotkeys.js';
 import { OPACITY_MIN, clampOpacity, loadOpacity, saveOpacity, fitText } from './minifit.js';
 
@@ -36,6 +37,7 @@ export function keyAction(ev) {
 
 /** 0.3.6 K14 / K22: the mini player as a component. The page (mini.html, popup or Player window) mounts it full size; the main app mounts it with { embedded: true } in the right-hand column. */
 export function mountMini(root, { embedded = false, run = null, home = null } = {}) {
+  let shufB = null, repB = null;
   let now = null, level = 0, muted = false, pinned = false, dragging = false, timer = 0;
   try { pinned = localStorage.getItem('wavwiz.mini.pin') === '1'; } catch { /* ignore */ }
 
@@ -49,10 +51,11 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const reloadArt = () => { clearTimeout(artT); if (!lastArt || !art.classList.contains('noart')) return; art.src = lastArt + (lastArt.includes('?') ? '&' : '?') + 'r=' + (++artTry); };
   function retryArt() { clearTimeout(artT); if (lastArt && artTry < 4) artT = setTimeout(reloadArt, 3000 * (artTry + 1)); }
   window.addEventListener('wavwiz:art', () => { artTry = 0; setTimeout(reloadArt, 1500); });
+  const artBox = npArtBox({ cls: 'mp-artbox', cover: art });   // F98: square ring / spinning disc / sleeve / cassette, per Settings
   const t = h('div', { class: 'mp-t' }, '—'), a = h('div', { class: 'mp-a' }, '');
   const pos = h('span', null, '0:00'), dur = h('span', null, '0:00');
   const seek = h('input', { type: 'range', min: 0, max: 1000, value: 0, 'aria-label': 'Position', oninput: () => { dragging = true; }, onchange: async () => { dragging = false; if (now?.durationMs) await act('/stream/seek', { ms: Math.round(seek.value / 1000 * now.durationMs) }); } });
-  const txt = h('div', { class: 'mp-txt' }, t, h('div', { class: 'zl-line' }, a, Z.zoneLink('zl-mini')), h('div', { class: 'mp-seek' }, pos, seek, dur));
+  const txt = h('div', { class: 'mp-txt' }, t, h('div', { class: 'zl-line' }, a, Z.zoneLink('zl-mini')), ...(embedded ? [h('div', { class: 'mp-seek' }, pos, seek, dur)] : []));   // F98: the standalone shows the Track bar pick (mp-npl) in this slot instead of the plain range
   const b = (cls, ic, label, fn) => { const x = h('button', { type: 'button', class: 'mp-b ' + cls, 'aria-label': label, title: label, onclick: fn }); x.append(icon(ic)); return x; };
   const prev = b('prev', 'prev', 'Previous', () => act('/stream/prev'));
   const play = b('play', 'play', 'Play or pause', () => act(now?.state === 'playing' ? '/stream/pause' : now?.state === 'paused' ? '/stream/resume' : '/stream/resume'));
@@ -99,33 +102,37 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   // 0.4.9 F85b: the freed row shows the Now Playing layout picked in Settings, in its compact form (a full panel scaled into ~50 px is unreadable):
   // each layout's own seek / time element, in the theme colors - Classic: time pill + round-knob line, Center: waveform, Stack: LCD clock + LED blocks,
   // Horizon: glowing line from the cover edge. Clicking it seeks, like the panel.
-  const npHost = embedded ? h('div', { class: 'mp-npl', role: 'slider', 'aria-label': 'Position', tabindex: 0 }) : null;
-  const volRow = embedded ? npHost : h('div', { class: 'mp-vol dvol' }, volWrap, volPct, opRow, opBtn);   // its own full-width row
+  const npHost = h('div', { class: 'mp-npl', role: 'slider', 'aria-label': 'Position', tabindex: 0 });   // F98: both minis
+  if (!embedded) txt.append(npHost);
+  const volRow = embedded ? npHost : h('div', { class: 'mp-vol dvol' }, volWrap, volPct, opRow, opBtn);   // F140: standalone moves opBtn to the title bar (below)   // its own full-width row
   let paintNpl = () => {};
   if (npHost) {
     let style = '', parts = null, seed = null;
     const el = (cls, ...k) => h('div', { class: cls }, ...k);
     const build = () => {
-      style = loadNpPrefs().style; npHost.dataset.style = style; npHost.className = 'mp-npl npl-' + style; seed = null;
+      { const q = loadNpPrefs(); style = q.seek; npHost.dataset.seek = style; npHost.className = 'mp-npl npl-' + ({ line: 'classic', wave: 'center', led: 'stack', eq: 'center npl-eqs' }[style]) + ' npl-btn-' + q.buttons; if (!embedded) { applyNpClasses(root, q); applyNpColor(q); } } seed = null;   // F98: standalone wears pn-seek/btn/art + Color intensity itself (embedded inherits minicol + html)   // F95: compact form follows the Track bar pick
       const fill = el('npl-fill'), track = el('npl-track', fill, el('npl-knob')), el1 = h('span', { class: 'npl-el' }), el2 = h('span', { class: 'npl-du' });
-      if (style === 'center') { const base = el('npl-wave'), top = el('npl-wave on'), clip = el('npl-wclip', top); parts = { kind: 'wave', base, top, clip, el1, el2 }; npHost.replaceChildren(el1, el('npl-wbox', base, clip), el2); }
-      else if (style === 'stack') { const leds = el('npl-leds', ...Array.from({ length: 24 }, () => h('i'))); parts = { kind: 'led', leds, el1, el2 }; npHost.replaceChildren(el('npl-lcd', el1), leds, el('npl-lcd dim', el2)); }
-      else if (style === 'horizon') { parts = { kind: 'line', fill, track, el1, el2 }; npHost.replaceChildren(el1, track, el2); }
+      if (style === 'wave' || style === 'eq') { const base = el('npl-wave'), top = el('npl-wave on'), clip = el('npl-wclip', top); parts = { kind: 'wave', base, top, clip, el1, el2 }; npHost.replaceChildren(el1, el('npl-wbox', base, clip), el2); }
+      else if (style === 'led') { const leds = el('npl-leds', ...Array.from({ length: 24 }, () => h('i'))); parts = { kind: 'led', leds, el1, el2 }; npHost.replaceChildren(el('npl-lcd', el1), leds, el('npl-lcd dim', el2)); }
       else { parts = { kind: 'line', fill, track, el1, el2 }; npHost.replaceChildren(el('npl-pill', h('i'), el1, h('span', { class: 'dim' }, ' / '), el2), track); }
       paintNpl(now);
     };
     paintNpl = n => { if (!parts) return; const d = n?.durationMs || 0, p = Math.min(d, n?.positionMs || 0), f = d ? p / d : 0;
-      parts.el1.textContent = fmtTime(p); parts.el2.textContent = (style === 'horizon' ? '-' + fmtTime(Math.max(0, d - p)) : fmtTime(d)); npHost.setAttribute('aria-valuenow', String(Math.round(f * 100)));
+      parts.el1.textContent = fmtTime(p); parts.el2.textContent = fmtTime(d); npHost.setAttribute('aria-valuenow', String(Math.round(f * 100)));
       if (parts.kind === 'line') { parts.fill.style.width = f * 100 + '%'; parts.track.style.setProperty('--f', f * 100 + '%'); }
       else if (parts.kind === 'led') { const on = Math.round(f * parts.leds.children.length); [...parts.leds.children].forEach((x, i) => x.classList.toggle('on', i < on)); }
-      else { const sd = n?.item?.title || 'idle'; if (sd !== seed) { seed = sd; const bars = waveBars(sd, 48); for (const w of [parts.base, parts.top]) w.replaceChildren(...bars.map(v => h('i', { style: `height:${Math.round(v * 100)}%` }))); } parts.clip.style.clipPath = `inset(0 ${100 - f * 100}% 0 0)`; } };
+      else { const sd = n?.item?.title || 'idle'; if (sd !== seed) { seed = sd; const bars = style === 'eq' ? eqBars(sd, 24) : waveBars(sd, 48); for (const w of [parts.base, parts.top]) w.replaceChildren(...bars.map(v => h('i', { style: `height:${Math.round(v * 100)}%` }))); } parts.clip.style.clipPath = `inset(0 ${100 - f * 100}% 0 0)`; } };
     npHost.addEventListener('click', ev => { const t = npHost.querySelector('.npl-track,.npl-wbox,.npl-leds'); if (!t || !now?.durationMs) return; const r = t.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)); act('/stream/seek', { ms: Math.round(f * now.durationMs) }); });
     window.addEventListener('wavwiz:npstyle', build); window.addEventListener('storage', ev => { if (ev.key === NP_KEY) build(); });
     build();
   }
   // 0.3.7 L10 / L11 / L23: the shortcuts row - Home far right, a separator, up to 3 pins leftward. The standalone window asks the main app window (it is brought to the front first).
   const toMain = target => { writePending(target); if (!send('full', { target })) { try { window.opener?.focus(); } catch { /* ignore */ } } sendToMain(target); };   // 0.3.8 L34: ONE click - bring the main window forward and carry the target with it
-  const sc = shortcutsRow({ cls: 'mp-sc', run: run || (id => toMain({ run: id })), home: home || (() => toMain({ home: true })) });
+  const scRun = run || (id => toMain({ run: id })), scHome = home || (() => toMain({ home: true }));
+  // 0.5.0 F130 (Amendment 3): the condensed (embedded) player uses the same ONE Shortcuts toggle -> vertical pin strip + Home as Now Playing; the standalone window keeps its row
+  // 0.5.0 F138: the standalone window uses the same toggle + leftward horizontal strip, in its own NOW PLAYING title bar
+  const sc = (() => { const sd = shortcutsSide({ run: scRun, home: scHome, cls: 'mp-scside', onChange: o => root?.classList.toggle('scopen', o) });
+    return { el: h('div', { class: 'mp-sc mp-sctog' }, sd.toggle, sd.strip), destroy: sd.destroy }; })();
   // 0.3.8 L44: the same shortcuts inside the standalone window (Alt+M closes it, Alt+H opens the main window on Home)
   if (!embedded) installHotkeys(id => {
     if (id === 'playpause') play.click(); else if (id === 'next') next.click(); else if (id === 'prev') prev.click(); else if (id === 'mute') mute.click();
@@ -141,13 +148,31 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const mz = { groups: [], jb: null }; let mzN = 0;
   if (!embedded) Z.init(mz, { refreshNow: () => poll(), manage: () => toMain({ run: 'devices' }) });   // 0.4.5 F27: no zone chip on the shortcuts row; the zone name on the song line is the picker
   async function pollZones() { if (embedded || mzN++ % 3) return; try { const [g, jb] = await Promise.all([api('/groups'), api('/jukebox/zone').catch(() => null)]); mz.groups = g; mz.jb = jb; Z.sync(); } catch { /* keep the last list */ } }
-  root.append(art, txt, ctl, h('div', { class: 'mp-side' }, ...(embedded ? [] : [pin, full, close])), volRow, sc.el);
+  // 0.5.0 F139: shuffle / repeat toggles for both condensed and standalone
+  { const tog = (ic, label, fn) => { const x = b('tog ' + ic, ic, label, fn); x.setAttribute('aria-pressed', 'false'); return x; };
+    shufB = tog('shuffle', 'Shuffle', () => act('/stream/shuffle', { on: !now?.shuffle }));
+    repB = tog('repeat', 'Repeat', () => act('/stream/repeat', { mode: { off: 'all', all: 'one', one: 'off' }[now?.repeat ?? 'off'] })); }
+  if (embedded) {
+    // 0.5.0 F136: the condensed (under-Queue) player wears the flat Now Playing card chrome: a NOW PLAYING title bar with the Shortcuts pin on the
+    // right (F135e: the horizontal pin strip opens leftward ON that bar), then art | titles + labeled Artist / Album + seek, the full transport
+    // (shuffle / prev / play / next / repeat) and mute / mixer / EQ / Sleep + "on <zone>". The standalone window keeps its own layout.
+    const eqB = h('button', { type: 'button', class: 'mutebtn mp-eq', 'aria-label': 'Sound (EQ)', title: 'Sound (EQ)', onclick: () => scRun('eq') }, icon('eq'));
+    const sleepB = h('button', { type: 'button', class: 'btn sm mp-sleep', title: 'Sleep timer', onclick: () => scRun('sleep') }, 'Sleep');
+    const zl = txt.querySelector('.zlink'); const trow = ctl.firstChild; trow.replaceChildren(shufB, prev, play, next, repB);
+    const extras = h('div', { class: 'mp-ex' }, mute, ...(mixB ? [mixB] : []), eqB, sleepB, ...(zl ? [zl] : []));
+    ctl.append(extras);
+    const hd = h('div', { class: 'mp-hd' }, h('span', { class: 'mp-hdt' }, 'Now playing'), sc.el);
+    const body = h('div', { class: 'mp-body' }, artBox.el, txt, ctl);
+    root.classList.add('mp-flat'); root.append(hd, body, volRow);
+  } else { const hd = h('div', { class: 'mp-hd mp-sthd' }, h('span', { class: 'mp-hdt' }, 'Now playing'), opBtn, sc.el);   // F140: the Volume / Transparency selector sits in the title bar, left of the Shortcuts pin   // F138: title bar; pin / full / close stay top-right over it
+    ctl.firstChild.replaceChildren(shufB, prev, play, next, repB, mute); ctl.classList.add('mp-ctlr');   // F139: full transport, docked right
+    root.classList.add('mp-sttitle'); volRow.classList.add('mp-volx'); root.append(hd, artBox.el, txt, volRow, ctl, h('div', { class: 'mp-side' }, pin, full, close)); }   // F140: one slider (volume, or transparency while selected) left of the transport
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();
   if (!embedded) host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'opacity' && Number.isFinite(+m.value)) setOpac(Math.round(+m.value * 100)); if (m.cmd === 'pin') { pinned = !!m.on; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } paintPin(); } });
 
   // drag by the art or empty space (never by a control)
-  if (!embedded) root.addEventListener('mousedown', ev => { if (ev.button !== 0 || ev.target.closest('button,input')) return; send('drag'); });
+  if (!embedded) root.addEventListener('mousedown', ev => { if (ev.button !== 0 || ev.target.closest('button,input,.mp-npl')) return; send('drag'); });
   const paintPin = () => { pin.classList.toggle('on', pinned); pin.setAttribute('aria-pressed', String(pinned)); };
   const paintMute = () => { mute.classList.toggle('on', muted); mute.setAttribute('aria-pressed', String(muted)); mute.title = muted ? 'Unmute everything' : 'Mute everything'; setIcon(mute, muted ? 'mute' : 'volume'); };
   // 0.4.2: in the Player window slim is the host's choice (?slim=1), never a guess from the viewport (a DPI mismatch used to make the 420 px window look < 360 px and hide the transparency button, volume and shortcuts); in a browser popup the window size still decides.
@@ -169,10 +194,16 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
     try {
       await pollZones();
       const r = await api('/stream'); now = r.now;
-      const it = now?.item; t.textContent = it?.title || 'Nothing playing'; { const f = fitText(root.classList.contains('slim') ? 38 : 58, t.textContent.length); root.style.setProperty('--mp-tfs', f.title + 'px'); root.style.setProperty('--mp-afs', f.artist + 'px'); t.title = t.textContent; } a.textContent = it ? [it.artist, it.album].filter(Boolean).join(' · ') : '';
+      const it = now?.item; t.textContent = it?.title || 'Nothing playing'; { const f = fitText(root.classList.contains('slim') ? 38 : 58, t.textContent.length); root.style.setProperty('--mp-tfs', f.title + 'px'); root.style.setProperty('--mp-afs', f.artist + 'px'); t.title = t.textContent; } { // 0.5.0 F130: condensed player shows the same labeled Artist · Album line as the flat Now Playing panel (album omitted when missing)
+        const lab = (l, v) => [h('span', { class: 'np-aal' }, l), h('span', { class: 'np-aav' }, v)];
+        a.replaceChildren(...(it ? [...(it.artist ? lab('Artist', it.artist) : []), ...(it.artist && it.album ? [h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·')] : []), ...(it.album ? lab('Album', it.album) : [])] : []));
+        a.title = it ? [it.artist, it.album].filter(Boolean).join(' · ') : ''; }
       const u = it ? itemArtUrl(it, 96) : null; if (u !== lastArt) { lastArt = u; artTry = 0; clearTimeout(artT); art.classList.add('noart'); if (u) art.src = u; else art.removeAttribute('src'); railArt.style.backgroundImage = u ? `url("${u}")` : ''; }
       railBar.style.setProperty('--p', (now?.durationMs ? Math.min(1, (now.positionMs || 0) / now.durationMs) : 0) * 100 + '%');
       setIcon(play, now?.state === 'playing' ? 'pause' : 'play');
+      if (shufB) { shufB.classList.toggle('on', !!now?.shuffle); shufB.setAttribute('aria-pressed', String(!!now?.shuffle)); }
+      if (repB) { const r = now?.repeat || 'off'; repB.classList.toggle('on', r !== 'off'); repB.setAttribute('aria-pressed', String(r !== 'off')); setIcon(repB, r === 'one' ? 'repeatOne' : 'repeat'); }
+      artBox.setPlaying(now?.state === 'playing'); artBox.setFrac(now?.durationMs ? (now.positionMs || 0) / now.durationMs : 0); root.classList.toggle('playing', now?.state === 'playing');
       paintNpl(now); pos.textContent = fmtTime(now?.positionMs || 0); dur.textContent = fmtTime(now?.durationMs || 0);
       if (!dragging && now?.durationMs) seek.value = String(Math.round((now.positionMs || 0) / now.durationMs * 1000));
       const zs = await api('/zones'); const on = zs.filter(z => z.enabled); level = on.length ? Math.max(...on.map(z => z.volume)) : 0; muted = zs.length > 0 && zs.every(z => z.muted);

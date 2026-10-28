@@ -295,10 +295,11 @@ export function installAutoJoin(S, refreshAll) {
   // 0.2.5 phone role: a phone is either a speaker or a calibration mic. Asked once (fresh phones only), remembered, switchable in Devices > Phone role.
   if (isPhoneUa()) {
     let q = null; try { q = new URLSearchParams(location.search).get('role'); } catch { /* ignore */ }
-    if (q === 'speaker' || q === 'mic') { setPhoneRole(localStorage, q); if (q === 'speaker') { try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ } stored = '1'; } }
+    if (q === 'speaker' || q === 'remote' || q === 'mic') { setPhoneRole(localStorage, q); if (q === 'speaker') { try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ } stored = '1'; } }
     const role = phoneRole(localStorage);
     if (role === 'mic') { showMicBanner(); return; }                 // a calibration mic never joins as a speaker
-    if (role == null && stored == null) { askPhoneRole(r => { if (r === 'speaker') { unlockAudio(); go(); } else location.href = '/calmic.html'; }); return; }
+    if (role === 'remote') { showRemoteBanner(); return; }           // 0.5.0 phone remote: silent, never joins as a speaker
+    if (role == null && stored == null) { askPhoneRole(r => { if (r === 'speaker') { unlockAudio(); go(); } else if (r === 'remote') { showRemoteBanner(); goNow(); } else location.href = '/calmic.html'; }); return; }
   }
   if (!wantsAutoJoin(stored)) return;
   setTimeout(go, 150);
@@ -311,11 +312,25 @@ export function askPhoneRole(done) {
     h('div', { class: 'card' }, h('h2', null, 'How do you want to use this phone?'),
       h('button', { class: 'btn primary big', onclick: () => pick('speaker') }, 'Play music here'),
       h('p', { class: 'small dim' }, 'This phone plays in sync with your other speakers.'),
+      h('button', { class: 'btn big', onclick: () => pick('remote') }, 'Use as remote'),
+      h('p', { class: 'small dim' }, 'Control the music. This phone stays silent.'),
       h('button', { class: 'btn big', onclick: () => pick('mic') }, 'Use as a calibration mic'),
-      h('p', { class: 'small dim' }, 'This phone only listens, to line up your speakers. It never plays music.'),
-      h('p', { class: 'small dim' }, 'You can change this later in Devices › Phone role.')));
+      h('p', { class: 'small dim' }, 'Listens only, to line up your speakers.'),
+      h('p', { class: 'small dim' }, 'You can change this later in Settings → Phone role.')));
+  const cur = phoneRole(localStorage); if (cur) box.querySelectorAll('.btn').forEach(b => b.classList.toggle('current', b.textContent === ROLE_LABEL[cur]));
   document.body.append(box); try { box.showModal(); } catch { box.setAttribute('open', ''); } return box;
 }
+const ROLE_LABEL = { speaker: 'Play music here', remote: 'Use as remote', mic: 'Use as a calibration mic' };
+/** 0.5.0 phone remote (phones only; the PC tray Remote mode stays retired): a slim banner while this phone is a silent remote. */
+export function showRemoteBanner() {
+  if (document.querySelector('.remote-banner')) return;
+  const bar = h('div', { class: 'remote-banner', role: 'status' }, h('span', { class: 'grow' }, 'Remote — this phone is silent'),
+    h('button', { class: 'btn', onclick: () => { setPhoneRole(localStorage, 'speaker'); try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ } bar.remove(); unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => showUnlock(e.message)); } }, 'Play music here'));
+  document.body.append(bar);
+}
+/** F92: after picking Use as remote, bring Now Playing (the F68 remote layout) to the front. main.js listens. */
+function goNow() { try { window.dispatchEvent(new CustomEvent('wavwiz:go', { detail: 'now' })); } catch { /* ok */ } }
+function hideRoleBanners() { document.querySelectorAll('.remote-banner,.mic-banner').forEach(b => b.remove()); }
 function showMicBanner() {
   if (document.querySelector('.mic-banner')) return;
   const bar = h('div', { class: 'mic-banner', role: 'status' }, h('span', { class: 'grow' }, 'This phone is set as a calibration mic, so it does not play music.'),
@@ -323,9 +338,14 @@ function showMicBanner() {
     h('button', { class: 'btn', onclick: () => { setPhoneRole(localStorage, 'speaker'); bar.remove(); unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => toast(e.message, true)); } }, 'Play music here'));
   document.body.append(bar);
 }
-/** Devices > Phone role… (phones only): switch between speaker and calibration mic. */
+/** Menu > Phone role… (phones only): switch between speaker, remote and calibration mic. */
 export function changePhoneRole() {
-  askPhoneRole(async r => { if (r === 'mic') { await stopPhoneDevice(); location.href = '/calmic.html'; } else { unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => toast(e.message, true)); } });
+  askPhoneRole(async r => {
+    hideRoleBanners();
+    if (r === 'mic') { await stopPhoneDevice(); location.href = '/calmic.html'; }
+    else if (r === 'remote') { await stopPhoneDevice(); showRemoteBanner(); goNow(); }
+    else { unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => showUnlock(e.message)); }
+  });
 }
 function installGestureUnlock() {
   if (gestureInstalled) return; gestureInstalled = true;

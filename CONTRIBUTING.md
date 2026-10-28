@@ -7,7 +7,7 @@ Thanks for your interest in improving WavWiz. This guide is for **public contrib
 - Bug reports and clear reproductions ([SUPPORT.md](SUPPORT.md))
 - Feature ideas via Issues (check existing issues first)
 - Documentation fixes and small, focused pull requests
-- Code contributions that match the project’s direction (synced multi-zone playback on a local network)
+- Code contributions that match the project’s direction (synced whole-home playback on a local network)
 
 Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Security issues go to **vdubbin74@proton.me** only — see [SECURITY.md](SECURITY.md).
 

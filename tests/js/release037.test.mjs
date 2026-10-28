@@ -53,7 +53,7 @@ test('L1/L4/L17 every EQ / Queue / shortcut entry point goes through the shared 
   assert.match(main, /export function showEq/); assert.match(main, /export function runShortcut/); assert.match(main, /export function goHome/);
   assert.match(main, /openEq: \(\) => showEq\(\)/); assert.match(main, /if \(k === 'eq'\) return showEq\(\)/);
   assert.doesNotMatch(main.replace(/\/\*[\s\S]*?\*\//g, ''), /openEq\(S, refreshAll\)\s*[;}]\s*\n\s*if \(S\.view/, 'the phone go(eq) no longer opens the popup');
-  assert.match(now, /onclick: \(\) => ctl\.openEq\(\)/); assert.match(now, /mkSc\('np-sc'\)/); assert.match(now, /mkSc\('npb-sc'\)/);
+  assert.match(now, /onclick: \(\) => ctl\.openEq\(\)/); assert.match(now, /scSide\.toggle/);   // F130: NP header = one Shortcuts toggle + side strip assert.match(now, /mkSc\('npb-sc'\)/);
   assert.match(main, /if \(P6\.exp === 'dev'\) setPanels\(\{ \.\.\.P6, exp: null \}/);   // L17 queue from an expanded Devices view
   assert.match(menu, /pin: 'eq'/); assert.match(menu, /pin: 'queue'/); assert.match(mini, /shortcutsRow/); assert.match(mini, /sendToMain/);
   assert.match(css, /\.scrow/); assert.match(css, /\.schome/);
@@ -117,7 +117,7 @@ test('every new 0.3.7 helper a module calls is imported there (a missing import 
 
 test('L31/L23 standalone mini player: Home focuses the main window then goes Home; the in-app mini path is untouched', () => {
   const mini = src('mini.js'), main = src('main.js');
-  assert.match(mini, /const toMain = target => \{ writePending\(target\); if \(!send\('full', \{ target \}\)\)/); assert.match(mini, /home: home \|\| \(\(\) => toMain\(\{ home: true \}\)\)/);
+  assert.match(mini, /const toMain = target => \{ writePending\(target\); if \(!send\('full', \{ target \}\)\)/); assert.match(mini, /home \|\| \(\(\) => toMain\(\{ home: true \}\)\)/);   // F130: scHome
   assert.match(main, /export function openMini\(\) \{[\s\S]*?cmd: 'mini'[\s\S]*?window\.open\('\/mini\.html'/);
   assert.match(main, /mountMini\(host, \{ embedded: true, run: runShortcut, home: goHome \}\)/);   // the embedded (in-app) mini runs the shortcuts directly, never through the window channel
   assert.match(main, /installMiniTargets\(msg => \{ if \(msg\.home\) goHome\(\)/);

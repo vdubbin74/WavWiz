@@ -79,5 +79,5 @@ test('column choices are remembered and a corrupt store falls back to the defaul
 test('the wordmark SVG: orange Wav, teal Wiz, tagline, sparkle', async () => {
   const fs = await import('node:fs'); const svg = fs.readFileSync(new URL(`file://${process.env.JS_DIR}/brand.js`), 'utf8');
   // 0.0.6: plain text wordmark; colors + aria tagline remain required
-  for (const must of ['#FF3C00', '#19C3B1', 'Whole-home music, in sync.', 'wm-wav']) assert.ok(svg.includes(must), must);
+  for (const must of ['#FF3C00', '#19C3B1', 'Multi-zone music, in sync.', 'wm-wav']) assert.ok(svg.includes(must), must);
 });

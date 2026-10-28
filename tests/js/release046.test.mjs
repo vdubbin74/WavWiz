@@ -50,7 +50,7 @@ test('F36/F37: fullscreen Queue keeps the full-width bar; no corner mini box; ar
 });
 test('F38: the condensed player wears the active Now Playing layout (pn-<style>)', () => {
   const m = src('main'), c = css(); assert.match(m, /function paintMiniStyle/); assert.match(m, /wavwiz:npstyle/);
-  for (const s of ['classic', 'center', 'stack', 'horizon']) assert.match(c, new RegExp('\\.minicol\\.pn-' + s));
+  for (const s of ['round', 'soft', 'square', 'ring']) assert.match(c, new RegExp('\\.minicol\\.pn-btn-' + s));   // 0.5.0 F95
 });
 test('F39: expanded Devices - Library rail full height, bar spans exactly the Devices column', () => {
   const c = css(); assert.match(c, /\.desk\.devexpanded:not\(\.libexpanded\):not\(\.tight\) \.libpanel\{grid-row:1\/3!important\}/);

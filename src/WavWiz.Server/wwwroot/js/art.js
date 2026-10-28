@@ -61,6 +61,32 @@ export function cover(src, cls = '', glyph = '♪', gen = null) {
   return box;
 }
 
+/** 0.5.0 F123: Now Playing / Up next cover with a fallback chain for library tracks: 1) track/album art; 2) artist photo (same cached artistArt as
+ * Library, square box, object-fit cover); 3) generated album cover. Radio keeps radio art / 📻, receivers keep artUrl / 📱 (no artist lookup).
+ * onReal(url) fires only when the track picture itself loaded (bloom / jacket vars never point at a failed URL). Tagged data-artist for artPushed. */
+export const npArtistName = it => String(it?.albumArtist || it?.artist || '').trim();
+export const npKey = (it, src) => [src || '', it ? npArtistName(it) : '', it?.album || '', it?.title || ''].join('\0');
+export function npCover(it, size = 192, cls = '', onReal = null) {
+  const src = itemArtUrl(it, size);
+  if (!it || it.kind === 'radio' || isReceiver(it)) return cover(src, cls, it?.kind === 'radio' ? '📻' : isReceiver(it) ? '📱' : '♪');
+  const name = npArtistName(it);
+  const box = h('div', { class: 'cover ' + cls + ' gen loading' });
+  if (name) { box.classList.add('acover'); box.dataset.artist = name; }
+  const showGen = () => { box.classList.remove('loading'); if (!box.classList.contains('loaded') && !box.querySelector('.gencover')) box.append(genNode('album', it.album || it.title || '', it.artist || name || '')); };
+  const done = () => { box.classList.remove('loading'); box.classList.add('loaded'); box.querySelector('.gencover')?.remove(); };
+  const img = (u, cl, fail, ok) => {
+    const im = h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async', class: cl }); im.onerror = () => { im.remove(); fail(); };
+    im.onload = () => { if (!im.naturalWidth) { im.remove(); fail(); return; } (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => { done(); ok?.(); }); };
+    box.append(im);
+  };
+  const photo = bust => { const u = artistArt(name, Math.max(size, 192)); if (!u) { showGen(); return; } img(bust ? `${u}&v=${bust}` : u, 'cimg aphoto', showGen); };
+  let trackOk = false;
+  box._wwReload = () => { if (!trackOk && name) { box.querySelector('.aphoto')?.remove(); photo(Date.now()); } };
+  if (src) img(src, 'cimg', () => name ? photo() : showGen(), () => { trackOk = true; onReal?.(src); });
+  else if (name) photo(); else showGen();
+  return box;
+}
+
 /** 0.2.2 T4d: round artist picture with a fallback chain. 1) the artist photo (online, cached); 2) if there is none, the artist's own album
  * covers - a 2x2 mosaic when 4 load, else the first one that loads; 3) the generated portrait only when nothing loads at all.
  * T4b: the element is tagged with the artist name so an "art" push from the server swaps the photo in live (artPushed). */

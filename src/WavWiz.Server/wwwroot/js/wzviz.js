@@ -25,9 +25,8 @@ export class WavWizRing {
       this.hit = b.hit;
     } else { for (let i = 0; i < this.vals.length; i++) this.vals[i] *= 0.9; this.beat.push(0, dt); this.hit = false; }
     const pulse = this.beat.pulse, L = ringLayout(w, h, pulse), { cx, cy, r0, maxBar } = L;
-    // background: dark navy with a soft vignette; a faint center-line waveform across the whole banner uses the width of a wide banner
-    const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(w, h) / 2); bg.addColorStop(0, '#0d1526'); bg.addColorStop(1, '#050811');
-    g.globalCompositeOperation = 'source-over'; g.shadowBlur = 0; g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    // F94: clear to transparent so the CSS stage wash (theme accent x Color intensity) shows through, no navy plate; faint center-line waveform
+    g.globalCompositeOperation = 'source-over'; g.shadowBlur = 0; g.clearRect(0, 0, w, h);
     if (wave) {
       g.beginPath(); for (let i = 0; i < 1024; i += 4) { const x = i / 1023 * w, y = cy + ((wave[i] - 128) / 128) * h * 0.22; i ? g.lineTo(x, y) : g.moveTo(x, y); }
       const lg = g.createLinearGradient(0, 0, w, 0); lg.addColorStop(0, css(ORANGE, 0.28)); lg.addColorStop(0.5, 'rgba(255,255,255,0.06)'); lg.addColorStop(1, css(TEAL, 0.28));

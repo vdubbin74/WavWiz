@@ -143,7 +143,7 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
 
 test('0.2.1 F11: the NOW PLAYING header keeps only its label (+ collapsed song line) and the collapse arrow; no status chips or live dot', () => {
   const n = src('now.js');
-  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), (?:zoneChip\('zs-panel'\), )?ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), (?:mkSc\('np-sc'\), )?h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
+  assert.match(n, /h\('div', \{ class: 'pane-h' \}, h\('span', \{ class: 'np-ctltitle' \}, 'NOW PLAYING'\), (?:zoneChip\('zs-panel'\), )?ctlNow, (?:ctlStrip, )?h\('span', \{ class: 'grow' \}\), (?:mkSc\('np-sc'\), |scSide\.toggle, )?h\('span', \{ class: 'row listcolwrap' \}, ctlColBtn\)\)/);
   assert.doesNotMatch(n, /np-hchips|np-spk|class: 'np-dot'|liveDot|np-mutedtag/);
   assert.match(n, /class: 'np-vol' \}, eqBtn/);   // 0.3.5 J8: the Sleep button sits next to it
 });
@@ -203,8 +203,8 @@ test('0.2.1 F13: generated covers + portraits are deterministic, unique per albu
 
 test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on the background), Custom has five pickers; new theme order', async () => {
   const theme = await imp('theme');
-  assert.deepEqual(Object.values(theme.PRESETS).map(p => p.name), ['Midnight Neon', 'Pepecoin', 'Ember', 'Arctic', 'Violet Pulse', 'Monochrome', 'Daylight', 'Nebula', 'Blue Steel', 'Lime Circuit']);
-  const want = { default: '#F5C542', pepecoin: '#C07A4E', ember: '#4FC3F7', arctic: '#6EF7B2', violet: '#2EE6D6', mono: '#FF5A5F', daylight: '#6B4EE6', nebula: '#F472B6', steel: '#E0B15A', lime: '#F472D0' };
+  assert.deepEqual(Object.values(theme.PRESETS).map(p => p.name), ['Midnight Neon', 'Pepecoin', 'Ember', 'Arctic', 'Violet Pulse', 'Monochrome', 'Daylight', 'Nebula', 'Crimson Lounge', 'Ocean Abyss']);
+  const want = { default: '#F5C542', pepecoin: '#C07A4E', ember: '#4FC3F7', arctic: '#6EF7B2', violet: '#2EE6D6', mono: '#FF5A5F', daylight: '#5B3FD4', nebula: '#F472B6', crimson: '#F5E6C8', ocean: '#FF8A5B' };
   const ratio = (a, b) => { const x = theme.luminance(a), y = theme.luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   for (const [id, hl] of Object.entries(want)) {
     assert.equal(theme.PRESETS[id].hl, hl, id);

@@ -135,3 +135,132 @@ body.minibody .mp:not(.slim) .mp-vol .pct{width:2.6em;font-size:11px}
 body.minibody .mp:not(.slim) .mp-vol .mp-oplbl{display:none}
 body.minibody .mp:not(.slim) .mp-sc{flex:none;order:6;border-top:0;padding:0;margin:0}
 body.minibody .mp:not(.slim) .mp-seek{gap:4px}
+/* 0.5.0 F95: EQ-bars track bar in the compact form - even bars standing on the baseline */
+.npl-eqs .npl-wave{align-items:flex-end;gap:2px} .npl-eqs .npl-wave i{border-radius:1px 1px 0 0}
+/* 0.5.0 F98: transport buttons follow Settings > Appearance > Now Playing > Buttons on both minis (standalone .mp carries pn-btn-*; the
+   condensed one inherits it from .minicol). Mute / mixer siblings match. Standalone Track bar row (mp-npl) sits in the song block. */
+:is(.mp,.minicol).pn-btn-round .mp-tr :is(.mp-b,.mutebtn){border-radius:50%}
+:is(.mp,.minicol).pn-btn-round .mp-tr .mp-b.play{background:var(--accent);color:var(--accent-ink,#fff);box-shadow:0 0 calc(10px * var(--np-k,1)) color-mix(in srgb,var(--accent) 60%,transparent)}
+:is(.mp,.minicol).pn-btn-soft .mp-tr :is(.mp-b,.mutebtn:not(.on)){border-radius:50%;border-color:transparent;background:color-mix(in srgb,var(--ink) 9%,var(--panel))}
+:is(.mp,.minicol).pn-btn-soft .mp-tr .mp-b.play{background:color-mix(in srgb,var(--accent) 30%,var(--panel));border-color:transparent}
+:is(.mp,.minicol).pn-btn-square .mp-tr :is(.mp-b,.mutebtn){border-radius:5px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+:is(.mp,.minicol).pn-btn-ring .mp-tr :is(.mp-b,.mutebtn:not(.on)){border-radius:50%;background:transparent;border:1.5px solid color-mix(in srgb,var(--ink) 40%,transparent)}
+:is(.mp,.minicol).pn-btn-ring .mp-tr .mp-b.play{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
+body.minibody .mp .mp-txt .mp-npl{order:2;height:16px;display:flex;align-items:center;gap:5px;font-size:10px;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer;min-width:0}
+body.minibody .mp .mp-npl .npl-pill{padding:0 5px} body.minibody .mp .mp-npl .npl-wbox{height:14px} body.minibody .mp .mp-npl .npl-lcd{font-size:10px} body.minibody .mp .mp-npl .npl-leds{height:7px}
+.mp.slim .mp-npl :is(.npl-pill,.npl-el,.npl-du,.npl-lcd){display:none}
+.mp.slim .mp-txt{grid-template-rows:auto auto}
+/* 0.5.0 F98b: lock transport buttons to squares (5-button condensed row was shrinking them into ovals) */
+.mp .mp-tr :is(.mp-b,.mutebtn){flex:none;width:24px;height:24px;min-width:0;aspect-ratio:1;box-sizing:border-box}
+.mp.embedded .mp-ctl{width:auto;min-width:112px}
+.mp.embedded .mp-tr{justify-content:flex-start}
+
+/* 0.5.0 F99 — condensed under Queue: titles claim the empty right of transport */
+.mp.embedded .mp-side{display:none}
+.mp.embedded .mp-txt{flex:1 1 0;min-width:0}
+.mp.embedded .mp-ctl{flex:none;width:auto;min-width:0;margin-left:10px}
+.mp.embedded .mp-tr{justify-content:flex-start;gap:4px}
+.mp.embedded .mp-txt > .mp-seek{display:none}
+
+/* 0.5.0 F99b — condensed: zone under artist + bigger square transport */
+.mp.embedded .mp-txt{height:auto;min-height:56px;align-content:center;row-gap:2px}
+.mp.embedded .mp-txt .zl-line{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+.mp.embedded .mp-txt .zl-line>.mp-a,.mp.embedded .mp-txt .zl-line>:first-child{flex:none;max-width:100%}
+.mp.embedded .mp-txt .zl-line .zlink{margin:0;align-self:flex-start;flex:none}
+.mp.embedded .mp-tr{gap:5px}
+.mp.embedded .mp-tr :is(.mp-b,.mutebtn){flex:none;width:28px;height:28px;min-width:0;min-height:0;aspect-ratio:1;box-sizing:border-box}
+.mp.embedded .mp-tr .mp-b.play{width:32px;height:32px}
+.mp.embedded .mp-tr .mp-b .ico-svg,.mp.embedded .mp-tr .mutebtn .ico-svg{width:15px;height:15px}
+.mp.embedded .mp-tr .mp-b.play .ico-svg{width:17px;height:17px}
+/* F110: standalone mini two bands - Band A transport + pins/Home, Band B full-width volume/%/Transparency */
+body.minibody .mp:not(.slim):not(.embedded) .mp-ctl{order:4;flex:none;width:auto}
+body.minibody .mp:not(.slim):not(.embedded) .mp-sc{order:4;flex:1 1 0;min-width:0;justify-content:flex-end;border-top:0;padding:0;margin:0}
+body.minibody .mp:not(.slim):not(.embedded) .mp-vol{order:5;flex:1 0 100%;min-width:0;height:auto;min-height:26px;gap:6px;padding-right:4px;flex-wrap:nowrap}
+body.minibody .mp:not(.slim):not(.embedded) .mp-vol .vbar{flex:1 1 auto;min-width:120px}
+body.minibody .mp:not(.slim):not(.embedded) .mp-vol .pct{flex:none;width:2.8em;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
+body.minibody .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-4px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
+body.minibody .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-moz-range-thumb{width:13px;height:13px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
+body.minibody .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn{flex:none;width:22px;height:22px;padding:0;justify-content:center;gap:0}
+body.minibody .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn .mp-oplbl{display:none}
+/* 0.5.0 F130: labeled Artist · Album in the condensed / mini player (tokens only) */
+.mp .mp-a .np-aal{font-size:.78em;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--dim);margin-right:4px}
+.mp .mp-a .np-aav{color:var(--ink);opacity:.9}
+.mp .mp-a .np-aadot{color:var(--dim);margin:0 5px}
+.mp.embedded{position:relative}
+.mp .mp-sctog{display:flex;justify-content:flex-end;border-top:0}
+.mp .mp-sctog .sctoggle.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+.mp .mp-scside{position:absolute;right:0;bottom:100%;z-index:6;width:44px;padding:6px 0;background:var(--panel2,var(--panel));border:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0;display:flex;justify-content:center}
+.mp .mp-scside[hidden]{display:none}
+.mp .mp-scside .scrow{flex-direction:column;gap:6px;margin:0}
+.mp .mp-scside .scsep{width:18px;height:1px;background:var(--line)}
+.mp .mp-scside .schome{color:var(--accent-text,var(--accent))}
+/* 0.5.0 F133: condensed Shortcuts strip scrolls instead of clipping */
+.mp .mp-scside{max-height:min(60vh,420px);overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;align-items:flex-start}
+.mp .mp-scside .scrow > *{flex:0 0 auto}
+/* 0.5.0 F135d: condensed Shortcuts = horizontal pin row overlay docked right, slides in leftward over mini chrome; no hang-above/below. Toggle stays above it. */
+@keyframes mp-scslide{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0 0 0 0)}}
+.mp .mp-scside{top:0;bottom:auto;right:0;width:auto;max-width:70%;height:44px;max-height:none;z-index:20;flex-direction:row;align-items:center;padding:0 8px;border:0;border-left:1px solid var(--line);border-radius:0 var(--radius) 0 var(--radius);overflow-x:auto;overflow-y:hidden;box-shadow:-8px 0 18px color-mix(in srgb,var(--bg) 55%,transparent);animation:mp-scslide .16s ease-out}
+.mp .mp-scside .scrow{flex-direction:row;align-items:center;flex-wrap:nowrap}
+.mp .mp-scside .scsep{width:1px;height:18px}
+.mp .mp-sctog .sctoggle{position:relative;z-index:21}
+/* 0.5.0 F136: condensed (embedded) player = flat Now Playing card chrome. Title bar "NOW PLAYING" + Shortcuts pin on the right; the F135e
+   horizontal pin strip opens leftward ON that title bar. Body: art | title + Artist/Album + seek, then transport (shuffle/prev/play/next/repeat)
+   and mute / mixer / EQ / Sleep + "on <zone>". Tokens only. Standalone (.minibody, not .embedded) untouched. */
+.mp.embedded.mp-flat{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:0;padding:0;height:auto;--mp-hdh:30px}
+.mp.mp-flat > .mp-hd{position:relative;display:flex;align-items:center;gap:8px;height:var(--mp-hdh);min-height:var(--mp-hdh);padding:0 6px 0 10px;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--panel2,var(--panel));overflow:visible}
+.mp.mp-flat .mp-hdt{flex:1 1 auto;min-width:0;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent-text,var(--accent));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp.mp-flat > .mp-hd > .mp-sc{position:static;flex:none;order:0;margin:0;padding:0;border:0;display:flex;align-items:center}
+.mp.mp-flat .mp-sctog .sctoggle{width:24px;height:24px;min-width:0;padding:0;display:grid;place-items:center}
+.mp.mp-flat .mp-scside{position:absolute;top:0;bottom:auto;right:36px;height:var(--mp-hdh);max-width:calc(100% - 140px);box-sizing:border-box;border-top:0;border-bottom:0;border-radius:0 0 0 var(--radius);overflow-x:auto;overflow-y:hidden;animation:mp-scslide .16s ease-out}
+.mp.mp-flat .mp-scside .scrow > :not(.scsep){width:24px;height:24px;min-width:0}
+.mp.mp-flat > .mp-body{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;padding:10px 12px}
+.mp.mp-flat .mp-artbox{grid-row:1;grid-column:1}
+.mp.mp-flat .mp-art{width:72px;height:72px}
+.mp.mp-flat .mp-txt{grid-row:1;grid-column:2;display:flex;flex-direction:column;justify-content:center;height:auto;min-height:0;gap:3px}
+.mp.mp-flat .mp-t{font-size:15px}
+.mp.mp-flat .mp-txt .zl-line{display:block}
+.mp.mp-flat .mp-txt > .mp-seek{display:flex;order:0;margin-top:4px;font-size:11px}
+.mp.mp-flat .mp-txt > .mp-seek > span:first-child{color:var(--accent-text,var(--accent));font-weight:700}
+.mp.mp-flat .mp-ctl{grid-row:2;grid-column:1 / -1;width:auto;margin:0;display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.mp.mp-flat .mp-tr{justify-content:center;gap:10px}
+.mp.mp-flat .mp-tr .mp-b{width:36px;height:36px;border-radius:50%;flex:none}
+.mp.mp-flat .mp-tr .mp-b.tog{width:44px;height:32px;border-radius:999px}
+.mp.mp-flat .mp-tr .mp-b.play{width:50px;height:50px;background:var(--accent);color:var(--accent-ink,var(--bg));border-color:var(--accent);box-shadow:0 0 14px color-mix(in srgb,var(--accent) 45%,transparent)}
+.mp.mp-flat .mp-tr .mp-b .ico-svg{width:16px;height:16px}
+.mp.mp-flat .mp-tr .mp-b.play .ico-svg{width:22px;height:22px}
+.mp.mp-flat .mp-ex{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;row-gap:6px}
+.mp.mp-flat .mp-ex .mutebtn{width:30px;height:30px;flex:none;display:grid;place-items:center}
+.mp.mp-flat .mp-ex .mp-sleep{flex:none;height:28px}
+.mp.mp-flat .mp-ex .zlink{flex:none;margin:0;border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--accent-soft,var(--panel2));color:var(--accent-text,var(--accent));white-space:nowrap}
+.mp.mp-flat > .mp-npl{display:none}
+/* 0.5.0 F138: standalone mini - NOW PLAYING title bar carries the Shortcuts pin; the horizontal strip opens leftward on that bar (like F136 condensed).
+   The window buttons (pin / full / close) stay absolute top-right, so the bar reserves room for them. */
+body.minibody .mp.mp-sttitle:not(.embedded){position:relative;flex-wrap:wrap;align-content:flex-start;--mp-hdh:26px}
+.mp.mp-sttitle > .mp-sthd{order:0;flex:0 0 calc(100% + 13px);width:calc(100% + 13px);max-width:none;position:relative;display:flex;align-items:center;gap:6px;height:var(--mp-hdh);min-height:var(--mp-hdh);margin:-6px -6px 0 -7px;padding:0 74px 0 10px;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--panel2,var(--panel));overflow:visible}
+.mp.mp-sttitle .mp-sthd .mp-hdt{flex:1 1 auto;min-width:0;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent-text,var(--accent));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.minibody .mp.mp-sttitle:not(.slim) .mp-sthd > .mp-sc{order:0;position:static;flex:none;margin:0;padding:0;border:0;display:flex;align-items:center}
+.mp.mp-sttitle .mp-sthd .sctoggle{width:20px;height:20px;min-width:0;padding:0;display:grid;place-items:center}
+.mp.mp-sttitle .mp-scside{position:absolute;top:0;bottom:auto;right:98px;height:var(--mp-hdh);max-width:calc(100% - 210px);box-sizing:border-box;padding:0 6px;border-top:0;border-bottom:0;border-radius:0 0 0 var(--radius);overflow-x:auto;overflow-y:hidden}
+.mp.mp-sttitle .mp-scside .scrow > :not(.scsep){width:20px;height:20px;min-width:0}
+.mp.mp-sttitle:not(.embedded) .mp-side{top:4px;right:4px;z-index:22}
+.mp.mp-sttitle.slim > .mp-sthd{display:none}
+/* 0.5.0 F139: standalone transport docked to the right edge with shuffle / repeat pills (condensed language) */
+.mp:not(.embedded) .mp-ctl.mp-ctlr{margin-left:auto;align-self:center;width:auto}
+body.minibody .mp:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:auto;flex:none}
+.mp:not(.embedded) .mp-ctlr .mp-tr{justify-content:flex-end;gap:4px}
+.mp:not(.embedded) .mp-ctlr .mp-tr .mp-b.tog{width:34px;height:24px;aspect-ratio:auto;border-radius:999px}
+.mp:not(.embedded) .mp-ctlr .mp-tr .mp-b.tog.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+.mp:not(.embedded) .mp-ctlr .mp-tr .mp-b.play{width:28px;height:28px;border-radius:50%}
+.mp.slim:not(.embedded) .mp-ctlr .mp-tr .mp-b.tog{width:24px}
+@media (max-width:330px){.mp.slim:not(.embedded) .mp-ctlr .mp-tr .tog{display:none}}
+/* 0.5.0 F140: standalone - the slider row (Volume, or Transparency while the title-bar selector is on) sits LEFT of the right-docked transport;
+   the selector is a compact icon pill in the NOW PLAYING bar, left of the Shortcuts pin. Condensed untouched (all rules are :not(.embedded) + .mp-sttitle). */
+body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx{order:4;flex:1 1 0;min-width:0;min-height:26px;height:auto;padding-right:2px;gap:5px;flex-wrap:nowrap;align-self:center}
+body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .vbar{min-width:40px;flex:1 1 auto}
+body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow .mp-opl{font-size:9px}
+body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow input{min-width:30px}
+body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:0}
+.mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{flex:none;width:20px;height:20px;padding:0;display:grid;place-items:center;gap:0;border-radius:6px}
+.mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn .mp-oplbl{display:none}
+.mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+.mp.mp-sttitle.scopen:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{visibility:hidden}

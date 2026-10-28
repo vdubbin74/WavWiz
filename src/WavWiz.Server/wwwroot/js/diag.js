@@ -1,6 +1,7 @@
 import { h, api, toast, ask } from './util.js';
 import { vizStats, webgl2Ok, vizPrefs, vizName } from './viz.js';
 import { loadReact } from './vizcore.js';
+import { airplayDevCard } from './airplaydev.js';
 
 const ICON = { ok: '✓', warn: '!', fail: '✕', unknown: '?' };
 export const roomPillClass = s => ({ ok: 'ok', idle: 'idle', buffering: 'warn', dropped: 'bad', reconnecting: 'bad', offline: 'offline' }[s] || 'idle');
@@ -85,23 +86,58 @@ export function diagnosticsView(S) {
   const statusCard = st => h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
     h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${st.bind}`),
     st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : h('p', { class: 'okc' }, 'Everything looks fine.'));
-  async function draw() {
-    const st = await api('/status').catch(() => null), status = st ? statusCard(st) : null;
-    let d; try { d = await api('/diagnostics'); } catch (e) { root.replaceChildren(status || '', h('p', { class: 'err' }, e.status === 403 ? 'Diagnostics need Control or Admin access.' : e.message)); return; }
-    const report = () => [`WavWiz ${d.version} ${d.channel} diagnostics ${d.generatedAt}`, d.os, '', ...vizReport().map(([t, s, x]) => `[VIZ ${s.toUpperCase()}] ${t}: ${x}`), '', ...d.checks.map(c => `[${c.status.toUpperCase()}] ${c.title}: ${c.detail}${c.fix ? '  -> ' + c.fix : ''}`), '', ...d.devices.map(r => `DEVICE ${r.name} (${r.link || 'link unknown'}, ${r.remoteIp || 'no ip'}): ${r.state}; drops ${r.drops}, reconnects ${r.reconnects}, underrun events ${r.underrunEvents}\n   ` + r.events.map(e => `${e.at} ${e.kind} ${e.text}`).join('\n   '))].join('\n');
-    root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, 'Diagnostics'), h('button', { class: 'btn', onclick: draw }, 'Refresh'), h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(report()); toast('Report copied'); } catch { toast('Could not copy automatically - select the text on the page.', true); } } }, 'Copy report')),
-      ...(status ? [status] : []),
-      h('p', { class: 'small dim' }, `Checked ${d.generatedAt}. Nothing here leaves your network. “?” means WavWiz could not check it - never that it is fine.`),
-      h('div', { class: 'card' }, d.checks.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark', style: c.status === 'fail' ? 'border-color:#e5483f;color:#e5483f' : c.status === 'warn' ? 'border-color:#ffb300;color:#ffb300' : '' }, ICON[c.status] || '?'),
-        h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ' + c.fix) : null)))),
-      vizCard(), receiversCard(S), networkCard(S),
-      h('h3', null, 'Devices'), d.devices.length ? d.devices.map(r => h('div', { class: 'card' }, h('div', { class: 'row wrap' }, h('b', { class: 'grow' }, r.name), h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state), h('span', { class: 'pill' }, r.link || 'link unknown')),
-        h('div', { class: 'small dim' }, `${r.remoteIp || 'not connected'} • dropped ${r.drops}× • reconnected ${r.reconnects}× • underrun events ${r.underrunEvents}${r.syncErrorMs != null ? ` • sync error ${r.syncErrorMs.toFixed(1)} ms` : ' • sync error unknown'}`),
-        r.detail ? h('div', { class: 'small' }, r.detail) : null,
-        r.events.length ? h('details', null, h('summary', { class: 'small' }, `Recent events (${r.events.length})`), h('table', { class: 'tbl' }, h('tbody', null, r.events.map(e => h('tr', null, h('td', { class: 'mono small' }, e.at), h('td', null, e.kind), h('td', null, e.text)))))) : null)) : h('p', { class: 'dim' }, 'No devices yet.'));
+  // F111: build() once (and on manual Refresh); the 15 s interval calls refresh(), which patches Status / checks / Devices in place.
+  // Viz / Receivers / Network / AirPlay (developer) cards are never recreated by the interval, so nothing flashes or loses scroll.
+  let d = null, built = false, busy = false;
+  const statusSlot = h('div'), checkedP = h('p', { class: 'small dim' }), checksCard = h('div', { class: 'card' }), devSlot = h('div');
+  const checksNodes = () => d.checks.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark', style: c.status === 'fail' ? 'border-color:#e5483f;color:#e5483f' : c.status === 'warn' ? 'border-color:#ffb300;color:#ffb300' : '' }, ICON[c.status] || '?'),
+    h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ' + c.fix) : null)));
+  const devNodes = () => {
+    const open = new Set([...devSlot.querySelectorAll('details[open]')].map(x => x.dataset.dev));
+    return d.devices.length ? d.devices.map(r => h('div', { class: 'card' }, h('div', { class: 'row wrap' }, h('b', { class: 'grow' }, r.name), h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state), h('span', { class: 'pill' }, r.link || 'link unknown')),
+      h('div', { class: 'small dim' }, `${r.remoteIp || 'not connected'} • dropped ${r.drops}× • reconnected ${r.reconnects}× • underrun events ${r.underrunEvents}${r.syncErrorMs != null ? ` • sync error ${r.syncErrorMs.toFixed(1)} ms` : ' • sync error unknown'}`),
+      r.detail ? h('div', { class: 'small' }, r.detail) : null,
+      r.events.length ? h('details', { 'data-dev': r.name, open: open.has(r.name) }, h('summary', { class: 'small' }, `Recent events (${r.events.length})`), h('table', { class: 'tbl' }, h('tbody', null, r.events.map(e => h('tr', null, h('td', { class: 'mono small' }, e.at), h('td', null, e.kind), h('td', null, e.text)))))) : null)) : [h('p', { class: 'dim' }, 'No devices yet.')];
+  };
+  const report = () => [`WavWiz ${d.version} ${d.channel} diagnostics ${d.generatedAt}`, d.os, '', ...vizReport().map(([t, s, x]) => `[VIZ ${s.toUpperCase()}] ${t}: ${x}`), '', ...d.checks.map(c => `[${c.status.toUpperCase()}] ${c.title}: ${c.detail}${c.fix ? '  -> ' + c.fix : ''}`), '', ...d.devices.map(r => `DEVICE ${r.name} (${r.link || 'link unknown'}, ${r.remoteIp || 'no ip'}): ${r.state}; drops ${r.drops}, reconnects ${r.reconnects}, underrun events ${r.underrunEvents}\n   ` + r.events.map(e => `${e.at} ${e.kind} ${e.text}`).join('\n   '))].join('\n');
+  // keep the nearest scrolling ancestor (the Settings content pane) where the user left it
+  const keepScroll = fn => { let sc = root.parentElement; while (sc && sc.scrollHeight <= sc.clientHeight) sc = sc.parentElement; const y = sc ? sc.scrollTop : 0; fn(); if (sc) sc.scrollTop = y; };
+  async function fetchAll() {
+    const st = await api('/status').catch(() => null);
+    let dd = null, err = null; try { dd = await api('/diagnostics'); } catch (e) { err = e; }
+    return { st, dd, err };
   }
-  draw(); timer = setInterval(() => { if (document.body.contains(root)) draw(); else clearInterval(timer); }, 15000);
-  return { el: root, reload: draw };
+  function patch(st) {
+    keepScroll(() => {
+      statusSlot.replaceChildren(...(st ? [statusCard(st)] : []));
+      checkedP.textContent = `Checked ${d.generatedAt}. Nothing here leaves your network. “?” means WavWiz could not check it - never that it is fine.`;
+      checksCard.replaceChildren(...checksNodes());
+      devSlot.replaceChildren(...devNodes());
+    });
+  }
+  /** Full rebuild: first paint and the manual Refresh button. */
+  async function build() {
+    if (busy) return; busy = true;
+    try {
+      const { st, dd, err } = await fetchAll();
+      if (!dd) { built = false; root.replaceChildren(...(st ? [statusCard(st)] : []), h('p', { class: 'err' }, err?.status === 403 ? 'Diagnostics need Control or Admin access.' : err?.message || 'Diagnostics are not available.')); return; }
+      d = dd; devSlot.replaceChildren(); patch(st);
+      keepScroll(() => root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, 'Diagnostics'), h('button', { class: 'btn', onclick: build }, 'Refresh'), h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(report()); toast('Report copied'); } catch { toast('Could not copy automatically - select the text on the page.', true); } } }, 'Copy report')),
+        statusSlot, checkedP, checksCard,
+        vizCard(), receiversCard(S), networkCard(S), ...[airplayDevCard(S)].filter(Boolean),
+        h('h3', null, 'Devices'), devSlot));
+      built = true;
+    } finally { busy = false; }
+  }
+  /** Interval tick: patch Status, checks and Devices in place; never touches the other cards. */
+  async function refresh() {
+    if (!built) return build();
+    if (busy) return; busy = true;
+    try { const { st, dd } = await fetchAll(); if (dd) { d = dd; patch(st); } else statusSlot.replaceChildren(...(st ? [statusCard(st)] : [])); }
+    finally { busy = false; }
+  }
+  build(); timer = setInterval(() => { if (document.body.contains(root)) refresh(); else clearInterval(timer); }, 15000);
+  return { el: root, reload: build, refresh };
 }
 
 /* 0.2.0 item 12: the "checklist dismissed" flag moved from unison.checklist.dismissed to wavwiz.checklist.dismissed (old value read once). */

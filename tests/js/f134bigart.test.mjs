@@ -1,0 +1,10 @@
+import fs from 'node:fs'; import assert from 'node:assert';
+const css = fs.readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const f = css.slice(css.indexOf('F134:'));
+const m = f.match(/np-flat:not\(\.collapsed\) \.pn-art\{width:clamp\((\d+)px,[^,]+,(\d+)px\)/);
+assert.ok(m, 'F134 art clamp'); assert.ok(+m[1] > 76 && +m[2] > 92, 'art min/max above 76/92');
+assert.match(f, /\.np-tablexport \.tbtn\.play\{width:(7[0-9])px/);
+assert.match(f, /\.np-tablexport \.tbtn\{width:5\dpx/);
+assert.doesNotMatch(f, /#[0-9a-f]{3,6}\b/i);
+assert.ok(css.indexOf('F134:') > css.indexOf('F133:'));
+console.log('f134bigart ok');

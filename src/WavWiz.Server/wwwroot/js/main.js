@@ -8,10 +8,12 @@ import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { openSettings } from './settings.js';
+import { isPhone } from './viz.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
+import { centerEq } from './centerview.js';   // 0.5.0 F128: phone Sound / EQ sheet
+import { openSpeakerSettings, editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
 import { listTable } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
@@ -19,7 +21,7 @@ import { loadLayout, saveLayout, setLocked } from './plcols.js';
 import { installMiniTargets, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, holdFor, holdPage, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
-import { NP_STYLES, loadNpPrefs, npVars } from './npstyle.js';
+import { loadNpPrefs, npVars, applyNpColor, applyNpClasses } from './npstyle.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
 import { setRipAllowed, ripAllowed } from './library.js';
 import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, isTight, devTabText, loadLayout as loadLayoutMode, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
@@ -49,6 +51,7 @@ import * as Z from './zones40.js';
 import { isDevDragging } from './devorder.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
+import { toggleAppFull, installAppFull } from './fullscreen.js';   // 0.5.0 F120
 import { openMixer } from './mixer.js';   // 0.4.8 F49
 import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
@@ -153,11 +156,12 @@ function syncMini() { holdPage();
  *  pn-<style> class and effect variables as the Now Playing panel, and follows changes at once. */
 function paintMiniStyle() {
   if (!minicol) return; const p = loadNpPrefs();
-  for (const [id] of NP_STYLES) minicol.classList.toggle('pn-' + id, p.style === id);
-  for (const [k, v] of Object.entries(npVars(p))) minicol.style.setProperty(k, v); minicol.dataset.style = p.style;
+  applyNpClasses(minicol, p);   // F95
+  for (const [k, v] of Object.entries(npVars(p))) minicol.style.setProperty(k, v);
 }
-window.addEventListener('wavwiz:npstyle', () => paintMiniStyle());
-window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') paintMiniStyle(); });
+applyNpColor(loadNpPrefs()); // F94
+window.addEventListener('wavwiz:npstyle', () => { applyNpColor(loadNpPrefs()); paintMiniStyle(); });
+window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') { applyNpColor(loadNpPrefs()); paintMiniStyle(); } });
 
 async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
@@ -174,7 +178,7 @@ async function startMain() {
   content = h('main', { class: 'view', id: 'view', tabindex: -1 });
   S.view = wide() ? 'library' : 'now';
 
-  const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, '☰');
+  const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, h('span', { class: 'hb-bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')));
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => showEq() }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
@@ -252,12 +256,14 @@ async function startMain() {
       case 'prev': return act('/stream/prev');
       case 'mute': return [...document.querySelectorAll('.mutebtn')].find(b => b.getClientRects().length && !b.disabled)?.click();
       case 'mini': try { if (window.chrome?.webview) { window.chrome.webview.postMessage({ cmd: 'mini', toggle: true }); return; } } catch { /* browser */ } return openMini();
+      case 'fullscreen': return toggleAppFull();
       case 'home': return goHome();
       case 'mixer': return window.dispatchEvent(new CustomEvent('wavwiz:mixer'));
       case 'settings': return runShortcut('settings');
       default: return runShortcut(id);
     }
   });
+  installAppFull();   // 0.5.0 F120: Esc leaves app fullscreen
   installMedia({ S, api, act, masterLevel, allMuted });   // 0.3.8 L45
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
@@ -347,11 +353,15 @@ function wireNextBlock() {
     raf = 0;
     desk.classList.toggle('npcollapsed', nowc.ctlPanel.classList.contains('collapsed'));
     const wide = desk.classList.contains('listexpanded') && !desk.classList.contains('libexpanded') && !desk.classList.contains('devexpanded');
-    const on = (desk.classList.contains('listcollapsed') || wide) && !desk.classList.contains('libexpanded') && !window.matchMedia('(max-width:900px)').matches;   // 0.4.9 F83: not in the narrow column beside the expanded Library
+    const on = !window.matchMedia('(max-width:900px)').matches;   // 0.5.0 F88: shown with the Queue collapsed / open / full-screen; F137b: also in the narrow column beside the expanded Library (Copy is now an icon) - the gap check below still hides it when the header is too tight; phone (<=900px) keeps its own Up next
     nb.hidden = !on; nb.classList.toggle('wide', wide); listt.el.classList.toggle('nbshown', false);
     if (!on || !desk.isConnected) return;
-    const col = nowc.ctlPanel.getBoundingClientRect(), hd = listt.head.getBoundingClientRect();
-    if (!col.width) return;
+    const two = desk.classList.contains('libexpanded') && !desk.classList.contains('listcollapsed');   // F137b: narrow Queue beside the expanded Library has no free gap in its title row - Up next gets its own slim line under it
+    listt.head.classList.toggle('nb2', two);
+    if (two) { nb.style.left = ''; nb.style.maxWidth = ''; nb.classList.remove('tight'); listt.el.classList.toggle('nbshown', true); return; }
+    const hd = listt.head.getBoundingClientRect(); let col = nowc.ctlPanel.getBoundingClientRect();
+    if (!col.width) col = hd;   // F137b: Now Playing column hidden (mini NP under the narrow Queue) - center on the Queue header, still gap-checked
+    if (!hd.width) { nb.hidden = true; return; }
     // 0.4.8 F50: centered on the Now Playing column when it fits, otherwise slid into the free gap between the title and the right-hand
     // controls (zone picker included) - never over either of them
     const L = listt.leftEdge() + 16, Rr = listt.rightEdge() - 16, gap = Rr - L, c = col.left + col.width / 2;
@@ -456,17 +466,49 @@ export function goHome() {
   try { window.focus(); } catch { /* ignore */ }
   setTimeout(() => pulse(desk), reduced() ? 0 : GLIDE.ms);
 }
+// 0.5.0 F128: phone NP hides .np-vizpanel (F102), so Sound / EQ opens a full-screen sheet hosting centerEq
+let eqSheet = null;
+export function closePhoneEqSheet() {
+  const s = eqSheet; if (!s) return; eqSheet = null;
+  document.removeEventListener('keydown', s.onKey, true);
+  try { s.eq?.destroy(); } catch {}
+  s.el.remove(); document.documentElement.classList.remove('eqsheet-lock');
+}
+export function openPhoneEqSheet() {
+  if (eqSheet) { eqSheet.x.focus(); return eqSheet; }   // don't stack
+  const x = h('button', { type: 'button', class: 'iconbtn eqsheet-x', 'aria-label': 'Close', title: 'Close', onclick: () => closePhoneEqSheet() }, '\u2715');
+  const body = h('div', { class: 'eqsheet-b' });
+  const el = h('div', { class: 'eqsheet open npeqsheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Sound / EQ' }, h('header', { class: 'eqsheet-h' }, h('b', {}, 'Sound / EQ'), x), body);
+  const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePhoneEqSheet(); } };
+  document.documentElement.classList.add('eqsheet-lock');
+  document.body.append(el);
+  eqSheet = { el, x, body, onKey, eq: null };
+  eqSheet.eq = centerEq(S, body);
+  document.addEventListener('keydown', onKey, true);
+  x.focus();
+  return eqSheet;
+}
 export function showEq() {
-  if (!wide()) { if (S.view !== 'now') go('now'); }
-  else {
+  if (!wide()) {
+    if (S.view !== 'now') go('now');
+    openPhoneEqSheet();   // F128: phone never uses the hidden NP center stage
+    return;
+  } else {
     if (pageDlg) { pageDlg.close(); pageDlg = null; }
     if (P6.exp === 'lib') toggleLibExpanded(false); else if (P6.exp === 'dev') toggleDevExpanded(false);
     if (P6.list === 'expanded') setList('open');
   }
   nowc.showCenter?.('eq');
   const front = () => { const st = nowc.stage; if (st) { st.dataset.eqfront = String(Date.now()); pulse(st); } };
-  if (wide() && !reduced()) setTimeout(front, GLIDE.ms); else front();
+  if (!reduced()) setTimeout(front, GLIDE.ms); else front();
 }
+// F92: other modules (room.js phone role) can ask for a page without importing main.js
+// 0.5.0 F109: All sound settings (center EQ) -> that speaker's settings page
+window.addEventListener('wavwiz:openspk', e => { const id = +e.detail; if (!id) return;
+  if (wide()) { if (!openSpeakerSettings(id)) jumpTo('device', id); return; }
+  closePhoneEqSheet();   // F128: close the EQ sheet first (no stacked full-screen UIs)
+  go('devices'); let n = 0; const t = () => { if (!openSpeakerSettings(id, true) && n++ < 20) setTimeout(t, 60); }; setTimeout(t, 0); });
+window.addEventListener('wavwiz:go', e => { if (typeof e.detail === 'string') go(e.detail); });
 export function go(k, force) {
   if (k?.startsWith?.('settings:')) return openSettings(S, refreshAll, go, k.slice(9));
   if (k === 'zones' || k === 'rooms') k = 'devices';
@@ -476,7 +518,7 @@ export function go(k, force) {
   if (k === 'diag' || k === 'remote' || k === 'about') return openSettings(S, refreshAll, go, k);
   if (k === 'sleep') return nowc.openSleep?.();       // 0.3.5 J8: Now Playing > Sleep
   // 0.2.1 F8: Theme and Visualizer live on Settings > Appearance (one home)
-  if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, k === 'themes' ? 'theme' : 'viz');
+  if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, (k === 'themes' || isPhone()) ? 'theme' : 'viz');   // F125: phone has no Visualizer sub
   if (k === 'finder') k = 'radio';
   if (wide()) {                               // desktop layout: Now Playing, Library, Devices & Playlist are always on screen
     if (k === 'now') return;
@@ -567,6 +609,10 @@ function drawStatus() {
   // 0.3.6 K3: the count badges on the collapsed Library / Devices bars
   const lb = document.querySelector('.libpanel .prail-n'), db = document.querySelector('.devpanel .prail-n');
   if (lb) { const n = libCountLabel(tracks); lb.textContent = n.text; lb.title = n.title; } if (db) db.textContent = `${online}/${S.zones.length}`;
+  // 0.5.0 F106: fold the count into the vertical rail title, like the Auto Devices tab ("DEVICES · 2 ZONES")
+  const lt = document.querySelector('.libpanel .prail-t'), dt = document.querySelector('.devpanel .prail-t');
+  if (lt) lt.textContent = tracks != null ? `LIBRARY · ${libCountLabel(tracks).text}` : 'LIBRARY';
+  if (dt) dt.textContent = devTabText((S.groups || []).length);
   statusbar.replaceChildren(
     // 0.2.2 T10: the top-right indicator is the one home of "Connected"; the status bar speaks up only when the connection drops
     S.connected === false ? h('span', { class: 'sb sbconn', role: 'status' }, h('span', { class: 'dot bad' }), 'Reconnecting…') : null,

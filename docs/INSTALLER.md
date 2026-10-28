@@ -4,7 +4,9 @@
 Unsigned. Built and compiled on Linux (Inno Setup under Wine); installs and upgrades are tested by hand on Windows PCs.
 
 ## Wizard
-Welcome (BETA) > info page (what it does / never does) > folder > components (Server, Player) > **home-network address** (server only; auto-detected, editable, 0.0.0.0 refused) or **server address** (player-only) > tasks (player autostart, desktop link) > ready memo > install > final page (open the first-run web page, start the player).
+Welcome (BETA) > info page (what it does / never does) > folder > components (Server, Player) > **home-network address** (server only; auto-detected, editable, 0.0.0.0 refused) or **server address** (player-only) > tasks (player autostart, Player desktop shortcut — checked, web-page desktop link — unchecked) > ready memo > install > final page (Player first: open WavWiz Player to finish set-up when the Player is installed; the browser is optional — server-only installs open the first-run web page; when the WebView2 runtime is missing a checked "Download Microsoft Edge WebView2" row opens Microsoft's official evergreen bootstrapper link — nothing is downloaded silently).
+
+On the home-network address page a tip says Windows should list the network as **Private**; if the registry (NetworkList profiles, no WMI) shows a **Public** network the tip turns into a warning with how to change it. Setup never changes the profile and never blocks Continue; silent installs only log a NOTE.
 Silent: `/VERYSILENT /SUPPRESSMSGBOXES /COMPONENTS="server,player" /LANIP=192.168.1.20` (`/SERVERHOST=<addr>` seeds the player-only address). Without `/LANIP` the setup script keeps the address in an existing `server.json`, else detects one, else uses 127.0.0.1 with a notice. Other switches: `/SKIPSETUP=1`, `/NOSTART=1`; uninstall `/PURGE=1`.
 
 ## Silent install switches (checked against `installer/WavWiz.iss` and `installer/scripts/setup.ps1`)
@@ -16,7 +18,7 @@ WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our ow
 | `/SUPPRESSMSGBOXES` | Answers every message box with its default. With it, the uninstaller keeps your data (the "also delete your data?" question defaults to No). |
 | `/NORESTART` | Never restart Windows (WavWiz never asks for a restart anyway). |
 | `/COMPONENTS="server,player"` | What to install: `server`, `player` or both. Default: both. |
-| `/TASKS="autostart,desktopicon"` | Optional tasks: `autostart` (start the Player at sign-in, player only), `desktopicon` (desktop link to the web page, server only). Without `/TASKS` the defaults apply (autostart on, desktop link off). |
+| `/TASKS="autostart,playerdesktop,desktopicon"` | Optional tasks: `autostart` (start the Player at sign-in, player only), `playerdesktop` (desktop shortcut "WavWiz Player (BETA)", player only), `desktopicon` (desktop link to the web page, server only). Without `/TASKS` the defaults apply (autostart on, Player shortcut on, web-page link off). `/TASKS` replaces the defaults, so list every task you want. |
 | `/LANIP=192.168.1.20` | Server only: the one home-network IPv4 address the server listens on. `0.0.0.0` and anything that is not a single IPv4 address is refused (setup fails with that message in `install.log`). Without it an existing `server.json` keeps its address; otherwise one is detected, else 127.0.0.1 with a notice. |
 | `/SERVERHOST=192.168.1.20` | Player-only installs: seeds the server address the Player connects to. |
 | `/NOSTART=1` | Install and configure, but do not start the service or the Player. |
@@ -28,7 +30,7 @@ WavWiz uses Inno Setup, so the standard Inno switches work, plus a few of our ow
 Examples:
 ```
 WavWiz-Setup-0.2.5.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="server,player" /LANIP=192.168.1.20
-WavWiz-Setup-0.2.5.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart"
+WavWiz-Setup-0.2.5.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="player" /SERVERHOST=192.168.1.20 /TASKS="autostart,playerdesktop"
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES            (keeps your data)
 "C:\Program Files\WavWiz\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /PURGE=1   (also deletes C:\ProgramData\WavWiz; music files are never touched)
 ```

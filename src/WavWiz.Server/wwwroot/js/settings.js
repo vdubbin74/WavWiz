@@ -9,6 +9,10 @@ import { appearancePane } from './appearance.js';
 import { npPreview, npStyleThumb } from './nppreview.js';
 import { loadLibPrefs, saveLibPrefs, resetLibView, TILE_SIZES, DEF_SORTS } from './libsort.js';
 import { setArtCv } from './art.js';   // 0.4.4 F24
+import { airplayOutCard } from './airplayout.js';   // 0.5.0 stage 10 (WIP)
+import { changePhoneRole } from './room.js';   // F100
+import { isPhoneUa } from './phonejoin.js';
+import { phoneRole } from './calmic-core.js';
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -24,12 +28,10 @@ export const GROUPS = [
   ['general', 'General'],
   ['appearance', 'Appearance'],
   ['playback', 'Playback'],
-  ['devices', 'Devices'],
   ['library', 'Library'],
-  ['network', 'Network'],
+  ['devices', 'Devices'],
+  ['network', 'Network'],   // F117: Away-from-home (Tailscale) lives here now - no Access tab
   ['jukebox', 'Jukebox'],
-  // 0.3.5 J9: these were popups from the File / Help / Devices menus
-  ['access', 'Access'],
   ['diagnostics', 'Diagnostics'],
   ['about', 'About'],
 ];
@@ -42,14 +44,14 @@ export const RESET = {
   library: { 'library.onlineArt': true },
   network: { 'airplay.levelDb': 0, 'spotify.levelDb': 0 },
   jukebox: { 'jukebox.config': null },
-  access: {}, diagnostics: {}, about: {},
+  diagnostics: {}, about: {},
 };
 /** 0.3.5 J9: which Settings section a deep link opens. Pure. */
 export function sectionFor(section) {
   return section === 'players' || section === 'phone' || section === 'devices' || section === 'calibration' ? 'devices'
     : section === 'library' ? 'library' : section === 'network' ? 'network' : section === 'playback' ? 'playback'
     : section === 'general' || section === 'backup' ? 'general' : section === 'jukebox' ? 'jukebox'
-    : section === 'remote' || section === 'access' ? 'access' : section === 'diag' || section === 'diagnostics' ? 'diagnostics' : section === 'about' ? 'about'
+    : section === 'remote' || section === 'access' ? 'network' : section === 'diag' || section === 'diagnostics' ? 'diagnostics' : section === 'about' ? 'about'
     : 'appearance';
 }
 
@@ -72,7 +74,7 @@ export async function openSettings(S, refresh, nav, section) {
   let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
   const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
   d.el.querySelector('header .grow').after(search.el);
-  const focusSec = section === 'players' ? 'sec-players' : null;
+  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-remote' : null;   // F117
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
@@ -82,10 +84,9 @@ export async function openSettings(S, refresh, nav, section) {
       if (admin) tokens = await api('/tokens');
     } catch (e) { body.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
 
-    const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [], access: [], diagnostics: [], about: [] };
+    const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [], diagnostics: [], about: [] };
     // 0.3.5 J9: Away-from-home access, Diagnostics and About are Settings sections (no page popups)
-    { const rv = remoteView(S); panes.access.push(h('div', { class: 'card setpage', id: 'sec-remote' }, rv.el)); }
-    { const dv = diagnosticsView(S); panes.diagnostics.push(h('div', { class: 'card setpage', id: 'sec-diag' }, dv.el)); dv.reload?.(); }
+    { const dv = diagnosticsView(S); panes.diagnostics.push(h('div', { class: 'card setpage', id: 'sec-diag' }, dv.el)); /* F111: diagnosticsView paints once on its own */ }
     panes.about.push(h('div', { class: 'card setpage', id: 'sec-about' }, aboutBody(S)));
     const cal = [], players = [];
 
@@ -95,6 +96,11 @@ export async function openSettings(S, refresh, nav, section) {
     // Devices: phone/https, pairing, tokens, delay defaults
 
     cal.push(...calibrationExtras(S, settings, { admin, put: putSettings, go: k => { d.close(); nav?.(k); } }));
+    // F100: phones change speaker / remote / calibration mic here (reuses room.js's picker)
+    if (isPhoneUa()) { const cur = phoneRole(localStorage); cal.push(h('div', { class: 'card', id: 'sec-phonerole' }, h('h3', null, 'Phone role'),
+      h('p', { class: 'small' }, 'This phone is: ', h('b', null, { speaker: 'Playing music here', remote: 'Remote (silent)', mic: 'Calibration mic' }[cur] || 'Not chosen yet')),
+      h('p', { class: 'small dim' }, 'Speaker, remote or calibration mic.'),
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { d.close(); changePhoneRole(); } }, 'Change…')))); }
     cal.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
       learn('A phone only allows its microphone on a trusted HTTPS page. Install the WavWiz certificate once on each phone.', 'WavWiz makes its own small certificate that is valid only for this PC\'s address. A phone that plays as a speaker also gets more reliable sound on HTTPS.'),
       st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'HTTPS is on.'),
@@ -154,7 +160,9 @@ export async function openSettings(S, refresh, nav, section) {
     panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Home network'),
       h('p', { class: 'dim small' }, 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.'),
       h('p', { class: 'small' }, `Listening on ${st.bind}`),
-      h('button', { class: 'btn', onclick: () => { active = 'access'; paint(); } }, 'Away-from-home access (Tailscale)')));
+      h('button', { class: 'btn', onclick: () => body.querySelector('#sec-remote')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, 'Away-from-home access (Tailscale)')));
+    // F117: Away-from-home access is a normal Network card, right after Home network (local, then remote)
+    { const rv = remoteView(S); panes.network.push(h('div', { class: 'card setpage', id: 'sec-remote' }, rv.el)); }
     panes.network.push(networkCard({ auth: { role: admin ? 'admin' : 'view' } }));      // 0.1.3: Private/Public, re-detect, use the new address
     // 0.1.2: AirPlay + Spotify Connect with level (0…+6 dB) arrows
     const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : rc.airplay.installed ? 'Not running - see Diagnostics.' : 'Not installed on this PC.') : '';
@@ -182,11 +190,12 @@ export async function openSettings(S, refresh, nav, section) {
         ? h('label', { class: 'row', style: 'margin-top:12px' }, h('input', { type: 'checkbox', id: 'spotify-enabled', checked: settings['spotify.enabled'] === true, onchange: ev => putSettings({ 'spotify.enabled': ev.target.checked }) }), h('b', null, 'Spotify Connect'), h('span', { class: 'dim small' }, 'Requires Spotify Premium.'))
         : h('p', { style: 'margin-top:12px' }, h('b', null, 'Spotify Connect: '), settings['spotify.enabled'] === true ? 'On' : 'Off', ' ', h('span', { class: 'dim small' }, 'Requires Spotify Premium.')),
       levelRow('spotify.levelDb', 'Spotify Connect level', spLv)));
+    panes.network.push(airplayOutCard(admin));
     if (admin) {
       const curPw = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Current password' });
       const nw = h('input', { type: 'password', autocomplete: 'new-password', placeholder: 'New password (≥8)' });
       const resetNw = h('input', { type: 'password', autocomplete: 'new-password', placeholder: 'New password (≥8)' });
-      panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Administrator password'),
+      panes.general.push(h('div', { class: 'card', id: 'sec-adminpw' }, h('h3', null, 'Administrator password'),   // F117: moved from Network
         h('div', { class: 'row wrap' }, h('input', { type: 'password', hidden: true }), curPw, nw,
           h('button', { class: 'btn', onclick: async () => { try { await api('/auth/password', { method: 'POST', body: { current: curPw.value, password: nw.value } }); toast('Password changed'); curPw.value = nw.value = ''; } catch (e) { toast(e.message, true); } } }, 'Change')),
         h('p', { class: 'dim small', style: 'margin-top:12px' }, 'Forgot the password? On this server PC only you can set a new one without wiping the music library.'),

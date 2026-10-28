@@ -27,7 +27,7 @@ public sealed class Services
     public Features.RadioFinderService RadioFinder = null!;
     public Features.TagFixService TagFix = null!;
     public Features.CdRipService CdRip = null!;
-    public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv;      // 0.4.0 Stage 4: one name per zone
+    public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
     public Library.NasLogon? Nas;      // 0.1.3
     public WavWiz.Core.Discovery.ServerBeacon Beacon() => new(ServerId, ServerName ?? Environment.MachineName, System.Net.IPAddress.TryParse(Cfg.BindAddress, out var ip) && !System.Net.IPAddress.IsLoopback(ip) ? Cfg.BindAddress : "", Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
     public string? ServerName => Db.Setting("server.name") is string s ? JsonSerializer.Deserialize<string>(s) : null;

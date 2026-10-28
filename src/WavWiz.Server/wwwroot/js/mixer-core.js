@@ -1,5 +1,5 @@
 // 0.4.8 F49: Master Volume mixer - pure math (no DOM). Levels are 0..100.
-// Whole-Home scales every on speaker relative to where they are now; a zone slider scales its own speakers relative to each other;
+// All zones scales every on speaker relative to where they are now; a zone slider scales its own speakers relative to each other;
 // a speaker slider changes only that speaker. Scaling always starts from the snapshot taken when the drag began, so ratios survive a
 // drag down to 0 and back up (nothing collapses to the same value on the way).
 export const clamp = (v, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));

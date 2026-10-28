@@ -69,7 +69,7 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(th, /export function appPreview\(\)/); assert.match(th, /Recolors as you hover or pick/);
   for (const l of ['Background', 'Main', 'Second', 'Highlight', 'Text']) assert.match(th, new RegExp(`picker\\('[a-z0-9]+', '${l}'`));
   assert.match(th, /Object\.entries\(PRESETS\)\.map\(\(\[id, p\]\) => previewCard/, 'F15 order = PRESETS order');
-  const theme = await imp('theme'); assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime']);
+  const theme = await imp('theme'); assert.deepEqual(Object.keys(theme.PRESETS), ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'crimson', 'ocean']);
   // Visualizer = the 0.2.0 Visualizer page + live mini visualizer of the active look
   assert.match(ap, /visualizerView\(\{ nested: true \}\)/); assert.match(ap, /new Viz\(stage, \{ engine: p\.engine, preview: true \}\)/);
   assert.match(vp, /export function visualizerView\(\{ nested = false \} = \{\}\)/); assert.match(vp, /fold\('Graphics \(this device\)'/);
@@ -78,7 +78,7 @@ test('0.2.2 T2: Appearance has a left sub-nav (Theme, Visualizer, EQ, Now Playin
   assert.match(ap, /gridEl\('eq', 'EQ style', cards\)/); assert.match(ap, /min: 0, max: 100, step: 1, value: p\.glow/);
   assert.match(ap, /interactive: false/);
   // Now Playing keeps the F9 preview (0.2.3 U4: Display size has no preview any more - see release023)
-  assert.match(ap, /gridEl\('np', 'Now Playing style', cards\)/);   // 0.3.1 B14: live style grid replaces the single preview
+  assert.match(ap, /pick\(NP_SEEKS, 'seek'/); assert.match(ap, /pick\(NP_BUTTONS, 'buttons'/);   // 0.5.0 F95: Track bar + Buttons pickers replace the 4 layout cards
   assert.match(st, /section: APP_SECTION\[section\]/); assert.match(st, /else app\?\.resume\?\.\(\)/);
   assert.match(css, /\.appstack\{display:flex;flex-direction:column/);   // 0.2.5 C: sub-tabs on top (was a 150 px left column)
   assert.match(css, /\.themecard\{border-radius:6px\}/);

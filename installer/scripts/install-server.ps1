@@ -52,7 +52,7 @@ if ($exists) {
     [void](Invoke-Sc 'create' @('create', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', 'NT AUTHORITY\LocalService', 'DisplayName=', 'WavWiz Server (BETA)'))
     Say 'Service created.'
 }
-[void](Invoke-Sc 'description' @('description', $svc, 'WavWiz whole-home synchronized music server (BETA). Listens on the home network only.'))
+[void](Invoke-Sc 'description' @('description', $svc, 'WavWiz multi-zone synchronized music server (BETA). Listens on the local network only.'))
 [void](Invoke-Sc 'recovery' @('failure', $svc, 'reset=', '86400', 'actions=', 'restart/5000/restart/30000/restart/60000'))
 
 Set-Step 'server: firewall rules (private networks, local subnet only)'

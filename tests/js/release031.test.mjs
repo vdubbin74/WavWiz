@@ -101,13 +101,13 @@ test('B10/B11/B12: Settings shell - reset in a fixed slot of the sub-tab bar, pi
 });
 test('B13-B16: one Appearance grid - per-row counts, 16:10 cards up to 170 px, 12 px gaps, check + theme border; live previews pause off screen', async () => {
   const G = await imp('pgrid');
-  assert.deepEqual(G.GRID_COLS, { theme: 5, viz: 4, eq: 3, np: 2, display: 3 });
+  assert.deepEqual(G.GRID_COLS, { theme: 5, viz: 4, eq: 3, np: 2, npseek: 4, npbtn: 4, npart: 4, display: 3 });
   assert.equal(G.CARD_MAX_H, 170); assert.equal(G.GRID_GAP, 12); assert.equal(G.CARD_RATIO, 1.6);
   const c = rule('.pgcard'); assert.match(c, /aspect-ratio:16\/10;max-height:170px/); assert.match(c, /border-radius:3px/);
   assert.match(rule('.pgcard.on'), /border-color:var\(--accent\)/); assert.match(css, /\.pgcard\.on \.pg-check\{display:grid\}/);
   assert.match(css, /\.pgrid\{display:grid;[^}]*gap:12px/);
   const ap = src('appearance.js'), vp = src('vizpage.js');
-  assert.match(ap, /stopLive = whileVisible\(cards/); assert.match(ap, /stopNp = whileVisible\(cards/); assert.match(vp, /stopVis = whileVisible\(list/);
+  assert.match(ap, /stopLive = whileVisible\(cards/); assert.match(ap, /stopNp = whileVisible\(\[liveCard\]/); assert.match(vp, /stopVis = whileVisible\(list/);
   assert.match(ap, /interactive: false \}\), \{ id \}\)\);/, 'EQ previews are display-only');
   // a hidden card stops its live preview, a visible one starts it
   let shown = 0, hidden = 0; const stop = G.whileVisible([{}, {}], () => shown++, () => hidden++); assert.equal(shown, 2); stop(); assert.equal(hidden, 2);

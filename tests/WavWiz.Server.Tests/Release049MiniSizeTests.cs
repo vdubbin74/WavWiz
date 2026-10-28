@@ -22,4 +22,8 @@ public class Release049MiniSizeTests
     public void Two_row_player_height(double scale, int ew, int eh) { var (cw, ch) = MiniPlayer.ContentSize(420, 89, false); Assert.Equal((ew, eh), MiniPlayer.SizeFor(cw, ch, scale)); Assert.InRange(MiniPlayer.Height, 89, 100); }
 
     [Fact] public void Nan_report_falls_back_to_design_width() => Assert.Equal(420, MiniPlayer.ContentSize(double.NaN, 145, false).W);
+    // 0.5.0: size with the page's devicePixelRatio (what WebView2 renders at); DeviceDpi only as fallback
+    [Theory, InlineData(2.0, 144, 2.0), InlineData(1.0, 192, 1.0), InlineData(0, 192, 2.0), InlineData(double.NaN, 144, 1.5), InlineData(9.0, 96, 1.0)]
+    public void Scale_prefers_page_dpr(double dpr, int dpi, double e) => Assert.Equal(e, MiniPlayer.ScaleFor(dpr, dpi));
+    [Fact] public void Two_rows_at_200_with_stale_150_dpi_not_clipped() { var (cw, ch) = MiniPlayer.ContentSize(420, 89, false); Assert.Equal((840, 178), MiniPlayer.SizeFor(cw, ch, MiniPlayer.ScaleFor(2.0, 144))); }
 }

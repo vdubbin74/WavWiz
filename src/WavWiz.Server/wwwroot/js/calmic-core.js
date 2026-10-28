@@ -81,8 +81,8 @@ export function phoneName(ua = '', touch = 0) {
 
 /** 0.2.5 phone role: a phone opening WavWiz normally is asked once - play music here, or be a calibration mic. Stored per browser. */
 export const ROLE_KEY = 'wavwiz.phoneRole';
-export function phoneRole(store) { try { const v = store.getItem(ROLE_KEY); return v === 'speaker' || v === 'mic' ? v : null; } catch { return null; } }
-export function setPhoneRole(store, v) { try { if (v === 'speaker' || v === 'mic') store.setItem(ROLE_KEY, v); else store.removeItem(ROLE_KEY); } catch { /* private mode */ } }
+export function phoneRole(store) { try { const v = store.getItem(ROLE_KEY); return v === 'speaker' || v === 'remote' || v === 'mic' ? v : null; } catch { return null; } }
+export function setPhoneRole(store, v) { try { if (v === 'speaker' || v === 'remote' || v === 'mic') store.setItem(ROLE_KEY, v); else store.removeItem(ROLE_KEY); } catch { /* private mode */ } }
 
 // ---- 0.3.1 B3: guided calibration. One stop per speaker visit (reference, each speaker, the reference again); nothing plays until Ready.
 export const COUNTDOWN_KEY = 'wavwiz.cal.countdown', COUNTDOWN_S = 5;

@@ -3,7 +3,7 @@
 // effects plus the current theme colors, and scales it down to fit the card. Updates instantly on each pick. Never interactive.
 import { h } from './util.js';
 import { iconSvg } from './icons.js';
-import { NP_STYLES, loadNpPrefs, npVars, waveBars } from './npstyle.js';
+import { NP_SEEKS, NP_BUTTONS, NP_ARTS, loadNpPrefs, npVars, waveBars, eqBars, applyNpClasses, normNpPrefs } from './npstyle.js';
 import { npPanelTemplate } from './now.js';
 import { loadTheme, PRESETS } from './theme.js';
 
@@ -14,16 +14,16 @@ export function fillSample(panel, p = loadNpPrefs(), { keepSong = false } = {}) 
   const S0 = PREVIEW_SAMPLE, q = sel => panel.querySelectorAll(sel), set = (sel, t) => q(sel).forEach(e => { e.textContent = t; });
   panel.removeAttribute('id'); q('[id]').forEach(e => e.removeAttribute('id'));
   panel.classList.remove('collapsed'); panel.classList.add('playing', 'npprev-panel');
-  for (const [id] of NP_STYLES) panel.classList.toggle('pn-' + id, p.style === id);
+  applyNpClasses(panel, p);   // F95
   for (const [k, v] of Object.entries(npVars(p))) panel.style.setProperty(k, v);
-  panel.dataset.style = p.style;
   if (keepSong) { panel.style.setProperty('--npprev', '1'); return panel; }   // 0.3.1 B14: the clone already shows the playing song
   set('.np-tabletitles .t1', S0.title); set('.np-tabletitles .t2', S0.artist); set('.np-ctlnow', '');
   set('.np-elv,.pn-pel,.pn-cval', S0.elapsed); set('.np-rev,.pn-lrev', S0.remain); set('.pn-pdur', S0.total); set('.pn-trk', S0.track);
   set('.volpct', '60%'); q('input[type=range]').forEach(r => { r.value = 60; r.disabled = false; });
   q('.prog .fill,.pn-ledfill').forEach(e => { e.style.width = S0.frac * 100 + '%'; }); q('.prog .knob').forEach(e => { e.style.left = S0.frac * 100 + '%'; });
-  q('.pn-ring .val').forEach(e => { e.style.strokeDashoffset = String(100 - S0.frac * 100); });
+  q('.pn-ring .val').forEach(e => { e.style.strokeDashoffset = String(100 - S0.frac * 100); }); panel.style.setProperty('--np-frac', String(S0.frac));   // F96 sleeve
   q('.pn-wclip').forEach(e => { e.style.clipPath = `inset(0 ${100 - S0.frac * 100}% 0 0)`; });
+  const eb = eqBars(S0.title); q('.np-tablemeta .pn-eqbars').forEach(b => b.replaceChildren(...eb.map(v => h('i', { style: `height:${Math.round(v * 100)}%` }))));
   const bars = waveBars(S0.title); q('.pn-wbars').forEach(b => b.replaceChildren(...bars.map(v => h('i', { style: `height:${Math.round(v * 100)}%` }))));
   q('.pn-cover,.pn-refl').forEach(c => c.replaceChildren(h('div', { class: 'cover md npprev-art', 'aria-hidden': 'true' }, h('span', null, '♪'))));
   q('.np-heartslot').forEach(s => { const b = h('button', { class: s.classList.contains('np-xheart') ? 'heart tbtn ico' : 'heart', tabindex: -1, 'aria-hidden': 'true' }); if (b.classList.contains('ico')) b.innerHTML = iconSvg('heart'); else b.textContent = '♡'; s.replaceChildren(b); });
@@ -43,7 +43,7 @@ export function npPreview() {
   const fit = () => { if (!panel) return; const w = Math.max(W, panel.scrollWidth), s = Math.min(1, (stage.clientWidth || w) / w); panel.style.width = w + 'px'; panel.style.transform = `scale(${s})`; stage.style.height = Math.ceil(panel.offsetHeight * s) + 'px'; };
   function update() {
     const p = loadNpPrefs(), t = loadTheme();
-    label.textContent = `${NP_STYLES.find(x => x[0] === p.style)?.[1] ?? p.style} · ${PRESETS[t.preset]?.name ?? 'Custom'}`;
+    { const n = normNpPrefs(p); label.textContent = `${NP_SEEKS.find(x => x[0] === n.seek)?.[1]} + ${NP_BUTTONS.find(x => x[0] === n.buttons)?.[1]} + ${NP_ARTS.find(x => x[0] === n.art)?.[1]} · ${PRESETS[t.preset]?.name ?? 'Custom'}`; }
     const tpl = npPanelTemplate();
     if (!tpl) { stage.replaceChildren(h('p', { class: 'small dim' }, 'The preview appears once the player has loaded.')); panel = null; return; }
     panel = fillSample(tpl.cloneNode(true), p);
@@ -61,14 +61,15 @@ export function npPreview() {
 
 /** 0.3.1 B14: one style as a small live card preview - the real panel cloned with the playing song (example song when nothing plays),
  *  scaled to the card. update() re-clones (called about once a second while the card is on screen). */
-export function npStyleThumb(styleId, playing = () => false) {
+/** F95: override = partial prefs ({ seek } / { buttons }) on top of the saved ones; null = the saved mix as-is. */
+export function npStyleThumb(override = null, playing = () => false) {
   const stage = h('div', { class: 'npthumb' }); let panel = null;
   // 0.3.3 G2: the panel is laid out at its TRUE in-app width (the live Now Playing panel, else the center column) so buttons, glow and
   // waveform keep their real proportions, then the whole thing is scaled down with transform: scale() to the card; the card clips (overflow hidden).
   const fit = () => { if (!panel) return; const sw = stage.clientWidth || 543, w = trueNpWidth(), s = thumbScale(w, sw); panel.style.width = w + 'px'; panel.style.transform = s < 1 ? `scale(${s})` : ''; stage.style.height = Math.ceil(panel.offsetHeight * s) + 'px'; };
   function update() {
     const tpl = npPanelTemplate(); if (!tpl) { stage.replaceChildren(); panel = null; return; }
-    panel = fillSample(tpl.cloneNode(true), { ...loadNpPrefs(), style: styleId }, { keepSong: playing() });
+    panel = fillSample(tpl.cloneNode(true), { ...loadNpPrefs(), ...(override || {}) }, { keepSong: playing() });
     panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); panel.style.width = W + 'px'; panel.style.transformOrigin = '0 0';
     stage.replaceChildren(panel); requestAnimationFrame(fit);
   }
@@ -85,3 +86,4 @@ export function trueNpWidth() {
 }
 /** 0.3.3 G2: scale factor for a preview laid out at trueW shown in a cardW-wide card. Never scales up. Pure. */
 export const thumbScale = (trueW, cardW) => (trueW > 0 && cardW > 0 ? Math.min(1, cardW / trueW) : 1);
+

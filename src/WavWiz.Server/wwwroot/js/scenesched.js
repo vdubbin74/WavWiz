@@ -22,7 +22,7 @@ export function fmtHm(hm, locale) {
 export const canSave = (days, onceDate) => !!onceDate || !!(days && days.length > 0);
 /** Plain one-line summary of what a schedule does. */
 export function summary(r, { scenes = [], stations = [], zones = [], groups = [], jb = null } = {}) {
-  const p = r.payload || {}; const zt = p.zoneKey ? ` · in ${Z.targetName(p.zoneKey, groups, jb)}` : ''; const sc = id => scenes.find(s => s.id === id)?.name; const st = id => stations.find(s => s.id === id)?.name;
+  const p = r.payload || {}; const zn = p.zoneKey ? Z.targetName(p.zoneKey, groups, jb) : ''; const zt = !zn ? '' : zn === 'zone unavailable' ? ' · zone unavailable' : ` · in ${zn}`; const sc = id => scenes.find(s => s.id === id)?.name; const st = id => stations.find(s => s.id === id)?.name;
   const where = p.sceneId ? ` · scene ${sc(p.sceneId) || '(deleted)'}` : (p.deviceIds || []).length ? ' · ' + p.deviceIds.map(id => zones.find(z => z.id === id)?.name || 'speaker').join(' + ') : '';
   switch (r.action) {
     case 'play': { const what = { playlist: 'playlist', album: 'album', track: 'song', radio: 'radio' }[p.source] || 'radio';
@@ -67,7 +67,7 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
   const admin = isAdmin(S), ctlOk = canControl(S), locale = navigator.language;
   const body = h('div', { class: 'ss' });
   const clock = h('span', { class: 'small dim ss-clock' }, 'Server clock…');
-  const sleepBtn = h('button', { class: 'btn sm', type: 'button', 'aria-haspopup': 'menu' }, '☾ Sleep timer: Off');
+  const sleepBtn = h('button', { class: 'btn sm ss-sleepbtn', type: 'button', 'aria-haspopup': 'menu' }, '☾ Sleep timer: Off');
   const d = dialog('Scenes & Schedules', body, [{ text: 'Close' }], { cls: 'settings-dlg ss-dlg' + (phone() ? ' ss-phone' : ''), onClose: () => { clearInterval(iv); refresh?.(); } });
   d.el.querySelector('header .grow').after(clock, sleepBtn);
   let data = { scenes: [], rows: [], stations: [], playlists: [], now: null, sleep: null, active: null };
@@ -82,7 +82,7 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
   }
   function drawHead() {
     clock.textContent = `Times use the server PC’s clock (${data.server || 'server'}, ${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'})`;
-    const s = data.sleep; sleepBtn.textContent = s && s.mode !== 'off' ? `☾ Sleep: ${Math.ceil(s.remainingSec / 60)} min` : '☾ Sleep timer: Off';
+    const s = data.sleep; sleepBtn.textContent = s && s.mode !== 'off' ? (phone() ? `☾ ${Math.ceil(s.remainingSec / 60)} min` : `☾ Sleep: ${Math.ceil(s.remainingSec / 60)} min`) : (phone() ? '☾ Sleep' : '☾ Sleep timer: Off'); sleepBtn.setAttribute('aria-label', s && s.mode !== 'off' ? `Sleep timer: ${Math.ceil(s.remainingSec / 60)} min` : 'Sleep timer: Off');
     if (!ctlOk) { sleepBtn.disabled = true; sleepBtn.title = 'View-only access.'; }
   }
   sleepBtn.addEventListener('click', () => openSleep(S, () => load()));
@@ -90,10 +90,13 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
   function draw() {
     drawHead();
     const next = data.rows.find(r => r.enabled && r.nextRunAt);
-    const nextStrip = next ? h('div', { class: 'ss-next' }, h('span', { 'aria-hidden': 'true' }, next.alarm ? '⏰' : '🗓'),
-      h('div', { class: 'grow' }, h('b', null, 'Next up: '), `${next.name}, ${whenLabel(next.nextRunAt, data.now, locale)} (${countdown(next.nextRunAt, data.now)})`, h('div', { class: 'small dim' }, summary(next, data))),
-      h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => skip(next) }, 'Skip next'),
-      admin ? h('button', { class: 'btn sm', type: 'button', onclick: () => edit(next) }, 'Edit') : adminOnly(S, h('button', { class: 'btn sm', type: 'button' }, 'Edit'))) : null;
+    // F103: Next up is a vertical stack (title · countdown · summary) with its actions on their own row; icon in its own column.
+    const nextStrip = next ? h('div', { class: 'ss-next' },
+      h('div', { class: 'ss-nx-top' }, h('span', { class: 'ss-nx-ic', 'aria-hidden': 'true' }, next.alarm ? '⏰' : '🗓'),
+        h('div', { class: 'ss-nx-txt' }, h('div', { class: 'ss-nx-t' }, h('b', null, 'Next up'), ` · ${next.name} · ${whenLabel(next.nextRunAt, data.now, locale)}`),
+          h('div', { class: 'ss-nx-cd' }, countdown(next.nextRunAt, data.now)), h('div', { class: 'ss-nx-sum small dim' }, summary(next, data)))),
+      h('div', { class: 'ss-nx-a' }, h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => skip(next) }, 'Skip next'),
+        admin ? h('button', { class: 'btn sm', type: 'button', onclick: () => edit(next) }, 'Edit') : adminOnly(S, h('button', { class: 'btn sm', type: 'button' }, 'Edit')))) : null;
     const scenesCol = h('section', { class: 'ss-col', 'data-col': 'scenes', 'aria-label': 'Scenes' },
       h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCENES'), h('span', { class: 'dim' }, String(data.scenes.length)), h('span', { class: 'grow' }), admin ? null : adminTag(),
         adminOnly(S, h('button', { class: 'btn sm', type: 'button', onclick: capture }, '+ From current setup')), adminOnly(S, h('button', { class: 'btn sm', type: 'button', onclick: () => editScene(null) }, '+ New'))),
@@ -105,7 +108,7 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
       lastRun());
     const segBar = h('div', { class: 'seg ss-seg', role: 'tablist' }, [['scenes', `Scenes (${data.scenes.length})`], ['schedules', `Schedules & alarms (${data.rows.length})`]].map(([k, t]) =>
       h('button', { role: 'tab', type: 'button', 'aria-selected': String(seg.v === k), class: seg.v === k ? 'on' : '', onclick: () => { seg.v = k; try { localStorage.setItem(SEG_KEY, k); } catch { /* ok */ } draw(); } }, t)));
-    const fab = admin ? h('button', { class: 'btn primary ss-fab', type: 'button', 'aria-label': 'Add', onclick: () => seg.v === 'scenes' ? fabMenu([['From current setup', capture], ['New scene', () => editScene(null)]]) : fabMenu([['Alarm', () => edit(null, 'play')], ['Schedule', () => edit(null, 'scene')]]) }, '+') : null;
+    const fab = admin && !phone() ? h('button', { class: 'btn primary ss-fab', type: 'button', 'aria-label': 'Add', onclick: () => seg.v === 'scenes' ? fabMenu([['From current setup', capture], ['New scene', () => editScene(null)]]) : fabMenu([['Alarm', () => edit(null, 'play')], ['Schedule', () => edit(null, 'scene')]]) }, '+') : null;
     body.replaceChildren(nextStrip, segBar, h('div', { class: 'ss-cols', 'data-seg': seg.v }, scenesCol, schedCol), fab);
   }
   function fabMenu(items) { const m = h('div', { class: 'ss-menu ss-fabmenu', role: 'menu' }, items.map(([t, fn]) => h('button', { role: 'menuitem', type: 'button', onclick: () => { m.remove(); fn(); } }, t))); body.append(m); const off = e => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; setTimeout(() => document.addEventListener('pointerdown', off, true)); }
@@ -192,7 +195,7 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   const onWhat = h('select', { 'aria-label': 'Play on' }, h('option', { value: 'speakers', selected: !p.sceneId }, 'Speakers'), h('option', { value: 'scene', selected: !!p.sceneId }, 'A scene'));
   const chosen = new Set(p.deviceIds || []);
   // 0.4.0: which zone's music (and speakers) the alarm / stop acts on; "Everything" = today's behavior
-  const zoneT = h('select', { 'aria-label': 'Zone', 'data-zone-target': '' }, h('option', { value: '' }, 'Everything (all linked zones)'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k, selected: p.zoneKey === k }, n)), p.zoneKey && !Z.targetKeys(S.groups, S.jb).some(([k]) => k === p.zoneKey) ? h('option', { value: p.zoneKey, selected: true }, '(deleted zone)') : null);
+  const zoneT = h('select', { 'aria-label': 'Zone', 'data-zone-target': '' }, h('option', { value: '' }, 'Everything (all linked zones)'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k, selected: p.zoneKey === k }, n)), p.zoneKey && !Z.targetKeys(S.groups, S.jb).some(([k]) => k === p.zoneKey) ? h('option', { value: p.zoneKey, selected: true }, 'Zone unavailable') : null);
   zoneT.addEventListener('change', () => preview());
   // 0.4.2: alarms and schedules target ZONES only. The chips are zones; the stored deviceIds are the speakers of the chosen zones (an older alarm keeps any speaker it already had).
   const zs = (S.groups || []).filter(g => (g.deviceIds || []).length), inZ = new Set(zs.flatMap(g => g.deviceIds)), legacy = [...chosen].filter(id => !inZ.has(id));

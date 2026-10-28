@@ -1,13 +1,14 @@
 import { holdPage } from './motion.js';
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
-import { cover, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
+import { cover, npCover, npKey, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { mixerButton } from './mixer.js';
-import { shortcutsRow } from './shortcuts.js';
+import { shortcutsRow, shortcutsSide } from './shortcuts.js';
 import { canControl, thisDevice } from './ui.js';
-import { NP_STYLES, loadNpPrefs, npVars, waveBars, ringFrac } from './npstyle.js';
+import { loadNpPrefs, npVars, waveBars, eqBars, applyNpClasses } from './npstyle.js';
+import { npArtBox } from './npart.js';   // 0.5.0 F98: Album art axis on the compact strips too
 import { heartBtn } from './fav.js';
 import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
@@ -30,6 +31,9 @@ let panelTpl = null;
 export const npPanelTemplate = () => panelTpl;
 export function createNow(S, ctl) {
   const mkSc = cls => shortcutsRow({ run: id => ctl.runShortcut?.(id), home: () => ctl.goHome?.(), cls }).el;   // 0.3.7 L5/L11: Home (far right) + up to 3 pins
+  let ctlPanel = null;
+  // 0.5.0 F130: NP header = one Shortcuts toggle -> vertical side icon strip (pins + Home); the bar / mini keep their rows
+  const scSide = shortcutsSide({ run: id => ctl.runShortcut?.(id), home: () => ctl.goHome?.(), cls: 'np-scside', onChange: o => ctlPanel?.classList.toggle('scopen', o) });
   const E = {}; let viz = null, vizState = { audible: false, error: null, preset: '' }, overlay = null, receivers = null;
   const act = ctl.act;
   const stage = h('div', { class: 'stage np-stage' }), coverHolder = h('div', { class: 'stagecover' }), host = h('div', { class: 'vizhost' }), vname = h('div', { class: 'vname' }), vbtns = h('div', { class: 'vbtns' });
@@ -71,16 +75,18 @@ export function createNow(S, ctl) {
   const seekFrac = f => { if (!canControl(S) || !S.now?.item || isLive(S.now.item) || !S.now.durationMs) return; act('/stream/seek', { ms: Math.round(Math.min(1, Math.max(0, f)) * S.now.durationMs) }); };
   const fracAt = (el, ev) => { const r = el.getBoundingClientRect(); return (ev.clientX - r.left) / r.width; };
   const pnCover = h('div', { class: 'pn-cover' }), pnRefl = h('div', { class: 'pn-refl', 'aria-hidden': 'true' }), pnDisc = h('div', { class: 'pn-disc', 'aria-hidden': 'true' }, h('i'));
+  // 0.5.0 F97: cassette shell (art: cassette) - opaque body, gold meta bar under the label (cover art moves into the label), hubs spin while playing, brown tape behind each hub tracks --np-frac
+  const cassSpool = side => h('span', { class: 'pc-sp pc-' + side }, h('i', { class: 'pc-tape' }), h('i', { class: 'pc-hub' }));
+  const pnCass = h('div', { class: 'pn-cass', 'aria-hidden': 'true' }, h('i', { class: 'pc-lbl' }),   // F104: Matte Tape - no grips / gold TYPE I bar; recessed label window frame
+    ...['tl', 'tr', 'bl', 'br', 'bc'].map(c => h('i', { class: 'pc-scr pc-' + c })),
+    h('div', { class: 'pc-well' }, h('i', { class: 'pc-bridge' }), cassSpool('l'), cassSpool('r')), h('div', { class: 'pc-notch' }, h('i'), h('i'), h('i')));
   const pnRing = h('span', { class: 'pn-ring', 'aria-hidden': 'true' });
   pnRing.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect class="trk" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/><rect class="val" x="1.5" y="1.5" width="97" height="97" rx="9" pathLength="100"/></svg>';
   const ringVal = pnRing.querySelector('.val'), ringDot = h('span', { class: 'pn-ringdot', 'aria-hidden': 'true' });
   const npHeart = h('span', { class: 'np-heartslot' }), barHeart = h('span', { class: 'np-heartslot' });   // 0.2.0 item 14: heart the playing song
   const idleHeart = () => { const b = h('button', { type: 'button', class: 'heart tbtn ico', disabled: true, 'aria-label': 'Favorite (nothing playing)', title: 'Nothing playing' }); b.innerHTML = iconSvg('heart'); return b; };
   const xHeart = h('span', { class: 'np-heartslot np-xheart' }, idleHeart());   // 0.2.1 F10: Classic shows the heart as a round button left of Shuffle
-  const pnArt = h('div', { class: 'pn-art', title: 'Drag around the cover to seek (Classic)' }, pnDisc, pnCover, pnRing, ringDot, pnRefl);
-  let ringDrag = false; const ringSeek = ev => { const r = pnArt.getBoundingClientRect(); seekFrac(ringFrac(r.left + r.width / 2, r.top + r.height / 2, ev.clientX, ev.clientY)); };
-  pnArt.addEventListener('pointerdown', ev => { if (!ctlPanel.classList.contains('pn-classic')) return; ringDrag = true; pnArt.setPointerCapture?.(ev.pointerId); });
-  pnArt.addEventListener('pointerup', ev => { if (ringDrag) { ringDrag = false; ringSeek(ev); } });
+  const pnArt = h('div', { class: 'pn-art' }, pnDisc, pnCass, pnCover, pnRing, ringDot, pnRefl);   // F96: ring (square) / spinning cover (disc) / sliding vinyl (sleeve) per pn-art-*; reflection stays off
   const pillElv = h('span', { class: 'pn-pel' }, '--:--'), pillDur = h('span', { class: 'pn-pdur' }, '-:--');
   const pnPill = h('div', { class: 'pn-pill' }, h('i', { 'aria-hidden': 'true' }), pillElv, h('span', { class: 'dim' }, ' / '), pillDur);
   const waveBase = h('div', { class: 'pn-wbars' }), waveTop = h('div', { class: 'pn-wbars on' }), waveClip = h('div', { class: 'pn-wclip' }, waveTop);
@@ -89,14 +95,27 @@ export function createNow(S, ctl) {
   const trackNo = h('span', { class: 'pn-trk' }, 'TRACK --'), lcdRev = h('span', { class: 'pn-lrev' }, '-:--');
   const ledFill = h('div', { class: 'pn-ledfill' });
   const pnLed = h('div', { class: 'pn-led', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnLed, ev)) }, ledFill);
+  // 0.5.0 F95: EQ-bars seek - even-width bars of varying height, the played part lit (clip), click seeks by x like wave / LED
+  const eqBase = h('div', { class: 'pn-eqbars' }), eqTop = h('div', { class: 'pn-eqbars on' }), eqClip = h('div', { class: 'pn-wclip pn-eqclip' }, eqTop);
+  const pnEq = h('div', { class: 'pn-eq', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnEq, ev)) }, eqBase, eqClip);
+  // keyboard: left / right nudge 5 s on any of the bar seeks
+  const keySeek = ev => { const d = { ArrowLeft: -5000, ArrowRight: 5000 }[ev.key]; const n0 = S.now; if (!d || !n0?.durationMs) return; ev.preventDefault();
+    const pos = n0.state === 'playing' ? S.localPos + (performance.now() - S.localAt) : n0.positionMs; seekFrac((pos + d) / n0.durationMs); };
+  for (const s of [pnWave, pnLed, pnEq]) s.addEventListener('keydown', keySeek);
+  // 0.5.0 F130: labeled ARTIST · ALBUM line (desktop flat NP); album part omitted when missing
+  const aaArtist = h('span', { class: 'np-aav ell' }), aaAlbum = h('span', { class: 'np-aav ell' });
+  const aaAlbumWrap = h('span', { class: 'np-aapart np-aaalb' }, h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·'), h('span', { class: 'np-aal' }, 'Album'), aaAlbum);
+  const aaArtistLbl = h('span', { class: 'np-aal' }, 'Artist');
+  const aaLine = h('div', { class: 'np-aaline' }, h('span', { class: 'np-aapart' }, aaArtistLbl, aaArtist), aaAlbumWrap);
   const tableMeta = h('div', { class: 'np-tablemeta pn-meta' },
-    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2, ovAl, zoneLink('zl-ov')), npHeart, pnClock),
-    h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave,
+    h('div', { class: 'pn-titlerow' }, h('div', { class: 'np-tabletitles' }, ovT1, ovT2, ovAl, aaLine), npHeart, pnClock),
+    h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave, pnEq,
     h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, ovAA, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
     h('div', { class: 'np-volrow' }, muteBtn, mkMix(), h('div', { class: 'np-vol' }, eqBtn), mkSleep()),   /* 0.4.8 F54: no volume slider in the play bars - the mixer button is in its place */
+    zoneLink('zl-ov'),   // 0.5.0 F130: "on <zone> ▾" sits bottom-right under mute / mixer / EQ / Sleep (same F119 picker; phone grid-area unchanged)
     zoneVolRow());   // 0.4.9 F68: phone only (CSS) - full-width volume of the zone being controlled
   // 0.4.9 F68: phone remote - one volume + mute for the zone in the "on <zone>" picker; same scaling (scaleTo / caps) as the Volume Mixer's zone slider
   function zoneGroup() { const c = currentZone(); return c?.kind === 'zone' ? (S.groups || []).find(g => g.id === c.id) || null : null; }
@@ -145,12 +164,13 @@ export function createNow(S, ctl) {
   const sNext = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
   const sPlay = h('button', { class: 'tbtn play', 'aria-label': 'Play or pause', onclick: () => play.click() }, icon('play'));
   const sVol = mkVol(), sPct = h('span', { class: 'volpct' }, ''), sMute = mkMute(), sEq = mkEq();
-  const sArt = h('div', { class: 'ns-art' }), sT1 = h('span', { class: 'ns-t1 ell' }, 'Nothing playing'), sT2 = h('span', { class: 'ns-t2 ell' }, '');
+  const sArtB = npArtBox({ cls: 'npa-sm' }), sArt = h('div', { class: 'ns-art' }, sArtB.el), sT1 = h('span', { class: 'ns-t1 ell' }, 'Nothing playing'), sT2 = h('span', { class: 'ns-t2 ell' }, '');
   const sElv = h('span', { class: 'ns-elv' }, '--:--'), sDur = h('span', { class: 'ns-dur' }, '-:--');
   const sFill = h('div', { class: 'fill' }), sKnob = h('div', { class: 'knob' }), sLedFill = h('div', { class: 'ns-ledfill' });
   const sWaveBase = h('div', { class: 'pn-wbars' }), sWaveTop = h('div', { class: 'pn-wbars on' }), sWaveClip = h('div', { class: 'pn-wclip' }, sWaveTop);
+  const sEqBase = h('div', { class: 'pn-eqbars' }), sEqTop = h('div', { class: 'pn-eqbars on' }), sEqClip = h('div', { class: 'pn-wclip' }, sEqTop);
   const sProg = h('div', { class: 'ns-prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(sProg, ev)) },
-    h('div', { class: 'bar' }), sFill, sKnob, h('div', { class: 'ns-led', 'aria-hidden': 'true' }, sLedFill), h('div', { class: 'ns-wave', 'aria-hidden': 'true' }, sWaveBase, sWaveClip));
+    h('div', { class: 'bar' }), sFill, sKnob, h('div', { class: 'ns-led', 'aria-hidden': 'true' }, sLedFill), h('div', { class: 'ns-wave', 'aria-hidden': 'true' }, sWaveBase, sWaveClip), h('div', { class: 'ns-eq', 'aria-hidden': 'true' }, sEqBase, sEqClip));
   const ctlStrip = h('div', { class: 'np-strip', role: 'group', 'aria-label': 'Now playing (compact)' },
     h('div', { class: 'ns-song' }, sArt, h('div', { class: 'ns-main' }, h('div', { class: 'ns-titles' }, sT1, h('span', { class: 'ns-dot', 'aria-hidden': 'true' }, '·'), sT2, zoneLink('zl-strip')), h('div', { class: 'ns-seek' }, sElv, sProg, sDur))),
     h('div', { class: 'ns-x', role: 'group', 'aria-label': 'Transport' }, sHeart, sShuffle, sPrev, sPlay, sNext, sRepeat),
@@ -159,13 +179,12 @@ export function createNow(S, ctl) {
   const nxArt = h('div', { class: 'pln-art' }), nxT1 = h('span', { class: 'pln-t1 ell' }, ''), nxT2 = h('span', { class: 'pln-t2 ell' }, '');
   const nextBlock = h('div', { class: 'plnext', 'aria-label': 'Up next', hidden: true }, h('span', { class: 'pln-lbl' }, 'UP NEXT'), nxArt, nxT1, h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·'), nxT2);
   const ctlBody = h('div', { class: 'np-ctlbody' }, h('div', { class: 'np-tablemain' }, pnArt, tableMeta, h('div', { class: 'pn-ctl' }, tableXport, tableVol)));
-  const ctlPanel = h('section', { class: 'np-ctlpanel' + (ctlCollapsed ? ' collapsed' : ''), role: 'group', 'aria-label': 'Playback controls' },
-    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, ctlStrip, h('span', { class: 'grow' }), mkSc('np-sc'), h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody);
+  ctlPanel = h('section', { class: 'np-ctlpanel np-flat' + (ctlCollapsed ? ' collapsed' : '') + (scSide.isOpen() ? ' scopen' : ''), role: 'group', 'aria-label': 'Playback controls' },
+    h('div', { class: 'pane-h' }, h('span', { class: 'np-ctltitle' }, 'NOW PLAYING'), ctlNow, ctlStrip, h('span', { class: 'grow' }), scSide.toggle, h('span', { class: 'row listcolwrap' }, ctlColBtn)), ctlBody, scSide.strip);
   function applyNpStyle() {
     const p = loadNpPrefs();
-    for (const [id] of NP_STYLES) ctlPanel.classList.toggle('pn-' + id, p.style === id);
+    applyNpClasses(ctlPanel, p);   // F95: pn-seek-<line|wave|led|eq> + pn-btn-<round|soft|square|ring> + pn-art-<square|disc|sleeve>
     for (const [k, v] of Object.entries(npVars(p))) ctlPanel.style.setProperty(k, v);
-    ctlPanel.dataset.style = p.style;
   }
   panelTpl = ctlPanel;
   applyNpStyle(); window.addEventListener('wavwiz:npstyle', applyNpStyle);
@@ -195,13 +214,13 @@ export function createNow(S, ctl) {
     ctlPanel, upnext, strip, checklist);
   E.ovTitles = ovTitles;
 
-  const miniCover = h('div'), miniT = h('div', { class: 't1 ell' }, 'Nothing playing'), miniS = h('div', { class: 't2 ell' });
+  const miniArtB = npArtBox({ cls: 'npa-sm npa-phone' }), miniCover = h('div', { class: 'mini-art' }, miniArtB.el), miniT = h('div', { class: 't1 ell' }, 'Nothing playing'), miniS = h('div', { class: 't2 ell' });
   const miniPlay = h('button', { class: 'tbtn play mini-play', 'aria-label': 'Play or pause', onclick: ev => { ev.stopPropagation(); play.click(); } }, icon('play'));
   const mini = h('div', { class: 'mini', onclick: () => ctl.go('now') }, miniCover, h('div', { class: 'grow' }, miniT, h('div', { class: 'zl-line' }, miniS, zoneLink('zl-phone'))), miniPlay);
 
   // 0.2.0 items 16 + 27: full-width Now Playing bar for the expanded Library / Devices views (art, titles, transport, seek + times,
   // this-device volume, Mute, More). Same Classic button style as the panel.
-  const barCover = h('div', { class: 'npb-art' }), barT1 = h('div', { class: 't1 ell' }, 'Nothing playing'), barT2 = h('div', { class: 't2 ell' });
+  const barArtB = npArtBox({ cls: 'npa-sm' }), barCover = h('div', { class: 'npb-art' }, barArtB.el), barT1 = h('div', { class: 't1 ell' }, 'Nothing playing'), barT2 = h('div', { class: 't2 ell' });
   const barFill = h('div', { class: 'fill' }), barKnob = h('div', { class: 'knob' }), barElv = h('span', { class: 'np-elv' }, '--:--'), barRev = h('span', { class: 'np-rev' }, '-:--');
   const barProg = h('div', { class: 'prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => { if (!canControl(S) || !S.now?.item || isLive(S.now.item)) return; const r = barProg.getBoundingClientRect(); act('/stream/seek', { ms: Math.round(Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * S.now.durationMs) }); } }, h('div', { class: 'bar' }), barFill, barKnob);
   const barPlay = h('button', { class: 'tbtn play', 'aria-label': 'Play or pause', onclick: () => play.click() }, icon('play'));
@@ -348,7 +367,8 @@ export function createNow(S, ctl) {
     t1.textContent = it ? (radio ? (n.liveTitle || it.title) : it.title) : 'Nothing playing';
     t2.textContent = it ? (radio ? (n.liveTitle ? it.title : 'Internet radio') : (it.artist || ' ')) : 'Pick something from the library';
     if (E.ovTitles) { E.ovTitles.children[0].textContent = t1.textContent; E.ovTitles.children[1].textContent = t2.textContent; }
-    { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; ovAl.textContent = it2 && it2.kind !== 'radio' ? it2.album || '' : ''; }
+    { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; ovAl.textContent = it2 && it2.kind !== 'radio' ? it2.album || '' : ''; for (const e of [t2, ovT2]) e.dataset.album = ovAl.textContent;
+      const rad = !it2 || it2.kind === 'radio'; aaArtistLbl.hidden = rad; aaArtist.textContent = rad ? t2.textContent.trim() : (it2.artist || ''); aaAlbum.textContent = ovAl.textContent; aaAlbumWrap.hidden = !ovAl.textContent; aaLine.title = [aaArtist.textContent, aaAlbum.textContent].filter(Boolean).join(' · '); }   // F102e: phone shows Artist · Album on one line
     ctlNow.textContent = it ? [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' — ') : '';
     // genre line (mockup: "Ambient • Electronica"); falls back to album • year when the file has no genre tag
     const genres = it?.genre ? String(it.genre).split(/\s*[;/,|]\s*/).filter(Boolean).slice(0, 3) : [];
@@ -360,22 +380,29 @@ export function createNow(S, ctl) {
     genre.classList.toggle('on', n.state === 'playing');
     t3.textContent = n.notice || '';
     const src = itemArtUrl(it, 768), srcMd = itemArtUrl(it, 384), srcSm = itemArtUrl(it, 96);
-    const glyph = radio ? '📻' : isReceiver(it) ? '📱' : '♪';
-    if (coverHolder.dataset.src !== (src || '')) {
-      coverHolder.dataset.src = src || '';
-      coverHolder.replaceChildren(cover(src, '', glyph));
-      art.replaceChildren(cover(srcMd, 'md', glyph));
-      miniCover.replaceChildren(cover(srcSm, 'sm', glyph));
-      pnCover.replaceChildren(cover(srcMd, 'md', glyph)); pnRefl.replaceChildren(cover(srcMd, 'md', glyph));
-      sArt.replaceChildren(cover(srcSm, 'sm', glyph));
+    const npk = npKey(it, src);   // 0.5.0 F123: key includes artist + album so a new track with the same (missing) art rebuilds
+    if (coverHolder.dataset.src !== npk) {
+      coverHolder.dataset.src = npk;
+      const nowcol = ctlPanel.closest('.nowcol');
+      pnArt.style.setProperty('--np-cover', 'none'); nowcol?.style.setProperty('--np-bloom', 'none');   // F123: only a loaded track picture feeds bloom / jacket
+      const realMd = u => { if (coverHolder.dataset.src === npk) pnArt.style.setProperty('--np-cover', `url("${u}")`); };   // F104: Jacket vinyl center label = cover crop
+      const realSm = u => { if (coverHolder.dataset.src === npk) nowcol?.style.setProperty('--np-bloom', `url("${u}")`); };   // F102: phone cover bloom
+      coverHolder.replaceChildren(npCover(it, 768, ''));
+      art.replaceChildren(npCover(it, 384, 'md', realMd));
+      miniArtB.setCover(npCover(it, 96, 'sm', realSm));
+      pnCover.replaceChildren(npCover(it, 384, 'md')); pnRefl.replaceChildren(npCover(it, 384, 'md'));
+      sArtB.setCover(npCover(it, 96, 'sm'));
     }
     const wseed = it ? (it.id ?? it.title ?? '') + '' : '';
     if (pnWave.dataset.seed !== wseed) {
       pnWave.dataset.seed = wseed; const hs = waveBars(wseed || 'idle');
       for (const box of [waveBase, waveTop, sWaveBase, sWaveTop]) box.replaceChildren(...hs.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
+      const es = eqBars(wseed || 'idle'), es2 = eqBars(wseed || 'idle', 16);
+      for (const box of [eqBase, eqTop]) box.replaceChildren(...es.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
+      for (const box of [sEqBase, sEqTop]) box.replaceChildren(...es2.map(v => h('i', { style: `height:${Math.round(v * 100)}%` })));
     }
     trackNo.textContent = 'TRACK ' + (it?.trackNo || it?.track ? String(it.trackNo || it.track).padStart(2, '0') : (n.index >= 0 ? String(n.index + 1).padStart(2, '0') : '--'));
-    ctlPanel.classList.toggle('playing', n.state === 'playing');
+    ctlPanel.classList.toggle('playing', n.state === 'playing'); for (const b of [sArtB, miniArtB, barArtB]) b.setPlaying(n.state === 'playing');
     const favId = it?.kind === 'track' && !isReceiver(it) ? it.refId : null;
     if (npHeart.dataset.id !== String(favId ?? '')) { npHeart.dataset.id = barHeart.dataset.id = String(favId ?? ''); npHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); xHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); sHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); barHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); }
     miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
@@ -383,9 +410,9 @@ export function createNow(S, ctl) {
     for (const b of [shuffle, sShuffle]) { b.classList.toggle('on', !!n.shuffle); b.setAttribute('aria-pressed', String(!!n.shuffle)); }
     for (const b of [repeat, sRepeat]) { b.classList.toggle('on', n.repeat !== 'off'); b.setAttribute('aria-pressed', String(n.repeat !== 'off')); setIcon(b, n.repeat === 'one' ? 'repeatOne' : 'repeat'); }
     setIcon(sPlay, playing ? 'pause' : 'play'); sPlay.classList.toggle('playing', playing);
-    sT1.textContent = t1.textContent; sT2.textContent = t2.textContent.trim(); ctlStrip.querySelector('.ns-titles').title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
+    sT1.textContent = t1.textContent; sT2.textContent = [t2.textContent.trim(), S.now?.item?.kind !== 'radio' && S.now?.item?.album].filter(Boolean).join(' · ');   /* F130: collapsed line = Artist · Album */ ctlStrip.querySelector('.ns-titles').title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
     drawMine(); barT1.textContent = t1.textContent; barT2.textContent = t2.textContent; barPlay.classList.toggle('playing', playing); setIcon(barPlay, playing ? 'pause' : 'play');
-    if (barCover.dataset.src !== (srcSm || '')) { barCover.dataset.src = srcSm || ''; barCover.replaceChildren(cover(srcSm, 'sm', glyph)); }
+    { const bk = npKey(it, srcSm); if (barCover.dataset.src !== bk) { barCover.dataset.src = bk; barArtB.setCover(npCover(it, 96, 'sm')); } }
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
     setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
       seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') });
@@ -395,7 +422,7 @@ export function createNow(S, ctl) {
       : (qi >= 0 && S.queue && qi + 1 < S.queue.length) ? S.queue[qi + 1] : null;
     upnext.replaceChildren(h('span', { class: 'np-uplbl' }, 'Up next'),
       nxt ? h('span', { class: 'ell np-uptitle' }, `${nxt.title}${nxt.artist ? ' - ' + nxt.artist : ''}${nxt.durationMs ? ' • ' + fmtDur(nxt.durationMs) : (nxt.kind === 'radio' ? ' • LIVE' : '')}`) : null,
-      h('span', { class: 'np-upline', 'aria-hidden': 'true' }));
+      isPhone() ? null : h('span', { class: 'np-upline', 'aria-hidden': 'true' }));   // F102b: no decorative rule on phone
     upnext.title = nxt ? '' : (it ? 'Nothing queued after this' : 'Pick something from the library');
     drawNext(nxt);
     ensureViz(); tickPos(); drawChips(); paintSrcChip();
@@ -407,7 +434,7 @@ export function createNow(S, ctl) {
     nxT1.textContent = nxt ? nxt.title || 'Untitled' : 'Nothing queued after this';
     nxT2.textContent = nxt ? (nxt.kind === 'radio' ? 'Internet radio' : nxt.artist || '') : '';
     const src = nxt ? itemArtUrl(nxt, 96) : null;
-    if (nxArt.dataset.src !== (src || '') || !nxArt.firstChild) { nxArt.dataset.src = src || ''; nxArt.replaceChildren(nxt ? cover(src, 'sm', nxt.kind === 'radio' ? '📻' : '♪') : ''); }
+    const nk = nxt ? npKey(nxt, src) : ''; if (nxArt.dataset.src !== nk || !nxArt.firstChild) { nxArt.dataset.src = nk; nxArt.replaceChildren(nxt ? npCover(nxt, 96, 'sm') : ''); }   // F123
     nextBlock.title = nxt ? ['Up next', nxt.title, nxt.artist].filter(Boolean).join(' · ') : 'Nothing queued after this';
     window.dispatchEvent(new CustomEvent('wavwiz:upnext'));
   }
@@ -419,10 +446,13 @@ export function createNow(S, ctl) {
     const frac = live || !dur ? 0 : Math.min(1, pos / dur); fill.style.width = barFill.style.width = frac * 100 + '%'; knob.style.left = barKnob.style.left = frac * 100 + '%'; setVizProgress(live || !dur ? null : frac);
     barElv.textContent = sElv.textContent = elv.textContent; barRev.textContent = rev.textContent;
     sDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
-    sFill.style.width = sLedFill.style.width = frac * 100 + '%'; sKnob.style.left = frac * 100 + '%'; sWaveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`; ctlStrip.style.setProperty('--ns-frac', frac.toFixed(4));
+    sFill.style.width = sLedFill.style.width = frac * 100 + '%'; sKnob.style.left = frac * 100 + '%'; sWaveClip.style.clipPath = sEqClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`; ctlStrip.style.setProperty('--ns-frac', frac.toFixed(4));
     pillElv.textContent = clockVal.textContent = elv.textContent; lcdRev.textContent = rev.textContent;
     pillDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
-    ringVal.style.strokeDashoffset = String(100 - frac * 100); ledFill.style.width = frac * 100 + '%'; waveClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
+    ringVal.style.strokeDashoffset = String(100 - frac * 100); ctlPanel.style.setProperty('--np-frac', frac.toFixed(4)); for (const b of [sArtB, miniArtB, barArtB]) b.setFrac(frac);   // F96: sleeve vinyl
+    ledFill.style.width = frac * 100 + '%';
+    waveClip.style.clipPath = eqClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
+    for (const s of [pnWave, pnLed, pnEq]) s.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
   }
   // 0.2.1 F11: no speaker status chips, live dot or "muted" tag in the panel header - device status lives in the Devices panel
   // (this device's Mute button still shows its own state). Kept as a hook: the zone refresh still repaints this device's volume / mute.

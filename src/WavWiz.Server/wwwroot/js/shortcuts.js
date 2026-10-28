@@ -31,7 +31,7 @@ export function movePin(pins, from, to) { if (from === to || from < 0 || to < 0 
 export const rowOrder = pins => [...pins.slice().reverse().map(id => ({ kind: 'pin', id })), ...(pins.length ? [{ kind: 'sep' }] : []), { kind: 'home' }];
 
 /** The row. `run(id)` runs a pinned destination, `home()` goes Home. Redraws when the pins change (here or in another window). Returns { el, destroy }. */
-export function shortcutsRow({ run, home, cls = '' } = {}) {
+export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
   const el = h('div', { class: 'scrow ' + cls, role: 'toolbar', 'aria-label': 'Shortcuts' });
   let pins = loadPins(), drag = -1;
   const popover = (btn, i) => {
@@ -45,7 +45,7 @@ export function shortcutsRow({ run, home, cls = '' } = {}) {
   const set = p => { pins = savePins(p); draw(); };
   /** 0.3.8 L37: in a very narrow window the pins nearest Home stay and the rest move into a 'more' menu. */
   let cap = 99;
-  const calcCap = () => { const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1; };
+  const calcCap = () => { if (vertical) return 99; const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1; };
   const more = btn => {
     document.querySelector('.scpop')?.remove();
     const rest = pins.slice(cap).map(id => { const p = pinInfo(id); return h('button', { type: 'button', class: 'btn sm', 'data-sc': id, onclick: () => { pop.remove(); run?.(id); } }, p.label); });
@@ -76,6 +76,23 @@ export function shortcutsRow({ run, home, cls = '' } = {}) {
   window.addEventListener('storage', onStore); window.addEventListener('wavwiz:pins', onPins);
   draw();
   return { el, destroy: () => { ro?.disconnect(); window.removeEventListener('storage', onStore); window.removeEventListener('wavwiz:pins', onPins); } };
+}
+/** 0.5.0 F130: the Now Playing header shows ONE Shortcuts toggle; it opens a vertical side icon strip (same pins / order / Home as shortcutsRow).
+ *  Open state is remembered per device. Returns { toggle, strip, isOpen, setOpen, destroy }. */
+export const SCSIDE_KEY = 'wavwiz.scside.v1';
+export function shortcutsSide({ run, home, cls = '', onChange } = {}) {
+  const row = shortcutsRow({ run, home, cls: 'scside-row', vertical: true });
+  row.el.setAttribute('aria-orientation', 'vertical');
+  const strip = h('div', { class: 'scside ' + cls, role: 'group', 'aria-label': 'Shortcuts strip', hidden: true }, row.el);
+  let open = false; try { open = localStorage.getItem(SCSIDE_KEY) === '1'; } catch { /* ignore */ }
+  const toggle = h('button', { type: 'button', class: 'scbtn sctoggle', 'data-sc': 'toggle', 'aria-label': 'Shortcuts', 'aria-haspopup': 'true', title: 'Shortcuts - pins + Home', onclick: () => setOpen(!open) }, icon('pin'));
+  function setOpen(v) {
+    open = !!v; strip.hidden = !open; toggle.classList.toggle('on', open); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-pressed', String(open));
+    try { localStorage.setItem(SCSIDE_KEY, open ? '1' : '0'); } catch { /* ignore */ }
+    onChange?.(open);
+  }
+  setOpen(open);
+  return { toggle, strip, isOpen: () => open, setOpen, destroy: row.destroy };
 }
 /** Pin / unpin from a menu row or a title bar. Tells every row in this window; returns the result (full = the 3 slots are taken). */
 export function pinToggle(id) {

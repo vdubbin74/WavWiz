@@ -10,6 +10,7 @@ export const SHORTCUTS = [
   { id: 'eq', keys: 'Alt+E', label: 'Sound / EQ', group: 'Windows' },
   { id: 'queue', keys: 'Alt+Q', label: 'Queue', group: 'Windows' },
   { id: 'mixer', keys: 'Alt+V', label: 'Master volume (every zone and speaker)', group: 'Windows' },
+  { id: 'fullscreen', keys: 'F11', label: 'Fullscreen on / off', group: 'Windows' },   // 0.5.0 F120
   { id: 'settings', keys: 'Ctrl+,', label: 'Settings', group: 'Windows' },
   { id: 'new-zone', keys: 'Ctrl+Shift+Z', label: 'New zone', group: 'Create' },
   { id: 'new-scene', keys: 'Ctrl+Shift+S', label: 'New scene', group: 'Create' },
@@ -18,7 +19,7 @@ export const SHORTCUTS = [
 ];
 export const keysFor = id => SHORTCUTS.find(s => s.id === id)?.keys || '';
 export const hint = (label, id) => { const k = keysFor(id); return k ? `${label} (${k})` : label; };
-const BY_CODE = { Space: 'playpause', KeyM: 'mute' };
+const BY_CODE = { Space: 'playpause', KeyM: 'mute', F11: 'fullscreen' };
 const ALT_CODE = { KeyM: 'mini', KeyH: 'home', KeyE: 'eq', KeyQ: 'queue', KeyV: 'mixer' };
 /** Pure: which shortcut id a keydown asks for (the four Ctrl+Shift "new" chords stay in menusub.js), or null. */
 export function matchShortcut(ev) {

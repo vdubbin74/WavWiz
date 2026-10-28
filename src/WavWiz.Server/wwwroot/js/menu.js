@@ -1,8 +1,9 @@
+import { toggleAppFull } from './fullscreen.js';
 import { ripAllowed } from './library.js';
 // Top menu: File / Library / Playback / Devices / Help. 0.2.1 F8: menus DO things, Settings SETS things - every item has exactly one home.
 // The View menu is gone: Theme, Visualizer, Now Playing style and Display size all live on Settings > Appearance. Phone hamburger reuses the same tree.
 import { h, api, toast, dialog } from './util.js';
-import { openSettings } from './settings.js';
+import { openSettings, GROUPS } from './settings.js';
 import { openWhatsNew } from './about.js';
 import { openCalibration } from './calibrate.js';
 import { canControl, ADMIN_HINT } from './ui.js';
@@ -42,7 +43,8 @@ function menuActions(S, ctl, desktop = false) {
     // 0.2.0 item 31: elevate in place (same pairing, same speaker), and drop back again - no sign-out, no new pairing code
     // 0.3.5 J16 (next-menus-*.png): menus open the inline homes from J8 / J9 - no page popups any more
     file: [
-      ['Settings', () => openSettings(S, refreshAll, go), null, null, { pin: 'settings', kbd: keysFor('settings') }],
+      // F117: click opens Settings as before; the flyout lists the nine sections in tab order
+      ['Settings', () => openSettings(S, refreshAll, go), null, null, { pin: 'settings', kbd: keysFor('settings'), sub: () => GROUPS.map(([id, label]) => [label, () => openSettings(S, refreshAll, go, id)]) }],
       'hr',
       // 0.3.6 K17 / K19: New ▸ (zone, scene, alarm, schedule) and Run ▸ (scenes, schedules, alarms - the only place to start them)
       ['New', null, null, null, { sub: () => [
@@ -89,11 +91,12 @@ function menuActions(S, ctl, desktop = false) {
       ['Scenes', () => go('scenes'), null, null, { sub: () => scenesSpec(S, { ...ctl, canAdmin: admin }) , pin: 'scenes' }],
       ['Schedules & alarms', () => go('schedules'), null, null, { pin: 'alarms' }],
       ['Calibrate speakers…', () => openCalibration(S, refreshAll), () => !control()],
-      ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.2.5: speaker or calibration mic (phones only)
+      ['Phone role…', () => changePhoneRole(), null, () => !isPhoneUa() || isPlayerUa()],      // 0.5.0: speaker, remote, or calibration mic (phones only)
       ['Mini player', () => ctl.openMini?.(), null, null, { kbd: keysFor('mini') }],
+      ['Fullscreen', () => toggleAppFull(), null, () => isPhoneUa() && !isPlayerUa(), { kbd: keysFor('fullscreen') }],   // 0.5.0 F120: borderless whole-window
       'hr',
       ['Pair a player', () => openSettings(S, refreshAll, go, 'players'), () => !admin()],
-      ['Away-from-home access', () => go('remote'), () => !admin()],
+      ['Away-from-home access', () => openSettings(S, refreshAll, go, 'remote'), () => !admin()],   // F117: Settings > Network (Tailscale card)
     ],
     help: [
       ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],
@@ -249,8 +252,9 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
 
   a2hsBoot();
   if (shouldOffer({})) nav.append(h('button', { type: 'button', class: 'a2hs-entry', onclick: () => { close(); dialog('Add to Home Screen', a2hsCard(), [{ text: 'Close', cls: 'primary' }]); } }, 'Add to Home Screen'), h('hr'));
-  // 0.4.9 F67: the phone menu is seven plain items (no submenus, no File / Playback / Mini player, no shortcut labels), each opening an existing view:
-  // Devices & Zones holds devices, zones, pairing and calibrate; Settings holds EQ / sound, phone role, away-from-home access and help / about.
+  // 0.4.9 F67: the phone menu is plain items (no submenus, no File / Playback / Mini player, no shortcut labels), each opening an existing view:
+  // Devices & Zones holds devices, zones, pairing and calibrate; Settings holds EQ / sound, away-from-home access and help / about.
+  // 0.5.0 F127: Phone role… (speaker / remote / calibration mic) has its own drawer row so phones can find it; skipped in the Player WebView.
   void accordion; void A;
   nav.append(
     leaf('Now Playing', () => ctl.go?.('now')),
@@ -258,6 +262,7 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
     leaf('Volume Mixer', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))),
     leaf('Library', () => ctl.go?.('library')),
     leaf('Devices & Zones', () => ctl.go?.('devices')),
+    ...(isPhoneUa() && !isPlayerUa() ? [leaf('Phone role…', () => changePhoneRole())] : []),
     leaf('Scenes & Alarms', () => ctl.go?.('scenes')),
     leaf('Settings', () => openSettings(S, ctl.refreshAll, ctl.go)),
   );

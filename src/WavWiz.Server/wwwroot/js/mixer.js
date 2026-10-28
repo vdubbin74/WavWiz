@@ -31,7 +31,7 @@ export function openMixer(S, ctl) {
   const tagEl = t => h('span', { class: 'mv-tag t-' + t.toLowerCase() }, t);
   const tagRow = ts => ts.length ? h('span', { class: 'mv-tags' }, ...ts.map(tagEl)) : null;   // 0.4.9 F79: status tags on their own small row under the name, never beside the slider
 
-  // a group (whole home or zone) slider: scale the snapshot taken at drag start
+  // a group (all zones or zone) slider: scale the snapshot taken at drag start
   const groupInput = (ids, pctEl) => (v) => { const zs = ids.map(zoneById).filter(Boolean); if (!base || base.key !== ids.join()) base = { key: ids.join(), vols: zs.map(z => z.volume), ids: zs.map(z => z.id) };
     const caps = base.ids.map(id => zoneById(id)?.volCap ?? 100), next = scaleTo(base.vols, v, caps);
     for (const [i, nv] of changed(base.vols, next)) { const z = zoneById(base.ids[i]); if (z) { z.volume = nv; patch(z.id, { volume: nv }); } }
@@ -74,9 +74,9 @@ export function openMixer(S, ctl) {
     if (dragging || body.contains(document.activeElement) && document.activeElement.matches?.('input[type=text]')) return;
     const zs = S.zones || [], gs = S.groups || [], on = enabledOn(), shown = on.length ? on : zs.filter(z => z.enabled !== false);
     const mPct = h('span', { class: 'mv-pct' }, Math.round(groupLevel(shown.map(z => z.volume))) + '%');
-    const mR = slider('Whole-Home volume', groupLevel(shown.map(z => z.volume)), groupInput(on.map(z => z.id), mPct), { disabled: !can || !on.length, cls: 'mv-master-s' });
+    const mR = slider('All zones volume', groupLevel(shown.map(z => z.volume)), groupInput(on.map(z => z.id), mPct), { disabled: !can || !on.length, cls: 'mv-master-s' });
     const all = m => () => { for (const z of zs) if (!!z.muted !== m) { z.muted = m; patch(z.id, { muted: m }); } paint(); };
-    const master = h('div', { class: 'mv-master' }, h('div', { class: 'mv-row mv-mrow' }, h('span', { class: 'n' }, 'Whole-Home'), mR, mPct),
+    const master = h('div', { class: 'mv-master' }, h('div', { class: 'mv-row mv-mrow' }, h('span', { class: 'n' }, 'All zones'), mR, mPct),
       h('div', { class: 'mv-btns' }, h('button', { type: 'button', class: 'btn sm', 'data-act': 'muteall', disabled: !can, onclick: all(true) }, 'Mute all'), h('button', { type: 'button', class: 'btn sm', 'data-act': 'unmuteall', disabled: !can, onclick: all(false) }, 'Unmute all')));
     const card = (title, list, g) => { const live = list.filter(z => z.connected), lv = (live.length ? live : list).map(z => z.volume), muted = !!list.length && list.every(z => z.muted);
       const c = h('div', { class: 'mv-card', 'data-group': g ? g.id : 'un' });

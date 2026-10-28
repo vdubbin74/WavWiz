@@ -5,8 +5,9 @@ import { h, api, toast, debounce } from './util.js';
 import { SCALES, loadScale, applyScale, scaleFactor } from './uiscale.js';
 import { LAYOUTS, loadLayout, saveLayout } from './panels.js';
 import { SLIDER_STYLES, loadSlider, applySlider } from './sliderstyle.js';
-import { NP_STYLES, NP_EFFECTS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
-import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap } from './viz.js';
+import { NP_SEEKS, NP_BUTTONS, NP_ARTS, NP_EFFECTS, NP_COLORS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
+import { npSeekMini, npBtnMini, npArtMini } from './npmini.js';
+import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap, isPhone } from './viz.js';
 import { VIZ_BLURB, vizName } from './vizcore.js';
 import { visualizerView } from './vizpage.js';
 import { themeCard } from './themes.js';
@@ -57,17 +58,37 @@ function npStyleCard(preview, S = null, thumbFn = null) {
         oninput: ev => { out.textContent = ev.target.value + '%'; saveNpPrefs({ ...loadNpPrefs(), [k]: +ev.target.value }); thumbs.forEach(t => t.update()); } });
       return h('label', { class: 'row', style: 'gap:10px;margin-top:6px' }, h('span', { style: 'min-width:8.5em' }, label), r, out);
     };
-    // 0.3.1 B14: every style as a live preview with the playing song, 2 per row; click to select; options below the grid
-    stopNp?.(); thumbs = NP_STYLES.map(([id]) => thumbFn ? thumbFn(id, () => !!S?.now?.item) : { el: h('div'), update() {} });
-    const cards = NP_STYLES.map(([id, name, tip], i) => { const c = pgCard({ id, name: name + (id === 'classic' ? ' (default)' : ''), sub: tip, on: p.style === id, preview: thumbs[i].el, attrs: { 'data-npstyle': id },
-      onSelect: v => { saveNpPrefs({ ...loadNpPrefs(), style: v }); draw(); } }); c._t = thumbs[i]; return c; });
-    stopNp = whileVisible(cards, c => { c._t.update(); c._iv = setInterval(() => c._t.update(), 1000); }, c => { clearInterval(c._iv); });
+    // 0.5.0 F94: Color intensity, a 3-stop track bar (snaps to Subtle / Spicy / Max), live on the real stage and the previews
+    const colorBar = () => {
+      const idx = Math.max(0, NP_COLORS.findIndex(([id]) => id === p.color));
+      const wrap = h('div', { class: 'npcolor', 'data-npcolor-bar': '', style: '--stop:' + idx });
+      const set = i => { i = Math.max(0, Math.min(NP_COLORS.length - 1, i)); wrap.style.setProperty('--stop', i); r.value = i;
+        r.setAttribute('aria-valuetext', NP_COLORS[i][1]); labs.forEach((l, j) => l.classList.toggle('on', j === i));
+        saveNpPrefs({ ...loadNpPrefs(), color: NP_COLORS[i][0] }); thumbs.forEach(t => t.update()); };
+      const r = h('input', { type: 'range', min: 0, max: NP_COLORS.length - 1, step: 1, value: idx, class: 'npcolor-range', 'aria-label': 'Color intensity',
+        'aria-valuetext': NP_COLORS[idx][1], 'data-npcolor-range': '', oninput: ev => set(+ev.target.value) });
+      const labs = NP_COLORS.map(([id, l], j) => h('button', { type: 'button', class: 'npcolor-lab' + (j === idx ? ' on' : ''), 'data-npcolor': id, onclick: () => set(j) }, l));
+      wrap.append(h('div', { class: 'npcolor-rail' }, h('div', { class: 'npcolor-fill' }), ...NP_COLORS.map((_, j) => h('span', { class: 'npcolor-tick', style: '--i:' + j })), r),
+        h('div', { class: 'npcolor-labs' }, ...labs));
+      return wrap;
+    };
+    // 0.5.0 F95: no locked layout packages - one live preview of the saved mix, then Track bar / Buttons / Color intensity mixed independently
+    stopNp?.(); const live = thumbFn ? thumbFn(null, () => !!S?.now?.item) : { el: h('div'), update() {} }; thumbs = [live];
+    const liveCard = h('div', { class: 'npmix-live', 'data-npmix-live': '' }, live.el);
+    stopNp = whileVisible([liveCard], c => { live.update(); c._iv = setInterval(() => live.update(), 1000); }, c => { clearInterval(c._iv); });
+    const pick = (list, key, mini, kind, label) => gridEl(kind, label, list.map(([id, name, tip]) => pgCard({ id, name: name + (id === list[0][0] ? ' (default)' : ''), sub: tip, on: p[key] === id,
+      preview: mini(id), attrs: { ['data-np' + key]: id }, onSelect: v => { saveNpPrefs({ ...loadNpPrefs(), [key]: v }); draw(); } })));
     box.replaceChildren(h('h3', null, 'Now Playing'),
-      h('p', { class: 'dim small' }, 'How the playback controls under the visualizer look. Classic is the default.'),
-      gridEl('np', 'Now Playing style', cards),
+      h('p', { class: 'dim small' }, 'Mix the track bar, buttons, album art and color intensity. Applies on this PC and on phones / tablets using this browser.'),
+      liveCard,
+      h('div', { class: 'sec', style: 'margin-top:12px' }, 'Track bar'), pick(NP_SEEKS, 'seek', npSeekMini, 'npseek', 'Track bar'),
+      h('div', { class: 'sec', style: 'margin-top:12px' }, 'Buttons'), pick(NP_BUTTONS, 'buttons', npBtnMini, 'npbtn', 'Buttons'),
+      h('div', { class: 'sec', style: 'margin-top:12px' }, 'Album art'), pick(NP_ARTS, 'art', npArtMini, 'npart', 'Album art'),   // 0.5.0 F96
+      h('div', { class: 'sec', style: 'margin-top:12px' }, 'Color intensity'),
+      h('p', { class: 'dim small', style: 'margin:2px 0 4px' }, 'How hard Now Playing leans into the active theme'), colorBar(),
       h('div', { class: 'sec', style: 'margin-top:12px' }, 'Effects'), slider('fx', 'Panel effects'), ...NP_EFFECTS.map(([k, l]) => slider(k, l)),
       h('div', { class: 'row', style: 'margin-top:6px' }, h('p', { class: 'small dim grow', style: 'margin:0' }, 'Panel effects scales all of them at once. Each starts at 50% and goes up to 100%.'),
-        h('button', { class: 'btn', onclick: () => { saveNpPrefs({ style: loadNpPrefs().style }); draw(); } }, 'Reset effects')));
+        h('button', { class: 'btn', onclick: () => { { const q = loadNpPrefs(); saveNpPrefs({ seek: q.seek, buttons: q.buttons, art: q.art, color: q.color }); } draw(); } }, 'Reset effects')));
     thumbs.forEach(t => t.update());
   }
   draw();
@@ -191,6 +212,10 @@ function displaySizeCard() {
 // 0.3.5 J2: Display size is part of the theme - it sits on the Theme page (no Display size sub-tab any more)
 export const APP_SUBS = [['theme', 'Theme'], ['viz', 'Visualizer'], ['eq', 'EQ'], ['np', 'Now Playing']];
 const SUB_KEY = 'wavwiz.appsub';
+/** 0.5.0 F125: phone Settings has no Appearance > Visualizer (phone Now Playing shows no visualizer); desktop keeps it. */
+export const appSubsFor = (phone = isPhone()) => phone ? APP_SUBS.filter(([id]) => id !== 'viz') : APP_SUBS;
+/** F125: on phone a 'viz' request (looks / section / saved sub) opens Theme instead. */
+export const appSubFor = (id, phone = isPhone()) => (phone && id === 'viz') ? 'theme' : id;
 /** The Appearance pane (0.2.2 T2; 0.2.5 C: sub-tabs on top): one sub-section at a time. `opts.section` opens a sub-section (the visualizer
  *  panel's Looks button opens Visualizer); otherwise the last one used in this session, else Theme. `opts.preview` builds the F9 strip. */
 export function appearancePane(opts = {}) {
@@ -200,12 +225,15 @@ export function appearancePane(opts = {}) {
   const pages = { theme: themePage, viz, eq: eqs, np, display: themePage };
   let saved = null; try { saved = sessionStorage.getItem(SUB_KEY); } catch { /* ignore */ }
   let cur = opts.looks ? 'viz' : (pages[opts.section] ? opts.section : (pages[saved] ? saved : 'theme'));
+  const phone = isPhone(); cur = appSubFor(cur, phone);
+  if (phone && saved === 'viz') { try { sessionStorage.setItem(SUB_KEY, 'theme'); } catch { /* ignore */ } }
   const wantDisplay = cur === 'display'; if (cur === 'display') cur = 'theme';
   // 0.2.5 C: a row of sub-tabs right under the main Settings tabs (was a left column), so the content uses the full Settings width
   const nav = h('nav', { class: 'appnav subtabs', 'aria-label': 'Appearance sections' },
-    APP_SUBS.map(([id, label]) => h('button', { type: 'button', 'data-sub': id, 'aria-current': String(id === cur), onclick: () => select(id) }, label)));
+    appSubsFor(phone).map(([id, label]) => h('button', { type: 'button', 'data-sub': id, 'aria-current': String(id === cur), onclick: () => select(id) }, label)));
   const host = h('div', { class: 'appsub' });
   function select(id) {
+    id = appSubFor(id, phone); if (!pages[id]) return;   // F125: no Visualizer sub on phone
     if (pages[cur] !== pages[id]) pages[cur].hide?.();
     cur = id; try { sessionStorage.setItem(SUB_KEY, id); } catch { /* ignore */ }
     nav.querySelectorAll('button').forEach(b => { const on = b.dataset.sub === id; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
@@ -219,7 +247,7 @@ export function appearancePane(opts = {}) {
   const el = h('div', { class: 'appearance appstack' }, nav, host);
   /** Stop every live preview (Settings closed or another tab); `resume` restarts the visible one. */
   const hide = () => { viz.hide(); eqs.hide(); np.hide?.(); };
-  const resume = () => { if (cur === 'viz') viz.reload(); else if (cur === 'eq') eqs.reload(); };
+  const resume = () => { if (cur === 'viz' && !phone) viz.reload(); else if (cur === 'eq') eqs.reload(); };
   return { el, hide, resume, select, current: () => cur, theme, viz: { ...viz, reload: resume }, np, eqs, disp };
 }
 

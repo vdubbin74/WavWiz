@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { SHORTCUTS, matchShortcut, keysFor } from '../../src/WavWiz.Server/wwwroot/js/hotkeys.js';
+const rd = f => readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/' + f, import.meta.url), 'utf8');
+assert.equal(keysFor('fullscreen'), 'F11');
+assert.equal(SHORTCUTS.find(s => s.id === 'fullscreen').group, 'Windows');
+assert.equal(matchShortcut({ code: 'F11' }), 'fullscreen');
+assert.equal(matchShortcut({ code: 'F11', repeat: true }), null);
+assert.match(rd('menu.js'), /\['Fullscreen', \(\) => toggleAppFull\(\)[^\n]*keysFor\('fullscreen'\)/);
+assert.match(rd('fullscreen.js'), /requestFullscreen\?\.\(\{ navigationUI: 'hide' \}\)/);
+assert.match(rd('main.js'), /case 'fullscreen': return toggleAppFull\(\)/);
+assert.ok(!/Fullscreen/.test(rd('menu.js').split('F67')[1] || ''), 'phone menu untouched');
+console.log('ok f120');

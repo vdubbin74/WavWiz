@@ -8,6 +8,48 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## [0.5.0] - 2026-10-28 (beta)
+
+### Highlights
+- **AirPlay speakers as WavWiz outputs.** An AirPlay speaker joins a zone like any WavWiz player and follows play, pause, seek, skip, group moves and the house timeline, with its own volume and delay.
+  - AirPlay 1 (RAOP) speakers, unencrypted and RSA (AirPort Express), with resend of lost packets.
+  - AirPlay 2 speakers (**experimental, off by default**): transient pairing, WavWiz acts as the speakers' PTP clock (several speakers share one clock), buffered AAC audio via the bundled ffmpeg for near-instant pause and seek, realtime ALAC fallback.
+  - Settings > Network > "AirPlay speakers (experimental)": AirPlay 2 and buffered-audio switches, connected speakers, and Windows firewall rules (UDP 319/320 for PTP).
+  - Help > Diagnostics (admin): AirPlay speakers found on the network with version, codecs and route, plus Connect / Disconnect for audio tests.
+- **New Now Playing.** A flatter desktop panel: art left, title over a labeled Artist · Album line, thin progress, transport beside, "on Zone ▾" picker back next to the titles; mute, mixer, Sound / EQ and Sleep share that line. Slightly bigger art and transport. (F130, F132, F134)
+- **Mix-and-match looks.** Settings > Appearance > Now Playing: pick Track bar (line · wave · led · eq), Buttons (round · soft · square · ring), Color intensity (Subtle · Spicy · Max) and Album art (square, spinning disc, record sleeve, Cassette, Tape, Jacket). Replaces Classic / Center / Stack / Horizon, and applies live to mini players and compact strips too. (F94–F98, F104)
+- **Shortcuts strip.** The header pin row is now one Shortcuts button that slides a horizontal pin strip (pins + Home) in from the right on every Now Playing size, including collapsed and condensed; on expanded it opens on the title bar. Scrolls when full; drag / right-click reordering kept. (F133–F135e)
+- **Standalone mini player redesign.** NOW PLAYING title bar with the Shortcuts pin and a Transparency toggle; volume slider left of the transport; play / prev / next docked to the right edge with Shuffle and Repeat (off → all → one). Transparency switches the same slider to window opacity (returns to volume after 6 s). Slim mode stays compact. (F138, F139, F140)
+- **Phone as a remote.** A third phone role, Use as remote: silent, opens straight to Now Playing with a remote banner. Switch any time from the menu or Settings > Devices > Phone role. (F91, F92, F100)
+- **Premium polish pass.** Phone Now Playing (bigger hero art with cover bloom, full-width Up next), Scenes & Schedules sheet, Library (rounded art and rows, pill tabs, better phone layout), and premium EQ looks (LED bars, console-style Studio faders, Spectrum) with live response curve and theme colors. (F102, F103, F105, F107, F108)
+
+### Added
+- Player: borderless fullscreen - F11 or Devices > Fullscreen; Esc exits. Always starts windowed. (F120)
+- Queue: "Copy queue to zone" is a title-bar icon with a zone list and "Start playing it there"; Up next shows in the Queue title bar on every Queue form. (F137)
+- Themes: Crimson Lounge and Ocean Abyss added; Daylight reworked for contrast. Blue Steel and Lime Circuit removed (saved picks load Midnight Neon). (F114)
+- Now Playing / Up next: tracks with no cover show the artist photo, then a generated album cover, instead of a bare note icon. (F123)
+- Phone: Sound / EQ opens a full-screen EQ sheet. (F128)
+
+### Changed
+- Settings reorganized: General · Appearance · Playback · Library · Devices · Network · Jukebox · Diagnostics · About; Access folded into Network; admin password under General; File > Settings lists the sections. (F117)
+- "All sound settings" opens the speaker's settings page instead of a panel under the EQ; Trim, Auto pre-gain and Limiter now live there. (F109)
+- Collapsed Library and Devices rails share one flat soft-tab look ("LIBRARY · N", "DEVICES · N ZONES"). (F106)
+- Installer: finish page offers "Open WavWiz Player" first (browser optional), "WavWiz Player (BETA)" desktop shortcut, refreshed info page, Private-network tip on the address page, and a WebView2 download offer when it is missing. FIRST-RUN.txt updated. (F121, F122)
+- Phone: Settings no longer scrolls sideways; Visualizer setting hidden on phone; Now Playing art sized so controls and Up next stay on screen. (F100, F125)
+- Pins use a solid accent chip when on, quiet outline when off. (F124)
+- Diagnostics updates in place instead of rebuilding every 15 s. (F111)
+- What's New / About say 0.5.0. (F118)
+
+### Fixed
+- Queue: drag-to-reorder works again in the WavWiz Player; Time column header stays pinned while scrolling. (F113, F115)
+- Now Playing LED / wave / EQ track bars advance again while playing. (F98c)
+- Condensed player: round buttons and cassette hubs no longer squash; more room for title/artist. (F98b, F99)
+- Library: tabs and Expand / Collapse keep the theme style. (F116, F131)
+- Offline first load keeps Scenes, rails and EQ styling. (F106b)
+
+### Known limits
+- AirPlay 2 output is experimental. Sonos, WiiM and similar AirPlay 2 speakers are still being tested. HomePod and Apple TV are not supported yet (they need a pairing flow), nor are FairPlay-only or NTP-timed AirPlay 2 speakers.
+
 ## [0.4.9] - 2026-10-23 (beta)
 - Library: the tab row fits again after you collapse and reopen the Library. (F64)
 - Roomy layout: Devices slides out over the side again from the narrow bar; click outside it or press Escape to fold it. (F65)

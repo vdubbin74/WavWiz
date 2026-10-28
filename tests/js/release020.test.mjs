@@ -156,12 +156,13 @@ test('0.2.0 item 29: calibration ends its session (music resumes), re-syncs befo
 
 test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 % default / 100 % max, master scales them', async () => {
   const m = await imp('npstyle');
-  assert.deepEqual(m.NP_STYLES.map(s => s[0]), ['classic', 'center', 'stack', 'horizon']);
+  // 0.5.0 F95: the four packages became independent Track bar + Buttons axes (old `style` migrates)
+  assert.deepEqual(m.NP_SEEKS.map(s => s[0]), ['line', 'wave', 'led', 'eq']); assert.deepEqual(m.NP_BUTTONS.map(s => s[0]), ['round', 'soft', 'square', 'ring']);
   const st = memStore();
-  assert.deepEqual(m.loadNpPrefs(st), { style: 'classic', fx: 50, glow: 50, motion: 50, reflect: 50 });
+  assert.deepEqual(m.loadNpPrefs(st), { seek: 'line', buttons: 'round', art: 'square', fx: 50, glow: 50, motion: 50, reflect: 50, color: 'spicy' });
   m.saveNpPrefs({ style: 'stack', glow: 140, motion: -3 }, st);
-  const p = m.loadNpPrefs(st); assert.equal(p.style, 'stack'); assert.equal(p.glow, 100); assert.equal(p.motion, 0); assert.equal(p.fx, 50);
-  assert.equal(m.normNpPrefs({ style: 'terrain' }).style, 'classic');
+  const p = m.loadNpPrefs(st); assert.equal(p.seek, 'led'); assert.equal(p.buttons, 'square'); assert.equal(p.style, undefined); assert.equal(p.glow, 100); assert.equal(p.motion, 0); assert.equal(p.fx, 50);
+  assert.equal(m.normNpPrefs({ style: 'terrain' }).seek, 'line');
   assert.equal(m.effectLevel({ fx: 50, glow: 50 }, 'glow'), 0.5);
   assert.equal(m.effectLevel({ fx: 0, glow: 100 }, 'glow'), 0);
   assert.equal(m.effectLevel({ fx: 100, glow: 100 }, 'glow'), 1);
@@ -169,24 +170,25 @@ test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 
   assert.deepEqual(m.waveBars('a', 10), m.waveBars('a', 10)); assert.ok(m.waveBars('a').every(v => v >= 0.2 && v <= 1));
   assert.ok(Math.abs(m.ringFrac(0, 0, 10, 0) - 0.25) < 1e-9); assert.ok(Math.abs(m.ringFrac(0, 0, 0, 10) - 0.5) < 1e-9);
   const s = src('appearance.js'); assert.match(s, /np = npStyleCard\(/); assert.match(s, /disp = displaySizeCard\(\)/); assert.match(s, /'Panel effects'/);      // 0.2.1 F8: moved to appearance.js
-  for (const k of ['.pn-classic', '.pn-center', '.pn-stack', '.pn-horizon', '--fx-glow']) assert.ok(css.includes(k), k);
+  for (const k of ['.pn-seek-wave', '.pn-seek-led', '.pn-seek-eq', '.pn-btn-round', '.pn-btn-soft', '.pn-btn-square', '.pn-btn-ring', '--fx-glow']) assert.ok(css.includes(k), k);
   assert.match(src('now.js'), /pnArt, tableMeta/);
 });
 
 test('0.2.0 items 4-7: ten presets with the agreed hexes, four-color custom, old three-color saves migrate, Pepecoin polish', async () => {
   const theme = await imp('theme');
   const want = { default: ['#FF3C00', '#19C3B1', '#14171A', '#E8EDF0'], pepecoin: ['#269B4D', '#208241', '#212121', '#FFFFFF'], ember: ['#FF5A1F', '#FFB347', '#160E0A', '#E8EDF0'], arctic: ['#3BA7FF', '#A8E6FF', '#0B1218', '#E8EDF0'], violet: ['#A855F7', '#C084FC', '#1A1028', '#F5F3FF'], mono: ['#E8EDF0', '#9AA6AE', '#0E1012', '#E8EDF0'],
-    daylight: ['#E03500', '#0E8F82', '#F3F1EE', '#1A1D21'], nebula: ['#8B5CF6', '#2DD4BF', '#0F0B1A', '#EDE9FE'], steel: ['#A9BCCF', '#5F7488', '#18202A', '#E3EAF2'], lime: ['#A3E635', '#22D3EE', '#0B120E', '#ECFCCB'] };
+    daylight: ['#D63A12', '#0B7A6E', '#EDE9E3', '#14171C'], nebula: ['#8B5CF6', '#2DD4BF', '#0F0B1A', '#EDE9FE'], crimson: ['#E84A5F', '#D4A574', '#1A0C10', '#F8EDE8'], ocean: ['#2EC4B6', '#3D8BFF', '#07151F', '#E6F1F8'] };
   assert.deepEqual(Object.keys(theme.PRESETS), Object.keys(want));
   for (const [id, [a, a2, bg, ink]] of Object.entries(want)) assert.deepEqual([theme.PRESETS[id].accent, theme.PRESETS[id].accent2, theme.PRESETS[id].bg, theme.PRESETS[id].ink], [a, a2, bg, ink], id);
-  assert.equal(theme.PRESETS.steel.name, 'Blue Steel');
+  assert.equal(theme.PRESETS.crimson.name, 'Crimson Lounge'); assert.equal(theme.PRESETS.ocean.name, 'Ocean Abyss');
   const st = memStore(); globalThis.localStorage = st;
   try {
     st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#112233', accent2: '#AABBCC', bg: '#000000', ink: '#FFFFFF', preset: 'custom' }));   // 0.1.x save: second was derived
     const t = theme.loadTheme(); assert.equal(t.accent2, theme.companionAccent('#112233'));
     assert.equal(JSON.parse(st.getItem('wavwiz.theme.v1')).v, 4, 'migrated once');
     theme.saveTheme({ ...t, accent2: '#123456' }); assert.equal(theme.loadTheme().accent2, '#123456', 'second is stored, not derived');
-    st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#A9BCCF', bg: '#18202A', preset: 'steel' })); assert.equal(theme.loadTheme().preset, 'steel');
+    st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#A9BCCF', bg: '#18202A', preset: 'steel' })); assert.equal(theme.loadTheme().preset, 'default', 'F114: Blue Steel -> Midnight Neon');
+    st.setItem('wavwiz.theme.v1', JSON.stringify({ accent: '#A3E635', bg: '#0B120E', preset: 'lime' })); assert.equal(theme.loadTheme().preset, 'default', 'F114: Lime Circuit -> Midnight Neon');
   } finally { delete globalThis.localStorage; }
   const tv = src('themes.js'); for (const l of ['Background', 'Main', 'Second', 'Text']) assert.match(tv, new RegExp(`'${l}'`));
   assert.match(tv, /pepeNote/);   // 0.2.1 F14/F20: copper is now the official Pepecoin Highlight; the note shows the kit's onDark logo (see release021) assert.match(tv, /not affiliated/);

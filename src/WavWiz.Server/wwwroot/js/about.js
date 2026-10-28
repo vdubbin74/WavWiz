@@ -1,10 +1,17 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.4.9';
+export const WHATS_NEW_VERSION = '0.5.0';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.5.0 (only what shipped)
+  ['Mix-and-match Now Playing', 'Settings > Appearance > Now Playing: pick a Track bar, Buttons, Album art (Square · Disc · Tape · Jacket) and Color intensity (Subtle · Spicy · Max). Mini players follow the same mix.'],
+  ['Phone remote + Now Playing', 'Use as remote keeps the phone silent and in control. Phone Now Playing gets bigger hero art, cover bloom, cleaner Up next, and no dead overlay controls.'],
+  ['Premium Tape & Jacket art', 'Cassette is a matte Tape shell with moving tape; Sleeve is a paper Jacket with grooved vinyl that slides out with the song.'],
+  ['Premium Library, EQ & rails', 'Softer Library tiles and pill tabs, studio-style EQ with a live response curve, and Library/Devices rails that match the soft Devices tab chrome.'],
+  ['AirPlay speakers as outputs', 'Join AirPlay speakers to a zone like any player (play, pause, seek, volume, delay). AirPlay 2 is experimental and off by default under Settings > Network.'],
+  ['Settings cleaned up', 'Nine sections (Access folded into Network; admin password under General). File → Settings still opens Settings, with a flyout of every section.'],
   // 0.4.9 (only what shipped)
   ['Streaming quality', 'Settings > Playback > Streaming quality: Studio (24-bit / 48 kHz) or Studio Max (24-bit / 96 kHz). Players that can\'t play 96 kHz still get 48 kHz.'],
   ['Jukebox zone', 'The Jukebox shows in Devices, has its own default speakers in Settings > Jukebox, and lets you pick speakers when you start it. From the kiosk you can switch to the app and come back with "Return to Jukebox".'],

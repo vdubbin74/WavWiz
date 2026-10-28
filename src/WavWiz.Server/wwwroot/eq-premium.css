@@ -1,0 +1,96 @@
+/* F107: Premium EQ (LED / Studio faders / Spectrum curve) - shared by every eqArea */
+.eqa-field{border-radius:12px;background:color-mix(in srgb,var(--ink) 2.5%,transparent)}
+.eqa-grid i{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.eqa-grid i.zero{height:1.5px;background:color-mix(in srgb,var(--accent) 38%,var(--ink) 10%)}
+.eqa-vgrid i{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+/* response line + under-fill */
+.eqa-curve path.eqa-line{stroke-width:2;transition:stroke-width .15s,opacity .25s,filter .15s}
+.eqarea[data-eqstyle=curve] .eqa-curve path.eqa-line{stroke-width:2;filter:drop-shadow(0 0 3px color-mix(in srgb,var(--accent) 40%,transparent))}
+.eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 12%,transparent);stroke:none;transition:opacity .25s}
+.eqarea[data-eqstyle=curve] .eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 20%,transparent)}
+.eqarea.dragging .eqa-curve path.eqa-line{stroke-width:2.6;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 55%,transparent))}
+.eqarea.isflat .eqa-curve path.eqa-line{stroke-width:1;opacity:.45;filter:none}
+.eqarea.isflat .eqa-curve path.eqa-under{opacity:0}
+/* Flat chip */
+.eqa-flat{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:10px;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);background:color-mix(in srgb,var(--ink) 6%,transparent);border:1px solid color-mix(in srgb,var(--ink) 10%,transparent)}
+.eqa-flat[hidden]{display:none}
+/* tip */
+.eqa-tip{border-radius:12px!important;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line))!important;background:color-mix(in srgb,var(--panel) 92%,transparent)!important;box-shadow:0 6px 18px rgba(0,0,0,.35)!important;font-family:ui-monospace,Consolas,monospace;font-size:11px;padding:4px 10px!important;color:var(--ink)!important;backdrop-filter:blur(6px)}
+/* focus + neighbors dim */
+.eqarea:has(.eqb.sel) .eqb:not(.sel),.eqarea:has(.eqn.sel) .eqn:not(.sel){opacity:.92}
+.eqb:focus-visible,.eqn:focus-visible{outline:none}
+/* LED */
+.eqb-segs{gap:1.5px}
+.eqb-segs i{border-radius:2.5px}
+.eqb-segs i.lit.up{box-shadow:none}
+.eqb-cap{height:10px;border-radius:5px;box-shadow:0 2px 6px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.25)!important}
+.eqb.sel .eqb-cap{background:var(--ink);box-shadow:0 0 0 2px var(--accent),0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent)!important}
+/* Studio faders */
+.eqb-slot{left:calc(50% - 4px);width:8px;border-radius:4px;background:color-mix(in srgb,#000 70%,var(--panel))}
+.eqb-fill{left:calc(50% - 3px);width:6px;border-radius:3px;background:linear-gradient(color-mix(in srgb,var(--accent) 90%,#fff 10%),color-mix(in srgb,var(--accent) 45%,transparent))}
+.eqb-knob{border-radius:6px!important;background:linear-gradient(color-mix(in srgb,var(--ink) 30%,#3a4046),color-mix(in srgb,var(--ink) 8%,#23272b))!important;border:1px solid rgba(0,0,0,.55)!important;box-shadow:0 3px 8px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18)!important}
+.eqb-knob::after{height:1.5px!important;opacity:.9}
+.eqb.sel .eqb-knob{box-shadow:0 0 0 2px var(--accent),0 3px 10px color-mix(in srgb,var(--accent) 40%,transparent)!important}
+/* Spectrum nodes */
+.eqarea[data-eqstyle=curve] .eqn{width:16px!important;height:16px!important;font-size:9px!important;line-height:16px!important;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.eqarea[data-eqstyle=curve] .eqn.sel{box-shadow:0 0 0 2px var(--accent),0 0 12px color-mix(in srgb,var(--accent) 55%,transparent)}
+.eqarea[data-eqstyle=curve] .eqa-field>.eqled{opacity:.7}
+/* F107c: Exquisite EQ - Studio faders read as console hardware; live meter moved to a side strip right of the slot */
+.eqarea[data-eqstyle=faders] .eqb-slot{left:calc(50% - 5.5px);width:11px;border-radius:6px;background:linear-gradient(90deg,color-mix(in srgb,#000 88%,var(--panel)),color-mix(in srgb,#000 70%,var(--panel)) 50%,color-mix(in srgb,#000 88%,var(--panel)));box-shadow:inset 0 2px 4px rgba(0,0,0,.75),inset 0 0 0 1px rgba(0,0,0,.6),0 0 0 1px color-mix(in srgb,var(--ink) 12%,transparent),0 1px 0 color-mix(in srgb,#fff 6%,transparent);z-index:1}
+.eqarea[data-eqstyle=faders] .eqb-fill{left:calc(50% - 4.5px);width:9px;border-radius:5px;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 70%,#000 30%),color-mix(in srgb,var(--accent) 92%,#fff 8%) 50%,color-mix(in srgb,var(--accent) 70%,#000 30%));opacity:.85;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 30%,transparent);z-index:2}
+.eqarea[data-eqstyle=faders] .eqb-ticks{left:calc(50% - 22px);width:9px}
+.eqarea[data-eqstyle=faders] .eqb-ticks i{width:6px;left:3px;background:color-mix(in srgb,var(--ink) 16%,transparent)}
+.eqarea[data-eqstyle=faders] .eqb-ticks i:nth-child(odd){width:4px;left:5px}
+.eqarea[data-eqstyle=faders] .eqb-ticks i[style*="50%"]{width:10px;left:-1px;height:1.5px;background:color-mix(in srgb,var(--accent) 45%,var(--ink) 20%)}
+/* live meter: thin strip right of the slot, never under knob or over fill */
+.eqarea[data-eqstyle=faders] .eqled{left:calc(50% + 20px)!important;right:auto!important;width:5px!important;top:0;bottom:0;height:100%!important;transform:none!important;border-radius:2px;opacity:.55;z-index:1;transition:opacity .3s}
+.eqarea[data-eqstyle=faders]:has(.eqa-live:not([hidden])) .eqled{opacity:.85}
+.eqarea[data-eqstyle=faders] .eqb-knob{left:calc(50% - 17px)!important;width:34px!important;height:22px!important;border-radius:6px!important;z-index:4;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),linear-gradient(180deg,color-mix(in srgb,var(--ink) 34%,#3c4248) 0%,color-mix(in srgb,var(--ink) 16%,#2b3035) 48%,color-mix(in srgb,var(--ink) 6%,#1c2024) 52%,color-mix(in srgb,var(--ink) 12%,#262a2e) 100%)!important;
+  border:1px solid rgba(0,0,0,.7)!important;box-shadow:0 4px 10px rgba(0,0,0,.5),0 1px 2px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.35)!important}
+.eqarea[data-eqstyle=faders] .eqb-knob::after{left:5px!important;right:5px!important;height:2px!important;margin-top:-1px!important;border-radius:1px;opacity:1;box-shadow:0 0 4px color-mix(in srgb,var(--hl,var(--accent)) 50%,transparent)}
+.eqarea[data-eqstyle=faders] .eqb-knob::before{content:"";position:absolute;left:8px;right:8px;top:4px;bottom:4px;border-top:1px solid rgba(0,0,0,.35);border-bottom:1px solid rgba(0,0,0,.35);pointer-events:none}
+.eqarea[data-eqstyle=faders] .eqb.sel .eqb-knob{border-color:color-mix(in srgb,var(--accent) 70%,#000)!important;box-shadow:0 0 0 2px var(--accent),0 0 10px color-mix(in srgb,var(--accent) 35%,transparent),0 4px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.25)!important}
+.eqarea[data-eqstyle=faders] .eqb.sel,.eqarea[data-eqstyle=faders] .eqb:focus-visible{border-color:transparent;background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.eqarea[data-eqstyle=faders] .eqb-val{top:-30px;width:46px;padding:4px 0;border-radius:12px;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+.eqarea[data-eqstyle=faders] .eqb.sel .eqb-val{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.eqarea[data-eqstyle=faders]:has(.eqb.sel) .eqb:not(.sel){opacity:.9}
+.eqarea[data-eqstyle=faders] .eqa-curve path.eqa-line{stroke-width:1.25;opacity:.55;filter:none}
+.eqarea[data-eqstyle=faders] .eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 10%,transparent)}
+.eqarea[data-eqstyle=faders].dragging .eqa-curve path.eqa-line{stroke-width:1.6;opacity:.75;filter:none}
+/* F107c B: LED + Spectrum lift */
+.eqarea[data-eqstyle=led] .eqb-cap{height:12px;border-radius:6px;z-index:3}
+.eqarea[data-eqstyle=led] .eqb.sel .eqb-cap{box-shadow:0 0 0 2px var(--accent),0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent),0 2px 8px rgba(0,0,0,.45)!important}
+.eqarea[data-eqstyle=led] .eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 8%,transparent)}
+.eqarea[data-eqstyle=curve] .eqn.sel{box-shadow:0 0 0 2px var(--accent),0 0 8px color-mix(in srgb,var(--accent) 38%,transparent)}
+/* F108: colorful premium makeover - theme accent/accent2/hl driven harder through all three looks (fader LEDs kept) */
+.eqa-field{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 4%,transparent),color-mix(in srgb,var(--accent2) 3%,transparent)),color-mix(in srgb,var(--ink) 2%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 10%,transparent)}
+.eqa-grid i.zero{height:1.5px;background:color-mix(in srgb,var(--accent) 62%,var(--ink) 8%);box-shadow:0 0 4px color-mix(in srgb,var(--accent) 30%,transparent)}
+.eqa-curve path.eqa-line{stroke:var(--accent)!important;filter:drop-shadow(0 0 3px color-mix(in srgb,var(--accent2) 45%,transparent))}
+.eqarea[data-eqstyle=curve] .eqa-curve path.eqa-line{stroke-width:2.2;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--accent2) 55%,transparent)) drop-shadow(0 0 1px var(--accent))}
+.eqarea[data-eqstyle=curve] .eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 22%,transparent)}
+.eqarea[data-eqstyle=led] .eqa-curve path.eqa-under,.eqarea[data-eqstyle=faders] .eqa-curve path.eqa-under{fill:color-mix(in srgb,var(--accent) 13%,transparent)}
+.eqarea[data-eqstyle=faders] .eqa-curve path.eqa-line{opacity:.7}
+.eqarea.dragging .eqa-curve path.eqa-line{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent2) 65%,transparent))}
+.eqarea.isflat .eqa-curve path.eqa-line{filter:none}
+/* selected band: accent wash, neighbors dim ~12% */
+.eqarea:has(.eqb.sel) .eqb:not(.sel),.eqarea:has(.eqn.sel) .eqn:not(.sel),.eqarea[data-eqstyle=faders]:has(.eqb.sel) .eqb:not(.sel){opacity:.88}
+.eqarea .eqb.sel{background:color-mix(in srgb,var(--accent) 9%,transparent);border-radius:10px}
+/* tips / dB cards / Flat chip */
+.eqa-tip{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))!important;box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 10px color-mix(in srgb,var(--accent) 22%,transparent)!important}
+.eqa-flat{border-color:color-mix(in srgb,var(--accent) 28%,transparent);background:color-mix(in srgb,var(--accent) 5%,color-mix(in srgb,var(--ink) 5%,transparent))}
+.eqarea[data-eqstyle=faders] .eqb-val{border-color:color-mix(in srgb,var(--accent) 22%,var(--line))}
+.eqarea[data-eqstyle=faders] .eqb.sel .eqb-val{border-color:color-mix(in srgb,var(--accent) 70%,var(--line));color:var(--accent-text,var(--ink))}
+/* LED caps */
+.eqarea[data-eqstyle=led] .eqb-cap{background:linear-gradient(color-mix(in srgb,var(--hl) 70%,#fff 30%),var(--hl))!important}
+.eqarea[data-eqstyle=led] .eqb.sel .eqb-cap{box-shadow:0 0 0 2px var(--accent),0 0 0 4px color-mix(in srgb,var(--accent) 30%,transparent),0 0 12px color-mix(in srgb,var(--accent) 45%,transparent),0 2px 8px rgba(0,0,0,.45)!important}
+.eqb-segs i.lit{filter:saturate(1.2)}
+/* Studio faders: accent fill, hl knob hairline; side LED stays */
+.eqarea[data-eqstyle=faders] .eqb-fill{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 75%,#000 25%),var(--accent) 50%,color-mix(in srgb,var(--accent) 75%,#000 25%));opacity:.95;box-shadow:0 0 8px color-mix(in srgb,var(--accent) 45%,transparent)}
+.eqarea[data-eqstyle=faders] .eqb-knob::after{background:var(--hl,var(--accent))!important;box-shadow:0 0 5px color-mix(in srgb,var(--hl,var(--accent)) 70%,transparent)}
+.eqarea[data-eqstyle=faders] .eqb-ticks i[style*="50%"]{background:color-mix(in srgb,var(--accent) 70%,var(--ink) 10%)}
+.eqarea[data-eqstyle=faders] .eqled{opacity:.7}
+.eqarea[data-eqstyle=faders]:has(.eqa-live:not([hidden])) .eqled{opacity:1}
+/* Spectrum nodes */
+.eqarea[data-eqstyle=curve] .eqn{border:1.5px solid var(--accent)!important}
+.eqarea[data-eqstyle=curve] .eqn.sel{background:var(--accent)!important;box-shadow:0 0 0 2px var(--accent),0 0 0 5px color-mix(in srgb,var(--hl) 40%,transparent),0 0 14px color-mix(in srgb,var(--hl) 45%,transparent)}

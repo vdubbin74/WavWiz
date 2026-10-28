@@ -94,11 +94,12 @@ test('0.2.5 B: device card tags (max 2), the one status line and the "Measured w
   const o = (x = {}) => ({ deviceId: 'd', endpointDbId: 1, kind: 'analog', name: 'Realtek', connected: true, active: true, latencyMs: 40, notCalibrated: false, ...x });
   const z = (x = {}) => ({ id: 1, name: 'Kitchen', connected: true, enabled: true, muted: false, reference: false, isWeb: false, outputs: [o()], room: { state: 'ok' }, ...x });
   const t = zz => d.cardTags(zz).map(x => x.text);
-  assert.deepEqual(t(z()), []);
-  assert.deepEqual(t(z({ reference: true })), ['REF']);
-  assert.deepEqual(t(z({ muted: true, outputs: [o({ notCalibrated: true })] })), ['MUTED', 'NO DELAY']);
-  assert.deepEqual(t(z({ connected: false, reference: true, muted: true })), ['OFFLINE', 'REF'], 'never more than two');
-  assert.deepEqual(t(z({ isWeb: true, name: 'Dana’s iPhone' })), ['SPEAKER']);
+  assert.deepEqual(t(z()), ['ANALOG']);
+  assert.deepEqual(t(z({ reference: true })), ['ANALOG', 'REF']);
+  assert.deepEqual(t(z({ muted: true, outputs: [o({ notCalibrated: true })] })), ['ANALOG', 'MUTED', 'NO DELAY']);
+  assert.deepEqual(t(z({ connected: false, reference: true, muted: true })), ['ANALOG', 'OFFLINE', 'REF'], 'type + never more than two');
+  assert.deepEqual(t(z({ isWeb: true, name: 'Dana’s iPhone', outputs: [] })), ['SPEAKER']);
+  assert.deepEqual(['hdmi', 'spdif', 'bluetooth', 'usb', 'other'].map(k => t(z({ outputs: [o({ kind: k })] }))[0]), ['HDMI', 'TOSLINK', 'BLUETOOTH', 'USB', undefined], '0.5.0 output type tag');
   for (const zz of [z(), z({ isWeb: true, name: 'Chrome on Windows' })]) assert.ok(!t(zz).some(x => /BROWSER|THIS DEVICE/.test(x)));
   assert.equal(d.statusLine(z()), 'Playing · Speakers (Realtek) · 40 ms');
   assert.equal(d.statusLine(z({ room: { state: 'idle' }, outputs: [o({ notCalibrated: true })] })), 'Not playing · Speakers (Realtek)');

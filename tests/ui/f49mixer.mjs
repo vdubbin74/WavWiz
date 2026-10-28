@@ -34,7 +34,7 @@ for (const [vw, vh, d, sc, zt] of [[1920, 1080, 1, 'tiny', '67'], [1920, 1080, 1
   const th = await p.evaluate(() => { const rgb = v => { const e = document.createElement('i'); e.style.color = v; document.body.append(e); const o = getComputedStyle(e).color; e.remove(); return o; }; const r = getComputedStyle(document.documentElement);
     const acc = rgb(r.getPropertyValue('--accent').trim()), at = rgb((r.getPropertyValue('--accent-text') || r.getPropertyValue('--accent')).trim()); const m = document.querySelector('.mv-master'), pc = document.querySelector('.mv-pct'), rg = document.querySelector('input.mv-s');
     return { mb: getComputedStyle(m).borderTopColor, acc, pc: getComputedStyle(pc).color, at, ac: getComputedStyle(rg).accentColor }; });
-  ok(`[${zt}] themed: Whole-Home card border, % readouts and sliders use the theme accent`, th.mb === th.acc && th.pc === th.at && th.ac === th.acc, JSON.stringify(th));
+  ok(`[${zt}] themed: All zones card border, % readouts and sliders use the theme accent`, th.mb === th.acc && th.pc === th.at && th.ac === th.acc, JSON.stringify(th));
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   await p.locator('.devpanel .dmaster [data-act=mixer]').click(); await p.waitForTimeout(400); ok(`[${zt}] Devices button opens the mixer`, !!(await geo(p))); await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   await p.keyboard.press('Alt+v'); await p.waitForTimeout(400); ok(`[${zt}] Alt+V opens the mixer`, !!(await geo(p)));

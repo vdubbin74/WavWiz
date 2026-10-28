@@ -41,7 +41,7 @@ test('L53/L56 CSS: master row spaced + capped; card volume edge to edge; mute bo
 });
 test('L50 collapsed bar drops optional parts earlier when pins are shown; pins sit above', () => {
   assert.match(css, /\.np-ctlpanel \.pane-h \.scrow\{flex:none;position:relative;z-index:2\}/); assert.match(css, /\.np-ctlpanel\.collapsed \.np-strip\{overflow:hidden\}/);
-  assert.match(css, /@container npctl \(max-width:1100px\)\{ \.np-ctlpanel\.collapsed:has\(\.scrow \.scbtn\)/);
+  assert.match(css, /@container npctl \(max-width:1100px\)\{ \.np-ctlpanel\.collapsed:has\((?:\.pane-h )?\.scrow \.scbtn\)/);   // F130 retargets to the (now pin-less) header
 });
 test('L57 mini player: Devices-style volume bar (.dvol .vbar .pct) in its own row, mute by the transport', () => {
   const m = src('mini.js'); assert.match(m, /class: 'vbar' \}, vol/); assert.match(m, /class: 'pct'/); assert.match(m, /mp-vol dvol/); assert.match(m, /'\/zones\/master', \{ set: \+vol\.value \}/);

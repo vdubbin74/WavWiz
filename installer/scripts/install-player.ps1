@@ -42,4 +42,10 @@ if ($wv -ne 'present') {
     $n = 'The Microsoft Edge WebView2 runtime was not found. WavWiz Player will open its control page in your web browser instead (everything still works). Windows 11 and up-to-date Windows 10 normally include WebView2.'
     Say "NOTE: $n"; [pscustomobject]@{ Kind = 'notice'; Value = $n }
 }
+# F122: flag the wizard reads to offer the official WebView2 download on the finish page (never downloads by itself)
+$wvFlag = Join-Path $env:ProgramData 'WavWiz\webview2-missing.txt'
+try {
+    if ($wv -ne 'present') { New-Item -ItemType Directory -Force -Path (Split-Path $wvFlag) | Out-Null; Set-Content -LiteralPath $wvFlag -Value 'missing' -Encoding ascii }
+    elseif (Test-Path -LiteralPath $wvFlag) { Remove-Item -LiteralPath $wvFlag -Force }
+} catch { }
 Complete-Step

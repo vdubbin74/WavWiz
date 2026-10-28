@@ -88,6 +88,8 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const balance = slider({ label: 'Balance', min: -100, max: 100, value: 0, fmt: balanceLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.balance = v; }) });
   const bass = slider({ label: 'Bass', min: -12, max: 12, step: 0.5, value: 0, fmt: dbLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.bass = { ...c.bass, gainDb: v }; }) });
   const treble = slider({ label: 'Treble', min: -12, max: 12, step: 0.5, value: 0, fmt: dbLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.treble = { ...c.treble, gainDb: v }; }) });
+  // 0.5.0 F109b: Trim / Auto pre-gain / Limiter moved here from the old in-place All sound settings
+  const trim = slider({ label: 'Trim', min: -24, max: 6, step: 0.5, value: 0, fmt: dbLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.trimDb = v; }) });
   const eqHost = h('div', { class: 'spk-eq' });
   async function loadReal() {
     const o = cur(); if (!o) { real = null; paintEq(); return; }
@@ -97,9 +99,9 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
       const c = { ...flatEq(), ...(p ? structuredClone(p.json) : {}) }; c.bypass = !!a?.bypass;
       real = { out: o, presets, cur: c };
     } catch { real = null; }
-    paintEq(); syncSliders(); paintPresets(); const lc = loud.querySelector('input'); if (lc) { lc.checked = !!real?.cur.loudness?.enabled; lc.disabled = !tune; }
+    paintEq(); syncSliders(); paintPresets(); const lc = loud.querySelector('input'); if (lc) { lc.checked = !!real?.cur.loudness?.enabled; lc.disabled = !tune; } const pa = preamp.querySelector('input'); if (pa) { pa.checked = !!real?.cur.autoPreamp; pa.disabled = !tune; } const li = limiter.querySelector('input'); if (li) { li.checked = !!real?.cur.limiter?.enabled; li.disabled = !tune; }
   }
-  function syncSliders() { if (!real) return; balance._set(real.cur.balance || 0); bass._set(real.cur.bass?.gainDb || 0); treble._set(real.cur.treble?.gainDb || 0); }
+  function syncSliders() { if (!real) return; balance._set(real.cur.balance || 0); bass._set(real.cur.bass?.gainDb || 0); treble._set(real.cur.treble?.gainDb || 0); trim._set(real.cur.trimDb || 0); }
   function paintEq() {
     area?.stopLive?.(); area?.destroy?.(); area = null;
     if (!real) { eqHost.replaceChildren(h('p', { class: 'small dim' }, cur() ? 'The EQ could not be read.' : 'No output yet.')); return; }
@@ -163,11 +165,11 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const calLine = h('div', { class: 'small spk-cal', 'data-cal': '1' }, 'Calibration: …');
   const paintCal = async () => { const o = cur(); if (!o?.deviceId) { calLine.textContent = 'Calibration: Not calibrated'; return; }
     try { const hs = await api(`/outputs/${encodeURIComponent(o.deviceId)}/calibrations`); calLine.textContent = calText(hs); } catch { calLine.textContent = 'Calibration: unknown'; } };
-  const left = h('div', { class: 'spk-left' }, vol, capRow, delay, balance, bass, treble);
+  const left = h('div', { class: 'spk-left' }, vol, capRow, delay, balance, bass, treble, trim);
   // ---- 0.4.2: EQ on/off, Reset, PRESETS row (8 built-ins, then "My presets"), Save as preset, loudness
   const eqOn = h('button', { type: 'button', class: 'onpill spk-eqon', role: 'switch', 'data-act': 'eq-on', 'aria-label': 'EQ on or off', onclick: () => { if (!real || !tune) return; edit(c => { c.bypass = !c.bypass; }); paintEqCtl(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
   ro(eqOn, tune, 'Only this device’s own owner or an admin can change the sound.');
-  const resetBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'eq-reset', title: 'Back to flat', onclick: () => { if (!real) return; edit(c => { c.graphicDb = new Array(10).fill(0); c.bass = { ...c.bass, gainDb: 0 }; c.treble = { ...c.treble, gainDb: 0 }; c.balance = 0; }); paintEq(); syncSliders(); paintPresets(); } }, 'Reset'), tune, 'Only this device’s own owner or an admin can change the sound.');
+  const resetBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'eq-reset', title: 'Back to flat', onclick: () => { if (!real) return; edit(c => { c.graphicDb = new Array(10).fill(0); c.bass = { ...c.bass, gainDb: 0 }; c.treble = { ...c.treble, gainDb: 0 }; c.balance = 0; c.trimDb = 0; }); paintEq(); syncSliders(); paintPresets(); } }, 'Reset'), tune, 'Only this device’s own owner or an admin can change the sound.');
   const saveAsBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'preset-saveas', onclick: () => { if (!real) return; parts.promptName?.('Save as preset', '', async v => { const body = { name: v, preset: { ...real.cur, name: v } }; await api('/dsp/presets', { method: 'POST', body }); real.presets = await api('/dsp/presets'); toast(`Saved preset “${v}”`); paintPresets(); }); } }, 'Save as preset'), admin || tune, 'Only this device’s own owner or an admin can save presets.');
   const eqCtl = h('span', { class: 'spk-eqctl' }, eqOn);
   const paintEqCtl = () => { const on = real ? !real.cur.bypass : false; eqOn.classList.toggle('on', on); eqOn.setAttribute('aria-checked', String(on)); };
@@ -182,7 +184,9 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     presetSel.replaceChildren(h('option', { value: '', selected: act == null, disabled: true }, 'Custom'), ...groups.flatMap(g => g.label ? [h('optgroup', { label: g.label }, ...g.items.map(opt))] : g.items.map(opt)));
   }
   const loud = h('label', { class: 'spk-loud' }, h('input', { type: 'checkbox', 'data-act': 'loudness', onchange: ev => edit(c => { c.loudness = { ...c.loudness, enabled: ev.target.checked }; }) }), ' Loudness ', h('span', { class: 'small dim' }, 'More bass and treble at low volume'));
-  const extraSw = h('div', { class: 'spk-sw' }, loud);
+  const preamp = h('label', { class: 'spk-loud spk-preamp' }, h('input', { type: 'checkbox', 'data-act': 'autopreamp', onchange: ev => edit(c => { c.autoPreamp = ev.target.checked; }) }), ' Auto pre-gain ', h('span', { class: 'small dim' }, 'Prevents clipping when boosting.'));
+  const limiter = h('label', { class: 'spk-loud spk-limiter' }, h('input', { type: 'checkbox', 'data-act': 'limiter', onchange: ev => edit(c => { c.limiter = { ...c.limiter, enabled: ev.target.checked }; }) }), ' Limiter ', h('span', { class: 'small dim' }, 'Protects the speaker.'));
+  const extraSw = h('div', { class: 'spk-sw' }, loud, preamp, limiter);
   const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), eqCtl), presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
   root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: () => parts.onRename(z) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, h('span', { class: 'grow' }), done), parts.zoneRow ? parts.zoneRow(z) : null, tagRow, profRow, h('div', { class: 'spk-body' }, left, right));
   capTitle();

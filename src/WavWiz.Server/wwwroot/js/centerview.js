@@ -7,7 +7,6 @@ import { flatEq } from './eq.js';
 import { thisDevice, canTune, isAdmin } from './ui.js';
 import { spectrumTap } from './viz.js';
 import { flag } from './flags.js';
-import { soundSettings, LOCK_HINT } from './eqsettings.js';
 import { icon, setIcon } from './icons.js';
 
 export const CENTER_KEY = 'wavwiz.center.v1';
@@ -29,7 +28,7 @@ export function pickerOutputs(zones = [], mine = null, ctlFirst = null) {
 
 /** Mounts the editable EQ (chosen EQ style, glow behind it) into host. Returns { destroy, refresh }. */
 export function centerEq(S, host, opts = {}) {
-  let area = null, real = null, gone = false, target = opts.deviceId || null, allOpen = false, all = null;   // target: picker choice (not saved: resets to this Player's own output on reload)
+  let area = null, real = null, gone = false, target = opts.deviceId || null;   // target: picker choice (not saved: resets to this Player's own output on reload)
   const root = h('div', { class: 'np-eqview' }); host.replaceChildren(root);
   // 0.4.3 #5: by default the first speaker of the Controlling zone (then this device's own output, then the first live one)
   const ctlT = () => { try { return controllingTarget(S.zones, S.groups, Z.current()); } catch { return null; } };
@@ -70,44 +69,19 @@ export function centerEq(S, host, opts = {}) {
     const picker = flag('ui.eqOutputPicker') && isAdmin(S) && outs.length > 1
       ? h('select', { class: 'np-eqpick', 'aria-label': 'Which output this EQ adjusts', onchange: ev => { target = ev.target.value; reload(); } }, outs.map(x => h('option', { value: x.deviceId, selected: x.deviceId === o?.deviceId, title: `${x.zone} — ${x.name}` }, pickerLabel(x, outs))))
       : null;
-    // 0.3.7 L7: ONE title bar: name, [All sound settings] expands the rest in place, ONE padlock locks everything (bands + all settings)
-    const allBtn = h('button', { type: 'button', class: 'btn sm eqallbtn' + (allOpen ? ' on' : ''), 'data-act': 'allsound', 'aria-expanded': String(allOpen), disabled: !real || undefined, onclick: () => { allOpen = !allOpen; draw(); } }, 'All sound settings');
+    // 0.5.0 F109: All sound settings opens THIS speaker's settings (Devices) instead of expanding under the EQ; hidden when embedded for one speaker
+    const allBtn = opts.deviceId ? null : h('button', { type: 'button', class: 'btn sm eqallbtn', 'data-act': 'allsound', title: o ? `Open ${o.zone} settings` : 'Open speaker settings', disabled: !real || undefined,
+      onclick: () => { if (real?.out?.zoneId) window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: real.out.zoneId })); } }, 'All sound settings');
     // 0.3.8 L39: the active preset as a plain themed select (same look as the output picker); every EQ chooser uses this select style
     const presetSel = real ? h('select', { class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
       onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
       real.presetId == null ? h('option', { value: '', selected: true }, 'Custom (not saved)') : null,
       (real.presets || []).map(p => h('option', { value: String(p.id), selected: p.id === real.presetId }, p.name))) : null;
-    all = null;
-    if (real && allOpen) {
-      all = soundSettings({
-        cur: () => real.cur, changed: () => { if (!ok || loadEqLock()) return; previewNow(); saveSoon(); area?.setGains?.(real.cur.graphicDb); },
-        presets: () => real.presets, presetId: () => real.presetId ?? null,
-        pick: p => { if (!ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass }; real.presetId = p.id; previewNow(); saveSoon(); draw(); },
-        saveAs: async name => { if (!ok || loadEqLock()) return; try { const id = (await api('/dsp/presets', { method: 'POST', body: { name, preset: { ...real.cur, name } } })).id; await api(`/dsp/assignments/${encodeURIComponent(real.out.deviceId)}`, { method: 'PUT', body: { presetId: id, enabled: true, bypass: real.cur.bypass } }); real.presets = await api('/dsp/presets'); real.presetId = id; toast(`Saved “${name}”`); draw(); } catch (e) { toast(e.message, true); } },
-        flat: () => { if (!ok || loadEqLock()) return; real.cur = { ...flatEq(), bypass: real.cur.bypass }; previewNow(); saveSoon(); draw(); },
-        revert: () => reload(),
-      });
-      all.setLocked(locked || !ok);
-    }
     root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Adjusting: ${o.zone}` : 'Sound'), picker, presetSel, h('span', { class: 'grow' }), note, allBtn),
-      real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'), all ? sheetOf(all.el) : (sheetEl?.remove(), sheetEl = null, null));
-    root.classList.toggle('allopen', !!all);
+      real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'));
   }
-  // 0.4.8 F56: "All sound settings" sits in a sheet: in place on PC, a full-screen sheet with a title + X on the phone (Esc / Back close it, body scroll locked)
-  const phone = () => matchMedia('(max-width:760px)').matches;
-  let sheetBack = false, sheetEl = null;
-  function closeAll() { if (!allOpen) return; allOpen = false; document.documentElement.classList.remove('eqsheet-lock'); if (sheetBack) { sheetBack = false; history.back(); } draw(); }
-  function sheetOf(el) {
-    const x = h('button', { type: 'button', class: 'iconbtn eqsheet-x', 'aria-label': 'Close', title: 'Close', onclick: closeAll }, '\u2715');
-    const sh = h('div', { class: 'eqsheet open', role: 'dialog', 'aria-label': 'All sound settings' }, h('div', { class: 'eqsheet-h' }, h('b', {}, 'All sound settings'), x), h('div', { class: 'eqsheet-b' }, el));
-    sheetEl?.remove(); sheetEl = null;
-    if (phone()) { document.documentElement.classList.add('eqsheet-lock'); if (!sheetBack) { sheetBack = true; history.pushState({ eqsheet: 1 }, ''); } document.body.append(sh); sheetEl = sh; return null; }   // on <body>: above the EQ header icons and the mini player
-    return sh;
-  }
-  window.addEventListener('popstate', () => { if (sheetBack) { sheetBack = false; closeAll(); } });
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && allOpen && root.isConnected) { ev.preventDefault(); ev.stopPropagation(); closeAll(); } }, true);
   async function reload() { try { real = await fetchReal(); } catch { real = null; } draw(); }
-  const onLock = () => { area?.setLocked(loadEqLock() || !can(real?.out)); all?.setLocked(loadEqLock() || !can(real?.out)); const l = loadEqLock(), b = root.querySelector('.eqpadlock'); if (b) { b.classList.toggle('on', l); b.setAttribute('aria-pressed', String(l)); setIcon(b.querySelector('.ic'), l ? 'lock' : 'unlock'); b.title = l ? 'Sound locked (click to unlock)' : 'Lock the sound (EQ and all settings)'; b.setAttribute('aria-label', b.title); } };
+  const onLock = () => { area?.setLocked(loadEqLock() || !can(real?.out)); const l = loadEqLock(), b = root.querySelector('.eqpadlock'); if (b) { b.classList.toggle('on', l); b.setAttribute('aria-pressed', String(l)); setIcon(b.querySelector('.ic'), l ? 'lock' : 'unlock'); b.title = l ? 'Sound locked (click to unlock)' : 'Lock the sound (EQ and all settings)'; b.setAttribute('aria-label', b.title); } };
   const onStyle = () => draw();
   const onGlow = e => { const v = +e.detail; area?.setGlow(v); if (v > 0) area?.startLive?.(spectrumTap); };
   window.addEventListener('wavwiz:eqglow', onGlow);
@@ -118,7 +92,7 @@ export function centerEq(S, host, opts = {}) {
   window.addEventListener('wavwiz:zone', onZone);
   reload();
   return {
-    destroy() { gone = true; sheetEl?.remove(); sheetEl = null; document.documentElement.classList.remove("eqsheet-lock"); area?.destroy(); area = null; window.removeEventListener('wavwiz:eqstyle', onStyle); window.removeEventListener('wavwiz:eqlock', onLock); window.removeEventListener('wavwiz:eqchanged', onEq); window.removeEventListener('wavwiz:zone', onZone); window.removeEventListener('wavwiz:eqglow', onGlow); root.remove(); },
+    destroy() { gone = true; area?.destroy(); area = null; window.removeEventListener('wavwiz:eqstyle', onStyle); window.removeEventListener('wavwiz:eqlock', onLock); window.removeEventListener('wavwiz:eqchanged', onEq); window.removeEventListener('wavwiz:zone', onZone); window.removeEventListener('wavwiz:eqglow', onGlow); root.remove(); },
     refresh() { const o = out(); if (o?.deviceId !== real?.out?.deviceId) reload(); },
   };
 }

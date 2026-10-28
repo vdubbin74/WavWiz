@@ -7,7 +7,7 @@ import { clearQueueFlow } from './queueclear.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
-import { pointerDropTarget } from './pdrag.js';
+import { pointerDropTarget, dndMode, usesPointer } from './pdrag.js';
 import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
 import { attachQueueMenu } from './queuemenu.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
@@ -48,15 +48,15 @@ export function listTable(S, ctl) {
   const setState = st => { const a = { up: st !== 'expanded', down: st !== 'collapsed' }; upBtn.title = st === 'collapsed' ? 'Show the queue' : 'Expand the queue'; upBtn.setAttribute('aria-label', st === 'collapsed' ? 'Show the queue' : 'Expand the queue upward'); upBtn.hidden = !a.up; colBtn.hidden = !a.down; colBtn.setAttribute('aria-expanded', String(st !== 'collapsed')); };
   // 0.4.6 F46: a collapse / expand (or a resize) ends any drag in progress, and for a moment afterwards rows / headers ignore presses - the panel is
   // sliding under the pointer, so a second click of a double-click (or a click-drag that began on the arrow) used to land on a row or a column header.
+  let pdrag = null;   // F113 pointer row-reorder session
   let toggledAt = 0; const settling = () => performance.now() - toggledAt < 600;
-  const cancelDrag = () => { dragging = null; clearIns?.(); stopScroll?.(); tbody?.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); };
+  const cancelDrag = () => { dragging = null; pdrag?.cancel(); clearIns?.(); stopScroll?.(); tbody?.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); };
   const setCollapsed = c => { toggledAt = performance.now(); cancelDrag(); setState(c === true ? 'collapsed' : c === false ? 'open' : c); };
-  if (typeof window !== 'undefined') window.addEventListener('resize', () => { if (dragging) cancelDrag(); });
+  if (typeof window !== 'undefined') window.addEventListener('resize', () => { if (dragging || pdrag) cancelDrag(); });
   // 0.3.6 K10: the column picker (checklist icon + right-click on the header) and the lock live in the TITLE BAR with the other icons, identical on every playlist view
   const pickBtn = h('button', { type: 'button', class: 'plus plpick', 'data-act': 'colpick', 'aria-label': 'Choose columns', title: 'Choose columns', 'aria-haspopup': 'true', onclick: ev => { ev.stopPropagation(); openPicker(pickBtn.getBoundingClientRect().left, pickBtn.getBoundingClientRect().bottom + 4); } }, icon('checklist'));
   const lockBtn = h('button', { type: 'button', class: 'plus pllock', 'data-act': 'collock', 'aria-pressed': 'false', onclick: ev => { ev.stopPropagation(); L = setLocked(L, !L.locked); save(); paintLock(); buildHead(); draw(); } }, icon('unlock'));
   const paintLock = () => { lockBtn.classList.toggle('on', L.locked); lockBtn.setAttribute('aria-pressed', String(L.locked)); const t = L.locked ? 'Columns locked (click to unlock)' : 'Lock the column layout'; lockBtn.title = t; lockBtn.setAttribute('aria-label', t); setIcon(lockBtn.querySelector('.ic'), L.locked ? 'lock' : 'unlock'); };
-  const iconRow = h('span', { class: 'row plbtns' }, btns, pickBtn, lockBtn);
   // 0.3.7 L30: "Sorted by Artist ▲ ✕" chip on the title bar; the ✕ gives back the queue's own order (disabled while the queue is locked)
   const sortChip = h('span', { class: 'sortchip', hidden: true, role: 'status' });
   // 0.4.0: "QUEUE · KITCHEN" names the zone whose queue this is (only once there is more than one zone to choose from)
@@ -65,35 +65,50 @@ export function listTable(S, ctl) {
   const editLbl = h('span', { class: 'qediting small', 'aria-hidden': 'true' }, 'Editing:');
   // 0.4.8 F60: "Queue: [zone ▾]" - the picker sits in the title right after the label; the zone name is shown only here (no "· ZONE" suffix, no "Editing:")
   const pickSel = h('select', { class: 'qzpick', 'aria-label': 'Queue to show and edit', title: 'Show and edit any zone\'s queue without changing the zone that is playing', onchange: () => setView(pickSel.value) });
-  const sendBtn = h('button', { type: 'button', class: 'btn sm qsend', 'data-act': 'sendqueue', title: 'Copy this queue to another zone (source stays as it is)', onclick: () => sendDialog() }, 'Copy queue to zone…');
-  void editLbl; const pickWrap = h('span', { class: 'row qzwrap', hidden: true }, sendBtn); title.append(pickSel);
+  // 0.5.0 F137: "Copy queue to zone" is a title-bar icon (with the save/trash/columns/lock icons) that opens a zone selector popover
+  const sendBtn = h('button', { type: 'button', class: 'plus qsendic', 'data-act': 'sendqueue', hidden: true, 'aria-label': 'Copy queue to zone', title: 'Copy queue to zone (source stays as it is)', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); if (document.querySelector('.qsendpop')) return closeSend(); const r = sendBtn.getBoundingClientRect(); openSend(r.left, r.bottom + 4); } }, icon('queue'));
+  void editLbl; title.append(pickSel);
+  const iconRow = h('span', { class: 'row plbtns' }, btns, sendBtn, pickBtn, lockBtn);
   function paintPick() {
-    const cs = Z.choicesNow(), cur = Z.current(), many = cs.length > 1; pickWrap.hidden = !many; pickSel.hidden = !many; title.classList.toggle('haspick', many); qlbl.textContent = many ? 'Queue:' : 'QUEUE'; if (!many) { view = null; try { root.classList.remove('qviewing'); } catch { /* before the panel exists */ } return; }
+    const cs = Z.choicesNow(), cur = Z.current(), many = cs.length > 1; sendBtn.hidden = !many; if (!many) closeSend(); pickSel.hidden = !many; title.classList.toggle('haspick', many); qlbl.textContent = many ? 'Queue:' : 'QUEUE'; if (!many) { view = null; try { root.classList.remove('qviewing'); } catch { /* before the panel exists */ } return; }
     if (view && !cs.some(c => c.key === view)) view = null;
     pickSel.replaceChildren(...cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
     queueMicrotask(() => { const n = pickSel.selectedOptions[0]?.textContent; title.title = 'Queue: ' + (n || ''); pickSel.title = (n ? n + ' - ' : '') + 'Show and edit any zone\'s queue without changing the zone that is playing'; });
     pickSel.value = view || cur?.key || '';
     root.classList.toggle('qviewing', !!view);
   }
-  function sendDialog() {
+  const sendOut = ev => { if (!ev.target.closest?.('.qsendpop') && !ev.target.closest?.('.qsendic')) closeSend(); };
+  const sendEsc = ev => { if (ev.key === 'Escape') { closeSend(); sendBtn.focus(); } };
+  function closeSend() { document.querySelector('.qsendpop')?.remove(); sendBtn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', sendOut, true); document.removeEventListener('keydown', sendEsc, true); }
+  function openSend(x, y) {
+    closeSend(); closePicker();
     const cs = Z.choicesNow(), from = editingKey(), others = cs.filter(c => c.key !== from); if (!others.length) return toast('There is no other zone to send it to.', true);
-    // 0.4.4 F11: always COPY — source queue and playback stay untouched (move option removed)
-    const to = h('select', { 'aria-label': 'Copy queue to zone' }, others.map(c => h('option', { value: c.key }, c.name))), go = h('input', { type: 'checkbox', 'aria-label': 'Start playing' });
-    dialog('Copy queue to zone', h('div', null, h('p', { class: 'small dim' }, 'The songs are copied. This zone’s queue and playback stay as they are.'), h('div', { class: 'field' }, h('label', null, 'Zone'), to), h('label', { class: 'row' }, go, 'Start playing it there')),
-      [{ text: 'Copy', cls: 'primary', onclick: async () => { try { await api(zq('/queue/send'), { method: 'POST', body: { to: to.value, mode: 'copy', play: go.checked } }); toast(`Queue copied to ${others.find(c => c.key === to.value)?.name}`); ctl.refreshAll?.(); if (view) loadView(true); } catch (e) { toast(e.message, e.status !== 409); return false; } } }, { text: 'Cancel' }]);
+    // 0.4.4 F11: always COPY — source queue and playback stay untouched
+    const go = h('input', { type: 'checkbox', 'data-act': 'sendplay' });
+    const copyTo = async c => { closeSend(); try { await api(zq('/queue/send'), { method: 'POST', body: { to: c.key, mode: 'copy', play: go.checked } }); toast(`Queue copied to ${c.name}`); ctl.refreshAll?.(); if (view) loadView(true); } catch (e) { toast(e.message, e.status !== 409); } };
+    const box = h('div', { class: 'plpicker qsendpop', role: 'menu', 'aria-label': 'Copy queue to zone' }, h('div', { class: 'plp-h' }, 'COPY QUEUE TO'),
+      ...others.map(c => h('button', { type: 'button', class: 'plp-sort qsendz', role: 'menuitem', 'data-zone': c.key, title: `Copy this queue to ${c.name}`, onclick: () => copyTo(c) }, c.name)),
+      h('label', { class: 'plp-row qsendplay' }, go, 'Start playing it there'),
+      h('div', { class: 'plp-note' }, 'Copies the songs. This queue and its playback stay as they are.'));
+    box.addEventListener('keydown', ev => { if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return; const it = [...box.querySelectorAll('.qsendz, input')], i = it.indexOf(document.activeElement); ev.preventDefault(); it[(i + (ev.key === 'ArrowDown' ? 1 : it.length - 1)) % it.length]?.focus(); });
+    document.body.append(box); sendBtn.setAttribute('aria-expanded', 'true');
+    const r = box.getBoundingClientRect(); box.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 6)) + 'px'; box.style.top = Math.max(4, Math.min(y, innerHeight - r.height - 6)) + 'px';
+    setTimeout(() => { document.addEventListener('pointerdown', sendOut, true); document.addEventListener('keydown', sendEsc, true); }, 0);
+    box.querySelector('.qsendz')?.focus();
   }
   window.addEventListener('wavwiz:zonesync', paintPick);
   // 0.4.5 F27: picking a zone from "on <zone> ▾" in Now Playing also makes it the Editing zone here (like the 0.4.4 F14 box title)
   window.addEventListener('wavwiz:editzone', () => setView(null));
   const paintQz = () => { const many = Z.choicesNow().length > 1, c = view ? viewChoice() : Z.current(); qzone.textContent = c && many ? (view ? Z.queueSuffixFor(c) : Z.queueSuffixNow()) : ''; if (!title.classList.contains('haspick')) title.title = ('Queue' + qzone.textContent).trim(); /* 0.4.8 F50: full label as a tooltip when a long zone name ellipsizes */ try { root.setAttribute('data-editing', editingKey() || ''); } catch { /* before the panel exists */ } };
   window.addEventListener('wavwiz:zonesync', paintQz); paintQz(); paintPick();
-  const head = h('div', { class: 'pane-h' }, title, pickWrap, meta, sortChip, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
+  const head = h('div', { class: 'pane-h' }, title, meta, sortChip, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Queue' }, head, wrap);
   /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
   const setNextBlock = el => { head.insertBefore(el, meta); };
   /** Left edge of the right-hand header controls (count, icons, arrow), for keeping the Up next line clear of them. */
-  const rightEdge = () => Math.min(...[pickWrap, head.querySelector('.tpin'), meta, sortChip, iconRow, upBtn, colBtn].filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
-  const leftEdge = () => { const r = document.createRange(); r.selectNodeContents(title); return Math.min(r.getBoundingClientRect().right, title.getBoundingClientRect().right); };   // F50: clipped text ends at the box
+  const rightEdge = () => Math.min(...[head.querySelector('.tpin'), meta, sortChip, iconRow, upBtn, colBtn].filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
+  const leftEdge = () => { const pk = title.querySelector('select,.qzpick'); if (pk && pk.getBoundingClientRect().width) return Math.max(pk.getBoundingClientRect().right, title.getBoundingClientRect().right);   // F137b: a zone picker in the title ends at its own box (a text range over a <select> under-measures and let Up next sit on it)
+    const r = document.createRange(); r.selectNodeContents(title); return Math.min(r.getBoundingClientRect().right, title.getBoundingClientRect().right); };   // F50: clipped text ends at the box
   const save = () => saveLayout(L, narrow);
   const isNarrow = () => !!root.closest('.desk')?.classList.contains('libexpanded');   // the side (right-hand) playlist while the Library is expanded
 
@@ -200,13 +215,14 @@ export function listTable(S, ctl) {
     if (!btns.querySelector('.qsave')) btns.replaceChildren(can && V.queue.length ? [h('button', { class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: () => inlineSave() }, icon('save')), h('button', { class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: L.locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: L.locked || undefined, onclick: () => { if (!L.locked) clearQueue(); } }, icon('trash'))] : null);
     if (!V.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: Math.max(1, ids.length) }, 'The queue is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
     if (dragging) return;   // never redraw under a drag
+    if (pdrag) return;   // F113: nor under a pointer row-reorder session
     sel = sel.filter(i => i < V.queue.length);
     order = sortedIndexes(V.queue, sort);
-    nextIdx = cur >= 0 && cur + 1 < V.queue.length ? cur + 1 : -1;
+    nextIdx = queueNextIndex(V.now, V.queue);   // 0.5.0 F89: same next as playback (shuffle pick / Repeat wrap), not the list neighbour
     tbody.replaceChildren(...order.map(i => {
-      const q = V.queue[i], isCur = i === cur && playing, dg = canDragRows({ can, locked: L.locked });   // 0.3.7 L29: a sort showing no longer blocks the drag (it asks), the lock does
+      const q = V.queue[i], pmode = dndMode() === 'pointer', isCur = i === cur && playing, dg = canDragRows({ can, locked: L.locked });   // 0.3.7 L29: a sort showing no longer blocks the drag (it asks), the lock does
       // 0.3.3 G12: grip + drag to reorder (Ctrl / Shift click selects several), plain click still plays that row. 0.3.6: no row reorder while a sort is showing.
-      const tr = h('tr', { class: (isCur ? 'cur' : '') + (sel.includes(i) ? ' sel' : ''), 'data-i': i, draggable: dg ? 'true' : 'false', 'aria-selected': String(sel.includes(i)),
+      const tr = h('tr', { class: (isCur ? 'cur' : '') + (sel.includes(i) ? ' sel' : ''), 'data-i': i, draggable: dg && !pmode ? 'true' : 'false', 'aria-selected': String(sel.includes(i)),
         onclick: ev => { if (settling()) return; if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { sel = nextSelection(sel, i, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, anchor); if (!ev.shiftKey) anchor = i; draw(); return; } sel = [i]; anchor = i; if (isCur) pulse(tr); can && qact('/stream/jump', { index: i }); } });
       if (dg) tr.addEventListener('dragstart', ev => { if (settling() || ev.target.closest?.('button,[data-nodrag]') !== null && ev.target !== tr) { ev.preventDefault(); return; } if (!sel.includes(i)) { sel = [i]; anchor = i; } dragging = sel.slice(); ev.dataTransfer.setData(QMIME, JSON.stringify(dragging)); ev.dataTransfer.setData('text/plain', q.title); ev.dataTransfer.effectAllowed = 'move'; tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('dragging', dragging.includes(+r.dataset.i))); });
       tr.addEventListener('dragend', () => { dragging = null; clearIns(); stopScroll(); tbody.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); setTimeout(draw, 0); });
@@ -223,6 +239,36 @@ export function listTable(S, ctl) {
 // ---- 0.3.3 G12: drop handling (reorder rows, or songs / albums / folders from the Library at the line), auto-scroll, Ctrl+Z undo ----
   let sel = [], anchor = null, dragging = null, undo = null, scrollT = 0, scrollV = 0; const insLine = h('div', { class: 'qins', hidden: true });
   wrap.append(insLine);
+  // 0.5.0 F113: pointer-path row reorder. dndMode()==='pointer' (Player UA / ?dnd=pointer) = the only row-reorder path (rows are not draggable);
+  // hybrid/native keep HTML5 for the mouse and use this for touch / pen (usesPointer). ~5 px before it starts so a plain click still plays / jumps.
+  // Own session flag (pdrag) like F46's `dragging`: collapse / expand / resize cancels it, the settling window ignores presses, no move unless it moved.
+  tbody.addEventListener('pointerdown', ev => {
+    if (pdrag || dragging || ev.button > 0 || !ev.isPrimary || settling() || !usesPointer(dndMode(), ev.pointerType)) return;
+    const tr = ev.target.closest?.('tr[data-i]'); if (!tr || !tbody.contains(tr) || ev.target.closest('button,input,a,[data-nodrag]')) return;
+    if (!canControl(S) || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+    if (ev.pointerType !== 'mouse' && !ev.target.closest('.qgrip')) return;   // touch / pen start on the grip so a finger still scrolls the list
+    const i = +tr.dataset.i, x0 = ev.clientX, y0 = ev.clientY, pid = ev.pointerId; let y = y0, moved = false, t = 0, done = false;
+    if (ev.pointerType !== 'mouse') ev.preventDefault();
+    const place = () => { const boxes = rowBoxes(), wr = wrap.getBoundingClientRect(); t = dropIndex(boxes, y); const yy = boxes.length ? (t < boxes.length ? boxes[t].top : boxes[boxes.length - 1].bottom) : wr.top + 24;
+      insLine.hidden = false; insLine.style.top = (yy - wr.top + wrap.scrollTop - 1) + 'px'; insLine.dataset.at = String(t); insLine.dataset.label = `Move here: #${t + 1}`;
+      scrollV = edgeScroll(y, wr.top, wr.bottom); if (scrollV && !scrollT) scrollT = requestAnimationFrame(tick); };
+    const end = () => { if (done) return; done = true; removeEventListener('pointermove', move, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', cancel, true);
+      clearIns(); stopScroll(); document.body.classList.remove('qrow-dragging'); tbody.querySelectorAll('tr.dragging').forEach(r => r.classList.remove('dragging')); pdrag = null; };
+    const cancel = () => { const was = moved; end(); if (was) setTimeout(draw, 0); };
+    const move = e => { if (e.pointerId !== pid) return; y = e.clientY;
+      if (!moved) { if (Math.hypot(e.clientX - x0, y - y0) < 5) return;
+        if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); end(); return; }
+        moved = true; pdrag.rows = sel.includes(i) ? sel.slice() : [i]; if (!sel.includes(i)) { sel = [i]; anchor = i; }
+        document.body.classList.add('qrow-dragging'); getSelection?.()?.removeAllRanges?.(); tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('dragging', pdrag.rows.includes(+r.dataset.i))); }
+      e.preventDefault(); place(); };
+    const up = async e => { if (e.pointerId !== pid) return; const was = moved, rows = pdrag?.rows; end(); if (!was || !rows) return;
+      // swallow the click that follows a real drag so it doesn't also jump / play the row
+      const eat = c => { c.stopPropagation(); c.preventDefault(); }; addEventListener('click', eat, { capture: true, once: true }); setTimeout(() => removeEventListener('click', eat, true), 0);
+      try { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(); else await moveRows(rows, t); }
+      catch (err) { toast(err.message, true); ctl.refreshAll?.(); } finally { setTimeout(draw, 0); } };
+    pdrag = { rows: null, cancel };
+    addEventListener('pointermove', move, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', cancel, true);
+  });
   const rowBoxes = () => [...tbody.querySelectorAll('tr[data-i]')].map(r => r.getBoundingClientRect());
   const clearIns = () => { insLine.hidden = true; };
   const stopScroll = () => { cancelAnimationFrame(scrollT); scrollT = 0; scrollV = 0; };
@@ -291,4 +337,11 @@ export function listTable(S, ctl) {
   if (typeof document !== 'undefined') document.addEventListener('keydown', ev => { if (undo && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z' && !document.querySelector('dialog[open]') && !ev.target.closest?.('input,textarea,select,[contenteditable]')) { ev.preventDefault(); doUndo(); } });   // Ctrl+Z undoes the last reorder
   paintLock(); buildHead();
   return { el: root, head, draw, widths: () => widths.slice(), relayout: layout, setCollapsed, setState, setNextBlock, leftEdge, rightEdge };
+}
+
+/** 0.5.0 F89: queue index that will really play next. Uses the server's nextIndex (shuffle pick, Repeat All wrap, Repeat One) like the title-bar strip; list neighbour only for an older server without nextIndex. */
+export function queueNextIndex(now, queue) {
+  const n = queue?.length || 0, cur = now?.index ?? -1;
+  if (now && 'nextIndex' in now) { const i = now.nextIndex; return Number.isInteger(i) && i >= 0 && i < n ? i : -1; }
+  return cur >= 0 && cur + 1 < n ? cur + 1 : -1;
 }

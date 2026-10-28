@@ -17,8 +17,8 @@ export function choices(groups, jb) {
 }
 /** Pure: the zone targets for an alarm / schedule / sleep timer: [key, name] per zone and the Jukebox zone (once it has speakers). No key = everything (today's behavior). */
 export const targetKeys = (groups, jb) => choices(groups, jb).map(c => [c.key, c.name]);
-/** Pure: the name for a stored zone key (a deleted zone says so). */
-export const targetName = (key, groups, jb) => !key ? '' : targetKeys(groups, jb).find(([k]) => k === key)?.[1] || '(deleted zone)';
+/** Pure: the name for a stored zone key (F103: a deleted zone reads "zone unavailable"). */
+export const targetName = (key, groups, jb) => !key ? '' : targetKeys(groups, jb).find(([k]) => k === key)?.[1] || 'zone unavailable';
 /** Pure: the selected zone (a stale or missing choice falls back to the first zone; null when there are no zones at all). */
 export const resolve = (groups, jb, sel) => { const c = choices(groups, jb); return c.find(x => x.key === sel) || c[0] || null; };
 /** Pure: the zoneId the API wants: null for the house group (old behavior, nothing added to the URL). */
