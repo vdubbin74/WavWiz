@@ -20,7 +20,7 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ## Screenshots
 
-![WavWiz 0.4.9 main window: the library, the live LED EQ, the playlist, the compact Now Playing bar and six zones of speakers, each zone playing its own music](docs/img/wavwiz-main.png)
+![WavWiz 0.5.0 main window: the library, the live LED EQ, the playlist, the compact Now Playing bar and six zones of speakers, each zone playing its own music](docs/img/wavwiz-main.png)
 
 | Zones and speakers | Master volume | Jukebox zone |
 | --- | --- | --- |
