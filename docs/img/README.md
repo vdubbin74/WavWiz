@@ -12,7 +12,7 @@ Real captures used by the root `README.md`, made with demo libraries (generated 
 | `wavwiz-menu-hover.png` | Playback menu with the Sleep timer hover submenu |
 | `wavwiz-eq-lock.png` | Full-screen 10-band LED EQ with Lock EQ on |
 | `wavwiz-appearance-theme.png` | Settings > Appearance > Theme cards |
-| `wavwiz-minimized-bar.png` | Compact Now Playing bar on one line |
+| `wavwiz-minimized-bar.png` | Redesigned standalone mini player (Shortcuts, volume, transport) |
 | `wavwiz-phone.png` | Now Playing in a phone browser, controlling a zone |
 | `wavwiz-settings-library.png` | Settings > Library with the music folders |
 | `wavwiz-viz-*.png` | Visualizer looks (Graphic EQ, Ring, Speaker cone, VU meters) |
