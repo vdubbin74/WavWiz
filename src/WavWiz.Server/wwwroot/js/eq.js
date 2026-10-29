@@ -54,7 +54,7 @@ export async function openEq(S, refresh, deviceId, host = null) {
   function buildArea() {
     area?.destroy();
     area = eqArea({ style: loadEqPrefs().style, gains: cur.graphicDb, glow: loadEqPrefs().glow, locked: loadEqLock(), onChange: (i, db) => { cur.graphicDb[i] = db; changed(); } });
-    mainHost.replaceChildren(area.el); area.setResponse(lastResp); area.exampleSpectrum?.(); if (loadEqPrefs().glow > 0) area.startLive(spectrumTap);
+    mainHost.replaceChildren(area.el); area.setResponse(lastResp); area.exampleSpectrum?.(); area.startLive(spectrumTap);   // 0.5.1: LEDs always live; Glow 0 only drops the halo (was: frozen example frame)
   }
   // shared lower card: Bass / Treble / Trim, switches, Spectrum glow
   const knob = (lbl, range, get, set, min, max) => {

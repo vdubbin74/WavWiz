@@ -91,8 +91,18 @@ export function shortcutsSide({ run, home, cls = '', onChange } = {}) {
     try { localStorage.setItem(SCSIDE_KEY, open ? '1' : '0'); } catch { /* ignore */ }
     onChange?.(open);
   }
+  // 0.5.0 F141: hover-dismiss - when a MOUSE leaves both the sleeve and its pin toggle, slide the sleeve shut (short grace so crossing the gap
+  // between toggle and strip doesn't close it). Re-entering either cancels. Touch/pen never auto-close; a held button (drag-reorder) never closes.
+  let leaveT = 0;
+  const cancelLeave = () => { clearTimeout(leaveT); leaveT = 0; };
+  const onLeave = ev => {
+    if (!open || ev.pointerType !== 'mouse' || ev.buttons) return;
+    const to = ev.relatedTarget; if (to && (strip.contains(to) || toggle.contains(to))) return;
+    cancelLeave(); leaveT = setTimeout(() => { leaveT = 0; if (open && !strip.matches(':hover') && !toggle.matches(':hover')) setOpen(false); }, 350);
+  };
+  for (const el of [strip, toggle]) { el.addEventListener('pointerleave', onLeave); el.addEventListener('pointerenter', cancelLeave); }
   setOpen(open);
-  return { toggle, strip, isOpen: () => open, setOpen, destroy: row.destroy };
+  return { toggle, strip, isOpen: () => open, setOpen, destroy: () => { cancelLeave(); row.destroy(); } };
 }
 /** Pin / unpin from a menu row or a title bar. Tells every row in this window; returns the result (full = the 3 slots are taken). */
 export function pinToggle(id) {

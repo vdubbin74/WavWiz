@@ -145,7 +145,7 @@ function eqStyleCard(S) {
     prev = eqArea({ style: p.style, gains: gains(), glow: p.glow, interactive: true, locked: locked || !real || !can(),
       onChange: (i, db) => { if (!real || locked) return; real.cur.graphicDb[i] = db; others.forEach(o => o.setGains(real.cur.graphicDb)); previewNow(); saveSoon(); } });
     if (real?.resp) prev.setResponse(real.resp);
-    prev.exampleSpectrum?.(); if (shown && p.glow > 0) prev.startLive?.(spectrumTap);
+    prev.exampleSpectrum?.(); if (shown) prev.startLive?.(spectrumTap);
     // 0.3.1 B13: all three styles as live, display-only previews of this speaker's real EQ (no demo values once a speaker is known)
     stopLive?.(); stopLive = null;
     others = EQ_STYLES.map(([id]) => Object.assign(eqArea({ style: id, gains: gains(), glow: p.glow, interactive: false }), { id }));

@@ -58,7 +58,7 @@ export const current = () => S ? resolve(S.groups, S.jb, loadSel()) : null;
 export const selectedGroupId = () => { const c = current(); return c?.kind === 'zone' ? c.id : null; };
 /** Apply the selection: the API zone, the chips, and (when the stream we show changed) a reload of Now Playing + Queue. Call after zones data changed. */
 export function sync() {
-  if (!S) return; const c = current(), pid = zoneIdFor(c); setApiZone(pid);
+  if (!S) return; const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
   // 0.4.1: a selected zone that no longer exists is forgotten (back to the first zone), not kept in storage
   if ((S.groups || []).length && loadSel() && c && loadSel() !== c.key) saveSel(null);
   if (pid !== lastPid) { const first = lastPid === undefined; lastPid = pid; if (!first) ctl.refreshNow?.(); }

@@ -33,6 +33,8 @@ async function call(path, { method = 'GET', body, raw } = {}) {
 }
 let lastErr = null;
 function diag() { return h('p', { class: 'small mono diag', id: 'diag', 'aria-live': 'polite', text: diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: lastErr }) }); }
+/** Exit the finished cal flow into WavWiz as speaker or remote (same roles/labels as askPhoneRole in room.js) (replace so Back doesn't re-enter calmic). */
+function exitRow() { const go = r => () => { releaseMic?.(); location.replace('/?role=' + r); }; return h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: go('speaker') }, 'Play music here'), h('button', { class: 'btn', type: 'button', onclick: go('remote') }, 'Use as remote')); }
 function show(...nodes) { nodes.push(diag()); $('loading').hidden = true; const v = $('view'); v.hidden = false; v.replaceChildren(...nodes.filter(n => n != null && n !== false)); }
 
 // ------------------------------------------------------------ boot
@@ -63,7 +65,7 @@ async function hello(st) {
 }
 function stopFromPc(msg) {
   if (stopped) return; stopped = true; clearInterval(helloTimer); releaseMic();
-  show(h('div', { class: 'card' }, h('h2', { text: 'Stopped' }), h('p', { text: msg || 'The calibration mic was stopped from the PC. You can close this page.' })));
+  show(h('div', { class: 'card' }, h('h2', { text: 'Stopped' }), h('p', { text: msg || 'The calibration mic was stopped from the PC. You can close this page.' }), exitRow()));
 }
 
 // ------------------------------------------------------------ not trusted yet: certificate steps right here, then back to calibration by itself
@@ -309,7 +311,7 @@ function results(fin, failed, retry) {
   save.addEventListener('click', async () => {
     save.disabled = true;
     try { const r = await call(`/calibration/sessions/${sid}/commit`, { method: 'POST', body: { zoneIds: [...pick].filter(([, v]) => v).map(([k]) => k) } }); sid = null;
-      releaseMic(); show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' }), rememberedNote({ calibrated: r.saved > 0, named: true, mic: true })));
+      releaseMic(); show(h('div', { class: 'card ok' }, h('h2', { text: `Saved ${r.saved} speaker${r.saved === 1 ? '' : 's'}` }), r.skipped ? h('p', { class: 'small', text: `${r.skipped} skipped (only your own speaker is saved).` }) : null, h('p', { text: 'Music resumes. You can close this page.' }), rememberedNote({ calibrated: r.saved > 0, named: true, mic: true }), exitRow()));
       state = 'left'; hello(state); clearInterval(helloTimer);
     } catch (e) { save.disabled = false; save.textContent = 'Save all (try again)'; save.title = e.message; lastErr = e; const dg = $('diag'); if (dg) dg.textContent = diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: e }); }
   });

@@ -259,7 +259,10 @@ export function createNow(S, ctl) {
     vbtns.style.setProperty('--ov-rest', String(btnOpacity(l.btn)));
     stage.style.setProperty('--wz-ovf', f.toFixed(2)); stage.style.setProperty('--wz-ovx', x.toFixed(2));
   }
-  window.addEventListener('wavwiz:looks', () => { applyLooks(); if (looksPop) paintLooks(); });
+  // 0.5.1: refresh the open popover's values IN PLACE - rebuilding it on every input event (Overlay opacity / Button transparency save -> wavwiz:looks)
+  // replaced the slider under the pointer, so those drags froze. The input being dragged is left alone.
+  const syncLooks = () => { if (!looksPop) return; const eng = vizPrefs().engine; for (const r of looksPop.querySelectorAll('input[data-look]')) { if (r === document.activeElement) continue; const v = getLook(r.dataset.look, eng); r.value = v; const o = r.parentElement?.querySelector('.p'); if (o) o.textContent = v + '%'; } };
+  window.addEventListener('wavwiz:looks', () => { applyLooks(); syncLooks(); });
   function drawVBtns() {
     const p = vizPrefs(), locked = loadEqLock(), mode = center;
     const want = overlayButtons(mode, { popout: !inDesktopPlayer() && !isPhone() });

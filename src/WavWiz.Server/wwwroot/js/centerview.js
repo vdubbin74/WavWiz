@@ -62,7 +62,7 @@ export function centerEq(S, host, opts = {}) {
     area = eqArea({ style: p.style, gains: real ? [...real.cur.graphicDb] : new Array(10).fill(0), glow: p.glow, interactive: true, locked: locked || !ok || !real,
       onChange: (i, db) => { if (!real || loadEqLock() || !ok) return; real.cur.graphicDb[i] = db; previewNow(); saveSoon(); } });
     if (real?.resp) area.setResponse(real.resp);
-    if (p.glow > 0) area.startLive?.(spectrumTap);
+    area.startLive?.(spectrumTap);   // 0.5.1: always live, Glow 0 = no halo only
     // 0.3.1 B17: Lock EQ moved into the center panel's overlay button group (now.js); this header keeps a read-only note for non-tuners
     const note = !ok ? h('span', { class: 'small dim np-eqro', title: o ? 'Only Control or Admin access can change this speaker’s EQ.' : 'No speaker connected.' }, o ? 'Read-only' : '') : null;
     const outs = outsNow();

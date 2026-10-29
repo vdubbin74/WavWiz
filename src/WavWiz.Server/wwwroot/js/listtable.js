@@ -10,7 +10,7 @@ import { pulse } from './motion.js';
 import { pointerDropTarget, dndMode, usesPointer } from './pdrag.js';
 import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
 import { attachQueueMenu } from './queuemenu.js';
-import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
+import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, numMinFor, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
 export function listTable(S, ctl) {
@@ -112,10 +112,11 @@ export function listTable(S, ctl) {
   const save = () => saveLayout(L, narrow);
   const isNarrow = () => !!root.closest('.desk')?.classList.contains('libexpanded');   // the side (right-hand) playlist while the Library is expanded
 
+  let numMin = 64;   // # column floor, grows with the queue's digit count (bulk add of 1000+ rows)
   function applyWidths() { [...colgroup.children].forEach((c, i) => { c.style.width = widths[i] + 'px'; }); table.style.width = widths.reduce((a, b) => a + b, 0) + 'px'; }
   function layout() {
     const n = isNarrow(); if (n !== narrow) { narrow = n; L = loadLayout(narrow); paintLock(); buildHead(); return; }
-    const total = Math.max(240, wrap.clientWidth); const r = widthsFor(L, total); ids = r.ids; widths = r.w; applyWidths();
+    const total = Math.max(240, wrap.clientWidth); numMin = numMinFor(V.queue.length); table.style.setProperty('--qnum-n', numMin + 'px'); const r = widthsFor(L, total, numMin); ids = r.ids; widths = r.w; applyWidths();
   }
   const closePicker = () => { document.querySelector('.plpicker')?.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escKey, true); };
   const outside = ev => { if (!ev.target.closest?.('.plpicker') && !ev.target.closest?.('.plpick')) closePicker(); };
@@ -155,12 +156,12 @@ export function listTable(S, ctl) {
         if (!L.locked) {
           const start = ev => {
             ev.preventDefault(); ev.stopPropagation(); const x0 = ev.clientX ?? ev.touches?.[0]?.clientX, base = widths.slice(); grip.classList.add('on');
-            const move = e => { const x = e.clientX ?? e.touches?.[0]?.clientX; widths = resizeAt(base, ids, i, x - x0); applyWidths(); };
+            const move = e => { const x = e.clientX ?? e.touches?.[0]?.clientX; widths = resizeAt(base, ids, i, x - x0, numMin); applyWidths(); };
             const up = () => { grip.classList.remove('on'); removeEventListener('pointermove', move); removeEventListener('pointerup', up); L = fracsFromWidths(L, ids, widths); save(); };
             addEventListener('pointermove', move); addEventListener('pointerup', up);
           };
           grip.addEventListener('pointerdown', start); grip.addEventListener('click', ev => ev.stopPropagation());
-          grip.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); widths = resizeAt(widths, ids, i, e.key === 'ArrowLeft' ? -12 : 12); applyWidths(); L = fracsFromWidths(L, ids, widths); save(); } });
+          grip.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); widths = resizeAt(widths, ids, i, e.key === 'ArrowLeft' ? -12 : 12, numMin); applyWidths(); L = fracsFromWidths(L, ids, widths); save(); } });
         } else grip.classList.add('off');
         th.append(grip);
       }
@@ -216,6 +217,7 @@ export function listTable(S, ctl) {
     if (!V.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: Math.max(1, ids.length) }, 'The queue is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
     if (dragging) return;   // never redraw under a drag
     if (pdrag) return;   // F113: nor under a pointer row-reorder session
+    if (ids.length && numMinFor(V.queue.length) !== numMin) layout();   // digit count changed (e.g. 999 -> 1616 rows): re-fit so # never clips
     sel = sel.filter(i => i < V.queue.length);
     order = sortedIndexes(V.queue, sort);
     nextIdx = queueNextIndex(V.now, V.queue);   // 0.5.0 F89: same next as playback (shuffle pick / Repeat wrap), not the list neighbour

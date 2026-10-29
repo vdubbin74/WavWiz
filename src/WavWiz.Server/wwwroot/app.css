@@ -2511,7 +2511,7 @@ body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:no
   .desk.libexpanded{row-gap:10px!important}
   .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .desk.libexpanded .minicol .mp{border:0;border-radius:var(--radius)}
-  .desk.libexpanded .listpanel .qtable col:first-child{width:34px!important}
+  .desk.libexpanded .listpanel .qtable col:first-child{width:max(34px,var(--qnum-n,34px))!important}   /* grows with the digit count so 4-5 digit indices never clip */
 }
 /* 0.3.7 L10: Devices collapsed -> ONE small music-note button bottom right; hovering it floats the SAME mini player (shortcuts row + Home far right) to its left. No strip, no cover art. */
 @media (min-width:901px){
@@ -4104,9 +4104,9 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
   .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport{gap:10px}
   .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn{width:52px;height:52px;font-size:20px}
   .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.tog{width:56px;height:40px;font-size:12px}
-  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play{width:74px;height:74px;font-size:30px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play{width:64px;height:64px;font-size:26px} /* F137: play ~14% smaller (was 74) */
   .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn .ic svg{width:22px;height:22px}
-  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play .ic svg{width:28px;height:28px}
+  .np-ctlpanel.np-flat:not(.collapsed) .np-tablexport .tbtn.play .ic svg{width:25px;height:25px}
 }
 @media (min-width:761px){ @container npctl (max-width:900px){ .np-ctlpanel.np-flat:not(.collapsed) .pn-art{width:88px;height:88px} } }   /* F136: desktop-only, phone keeps F102/F126 */
 /* 0.5.0 F135d: Shortcuts = HORIZONTAL pin row overlay that slides in leftward from the right over the NP controls (expanded + collapsed). Never a vertical column, never hangs below/above, never pushes layout. Collapsed: inside the bar (top:0;bottom:0), left of the pin toggle + chevron. Expanded (F135e): one band flush on the title bar (.pane-h) just left of the pin toggle + chevron. Many pins -> overflow-x:auto inside the strip. Reorder (drag + right-click) unchanged. Tokens only; phone untouched. */
@@ -4123,3 +4123,16 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
   .np-ctlpanel.np-flat > .pane-h .sctoggle,.np-ctlpanel.np-flat > .pane-h .listcolwrap{position:relative;z-index:21}
 }
 @media (prefers-reduced-motion:reduce){ .np-ctlpanel.np-flat .np-scside,.mp .mp-scside{animation:none} }
+
+/* 0.5.1 fix: keep the large-EQ field + LED canvases from collapsing to 0 height (LEDs stayed flat) */
+.eqa-field{min-height:120px}
+.eqled{min-height:60px}
+
+/* F138: Library fully open - no Queue expand/collapse chevrons (they only hid the screen); other layouts keep them */
+.desk.libexpanded .listpanel>.pane-h>.listcolwrap{display:none!important}
+
+/* F139: Library + Devices title pins get the menu pin (.mpin) marker: dim when unpinned, accent-filled when pinned. The panel .plus rules
+   (.libpanel .pane-h .plus, later in the file, same specificity) were overriding .pane-h .tpin.on, so a pinned Library/Devices pin looked plain. */
+:is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin{color:var(--dim);border:1px solid var(--line);background:transparent;opacity:.75}
+:is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin:hover{opacity:1;color:var(--ink);border-color:var(--accent);background:transparent}
+:is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin.on,:is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin.on:hover{opacity:1;color:var(--accent-ink,#fff);border-color:var(--accent);background:var(--accent)}

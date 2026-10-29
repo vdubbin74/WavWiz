@@ -8,6 +8,19 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## [0.5.1] - 2026-10-29 (beta)
+
+### Fixed
+- EQ: setting Glow to 0 now takes effect live.
+- Calm mode: exiting now offers two clear buttons.
+- Now Playing: the Play button is a tidier 64 px.
+- Level meters stay quiet for silent zones and no longer show activity when the player and queue are on different zones.
+- Settings > Appearance > Looks: dragging no longer freezes the UI.
+- Queue: the # column grows with the digit count, so big queues (1000+ tracks) never clip track numbers, including with Library fully open.
+- Queue: expand / collapse chevrons are hidden when Library is fully open.
+- Shortcuts: the pin sleeve closes when the mouse leaves it.
+- Library, Devices and Queue header pins use the same highlighted pin marker as the menus.
+
 ## [0.5.0] - 2026-10-28 (beta)
 
 ### Highlights

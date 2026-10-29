@@ -171,6 +171,9 @@ export function eqArea({ style = 'led', gains = new Array(10).fill(0), glow = 50
   function stopLive() { untap?.(); untap = null; }   // 0.3.1 B15: off-screen previews stop listening
   function destroy() { untap?.(); untap = null; ro?.disconnect(); }
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => paintMeters()) : null; ro?.observe(field);
+  // 0.5.1 fix: also watch each LED canvas + the EQ root; paintMeters() skips a 0-size canvas, so a canvas that
+  // only gets its height later (large EQ window / DPI change) never repainted when only the field was watched.
+  if (ro) { leds.forEach(c => ro.observe(c)); ro.observe(el); }
   setGains(g); if (interactive) setLocked(isLocked);
   if (!interactive) { exampleSpectrum(); paintMeters(); requestAnimationFrame(paintMeters); }
   return { el, setGains, setResponse, setGlow, setLocked, get locked() { return isLocked; }, select, startLive, stopLive, destroy, exampleSpectrum: () => { exampleSpectrum(); drawGlow(); paintMeters(); }, get gains() { return g.slice(); } };
