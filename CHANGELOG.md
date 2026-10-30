@@ -17,6 +17,10 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 - Settings -> Network AirPlay hint names Sonos/WiiM and UDP 319/320; firewall commands get Copy buttons.
 - Evening fixes F145-F158.
 
+### Checksums
+- `WavWiz-Setup-0.5.2.exe` - 103,895,834 bytes
+- SHA-256: `51DD1A89FA7B2DBAF16B64512C154FDF03EF07145AB493167F74DF6252E02E45`
+
 ## [0.5.1] - 2026-10-29 (beta)
 
 ### Fixed

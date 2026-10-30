@@ -98,6 +98,12 @@ The automated tests in this repository run on Linux (pwsh with shims, ISCC under
 * Size: 101925142 bytes
 * SHA-256 (uppercase): 03E543ABA52D68DA476674A6553FBE948B341100734E471D0EE6A9DD046798A3
 
+## 0.5.2 BETA
+* Installer `WavWiz-Setup-0.5.2.exe` upgrades 0.5.1 in place (same AppId; `ProgramData\WavWiz` is kept).
+* Built 2026-10-29, unsigned.
+* Size: 103895834 bytes
+* SHA-256 (uppercase): 51DD1A89FA7B2DBAF16B64512C154FDF03EF07145AB493167F74DF6252E02E45
+
 ## Upgrading over a running WavWiz (0.2.2)
 
 Before any file is replaced the installer shows **Closing WavWiz...** and runs `scripts/close-wavwiz.ps1` (hidden, with a 2-minute limit):
