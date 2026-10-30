@@ -49,6 +49,11 @@ for (const [vw, vh, dpr, scale, z] of [[1920, 1080, 1, 'compact', '100'], [960, 
   const m3 = await menu(p, 3); ok(`${t} now-top zone's up items disabled`, m3.moveup === false && m3.movedown, JSON.stringify(m3)); await esc(p);
   ON.delete(3); const o1 = await waitOrder(p, '3,2,1o,4e'); ok(`${t} Basement's speaker goes offline -> live: it drops below the active zones, marked Offline`, o1 === '3,2,1o,4e', o1);
   const b = await emptyRow(p, 1); ok(`${t} inactive zone: compact row with Offline, no drag handle`, b && b.minimal && b.note === 'Offline' && !b.handle, JSON.stringify(b));
+  const g1 = await p.evaluate(() => { const s = document.querySelector('.tree42 > section[data-leader-id="1"]'); return [...s.querySelectorAll('.sp42.gone[data-device-id]')].filter(e => e.offsetParent).map(e => ({ id: +e.dataset.deviceId, grip: !!e.querySelector('.dgrip42') })); });
+  ok(`${t} F160 inactive zone still lists its speakers as dimmed gone rows with grips`, g1.length >= 1 && g1.every(x => x.grip), JSON.stringify(g1));
+  await esc(p); await p.locator('.tree42 section[data-leader-id="1"] .sp42.gone >> visible=true').first().click({ button: 'right' }); await p.waitForTimeout(250);
+  const gm = await p.evaluate(() => [...document.querySelectorAll('.ctxmenu .ctx-item')].map(b => b.dataset.ctx)); ok(`${t} F160 gone row has the speaker menu (Move / Remove)`, gm.length > 0, JSON.stringify(gm)); await esc(p);
+  const e4 = await p.evaluate(() => document.querySelectorAll('.tree42 > section[data-leader-id="4"] .sp42').length); ok(`${t} F160 empty zone still has no rows`, e4 === 0, String(e4));
   const m1 = await menu(p, 1); ok(`${t} inactive zone has no move options`, Object.keys(m1).length === 0, JSON.stringify(m1)); await esc(p);
   if (SH) await p.screenshot({ path: `${OUT}/${layout}-${z}-offline-zone.png` });
   await menu(p, 2); await pick(p, 'movetop'); ok(`${t} Patio > Move to top (Basement offline)`, (await waitOrder(p, '2,3,1o,4e')) === '2,3,1o,4e', await order(p));

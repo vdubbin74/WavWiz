@@ -2,6 +2,7 @@
 // Spectrum curve. All three drive the same real DSP (10 bands 31 Hz - 16 kHz, ±12 dB, 0.5 dB steps, per speaker); only the main EQ area
 // differs. Header (speaker + preset), Bass / Treble / Trim, the switches, Spectrum glow and the footer are shared. Changes preview live on the
 // picked speaker; Save asks for a name when it makes a new preset (no name box in the footer).
+import { wsel } from './wwselect.js';
 import { groupPresets } from './eqsettings.js';   // 0.4.4 F6
 import { h, api, toast, dialog, debounce } from './util.js';
 import { eqArea, eqLockBox } from './eqview.js';
@@ -45,7 +46,7 @@ export async function openEq(S, refresh, deviceId, host = null) {
   }, 150);
   const changed = () => { if (!dirty) { dirty = true; paintPreset(); } sync(); };
 
-  const preSel = h('select', { 'aria-label': 'Preset', onchange: ev => { const p = presets.find(x => String(x.id) === ev.target.value); if (p) { cur = { ...flatEq(), ...structuredClone(p.json) }; presetId = p.id; dirty = false; paintAll(); sync(); } } });
+  const preSel = wsel({ 'aria-label': 'Preset', onchange: ev => { const p = presets.find(x => String(x.id) === ev.target.value); if (p) { cur = { ...flatEq(), ...structuredClone(p.json) }; presetId = p.id; dirty = false; paintAll(); sync(); } } });
   function paintPreset() {
     preSel.replaceChildren(h('option', { value: '', selected: dirty || presetId == null }, 'Custom'),
       ...groupPresets(presets).map(g => { const opts = g.items.map(p => h('option', { value: p.id, selected: !dirty && p.id === presetId }, p.name)); return g.label ? h('optgroup', { label: g.label }, ...opts) : opts; }).flat());   // 0.4.4 F6: the 8 built-ins, then "My presets" (no legacy built-ins)

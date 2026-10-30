@@ -12,7 +12,7 @@ const P = {
   mute: '<path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
   heart: '<path d="M12 20.3s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/>',
   heartOn: '<path d="M12 20.3s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z" fill="currentColor"/>',
-  eq: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  eq: '<path d="M6 4v16M12 4v16M18 4v16"/><rect x="4" y="13" width="4" height="3" rx=".5" fill="currentColor"/><rect x="10" y="7" width="4" height="3" rx=".5" fill="currentColor"/><rect x="16" y="11" width="4" height="3" rx=".5" fill="currentColor"/>',   // F158: vertical faders (EQ sliders go up/down)
   full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   vizoff: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M3 3l18 18"/>',
@@ -33,7 +33,7 @@ const P = {
   checklist: '<path d="M4 6.5l1.6 1.6L8.5 5M4 12.5l1.6 1.6 2.9-3.1M4 18.5l1.6 1.6 2.9-3.1M12 6.5h8M12 12.5h8M12 18.5h8"/>',
   unlock: '<rect x="5" y="10.5" width="14" height="10" rx="1.6"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
-  mixer: '<path d="M6 4v16M12 4v16M18 4v16"/><rect x="4" y="13" width="4" height="3" rx=".5" fill="currentColor"/><rect x="10" y="7" width="4" height="3" rx=".5" fill="currentColor"/><rect x="16" y="11" width="4" height="3" rx=".5" fill="currentColor"/>',
+  mixer: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',   // F158: horizontal sliders (volume sliders are horizontal)
   // 0.3.6 K2: thin chevrons (1.6 stroke) for every expand / collapse; each points where the panel will move
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   chevL: '<path d="M14.5 6.5l-5.5 5.5 5.5 5.5"/>', chevR: '<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>', chevU: '<path d="M6.5 14.5l5.5-5.5 5.5 5.5"/>', chevDn: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',

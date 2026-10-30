@@ -8,6 +8,15 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## [0.5.2] - 2026-10-29 (beta)
+
+### Added
+- Devices: AirPlay speakers strip (experimental) - search and Add/Remove Sonos, WiiM and other AirPlay speakers when AirPlay 2 speakers is on in Settings -> Network.
+
+### Changed
+- Settings -> Network AirPlay hint names Sonos/WiiM and UDP 319/320; firewall commands get Copy buttons.
+- Evening fixes F145-F158.
+
 ## [0.5.1] - 2026-10-29 (beta)
 
 ### Fixed

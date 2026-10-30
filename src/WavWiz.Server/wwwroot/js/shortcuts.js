@@ -10,7 +10,7 @@ export const PINS_KEY = 'wavwiz.pins.v1';
 export const PINNABLE = [
   { id: 'eq', label: 'Sound / EQ', icon: 'eq' }, { id: 'queue', label: 'Queue', icon: 'queue' }, { id: 'library', label: 'Library', icon: 'library' },
   { id: 'devices', label: 'Devices & zones', icon: 'devices' }, { id: 'scenes', label: 'Scenes & Schedules', icon: 'scenes' }, { id: 'alarms', label: 'Alarms', icon: 'alarm' },
-  { id: 'sleep', label: 'Sleep timer', icon: 'moon' }, { id: 'settings', label: 'Settings', icon: 'gear' },
+  { id: 'sleep', label: 'Sleep timer', icon: 'moon' }, { id: 'mixer', label: 'Master volume', icon: 'mixer' }, { id: 'settings', label: 'Settings', icon: 'gear' },   // F149: mixer = the Alt+V Master volume panel
 ];
 const KNOWN = new Set(PINNABLE.map(p => p.id));
 export const pinInfo = id => PINNABLE.find(p => p.id === id) || null;
@@ -42,7 +42,7 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
     pop.style.left = Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 6)) + 'px'; pop.style.top = Math.max(4, r.top - pop.offsetHeight - 6) + 'px';
     setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
   };
-  const set = p => { pins = savePins(p); draw(); };
+  const set = p => { pins = savePins(p); draw(); try { window.dispatchEvent(new CustomEvent('wavwiz:pins')); } catch { /* ignore */ } };   // F145: title pins + menu pins repaint after a sleeve reorder / unpin
   /** 0.3.8 L37: in a very narrow window the pins nearest Home stay and the rest move into a 'more' menu. */
   let cap = 99;
   const calcCap = () => { if (vertical) return 99; const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1; };

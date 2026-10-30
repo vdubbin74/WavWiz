@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, undoToast } from './util.js';
 import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
@@ -51,7 +52,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     body.replaceChildren(h('div', { class: 'card', role: 'alert' }, h('h3', { class: 'amber' }, `The reference speaker “${house.name}” is offline`),
       h('p', null, 'Calibration measures every speaker against the house reference speaker, so it must be on and connected.'),
       h('p', { class: 'small' }, admin ? 'Turn it on, or pick another reference: Devices > Expanded > Settings > More > Set as reference.' : 'Turn it on, or ask an administrator to pick another reference.'),
-      admin ? h('div', { class: 'field' }, h('label', null, 'Use another reference for this calibration'), h('select', { onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, h('option', { value: '' }, 'Pick a speaker…'), zones.map(z => h('option', { value: z.id }, z.name)))) : null));
+      admin ? h('div', { class: 'field' }, h('label', null, 'Use another reference for this calibration'), wsel({ onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, h('option', { value: '' }, 'Pick a speaker…'), zones.map(z => h('option', { value: z.id }, z.name)))) : null));
   }
   if (hold && !admin) return;
   if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the speaker you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other speakers'))); return; }
@@ -67,7 +68,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   function speakersBox() {
     queueMicrotask(capNote);
     const refZ = zones.find(z => z.id === st.ref);
-    const refSel = h('select', { 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : '') + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));
+    const refSel = wsel({ 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : '') + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));
     if (!admin) { refSel.disabled = true; refSel.title = 'Only an administrator can change the reference speaker.'; }
     const names = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref).map(z => z.name);
     const anyWeb = zones.some(z => st.sel.has(z.id) && isWebSpeaker(z));
@@ -258,9 +259,9 @@ function pcMicCard(S, admin, { start }) {
     el.className = 'card calway calpc';
     // 0.4.4 F21: always show the PC picker when any other Player PC has a mic (label "(this PC)")
     const pcsWithMic = pcs.filter(p => p.supportsMic && (p.mics || []).length);
-    const pcSel = pcsWithMic.length > 1 ? h('select', { 'aria-label': 'PC', onchange: ev => { levelOn(false); pc = pcs.find(p => p.playerId === ev.target.value); mic = pc.mics.find(m => m.id === pc.selected) || pc.mics[0]; paint(); levelOn(true); } },
+    const pcSel = pcsWithMic.length > 1 ? wsel({ 'aria-label': 'PC', onchange: ev => { levelOn(false); pc = pcs.find(p => p.playerId === ev.target.value); mic = pc.mics.find(m => m.id === pc.selected) || pc.mics[0]; paint(); levelOn(true); } },
       pcsWithMic.map(p => h('option', { value: p.playerId, selected: p === pc }, p.name + (p.mine ? ' (this PC)' : '')))) : null;
-    const micSel = h('select', { 'aria-label': 'Microphone', onchange: ev => { levelOn(false); mic = pc.mics.find(m => m.id === ev.target.value); api('/calibration/pc-mics/level', { method: 'POST', body: { playerId: pc.playerId, micId: mic.id, on: true, remember: true } }).catch(() => {}); pc.selected = mic.id; paint(); levelOn(true); } },
+    const micSel = wsel({ 'aria-label': 'Microphone', onchange: ev => { levelOn(false); mic = pc.mics.find(m => m.id === ev.target.value); api('/calibration/pc-mics/level', { method: 'POST', body: { playerId: pc.playerId, micId: mic.id, on: true, remember: true } }).catch(() => {}); pc.selected = mic.id; paint(); levelOn(true); } },
       pc.mics.map(m => h('option', { value: m.id, selected: m.id === mic.id }, `${m.name} · ${m.label}`)));
     const startBtn = h('button', { class: 'btn primary', onclick: () => { levelOn(false); start(pc, mic); } }, 'Start');
     el.replaceChildren(head(true),

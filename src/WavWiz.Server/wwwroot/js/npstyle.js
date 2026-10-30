@@ -28,13 +28,13 @@ export const NP_EFFECTS = [['glow', 'Glow'], ['motion', 'Motion'], ['reflect', '
 export const NP_KEY = 'wavwiz.npstyle.v1';
 /** 0.5.0 F94: Now Playing Color intensity, how hard the stage + play glow lean into the active theme accent. Default spicy. */
 export const NP_COLORS = [['subtle', 'Subtle'], ['spicy', 'Spicy'], ['max', 'Max']];
-export const NP_DEFAULT = Object.freeze({ seek: 'line', buttons: 'round', art: 'square', fx: 50, glow: 50, motion: 50, reflect: 50, color: 'spicy' });
+export const NP_DEFAULT = Object.freeze({ seek: 'line', buttons: 'square', art: 'square', fx: 50, glow: 50, motion: 50, reflect: 50, color: 'spicy' });
 export const normNpColor = c => NP_COLORS.some(([id]) => id === c) ? c : NP_DEFAULT.color;
 const pct = (v, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : d; };
 
 export function normNpPrefs(p) {
   p = p && typeof p === 'object' ? p : {};
-  const leg = NP_LEGACY[p.style] || NP_LEGACY.classic;   // F95: migrate an old `style`; it is not written back
+  const leg = NP_LEGACY[p.style] || [NP_DEFAULT.seek, NP_DEFAULT.buttons];   // F95: migrate an old `style`; it is not written back. F157b: unset -> app default (Square buttons); saved choices kept
   const pick = (list, v, d) => list.some(([id]) => id === v) ? v : d;
   const out = { seek: pick(NP_SEEKS, p.seek, leg[0]), buttons: pick(NP_BUTTONS, p.buttons, leg[1]), art: pick(NP_ARTS, p.art, NP_DEFAULT.art), fx: pct(p.fx, NP_DEFAULT.fx), color: normNpColor(p.color) };
   for (const [k] of NP_EFFECTS) out[k] = pct(p[k], NP_DEFAULT[k]);

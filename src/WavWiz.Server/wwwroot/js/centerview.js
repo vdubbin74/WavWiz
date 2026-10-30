@@ -1,4 +1,5 @@
 // WavWiz 0.3.0 §3: the center panel shows the live EQ by default; one toggle (next to Looks) switches EQ ⇄ Visualizer, remembered per device.
+import { wsel } from './wwselect.js';
 import { h, api, toast, debounce } from './util.js';
 import { loadEqPrefs, eqTarget, ownEqName, loadEqLock, saveEqLock, controllingTarget, pickerLabel } from './eqstyle.js';
 import * as Z from './zones40.js';
@@ -67,13 +68,13 @@ export function centerEq(S, host, opts = {}) {
     const note = !ok ? h('span', { class: 'small dim np-eqro', title: o ? 'Only Control or Admin access can change this speaker’s EQ.' : 'No speaker connected.' }, o ? 'Read-only' : '') : null;
     const outs = outsNow();
     const picker = flag('ui.eqOutputPicker') && isAdmin(S) && outs.length > 1
-      ? h('select', { class: 'np-eqpick', 'aria-label': 'Which output this EQ adjusts', onchange: ev => { target = ev.target.value; reload(); } }, outs.map(x => h('option', { value: x.deviceId, selected: x.deviceId === o?.deviceId, title: `${x.zone} — ${x.name}` }, pickerLabel(x, outs))))
+      ? wsel({ class: 'np-eqpick', 'aria-label': 'Which output this EQ adjusts', onchange: ev => { target = ev.target.value; reload(); } }, outs.map(x => h('option', { value: x.deviceId, selected: x.deviceId === o?.deviceId, title: `${x.zone} — ${x.name}` }, pickerLabel(x, outs))))
       : null;
     // 0.5.0 F109: All sound settings opens THIS speaker's settings (Devices) instead of expanding under the EQ; hidden when embedded for one speaker
     const allBtn = opts.deviceId ? null : h('button', { type: 'button', class: 'btn sm eqallbtn', 'data-act': 'allsound', title: o ? `Open ${o.zone} settings` : 'Open speaker settings', disabled: !real || undefined,
       onclick: () => { if (real?.out?.zoneId) window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: real.out.zoneId })); } }, 'All sound settings');
     // 0.3.8 L39: the active preset as a plain themed select (same look as the output picker); every EQ chooser uses this select style
-    const presetSel = real ? h('select', { class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
+    const presetSel = real ? wsel({ class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
       onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
       real.presetId == null ? h('option', { value: '', selected: true }, 'Custom (not saved)') : null,
       (real.presets || []).map(p => h('option', { value: String(p.id), selected: p.id === real.presetId }, p.name))) : null;

@@ -57,7 +57,8 @@ export function treeEl(S, ctl, kit, st) {
     ro(h('button', { type: 'button', class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: create }, '+'), admin)));
 
   const move = async (z, toId) => {
-    try { for (const op of movePlan(S.groups, z.id, toId)) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); toast(toId == null ? `${z.name} is now unassigned` : `${z.name} moved to ${zname(toId)}`); done(); }
+    try { for (const op of movePlan(S.groups, z.id, toId)) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); const tg = toId == null ? null : groups.find(g => g.id === toId), live = tg && [...(tg.deviceIds || []).filter(x => x !== z.id).map(x => (S.zones || []).find(d => d.id === x)), z].some(d => d?.connected);   // F160: landing in a zone with no speaker online
+      toast(toId == null ? `${z.name} is now unassigned` : tg && !live ? `Added to ${zname(toId)} — zone is offline until a speaker comes online.` : `${z.name} moved to ${zname(toId)}`); done(); }
     catch (e) { toast(e.message, true); }
   };
   const playPause = async g => {
@@ -150,12 +151,14 @@ export function treeEl(S, ctl, kit, st) {
     return el;
   };
   // 0.4.9 F69: a zone with no speakers is one compact row (name, "No speakers" / "Offline") - still a drop target (its hint opens while dragging)
-  const emptyBox = (g, off = false) => {
-    const sel = isControlling(g, cur);
+  // 0.5.2 F160: an OFFLINE zone (speakers, none online) keeps the compact Offline header but lists its real speakers as dimmed .gone rows (Move / Remove still work)
+  const emptyBox = (g, off = false, box = null) => {
+    const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).map(z => spRow(z, zg.id))) : [];
     const wrap = h('section', { class: 'qb42 empty42' + (off ? ' off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
         h('div', { class: 'ze42-row' }, h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
           h('span', { class: 'small dim ze42-note' }, off ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })),
+        gone.length ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': `Speakers in ${g.name} (offline)` }, ...gone) : null,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here')));
     zoneCtx(g, wrap.firstChild);
     return wrap;
@@ -191,7 +194,8 @@ export function treeEl(S, ctl, kit, st) {
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
           h('div', { class: 'ze42-row', onclick: open }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
-            ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.'))));
+            ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.')),
+          jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : null));   // F160
       return wrap;
     }
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
@@ -214,7 +218,7 @@ export function treeEl(S, ctl, kit, st) {
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; pick(ev); });
     return el;
   };
-  const boxEls = model.boxes.map(b => [rank(b), rank(b) > 0 ? emptyBox(b.leader, rank(b) === 1) : queueBox(b)]);
+  const boxEls = model.boxes.map(b => [rank(b), rank(b) > 0 ? emptyBox(b.leader, rank(b) === 1, b) : queueBox(b)]);
   if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox()]); }
   root.append(...boxEls.map(x => x[1]));
   if (!model.boxes.length) root.append(h('p', { class: 'dim small pad' }, 'Zones hold speakers, like “Downstairs”. An administrator can create one with +.'));

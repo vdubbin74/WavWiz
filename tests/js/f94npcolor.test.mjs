@@ -32,7 +32,7 @@ test('F95: old package style migrates to seek + buttons; unknown ids clamp; styl
   const mig = { classic: ['line', 'round'], center: ['wave', 'soft'], stack: ['led', 'square'], horizon: ['line', 'ring'], undefined: ['line', 'round'] };
   for (const [s, [seek, buttons]] of Object.entries(mig)) { const n = m.normNpPrefs(s === 'undefined' ? {} : { style: s }); assert.equal(n.seek, seek, s); assert.equal(n.buttons, buttons, s); assert.equal(n.color, 'spicy'); assert.ok(!('style' in n)); }
   assert.deepEqual([m.normNpPrefs({ seek: 'eq', buttons: 'ring', color: 'max' })].map(n => [n.seek, n.buttons, n.color])[0], ['eq', 'ring', 'max']);
-  assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).seek, 'line'); assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).buttons, 'round');
+  assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).seek, 'line'); assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).buttons, 'square');
   assert.equal(m.normNpPrefs({ style: 'center', seek: 'eq' }).seek, 'eq');   // an explicit pick beats the legacy package
   assert.deepEqual(m.npClasses({ seek: 'eq', buttons: 'ring' }), ['pn-seek-eq', 'pn-btn-ring', 'pn-art-square']);
   const b = m.eqBars('song', 20); assert.equal(b.length, 20); assert.ok(b.every(v => v >= 0.25 && v <= 1)); assert.deepEqual(b, m.eqBars('song', 20));

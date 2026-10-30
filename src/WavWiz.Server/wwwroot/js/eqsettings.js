@@ -1,5 +1,6 @@
 // WavWiz 0.3.7 L7: "All sound settings" - everything beyond the 10 bands, shown IN PLACE under the EQ (no popup): preset list, Bass, Treble, Trim, Balance,
 // Loudness, Limiter, Bypass and Auto pre-gain. The ONE padlock on the EQ title bar locks all of it. The same panel is embedded in Speaker settings.
+import { wsel } from './wwselect.js';
 import { h } from './util.js';
 import { fmtDb } from './eqstyle.js';
 
@@ -43,7 +44,7 @@ export function soundSettings(api) {
   }
   function repaint() {
     const c = api.cur(); ctls = [];
-    const sel = h('select', { 'aria-label': 'Preset', class: 'eqall-preset', onchange: ev => { const p = api.presets().find(x => String(x.id) === ev.target.value); if (p) api.pick(p); } });
+    const sel = wsel({ 'aria-label': 'Preset', class: 'eqall-preset', onchange: ev => { const p = api.presets().find(x => String(x.id) === ev.target.value); if (p) api.pick(p); } });
     paintPresets(sel);
     const nameIn = h('input', { type: 'text', maxlength: 40, placeholder: 'Name this sound', 'aria-label': 'Name for a new preset', class: 'eqall-name' });
     const saveBtn = h('button', { type: 'button', class: 'btn sm', 'data-act': 'saveas', onclick: () => { const n = nameIn.value.trim(); if (!n) { nameIn.focus(); return; } api.saveAs(n); nameIn.value = ''; } }, 'Save as…');

@@ -26,7 +26,7 @@ export function tagsView(S) {
     const paint = () => {
       box.replaceChildren(
         h('p', { class: 'small dim' }, j.summary || ''),
-        h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: j.writeFiles, onchange: async ev => { await api(`/tags/jobs/${id}/approvals`, { method: 'POST', body: { writeFiles: ev.target.checked } }); j.writeFiles = ev.target.checked; } }), 'Also write tags into the music files (undo restores the database; re-tag files manually if needed)'),
+        h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: j.writeFiles, onchange: async ev => { await api(`/tags/jobs/${id}/approvals`, { method: 'POST', body: { writeFiles: ev.target.checked } }); j.writeFiles = ev.target.checked; } }), 'Also write tags and covers into the music files (undo restores the database and removes saved covers from the library cache; it does not strip tags or pictures from files)'),
         h('div', { class: 'row wrap', style: 'margin:8px 0' },
           h('button', { class: 'btn', onclick: async () => { await api(`/tags/jobs/${id}/approvals`, { method: 'POST', body: { all: true } }); j = await api(`/tags/jobs/${id}`); paint(); } }, 'Approve all'),
           h('button', { class: 'btn', onclick: async () => { await api(`/tags/jobs/${id}/approvals`, { method: 'POST', body: { all: false } }); j = await api(`/tags/jobs/${id}`); paint(); } }, 'Approve none'),
@@ -35,7 +35,7 @@ export function tagsView(S) {
         h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['', 'Track', 'Field', 'Old', 'New'].map(x => h('th', null, x)))),
           h('tbody', null, (j.items || []).map(it => h('tr', null,
             h('td', null, h('input', { type: 'checkbox', checked: it.approved, disabled: it.applied, onchange: async ev => { await api(`/tags/jobs/${id}/approvals`, { method: 'POST', body: { items: [{ id: it.id, approved: ev.target.checked }] } }); } })),
-            h('td', null, it.trackId), h('td', null, it.field), h('td', { class: 'small' }, it.oldValue || '—'), h('td', { class: 'small' }, it.newValue || it.artUrl || '—'))))));
+            h('td', null, h('div', null, it.title || 'Untitled'), h('div', { class: 'small dim' }, [it.artist, it.field === 'cover' ? it.album : null].filter(Boolean).join(' · '))), h('td', null, it.field), h('td', { class: 'small' }, it.field === 'cover' ? (it.oldValue || 'No cover') : (it.oldValue || '—')), h('td', { class: 'small' }, it.field === 'cover' ? (it.artUrl ? h('img', { src: it.artUrl, alt: 'Proposed cover', loading: 'lazy', style: 'width:48px;height:48px;object-fit:cover;border-radius:4px' }) : '—') : (it.newValue || '—')))))));
     };
     paint();
     const { dialog } = await import('./util.js');

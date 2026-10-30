@@ -292,7 +292,7 @@ dialog>footer{padding:10px 14px;border-top:1px solid var(--line);display:flex;ga
 .qtable th .grip::after{content:"";position:absolute;left:auto;right:4px;top:20%;bottom:20%;width:1px;background:var(--line)}
 .qtable th .grip:hover::after,.qtable th .grip.on::after,.qtable th .grip:focus::after{background:var(--accent);width:2px;right:3px}
 .qtable td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
-.qtable td.num,.qtable th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono)} .qtable td.dur{position:relative}
+.qtable td.num,.qtable th.num{text-align:right;padding-left:4px;white-space:nowrap;font-variant-numeric:tabular-nums;overflow:hidden} .qtable td.dur,.qtable th.dur{text-align:right;font-family:var(--mono)} .qtable td.dur{position:relative}
 .qtable tr:hover td{background:var(--accent-soft)} .qtable tr.cur td{background:var(--accent-soft);color:var(--ink);font-weight:700;box-shadow:inset 0 1px 0 var(--accent),inset 0 -1px 0 var(--accent)}
 .qtable tr.cur td.num{color:var(--accent-text,var(--accent))}
 .qtable td.empty,.qtable tr.empty td{color:var(--dim);cursor:default;white-space:normal}
@@ -916,8 +916,8 @@ html.tv *{transition:none!important;animation:none!important}
 .pn-btn-round .np-tablexport .tbtn.play{box-shadow:0 0 calc(18px * var(--fx-glow) * var(--np-k)) var(--np-play-hi)!important}
 .pn-btn-soft .np-tablexport .tbtn{border-radius:50%!important}
 .pn-btn-soft .np-tablexport .tbtn:not(.play){border-color:transparent!important;background:color-mix(in srgb,var(--ink) 8%,transparent)!important}
-.pn-btn-square .np-tablexport .tbtn{border-radius:8px!important}
-.pn-btn-square .np-volrow :is(.mutebtn,.np-volbtn,.mixbtn,.npsleep){border-radius:8px!important}
+.pn-btn-square .np-tablexport .tbtn{border-radius:3px!important}
+.pn-btn-square .np-volrow :is(.mutebtn,.np-volbtn,.mixbtn,.npsleep){border-radius:3px!important}
 .pn-btn-ring .np-tablexport .tbtn{border-radius:50%!important;background:transparent!important;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)!important}
 .pn-btn-ring .np-tablexport .tbtn.play{border-color:var(--accent)!important;background:var(--accent)!important}
 /* phones: stacked variant of each style (art + titles, then seek, then controls) */
@@ -1108,7 +1108,7 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .np-ctlpanel .np-volrow .eqbtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;flex:none}
 .np-ctlpanel .np-volrow .eqbtn .ic svg{width:15px;height:15px}
 .np-ctlpanel .np-volrow .eqbtn:hover,.npbar .eqbtn:hover{color:var(--accent-text,var(--accent));border-color:var(--accent)}
-.pn-btn-square .np-volrow .eqbtn{border-radius:8px!important}
+.pn-btn-square .np-volrow .eqbtn{border-radius:3px!important}
 .pn-btn-ring .np-volrow :is(.eqbtn,.mutebtn,.mixbtn){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
 .pn-btn-soft .np-volrow :is(.eqbtn,.mutebtn:not(.on),.mixbtn){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
 .np-xheart{display:none}
@@ -1403,7 +1403,7 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 .ns-eq{display:none;position:absolute;inset:0}
 .pn-btn-round .np-strip .tbtn.play{box-shadow:0 0 calc(14px * var(--fx-glow) * var(--np-k)) var(--np-play-hi)}
 .pn-btn-soft .np-strip .tbtn:not(.play):not(.on){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
-.pn-btn-square .np-strip .tbtn,.pn-btn-square .np-strip .np-heartslot > *{border-radius:6px}
+.pn-btn-square .np-strip .tbtn,.pn-btn-square .np-strip .np-heartslot > *{border-radius:3px}
 .pn-btn-ring .np-strip .tbtn{background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
 .pn-btn-ring .np-strip .tbtn.play,.pn-btn-ring .np-strip .tbtn.mutebtn.on{background:var(--accent);border-color:var(--accent)}
 .pn-btn-ring .np-strip .tbtn.tog.on{border-color:var(--accent)}
@@ -1419,7 +1419,7 @@ dialog.eqdialog header .grow{display:flex;align-items:baseline;gap:12px;min-widt
 @container npctl (max-width:720px){ .ns-vol > .ic,.ns-vol input[type=range]{display:none} .ns-dur{display:none} .ns-x,.ns-vol{gap:4px} }
 @container npctl (max-width:600px){ .np-strip .tbtn,.np-strip .np-heartslot > *{width:26px;height:26px} .np-strip .tbtn.play{width:32px;height:32px}
   .ns-x .np-heartslot,.ns-x .tog,.ns-elv{display:none} .ns-art{width:34px;height:34px} }
-@container npctl (max-width:440px){ .ns-art,.ns-vol .eqbtn{display:none} }
+@container npctl (max-width:440px){ .ns-vol .eqbtn{display:none} }
 @media (max-width:900px){ .ns-vol > .ic,.ns-vol input[type=range],.ns-vol .volpct{display:none} }
 /* ===== 0.2.3 U2: minimized Playlist title bar = "UP NEXT  [art] Title · Artist", centered on the Now Playing column ===== */
 .listpanel > .pane-h{position:relative}
@@ -1617,6 +1617,14 @@ body.jb-kiosk #app{visibility:hidden}
 .remote-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;border-radius:3px;display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--hl,var(--accent));color:var(--hl-ink,var(--accent-ink));font-weight:600;font-size:13px}
 .remote-banner .grow{flex:1}
 .remote-banner .btn{min-height:28px;padding:2px 10px;background:transparent;color:inherit;border-color:currentColor}
+/* 0.5.1+: phone tabbar visible (<=900px) -> role banners sit above Now/Library/Devices like toasts; keep NP content scrollable past them */
+@media (max-width:900px){
+  .remote-banner,.mic-banner{bottom:calc(70px + var(--safe-b))}
+  body:has(.remote-banner) .desk,body:has(.mic-banner) .desk{padding-bottom:56px}
+  /* F162: on Library/Devices the condensed Now Playing .mini sits in flow above the tabbar - stack the banner above it instead of over it */
+  body:has(.desk:not([data-view=now])~.mini) :is(.remote-banner,.mic-banner){bottom:calc(70px + var(--minih,58px) + 8px + var(--safe-b))}
+  body:has(.desk:not([data-view=now])~.mini):is(:has(.remote-banner),:has(.mic-banner)) .desk:not([data-view=now]){padding-bottom:calc(56px + var(--minih,58px) + 8px)}
+}
 .remote-choice{gap:8px;align-items:flex-start;margin:8px 0}
 /* 0.3.0 §3: EQ in the center panel (default), music glow behind it */
 .np-eqhost{display:none;position:absolute;inset:0;z-index:2;padding:10px 12px 40px;overflow:auto}
@@ -2511,7 +2519,7 @@ body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:no
   .desk.libexpanded{row-gap:10px!important}
   .desk.libexpanded .minicol{margin-top:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .desk.libexpanded .minicol .mp{border:0;border-radius:var(--radius)}
-  .desk.libexpanded .listpanel .qtable col:first-child{width:max(34px,var(--qnum-n,34px))!important}   /* grows with the digit count so 4-5 digit indices never clip */
+  .desk.libexpanded .listpanel .qtable col:first-child{width:var(--qnum-n,40px)!important}   /* grows with the digit count so 4-5 digit indices never clip */
 }
 /* 0.3.7 L10: Devices collapsed -> ONE small music-note button bottom right; hovering it floats the SAME mini player (shortcuts row + Home far right) to its left. No strip, no cover art. */
 @media (min-width:901px){
@@ -2601,7 +2609,7 @@ body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:no
 @container npctl (max-width:1100px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .ns-vol .volpct{display:none} .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .np-strip{gap:10px} }
 @container npctl (max-width:940px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-vol > .ic,.ns-vol input[type=range]){display:none} }
 @container npctl (max-width:820px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-x .np-heartslot,.ns-x .tog){display:none} .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) .ns-art{width:34px;height:34px} }
-@container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-art,.ns-vol,.ns-x){display:none} }
+@container npctl (max-width:700px){ .np-ctlpanel.collapsed:has(.pane-h .scrow .scbtn) :is(.ns-vol,.ns-x){display:none} }
 
 /* ===== 0.3.9 L51 / L53 / L54 / L56: expanded Devices view (layout B, approved render) ===== */
 /* L54: the whole speaker / zone card is the click target */
@@ -2756,7 +2764,7 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .zcard.droplink,.zc3.droplink{outline:3px dashed var(--accent);outline-offset:-3px;background:color-mix(in srgb,var(--accent) 16%,var(--panel));position:relative}
 .zcard.droplink::after,.zc3.droplink::after{display:block;content:attr(data-linklabel);position:absolute;left:52px;top:0;transform:translateY(-50%);z-index:60;pointer-events:none;background:var(--accent);color:black;font-weight:700;font-size:12px;padding:4px 10px;border-radius:3px;white-space:nowrap;box-shadow:0 0 0 2px var(--panel)}
 /* context menu */
-.ctxmenu{position:fixed;z-index:1200;min-width:190px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.55);padding:4px;display:flex;flex-direction:column}
+.ctxmenu{position:fixed;z-index:1600;min-width:190px;background:var(--panel);border:1px solid var(--accent);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.55);padding:4px;display:flex;flex-direction:column}
 .ctxmenu .ctx-item{background:none;border:0;color:var(--text);text-align:left;padding:7px 10px;border-radius:3px;font:inherit;cursor:pointer}
 .ctxmenu .ctx-item:hover:not([disabled]),.ctxmenu .ctx-item:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
 .ctxmenu .ctx-item[disabled]{opacity:.4;cursor:not-allowed}.ctxmenu .ctx-item.danger{color:var(--accent-text,var(--accent))}
@@ -2793,7 +2801,9 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .ctxmenu .ctx-l{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
 .ctxmenu .ctx-arrow{margin-left:auto;opacity:.7;font-size:16px;line-height:1}
 .ctxmenu .ctx-item.has-sub.cur{background:color-mix(in srgb,var(--accent) 22%,transparent)}
-.ctxmenu.ctx-sub{z-index:1201}
+.ctxmenu.ctx-sub{z-index:1601}
+/* F144: Library/item context menus sit above the remote/mic role banners (were z-index 1200 under banners at 1500). */
+
 
 /* ===== 0.4.2 zone tree: zones hold their speakers; Queue boxes; Unassigned; Expanded = Scenes | detail | tree ===== */
 .tree42{display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -3416,6 +3426,22 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 #sec-airplay-out .apo-out{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:3px;padding:6px 10px}
 #sec-airplay-out .apo-fw summary{cursor:pointer;color:var(--accent)}
 #sec-airplay-out .apo-fw pre{white-space:pre-wrap;word-break:break-all;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:6px 8px;margin:4px 0}
+/* F159: firewall Copy + Devices AirPlay speakers strip */
+#sec-airplay-out .apo-fwrow{gap:6px;align-items:flex-start}
+#sec-airplay-out .apo-fwrow pre{flex:1;min-width:0}
+/* F163: quiet collapsed "Add AirPlay…" row under the Speakers tree */
+.apds{margin:6px 0;padding:0}
+.apds-toggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:8px 6px;color:var(--dim,inherit);font:inherit;font-size:13px;text-align:left;cursor:pointer;border-top:1px solid var(--line)}
+.apds-toggle:hover .apds-lbl{color:var(--accent)}
+.apds-chev{display:inline-block;transition:transform .15s;opacity:.7}
+.apds.open .apds-chev{transform:rotate(90deg)}
+.apds-exp{opacity:.6;font-size:11px}
+.apds-body{padding:0 6px 6px}
+.apds .apds-row{gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.apds .apds-row.dim b{opacity:.7}
+.apds .apds-why{white-space:nowrap}
+.apds .mono{opacity:.75}
+.apds-self{background:none;border:0;padding:4px 0;cursor:pointer;text-decoration:underline}
 
 /* 0.4.9 F65: Roomy - the Devices bar stays Full's narrow collapsed bar in the grid; opened from it, the panel slides out over the right side
    (full height, accent edge, shadow, dim scrim) instead of widening the column. Expanded Devices is unchanged (.roomyopen is never set then). */
@@ -3523,7 +3549,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
   .nowcol .np-ctlpanel .np-volrow>.mixbtn{grid-area:x2} .nowcol .np-ctlpanel .np-vol>.eqbtn{grid-area:x4} .nowcol .np-ctlpanel .np-volrow>.npsleep{grid-area:x5}
   .nowcol .np-ctlpanel :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){width:48px!important;height:48px!important;min-width:48px;min-height:48px;border-radius:50%;padding:0!important;display:inline-flex;align-items:center;justify-content:center}
   .nowcol .np-ctlpanel .np-volrow>.npsleep{font-size:11px;border:1px solid var(--line)}
-  .nowcol .np-ctlpanel.pn-btn-square :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-radius:8px}
+  .nowcol .np-ctlpanel.pn-btn-square :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-radius:3px}
   .nowcol .np-ctlpanel.pn-btn-ring :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){background:transparent;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent)}
   .nowcol .np-ctlpanel.pn-btn-soft :is(.np-volrow>.mixbtn,.np-vol>.eqbtn,.np-volrow>.npsleep,.np-xheart>*,.np-phvol>.np-zmute){border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
   .nowcol>.np-upnext{flex:none;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:22px}
@@ -3537,6 +3563,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 .tree42 .ze42-note{flex:none}
 .tree42 .zempty42 .ze42-drop{display:none}
 .tree42.dragging .zempty42 .ze42-drop{display:block;margin-top:4px}
+.tree42 .zempty42 .ze42-gone{margin-top:4px}
 .tree42 .qb42.empty42.ctl .zempty42{border-color:var(--accent)}
 #p-zones .pd42-head .pd42-close{border-color:var(--accent);color:var(--accent-text,var(--accent));font-weight:600}
 
@@ -3941,8 +3968,8 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
 .lib .list .item .more{border-radius:50%}
 /* toolbar + tabs */
 .lib .libtools{gap:8px;margin:2px 0 12px}
-.lib .libtools .wwdd,.lib .libtools .libflip{border-radius:10px}
-.lib .libtools .seg{border-radius:10px;border-color:color-mix(in srgb,var(--line) 80%,transparent)}
+.lib .libtools .wwdd,.lib .libtools .libflip{border-radius:3px}
+.lib .libtools .seg{border-radius:3px;border-color:color-mix(in srgb,var(--line) 80%,transparent)}
 .lib .libtools .seg button{border-radius:0}
 .lib .libsearch input{border-radius:12px}
 .lib .tabs:not(.xtabs) button,.lib .tabs.ctabs button{border-radius:3px}
@@ -4136,3 +4163,63 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
 :is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin{color:var(--dim);border:1px solid var(--line);background:transparent;opacity:.75}
 :is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin:hover{opacity:1;color:var(--ink);border-color:var(--accent);background:transparent}
 :is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin.on,:is(.libpanel,.devpanel,.listpanel)>.pane-h>.plus.tpin.on:hover{opacity:1;color:var(--accent-ink,#fff);border-color:var(--accent);background:var(--accent)}
+
+/* F142: phone Settings — flatten top edge. Full-bleed sheet was still drawing the 3px accent
+   border-top and a translucent backdrop, so the Now Playing cover bloom (blur 60px) showed as a
+   soft haze under the status bar / safe-area. Solid panel + opaque backdrop; keep safe-t padding. */
+@media (max-width:900px){
+  dialog.settings-dlg{border-top:0;background:var(--panel);box-shadow:none}
+  dialog.settings-dlg::backdrop{background:var(--bg)}
+  dialog.settings-dlg>header{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
+}
+
+/* F145: Devices title pin = Library title pin when pinned. Match the pin wherever the header sits (rail, tight tab, swapped slot) and key off
+   aria-pressed too, with higher specificity than any panel .plus / .devhead button rule, so a pinned Devices pin is never left plain. */
+:is(.libpanel,.devpanel,.listpanel) .pane-h>button.plus.tpin:is(.on,[aria-pressed=true]),:is(.libpanel,.devpanel,.listpanel) .pane-h>button.plus.tpin:is(.on,[aria-pressed=true]):hover{opacity:1;color:var(--accent-ink,#fff);border-color:var(--accent);background:var(--accent)}
+
+/* F146: every native dropdown list follows the theme (the 0.4.4 F6 preset-picker treatment, now for all selects - Move to zone, Profile,
+   output pickers, scene/schedule pickers): panel background, ink text, accent-tinted current item. :root color-scheme gives the dark popup chrome. */
+select{accent-color:var(--accent)}
+select option{background:var(--panel);color:var(--ink)}
+select option:checked{background:var(--accent-soft,color-mix(in srgb,var(--accent) 30%,transparent));color:var(--accent-text,var(--ink))}
+select optgroup{background:var(--panel2);color:var(--dim);font-style:normal}
+
+/* F147: New / Edit scene - each speaker is a two-line block. Row 1: name, ON/OFF, Profile (grows; may wrap under the toggle when narrow).
+   Row 2: 'Volume' label, full-width track, one % readout that never wraps. OFF keeps row 2, dimmed + disabled. */
+.ss-inline .ss-mem.ss-mem2{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin:0;padding:8px 0;border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.ss-inline .ss-mem2>.ss-mtop{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+.ss-inline .ss-mem2 .ss-mn{width:auto;min-width:0;max-width:140px;flex:0 1 auto}
+.ss-inline .ss-mem2 .ss-prof{flex:1 1 140px;max-width:none;min-width:120px}
+.ss-inline .ss-mem2>.ss-mvol{display:flex;flex-wrap:nowrap;align-items:center;gap:10px;margin:0}
+.ss-inline .ss-mem2 .ss-vl{flex:none;font-size:11.5px;letter-spacing:.02em}
+.ss-inline .ss-mem2 .ss-mvol>input[type=range]{flex:1 1 auto;min-width:0;width:auto}
+.ss-inline .ss-mem2 .ss-pct{flex:none;width:auto;min-width:4ch;text-align:right;white-space:nowrap}
+.ss-inline .ss-mem2.off .ss-mvol{opacity:.45}
+.ss-inline .ss-mem2.off .ss-mvol>input[type=range]{cursor:not-allowed}
+
+/* 0.5.0 F148: the collapsed Now Playing strip keeps the chosen Album art (Tape / Jacket / disc / square) at every width - it used to drop .ns-art
+   at narrow widths (<=440px, or <=700px with pins shown), so the bar showed only titles + seek/EQ bars. Shrinks instead of hiding. */
+@container npctl (max-width:700px){ .np-ctlpanel.collapsed .ns-art .npa-box{--npa:32px} }
+@container npctl (max-width:440px){ .np-ctlpanel.collapsed .ns-art .npa-box{--npa:28px} }
+
+/* F150: Up next title in the title bar matches the muted "UP NEXT" label (no bright bold white) */
+.desk .plnext .pln-t1{font-weight:500;color:var(--dim)}
+/* F152: themed value pickers (wwselect.js) - closed = field chrome, open = the shared ctxmenu (File menu look) */
+.wwdd.wwsel{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--fld-h);padding:var(--fld-pad);background:var(--fld-bg);color:var(--fld-ink);border:1px solid var(--fld-line);border-radius:var(--fld-radius);font:inherit;font-size:var(--fld-fs);text-align:left;cursor:pointer;width:auto;max-width:100%;min-width:9em}
+.wwdd.wwsel:focus-visible{outline:2px solid var(--fld-focus);outline-offset:1px}
+.wwdd.wwsel[disabled]{opacity:.55;cursor:not-allowed}
+.wwdd.wwsel .wwdd-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+:is(.np-eqpick,.qzpick,.spk-presel,.fld-sm,.dsel,.spk-zsel,.spk-prof,.ss-prof).wwdd.wwsel{min-height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
+:is(.np-eqpick,.qzpick).wwdd.wwsel{width:auto;max-width:240px}
+.ctxmenu.wwsel-menu{border-color:var(--line)}
+.ctxmenu.wwsel-menu .ctx-ic{display:none}
+.ctxmenu.wwsel-menu .ctx-item.cur-val{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--ink)}
+.ctxmenu.wwsel-menu .ctx-item:hover:not([disabled]),.ctxmenu.wwsel-menu .ctx-item:focus-visible{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.ctxmenu.wwsel-menu .ctx-item.ctx-heading{opacity:1;cursor:default;color:var(--accent2-text,var(--accent2,var(--accent)));font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:8px 10px 3px}
+.field>.wwdd.wwsel,.dlg-body .field .wwdd.wwsel{width:100%}
+/* 0.5.1 F157: Square button style = one shape on every Now Playing layout (full, flat/expanded, condensed strip, phone grid),
+   matching the collapsed thin bar (3px). Earlier per-layout rules (8px / 6px squares, 50% play, 50% volbtn!important,
+   48px round side buttons, 999px "on <zone>" pill, tog capsules) only follow Round/Soft/Ring now. */
+.pn-btn-square :is(.np-tablexport,.np-strip,.np-volrow,.np-vol,.np-xheart,.np-phvol,.np-tablevol,.np-heartslot) :is(.tbtn,.tbtn.play,.tbtn.tog,.mutebtn,.np-volbtn,.mixbtn,.npsleep,.eqbtn,.np-zmute),
+.pn-btn-square :is(.np-xheart,.np-heartslot)>*,
+.pn-btn-square .zl-ov,.nowcol .np-ctlpanel.pn-btn-square .zl-ov,.np-ctlpanel.np-flat.pn-btn-square .np-tablevol>.zl-ov{border-radius:3px!important}

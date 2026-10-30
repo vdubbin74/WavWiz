@@ -20,7 +20,7 @@ export function airplayDevCard(S) {
   async function act(x, on) {
     if (busy.has(x.id)) return; busy.add(x.id); paintActs();
     try { await api(on ? '/dev/airplay/disconnect' : '/dev/airplay/connect', { method: 'POST', body: { key: x.id } }); toast(on ? `Disconnected ${x.name}` : `Connected ${x.name}`); }
-    catch (e) { toast(e.message, true); }
+    catch (e) { toast(/experimental/i.test(e.message || '') ? 'AirPlay 2 is off: turn on AirPlay 2 speakers in Settings → Network → AirPlay speakers (experimental).' : e.message, true); }
     busy.delete(x.id); await loadOuts(); paintActs(); window.dispatchEvent(new CustomEvent('wavwiz:airplay-outputs'));
   }
   async function paint() {
@@ -35,7 +35,7 @@ export function airplayDevCard(S) {
         h('td', null, h('b', null, x.name)), h('td', { class: 'mono', style: 'white-space:nowrap' }, (x.addresses[0] || x.host || '?')),
         h('td', { class: 'mono' }, x.raopPort || '–'), h('td', null, x.airplay2 ? `yes (port ${x.airplayPort || '?'})` : 'no'),
         h('td', null, x.codecs || '–'), h('td', null, x.encryption), h('td', null, x.model || '–'), h('td', { class: 'mono', style: 'white-space:nowrap' }, x.route), h('td', { class: 'apd-act', style: 'white-space:nowrap' }, actCell(x))))))),
-      h('div', { class: 'small dim apd-note' }, 'Audio only · experimental. AirPlay 2 needs Settings → Network → AirPlay speakers (experimental) → AirPlay 2 speakers on, plus the PTP firewall rules (UDP 319/320).'));
+      h('div', { class: 'small dim apd-note' }, 'Easier Add is in Devices when AirPlay 2 speakers is on. Audio only · experimental. AirPlay 2 needs Settings → Network → AirPlay speakers (experimental) → AirPlay 2 speakers on, plus the PTP firewall rules (UDP 319/320).'));
   }
   const again = async () => { try { await api('/dev/airplay/query', { method: 'POST' }); } catch (e) { toast(e.message, true); } setTimeout(paint, 1200); };
   box.append(h('div', { class: 'row wrap' }, h('h3', { class: 'grow' }, 'AirPlay speakers (developer)'), h('button', { class: 'btn', onclick: again }, 'Search again')),

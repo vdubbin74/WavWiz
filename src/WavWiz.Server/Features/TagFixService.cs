@@ -45,8 +45,11 @@ public sealed class TagFixService
         var j = _db.Query("SELECT id,status,write_files,created_at,applied_at,undone_at,summary FROM tag_fix_job WHERE id=$i",
             r => new { id = r.GetInt64(0), status = r.GetString(1), writeFiles = r.GetInt32(2) != 0, createdAt = r.GetString(3), appliedAt = r.IsDBNull(4) ? null : r.GetString(4), undoneAt = r.IsDBNull(5) ? null : r.GetString(5), summary = r.IsDBNull(6) ? null : r.GetString(6) }, ("$i", id)).FirstOrDefault();
         if (j == null) return null;
-        var items = _db.Query("SELECT id,track_id,field,old_value,new_value,art_url,approved,applied FROM tag_fix_item WHERE job_id=$j ORDER BY id",
-            r => new { id = r.GetInt64(0), trackId = r.GetInt64(1), field = r.GetString(2), oldValue = r.IsDBNull(3) ? null : r.GetString(3), newValue = r.IsDBNull(4) ? null : r.GetString(4), artUrl = r.IsDBNull(5) ? null : r.GetString(5), approved = r.GetInt32(6) != 0, applied = r.GetInt32(7) != 0 }, ("$j", id));
+        // F153: join track for Title / Artist / Album display. F154: cover rows are back (one per album; Apply saves to the OnlineArt album cache).
+        var items = _db.Query(@"SELECT i.id,i.track_id,i.field,i.old_value,i.new_value,i.art_url,i.approved,i.applied,t.title,t.artist,t.album
+            FROM tag_fix_item i LEFT JOIN track t ON t.id=i.track_id WHERE i.job_id=$j ORDER BY i.id",
+            r => new { id = r.GetInt64(0), trackId = r.GetInt64(1), field = r.GetString(2), oldValue = r.IsDBNull(3) ? null : r.GetString(3), newValue = r.IsDBNull(4) ? null : r.GetString(2) == "cover" ? "cover" : r.GetString(4), artUrl = r.IsDBNull(5) ? null : r.GetString(5), approved = r.GetInt32(6) != 0, applied = r.GetInt32(7) != 0,
+                title = r.IsDBNull(8) ? null : r.GetString(8), artist = r.IsDBNull(9) ? null : r.GetString(9), album = r.IsDBNull(10) ? null : r.GetString(10) }, ("$j", id));
         return new { j.id, j.status, j.writeFiles, j.createdAt, j.appliedAt, j.undoneAt, j.summary, items };
     }
 
@@ -62,6 +65,7 @@ public sealed class TagFixService
         var jobId = _db.Insert("INSERT INTO tag_fix_job(status,write_files,created_at,summary) VALUES('pending',$w,$t,$s)",
             ("$w", writeFilesDefault ? 1 : 0), ("$t", now), ("$s", $"Scanning {tracks.Count} tracks…"));
         int proposals = 0, acoustHits = 0;
+        var coverAlbums = new HashSet<string>(StringComparer.Ordinal);      // F154: one cover row per album (album artist + album)
         var apiKey = ApiKey();
         var fpcalc = FindFpcalc();
         foreach (var tr in tracks)
@@ -126,12 +130,21 @@ public sealed class TagFixService
                     proposals++;
                 }
                 Prop("title", tr.Title, title); Prop("artist", tr.Artist, artist); Prop("album", tr.Album, album);
+                // F154: cover proposal, deduped per album. Album identity = the track's album artist (else artist) + album, falling back to the
+                // proposed names when the current ones are blank/Unknown (so a job that also fixes the album text still lands in the right cache key).
                 if (!tr.HasArt && releaseId != null)
                 {
-                    var artUrl = $"https://coverartarchive.org/release/{releaseId}/front-250";
-                    _db.Exec("INSERT INTO tag_fix_item(job_id,track_id,field,old_value,new_value,art_url,approved) VALUES($j,$t,'cover',NULL,'cover',$a,1)",
-                        ("$j", jobId), ("$t", tr.Id), ("$a", artUrl));
-                    proposals++;
+                    var who = string.IsNullOrWhiteSpace(tr.AlbumArtist) || Library.OnlineArt.IsUnknown(tr.AlbumArtist) ? tr.Artist : tr.AlbumArtist;
+                    if (Library.OnlineArt.IsUnknown(who)) who = artist ?? "";
+                    var alb = Library.OnlineArt.IsUnknown(tr.Album) ? album ?? "" : tr.Album;
+                    var key = Library.OnlineArt.IsUnknown(who) || Library.OnlineArt.IsUnknown(alb) ? null : Library.OnlineArt.Key("album", who, alb);
+                    if (key != null && _art.Online?.CacheKey("album", who, alb) == null && (_lib.Track(tr.Id) is not { } row || _art.Source(row) == null) && coverAlbums.Add(key))
+                    {
+                        var artUrl = $"https://coverartarchive.org/release/{releaseId}/front-250";      // small preview for the Approve list; Apply fetches a larger one
+                        _db.Exec("INSERT INTO tag_fix_item(job_id,track_id,field,old_value,new_value,art_url,approved) VALUES($j,$t,'cover',NULL,'cover',$a,1)",
+                            ("$j", jobId), ("$t", tr.Id), ("$a", artUrl));
+                        proposals++;
+                    }
                 }
             }
             catch { /* skip track */ }
@@ -155,15 +168,18 @@ public sealed class TagFixService
         return null;
     }
 
-    public string? Apply(long jobId)
+    public string? Apply(long jobId) => ApplyAsync(jobId).GetAwaiter().GetResult();
+
+    public async Task<string?> ApplyAsync(long jobId)
     {
         var job = _db.Query("SELECT write_files,status FROM tag_fix_job WHERE id=$i", r => (Wf: r.GetInt32(0) != 0, St: r.GetString(1)), ("$i", jobId)).FirstOrDefault();
         if (job.St == null) return "job not found";
         if (job.St is "applied") return "already applied - use Undo first";
         var items = _db.Query("SELECT id,track_id,field,new_value,art_url FROM tag_fix_item WHERE job_id=$j AND approved=1 AND applied=0",
             r => (Id: r.GetInt64(0), Track: r.GetInt64(1), Field: r.GetString(2), New: r.IsDBNull(3) ? null : r.GetString(3), Art: r.IsDBNull(4) ? null : r.GetString(4)), ("$j", jobId));
-        int n = 0;
-        foreach (var it in items.GroupBy(x => x.Track))
+        int n = 0, covers = 0, embedded = 0, coverSkipped = 0;
+        // text fields first, so a cover row lands under the album name this same job fixed
+        foreach (var it in items.Where(c => c.Field != "cover").GroupBy(x => x.Track))
         {
             var trackId = it.Key;
             string? title = null, artist = null, album = null;
@@ -172,7 +188,6 @@ public sealed class TagFixService
                 if (x.Field == "title") title = x.New;
                 else if (x.Field == "artist") artist = x.New;
                 else if (x.Field == "album") album = x.New;
-                else if (x.Field == "cover" && x.Art != null) { try { _ = x.Art; } catch { } }
                 _db.Exec("UPDATE tag_fix_item SET applied=1 WHERE id=$i", ("$i", x.Id));
                 n++;
             }
@@ -186,17 +201,103 @@ public sealed class TagFixService
                     try { WriteTags(path, title, artist, album); } catch { }
             }
         }
+        // F154 (Wiz lock A/B): cover = download a larger CAA image -> OnlineArt album cache (album artist + album). writeFiles also embeds it into
+        // the album's tracks that have no embedded picture. new_value records "online:<key>" only when this job wrote the cache entry (for Undo).
+        foreach (var x in items.Where(c => c.Field == "cover"))
+        {
+            var t = _lib.Track(x.Track);
+            var who = t == null ? "" : string.IsNullOrWhiteSpace(t.AlbumArtist) || Library.OnlineArt.IsUnknown(t.AlbumArtist) ? t.Artist : t.AlbumArtist;
+            byte[]? img = null;
+            if (t != null && !Library.OnlineArt.IsUnknown(who) && !Library.OnlineArt.IsUnknown(t.Album) && x.Art != null) img = await DownloadCoverAsync(x.Art);
+            if (t == null || img == null) { coverSkipped++; continue; }      // stays unapplied (Album unknown, or download failed) - can Apply again after Undo/rescan
+            string? key = null;
+            if (_art.Online != null)
+            {
+                try { key = _art.Online.PutAlbum(who, t.Album, img); } catch { }
+                if (key != null) _art.ForgetOnline(key);
+            }
+            if (job.Wf)
+                foreach (var (tid, path) in AlbumTracksMissingArt(who, t.Album))
+                    try { EmbedCover(path, img); _db.Exec("UPDATE track SET has_art=1 WHERE id=$i", ("$i", tid)); embedded++; } catch { }
+            _db.Exec("UPDATE tag_fix_item SET applied=1, new_value=$v WHERE id=$i", ("$v", key != null ? "online:" + key : "cover"), ("$i", x.Id));
+            n++; covers++;
+            if (key == null) _ev.Publish("art", new { kind = "album", artist = who, album = t.Album });
+        }
+        var sum = $"Applied {n} change(s)" + (job.Wf ? " (files + database)" : " (database only)")
+            + (covers > 0 ? $"; {covers} album cover(s) saved" + (embedded > 0 ? $", embedded in {embedded} file(s)" : "") : "")
+            + (coverSkipped > 0 ? $"; {coverSkipped} cover(s) skipped (unknown album or download failed)" : "") + ".";
         _db.Exec("UPDATE tag_fix_job SET status='applied',applied_at=$t,summary=$s WHERE id=$i",
-            ("$t", DateTimeOffset.UtcNow.ToString("O")), ("$s", $"Applied {n} change(s)" + (job.Wf ? " (files + database)" : " (database only)") + "."), ("$i", jobId));
+            ("$t", DateTimeOffset.UtcNow.ToString("O")), ("$s", sum), ("$i", jobId));
         _ev.Publish("library"); return null;
+    }
+
+    /// <summary>F154: CAA preview URLs end in -250; on Apply try front-500, then the full front, then the URL as proposed.</summary>
+    public static IEnumerable<string> CoverCandidates(string url)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(url, @"^(https://coverartarchive\.org/(?:release|release-group)/[0-9a-fA-F-]{36}/front)(?:-\d+)?$");
+        if (m.Success) { yield return m.Groups[1].Value + "-500"; yield return m.Groups[1].Value; }
+        if (!m.Success || m.Groups[1].Value != url) yield return url;
+    }
+    private async Task<byte[]?> DownloadCoverAsync(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != "https") return null;
+        foreach (var c in CoverCandidates(url).Distinct())
+        {
+            try
+            {
+                using var resp = await _http.GetAsync(c);
+                if (!resp.IsSuccessStatusCode) continue;
+                var b = await resp.Content.ReadAsByteArrayAsync();
+                if (b.Length > 200 && b.Length < 12_000_000 && Library.ArtService.Sniff(b) != null) return b;
+            }
+            catch { }
+        }
+        return null;
+    }
+    /// <summary>Tracks of an album (album artist or artist match, normalized) with no embedded picture.</summary>
+    private List<(long Id, string Path)> AlbumTracksMissingArt(string who, string album) =>
+        _db.Query("SELECT id,path,artist,album_artist FROM track WHERE missing=0 AND has_art=0 AND album=$al COLLATE NOCASE",
+            r => (Id: r.GetInt64(0), Path: r.GetString(1), A: r.GetString(2), Aa: r.GetString(3)), ("$al", album))
+        .Where(r => Library.OnlineArt.Norm(string.IsNullOrWhiteSpace(r.Aa) || Library.OnlineArt.IsUnknown(r.Aa) ? r.A : r.Aa) == Library.OnlineArt.Norm(who) && File.Exists(r.Path))
+        .Select(r => (r.Id, r.Path)).ToList();
+    /// <summary>Same tag stack as WriteTags: TagLib front cover, only when the file has no picture yet.</summary>
+    private static void EmbedCover(string path, byte[] img)
+    {
+        var tfile = TagLib.File.Create(path);
+        try
+        {
+            if (tfile.Tag.Pictures.Length > 0) return;
+            var pic = new TagLib.Picture(new TagLib.ByteVector(img)) { Type = TagLib.PictureType.FrontCover, Description = "Cover", MimeType = Library.ArtService.Sniff(img) == "png" ? "image/png" : "image/jpeg" };
+            tfile.Tag.Pictures = new TagLib.IPicture[] { pic };
+            tfile.Save();
+        }
+        finally { tfile.Dispose(); }
     }
 
     public string? Undo(long jobId)
     {
-        var items = _db.Query("SELECT id,track_id,field,old_value FROM tag_fix_item WHERE job_id=$j AND applied=1",
-            r => (Id: r.GetInt64(0), Track: r.GetInt64(1), Field: r.GetString(2), Old: r.IsDBNull(3) ? null : r.GetString(3)), ("$j", jobId));
+        var items = _db.Query("SELECT id,track_id,field,old_value,new_value FROM tag_fix_item WHERE job_id=$j AND applied=1",
+            r => (Id: r.GetInt64(0), Track: r.GetInt64(1), Field: r.GetString(2), Old: r.IsDBNull(3) ? null : r.GetString(3), New: r.IsDBNull(4) ? null : r.GetString(4)), ("$j", jobId));
         if (items.Count == 0) return "nothing to undo";
-        foreach (var it in items)
+        // F154 (lock C): covers first, while the album text is still the applied one. Drop only the cache entry this job wrote; never touch files;
+        // has_art re-probed from the files (an embed we did stays, so has_art stays 1 for it - honest to what is on disk).
+        foreach (var it in items.Where(x => x.Field == "cover"))
+        {
+            if (it.New is { } nv && nv.StartsWith("online:", StringComparison.Ordinal) && _art.Online != null)
+            {
+                var key = nv[7..]; _art.Online.Drop(key); _art.ForgetOnline(key);
+                var t = _lib.Track(it.Track);
+                if (t != null)
+                {
+                    var who = string.IsNullOrWhiteSpace(t.AlbumArtist) || Library.OnlineArt.IsUnknown(t.AlbumArtist) ? t.Artist : t.AlbumArtist;
+                    _ev.Publish("art", new { kind = "album", artist = who, album = t.Album });
+                    foreach (var (tid, path) in _db.Query("SELECT id,path FROM track WHERE missing=0 AND album=$al COLLATE NOCASE", r => (r.GetInt64(0), r.GetString(1)), ("$al", t.Album)))
+                        if (File.Exists(path)) _db.Exec("UPDATE track SET has_art=$h WHERE id=$i", ("$h", Library.ArtService.ReadEmbedded(path) != null ? 1 : 0), ("$i", tid));
+                }
+            }
+            _db.Exec("UPDATE tag_fix_item SET applied=0, new_value='cover' WHERE id=$i", ("$i", it.Id));
+        }
+        foreach (var it in items.Where(x => x.Field != "cover"))
         {
             if (it.Field is "title" or "artist" or "album")
                 _db.Exec($"UPDATE track SET {it.Field}=$v WHERE id=$i", ("$v", it.Old ?? ""), ("$i", it.Track));

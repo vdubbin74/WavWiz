@@ -1,6 +1,7 @@
 // WavWiz 0.3.6 K5 / K6: the Speaker Settings column of the expanded Devices view - the widest column (~1050 px at 1920), roomy sliders for volume,
 // volume cap, delay, balance, bass and treble, the EQ and the output, and the speaker PROFILE row (dropdown, Save, Save as with an inline name, modified dot).
 // Profiles are stored on the server (/profiles); loading one snaps the sliders and shows "Loaded <name>". Nothing here opens a window.
+import { wsel } from './wwselect.js';
 import { h, api, toast, debounce } from './util.js';
 import { icon } from './icons.js';
 import { isAdmin, canTune, canControl, ADMIN_HINT } from './ui.js';
@@ -112,7 +113,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   }
 
   // ---- K6 profile row
-  const profSel = h('select', { class: 'spk-prof', 'aria-label': 'Profile', onchange: ev => { const v = ev.target.value; if (v) loadProfile(+v); } });
+  const profSel = wsel({ class: 'spk-prof', 'aria-label': 'Profile', onchange: ev => { const v = ev.target.value; if (v) loadProfile(+v); } });
   const dot = h('i', { class: 'spk-moddot', title: 'Changed since this profile was loaded', hidden: true });
   const saveBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'prof-save', title: 'Save the current settings into this profile', onclick: () => saveProfile(st.profileId, profiles.find(p => p.id === st.profileId)?.name) }, icon('save'), ' Save'), admin, 'Only an admin can save profiles.');
   const asBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'prof-saveas', onclick: () => { naming = true; paintProfile(); } }, 'Save as…'), admin, 'Only an admin can save profiles.');
@@ -174,7 +175,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const eqCtl = h('span', { class: 'spk-eqctl' }, eqOn);
   const paintEqCtl = () => { const on = real ? !real.cur.bypass : false; eqOn.classList.toggle('on', on); eqOn.setAttribute('aria-checked', String(on)); };
   // 0.4.4 F20: one themed dropdown "Preset: <name> ▾" (8 built-ins, then My presets; Custom when the bands match none), Reset + Save as preset beside it
-  const presetSel = ro(h('select', { class: 'eqall-preset spk-presel', 'aria-label': 'Preset', 'data-act': 'preset', onchange: ev => { if (!tune || !real) return; const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p) return; edit(c => { const j = structuredClone(p.json); Object.assign(c, j, { bypass: c.bypass, name: c.name }); }); paintEq(); syncSliders(); paintPresets(); } }), tune, 'Only this device’s own owner or an admin can change the sound.');
+  const presetSel = ro(wsel({ class: 'eqall-preset spk-presel', 'aria-label': 'Preset', 'data-act': 'preset', onchange: ev => { if (!tune || !real) return; const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p) return; edit(c => { const j = structuredClone(p.json); Object.assign(c, j, { bypass: c.bypass, name: c.name }); }); paintEq(); syncSliders(); paintPresets(); } }), tune, 'Only this device’s own owner or an admin can change the sound.');
   const presetRow = h('div', { class: 'spk-presets', 'aria-label': 'Presets' }, h('label', { class: 'dlbl spk-prelbl' }, 'Preset:'), presetSel, resetBtn, saveAsBtn);
   function paintPresets() {
     paintEqCtl(); if (!real) { presetSel.replaceChildren(h('option', { value: '' }, '—')); presetSel.disabled = true; return; }

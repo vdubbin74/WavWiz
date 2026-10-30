@@ -85,6 +85,7 @@ function menuActions(S, ctl, desktop = false) {
     ],
     devices: [
       ['Devices & zones', devPanel, null, null, { pin: 'devices' }],
+      ['Master volume', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer')), null, null, { pin: 'mixer', kbd: keysFor('mixer') }],   // F149
       // 0.3.6 K18: hover submenus listing devices, zones and scenes (click jumps to it), each ending with New… (no Start buttons: File > Run is the one place to start)
       ['Speakers', devPanel, null, null, { sub: () => deviceListSpec(S, { ...ctl, canAdmin: admin }) }],
       ['Zones', devPanel, null, null, { sub: () => zonesSpec(S, { ...ctl, canAdmin: admin }) }],
@@ -259,7 +260,7 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
   nav.append(
     leaf('Now Playing', () => ctl.go?.('now')),
     leaf('Queue', () => (ctl.openQueue ? ctl.openQueue() : ctl.go?.('queue'))),
-    leaf('Volume Mixer', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))),
+    (() => { const b = leaf('Volume Mixer', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))); b.append(pinSpan('mixer')); return b; })(),   // F149: pinnable
     leaf('Library', () => ctl.go?.('library')),
     leaf('Devices & Zones', () => ctl.go?.('devices')),
     ...(isPhoneUa() && !isPlayerUa() ? [leaf('Phone role…', () => changePhoneRole())] : []),

@@ -47,10 +47,10 @@ export function moveCol(l, from, to) {
 }
 /** Pixel widths for the visible columns, adding up to exactly `total` (min widths kept). */
 /** # column floor for a queue of n rows: the grip (14) + cell padding (16) + ~8 px per digit, never below NUM_MIN (so 4-5 digit indices never clip after a bulk add). */
-export const numMinFor = n => Math.max(NUM_MIN, 30 + 8 * String(Math.max(1, n | 0)).length);
+export const numMinFor = n => 26 + 7 * Math.max(2, String(Math.max(1, n | 0)).length);   // F155: snug - grip 14 + pad 4/8 + ~7 px per tabular digit (2 digits min); no 64 px floor
 export function widthsFor(l, total, numMin = NUM_MIN) {
   const ids = visible(l), min = id => (id === 'num' ? numMin : MIN_COL), fr = ids.map(id => l.fracs[id] || 0.1), sum = fr.reduce((a, b) => a + b, 0) || 1;
-  const w = fr.map((f, i) => Math.max(min(ids[i]), Math.floor(total * f / sum)));
+  const w = fr.map((f, i) => (ids[i] === 'num' ? numMin : Math.max(min(ids[i]), Math.floor(total * f / sum))));   // F155: # is content-sized, never a share of the width
   let over = w.reduce((a, b) => a + b, 0) - total;
   // Title takes the leftover space (K1); when over, shrink the widest non-number columns first
   const ti = ids.indexOf('title');

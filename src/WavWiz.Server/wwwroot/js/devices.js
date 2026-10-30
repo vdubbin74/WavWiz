@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler } from './devorder.js';
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
@@ -10,6 +11,7 @@ import { whenIdle } from './slider.js';
 import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
 import { speakerSettings } from './spkset.js';
+import { airplayDevicesStrip } from './airplaydevices.js';   // F159
 import { mixerButton } from './mixer.js';   // 0.4.8 F49
 import { pulse } from './motion.js';
 import { itemArtUrl } from './art.js';
@@ -331,6 +333,7 @@ function ssCompact(S, ctl) {
   const el = ssEl;
   const open = () => ctl.go?.('scenes');
   const paint = d => {
+    const k = JSON.stringify([d.scenes, d.rows, admin, can]); if (el._k === k && el.firstChild) return; el._k = k;   // F151: no rebuild when nothing changed
     const nx = nextEvent(d.rows), skew = d.now ? new Date(d.now) - d.nowAt : 0;
     const cd = nx ? h('span', { class: 'dss-cd', 'data-at': nx.nextRunAt }, ssCountdown(nx.nextRunAt, Date.now() + skew)) : null;
     el.replaceChildren(
@@ -338,7 +341,7 @@ function ssCompact(S, ctl) {
         h('button', { type: 'button', class: 'linkbtn dss-open', title: 'Open Scenes & Schedules', onclick: open }, 'Open'),
         admin ? h('button', { type: 'button', class: 'plus zbtn dss-add', 'aria-label': 'New scene or schedule', title: 'New scene or schedule (opens the full window)', onclick: open }, '+') : null),
       nx ? h('div', { class: 'dss-next' }, h('span', { 'aria-hidden': 'true' }, nx.alarm ? '⏰' : '🗓'), h('span', { class: 'ell grow' }, h('b', null, nx.name), ' ', cd),
-        ro(h('button', { type: 'button', class: 'btn sm dss-skip', title: `Skip the next “${nx.name}”`, onclick: async () => { try { const x = await api(`/schedules/${nx.id}/skip`, { method: 'POST' }); toast(x.skipped ? `Skipping the next “${nx.name}”` : `“${nx.name}” runs as planned`); paint(await loadSS(true)); } catch (e) { toast(e.message, true); } } }, 'Skip'), can, 'Your access is view-only.'))
+        ro(h('button', { type: 'button', class: 'btn sm dss-skip', title: `Skip the next “${nx.name}”`, onclick: async () => { try { const x = await api(`/schedules/${nx.id}/skip`, { method: 'POST' }); toast(x.skipped ? `Skipping the next “${nx.name}”` : `“${nx.name}” runs as planned`); el._k = ''; paint(await loadSS(true)); } catch (e) { toast(e.message, true); } } }, 'Skip'), can, 'Your access is view-only.'))
         : h('p', { class: 'small dim dss-none' }, 'Nothing scheduled.'),
       d.scenes.length ? h('div', { class: 'dss-chips' }, d.scenes.map(sc => ro(h('button', { type: 'button', class: 'chip dss-run', 'data-scene': sc.id, title: `Run the scene “${sc.name}”`,
         onclick: async () => { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`Scene “${sc.name}” applied`); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } }, '▶ ' + sc.name), can, 'Your access is view-only.'))) : null);
@@ -500,12 +503,12 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
   document.addEventListener('focusout', flushSoon, true);
   globalThis.addEventListener?.('blur', up);
 }
-const EDITABLE = /^(INPUT|SELECT|TEXTAREA)$/;
+const EDITABLE = /^(INPUT|SELECT|TEXTAREA)$/; // + BUTTON.wwsel (themed select) checked in userBusyIn
 /** Is the user working inside el right now (focus in a field / slider / dropdown, or a pointer held down in it)? */
 export function userBusyIn(el) {
   if (!el) return false;
   const a = document.activeElement;
-  if (a && EDITABLE.test(a.tagName || '') && el.contains(a)) return true;
+  if (a && (EDITABLE.test(a.tagName || '') || a.classList?.contains('wwsel')) && el.contains(a)) return true;
   return !!(dragEl && el.contains(dragEl)) || !!el.querySelector?.('.dragging') || el.classList?.contains('dragging');
 }
 /** May a live value be written into this control (it has no focus and is not being dragged)? */
@@ -558,6 +561,10 @@ function keepCard(old, S, z, hl, build, busy) {
 /** Keep a section (master row, zones sidebar) while the user is working in it; else take the fresh one. */
 function keepSection(old, fresh, busy) {
   if (old && userBusyIn(old)) { busy.v = true; return old; }
+  // F151b: a status tick (~2 s) rebuilt the master row even when nothing changed - hovering the mixer / mute icon lost :hover and its
+  // tooltip every tick (flash). Same markup = keep the live node.
+  if (old && fresh && old.outerHTML === fresh.outerHTML) return old;
+  if (old && fresh && old.isConnected && hov42(old)) return old;   // F151b: pointer on Mute / mixer: keep until it leaves
   return fresh;
 }
 const childCards = (parent, cls) => new Map([...parent.children].filter(e => e.classList.contains(cls) && e.dataset.zoneId != null).map(e => [e.dataset.zoneId, e]));
@@ -689,16 +696,16 @@ function outputPicker(S, ctl, z) {
   const cur = chosenOutput(z);
   let el;
   if (z.outputUnavailable) {
-    el = h('select', { class: 'dsel warn', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) },
+    el = wsel({ class: 'dsel warn', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) },
       h('option', { value: '', selected: true }, '⚠ Output unavailable'), ...outs.filter(o => o.connected).map(o => h('option', { value: o.endpointDbId }, `${outputLabel(o)} — ${dms(o)}`)));
   } else if (outs.length <= 1) {
     // 0.4.3 #8: always a picker ("Output device"), disabled when there is nothing else to choose
-    el = h('select', { class: 'dsel dsingle', 'aria-label': `${z.name} output device`, disabled: true, title: 'This is the only output this device reports' },
+    el = wsel({ class: 'dsel dsingle', 'aria-label': `${z.name} output device`, disabled: true, title: 'This is the only output this device reports' },
       h('option', { selected: true }, z.isWeb ? 'This browser’s default output' : cur ? outputLabel(cur) : 'No output reported yet'));
   } else {
-    el = h('select', { class: 'dsel', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) }, ...outs.map(o => h('option', { value: o.endpointDbId, selected: o === cur, disabled: !o.connected }, `${outputLabel(o)}${o.connected ? '' : ' (unplugged)'}`)));
+    el = wsel({ class: 'dsel', 'aria-label': `${z.name} output`, onchange: ev => pick(ev.target.value) }, ...outs.map(o => h('option', { value: o.endpointDbId, selected: o === cur, disabled: !o.connected }, `${outputLabel(o)}${o.connected ? '' : ' (unplugged)'}`)));
   }
-  if (el.tagName === 'SELECT' && !el.disabled) ro(el, can, hint);
+  if (!el.disabled) ro(el, can, hint);
   async function pick(id) { if (!id) return; try { await api(`/zones/${z.id}/output`, { method: 'POST', body: { endpointId: +id } }); toast('Output switched - its own delay is back'); ctl.refreshAll(); } catch (e) { toast(e.message, true); ctl.refreshAll(); } }
   return { el, patch: () => {} };
 }
@@ -794,8 +801,33 @@ export function patchLive42(cur, fresh) {
   const pairs = [];
   for (const sel of LIVE42) { const a = cur.querySelectorAll(sel), b = fresh.querySelectorAll(sel); if (a.length !== b.length) return 0; a.forEach((x, i) => pairs.push([x, b[i]])); }
   const ae = document.activeElement; let all = 1;
-  for (const [x, y] of pairs) { if (x.outerHTML === y.outerHTML) continue; if ((ae && x.contains(ae)) || x.querySelector('input:active')) { all = 2; continue; } x.replaceWith(y); }
+  for (const [x, y] of pairs) { if (x.outerHTML === y.outerHTML) continue; if ((ae && x.contains(ae)) || x.querySelector('input:active') || hov42(x)) { all = 2; continue; } x.replaceWith(y); }
   return all;   // 1 = all patched, 2 = some part in use (patched later), 0 = rebuild
+}
+/** F151: same layout (the same rows in the same order) -> replace only the rows / zone cards / box shells that changed, return 1 (2 = a row in
+ *  use was left for later); 0 = layout differs, caller rebuilds. */
+const hov42 = x => !!x.querySelector?.('button:hover,a:hover,[role=switch]:hover,[title]:hover');   // F151b: pointer on a control: defer the swap (keeps cursor + tooltip)
+const ROWS42 = '.qb42,.zcard42,.sp42';
+const rowId42 = x => (x.dataset.leaderId || '') + '|' + (x.dataset.groupId || '') + '|' + (x.dataset.deviceId || '') + '|' + x.tagName;
+export function patchRows42(cur, fresh) {
+  if (cur.outerHTML === fresh.outerHTML) return 1;
+  const a = [...cur.querySelectorAll(ROWS42)], b = [...fresh.querySelectorAll(ROWS42)];
+  if (a.length !== b.length || a.some((x, i) => rowId42(x) !== rowId42(b[i]))) return 0;
+  const LS = LIVE42.join(','), la = [...cur.querySelectorAll(LS)], lb = [...fresh.querySelectorAll(LS)]; if (la.length !== lb.length) return 0;
+  const skel = t => { const c = t.cloneNode(true); for (const n of c.querySelectorAll(LS)) n.replaceChildren(); for (const n of [...c.querySelectorAll(ROWS42)].reverse()) { if (!n.querySelector(ROWS42)) n.replaceChildren(); for (const at of [...n.attributes]) n.removeAttribute(at.name); } return c.outerHTML; };
+  if (skel(cur) !== skel(fresh)) return 0;   // something outside the rows changed: rebuild
+  const html = b.map(y => y.outerHTML), lhtml = lb.map(y => y.outerHTML), shell = x => x.cloneNode(false).outerHTML;
+  const ae = document.activeElement, inUse = x => (ae && x.contains(ae)) || !!x.querySelector('input:active') || !!(dragEl && x.contains(dragEl)) || hov42(x);
+  let all = 1;
+  // leaf rows whose contents changed are swapped whole (fresh listeners); an outer box only gets its attributes copied
+  for (let i = a.length - 1; i >= 0; i--) {
+    const x = a[i], y = b[i];
+    if (!x.querySelector(ROWS42)) { if (x.outerHTML === html[i]) continue; if (inUse(x)) { all = 2; continue; } x.replaceWith(y); continue; }
+    if (shell(x) !== shell(y)) { for (const at of [...x.attributes]) if (!y.hasAttribute(at.name)) x.removeAttribute(at.name); for (const at of [...y.attributes]) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value); }
+  }
+  // live parts outside the swapped rows (box heads: now playing, volume)
+  la.forEach((x, i) => { if (!cur.contains(x) || x.outerHTML === lhtml[i]) return; if (inUse(x)) { all = 2; return; } x.replaceWith(lb[i]); });
+  return all;
 }
 function tree42Kit(S, ctl, X) {
   // 0.4.2: the tree is rebuilt only when what it shows changed (a position tick alone repaints at most every 10 s), and never while a drag or slider is in use
@@ -812,6 +844,10 @@ function tree42Kit(S, ctl, X) {
   const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock };
   const treeNode = force => {
     const sg = sig42(), lv = live42(); if (!force && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
+    // F151: a status flap (online / buffering / muted / cap) changed sig42 but not the tree's layout: swap only the rows that differ instead of
+    // rebuilding the whole tree (that rebuild was the occasional "Devices reloads" flash: art re-decoded, scroll + hover reset)
+    if (!force && tnode && tnode.isConnected) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { tsig = sg; if (r === 1) tlive = lv; return tnode; } }
+    if (!force && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b: pointer on a tree control: defer the full rebuild (tsig unchanged -> retried next tick)
     const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : '' } : null;
     tnode = treeEl(S, ctl, kit42, st42); tsig = sg; tlive = lv; tnode._top = top;
     if (keep) queueMicrotask(() => { if (document.activeElement?.closest?.('.tree42')) return;   // 0.4.9 F82: the same control (speaker, else zone, by its first class) gets focus back
@@ -833,7 +869,7 @@ function tree42Kit(S, ctl, X) {
     const hint = h('div', { class: 'small dim dhint42' }, dcol.closest('.e42') ? HINT42 : HINT42.replace(' on the right', ''));
     const key = jbSel ? 'jb' : spZ ? 's' + spZ.id : zg ? 'z' + zg.id : 'none';
     let pnl = dcol.querySelector('.d42-pane');
-    if (!pnl || pnl.dataset.key !== key || (!spZ && pnl._sig !== sig42() && !pnl.contains(document.activeElement))) {
+    if (!pnl || pnl.dataset.key !== key || (!spZ && pnl._sig !== sig42() && !pnl.contains(document.activeElement) && !hov42(pnl))) {
       pnl?.firstChild?._destroy?.();
       pnl = h('div', { class: 'd42-pane', 'data-key': key });
       if (spZ) {
@@ -846,13 +882,15 @@ function tree42Kit(S, ctl, X) {
       } else if (jbSel) { jbUserOpen = true; const c = jukeboxCard(S, ctl); if (c) { c.classList.add('jbpane76'); pnl.append(h('div', { class: 'pane-h dsec-h' }, h('span', null, 'JUKEBOX ZONE SETTINGS')), c); } }
       else if (zg) pnl.append(zonePane(S, ctl, kit42, zg, st42)); else pnl.append(h('p', { class: 'dim small pad' }, 'No zones yet. Use + in the tree to create one.'));
       pnl._sig = sig42();
+      const was = dcol.querySelector('.d42-pane');   // F151: a rebuilt pane that looks the same keeps the shown one (its fade-in replayed = flash)
+      if (was && was.dataset.key === key && !spZ && !jbSel && was.innerHTML === pnl.innerHTML) { was._sig = pnl._sig; pnl.firstChild?._destroy?.(); pnl = was; }
     } else if (spZ) pnl.firstChild?._patch?.(spZ);
     reconcile(dcol, [crumbEl, hint, pnl]);
   }
   /** The speaker page's ZONE row: which zone it is in + Move to zone. */
   function zoneRow42(z, groups) {
     const mine = groups.find(g => (g.deviceIds || []).includes(z.id)), admin = isAdmin(S);
-    const sel = h('select', { class: 'spk-zsel', 'aria-label': 'Move to zone', 'data-act': 'move-zone', onchange: async ev => { const v = ev.target.value, to = v === '' ? null : +v; try { for (const op of movePlan(S.groups, z.id, to)) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); toast(to == null ? `${z.name} is now unassigned` : `${z.name} moved`); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } },
+    const sel = wsel({ class: 'spk-zsel', 'aria-label': 'Move to zone', 'data-act': 'move-zone', onchange: async ev => { const v = ev.target.value, to = v === '' ? null : +v; try { for (const op of movePlan(S.groups, z.id, to)) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); toast(to == null ? `${z.name} is now unassigned` : `${z.name} moved`); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } },
       h('option', { value: '', selected: !mine }, 'Unassigned'), ...groups.map(g => h('option', { value: g.id, selected: mine?.id === g.id }, g.name)));
     return h('div', { class: 'spk-zonerow' }, h('span', { class: 'dlbl' }, 'ZONE'), h('b', { class: 'spk-zname' }, mine?.name || 'Unassigned'), h('span', { class: 'dlbl' }, 'MOVE TO ZONE'), ro(sel, admin, 'Only an administrator can change zones.'));
   }
@@ -916,7 +954,7 @@ export function devicesPanel(S, ctl) {
       body.classList.remove('rich');
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main e42' });
       emain.classList.add('e42'); emain.classList.remove('e1', 'spk-open');
-      reconcile(etop, [castBar(S, ctl, etop), keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));
+      reconcile(etop, [castBar(S, ctl, etop), keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));   // F163: the AirPlay strip moved under the Speakers tree (tcol)
       alignMasterSoon(body);
       const sscol = kid(emain, 'sscol') || h('div', { class: 'sscol ecol' });
       if (!sscol.firstChild) sscol.append(scenesColumn(S, { refresh: ctl.refreshAll, zones: () => S.zones, groups: () => S.groups || [] })); else sscol.firstChild._refresh?.();
@@ -924,6 +962,7 @@ export function devicesPanel(S, ctl) {
       paintDetail(dcol, groups);
       const tcol = kid(emain, 'tcol42') || h('div', { class: 'tcol42 ecol' });
       const tn = treeNode(force); if (tcol.firstChild !== tn) { tcol.replaceChildren(tn); restoreScroll(tcol); }
+      { const ap = airplayDevicesStrip(S, ctl); if (ap && tn.nextSibling !== ap) tn.after(ap); }   // F163: quiet Add AirPlay… right after the tree (Unassigned)
       reconcile(emain, [sscol, dcol, tcol]);
       reconcile(body, [etop, emain]);
       if (busy.v) later();
@@ -1013,7 +1052,7 @@ export function devicesView(S, ctl) {
     if (sel42) { T.paintDetail(pdet, orderedGroups(S.groups || [])); const z = X.spk != null ? (S.zones || []).find(x => x.id === X.spk) : null, g = X.zsel != null ? (S.groups || []).find(x => x.id === X.zsel) : null;
       ptitle.textContent = z ? `Speaker: ${z.name}` : g ? `Zone: ${g.name}` : 'Settings'; pwrap.setAttribute('aria-label', ptitle.textContent); }
     document.documentElement.classList.toggle('pd42-open', sel42);
-    reconcile(list, [T.treeNode(false), sel42 ? pwrap : null].filter(Boolean));   // 0.4.4 F23: the same wrap every tick (a new one re-attached the open speaker page: flash, scroll + focus lost)
+    reconcile(list, [T.treeNode(false), airplayDevicesStrip(S, ctl), sel42 ? pwrap : null].filter(Boolean));   // F159: AirPlay speakers under the speakers   // 0.4.4 F23: the same wrap every tick (a new one re-attached the open speaker page: flash, scroll + focus lost)
     const live = S.zones.some(z => z.enabled && z.connected);
     foot.replaceChildren(h('span', { class: 'dot ' + (live ? 'ok' : 'warn') }), live ? 'Synced playback active' : 'No device is switched on and connected', h('span', { class: 'grow' }),
       canControl(S) ? h('button', { class: 'btn', onclick: () => openCalibration(S, ctl.refreshAll) }, '🎤 Calibrate') : null);
@@ -1151,13 +1190,13 @@ const tagEls3 = list => list.map(t => { const tip = TAG_ACTIONS[t.k]; return h('
 /** 0.4.4 F19: where a tag leads, inside an open speaker page / zone page. */
 export function tagFocusTarget(kind, pane) {
   if (!pane) return null;
-  const row = lbl => { const l = [...pane.querySelectorAll('.spk-l span, .dlbl, label')].find(e => e.textContent.trim().toLowerCase().startsWith(lbl)); let r = l; for (let i = 0; r && i < 4; i++, r = r.parentElement) { const x = r.querySelector('input[type=range], select'); if (x) return x; } return null; };
+  const row = lbl => { const l = [...pane.querySelectorAll('.spk-l span, .dlbl, label')].find(e => e.textContent.trim().toLowerCase().startsWith(lbl)); let r = l; for (let i = 0; r && i < 4; i++, r = r.parentElement) { const x = r.querySelector('input[type=range], select, .wwsel'); if (x) return x; } return null; };
   if (kind === 'capped') return row('max volume') || pane.querySelector('input[type=range]');
   if (kind === 'nodelay') return row('delay') || pane.querySelector('.calbtn');
   if (kind === 'ref') return pane.querySelector('.calbtn');
   if (kind === 'offline' || kind === 'bt') { const ok = e => e && !e.disabled ? e : null;
     const lbl = [...pane.querySelectorAll('.dlbl')].find(e => /output device/i.test(e.textContent)); if (lbl) lbl.tabIndex = -1;
-    return ok(pane.querySelector('select[aria-label$="output device"]')) || (kind === 'bt' ? ok(pane.querySelector('.calbtn')) : null) || lbl || null; }
+    return ok(pane.querySelector('.wwsel[aria-label$="output device"]')) || (kind === 'bt' ? ok(pane.querySelector('.calbtn')) : null) || lbl || null; }
   return null;
 }
 const tagNav = { panel: null, page: null };

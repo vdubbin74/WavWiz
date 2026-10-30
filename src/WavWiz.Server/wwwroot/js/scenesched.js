@@ -1,6 +1,7 @@
 // WavWiz 0.3.0 §5: ONE "Scenes & Schedules" window (replaces the separate Scenes and Schedules pages). Same dialog shell and size as Settings
 // (up to 1200 px); a full-screen sheet on phones (< 900 px). Roles: View = read-only with disabled buttons + ADMIN tag; Control = Run scenes,
 // Run now / Skip next / Snooze / Stop; Admin = everything. The UI checks isAdmin before offering edit actions (the API requires Admin for them).
+import { wsel } from './wwselect.js';
 import * as Z from './zones40.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { canControl, isAdmin, adminOnly } from './ui.js';
@@ -189,13 +190,13 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   const hint = h('span', { class: 'small warn-t ss-hint', role: 'status' });
   const save = h('button', { class: 'btn primary', type: 'button' }, 'Save');
   const segA = h('div', { class: 'seg ss-what', role: 'radiogroup', 'aria-label': 'What should happen?' });
-  const src = h('select', { 'aria-label': 'Source' }, [['playlist', 'Playlist'], ['album', 'Album'], ['track', 'Song'], ['radio', 'Radio']].map(([v, t]) => h('option', { value: v, selected: (p.source || (r?.action === 'play_radio' ? 'radio' : 'playlist')) === v }, t)));
-  const pick = h('select', { 'aria-label': 'What to play' }); const pickQ = h('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search what to play' });
-  const sceneSel = h('select', { 'aria-label': 'Scene' }, h('option', { value: '' }, '—'), (data.scenes || []).map(x => h('option', { value: x.id, selected: (p.sceneId) === x.id }, x.name)));
-  const onWhat = h('select', { 'aria-label': 'Play on' }, h('option', { value: 'speakers', selected: !p.sceneId }, 'Speakers'), h('option', { value: 'scene', selected: !!p.sceneId }, 'A scene'));
+  const src = wsel({ 'aria-label': 'Source' }, [['playlist', 'Playlist'], ['album', 'Album'], ['track', 'Song'], ['radio', 'Radio']].map(([v, t]) => h('option', { value: v, selected: (p.source || (r?.action === 'play_radio' ? 'radio' : 'playlist')) === v }, t)));
+  const pick = wsel({ 'aria-label': 'What to play' }); const pickQ = h('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search what to play' });
+  const sceneSel = wsel({ 'aria-label': 'Scene' }, h('option', { value: '' }, '—'), (data.scenes || []).map(x => h('option', { value: x.id, selected: (p.sceneId) === x.id }, x.name)));
+  const onWhat = wsel({ 'aria-label': 'Play on' }, h('option', { value: 'speakers', selected: !p.sceneId }, 'Speakers'), h('option', { value: 'scene', selected: !!p.sceneId }, 'A scene'));
   const chosen = new Set(p.deviceIds || []);
   // 0.4.0: which zone's music (and speakers) the alarm / stop acts on; "Everything" = today's behavior
-  const zoneT = h('select', { 'aria-label': 'Zone', 'data-zone-target': '' }, h('option', { value: '' }, 'Everything (all linked zones)'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k, selected: p.zoneKey === k }, n)), p.zoneKey && !Z.targetKeys(S.groups, S.jb).some(([k]) => k === p.zoneKey) ? h('option', { value: p.zoneKey, selected: true }, 'Zone unavailable') : null);
+  const zoneT = wsel({ 'aria-label': 'Zone', 'data-zone-target': '' }, h('option', { value: '' }, 'Everything (all linked zones)'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k, selected: p.zoneKey === k }, n)), p.zoneKey && !Z.targetKeys(S.groups, S.jb).some(([k]) => k === p.zoneKey) ? h('option', { value: p.zoneKey, selected: true }, 'Zone unavailable') : null);
   zoneT.addEventListener('change', () => preview());
   // 0.4.2: alarms and schedules target ZONES only. The chips are zones; the stored deviceIds are the speakers of the chosen zones (an older alarm keeps any speaker it already had).
   const zs = (S.groups || []).filter(g => (g.deviceIds || []).length), inZ = new Set(zs.flatMap(g => g.deviceIds)), legacy = [...chosen].filter(id => !inZ.has(id));
@@ -206,8 +207,8 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
   const sv = rng(p.startVol ?? 10, 'Start volume'), ev2 = rng(p.endVol ?? 40, 'End volume');
   const fade = h('input', { type: 'range', min: 0, max: 30, step: 1, 'data-coarse': 5, value: p.fadeMin ?? 5, 'aria-label': 'Fade in over (minutes)', oninput: () => preview() });
   const fadeOut = h('span', { class: 'small mono' }, `${p.fadeMin ?? 5} min`); fade.addEventListener('input', () => { fadeOut.textContent = `${fade.value} min`; });
-  const snooze = h('select', { 'aria-label': 'Snooze' }, [5, 9, 15].map(m => h('option', { value: m, selected: (p.snoozeMin ?? 9) === m }, `${m} min`)));
-  const autoStop = h('select', { 'aria-label': 'Stop by itself' }, [[30, 'after 30 min'], [60, 'after 1 h'], [0, 'never']].map(([m, t]) => h('option', { value: m, selected: (p.autoStopMin ?? 30) === m }, t)));
+  const snooze = wsel({ 'aria-label': 'Snooze' }, [5, 9, 15].map(m => h('option', { value: m, selected: (p.snoozeMin ?? 9) === m }, `${m} min`)));
+  const autoStop = wsel({ 'aria-label': 'Stop by itself' }, [[30, 'after 30 min'], [60, 'after 1 h'], [0, 'never']].map(([m, t]) => h('option', { value: m, selected: (p.autoStopMin ?? 30) === m }, t)));
   const vols = (S.zones || []).map(z => { const ex = (p.devices || []).find(x => x.deviceId === z.id); return { z, r: rng(Math.round(ex?.volume ?? z.volume), `${z.name} volume`) }; });
   const items = { playlist: [], album: [], track: [], radio: data.stations || [] };
   const sentence = h('p', { class: 'ss-sentence', 'aria-live': 'polite' });
@@ -297,9 +298,9 @@ export function openScheduleEditor(S, r, kind, data, done, host = null, onClose 
 export function openSleep(S, done, anchor = null) {
   document.querySelector('.sleepmenu')?.remove();
   anchor = anchor || document.querySelector('.npsleep:not([hidden])') || document.getElementById('sleepchip');
-  const zones = S.zones || []; const zoneSel = h('select', { 'aria-label': 'Which speakers' }, h('option', { value: '' }, 'All speakers'), zones.map(z => h('option', { value: z.id }, z.name)));
+  const zones = S.zones || []; const zoneSel = wsel({ 'aria-label': 'Which speakers' }, h('option', { value: '' }, 'All speakers'), zones.map(z => h('option', { value: z.id }, z.name)));
   // 0.4.0: a timer for one zone stops that zone's music (and fades its speakers); "Everything" is the old behavior
-  const zoneT = Z.targetKeys(S.groups, S.jb).length > 1 ? h('select', { 'aria-label': 'Which zone', 'data-sleep-zone': '' }, h('option', { value: '' }, 'Every zone'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k }, n))) : null;
+  const zoneT = Z.targetKeys(S.groups, S.jb).length > 1 ? wsel({ 'aria-label': 'Which zone', 'data-sleep-zone': '' }, h('option', { value: '' }, 'Every zone'), Z.targetKeys(S.groups, S.jb).map(([k, n]) => h('option', { value: k }, n))) : null;
   const custom = h('input', { type: 'number', min: 1, max: 1440, value: 20, 'aria-label': 'Minutes', style: 'width:72px', hidden: true, onkeydown: ev => { if (ev.key === 'Enter') set('custom'); } });
   const close = () => { menu.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); };
   const out = ev => { if (!menu.contains(ev.target) && ev.target !== anchor && !anchor?.contains?.(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') close(); };
@@ -359,7 +360,7 @@ export function scenesColumn(S, { refresh } = {}) {
   const root = h('section', { class: 'ssc-col', 'aria-label': 'Scenes and schedules' });
   let data = { scenes: [], rows: [], stations: [], now: null, server: null, profiles: [] }, editing = null;   // editing: {kind:'scene'|'sched'|'capture', id|null, kind2}
   const freshProfiles = async () => { try { data.profiles = await api('/profiles'); } catch { /* keep */ } };   // 0.3.6 K7: a profile saved a moment ago is in the picker
-  const busy = () => !!editing || !!root.querySelector('input:focus,select:focus');
+  const busy = () => !!editing || !!root.querySelector('input:focus,select:focus,.wwsel:focus,.wwsel[aria-expanded=true]');
   async function load(force) {
     if (!force && busy()) return;
     try { const [scenes, rows, ck, stations, profiles] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock').catch(() => ({})), api('/radio').catch(() => []), api('/profiles').catch(() => [])]);
@@ -432,11 +433,15 @@ export function scenesColumn(S, { refresh } = {}) {
       const out = h('span', { class: 'mono small ss-pct' }, `${Math.round(ex ? ex.volume : z.volume)}%`);
       const vol = h('input', { type: 'range', min: 0, max: 100, step: 1, 'data-coarse': 5, value: Math.round(ex ? ex.volume : z.volume), class: 'grow', 'aria-label': `${z.name} volume`, oninput: ev => { out.textContent = ev.target.value + '%'; } });
       // 0.3.6 K7: an optional speaker profile per device - loaded first, then the scene's on/off and volume (zones are never touched by profiles)
-      const prof = h('select', { class: 'ss-prof', 'aria-label': `${z.name} profile`, title: 'Load a speaker profile on this device when the scene runs', 'data-dev': z.id },
+      const prof = wsel({ class: 'ss-prof', 'aria-label': `${z.name} profile`, title: 'Load a speaker profile on this device when the scene runs', 'data-dev': z.id },
         h('option', { value: '' }, 'No profile'), ...(data.profiles || []).map(p => h('option', { value: p.id, selected: ex?.profileId === p.id }, p.name)));
       const m = { z, vol, prof, get en() { return en; } };
-      const pill = pillEl(en, `${z.name} in this scene`, true, v => { en = v; pill.classList.toggle('on', v); pill.setAttribute('aria-checked', String(v)); pill.onclick = ev => { ev.stopPropagation(); en = !en; pill.classList.toggle('on', en); pill.setAttribute('aria-checked', String(en)); }; });
-      m.row = h('div', { class: 'row ss-mem' }, h('span', { class: 'ss-mn ell' }, z.name), pill, (data.profiles || []).length ? prof : null, vol, out); return m; });
+      // F147: two-line speaker block - row 1 name / ON-OFF / Profile, row 2 Volume label / full-width track / one % readout; OFF keeps the row, slider dimmed + disabled
+      const sync = () => { vol.disabled = !en; m.row?.classList.toggle('off', !en); };
+      const pill = pillEl(en, `${z.name} in this scene`, true, v => { en = v; pill.classList.toggle('on', v); pill.setAttribute('aria-checked', String(v)); sync(); pill.onclick = ev => { ev.stopPropagation(); en = !en; pill.classList.toggle('on', en); pill.setAttribute('aria-checked', String(en)); sync(); }; });
+      m.row = h('div', { class: 'ss-mem ss-mem2' }, h('div', { class: 'row ss-mtop' }, h('span', { class: 'ss-mn ell', title: z.name }, z.name), pill, (data.profiles || []).length ? prof : null),
+        h('div', { class: 'row ss-mvol' }, h('span', { class: 'ss-vl small dim' }, 'Volume'), vol, out));
+      sync(); return m; });
     const err = h('span', { class: 'small err', role: 'status' });
     const body = () => ({ name: name.value, icon: iconIn.value, members: members.map(m => ({ deviceId: m.z.id, enabled: m.en, volume: +m.vol.value, profileId: m.prof.value ? +m.prof.value : null })) });
     const save = async () => { try { if (sc) await api(`/scenes/${sc.id}`, { method: 'PUT', body: body() }); else await api('/scenes', { method: 'POST', body: body() }); toast('Scene saved'); reload(); } catch (e) { err.textContent = 'Not saved: ' + e.message; } };

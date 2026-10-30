@@ -73,6 +73,26 @@ public sealed class OnlineArt : IDisposable
     public byte[]? Artist(string name) => Get("artist", name, "");
     public string? CacheKey(string kind, string a, string b = "") { if (IsUnknown(a) || (kind == "album" && IsUnknown(b))) return null; var k = Key(kind, a, b); return File.Exists(PathOf(k)) ? k : null; }
 
+    /// <summary>F154: Tag Fix Apply - save an approved album cover into this cache (same key Library uses). Returns the key, or null for unknown names / bad bytes.
+    /// An existing cached picture is never overwritten (returns null) so Undo only removes what Tag Fix wrote.</summary>
+    public string? PutAlbum(string artist, string album, byte[] bytes)
+    {
+        if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(album) || IsUnknown(artist) || IsUnknown(album)) return null;
+        if (bytes is not { Length: > 200 } || bytes.Length >= 12_000_000) return null;
+        var key = Key("album", artist, album); var file = PathOf(key);
+        if (File.Exists(file)) return null;
+        var tmp = file + ".tf.tmp"; File.WriteAllBytes(tmp, bytes); File.Move(tmp, file, true);
+        TryDelete(MissOf(key)); TryDelete(RetryOf(key));
+        try { Arrived?.Invoke("album", artist, album); } catch { }
+        return key;
+    }
+    /// <summary>F154: Tag Fix Undo - drop a cached picture by key (miss/back-off files too).</summary>
+    public void Drop(string key)
+    {
+        if (string.IsNullOrEmpty(key) || key.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || key.Contains("..")) return;
+        TryDelete(PathOf(key)); TryDelete(MissOf(key)); TryDelete(RetryOf(key));
+    }
+
     private byte[]? Get(string kind, string a, string b)
     {
         if (string.IsNullOrWhiteSpace(a) || (kind == "album" && string.IsNullOrWhiteSpace(b))) return null;

@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { h, api, toast } from './util.js';
 
 export function ripView(S) {
@@ -6,9 +7,9 @@ export function ripView(S) {
     if (S.auth.role !== 'admin') { root.replaceChildren(h('p', { class: 'dim' }, 'CD ripping needs administrator access.')); return; }
     let drives = { drives: [] }, formats = { formats: [] }, jobs = [];
     try { [drives, formats, jobs] = await Promise.all([api('/rip/drives'), api('/rip/formats'), api('/rip/jobs')]); } catch (e) { root.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
-    const drive = h('select', null, (drives.drives || []).map(d => h('option', { value: d.letter }, `${d.letter} ${d.ready ? (d.label || 'ready') : '(no disc)'}`)));
+    const drive = wsel(null, (drives.drives || []).map(d => h('option', { value: d.letter }, `${d.letter} ${d.ready ? (d.label || 'ready') : '(no disc)'}`)));
     if (!(drives.drives || []).length) drive.append(h('option', { value: '' }, 'No optical drive detected'));
-    const format = h('select', null, (formats.formats || []).map(f => h('option', { value: f.id, disabled: !f.available, selected: f.id === (formats.defaultFormat || 'flac') }, `${f.name}${f.available ? '' : ' — unavailable'}`)));
+    const format = wsel(null, (formats.formats || []).map(f => h('option', { value: f.id, disabled: !f.available, selected: f.id === (formats.defaultFormat || 'flac') }, `${f.name}${f.available ? '' : ' — unavailable'}`)));
     const artist = h('input', { type: 'text', placeholder: 'Artist', maxlength: 120 });
     const album = h('input', { type: 'text', placeholder: 'Album', maxlength: 120 });
     root.replaceChildren(

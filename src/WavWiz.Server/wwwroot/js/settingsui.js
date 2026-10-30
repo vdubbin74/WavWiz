@@ -1,5 +1,6 @@
 // WavWiz 0.3.0 §7: Settings polish helpers - inline "Saved ✓", "Learn more", Admin tags, Reset this section, the header search, friendly role
 // names, Backup and restore, the Calibration sub-tab extras and the Jukebox tab.
+import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly } from './ui.js';
 import { jbPreview } from './jukebox-preview.js';
@@ -130,7 +131,7 @@ export function jukeboxPane(S, settings, { admin }) {
     const tog = (k, l) => h('label', { class: 'row' }, h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg[k], 'aria-label': l, onchange: ev => save({ [k]: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })), l);
     const multi = (list, key, label, val, txt) => h('div', { class: 'jbsrc', role: 'group', 'aria-label': label }, list.length ? list.map(x => h('label', { class: 'row small' }, A(h('input', { type: 'checkbox', checked: (cfg[key] || []).includes(val(x)), onchange: ev => { const set = new Set(cfg[key] || []); ev.target.checked ? set.add(val(x)) : set.delete(val(x)); save({ [key]: [...set] }, ev.target); } })), txt(x))) : h('span', { class: 'small dim' }, 'None yet.'));
     const pin = A(h('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: 8, placeholder: cfg.hasPin ? '•••• (set)' : '4-8 digits', 'aria-label': 'Host PIN', style: 'width:120px' }));
-    const fillSel = A(h('select', { 'aria-label': 'Auto-fill from', onchange: ev => save({ autofill: { ...cfg.autofill, kind: 'playlist', id: +ev.target.value || null } }, ev.target) }, h('option', { value: '' }, 'Off'), playlists.map(p => h('option', { value: p.id, selected: cfg.autofill?.id === p.id }, p.name))));
+    const fillSel = A(wsel({ 'aria-label': 'Auto-fill from', onchange: ev => save({ autofill: { ...cfg.autofill, kind: 'playlist', id: +ev.target.value || null } }, ev.target) }, h('option', { value: '' }, 'Off'), playlists.map(p => h('option', { value: p.id, selected: cfg.autofill?.id === p.id }, p.name))));
     box.replaceChildren(
       h('div', { class: 'card jbstyle', id: 'sec-jbstyle' }, h('h3', null, 'Display style ', admin ? null : adminTag()), h('p', { class: 'small dim' }, 'How the guest TV screen looks. Guests’ phones follow the same style.'),
         (cards.replaceChildren(card('modern', 'Modern (default)', 'Clean, follows your theme'), card('retro', 'Retro CD', 'Chrome-and-neon CD jukebox')), cards),

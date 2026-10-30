@@ -35,6 +35,13 @@ public sealed class ArtService
     public Func<byte[], bool>? ValidatorOverride { get; set; }
     /// <summary>0.3.2 F10: forget every "no picture" answer (on upgrade and when asked).</summary>
     public void ClearNegative() => _none.Clear();
+    /// <summary>F154: forget resized thumbnails (and the negative entry) built from an online cache key, so Tag Fix Apply/Undo shows at once.</summary>
+    public void ForgetOnline(string key)
+    {
+        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes("online|" + key))).ToLowerInvariant();
+        _none.TryRemove(hash, out _);
+        foreach (var size in Sizes) { try { var f = Path.Combine(_cache, $"v{CacheVersion}-{hash}-{size}.jpg"); if (File.Exists(f)) File.Delete(f); } catch { } }
+    }
     public int NegativeCount => _none.Count;
     static void LogValidator(string msg)
     {

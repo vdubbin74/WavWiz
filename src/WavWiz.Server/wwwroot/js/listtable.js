@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { h, fmtDur, fmtTime } from './util.js';
 import * as Z from './zones40.js';
 import { setChev, icon, setIcon } from './icons.js';
@@ -64,7 +65,7 @@ export function listTable(S, ctl) {
   // 0.4.4 F10: one "Editing: <zone>" picker (no "(controlling)" wording; CONTROLLING stays on Now Playing / bottom bar only)
   const editLbl = h('span', { class: 'qediting small', 'aria-hidden': 'true' }, 'Editing:');
   // 0.4.8 F60: "Queue: [zone ▾]" - the picker sits in the title right after the label; the zone name is shown only here (no "· ZONE" suffix, no "Editing:")
-  const pickSel = h('select', { class: 'qzpick', 'aria-label': 'Queue to show and edit', title: 'Show and edit any zone\'s queue without changing the zone that is playing', onchange: () => setView(pickSel.value) });
+  const pickSel = wsel({ class: 'qzpick', 'aria-label': 'Queue to show and edit', title: 'Show and edit any zone\'s queue without changing the zone that is playing', onchange: () => setView(pickSel.value) });
   // 0.5.0 F137: "Copy queue to zone" is a title-bar icon (with the save/trash/columns/lock icons) that opens a zone selector popover
   const sendBtn = h('button', { type: 'button', class: 'plus qsendic', 'data-act': 'sendqueue', hidden: true, 'aria-label': 'Copy queue to zone', title: 'Copy queue to zone (source stays as it is)', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); if (document.querySelector('.qsendpop')) return closeSend(); const r = sendBtn.getBoundingClientRect(); openSend(r.left, r.bottom + 4); } }, icon('queue'));
   void editLbl; title.append(pickSel);

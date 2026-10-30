@@ -119,7 +119,7 @@ public static class FeaturesApi
             catch (Exception e) { return Ext.Bad(e.Message, 502); }
         }).Req(Role.Admin);      // 0.2.0 item 28: tag lookups/approval, scenes and schedules editing are admin-only (running a scene stays Control)
         g.MapPost("/tags/jobs/{id:long}/approvals", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.TagFix.SetApprovals(id, b); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
-        g.MapPost("/tags/jobs/{id:long}/apply", (long id) => { var err = s.TagFix.Apply(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapPost("/tags/jobs/{id:long}/apply", async (long id) => { var err = await s.TagFix.ApplyAsync(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapPost("/tags/jobs/{id:long}/undo", (long id) => { var err = s.TagFix.Undo(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok = true }); }).Req(Role.Admin);
     }
 

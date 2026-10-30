@@ -159,7 +159,7 @@ test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 
   // 0.5.0 F95: the four packages became independent Track bar + Buttons axes (old `style` migrates)
   assert.deepEqual(m.NP_SEEKS.map(s => s[0]), ['line', 'wave', 'led', 'eq']); assert.deepEqual(m.NP_BUTTONS.map(s => s[0]), ['round', 'soft', 'square', 'ring']);
   const st = memStore();
-  assert.deepEqual(m.loadNpPrefs(st), { seek: 'line', buttons: 'round', art: 'square', fx: 50, glow: 50, motion: 50, reflect: 50, color: 'spicy' });
+  assert.deepEqual(m.loadNpPrefs(st), { seek: 'line', buttons: 'square', art: 'square', fx: 50, glow: 50, motion: 50, reflect: 50, color: 'spicy' });
   m.saveNpPrefs({ style: 'stack', glow: 140, motion: -3 }, st);
   const p = m.loadNpPrefs(st); assert.equal(p.seek, 'led'); assert.equal(p.buttons, 'square'); assert.equal(p.style, undefined); assert.equal(p.glow, 100); assert.equal(p.motion, 0); assert.equal(p.fx, 50);
   assert.equal(m.normNpPrefs({ style: 'terrain' }).seek, 'line');

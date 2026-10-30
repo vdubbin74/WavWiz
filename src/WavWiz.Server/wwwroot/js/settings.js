@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
@@ -49,7 +50,7 @@ export const RESET = {
 /** 0.3.5 J9: which Settings section a deep link opens. Pure. */
 export function sectionFor(section) {
   return section === 'players' || section === 'phone' || section === 'devices' || section === 'calibration' ? 'devices'
-    : section === 'library' ? 'library' : section === 'network' ? 'network' : section === 'playback' ? 'playback'
+    : section === 'library' ? 'library' : section === 'network' || section === 'airplay' ? 'network' : section === 'playback' ? 'playback'
     : section === 'general' || section === 'backup' ? 'general' : section === 'jukebox' ? 'jukebox'
     : section === 'remote' || section === 'access' ? 'network' : section === 'diag' || section === 'diagnostics' ? 'diagnostics' : section === 'about' ? 'about'
     : 'appearance';
@@ -74,14 +75,13 @@ export async function openSettings(S, refresh, nav, section) {
   let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
   const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
   d.el.querySelector('header .grow').after(search.el);
-  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-remote' : null;   // F117
+  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-remote' : section === 'airplay' ? 'sec-airplay-out' : null;   // F159: airplay   // F117
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
     try {
-      [roots, st, settings] = await Promise.all([api('/library/roots'), api('/status'), api('/settings')]);
-      rc = await api('/receivers').catch(() => null);
-      if (admin) tokens = await api('/tokens');
+      // F143: all five reads in parallel (were three serial round-trips - slow phones sat on an empty sheet)
+      [roots, st, settings, rc, tokens] = await Promise.all([api('/library/roots'), api('/status'), api('/settings'), api('/receivers').catch(() => null), admin ? api('/tokens') : []]);
     } catch (e) { body.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
 
     const panes = { general: [], appearance: [], playback: [], devices: [], library: [], network: [], jukebox: [], diagnostics: [], about: [] };
@@ -249,7 +249,7 @@ export async function openSettings(S, refresh, nav, section) {
   function makeToken(ev) {
     const card = ev?.target?.closest?.('.card') || document.getElementById('sec-tokens'); if (!card) return;
     card.querySelector('.tokform')?.remove();
-    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant', 'aria-label': 'Token name' }), role = h('select', { 'aria-label': 'Access' }, ROLE_NAMES.map(([r, t, d]) => h('option', { value: r, title: d }, `${t} - ${d}`)));
+    const name = h('input', { type: 'text', maxlength: 60, placeholder: 'e.g. Home Assistant', 'aria-label': 'Token name' }), role = wsel({ 'aria-label': 'Access' }, ROLE_NAMES.map(([r, t, d]) => h('option', { value: r, title: d }, `${t} - ${d}`)));
     const out = h('div', { class: 'mono small', style: 'word-break:break-all' });
     const form = h('div', { class: 'tokform inlineform' }, h('div', { class: 'field' }, h('label', null, 'Name'), name), h('div', { class: 'field' }, h('label', null, 'Access'), role), out,
       h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { form.remove(); if (out.childNodes.length) draw(); } }, 'Done'),
@@ -264,7 +264,7 @@ export async function openSettings(S, refresh, nav, section) {
       h('button', { type: 'button', class: cur === v ? 'on' : '', 'aria-pressed': String(cur === v), 'data-libpref': key + ':' + v, onclick: () => set({ [key]: v }) }, t)));
     function paintLib() {
       const p = loadLibPrefs();
-      const sort = h('select', { 'aria-label': 'Default sort', 'data-libpref': 'defSort', onchange: ev => { const q = loadLibPrefs(); set({ defSort: ev.target.value, sort: { ...q.sort, albums: ev.target.value } }); } },
+      const sort = wsel({ 'aria-label': 'Default sort', 'data-libpref': 'defSort', onchange: ev => { const q = loadLibPrefs(); set({ defSort: ev.target.value, sort: { ...q.sort, albums: ev.target.value } }); } },
         DEF_SORTS.map(([v, t]) => h('option', { value: v, selected: p.defSort === v }, t)));
       const remember = h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: p.remember, 'aria-label': 'Remember view per tab', 'data-libpref': 'remember', onchange: ev => set({ remember: ev.target.checked }) }), h('span', { 'aria-hidden': 'true' }));
       box.replaceChildren(h('h3', null, 'Library view'),
@@ -286,6 +286,9 @@ export async function openSettings(S, refresh, nav, section) {
       admin ? h('div', { class: 'row', style: 'margin-top:8px' }, inp, h('button', { class: 'btn primary', onclick: async () => { try { await putSettings({ 'acoustid.apiKey': inp.value.trim() }); draw(); } catch (e) { toast(e.message, true); } } }, 'Save')) : h('p', { class: 'dim' }, key ? 'A key is configured.' : 'Ask the administrator to set an AcoustID API key.'),
       h('p', { class: 'small dim' }, key ? 'Key is set — fingerprint lookup is enabled when Chromaprint (fpcalc) is available beside FFmpeg.' : 'No key yet — fingerprint lookup stays off until one is saved.'));
   }
+  // F143: first paint is the tab row + a loading line, never an empty sheet under the search box
+  if (!body.firstChild) body.replaceChildren(h('div', { class: 'settings-nav', 'aria-hidden': 'true' }, GROUPS.map(([id, label]) => h('button', { class: active === id ? 'on' : '', disabled: true, tabindex: -1 }, label))),
+    h('div', { class: 'settings-scroll' }, h('p', { class: 'dim', role: 'status' }, 'Loading settings…')));
   draw();
 }
 
@@ -339,7 +342,7 @@ function crossfadeCard(settings, admin) {
 function replayGainCard(settings) {
   const cur = typeof settings['playback.replayGain'] === 'string' ? settings['playback.replayGain'] : 'auto';
   const opts = [['auto', 'Automatic - album levels when an album plays in order, song levels otherwise'], ['track', 'Song - every song at the same loudness'], ['album', 'Album - keep the loud and quiet songs of an album as mastered'], ['off', 'Off - play files exactly as they are']];
-  const sel = h('select', { 'aria-label': 'Volume leveling', id: 'rg-mode', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.replayGain': ev.target.value } }); savedMark(ev.target); } catch (e) { toast(e.message, true); } } },
+  const sel = wsel({ 'aria-label': 'Volume leveling', id: 'rg-mode', onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.replayGain': ev.target.value } }); savedMark(ev.target); } catch (e) { toast(e.message, true); } } },
     opts.map(([v, t]) => h('option', { value: v, selected: v === cur }, t)));
   return h('div', { class: 'card', id: 'sec-replaygain' }, h('h3', null, 'Volume leveling (ReplayGain)'),
     h('p', { class: 'dim small' }, 'Uses the ReplayGain or R128 loudness tags in your files (taggers such as foobar2000 or MusicBrainz Picard add them). Songs without tags play unchanged. It never makes a song clip.'),

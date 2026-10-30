@@ -3,6 +3,7 @@
 // button is gone (the settings of the selected look are always shown below), each look has its own effect controls, and a device-wide Sensitivity /
 // auto-gain card drives how strongly every look reacts. 0.1.3: every level is a 0-100 % slider (default 50 %), Mood became the Energy level, the
 // Detail choice became Quality (Auto / Low / High / Ultra), and a Graphics card holds the post-processing knobs (bloom, streaks, fringing, depth blur).
+import { wsel } from './wwselect.js';
 import { h, toast } from './util.js';
 import { Viz, vizPrefs, saveVizPrefs } from './viz.js';
 import { loadLooks, saveLooks } from './looks.js';
@@ -45,7 +46,7 @@ export function visualizerView({ nested = false } = {}) {
       ...[['primary', 'Primary'], ['secondary', 'Secondary'], ['accent', 'Accent']].map(([key, label]) => h('label', { class: 'row tp-pick' }, h('input', { type: 'color', value: s[key], 'aria-label': `${label} color`, oninput: ev => save({ [key]: ev.target.value.toUpperCase() }) }), label)));
     const mode = v => h('label', { class: 'row' }, h('input', { type: 'radio', name: 'vcm-' + k, checked: s.colorMode === v, onchange: () => { save({ colorMode: v }); custom.style.display = v === 'custom' ? '' : 'none'; } }), v === 'theme' ? 'Follow the theme' : 'Custom colors');
     const fxEls = (FX[k] || []).map(([key, label, map, choices, def]) => {
-      if (map === null) return h('label', { class: 'row wrap vchoice' }, h('span', { class: 'vsl-l' }, label), h('select', { 'aria-label': label, 'data-fx': key, onchange: ev => saveFx({ [key]: ev.target.value }) }, choices.map(([v, t]) => h('option', { value: v, selected: v === (s.fx?.[key] ?? def) }, t))));
+      if (map === null) return h('label', { class: 'row wrap vchoice' }, h('span', { class: 'vsl-l' }, label), wsel({ 'aria-label': label, 'data-fx': key, onchange: ev => saveFx({ [key]: ev.target.value }) }, choices.map(([v, t]) => h('option', { value: v, selected: v === (s.fx?.[key] ?? def) }, t))));
       return slider({ label, value: s.fx?.[key] ?? 50, hint: choices, key, offAtZero: map[0] === 0, onInput: v => saveFx({ [key]: v }) });
     });
     box.append(h('h3', null, `${vizName(k)} settings`),
@@ -65,7 +66,7 @@ export function visualizerView({ nested = false } = {}) {
   }
   function graphicsCard(p) {
     const post = loadPost(), set = patch => { savePost({ ...loadPost(), ...patch }); changed(); };
-    const quality = h('select', { 'aria-label': 'Visualizer quality', 'data-quality': '1', onchange: ev => { const x = vizPrefs(); x.quality = ev.target.value; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); changed(); } },
+    const quality = wsel({ 'aria-label': 'Visualizer quality', 'data-quality': '1', onchange: ev => { const x = vizPrefs(); x.quality = ev.target.value; saveVizPrefs(x); window.dispatchEvent(new CustomEvent('wavwiz:viz')); changed(); } },
       QUALITY_LIST.map(([v, t]) => h('option', { value: v, selected: p.quality === v }, t)));
     return h('div', { class: 'card vizgfx' }, h('h3', null, 'Graphics (this device)'),
       h('label', { class: 'row wrap vchoice' }, h('span', { class: 'vsl-l' }, 'Quality'), quality),

@@ -143,7 +143,7 @@ body.minibody .mp:not(.slim) .mp-seek{gap:4px}
 :is(.mp,.minicol).pn-btn-round .mp-tr .mp-b.play{background:var(--accent);color:var(--accent-ink,#fff);box-shadow:0 0 calc(10px * var(--np-k,1)) color-mix(in srgb,var(--accent) 60%,transparent)}
 :is(.mp,.minicol).pn-btn-soft .mp-tr :is(.mp-b,.mutebtn:not(.on)){border-radius:50%;border-color:transparent;background:color-mix(in srgb,var(--ink) 9%,var(--panel))}
 :is(.mp,.minicol).pn-btn-soft .mp-tr .mp-b.play{background:color-mix(in srgb,var(--accent) 30%,var(--panel));border-color:transparent}
-:is(.mp,.minicol).pn-btn-square .mp-tr :is(.mp-b,.mutebtn){border-radius:5px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+:is(.mp,.minicol).pn-btn-square .mp-tr :is(.mp-b,.mutebtn){border-radius:3px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
 :is(.mp,.minicol).pn-btn-ring .mp-tr :is(.mp-b,.mutebtn:not(.on)){border-radius:50%;background:transparent;border:1.5px solid color-mix(in srgb,var(--ink) 40%,transparent)}
 :is(.mp,.minicol).pn-btn-ring .mp-tr .mp-b.play{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
 body.minibody .mp .mp-txt .mp-npl{order:2;height:16px;display:flex;align-items:center;gap:5px;font-size:10px;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer;min-width:0}
@@ -264,3 +264,7 @@ body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;m
 .mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn .mp-oplbl{display:none}
 .mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
 .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{visibility:hidden}
+/* 0.5.1 F157: Square button style = one shape everywhere (the collapsed thin bar's 3px corners). The flat / standalone mini
+   pill + circle sizes (.mp-flat .mp-b 50% / .tog 999px, .mp-ctlr .tog 999px / .play 50%, zone link 999px) ignored the setting. */
+:is(.mp,.minicol).pn-btn-square :is(.mp-tr,.mp-ctl,.mp-ctlr,.mp-ex,.mp-vol) :is(.mp-b,.mutebtn,.mixbtn,.eqbtn,.zlink),
+:is(.mp,.minicol).pn-btn-square .zlink{border-radius:3px!important}

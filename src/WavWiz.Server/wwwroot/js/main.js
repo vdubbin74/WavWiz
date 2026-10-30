@@ -1,3 +1,4 @@
+import { wsel } from './wwselect.js';
 import { viewForMode } from './viewmode.js';
 import './marquee.js';   // 0.4.8 F62: shared now-playing marquee (main app + phone)
 import { libCountLabel } from './libcount.js';   // 0.4.4 F7
@@ -241,6 +242,7 @@ async function startMain() {
     }
   };
   addTitlePins(); window.addEventListener('wavwiz:pins', paintTitlePins);
+  window.addEventListener('storage', ev => { if (!ev.key || ev.key === 'wavwiz.pins.v1') paintTitlePins(); });   // F145: pins changed in another window (mini player / second tab)
   new MutationObserver(() => addTitlePins()).observe(desk, { childList: true, subtree: true });
   document.addEventListener('contextmenu', ev => {
     const t = ev.target.closest?.('.libpanel .pane-h, .devpanel .pane-h, .listpanel .pane-h, .np-stage'); if (!t || ev.target.closest('input,textarea,.plpicker')) return;
@@ -452,6 +454,7 @@ export function runShortcut(id) {
     case 'scenes': return go('scenes');
     case 'alarms': return go('alarms');
     case 'sleep': return go('sleep');
+    case 'mixer': return window.dispatchEvent(new CustomEvent('wavwiz:mixer'));   // F149: pinned Master volume panel (Alt+V)
     case 'settings': return openSettings(S, refreshAll, go);
     default: return undefined;
   }
@@ -670,7 +673,7 @@ function drawQueue() {
 /** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
 function phonePick() {
   const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;
-  const sel = h('select', { class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
+  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
   sel.value = cur?.key || ''; return h('span', { class: 'qzwrap pqwrap' }, sel);
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
