@@ -40,6 +40,9 @@ try {
     $mig = Invoke-LegacyMigration -NewRoot $Root
     foreach ($n in $mig.Notes) { $notices.Add([string]$n) }
     if ($mig.Found) { $notices.Add('Upgraded from Unison: your library, settings, administrator password and paired players were kept. This PC and your phones use WavWiz now; PCs running the old Unison Player keep working until you update them.') }
+    # F173: only the stable WavWiz AppId may remain in Apps & features
+    Set-Step 'setup: removing stray WavWiz/Unison Apps & features entries'
+    try { [void](Remove-StrayWavWizArp) } catch { Say ("ARP scrub skipped: " + $_.Exception.Message) }
 
     if ($Role -in 'server', 'both') {
         if (-not $LanIp) {

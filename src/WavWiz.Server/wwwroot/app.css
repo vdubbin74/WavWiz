@@ -4083,7 +4083,8 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
 @media (min-width:761px){ @container npctl (max-width:900px){ .np-ctlpanel.np-flat:not(.collapsed) .pn-art{width:76px;height:76px} .np-ctlpanel.np-flat .np-tablevol{flex-wrap:wrap;row-gap:6px} } }   /* F136: desktop-only, phone keeps F102/F126 */
 @media (min-width:761px){ @container npctl (max-width:560px){ .np-ctlpanel.np-flat:not(.collapsed) .np-tablemain{grid-template-columns:auto minmax(0,1fr)} .np-ctlpanel.np-flat .pn-ctl{grid-column:1 / -1;align-items:stretch} .np-ctlpanel.np-flat .np-tablevol{justify-content:space-between} .np-ctlpanel.np-flat .np-aaalb{display:none} } }   /* F136: desktop-only, phone keeps F102/F126 */
 @media (min-width:761px){
-  .np-ctlpanel.np-flat.pn-art-cassette .pn-art{height:clamp(76px,7vw,92px)!important;width:auto!important}
+  .np-ctlpanel.np-flat.pn-art-cassette:not(.collapsed) .pn-art{height:clamp(76px,7vw,92px)!important;width:auto!important} /* F171: scoped like F134 — collapsed strip art untouched */
+  .np-ctlpanel.np-flat.pn-art-cassette .npa-box > .pn-art{width:100%!important;height:100%!important} /* F171: small-box cassette fills its box */
   .np-ctlpanel.np-flat.pn-art-sleeve .np-tablemain{column-gap:calc(18px + 30px)}
   .np-ctlpanel.np-flat .np-scside .scrow{overflow:hidden;min-height:0}
   .np-ctlpanel.np-flat.collapsed .ns-t2{color:var(--dim)}

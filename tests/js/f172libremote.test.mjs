@@ -1,0 +1,20 @@
+// F172: Library tiles + Remote view prefs; Tools dropdown = tools only.
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const dir = process.env.JS_DIR || new URL('../../src/WavWiz.Server/wwwroot/js/', import.meta.url).pathname;
+const L = await import(dir.replace(/\/?$/, '/') + 'libsort.js');
+assert.ok(L.VIEW_TABS.includes('remote'), 'remote in VIEW_TABS');
+assert.ok(L.SORTS.remote?.length && L.DEFAULT_SORT.remote, 'remote sorts');
+const mem = { s: {}, getItem(k) { return this.s[k] ?? null; }, setItem(k, v) { this.s[k] = v; } };
+let p = L.loadLibPrefs(mem); p.views.remote = 'list'; L.saveLibPrefs(p, mem); p = L.loadLibPrefs(mem);
+assert.equal(L.tabView(p, 'remote'), 'list'); assert.equal(L.tabView(p, 'artists'), 'grid', 'remote list never strands local artists');
+assert.equal(p.views.artists, undefined); assert.equal(L.tabView(L.resetLibView(p), 'artists'), 'grid');
+const src = readFileSync(dir.replace(/\/?$/, '/') + 'library.js', 'utf8');
+assert.match(src, /const ALL_TOOL_TABS = \[\['rip', 'CD ripper'\], \['tags', 'Tag & cover fix'\], \['cleanup', 'Tidy up library'\]\];/);
+assert.match(src, /GRID_KINDS = new Set\(\[[^\]]*'artists'/);
+const lt = src.match(/export function libTabs[\s\S]*?\n}/)[0];
+assert.ok(!/more: \[[^\]]*'(recent|favorites|remote)'/.test(lt), 'recent/favorites/remote not in more');
+assert.ok(!/tools: [^}]*remote/.test(lt), 'remote not in tools');
+for (const k of ['recent', 'favorites', 'remote']) assert.ok((lt.match(new RegExp(`'${k}'`, 'g')) || []).length >= 2, k + ' is a tab in both layouts');
+assert.ok(!/P\.views\.(artists|albums)\s*=/.test(src), 'nothing writes local views directly');
+console.log('f172libremote ok');

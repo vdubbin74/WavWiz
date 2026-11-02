@@ -1,0 +1,11 @@
+# allowlist: only what the server image needs
+*
+!global.json
+!Directory.Build.props
+!src/WavWiz.Core/
+!src/WavWiz.Dsp/
+!src/WavWiz.Measure/
+!src/WavWiz.Server/
+**/bin/
+**/obj/
+src/WavWiz.Server/wwwroot/preview-*.html

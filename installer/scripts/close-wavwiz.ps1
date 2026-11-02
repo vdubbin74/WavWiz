@@ -36,7 +36,8 @@ function Get-WavWizProcs([string]$Dir) {
             }
         }
     }
-    return $list.ToArray()
+    # F173: never end the Inno uninstaller itself (unins000.exe lives in the install folder; taskkill /T on it killed the whole uninstall and left the Apps & features entry behind)
+    return @($list.ToArray() | Where-Object { $_.Name -notlike 'unins*.exe' })
 }
 function Get-Players([string]$Dir) { return @((Get-WavWizProcs $Dir) | Where-Object { $_.Name -ieq 'wavwiz-player.exe' }) }
 function Stop-ById([int]$Id, [string]$Why) {
@@ -55,7 +56,7 @@ function Request-PlayerExit {
 function Get-LockedFiles([string]$Dir) {
     $locked = New-Object System.Collections.Generic.List[string]
     if (-not $Dir -or -not (Test-Path -LiteralPath $Dir)) { return }
-    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' })) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' -and $_.Name -notlike 'unins*.exe' })) {
         $rel = $f.FullName.Substring($Dir.TrimEnd('\', '/').Length).TrimStart('\', '/')
         if ((Test-TestHost) -and $env:WAVWIZ_TEST_LOCKED -and ($env:WAVWIZ_TEST_LOCKED -split ';') -contains ($rel -replace '\\', '/')) { $locked.Add($rel); continue }
         try { $s = [IO.File]::Open($f.FullName, 'Open', 'ReadWrite', 'None'); $s.Dispose() } catch [IO.FileNotFoundException] { } catch { $locked.Add($rel) }

@@ -11,10 +11,21 @@ public static class AirPlaySenderApi
         g.MapPost("/dev/airplay/connect", async (ConnectReq r) =>
         {
             Ensure(s);
-            try { var o = await Outs(s).ConnectAsync(r.Key, r.Endpoint, r.DelayMs ?? 0, r.Volume ?? 50); return Results.Json(new { ok = true, id = o.Sink.Id, kind = o.Kind }); }
+            try
+            {
+                var o = await Outs(s).ConnectAsync(r.Key, r.Endpoint, r.DelayMs ?? 0, r.Volume ?? 50);
+                AirPlay.AirPlaySpeakers.Register(s, o, r.Endpoint);   // F170: only a successful connect becomes a Speaker (no orphan row on failure)
+                var zid = s.Zones.Zones().FirstOrDefault(z => z.PlayerId == o.Sink.Id)?.Id;
+                return Results.Json(new { ok = true, id = o.Sink.Id, kind = o.Kind, zoneId = zid });
+            }
             catch (Exception e) { return Results.Json(new { ok = false, error = e.Message }, statusCode: 409); }
         }).Req(Role.Admin);
-        g.MapPost("/dev/airplay/disconnect", async (KeyReq r) => Results.Json(new { ok = await Outs(s).DisconnectAsync(r.Key) })).Req(Role.Admin);
+        g.MapPost("/dev/airplay/disconnect", async (KeyReq r) =>
+        {   // F170: Remove = forget the Speaker too (rows, zone membership, saved reconnect); RemovePlayer -> ZoneManager.ExternalRemoved disconnects
+            var pid = AirPlay.AirPlayOutputs.PlayerId(r.Key); var had = Outs(s).IsConnected(r.Key);
+            s.Zones.RemovePlayer(pid); await Outs(s).DisconnectAsync(r.Key);
+            return Results.Json(new { ok = true, wasConnected = had });
+        }).Req(Role.Admin);
         g.MapPost("/dev/airplay/volume", async (VolReq r) => Results.Json(new { ok = await Outs(s).SetVolumeAsync(r.Key, r.Volume) })).Req(Role.Admin);
         g.MapPost("/dev/airplay/delay", (DelayReq r) => Results.Json(new { ok = Outs(s).SetDelay(r.Key, r.DelayMs) })).Req(Role.Admin);
         g.MapGet("/airplay/settings", () => Results.Json(Settings(s))).Req(Role.Admin);

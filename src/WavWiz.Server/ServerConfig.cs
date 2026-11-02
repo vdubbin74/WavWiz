@@ -33,6 +33,9 @@ public sealed class ServerConfig
     /// <summary>Tests only: behave as if every client were another PC (not serialized). Lets a loopback test exercise the 'other device' paths such as the https redirect and pairing codes.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool TestTreatAllClientsAsRemote { get; set; }
 
+    /// <summary>F166: no "this PC" browser (Linux/Docker). First-run uses the claim code / 15-min LAN window. WAVWIZ_HEADLESS=0/1 overrides; default = not Windows.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool Headless => Environment.GetEnvironmentVariable("WAVWIZ_HEADLESS")?.Trim() switch { "1" or "true" => true, "0" or "false" => false, _ => !OperatingSystem.IsWindows() };
+
     public static string DefaultDataDir() =>
         OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WavWiz")
                                      : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WavWiz-server");
@@ -67,7 +70,7 @@ public sealed class ServerConfig
     public static ServerConfig Load(string? explicitPath = null)
     {
         var cfg = new ServerConfig();
-        var dir = Environment.GetEnvironmentVariable("WAVWIZ_DATA_DIR");
+        var dir = Environment.GetEnvironmentVariable("WAVWIZ_DATA_DIR") is { Length: > 0 } d0 ? d0 : Environment.GetEnvironmentVariable("WAVWIZ_DATA") is { Length: > 0 } d1 ? d1 : null;     // F166: WAVWIZ_DATA alias (Docker: /data)
         var path = explicitPath ?? Path.Combine(dir ?? cfg.DataDir, "server.json");
         if (File.Exists(path))
         {
@@ -78,6 +81,19 @@ public sealed class ServerConfig
         if (dir != null) cfg.DataDir = dir;
         if (Environment.GetEnvironmentVariable("WAVWIZ_BIND") is { Length: > 0 } b) cfg.BindAddress = b;
         if (Environment.GetEnvironmentVariable("WAVWIZ_FFMPEG") is { Length: > 0 } f) cfg.FfmpegPath = f;
+        // F166: Linux/Docker overrides (side-by-side tests, bridge mode). Unset = server.json / defaults, so Windows is unchanged.
+        static int? Int(string n) => int.TryParse(Environment.GetEnvironmentVariable(n), out var v) && v is >= 0 and <= 65535 ? v : null;
+        static bool? Flag(string n) => Environment.GetEnvironmentVariable(n)?.Trim().ToLowerInvariant() switch { "1" or "true" or "yes" => true, "0" or "false" or "no" => false, _ => null };
+        if (Int("WAVWIZ_HTTP_PORT") is int hp) cfg.HttpPort = hp;
+        if (Int("WAVWIZ_HTTPS_PORT") is int hsp) cfg.HttpsPort = hsp;
+        if (Int("WAVWIZ_AUDIO_PORT") is int ap) cfg.AudioPort = ap;
+        if (Int("WAVWIZ_CLOCK_PORT") is int cp) cfg.ClockPort = cp;
+        if (Int("WAVWIZ_DISCOVERY_PORT") is int dp) cfg.DiscoveryPort = dp;
+        if (Int("WAVWIZ_AIRPLAY_PORT") is int app) cfg.AirPlayPort = app;
+        if (Int("WAVWIZ_SPOTIFY_PORT") is int sp) cfg.SpotifyPort = sp;
+        if (Flag("WAVWIZ_DISCOVERY") is bool disc) cfg.Discovery = disc;
+        if (Flag("WAVWIZ_AIRPLAY") is bool air) cfg.AirPlay = air;
+        if (Flag("WAVWIZ_ALLOW_ALL_INTERFACES") is bool all) cfg.AllowAllInterfaces = all;
         Directory.CreateDirectory(cfg.DataDir);
         return cfg;
     }

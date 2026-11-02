@@ -129,7 +129,7 @@ export async function openSettings(S, refresh, nav, section) {
         tokens.filter(t => !t.revoked).length ? h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['Name', 'Role', 'Last used', ''].map(x => h('th', null, x)))), h('tbody', null, tokens.filter(t => !t.revoked).map(t =>
           h('tr', null, h('td', null, t.name), h('td', null, t.role), h('td', null, t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : 'never'),
             h('td', null, h('button', { class: 'btn danger', onclick: () => revokeToken(t) }, 'Revoke')))))) : h('p', { class: 'dim' }, 'None.'),
-        h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: makeToken }, 'Create API token…'))));
+        h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: makeToken }, 'Create API token…'), h('button', { class: 'btn', onclick: makeHaToken, title: 'A Control token for Home Assistant (play, pause, volume, now playing). Revoke it here any time.' }, 'Home Assistant token…'))));
       const num = (key, label, def) => { const i = adminOnly(S, h('input', { type: 'number', min: 0, max: 1000, value: settings[key] ?? def, style: 'width:90px', onchange: () => putSettings({ [key]: +i.value }, i) })); return h('label', { class: 'row' }, h('span', { style: 'min-width:260px' }, label), i, 'ms'); };
       cal.push(h('div', { class: 'card', id: 'sec-delaydefaults' }, h('h3', null, 'Delay defaults ', admin ? null : adminTag()),
         h('p', { class: 'dim small' }, 'Used until a speaker is calibrated (shown as “not calibrated”).'),
@@ -152,6 +152,7 @@ export async function openSettings(S, refresh, nav, section) {
       h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } } }, 'Rescan now'),
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
     panes.library.push(admin ? nasCard() : h('div', { class: 'card', id: 'sec-nas' }, h('h3', null, 'Network share logins (NAS) ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add share logins.')));
+    panes.library.push(admin ? remoteCard() : h('div', { class: 'card', id: 'sec-remote' }, h('h3', null, 'Remote libraries ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add remote libraries.')));   // F164
     panes.library.push(onlineArtCard(settings, admin));
     panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings), streamQualityCard(settings, admin));
     panes.library.push(acoustIdCard(settings));
@@ -255,6 +256,17 @@ export async function openSettings(S, refresh, nav, section) {
       h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { form.remove(); if (out.childNodes.length) draw(); } }, 'Done'),
         h('button', { class: 'btn primary', type: 'button', onclick: async () => { try { const r = await api('/tokens', { method: 'POST', body: { name: name.value, role: role.value } }); out.replaceChildren(h('p', { class: 'amber' }, r.note), h('code', null, r.token)); } catch (e) { toast(e.message, true); } } }, 'Create')));
     card.append(form); name.focus();
+  }
+  /** F165: one click → a Control token named "Home Assistant", shown once with the URL to paste. Revoke from the list above. */
+  function makeHaToken(ev) {
+    const card = ev?.target?.closest?.('.card') || document.getElementById('sec-tokens'); if (!card) return;
+    card.querySelector('.tokform')?.remove();
+    const out = h('div', { class: 'mono small', style: 'word-break:break-all' }, h('p', { class: 'dim small' }, 'Creates a Control token named "Home Assistant" (play, pause, next, volume, mute, now playing — no admin). Docs: docs/HOME-ASSISTANT.md.'));
+    const form = h('div', { class: 'tokform inlineform' }, out,
+      h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn', type: 'button', onclick: () => { form.remove(); draw(); } }, 'Done'),
+        h('button', { class: 'btn primary', type: 'button', onclick: async (e) => { try { const r = await api('/tokens/home-assistant', { method: 'POST' }); e.target.disabled = true;
+          out.replaceChildren(h('p', { class: 'amber' }, r.note), h('p', null, 'Server URL: ', h('code', null, location.origin)), h('p', null, 'Token: ', h('code', null, r.token))); } catch (err) { toast(err.message, true); } } }, 'Create')));
+    card.append(form);
   }
   /** 0.2.1 F8: Library view (this device) - how the Expanded Library opens. Saves at once; the Library redraws through 'wavwiz:libprefs'. */
   function libViewCard() {
@@ -364,6 +376,28 @@ export function streamQualityCard(settings, admin) {
       opt('48000', 'Studio (24-bit / 48 kHz)', 'Default. Works on every speaker.'),
       opt('96000', 'Studio Max (24-bit / 96 kHz)', 'Uses about twice the network bandwidth. Best on wired or strong Wi-Fi.')),
     h('p', { class: 'small dim sq77-foot' }, 'Speakers that can’t play 96 kHz (web speakers, older players, or an output set to 44.1/48 kHz) get 48 kHz and stay in sync with the rest. Radio, AirPlay and Spotify always stream at 48 kHz.'));
+}
+
+/** F164: Subsonic / OpenSubsonic servers (Navidrome, Airsonic, Gonic…). WavWiz is the client; the password is stored like NAS logins (Windows DPAPI). */
+function remoteCard() {
+  const box = h('div', { class: 'card naslist', id: 'sec-remote' }), list = h('div');
+  const url = h('input', { type: 'text', placeholder: 'http://192.168.1.20:4533', 'aria-label': 'Server address', style: 'min-width:200px' });
+  const user = h('input', { type: 'text', placeholder: 'User name', autocomplete: 'off', 'aria-label': 'User name' });
+  const pw = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'new-password', 'aria-label': 'Password' });
+  const label = h('input', { type: 'text', placeholder: 'Label (optional)', 'aria-label': 'Label', style: 'max-width:140px' });
+  async function load() {
+    let r; try { r = await api('/remote/servers'); } catch (e) { list.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
+    if (!r.available) list.replaceChildren(h('p', { class: 'small dim' }, 'Saved remote library logins need the server to run on Windows.'));
+    else list.replaceChildren(...(r.servers.length ? r.servers.map(x => h('div', { class: 'row wrap' + (x.lastError ? ' dim' : ''), style: 'margin:4px 0' },
+      h('div', { class: 'grow' }, h('b', null, x.label), ' ', h('span', { class: 'mono small dim' }, x.url), ' as ', h('b', null, x.user), h('div', { class: 'small ' + (x.lastError ? 'err' : 'dim') }, x.lastError || (x.online ? 'Online' : 'Saved'))),
+      h('button', { class: 'btn', onclick: async () => { try { const t = await api('/remote/servers/test', { method: 'POST', body: { id: x.id } }); toast(t.ok ? 'Connected' : t.error, !t.ok); load(); } catch (e) { toast(e.message, true); } } }, 'Test'),
+      h('button', { class: 'btn danger', onclick: async () => { try { await api('/remote/servers/remove', { method: 'POST', body: { id: x.id } }); load(); } catch (e) { toast(e.message, true); } } }, 'Remove'))) : [h('p', { class: 'small dim' }, 'No remote libraries.')]));
+  }
+  box.append(h('h3', null, 'Remote libraries'),
+    h('p', { class: 'dim small' }, 'Play music from a Subsonic / OpenSubsonic server such as Navidrome. WavWiz connects as a client (it is not a Subsonic server); songs stream from the server and show under Library > Remote. Your local folders are never changed. The password is encrypted by Windows for the WavWiz service on this PC and is never shown again.'),
+    list, h('div', { class: 'row wrap', style: 'margin-top:8px;gap:6px' }, url, user, pw, label,
+      h('button', { class: 'btn primary', onclick: async ev => { const b = ev.currentTarget; b.disabled = true; try { const r = await api('/remote/servers', { method: 'POST', body: { url: url.value, user: user.value, password: pw.value, label: label.value } }); pw.value = ''; toast(r.message); load(); } catch (e) { toast(e.message, true); } finally { b.disabled = false; } } }, 'Connect & save')));
+  load(); return box;
 }
 
 /** 0.1.3: logins for password-protected network shares. Stored encrypted (Windows DPAPI); the password is never shown again. */

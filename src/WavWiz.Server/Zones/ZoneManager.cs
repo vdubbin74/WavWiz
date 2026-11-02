@@ -50,6 +50,8 @@ public sealed class ZoneManager
     private readonly Dictionary<string, string> _lastHealth = new();
     public Action<string>? Log { get => _log; set { _log = value; Rooms.Log = value; } }
     public Action? AfterOutputsChanged;
+    /// <summary>F170: devices that are not player sessions (AirPlay outputs "airplay:&lt;key&gt;"). Online = live sink; Patched = zone volume/mute/on-off changed; Removed = Forget.</summary>
+    public Func<string, bool>? ExternalOnline; public Action<string>? ExternalPatched; public Action<string>? ExternalRemoved;
     /// <summary>0.4.0 Stage 2: maps zones to playback groups (set by the host after construction).</summary>
     public ZoneLinks? Links;
     private Action<string>? _log;
@@ -266,6 +268,7 @@ public sealed class ZoneManager
         foreach (var z in rows)
         {
             var s = _host.Get(z.PlayerId); var st = s?.Status;
+            bool ext = s == null && ExternalOnline?.Invoke(z.PlayerId) == true;   // F170: a connected AirPlay output counts as online
             var eps = _db.Query("SELECT e.id,e.output_device_id,e.win_endpoint_id,d.friendly_name,d.kind,d.bt_address,e.connected FROM output_endpoint e JOIN output_device d ON d.id=e.output_device_id WHERE e.player_id=$p ORDER BY d.friendly_name",
                 r => (Id: r.GetInt64(0), Dev: r.GetString(1), Ep: r.GetString(2), Name: r.GetString(3), Kind: r.GetString(4), Bt: r.IsDBNull(5) ? null : r.GetString(5), Conn: r.GetInt32(6) != 0), ("$p", z.PlayerId));
             var activeEp = s?.Outputs.FirstOrDefault(o => o.Active)?.EndpointId;
@@ -277,12 +280,13 @@ public sealed class ZoneManager
                 var a = _dsp.AssignmentFor(e.Dev);
                 var how = r.NotCalibrated ? default : _db.Query("SELECT method,mic_source,measured_at FROM calibration WHERE output_device_id=$d AND is_current=1 AND (player_id=$p OR player_id IS NULL) ORDER BY measured_at DESC LIMIT 1",
                     q => (M: q.GetString(0), Src: q.IsDBNull(1) ? null : q.GetString(1), At: q.GetString(2)), ("$d", e.Dev), ("$p", z.PlayerId)).FirstOrDefault();
-                outs.Add(new OutputDto(e.Id, e.Dev, e.Ep, e.Name, e.Kind, e.Bt, s != null && (live?.Connected ?? false), e.Ep == activeEp, r.LatencyMs, SourceName(r.Source), r.Label, r.NotCalibrated, r.RecheckDue, r.Reason, live?.WinLatencyMs, live?.Codec, (int?)a?.PresetId, a?.Bypass ?? false,
+                outs.Add(new OutputDto(e.Id, e.Dev, e.Ep, e.Name, e.Kind, e.Bt, ext || (s != null && (live?.Connected ?? false)), ext || e.Ep == activeEp, r.LatencyMs, SourceName(r.Source), r.Label, r.NotCalibrated, r.RecheckDue, r.Reason, live?.WinLatencyMs, live?.Codec, (int?)a?.PresetId, a?.Bypass ?? false,
                     how.M == null ? null : how.Src == null ? how.M : how.M + ":" + how.Src, how.At));
             }
             var act = outs.FirstOrDefault(o => o.Active);
             string badge, text;
-            if (s == null) { badge = "offline"; text = "OFFLINE"; }
+            if (ext) { badge = "synced"; text = "AIRPLAY"; }
+            else if (s == null) { badge = "offline"; text = "OFFLINE"; }
             else if (act == null) { badge = "nooutput"; text = "NO OUTPUT"; }
             else if (act.NotCalibrated) { badge = "uncalibrated"; text = "NOT CALIBRATED"; }
             else if (act.RecheckDue) { badge = "recheck"; text = "RE-CHECK DUE"; }
@@ -291,7 +295,7 @@ public sealed class ZoneManager
             owners.TryGetValue(z.PlayerId, out var owner);
             // chosen output known but not connected right now -> amber "Output unavailable" (only meaningful while the PC itself is online)
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
-            res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
+            res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null || ext, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlayingFor(z.PlayerId), StreamAgeMsFor(z.PlayerId)), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
                 IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
         }
@@ -325,6 +329,7 @@ public sealed class ZoneManager
             PushZone(s);
             if (enabled == true) _reg.Subscribe(s); else if (enabled == false) _reg.Unsubscribe(s.Id);
         }
+        else ExternalPatched?.Invoke(z.PlayerId);
         _ev.Publish("zones"); return null;
     }
 
@@ -573,6 +578,7 @@ public sealed class ZoneManager
 
     private void RemovePlayerRows(string playerId)
     {
+        try { ExternalRemoved?.Invoke(playerId); } catch (Exception e) { _log?.Invoke("remove external " + playerId + ": " + e.Message); }
         foreach (var zid in _db.Query("SELECT id FROM zone WHERE player_id=$p", r => r.GetInt64(0), ("$p", playerId))) _db.Exec("DELETE FROM zone_group_member WHERE device_id=$d", ("$d", zid));
         _db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", playerId));
         _host.Get(playerId)?.CloseUnauthorized();

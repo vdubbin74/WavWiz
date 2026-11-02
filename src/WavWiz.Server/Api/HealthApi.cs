@@ -85,7 +85,7 @@ public static class HealthApi
             if (!IPAddress.TryParse(addr, out _) || !rep.Adapters.Any(a => a.Address == addr)) return Ext.Bad("That address does not belong to this PC's home network. Click Re-detect and pick one from the list.");
             if (!rep.CanRebind) return Ext.Bad("Changing the address from here only works on Windows. Edit bindAddress in server.json instead.", 409);
             var path = Net.NetworkHelper.SaveBind(s.Cfg, addr);
-            bool svc = Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService();
+            bool svc = OperatingSystem.IsWindows() && Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService();
             if (svc) _ = Task.Run(async () => { await Task.Delay(1500); Environment.Exit(1); });     // the service's recovery setting starts it again after 5 s
             return Results.Json(new { ok = true, address = addr, path, restarting = svc, url = $"http://{addr}:{s.Cfg.HttpPort}/",
                 message = svc ? $"Saved. WavWiz restarts now; open http://{addr}:{s.Cfg.HttpPort}/ in about 10 seconds." : "Saved. Restart WavWiz to use the new address." });

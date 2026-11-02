@@ -368,20 +368,36 @@ Test 'uninstall keeps data by default, removes service + rules; running it again
     $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u.ExitCode 0 $u.Output
     if (Test-Path (Join-Path $sb.State 'svc.state')) { throw 'service still registered' }; Eq (Count (Get-Rules $sb) 'name=WavWiz Server') 0
-    if (-not (Test-Path (Join-Path $sb.Data 'server.json'))) { throw 'data deleted without Purge' }; Has (Get-Log $sb) 'Your data was kept'
-    $u2 = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u2.ExitCode 0; Has (Get-Log $sb) 'No WavWiz service to remove'
+    if (-not (Test-Path (Join-Path $sb.Data 'server.json'))) { throw 'data deleted without Purge' }; Has (Get-Log $sb 'uninstall.log') 'Your data was kept'
+    $u2 = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u2.ExitCode 0; Has (Get-Log $sb 'uninstall.log') 'No WavWiz service to remove'
 }
 Test 'uninstall -Purge 1 deletes the data folder, and refuses to delete a folder that is not the WavWiz data folder' {
     $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     $victim = Join-Path $sb.Root 'important'; New-Item -ItemType Directory -Force $victim | Out-Null; Set-Content (Join-Path $victim 'keep.txt') 'x'
     $u0 = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Purge', '1', '-DataDir', $victim); Eq $u0.ExitCode 0
-    if (-not (Test-Path (Join-Path $victim 'keep.txt'))) { throw 'deleted a folder outside the WavWiz data folder' }; Has (Get-Log $sb) 'refusing to delete'
+    if (-not (Test-Path (Join-Path $victim 'keep.txt'))) { throw 'deleted a folder outside the WavWiz data folder' }; Has (Get-Log $sb 'uninstall.log') 'refusing to delete'
     $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Purge', '1'); Eq $u.ExitCode 0
     if (Test-Path (Join-Path $sb.Data 'server.json')) { throw 'purge left server.json' }
 }
 Test 'uninstall with a service that cannot be removed (sc delete denied) still exits 0 and says so' {
     $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App) @{ WAVWIZ_TEST_SC_FAIL = 'stop' }; Eq $u.ExitCode 0
+}
+
+Test 'F173: uninstall writes ProgramData\WavWiz\uninstall.log (kept even with -Purge 1)' {
+    $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
+    $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u.ExitCode 0 $u.Output
+    Has (Get-Log $sb 'uninstall.log') 'WavWiz uninstall'; Has (Get-Log $sb 'uninstall.log') 'Your data was kept'
+    $u2 = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App, '-Purge', '1'); Eq $u2.ExitCode 0 $u2.Output
+    if (Test-Path (Join-Path $sb.Data 'server.json')) { throw 'purge left server.json' }; Has (Get-Log $sb 'uninstall.log') 'only uninstall.log is kept'
+}
+Test 'F173: setup scrubs stray WavWiz/Unison Apps & features entries, keeps the stable AppId and foreign apps' {
+    $sb = New-Sandbox; $ur = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+    Set-Content (Join-Path $sb.State 'registry.txt') @(($ur + '\{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\{DEADBEEF-0000-0000-0000-000000000001}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\{DEADBEEF-0000-0000-0000-000000000002}_is1|DisplayName|Unison (BETA)'), ($ur + '\OtherApp|DisplayName|WavWizard Pro Not Ours'), ($ur + '\Foo|DisplayName|Foo App'))
+    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
+    $reg = Get-Content (Join-Path $sb.State 'registry.txt') -Raw
+    Has $reg '57415657495A}_is1|DisplayName' 'stable AppId removed'; HasNot $reg 'DEADBEEF' 'stray entry left'; Has $reg 'Foo App' 'foreign app touched'; Has $reg 'WavWizard Pro' 'similar-named app touched'
+    Has (Get-Log $sb) 'Removed a stray Apps & features entry'
 }
 
 Write-Host 'upgrade from Unison (0.0.1 / 0.0.2) to WavWiz: the rename migration'
@@ -523,6 +539,11 @@ Test 'a 0.2.2 Player that exits when asked is not force-ended' {
 Test 'nothing installed / nothing running (fresh install): exit 0, nothing ended, state says nothing to restart' {
     $sb = New-Sandbox; $r = Invoke-Close $sb
     Eq $r.Done '0' 'done'; HasNot (Get-Calls $sb) 'taskkill' 'ended something'; Has $r.State 'service=missing'; Has $r.State 'player=0'
+}
+Test 'F173: the Inno uninstaller (unins000.exe in the install folder) is never ended or treated as a locked file' {
+    $sb = New-Sandbox; Set-Content (Join-Path $sb.App 'unins000.exe') 'x'; Set-Procs $sb @("unins000.exe|4400|$($sb.App)/unins000.exe|1")
+    $r = Invoke-Close $sb @{ WAVWIZ_TEST_LOCKED = 'unins000.exe' }
+    Eq $r.Done '0' 'done'; HasNot (Get-Calls $sb) 'taskkill.exe /PID 4400' 'ended the uninstaller'
 }
 Test 'a Player in ANOTHER Windows session is ended but not restarted from this session' {
     $sb = New-Sandbox; Set-Procs $sb @("wavwiz-player.exe|4300|$($sb.App)/Player/wavwiz-player.exe|2")

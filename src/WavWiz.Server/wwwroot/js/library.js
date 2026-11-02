@@ -7,21 +7,22 @@ import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex,
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 import { openCtx } from './ctxmenu.js';
 
-const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio']];
+const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio'], ['remote', 'Remote']];
 // 0.3.5 J9: Playlists + Radio tabs (were popups); the tools are tabs of the expanded Library only (next-j9-lib-*.png)
 const ALL_TOOL_TABS = [['rip', 'CD ripper'], ['tags', 'Tag & cover fix'], ['cleanup', 'Tidy up library']];
 // 0.4.8 F57: the CD ripper only exists in the PC app (this machine, not a phone/remote browser) - decided by client type, not screen width
 let ripOk = false;
-export function setRipAllowed(auth, ua = navigator.userAgent) { ripOk = !!auth?.thisMachine && !/iPhone|iPad|iPod|Android|Mobile/i.test(ua); document.documentElement.dataset.rip = ripOk ? '1' : '0'; TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip' || ripOk); return ripOk; }
+export function setRipAllowed(auth, ua = navigator.userAgent) { ripOk = !!auth?.thisMachine && (auth?.serverOs ?? 'windows') === 'windows' && !/iPhone|iPad|iPod|Android|Mobile/i.test(ua); document.documentElement.dataset.rip = ripOk ? '1' : '0'; TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip' || ripOk); return ripOk; }
 export const ripAllowed = () => ripOk;
 export let TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip');
 export const EXTRA_TABS = new Set(['playlists', 'radio', 'rip', 'tags', 'cleanup']);
 /** Which tabs the Library shows (pure): the narrow panel = row 1 + row 2 (Playlists, Radio); expanded = everything + Tools. */
 export function libTabs(expanded) {
-  return expanded ? { main: ['artists', 'albums', 'genres', 'years', 'folders', 'playlists', 'radio'], more: ['recent', 'favorites'], tools: TOOL_TABS.map(t => t[0]) }
-    : { main: ['artists', 'albums', 'genres', 'folders'], row2: ['playlists', 'radio'], more: ['years', 'recent', 'favorites'], tools: [] };
+  // F172: Recently added / Favorites / Remote are normal Library tabs; the "⋯" / Tools dropdown holds only the tools (CD ripper, Tag & cover fix, Tidy up library).
+  return expanded ? { main: ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites', 'playlists', 'radio', 'remote'], more: [], tools: TOOL_TABS.map(t => t[0]) }
+    : { main: ['artists', 'albums', 'genres', 'folders'], row2: ['years', 'recent', 'favorites', 'playlists', 'radio', 'remote'], more: [], tools: [] };
 }
-const GRID_KINDS = new Set(['albums', 'recent', 'favorites']);
+const GRID_KINDS = new Set(['albums', 'recent', 'favorites', 'artists', 'genres', 'years', 'remote']);   // F172: artists/genres/years/remote tile in compact too
 const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', years: 'years', recent: 'albums', folders: 'folders', favorites: 'favorites', songs: 'songs' };
 
 const folderGlyph = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.innerHTML = '<path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l1.8 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>'; return s; };
@@ -87,6 +88,7 @@ export function libraryView(S, opts = {}) {
       h('span', { class: 'wwdd-t' }, txt), h('span', { class: 'wwdd-c', 'aria-hidden': 'true' }, '▾'));
     b.onclick = () => { const r = b.getBoundingClientRect(); openCtx(r.left, r.bottom + 2, opts.map(([v, t]) => ({ id: 'dd:' + v, label: (v === cur ? '✓ ' : '') + t, onclick: () => onpick(v) })), { label, from: b }); };
     return b; };
+  const toolsSel = keys => ddBtn('moresel toolsel' + (keys.includes(st.tab) ? ' on' : ''), 'Tools', '⋯', keys.map(k => [k, tname(k)]), st.tab, k => pick(k));
   const moreSel = keys => ddBtn('moresel' + (keys.includes(st.tab) ? ' on' : ''), 'More ways to browse', '⋯', keys.map(k => [k, tname(k).replace('♥ ', '')]), st.tab, k => pick(k));
   // 0.4.6 F34: the side panel's tabs are ONE row that always fits the panel: tabs that do not fit at this width / scaling / theme go into the "⋯"
   // overflow, a tab-style button (themed like the tabs, never a native select) that opens the themed menu with them + Years / Recently added /
@@ -117,7 +119,7 @@ export function libraryView(S, opts = {}) {
     window.addEventListener('wavwiz:relayout', refit); window.addEventListener('wavwiz:uiscale', refit); window.addEventListener('resize', refit);
     try { document.fonts?.ready?.then(refit); document.fonts?.addEventListener?.('loadingdone', refit); } catch { /* no font API */ }
     more.onclick = () => { const r = more.getBoundingClientRect(), mk = k => ({ id: 'tab:' + k, label: (st.tab === k ? '✓ ' : '') + tname(k).replace('♥ ', ''), onclick: () => pick(k) });
-      openCtx(r.left, r.bottom + 2, [...hiddenKeys().map(mk), ...(hiddenKeys().length ? [{ sep: true }] : []), ...T.more.map(mk), { sep: true }, { id: 'tools', label: 'Tools in Expanded view', disabled: true }], { label: 'More ways to browse', from: more }); };
+      openCtx(r.left, r.bottom + 2, [...hiddenKeys().map(mk), ...T.more.map(mk), ...(hiddenKeys().length || T.more.length ? [{ sep: true }] : []), { id: 'tools', label: 'Tools in Expanded view', disabled: true }], { label: 'More ways to browse', from: more }); };
     try { ro = new ResizeObserver(() => refit()); ro.observe(wrap); ro.observe(row); } catch { /* old browser: the events above re-fit */ }
     try { const io = new IntersectionObserver(() => refit()); io.observe(wrap); } catch { /* old browser */ }
     requestAnimationFrame(refit);
@@ -126,8 +128,8 @@ export function libraryView(S, opts = {}) {
   const tabs = () => {
     const T = libTabs(expanded);
     if (compact && !expanded) return ctabRow(T);
-    return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)), moreSel(T.more),
-      T.tools.length ? [h('span', { class: 'tabsep small dim', 'aria-hidden': 'true' }, 'TOOLS'), ...T.tools.map(k => tabBtn(k, 'tooltab'))] : null);
+    return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)),
+      T.tools.length ? toolsSel(T.tools) : null);   // F172: the "⋯" dropdown = Tools only
   };
   const push = page => { st.stack.push(page); draw(); };
   const back = () => { st.stack.pop(); draw(); };
@@ -277,6 +279,73 @@ export function libraryView(S, opts = {}) {
     st.kind = null;
     return out.length ? out : [empty(`Nothing found for “${q}”.`)];
   }
+  // ---- F164: Remote libraries (Subsonic / OpenSubsonic, e.g. Navidrome). WavWiz is the client; songs stream from the server, local library untouched. ----
+  const rsong = x => ({ id: x.id, title: x.title, artist: x.artist, album: x.album, durationMs: x.durationMs, coverArt: x.coverArt, trackNo: x.trackNo, year: x.year, genre: x.genre });
+  const rplay = (sid, songs, index = 0) => canControl(S) ? playNow({ kind: 'remote', server: sid, songs: songs.map(rsong), index }) : toast('Your access is view-only.');
+  const rbadge = () => h('span', { class: 'small dim rbadge' }, ' · Remote');
+  const ralbumRow = sid => al => { const el = h('li', { class: 'item', onclick: () => push({ title: al.album, kind: null, load: () => remoteAlbumPage(sid, al) }) }, cover(al.artUrl, 'sm', '♫', { album: al.album, artist: al.artist }),
+      h('div', { class: 't' }, h('div', { class: 't1 ell' }, al.album), h('div', { class: 't2 ell' }, [al.artist, al.year || null, al.tracks != null ? `${al.tracks} song${al.tracks === 1 ? '' : 's'}` : null].filter(Boolean).join(' • '), rbadge())),
+      canControl(S) ? h('button', { type: 'button', class: 'btn sm', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow({ kind: 'remote', server: sid, album: al.id }); } }, '▶') : null); return el; };
+  const rartistRow = sid => a => h('li', { class: 'item', onclick: () => rartistOpen(sid, a) },
+    cover(a.artUrl, 'sm rnd', '♪', { portrait: a.name }), h('div', { class: 't' }, h('div', { class: 't1 ell' }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge())));
+  // F172: remote tiles (same tilegrid / tile size as the local Library): albums square, artists round
+  const ralbumOpen = (sid, al) => push({ title: al.album, kind: null, load: () => remoteAlbumPage(sid, al) });
+  const ralbumTile = sid => al => h('li', { class: 'tile', onclick: () => ralbumOpen(sid, al) },
+    h('div', { class: 'tileart' }, cover(al.artUrl, 'lg', '♫', { album: al.album, artist: al.artist }),
+      canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow({ kind: 'remote', server: sid, album: al.id }); } }, '▶') : null),
+    h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, albumSub(al), rbadge()));
+  const rartistOpen = (sid, a) => push({ title: a.name, kind: 'remote', load: async () => { const rows = await api(`/remote/${sid}/artist/${encodeURIComponent(a.id)}`); return [rows.length ? rlist(sid, 'albums', rows) : empty('No albums.')]; } });
+  const rartistTile = sid => a => h('li', { class: 'tile atile', onclick: () => rartistOpen(sid, a) },
+    h('div', { class: 'tileart rnd' }, cover(a.artUrl, 'lg rnd', '♪', { portrait: a.name })),
+    h('div', { class: 't1 ell', title: a.name }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge()));
+  /** F172: remote Albums / Newest / Artists honor the Library view (own P.sort/flip/views.remote; never touches local views.artists / albums). */
+  function rlist(sid, mode, rows) {
+    st.kind = 'remote'; st.count = rows.length;
+    const key = P.sort.remote, art = mode === 'artists';
+    let sorted = rows.slice();
+    if (key !== 'server' && mode !== 'newest') sorted = art ? sortRows('artists', rows, key === 'name' || key === 'artist' ? 'name' : 'albums') : sortRows('albums', rows, key);
+    if (P.flip.remote) sorted.reverse();
+    const grid = gridOn('remote');
+    return h('ul', { class: grid ? 'tilegrid ' + (art ? 'tg-artists' : 'tg-albums') : 'list' }, sorted.map(art ? (grid ? rartistTile(sid) : rartistRow(sid)) : (grid ? ralbumTile(sid) : ralbumRow(sid))));
+  }
+  const rsongList = (sid, rows, albumPage = false) => h('ul', { class: 'list' }, rows.map((t, i) => {
+    const it = S.now?.item, on = !!it && it.kind === 'remote' && it.title === t.title && it.album === t.album;
+    return h('li', { class: 'item' + (on ? ' playing' : ''), onclick: () => rplay(sid, rows, i) }, h('span', { class: 'num' }, on ? '▮▮▮' : t.trackNo ?? i + 1),
+      h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, (albumPage ? [t.artist] : [t.artist, t.album]).filter(Boolean).join(' • '))), h('span', { class: 'dur' }, fmtTime(t.durationMs))); }));
+  async function remoteAlbumPage(sid, al) {
+    const r = await api(`/remote/${sid}/album/${encodeURIComponent(al.id)}`);
+    return [h('div', { class: 'albpage' }, h('div', { class: 'row', style: 'gap:12px;align-items:center;margin:6px 0 10px' }, cover(r.album.artUrl, 'lg', '♫', { album: r.album.album, artist: r.album.artist }),
+      h('div', { class: 'grow' }, h('h2', { class: 'ell' }, r.album.album), h('div', { class: 'dim' }, albumSub(r.album), rbadge()),
+        canControl(S) ? h('div', { class: 'row', style: 'gap:6px;margin-top:6px' }, h('button', { type: 'button', class: 'btn primary', onclick: () => rplay(sid, r.songs) }, '▶ Play'),
+          h('button', { type: 'button', class: 'linkbtn', onclick: () => api('/queue/add', { method: 'POST', body: { kind: 'remote', server: sid, songs: r.songs.map(rsong) } }).then(() => toast('Added to the queue'), e => toast(e.message, true)) }, 'Add to queue')) : null)),
+      rsongList(sid, r.songs, true))];
+  }
+  async function remoteServerPage(sv) {
+    st.rsid = sv.id;
+    const mode = st.rmode || 'albums', seg = h('span', { class: 'seg', role: 'group', 'aria-label': 'Browse remote by' },
+      ...[['albums', 'Albums A–Z'], ['newest', 'Newest'], ['artists', 'Artists']].map(([k, l]) => h('button', { type: 'button', class: mode === k ? 'on' : '', 'aria-pressed': String(mode === k), onclick: () => { st.rmode = k; draw(); } }, l)));
+    const head = h('div', { class: 'row wrap', style: 'gap:8px;margin:4px 0 8px' }, h('b', null, sv.label), h('span', { class: 'small ' + (sv.lastError ? 'err' : 'dim') }, sv.lastError || 'Remote library'), h('span', { class: 'grow' }), seg);
+    try {
+      if (mode === 'artists') { const rows = await api(`/remote/${sv.id}/artists`); st.count = rows.length; return [head, rows.length ? rlist(sv.id, 'artists', rows) : empty('No artists on this server.')]; }
+      const rows = await api(`/remote/${sv.id}/albums?type=${mode === 'newest' ? 'newest' : 'alphabeticalByName'}&size=500`); st.count = rows.length;
+      return [head, rows.length ? rlist(sv.id, mode, rows) : empty('No albums on this server.')];
+    } catch (e) { return [head, h('p', { class: 'dim roffline' }, e.message + ' Your local library is not affected.')]; }
+  }
+  async function remotePage() {
+    const r = await api('/remote/servers'); st.kind = null;
+    if (!r.servers.length) { st.rsid = null; return [empty('No remote libraries yet. An administrator can add a Navidrome (Subsonic / OpenSubsonic) server in Settings > Library > Remote libraries.')]; }
+    if (r.servers.length === 1) return remoteServerPage(r.servers[0]);
+    st.rsid = null;
+    return [h('ul', { class: 'list' }, r.servers.map(sv => h('li', { class: 'item' + (sv.lastError ? ' dim' : ''), onclick: () => push({ title: sv.label, kind: 'remote', load: () => remoteServerPage(sv) }) },
+      h('span', { class: 'cover sm' }, '☁'), h('div', { class: 't' }, h('div', { class: 't1 ell' }, sv.label), h('div', { class: 't2 ell ' + (sv.lastError ? 'err' : '') }, sv.lastError || sv.url)))))];
+  }
+  async function remoteFind(sid, q) {
+    const r = await api(`/remote/${sid}/search?q=${encodeURIComponent(q)}`), out = [];
+    if (r.artists.length) out.push(h('div', { class: 'sec' }, 'Artists'), h('ul', { class: 'list' }, r.artists.map(rartistRow(sid))));
+    if (r.albums.length) out.push(h('div', { class: 'sec' }, 'Albums'), h('ul', { class: 'list' }, r.albums.map(ralbumRow(sid))));
+    if (r.tracks.length) out.push(h('div', { class: 'sec' }, 'Songs'), rsongList(sid, r.tracks));
+    return out.length ? out : [empty(`Nothing found on the remote library for “${q}”.`)];
+  }
   const rootPage = {
     artists: async () => { const rows = await api('/library/artists'); return [rows.length ? list('artists', rows, artistRow, artistTile) : empty('No music yet. Add a music folder in Settings > Library.')]; },
     albums: async () => { const rows = await api('/library/albums?sort=artist'); return [rows.length ? list('albums', rows, albumRow) : empty('No albums yet.')]; },
@@ -285,6 +354,7 @@ export function libraryView(S, opts = {}) {
     recent: async () => { const rows = await api('/library/recent?limit=120'); return [rows.length ? list('recent', rows, albumRow) : empty('Nothing added yet.')]; },
     folders: async () => foldersPage(''),
     favorites: favoritesPage,
+    remote: remotePage,
   };
   for (const k of EXTRA_TABS) rootPage[k] = async () => { const v = extras[k]; if (!v) return [empty('Not available here.')]; v.reload?.(); st.kind = null; return [h('div', { class: 'libextra', 'data-extra': k }, v.el)]; };
   const pageKind = () => st.q ? null : st.stack.length ? st.stack[st.stack.length - 1].kind : EXTRA_TABS.has(st.tab) ? null : st.tab;
@@ -315,7 +385,7 @@ export function libraryView(S, opts = {}) {
     content.replaceChildren(h('p', { class: 'dim' }, 'Loading…')); drawTools(pageKind());
     try {
       root.dataset.tab = st.tab; root.classList.toggle('extratab', EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length);
-      const nodes = st.q ? await findPage(st.q) : st.stack.length ? await st.stack[st.stack.length - 1].load() : await rootPage[st.tab]();
+      const nodes = st.q ? (st.tab === 'remote' && st.rsid ? await remoteFind(st.rsid, st.q) : await findPage(st.q)) : st.stack.length ? await st.stack[st.stack.length - 1].load() : await rootPage[st.tab]();
       if (my !== drawing) return;
       content.replaceChildren(...nodes); drawTools(pageKind());
       content.classList.toggle('grid', !!content.querySelector('.tilegrid'));

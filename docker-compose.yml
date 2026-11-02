@@ -1,0 +1,16 @@
+# F167: WavWiz server (headless) - docs/DOCKER.md
+#   docker compose up -d        then open http://<this-host>:47800/
+services:
+  wavwiz:
+    image: docker.io/vdubbin74/wavwiz-server:0.6.0
+    container_name: wavwiz
+    # Host networking is recommended: speakers/players find the server by UDP discovery + mDNS, which bridge mode blocks.
+    network_mode: host
+    user: "10001:10001"
+    restart: unless-stopped
+    environment:
+      WAVWIZ_DATA: /data
+      # TZ: America/Chicago        # alarms/schedules use this time zone
+    volumes:
+      - ./wavwiz-data:/data            # settings, library DB, backups, HTTPS CA, claim.txt (must be writable by uid 10001)
+      - /path/to/your/music:/music:ro  # your music; add /music under Settings > Library. SMB/NFS: mount on the host first.

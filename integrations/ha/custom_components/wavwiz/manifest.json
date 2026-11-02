@@ -1,0 +1,9 @@
+{
+  "domain": "wavwiz",
+  "name": "WavWiz",
+  "version": "0.1.0",
+  "documentation": "https://github.com/vdubbin74/WavWiz/blob/main/docs/HOME-ASSISTANT.md",
+  "codeowners": ["@vdubbin74"],
+  "iot_class": "local_polling",
+  "requirements": []
+}

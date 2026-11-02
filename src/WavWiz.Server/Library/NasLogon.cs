@@ -12,6 +12,45 @@ public interface ISecretProtector
 }
 
 /// <summary>Windows DPAPI (CryptProtectData), user scope of the service account plus a WavWiz-specific entropy. The password never touches disk in plain text.</summary>
+/// <summary>F166: Linux/Docker. AES-256-GCM with a random key file under the data folder (mode 0600). Weaker than DPAPI: anyone who can read /data can decrypt. Used only where secrets must persist (remote library logins).</summary>
+public sealed class AesFileProtector : ISecretProtector
+{
+    private readonly string _keyPath; private byte[]? _key; private readonly object _l = new();
+    public AesFileProtector(string dataDir) { _keyPath = Path.Combine(dataDir, "secret.key"); }
+    public bool Available => true;
+    private byte[] Key()
+    {
+        lock (_l)
+        {
+            if (_key != null) return _key;
+            if (File.Exists(_keyPath)) { var k = File.ReadAllBytes(_keyPath); if (k.Length == 32) return _key = k; }
+            var nk = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+            Directory.CreateDirectory(Path.GetDirectoryName(_keyPath)!);
+            using (var fs = WavWiz.Server.Host.PrivateFile.Create(_keyPath)) fs.Write(nk);
+            return _key = nk;
+        }
+    }
+    public byte[] Protect(byte[] plain)
+    {
+        var nonce = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12); var tag = new byte[16]; var ct = new byte[plain.Length];
+        using (var g = new System.Security.Cryptography.AesGcm(Key(), 16)) g.Encrypt(nonce, plain, ct, tag);
+        var o = new byte[1 + 12 + 16 + ct.Length]; o[0] = 1; nonce.CopyTo(o, 1); tag.CopyTo(o, 13); ct.CopyTo(o, 29); return o;
+    }
+    public byte[] Unprotect(byte[] blob)
+    {
+        if (blob.Length < 29 || blob[0] != 1) throw new System.Security.Cryptography.CryptographicException("Unknown secret format.");
+        var pt = new byte[blob.Length - 29];
+        using (var g = new System.Security.Cryptography.AesGcm(Key(), 16)) g.Decrypt(blob.AsSpan(1, 12), blob.AsSpan(29), blob.AsSpan(13, 16), pt);
+        return pt;
+    }
+}
+
+public static class SecretProtectors
+{
+    /// <summary>Windows: DPAPI. Elsewhere (Linux/Docker): AES key file under the data folder.</summary>
+    public static ISecretProtector For(string dataDir) => OperatingSystem.IsWindows() ? new DpapiProtector() : new AesFileProtector(dataDir);
+}
+
 public sealed class DpapiProtector : ISecretProtector
 {
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("WavWiz.NAS.v1:7c1e");
@@ -109,7 +148,7 @@ public sealed class NasLogon
     {
         var share = ShareOf(path); if (share == null) return @"Enter the share as \\SERVER\Share (for example \\NAS\Music).";
         if (string.IsNullOrWhiteSpace(user)) return "Enter the user name for the share (for a NAS this is often NAS\\username or just username).";
-        if (!_prot.Available) return "Saving network-share logins needs Windows (the password is encrypted with Windows DPAPI).";
+        if (!_prot.Available) return "Saving network-share logins needs Windows. On Linux/Docker, mount the share on the host (or in docker-compose) and add the mounted folder, for example /music.";
         var err = Connect(share, user.Trim(), password);
         if (err != null) return err;
         var blob = Convert.ToBase64String(_prot.Protect(Encoding.UTF8.GetBytes(password)));

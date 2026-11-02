@@ -43,6 +43,7 @@ public sealed class WavWizServer : IAsyncDisposable
         try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
         catch (Exception e) { u._log.Write("TLS: certificate rename/migration failed (" + e.Message + "); the old certificate stays in use"); }
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
+        s.Claim = new HeadlessClaim(cfg.DataDir, cfg.Headless, auth.SetupRequired, u._log.Write);     // F166: claim.txt + 15-min LAN window (Linux/Docker)
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live
         u.S = s; s.Vizs = viz;
@@ -53,7 +54,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Profiles = new Features.DeviceProfileService(db, zones, dsp, cal, events);
         s.Scenes.Profiles = s.Profiles;
         s.Backup = new Features.BackupService(db, events, Path.Combine(cfg.DataDir, "backups"));
-        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd();   // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
+        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd(); AirPlay.AirPlaySpeakers.Attach(s, u._log.Write);   // F170: AirPlay outputs as Speakers + reconnect      // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
         s.Schedules.CondFor = s.Links.CondFor; s.Schedules.DevicesOf = s.Links.DevicesOf; s.Schedules.KeyName = s.Links.KeyName; s.Schedules.StopAll = s.Links.StopAll;      // 0.4.0 Stage 3: alarms / sleep timer target a zone
         s.Sleep.CondFor = s.Links.CondFor; s.Sleep.DevicesOf = s.Links.DevicesOf;
         s.Jukebox = new Features.JukeboxService(db, cond, events) { Zone = s.Links.JukeboxConductor };
@@ -68,6 +69,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Discovery = new Net.DiscoveryHost(cfg, () => s.Beacon(), u._log.Write);
         // 0.1.1: AirPlay (always on) + Spotify Connect (admin add-on, off by default), both advertised by our own mDNS responder where needed
         s.Nas = new Library.NasLogon(db); _ = Task.Run(() => { try { s.Nas.EnsureAll(true); } catch { } });     // 0.1.3: connect saved NAS shares early
+        s.Remote = new Library.SubsonicService(db, cfg.DataDir); Playback.Conductor.RemoteResolver = s.Remote.StreamUrl;     // F164
         s.AirPlay = new Receivers.AirPlayReceiver(s, u._log.Write); s.Spotify = new Receivers.SpotifyReceiver(s, u._log.Write);
         s.ZoneRecv = new Receivers.ZoneReceivers(s, u._log.Write); s.Links.Applied += () => s.ZoneRecv.Sync();
         s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!).Concat(s.ZoneRecv.MdnsGroups(host, ip).Select(g => g.ToList()));
@@ -76,7 +78,7 @@ public sealed class WavWizServer : IAsyncDisposable
         _ = Task.Run(async () => { for (int i = 0; i < 20 && !(s.AirPlay?.Ready ?? true); i++) await Task.Delay(500); if (s.AirPlay?.Ready == true) s.Discovery?.AnnounceSoon(); });
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args ?? Array.Empty<string>(), ContentRootPath = AppContext.BaseDirectory });
-        if (windowsService) builder.Host.UseWindowsService(o => o.ServiceName = WavWizInfo.ServiceName);
+        if (windowsService && OperatingSystem.IsWindows()) builder.Host.UseWindowsService(o => o.ServiceName = WavWizInfo.ServiceName);
         builder.Logging.ClearProviders(); builder.Logging.AddProvider(u._log.Provider); builder.Logging.SetMinimumLevel(LogLevel.Warning);
         var bindIp = IPAddress.Parse(cfg.BindAddress);
         builder.WebHost.ConfigureKestrel(k =>
@@ -135,7 +137,7 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s);
+        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();

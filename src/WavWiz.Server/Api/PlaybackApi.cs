@@ -46,6 +46,17 @@ public static class PlaybackApi
                     if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme is not ("http" or "https")) { error = "the address must start with http:// or https://"; return new(); }
                     return new() { Conductor.UrlItem(url, b.Str("name") ?? "") };
                 }
+            case "remote":
+                {   // F164: {kind:"remote", server, album} or {kind:"remote", server, songs:[{id,title,artist,album,durationMs,coverArt,trackNo,year}]}
+                    var sid = b.Str("server") ?? ""; if (s.Remote == null || sid == "") { error = "no remote library given"; return new(); }
+                    if (b.Str("album") is { Length: > 0 } alb) { try { return s.Remote.AlbumItems(sid, alb).GetAwaiter().GetResult(); } catch (Exception e) { error = e.Message; return new(); } }
+                    var list = new List<QueueItem>();
+                    if (b.Prop("songs") is JsonElement arr && arr.ValueKind == JsonValueKind.Array)
+                        foreach (var x in arr.EnumerateArray().Take(5000)) if (x.Str("id") is { Length: > 0 } sgid)
+                            list.Add(Library.SubsonicService.Item(sid, sgid, x.Str("title") ?? "", x.Str("artist") ?? "", x.Str("album") ?? "", x.Long("durationMs") ?? 0, x.Str("coverArt"), (int?)x.Long("trackNo"), (int?)x.Long("year"), x.Str("genre")));
+                    if (list.Count == 0) error = "no songs given";
+                    return list;
+                }
             case "playlist":
                 {
                     var id = b.Long("id") ?? 0; return PlaylistItems(s, id);

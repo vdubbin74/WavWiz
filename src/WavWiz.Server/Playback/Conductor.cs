@@ -125,12 +125,19 @@ public sealed class Conductor : IDisposable
             r.Status += t => { _notice = t == "Connecting..." ? null : t; };
             _radio = r; return r;
         }
+        if (it.Kind == "remote")
+        {   // F164: Subsonic / OpenSubsonic song - the stream URL (fresh auth salt) is minted now, ffmpeg reads it like a file (seekable over HTTP ranges)
+            var url = RemoteResolver?.Invoke(it.Location) ?? throw new InvalidOperationException("the remote library for this song was removed");
+            return new FfmpegDecoder(_ffmpeg, url, startMs, stallSeconds: 30, rate: _openRate);
+        }
         var dec = new FfmpegDecoder(_ffmpeg, it.Location, startMs, rate: _openRate);
         // 0.1.3 ReplayGain + iTunSMPB end trim (tags read off the stream thread)
         var mode = ReplayGainMode(); bool albumCtx = mode == "auto" && AlbumContextNoLock(it); var path = it.Location;
         return new ShapedDecoder(dec, Task.Run(() => { var t = TagReader(path); return (Loudness.Gain(t, mode, albumCtx), Loudness.ValidFrames(t, startMs)); }));
     }
 
+    /// <summary>F164: "subsonic:{server}:{song}" → stream URL (set by the host to SubsonicService.StreamUrl).</summary>
+    public static Func<string, string?>? RemoteResolver { get; set; }
     /// <summary>Tests can swap the tag reader.</summary>
     public Func<string, TrackTags> TagReader { get; set; } = Loudness.Read;
     /// <summary>0.3.0: Settings > Playback > Crossfade, 0-12 s, 0 (off) by default.</summary>
@@ -486,7 +493,8 @@ public sealed class Conductor : IDisposable
         {
             var np = NowNoLock();
             var real = _queue.Where(q => !IsReceiver(q.Kind)).ToList();
-            var items = real.Select(q => new { k = q.Kind, id = q.RefId, u = q.RefId == null ? q.Location : null, t = q.RefId == null ? q.Title : null }).ToList();
+            var items = real.Select(q => new { k = q.Kind, id = q.RefId, u = q.RefId == null ? q.Location : null, t = q.RefId == null ? q.Title : null,
+                ar = q.Kind == "remote" ? q.Artist : null, al = q.Kind == "remote" ? q.Album : null, d = q.Kind == "remote" ? q.DurationMs : (long?)null, img = q.Kind == "remote" ? q.ArtUrl : null, n = q.Kind == "remote" ? q.TrackNo : null }).ToList();   // F164: remote songs keep their tags (no secret: u is subsonic:{server}:{song})
             int idx = Math.Clamp(np.Index, 0, Math.Max(0, items.Count - 1));
             // 0.4.2: the list is saved in its real order (shuffle never permutes it); the shuffle flag, the songs played in this cycle and the history are saved as positions in that list
             int[] played, hist; lock (_shl) { played = real.Select((q, i) => (q, i)).Where(x => _played.Contains(x.q.Id)).Select(x => x.i).ToArray(); hist = _history.Select(h => real.FindIndex(q => q.Id == h)).Where(i => i >= 0).ToArray(); }
@@ -514,6 +522,11 @@ public sealed class Conductor : IDisposable
                 if (kind == "track" && id != null) it = TracksToItems(new[] { id.Value }).FirstOrDefault();
                 else if (kind == "radio" && id != null) it = StationToItem(id.Value);
                 else if (kind == "radio" && e.TryGetProperty("u", out var up) && up.GetString() is { Length: > 0 } url) it = UrlItem(url, e.TryGetProperty("t", out var tp) ? tp.GetString() ?? "" : "");
+                else if (kind == "remote" && e.TryGetProperty("u", out var ru) && ru.GetString() is { Length: > 0 } rl && rl.StartsWith("subsonic:"))
+                {
+                    string? P(string n) => e.TryGetProperty(n, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+                    it = new QueueItem(0, "remote", rl, P("t") ?? "Remote song", P("ar") ?? "", P("al") ?? "", e.TryGetProperty("d", out var dv) && dv.TryGetInt64(out var dl) ? dl : 0, null, null, null, P("img"), e.TryGetProperty("n", out var nv) && nv.TryGetInt32(out var ni) ? ni : null);
+                }
                 if (pos == want) newIdx = list.Count;
                 if (it != null) { posToList[pos] = list.Count; list.Add(it); }
                 pos++;

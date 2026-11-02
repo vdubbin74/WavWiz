@@ -46,7 +46,7 @@ Compression=lzma2/max
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 CloseApplications=yes
-CloseApplicationsFilter=wavwiz-player.exe
+CloseApplicationsFilter=wavwiz-player.exe,wavwiz-server.exe,ffmpeg.exe
 RestartApplications=no
 RestartIfNeededByRun=no
 SetupLogging=no
@@ -109,8 +109,15 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 Type: files; Name: "{app}\docs\FIRST-RUN.txt"
 Type: files; Name: "{group}\WavWiz web page (BETA).url"
 Type: files; Name: "{autodesktop}\WavWiz web page (BETA).url"
-Type: dirifempty; Name: "{app}\scripts"
-Type: dirifempty; Name: "{app}"
+; F173: the whole install folder goes (after uninstall.ps1 stopped the service and every process); ProgramData\WavWiz is NOT touched here
+Type: filesandordirs; Name: "{app}"
+; F173: Start Menu group + desktop shortcuts, whatever Inno's own log missed (older installs, renamed links)
+Type: filesandordirs; Name: "{group}"
+Type: filesandordirs; Name: "{commonprograms}\WavWiz (BETA)"
+Type: files; Name: "{commondesktop}\WavWiz Player (BETA).lnk"
+Type: files; Name: "{commondesktop}\WavWiz web page (BETA).url"
+Type: files; Name: "{userdesktop}\WavWiz Player (BETA).lnk"
+Type: files; Name: "{userdesktop}\WavWiz web page (BETA).url"
 
 [Code]
 var
@@ -119,6 +126,7 @@ var
   LanDetected: Boolean;
   SetupFailed: Boolean;
   UninstPurgeFlag: Boolean;
+  UninstNeedsReboot: Boolean; { F173 }
   { 0.2.2 T11: what was running before setup closed it (started again after the install) }
   PrivTip: TNewStaticText;
   PubNet: String;
@@ -631,3 +639,47 @@ begin
 end;
 
 function UninstPurge: Boolean; begin Result := UninstPurgeFlag; end;
+
+{ F173: after Inno removed its files: belt-and-braces delete of the install folder (only when it really is the WavWiz folder), the stable ARP key in every view,
+  and a CLEAR message when something stays locked until a restart (never a silent hang). }
+procedure WriteUninstLog(const M: String);
+begin
+  ForceDirectories(ExpandConstant('{commonappdata}\WavWiz'));
+  SaveStringToFile(ExpandConstant('{commonappdata}\WavWiz\uninstall.log'), GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') + ' ' + M + #13#10, True);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var App, K: String; Code: Integer;
+begin
+  App := ExpandConstant('{app}');
+  if CurUninstallStep = usUninstall then
+  begin
+    { fallback in case uninstall.ps1 could not run: stop the service and end every WavWiz process before files are deleted }
+    Exec(ExpandConstant('{sys}\sc.exe'), 'stop WavWizServer', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM wavwiz-player.exe /T /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM wavwiz-server.exe /T /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec(ExpandConstant('{sys}\sc.exe'), 'delete WavWizServer', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    WriteUninstLog('inno: service stopped/deleted and processes ended (fallback)');
+  end;
+  if CurUninstallStep = usPostUninstall then
+  begin
+    K := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1';
+    RegDeleteKeyIncludingSubkeys(HKLM64, K); RegDeleteKeyIncludingSubkeys(HKLM32, K); RegDeleteKeyIncludingSubkeys(HKCU64, K); RegDeleteKeyIncludingSubkeys(HKCU32, K);
+    if DirExists(App) and (CompareText(ExtractFileName(RemoveBackslashUnlessRoot(App)), 'WavWiz') = 0) then DelTree(App, True, True, True);
+    if DirExists(App) and (FileExists(App + '\Server\wavwiz-server.exe') or FileExists(App + '\Player\wavwiz-player.exe') or FileExists(App + '\Server\WavWiz.Server.dll')) then
+    begin
+      UninstNeedsReboot := True;
+      WriteUninstLog('inno: some files in ' + App + ' are still in use; a restart is needed to finish');
+      SuppressibleMsgBox('WavWiz (BETA) was removed from Apps & features, but some files in' + #13#10 + App + #13#10 +
+        'are still in use. Restart Windows to finish removing them.', mbInformation, MB_OK, IDOK);
+    end
+    else
+      WriteUninstLog('inno: uninstall finished; ' + App + ' removed');
+  end;
+end;
+
+function UninstallNeedRestart: Boolean;
+begin
+  Result := UninstNeedsReboot;
+end;
+

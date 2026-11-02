@@ -102,15 +102,33 @@ function fatal(msg) { app.replaceChildren(topbar(), h('div', { class: 'card auth
 
 function renderSetup() {
   const pw = h('input', { type: 'password', autocomplete: 'new-password', minlength: 8, id: 'pw1' }), pw2 = h('input', { type: 'password', autocomplete: 'new-password', id: 'pw2' }), msg = h('p', { class: 'err', role: 'alert' });
+  // F166: headless (Linux/Docker) server: 15-min LAN window, then the code from claim.txt
+  const cl = S.auth.headless ? S.auth.claim : null;
+  const code = cl ? h('input', { type: 'text', autocomplete: 'off', id: 'claim', spellcheck: 'false', placeholder: 'from claim.txt' }) : null;
+  const canSetup = S.auth.thisMachine || !!cl;
+  let left = cl?.windowSecondsLeft || 0;
+  const banner = cl ? h('p', { class: 'small', role: 'status' }) : null;
+  const paintBanner = () => {
+    if (!banner) return;
+    banner.textContent = left > 0
+      ? `Claim window open: ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left. Any browser on your home network can finish setup now; after that the claim code is needed.`
+      : `Setup window closed. Enter the claim code from ${cl.file} on the server (it is also in the server log).`;
+    if (codeField) codeField.hidden = left > 0;
+  };
+  const codeField = code ? h('div', { class: 'field' }, h('label', { for: 'claim' }, 'Claim code'), code) : null;
+  if (cl && left > 0) { const t = setInterval(() => { if (!banner.isConnected) { clearInterval(t); return; } left = Math.max(0, left - 1); paintBanner(); if (!left) clearInterval(t); }, 1000); }
   const form = h('form', { class: 'card auth', onsubmit: async ev => {
     ev.preventDefault(); msg.textContent = '';
     if (pw.value !== pw2.value) { msg.textContent = 'The two passwords are different.'; return; }
-    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value } }); location.reload(); } catch (e) { msg.textContent = e.message; }
+    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value, claimCode: code?.value || undefined } }); location.reload(); } catch (e) { msg.textContent = e.message; }
   } },
     h('h2', null, 'Welcome to WavWiz'), h('p', { class: 'dim' }, 'Choose an administrator password for this WavWiz server (at least 8 characters). It never leaves your home network. Nothing was generated or shown by the installer.'),
-    S.auth.thisMachine ? null : h('p', { class: 'err' }, 'First-time setup can only be done on the PC that runs the WavWiz server. Open this page on that PC.'),
+    banner,
+    canSetup ? null : h('p', { class: 'err' }, 'First-time setup can only be done on the PC that runs the WavWiz server. Open this page on that PC.'),
+    codeField,
     h('div', { class: 'field' }, h('label', { for: 'pw1' }, 'Password'), pw), h('div', { class: 'field' }, h('label', { for: 'pw2' }, 'Repeat password'), pw2), msg,
-    h('button', { class: 'btn primary', disabled: !S.auth.thisMachine }, 'Create and continue'));
+    h('button', { class: 'btn primary', disabled: !canSetup }, 'Create and continue'));
+  paintBanner();
   app.replaceChildren(topbar(), form);
 }
 

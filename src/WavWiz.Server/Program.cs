@@ -13,7 +13,7 @@ try
     }
     if (args.Contains("--version")) { Console.WriteLine(WavWizInfo.DisplayName); return 0; }
     var cfg = ServerConfig.Load();
-    bool svc = WindowsServiceHelpers.IsWindowsService();
+    bool svc = OperatingSystem.IsWindows() && WindowsServiceHelpers.IsWindowsService();     // F166: Linux/Docker runs in the foreground (systemd / container)
     await using var server = await WavWizServer.StartAsync(cfg, args, svc);
     if (!svc) Console.WriteLine($"{WavWizInfo.DisplayName} - listening on {server.HttpUrl} (Ctrl+C to stop)");
     await server.App.WaitForShutdownAsync();

@@ -244,7 +244,7 @@ function pcMicCard(S, admin, { start }) {
   const onLevel = ev => { const x = ev.detail; if (!pc || !mic || x?.playerId !== pc.playerId || x?.micId !== mic.id) return; const v = micLevelPct(x.db); meterBar.style.width = v + '%'; meter.setAttribute('aria-valuenow', v); meterTxt.textContent = x.db > -90 ? `${Math.round(x.db)} dB` : 'silent'; };
   const onMics = () => { if (!closed && el.isConnected) refresh(true); };
   window.addEventListener('wavwiz:miclevel', onLevel); window.addEventListener('wavwiz:calmics', onMics);
-  const head = (primary) => h('div', { class: 'calway-h' }, h('span', { class: 'calnum' }, '1'), h('h3', null, 'Use this PC’s microphone'), primary ? h('span', { class: 'tag-rec' }, 'Recommended') : null);
+  const head = (primary) => h('div', { class: 'calway-h' }, h('span', { class: 'calnum' }, '1'), h('h3', null, S?.auth?.headless ? 'Use a Player PC’s microphone' : 'Use this PC’s microphone'), primary ? h('span', { class: 'tag-rec' }, 'Recommended') : null);
   const levelOn = on => { clearTimeout(levelTimer); if (!pc || !mic) return; api('/calibration/pc-mics/level', { method: 'POST', body: { playerId: pc.playerId, micId: mic.id, on } }).catch(() => {}); if (on) levelTimer = setTimeout(() => { if (!closed && el.isConnected) levelOn(true); }, 45000); };
   function paint() {
     if (!pc || !pc.mics.length) {

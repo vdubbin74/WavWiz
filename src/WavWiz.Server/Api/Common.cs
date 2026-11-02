@@ -10,7 +10,7 @@ public sealed class Services
     public required Library.LibraryService Library; public required Playback.Conductor Conductor; public required Playback.ConductorRegistry Registry;   // Conductor = the default (house) group; Registry = every playback group (0.4.0)
      public required Net.AudioHost Audio; public required Net.ClockHost Clock;
     public required Zones.ZoneManager Zones; public required Dsp.DspService Dsp; public required Calibration.CalibrationService Cal; public required Tls.LocalCa Ca;
-    public DateTime Started = DateTime.UtcNow; public string FfmpegPath = "";
+    public DateTime Started = DateTime.UtcNow; public string FfmpegPath = ""; public Host.HeadlessClaim? Claim;     // F166
     public volatile bool Scanning; public Library.ScanResult? LastScan; public CancellationTokenSource Stop = new();
     public required Library.ArtService Art;
     public Playback.VizHubs Vizs = new();      // 0.4.3 #10: one feed per playback group
@@ -29,6 +29,7 @@ public sealed class Services
     public Features.CdRipService CdRip = null!;
     public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
     public Library.NasLogon? Nas;      // 0.1.3
+    public Library.SubsonicService? Remote;      // F164 remote libraries (Subsonic / OpenSubsonic client)
     public WavWiz.Core.Discovery.ServerBeacon Beacon() => new(ServerId, ServerName ?? Environment.MachineName, System.Net.IPAddress.TryParse(Cfg.BindAddress, out var ip) && !System.Net.IPAddress.IsLoopback(ip) ? Cfg.BindAddress : "", Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
     public string? ServerName => Db.Setting("server.name") is string s ? JsonSerializer.Deserialize<string>(s) : null;
 }

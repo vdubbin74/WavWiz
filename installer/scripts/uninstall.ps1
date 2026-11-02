@@ -7,7 +7,8 @@ param([string]$Root = '', [string]$DataDir = '', [int]$Purge = 0, [switch]$NonIn
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib.ps1')
 Set-NonInteractive $true
-Start-InstallLog
+Start-InstallLog 'uninstall.log'
+Say ("== WavWiz uninstall ({0}) root={1} purge={2} ==" -f (Get-Date -Format s), $Root, $Purge)
 if (-not $DataDir) { $DataDir = Get-WavWizDataRoot }
 $svc = $script:ServiceName; $problems = 0
 function Step([string]$Name, [scriptblock]$Do) { Set-Step $Name; try { & $Do } catch { $script:problems++; Say ("uninstall: '{0}' did not complete: {1}" -f $Name, ($_.Exception.Message -split "`n")[0]) } }
@@ -29,9 +30,19 @@ if ($Purge) {
     Step 'uninstall: delete the data folder (you chose to)' {
         $rootData = Get-WavWizDataRoot
         if ($DataDir -ne $rootData -and $DataDir -notlike "$rootData*") { throw "refusing to delete '$DataDir': it is not the WavWiz data folder" }
-        if (Test-Path -LiteralPath $DataDir) { Remove-Item -LiteralPath $DataDir -Recurse -Force; Say "Deleted $DataDir." }
+        # F173: uninstall.log itself is kept for diagnosis; everything else goes
+        if (Test-Path -LiteralPath $DataDir) {
+            foreach ($i in @(Get-ChildItem -LiteralPath $DataDir -Force)) { if ($i.Name -ine 'uninstall.log') { Remove-Item -LiteralPath $i.FullName -Recurse -Force } }
+            Say "Deleted the contents of $DataDir (only uninstall.log is kept)."
+        }
     }
 } else { Say "Your data was kept: $DataDir" }
+Step 'uninstall: make sure no WavWiz process is left (F173)' {
+    if (-not (Test-TestHost)) {
+        foreach ($n in 'wavwiz-player', 'wavwiz-server') { Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
+        if ($Root) { $d = $Root.TrimEnd('\') + '\'; Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) -and $_.Name -notlike 'unins*' } | Stop-Process -Force -ErrorAction SilentlyContinue }
+    }
+}
 Complete-Step
 if ($problems -gt 0) { Say "Uninstall finished with $problems step(s) that could not complete (see above); the files are still removed." }
 exit 0

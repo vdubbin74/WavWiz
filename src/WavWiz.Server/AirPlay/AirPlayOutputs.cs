@@ -108,6 +108,16 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         catch (Exception e) { o.Error = e.Message; return false; }
     }
 
+    /// <summary>F170: true while the speaker has a live sink.</summary>
+    public bool IsConnected(string key) { lock (_outs) return _outs.ContainsKey(key); }
+    public Out? Get(string key) { lock (_outs) return _outs.TryGetValue(key, out var o) ? o : null; }
+    /// <summary>F170: speaker card on/off -> the sink joins / leaves its playback group (the AirPlay session stays up).</summary>
+    public void SetEnabled(string key, bool on)
+    {
+        var o = Get(key); if (o == null) return;
+        if (on) _reg.Subscribe(o.Sink); else _reg.Unsubscribe(o.Sink.Id);
+    }
+
     public bool SetDelay(string key, int delayMs)
     {
         if (!_outs.TryGetValue(key, out var o)) return false;

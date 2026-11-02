@@ -84,8 +84,9 @@ public static class ZoneApi
             if (!IsAdmin(c) && !MineByPlayer(s, c, pid)) return Ext.Bad(AdminOnly("change the delay of another device"), 403);      // item 28: own device only
             var method = b.Str("method") == "ear" ? "ear" : "manual";
             // 0.0.8: the delay slider adjusts live; "live" edits fold into the current by-hand entry instead of filling the history
-            if (b.Bool("live") == true && s.Cal.UpdateLive(deviceId, pid, ms.Value, method)) return Results.Json(new { ok = true, live = true });
+            if (b.Bool("live") == true && s.Cal.UpdateLive(deviceId, pid, ms.Value, method)) { if (pid.StartsWith("airplay:")) await AirPlay.AirPlaySpeakers.Push(s, pid); return Results.Json(new { ok = true, live = true }); }
             s.Cal.Save(deviceId, pid, ms.Value, method, method == "ear" ? 0.5 : 1.0, notes: b.Str("note"));
+            if (pid.StartsWith("airplay:")) await AirPlay.AirPlaySpeakers.Push(s, pid);   // F170: card delay -> AirPlay sink
             return Results.Json(new { ok = true });
         }).Req(Role.Control);
 

@@ -8,6 +8,25 @@ approximate for early builds.
 
 WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
+## [Unreleased]
+
+## [0.6.0] - 2026-11-01 (beta)
+
+### Added
+- F172: Library tiles and Remote view preferences; Tools available without Remote.
+- F166/F167: Linux Server builds (x64/arm64), systemd unit, Docker image + compose; see docs/LINUX.md and docs/DOCKER.md.
+- F170: AirPlay outputs now appear as real Speakers (join zones, volume/mute/delay, persist + reconnect).
+- F165: Home Assistant control — `/api/v1/ha/players` (master + one per zone: play/pause/stop/next/prev, volume 0-100, mute, now playing + art URL, queue peek) with a revocable Control token from Settings > Paired devices & tokens > **Home Assistant token…**; docs/HOME-ASSISTANT.md and an optional minimal `media_player` component in integrations/ha.
+- F164: **Remote libraries** — Subsonic / OpenSubsonic client (Navidrome first). Settings → Library → Remote libraries (DPAPI-stored login, token auth with legacy fallback); Library → Remote browses albums / artists / search and plays via ffmpeg URL streaming; covers cached; offline servers dim without touching the local library. See docs/REMOTE-LIBRARIES.md.
+
+### Fixed
+- F171: collapsed Now Playing Mix Cassette art visible on desktop.
+- F173: clean uninstall from Apps & Features — entry, Start Menu/desktop shortcuts, install folder and service are fully removed; stray old WavWiz/Unison entries are scrubbed on install; `ProgramData\WavWiz\uninstall.log`.
+
+### Checksums
+- `WavWiz-Setup-0.6.0.exe` - 103,928,970 bytes
+- SHA-256: `4EC1CA1A9065B2B08B5627862C786E367CF3531516B825AE150280B8B3F98C8B`
+
 ## [0.5.2] - 2026-10-29 (beta)
 
 ### Added

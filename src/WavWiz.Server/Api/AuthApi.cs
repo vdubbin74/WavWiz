@@ -18,6 +18,8 @@ public static class AuthApi
             {
                 appVersion = WavWizInfo.Version, artCv = Library.ArtService.UrlVersion, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
                 setupRequired = s.Auth.SetupRequired, thisMachine = AuthService.IsThisMachine(c.Connection.RemoteIpAddress),
+                headless = s.Cfg.Headless, serverOs = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "other",
+                claim = s.Auth.SetupRequired && s.Claim is { Enabled: true } cl ? new { windowSecondsLeft = cl.WindowSecondsLeft, codeRequired = !cl.WindowOpen, file = cl.FilePath } : null,
                 authenticated = w != null && w.Role != Role.Player, role = w?.Role.ToString().ToLowerInvariant(), name = w?.Name,
                 elevated = w?.Elevated ?? false, baseRole = w == null ? null : (w.Elevated ? w.BaseRole : w.Role).ToString().ToLowerInvariant(),
                 https = c.Request.IsHttps, tlsEnabled = s.Ca.Enabled, serverName = s.ServerName ?? Environment.MachineName, serverId = s.ServerId,
@@ -28,10 +30,17 @@ public static class AuthApi
         g.MapPost("/auth/setup", async (HttpContext c) =>
         {
             if (!s.Auth.SetupRequired) return Ext.Bad("Setup is already done.", 409);
-            if (!AuthService.IsThisMachine(c.Connection.RemoteIpAddress)) return Ext.Bad("First-time setup can only be done on the PC that runs the WavWiz server. Open WavWiz there and set the password.", 403);
             var b = await c.Request.Body();
+            bool local = AuthService.IsThisMachine(c.Connection.RemoteIpAddress);
+            // F166: headless (Linux/Docker): any home-network browser during the 15-min window, or with the code from claim.txt afterwards (LAN-only is enforced by the pipeline)
+            if (!local && !(s.Claim?.Allows(b.Str("claimCode")) ?? false))
+            {
+                if (s.Claim is { Enabled: true }) { var ip = c.Client(); if (s.Auth.IsLimited(ip)) return Ext.Bad("Too many attempts. Wait a minute and try again.", 429); if (!string.IsNullOrWhiteSpace(b.Str("claimCode"))) s.Auth.NoteFailure(ip); return Ext.Bad($"The 15-minute setup window has closed. Enter the claim code from {s.Claim.FilePath} on the server (or restart it to reopen the window).", 403); }
+                return Ext.Bad("First-time setup can only be done on the PC that runs the WavWiz server. Open WavWiz there and set the password.", 403);
+            }
             var err = s.Auth.SetPassword(b.Str("password") ?? ""); if (err != null) return Ext.Bad(err);
-            c.SetSession(s.Auth.CreateToken("Browser on server PC", Role.Admin));
+            s.Claim?.Done();
+            c.SetSession(s.Auth.CreateToken(local ? "Browser on server PC" : "Browser " + c.Client(), Role.Admin));
             return Results.Json(new { ok = true });
         }).Anon();
 

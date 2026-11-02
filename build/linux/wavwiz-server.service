@@ -1,0 +1,30 @@
+# F166: systemd unit for a bare Linux install (see docs/LINUX.md).
+#   sudo useradd --system --home /var/lib/wavwiz --shell /usr/sbin/nologin wavwiz
+#   sudo tar -C /opt -xzf wavwiz-server-<ver>-linux-x64.tar.gz
+#   sudo install -d -o wavwiz -g wavwiz /var/lib/wavwiz
+#   sudo cp /opt/wavwiz-server/wavwiz-server.service /etc/systemd/system/ && sudo systemctl enable --now wavwiz-server
+[Unit]
+Description=WavWiz server (headless)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wavwiz
+Group=wavwiz
+Environment=WAVWIZ_DATA=/var/lib/wavwiz
+# Listen on the home network. Set a specific LAN address instead of 0.0.0.0 if you prefer.
+Environment=WAVWIZ_BIND=0.0.0.0
+Environment=WAVWIZ_ALLOW_ALL_INTERFACES=1
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+ExecStart=/opt/wavwiz-server/wavwiz-server
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/wavwiz
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

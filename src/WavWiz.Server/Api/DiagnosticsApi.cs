@@ -51,6 +51,7 @@ public static class DiagnosticsApi
         // --- address ---
         bool bindOk = IPAddress.TryParse(s.Cfg.BindAddress, out var bind);
         if (!bindOk) checks.Add(new("address", "Network address", "fail", $"'{s.Cfg.BindAddress}' is not a valid address.", "Open server.json and set bindAddress to this PC's home-network address, then restart the WavWiz service."));
+        else if ((bind!.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any)) && s.Cfg.AllowAllInterfaces) checks.Add(new("address", "Network address", "ok", $"Listening on all interfaces ({bind}); only home-network traffic is accepted.", null));     // F166: Docker / Linux default
         else if (IPAddress.IsLoopback(bind!)) checks.Add(new("address", "Network address", "warn", "WavWiz only listens on this PC (127.0.0.1). Other PCs and phones cannot reach it.", "Set bindAddress in server.json to this PC's home-network address (for example 192.168.1.10) and restart the WavWiz service, or run the installer's repair."));
         else if (!AuthService.IsPrivateSource(bind, s.Cfg.ExtraAllowedSubnets)) checks.Add(new("address", "Network address", "warn", $"{bind} is not a home-network (private) address.", "WavWiz only accepts local-network traffic. Check that the PC is on your home router."));
         else checks.Add(new("address", "Network address", "ok", $"Listening on {bind} (home network only).", null));
@@ -98,7 +99,19 @@ public static class DiagnosticsApi
 
         // --- ffmpeg ---
         var ff = File.Exists(s.FfmpegPath) || s.FfmpegPath == "ffmpeg";
-        checks.Add(new("ffmpeg", "Audio decoder (ffmpeg)", ff ? "ok" : "fail", ff ? s.FfmpegPath : "ffmpeg was not found.", ff ? null : "Re-run the WavWiz installer (it includes ffmpeg), or set ffmpegPath in server.json."));
+        if (!OperatingSystem.IsWindows())
+        {
+            // F166: Linux/Docker checks
+            bool dataOk; try { var t = Path.Combine(s.Cfg.DataDir, ".write-test"); File.WriteAllText(t, "x"); File.Delete(t); dataOk = true; } catch { dataOk = false; }
+            checks.Add(new("data-dir", "Data folder", dataOk ? "ok" : "fail", dataOk ? $"{s.Cfg.DataDir} is writable." : $"{s.Cfg.DataDir} is not writable.", dataOk ? null : "Docker: mount a writable volume at /data owned by the container user (uid 10001). Linux: chown the data folder to the service user."));
+            if (Directory.Exists("/music"))
+            {
+                bool musicOk; try { musicOk = Directory.EnumerateFileSystemEntries("/music").Take(1).Any() || true; } catch { musicOk = false; }
+                checks.Add(new("music-mount", "Music folder (/music)", musicOk ? "ok" : "fail", musicOk ? "/music is readable. Add it under Settings > Library if it is not listed yet." : "/music exists but cannot be read.", musicOk ? null : "Check the bind mount and its permissions (read access for uid 10001)."));
+            }
+            checks.Add(new("platform", "Linux server", "ok", "Headless Linux server. CD ripping, AirPlay 2 / Sonos output and this PC's speakers/mic are Windows-only; use a WavWiz Player or phone for local audio.", null));
+        }
+        checks.Add(new("ffmpeg", "Audio decoder (ffmpeg)", ff ? "ok" : "fail", ff ? s.FfmpegPath : "ffmpeg was not found.", ff ? null : OperatingSystem.IsWindows() ? "Re-run the WavWiz installer (it includes ffmpeg), or set ffmpegPath in server.json." : "Install ffmpeg (apt install ffmpeg), or set WAVWIZ_FFMPEG / ffmpegPath in server.json."));
 
         // --- library ---
         int tracks = s.Library.TrackCount(); int roots = Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM library_root WHERE enabled=1"));

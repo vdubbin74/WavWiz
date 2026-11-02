@@ -63,10 +63,10 @@ function Rename-WavWizLibraryDb([string]$DataDir) {
     } catch { Write-InstallLog ("Rename-WavWizLibraryDb: " + $_.Exception.Message) }
 }
 function Get-StepFile { return (Join-Path (Get-WavWizDataRoot) 'current-step.txt') }
-function Start-InstallLog {
+function Start-InstallLog([string]$Name = 'install.log') {
     $dir = Get-WavWizDataRoot
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $script:InstallLog = Join-Path $dir 'install.log'
+    $script:InstallLog = Join-Path $dir $Name
     try { if ((Test-Path -LiteralPath $script:InstallLog) -and ((Get-Item -LiteralPath $script:InstallLog).Length -gt 2MB)) { Move-Item -LiteralPath $script:InstallLog -Destination ($script:InstallLog + '.old') -Force } } catch { }
 }
 function Write-InstallLog([string]$m) { if ($script:InstallLog) { try { Add-Content -Path $script:InstallLog -Value ("{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $m) } catch { } } }
@@ -531,6 +531,42 @@ function Remove-MachineRegKey([string]$SubKey) {
     if (Test-TestHost) { $keep = @(Read-RegLines | Where-Object { ($_ -split '\|', 3)[0] -ne $SubKey }); Set-Content -LiteralPath (Get-RegFile) -Value $keep; return }
     $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
     $base.DeleteSubKeyTree($SubKey, $false)
+}
+
+# ---- F173: only ONE Apps & features entry. Stray WavWiz / Unison uninstall keys with another AppId (HKLM 64/32 + HKCU) are removed on install/upgrade. ----
+$script:WavWizAppKey = '{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1'
+$script:UninstallRoot = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+function Test-StrayWavWizArp([string]$KeyName, [string]$DisplayName) {
+    if ($KeyName -ieq $script:WavWizAppKey) { return $false }
+    if ($KeyName -ieq '{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1') { return $true }
+    return [bool]($DisplayName -match '^\s*(WavWiz|Unison)(\s|$|\()')
+}
+function Remove-StrayWavWizArp {
+    $removed = New-Object System.Collections.Generic.List[string]
+    if (Test-TestHost) {
+        $lines = @(Read-RegLines); $keys = @{}
+        foreach ($l in $lines) { $p = $l -split '\|', 3; if ($p.Count -eq 3 -and $p[0] -like ($script:UninstallRoot + '\*')) { $k = $p[0].Substring($script:UninstallRoot.Length + 1); if (-not $keys.ContainsKey($k)) { $keys[$k] = '' }; if ($p[1] -eq 'DisplayName') { $keys[$k] = $p[2] } } }
+        foreach ($k in @($keys.Keys)) { if (Test-StrayWavWizArp $k $keys[$k]) { Remove-MachineRegKey ($script:UninstallRoot + '\' + $k); $removed.Add('HKLM\' + $k) } }
+    } else {
+        $views = @(
+            @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry64; Tag = 'HKLM64' },
+            @{ Hive = [Microsoft.Win32.RegistryHive]::LocalMachine; View = [Microsoft.Win32.RegistryView]::Registry32; Tag = 'HKLM32' },
+            @{ Hive = [Microsoft.Win32.RegistryHive]::CurrentUser; View = [Microsoft.Win32.RegistryView]::Registry64; Tag = 'HKCU64' },
+            @{ Hive = [Microsoft.Win32.RegistryHive]::CurrentUser; View = [Microsoft.Win32.RegistryView]::Registry32; Tag = 'HKCU32' })
+        foreach ($v in $views) {
+            try {
+                $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($v.Hive, $v.View); $root = $base.OpenSubKey($script:UninstallRoot, $true); if ($null -eq $root) { continue }
+                try {
+                    foreach ($k in @($root.GetSubKeyNames())) {
+                        $dn = ''; try { $sk = $root.OpenSubKey($k); if ($null -ne $sk) { $dn = [string]$sk.GetValue('DisplayName'); $sk.Close() } } catch { }
+                        if (Test-StrayWavWizArp $k $dn) { try { $root.DeleteSubKeyTree($k, $false); $removed.Add($v.Tag + '\' + $k) } catch { Write-InstallLog ("ARP scrub: could not remove {0}\{1}: {2}" -f $v.Tag, $k, $_.Exception.Message) } }
+                    }
+                } finally { $root.Close() }
+            } catch { Write-InstallLog ("ARP scrub: {0} skipped: {1}" -f $v.Tag, $_.Exception.Message) }
+        }
+    }
+    foreach ($r in $removed) { Say ("Removed a stray Apps & features entry: " + $r) }
+    return $removed.ToArray()
 }
 
 # is this folder really an old Unison install (and not, say, the new install or a folder the person happens to have)?
