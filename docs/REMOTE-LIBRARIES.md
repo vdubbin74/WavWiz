@@ -19,3 +19,7 @@ Library → **Remote** (in the ⋯ menu): Albums A–Z, Newest, Artists, and the
 If the server is unreachable its row is dimmed with the reason; the local library is never changed or rescanned. Saved queues keep remote songs (`subsonic:{server}:{song}`, no secret) and the stream link is created again at play time.
 
 Not included yet: ratings/stars write-back, scrobbling, two-way playlist sync.
+
+---
+
+*Navidrome and Subsonic are trademarks of their owners; thanks to the Navidrome and OpenSubsonic projects. WavWiz is not affiliated with them.*

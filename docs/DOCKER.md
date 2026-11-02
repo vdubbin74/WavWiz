@@ -176,3 +176,7 @@ Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, 
 docker build -t docker.io/vdubbin74/wavwiz-server:0.6.0 .
 docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.0 .   # needs QEMU/binfmt for the arm64 runtime stage
 ```
+
+---
+
+*Licenses: the image contains Debian packages including GPL FFmpeg; see [THIRD-PARTY-NOTICES.txt](../THIRD-PARTY-NOTICES.txt).*

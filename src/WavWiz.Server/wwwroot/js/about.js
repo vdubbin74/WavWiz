@@ -162,10 +162,13 @@ const CREDITS = [
   ['QRCoder', 'MIT', 'QR codes for phone set-up', 'https://github.com/codebude/QRCoder'],
   ['SQLite (Microsoft.Data.Sqlite)', 'Public domain / MIT', 'The library and settings database', 'https://www.sqlite.org'],
   ['.NET and ASP.NET Core', 'MIT', 'The runtime of the server and the player', 'https://dotnet.microsoft.com'],
-  ['Nunito', 'SIL Open Font License 1.1', 'Letter shapes used in earlier wordmark experiments; 0.0.6 header is plain system text', 'https://fonts.google.com/specimen/Nunito'],
+  ['Nunito', 'SIL Open Font License 1.1', 'Letter shapes used in earlier wordmark experiments; not used in 0.6.0 UI', 'https://fonts.google.com/specimen/Nunito'],
   ['shairplay (wavwiz-airplay)', 'LGPL 2.1+ (ALAC decoder MIT, crypto BSD)', 'The AirPlay speaker. Runs as a separate program; source in the licenses folder', 'https://github.com/juhovh/shairplay'],
   ['librespot', 'MIT', 'Spotify Connect add-on (off by default). Runs as a separate program; unofficial, not made by Spotify', 'https://github.com/librespot-org/librespot'],
   ['Inno Setup', 'Inno Setup License', 'Builds the installer (not part of the installed app)', 'https://jrsoftware.org/isinfo.php'],
+  ['Subsonic / OpenSubsonic API', 'Protocol (no code included)', 'Remote libraries: play from Navidrome and other Subsonic-compatible servers. Thanks to the Navidrome and OpenSubsonic projects.', 'https://opensubsonic.netlify.app'],
+  ['Home Assistant', 'Integration via REST (no code included)', 'Control WavWiz from Home Assistant', 'https://www.home-assistant.io'],
+  ['Debian FFmpeg (Docker image only)', 'GPL 2+ (Debian build)', 'Decoding in the Linux/Docker server; separate program', 'https://packages.debian.org/ffmpeg'],
 ];
 const FILES = [['/licenses/LICENSE.txt', 'WavWiz license'], ['/licenses/THIRD-PARTY-NOTICES.txt', 'Third-party notices'], ['/licenses/FFMPEG-BUILD.txt', 'FFmpeg build configuration and source'], ['/licenses/COPYING.LGPLv2.1.txt', 'LGPL 2.1'], ['/licenses/LICENSE-shairplay.txt', 'shairplay license'], ['/licenses/LICENSE-librespot.txt', 'librespot license'], ['/licenses/COPYING.LGPLv3.txt', 'LGPL 3'], ['/licenses/PRIVACY.txt', 'Privacy note']];
 

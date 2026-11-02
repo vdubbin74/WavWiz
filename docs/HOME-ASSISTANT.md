@@ -69,3 +69,7 @@ media_player:
 ```
 It polls `/ha/players` every 10 s and creates one entity per player (play, pause, stop, next, previous, volume, mute, art, now playing).
 Minimal by design; it lives in this repo (not HACS yet).
+
+---
+
+*Home Assistant is a trademark of the Open Home Foundation. WavWiz is not affiliated with it.*
