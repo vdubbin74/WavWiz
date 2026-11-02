@@ -5,6 +5,18 @@ The container has **no local speakers**: audio plays on WavWiz Players (Windows 
 
 Image: `docker.io/vdubbin74/wavwiz-server` (tags `0.6.0`, `latest`). Hub tags are 64-bit x86 (`linux/amd64`) for now.
 
+## Limits vs the Windows app
+
+Docker is a **server only** build. It does not do everything the full Windows app does:
+
+- **Headless:** no local speakers or microphone on the Docker host (use a WavWiz Player PC's mic or a phone for calibration).
+- **No CD ripping**, **no Windows share logins**, **no Linux Player**.
+- **No AirPlay 2 / Sonos / HomePod output.**
+- **Windows Docker Desktop:** no real `network_mode: host`, so discovery (mDNS, AirPlay, Players finding the server) is weaker. Use published ports, see [Windows Docker Desktop (step-by-step)](#windows-docker-desktop-step-by-step).
+- **Want PC speakers or richer output?** Pair a Windows Player (or run the full Windows app).
+
+**Still included:** web UI, zones, scenes, schedules, alarms, Jukebox, Remote, and playback to Windows Players, phones/browsers and AirPlay 1 speakers.
+
 ## Quick start
 
 ```yaml
@@ -156,7 +168,7 @@ Auto-update is off. `docker compose pull && docker compose up -d`. (Watchtower w
 
 ## Not on Linux (0.6.0)
 
-CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers and microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins, Linux Player. These are hidden or labelled in the UI.
+Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers and microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins, Linux Player. These are hidden or labelled in the UI.
 
 ## Building the image
 
