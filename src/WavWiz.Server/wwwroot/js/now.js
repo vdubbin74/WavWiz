@@ -1,12 +1,12 @@
 import { holdPage } from './motion.js';
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
-import { cover, npCover, npKey, itemArtUrl, setMediaSession, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
+import { cover, npCover, npKey, itemArtUrl, setMediaSession, updateMediaSessionPosition, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
 import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { mixerButton } from './mixer.js';
 import { shortcutsRow, shortcutsSide } from './shortcuts.js';
-import { canControl, thisDevice } from './ui.js';
+import { canControl, thisDevice, repeatClickNext, repeatChrome, wireRepeatOne } from './ui.js';
 import { loadNpPrefs, npVars, waveBars, eqBars, applyNpClasses } from './npstyle.js';
 import { npArtBox } from './npart.js';   // 0.5.0 F98: Album art axis on the compact strips too
 import { heartBtn } from './fav.js';
@@ -48,7 +48,12 @@ export function createNow(S, ctl) {
   const prog = h('div', { class: 'prog', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: seek }, h('div', { class: 'bar' }), fill, knob);
   const play = h('button', { class: 'tbtn play', 'aria-label': 'Play or pause', onclick: () => act(S.now?.state === 'playing' ? '/stream/pause' : S.now?.state === 'paused' ? '/stream/resume' : (S.queue.length ? '/stream/jump' : '/stream/resume'), S.now?.state === 'stopped' ? { index: Math.max(0, S.now.index) } : undefined) }, icon('play'));
   const shuffle = h('button', { class: 'tbtn tog', 'aria-label': 'Shuffle', 'aria-pressed': 'false', onclick: () => act('/stream/shuffle', { on: !S.now?.shuffle }) }, icon('shuffle'));
-  const repeat = h('button', { class: 'tbtn tog', 'aria-label': 'Repeat', 'aria-pressed': 'false', onclick: () => act('/stream/repeat', { mode: { off: 'all', all: 'one', one: 'off' }[S.now?.repeat ?? 'off'] }) }, icon('repeat'));
+  // F230: click = off↔all only; One via long-press / Alt-click (wireRepeatOne)
+  const setRepeat = mode => act('/stream/repeat', { mode });
+  const cycleRepeat = () => setRepeat(repeatClickNext(S.now?.repeat));
+  const oneRepeat = () => { setRepeat('one'); toast('Repeat one track'); };
+  const repeat = h('button', { class: 'tbtn tog', 'aria-label': 'Repeat off', 'aria-pressed': 'false', title: 'Repeat off — click for all; long-press for one track', onclick: cycleRepeat }, icon('repeat'));
+  wireRepeatOne(repeat, oneRepeat);
   const me = () => thisDevice(S);
   const setMyVol = v => { const z = me(); if (!z) return; z.volume = v; act(`/zones/${z.id}`, { volume: v }, 'PATCH'); };
   const mkVol = () => { const r = h('input', { type: 'range', min: 0, max: 100, value: 0, class: 'myvol', 'aria-label': 'Volume of this device', oninput: ev => { syncVol(+ev.target.value, r); clearTimeout(r._t); r._t = setTimeout(() => setMyVol(+ev.target.value), 120); } }); return r; };
@@ -159,7 +164,8 @@ export function createNow(S, ctl) {
   // U3: the line wears the selected panel style (.pn-<style> on the panel: buttons, progress look, thumbnail effect) in the theme's colors.
   const sHeart = h('span', { class: 'np-heartslot' }, idleHeart());
   const sShuffle = h('button', { class: 'tbtn tog', 'aria-label': 'Shuffle', 'aria-pressed': 'false', onclick: () => shuffle.click() }, icon('shuffle'));
-  const sRepeat = h('button', { class: 'tbtn tog', 'aria-label': 'Repeat', 'aria-pressed': 'false', onclick: () => repeat.click() }, icon('repeat'));
+  const sRepeat = h('button', { class: 'tbtn tog', 'aria-label': 'Repeat off', 'aria-pressed': 'false', title: 'Repeat off — click for all; long-press for one track', onclick: cycleRepeat }, icon('repeat'));
+  wireRepeatOne(sRepeat, oneRepeat);   // F230: own secondary path (not only repeat.click())
   const sPrev = h('button', { class: 'tbtn', 'aria-label': 'Previous', onclick: () => act('/stream/prev') }, icon('prev'));
   const sNext = h('button', { class: 'tbtn', 'aria-label': 'Next', onclick: () => act('/stream/next') }, icon('next'));
   const sPlay = h('button', { class: 'tbtn play', 'aria-label': 'Play or pause', onclick: () => play.click() }, icon('play'));
@@ -411,14 +417,17 @@ export function createNow(S, ctl) {
     miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
     const playing = n.state === 'playing'; setIcon(play, playing ? 'pause' : 'play'); setIcon(miniPlay, playing ? 'pause' : 'play'); play.classList.toggle('playing', playing);
     for (const b of [shuffle, sShuffle]) { b.classList.toggle('on', !!n.shuffle); b.setAttribute('aria-pressed', String(!!n.shuffle)); }
-    for (const b of [repeat, sRepeat]) { b.classList.toggle('on', n.repeat !== 'off'); b.setAttribute('aria-pressed', String(n.repeat !== 'off')); setIcon(b, n.repeat === 'one' ? 'repeatOne' : 'repeat'); }
+    for (const b of [repeat, sRepeat]) {   // F230: clear All vs One chrome
+      const c = repeatChrome(n.repeat); b.classList.toggle('on', c.on); b.classList.toggle('rep-one', c.one);
+      b.setAttribute('aria-pressed', String(c.on)); b.setAttribute('aria-label', c.aria); b.title = c.title; setIcon(b, c.icon); }
     setIcon(sPlay, playing ? 'pause' : 'play'); sPlay.classList.toggle('playing', playing);
     sT1.textContent = t1.textContent; sT2.textContent = [t2.textContent.trim(), S.now?.item?.kind !== 'radio' && S.now?.item?.album].filter(Boolean).join(' · ');   /* F130: collapsed line = Artist · Album */ ctlStrip.querySelector('.ns-titles').title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
     drawMine(); barT1.textContent = t1.textContent; barT2.textContent = t2.textContent; barPlay.classList.toggle('playing', playing); setIcon(barPlay, playing ? 'pause' : 'play');
     { const bk = npKey(it, srcSm); if (barCover.dataset.src !== bk) { barCover.dataset.src = bk; barArtB.setCover(npCover(it, 96, 'sm')); } }
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
     setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
-      seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') });
+      seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') },
+      n.state === 'playing' ? S.localPos + (performance.now() - S.localAt) : n.positionMs);   // F206: same clock as tickPos
     // Up next
     // 0.4.9 F73: the server says what really plays next (shuffle pick, Repeat All wrap, Repeat One); the list neighbour only for an older server
     const qi = n.index ?? -1; const nxt = 'nextIndex' in n ? (n.nextIndex >= 0 ? (S.queue?.[n.nextIndex]?.id === n.nextTrack?.id && S.queue?.[n.nextIndex] || n.nextTrack || null) : null)
@@ -456,6 +465,7 @@ export function createNow(S, ctl) {
     ledFill.style.width = frac * 100 + '%';
     waveClip.style.clipPath = eqClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
     for (const s of [pnWave, pnLed, pnEq]) s.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+    updateMediaSessionPosition(n, pos, false);   // F204: lock-screen scrubber, throttled ~1s inside the helper
   }
   // 0.2.1 F11: no speaker status chips, live dot or "muted" tag in the panel header - device status lives in the Devices panel
   // (this device's Mute button still shows its own state). Kept as a hook: the zone refresh still repaints this device's volume / mute.

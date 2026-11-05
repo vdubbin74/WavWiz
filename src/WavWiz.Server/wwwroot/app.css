@@ -934,6 +934,18 @@ html.tv *{transition:none!important;animation:none!important}
 @media (max-width:420px){ .pepe-note{flex-direction:column;align-items:flex-start} }
 /* ===== 0.2.0 items 13-16: library sort / flip / letter strip, hearts, cover grid, Expanded library ===== */
 .libtools{display:flex;align-items:center;gap:6px;margin:0 0 8px;min-width:0;flex-wrap:wrap}
+.libtools .libsrv{max-width:140px}
+/* F239: Library sources as top xtabs (underline) in compact + expanded — not tools-row .seg chips.
+   Soft t2544u: same margins/sizing compact↔expanded so expand keeps source / search / category on the same lines. */
+.libsrcslot{margin:0 0 4px;min-width:0}
+.lib .libsrc-tabs.xtabs{display:flex;gap:4px;flex-wrap:wrap;margin:0;align-items:flex-end}
+.lib .libsrc-tabs.xtabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:6px 10px;color:var(--ink);cursor:pointer;font-size:13px;font-weight:600}
+.lib .libsrc-tabs.xtabs button.on{background:none;color:var(--ink);border-bottom-color:var(--hl,var(--accent));font-weight:700}
+.lib .libsearch{margin:4px 0 8px} /* beat .field 8px 0 so compact↔expanded don't jump */
+.lib .libhead{margin:0 0 6px;min-height:2.4em} /* keep category line from collapsing on ctabs↔xtabs */
+.lib.expanded .libsrcslot{margin:0 0 4px}
+.lib.expanded .libsrc-tabs.xtabs{flex:none}
+.lib .tilegrid.tg-radio{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
 .libtools:empty{display:none}
 .libtools .libsort{flex:0 1 auto;min-width:0;max-width:170px;font-size:12px;padding:4px 6px}
 .libtools .libflip{padding:4px 8px;font-size:12px;white-space:nowrap}
@@ -978,12 +990,12 @@ html.tv *{transition:none!important;animation:none!important}
 /* 0.2.2 T5: the arrow stays visible while Expanded (it returns to the normal layout first), same as Devices */
 .desk.libexpanded .libpanel .libbody{overflow:hidden;display:flex;padding:6px 14px 10px}
 .lib.expanded{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
-.lib.expanded .libhead{align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.lib.expanded .libhead{align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px} /* t2544u: match .lib .libhead */
 .lib.expanded .libhead .tabs{margin:0;flex:1 1 auto}
 .lib.expanded .xtabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:6px 10px;color:var(--ink)}
 .lib.expanded .xtabs button.on{background:none;color:var(--ink);border-bottom-color:var(--hl,var(--accent));font-weight:700}
 .lib.expanded .xtabs .favtab{color:var(--hl,var(--accent))}
-.lib.expanded .libsearch{margin:0;flex:0 1 260px;min-width:160px}
+.lib.expanded .libsearch{margin:4px 0 8px;flex:none;width:auto;max-width:none;min-width:160px} /* t2544u: same rhythm as compact */
 .lib.expanded .libtools .libsort{max-width:200px}
 .lib.expanded .libscroll{flex:1;min-height:0;overflow:auto}
 .lib.expanded .tilegrid{grid-template-columns:repeat(auto-fill,minmax(clamp(120px,calc(10.5vw / var(--z,1)),190px),1fr));gap:16px 14px}
@@ -1072,7 +1084,7 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button.on{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent-text,var(--accent));box-shadow:inset 0 0 0 1px var(--accent)}
 .switch{position:relative;display:inline-block;width:38px;height:20px;flex:none;cursor:pointer}
-.switch input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.switch input{position:absolute;-webkit-appearance:none;appearance:none;opacity:0;inset:0;margin:0;cursor:pointer}
 .switch span{position:absolute;inset:0;border-radius:4px;background:var(--panel2);border:1px solid var(--line);transition:background .15s}
 .switch span::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:3px;background:var(--dim);transition:transform .15s,background .15s}
 .switch input:checked+span{background:var(--accent);border-color:var(--accent)}
@@ -1477,7 +1489,8 @@ dialog.eqdialog > header .eqlockbox{margin-right:6px}
 .phone-role{border:0;padding:16px;background:transparent;max-width:calc(100vw / var(--z,1));max-height:calc(100vh / var(--z,1))} .phone-role[open]{display:flex;align-items:center;justify-content:center} .phone-role::backdrop{background:rgba(0,0,0,.72)}
 .phone-role .card{max-width:420px;width:100%;display:flex;flex-direction:column;gap:6px}
 .phone-role .btn.big{width:100%;padding:14px;font-size:17px}
-.mic-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel,#1b1f23);border:1px solid var(--accent,#FF3C00);border-radius:6px;padding:10px 12px}
+/* F241: mic banner docks in #app above .mini/.tabbar like remote (in-flow; accent edge kept) */
+.mic-banner{position:relative;z-index:25;flex:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;background:var(--panel,#1b1f23);border:0;border-top:1px solid var(--accent,#FF3C00);border-radius:0;padding:10px 12px}
 .mic-banner .grow{flex:1;min-width:180px}
 .phone-role .card > .btn.big:not(:first-of-type){margin-top:6px} .phone-role .btn.current{outline:2px solid var(--hl,var(--accent));outline-offset:1px}
 
@@ -1612,19 +1625,13 @@ dialog.ss-dlg header .ss-clock{font-weight:400;margin-right:6px}
 .jbchip{margin-left:8px;font-size:12px;border-color:var(--hl);color:var(--hl-text,var(--hl))}
 body.jb-kiosk #app{visibility:hidden}
 .jbhost{gap:6px;padding:4px 0;border-bottom:1px solid var(--line)}
-/* 0.3.0 §2: remote mode banner, theme Highlight color */
-/* F92: one .remote-banner rule (phone remote + legacy remote mode): Highlight-filled, pinned above the safe area */
-.remote-banner{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:1500;border-radius:3px;display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--hl,var(--accent));color:var(--hl-ink,var(--accent-ink));font-weight:600;font-size:13px}
-.remote-banner .grow{flex:1}
-.remote-banner .btn{min-height:28px;padding:2px 10px;background:transparent;color:inherit;border-color:currentColor}
-/* 0.5.1+: phone tabbar visible (<=900px) -> role banners sit above Now/Library/Devices like toasts; keep NP content scrollable past them */
-@media (max-width:900px){
-  .remote-banner,.mic-banner{bottom:calc(70px + var(--safe-b))}
-  body:has(.remote-banner) .desk,body:has(.mic-banner) .desk{padding-bottom:56px}
-  /* F162: on Library/Devices the condensed Now Playing .mini sits in flow above the tabbar - stack the banner above it instead of over it */
-  body:has(.desk:not([data-view=now])~.mini) :is(.remote-banner,.mic-banner){bottom:calc(70px + var(--minih,58px) + 8px + var(--safe-b))}
-  body:has(.desk:not([data-view=now])~.mini):is(:has(.remote-banner),:has(.mic-banner)) .desk:not([data-view=now]){padding-bottom:calc(56px + var(--minih,58px) + 8px)}
-}
+/* F240 chrome + F241 dock: in-flow #app strip above .mini/.tabbar (not fixed toast); dtag look; z below .drawer */
+.remote-banner{position:relative;z-index:25;flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;width:100%;box-sizing:border-box;background:var(--panel,var(--panel2));border:0;border-top:1px solid var(--line);border-radius:0;color:var(--dim);font-weight:600;font-size:13px}
+.remote-banner .grow{flex:1;min-width:0;color:var(--dim);font-weight:500}
+.remote-banner .dtag{flex:none}
+.remote-banner .btn{min-height:28px;padding:2px 10px;background:transparent;color:var(--ink);border:1px solid var(--line)}
+.remote-banner .btn:hover{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+/* F241: no phone fixed bottoms / F162 lift / desk padding hacks — banner is flex chrome in #app */
 .remote-choice{gap:8px;align-items:flex-start;margin:8px 0}
 /* 0.3.0 §3: EQ in the center panel (default), music glow behind it */
 .np-eqhost{display:none;position:absolute;inset:0;z-index:2;padding:10px 12px 40px;overflow:auto}
@@ -1643,7 +1650,8 @@ body.jb-kiosk #app{visibility:hidden}
   .desk.libcollapsed{--libw:30px} .desk.devcollapsed{--rightw:30px}
   .desk.libexpanded,.desk.devexpanded{grid-template-columns:var(--libw) minmax(0,1fr) var(--rightw);grid-template-rows:minmax(0,1fr) 64px}
   .desk.libexpanded{--rightw:30px;--libw:calc(100% - 50px)} .desk.devexpanded{--libw:30px;--rightw:calc(100% - 50px)}
-  .desk.libexpanded .libpanel{grid-area:1/1/2/2} .desk.devexpanded .devpanel,.desk.libexpanded .devpanel{grid-area:1/3/2/4}
+  .desk.libexpanded .libpanel{grid-area:1/1/2/2} .desk.libexpanded .devpanel{grid-area:1/3/2/4}
+  .desk.devexpanded:not(.libexpanded) .devpanel{grid-area:1/2/2/4}   /* F223 soft: eat middle fr so Library–Devices is one 10px gap (t1163u) */
   .desk .nowcol,.desk .listpanel{transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 0s}
   .desk.libexpanded .nowcol,.desk.devexpanded .nowcol,.desk.libexpanded .listpanel,.desk.devexpanded .listpanel{display:flex;visibility:hidden;opacity:0;pointer-events:none;transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 240ms}
   .desk .npbar{display:flex;visibility:hidden;opacity:0;pointer-events:none;transition:opacity 240ms cubic-bezier(.4,0,.2,1),visibility 0s linear 240ms}
@@ -1669,7 +1677,7 @@ body.jb-kiosk #app{visibility:hidden}
 /* ===== 0.3.1 B7/B8: master volume = the device bar (.dvol: slider, % readout, Mute-button slot), Mute all on its own line ===== */
 .dmaster .dvol-master{gap:8px} .dmaster .dvol-master .pct{width:auto;min-width:38px}
 .dvol-slot{visibility:hidden;pointer-events:none}
-.devbody > .dmaster .dvol-master{padding:0 2px}   /* 0.3.1 B7: same inset as the device rows, so the bars line up exactly */
+:is(.devbody,.tcol42) > .dmaster .dvol-master{padding:0 2px}   /* 0.3.1 B7: same inset as the device rows, so the bars line up exactly */
 .dmaster-mute{display:flex;justify-content:flex-start;margin-top:6px}
 .dmaster-mute .mutealls{flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;white-space:nowrap;border-radius:3px}
 .dmaster-mute .mutealls .ic svg{width:16px;height:16px}
@@ -1950,9 +1958,9 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 }
 .devpanel .zp42-row.dvol>.vbar{min-width:120px;width:auto}
 /* G10: slim standard Devices panel - one-line master, small subheads with counts, 2-line rows */
-.devpanel:not(.expanded) .dmaster{display:flex;align-items:center;gap:8px;padding:4px 2px 6px;margin:0}
-.devpanel:not(.expanded) .dmaster .dlbl{margin:0;white-space:nowrap} .devpanel:not(.expanded) .mvword{display:none}
-.devpanel:not(.expanded) .dmaster .dvol{flex:1;min-width:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster{display:flex;align-items:center;gap:8px;padding:4px 2px 6px;margin:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster .dlbl{margin:0;white-space:nowrap} :is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .mvword{display:none}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster .dvol{flex:1;min-width:0}
 .devpanel .slimsub{margin:6px 0 2px;padding:3px 2px;gap:6px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);font-size:11px;letter-spacing:.08em}
 .devpanel .slimsub>span:first-child{color:var(--accent2-text,var(--accent2));font-weight:800}
 .devpanel .drow.slim{padding:5px 8px 4px;margin:0 0 4px;min-height:0;display:flex;flex-direction:column;gap:1px}
@@ -2777,7 +2785,7 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .zs-ico{display:none}.zs-ico svg{width:15px;height:15px}
 .dvol-master>.zs-master{flex:none;max-width:46%;margin-right:4px}
 .dvol-master>.zs-master .zs-name{max-width:110px}
-.devbody>.dmaster .zs-master .zs-lbl,.devbody>.dmaster .zs-master .zs-name{display:none}.devbody>.dmaster .zs-master .zs-ico{display:inline-flex}
+:is(.devbody,.tcol42)>.dmaster .zs-master .zs-lbl,:is(.devbody,.tcol42)>.dmaster .zs-master .zs-name{display:none}:is(.devbody,.tcol42)>.dmaster .zs-master .zs-ico{display:inline-flex}
 @media (max-width:900px){.dvol-master>.zs-master .zs-lbl,.dvol-master>.zs-master .zs-name{display:none}.dvol-master>.zs-master .zs-ico{display:inline-flex}}
 
 /* 0.4.1 E: Add to Home Screen picture guide */
@@ -2887,7 +2895,16 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 @container spkset (max-width:820px){ .spkset .spk-body{grid-template-columns:1fr} }
 .eqarea{container:eqa/inline-size}
 .eqb-hz,.eqb-val{white-space:nowrap;overflow:hidden;text-overflow:clip}
-@container eqa (max-width:560px){ .eqb-hzu{display:none} }
+@container eqa (max-width:560px){ .eqb-hzu{display:none}
+  /* F181: narrow EQ column (Devices card) - faders shrink with the column, not the viewport */
+  .eqarea[data-eqstyle=faders] .eqa-cols{left:2px}
+  .eqarea[data-eqstyle=faders] .eqb .eqb-knob{left:calc(50% - 14px)!important;width:28px!important}
+  .eqarea[data-eqstyle=faders] .eqb .eqb-knob::before{left:6px;right:6px}
+  .eqarea[data-eqstyle=faders] .eqb .eqb-knob::after{left:4px!important;right:4px!important}
+  .eqarea[data-eqstyle=faders] .eqb .eqled{left:calc(50% + 16px)!important;width:4px!important}
+  .eqarea[data-eqstyle=faders] .eqb .eqb-ticks{left:calc(50% - 18px)}
+  .eqarea[data-eqstyle=faders] .eqb .eqb-val{font-size:10px;padding:3px 0;letter-spacing:-.2px}
+}
 @container eqa (max-width:400px){ .eqb-val{font-size:9px;letter-spacing:-.3px} .eqb-hz{font-size:10px} }
 @container eqa (max-width:300px){ .eqb:nth-child(even) .eqb-hz{visibility:hidden} .eqb:nth-child(even) .eqb-val{visibility:hidden} .eqb.sel .eqb-hz,.eqb.sel .eqb-val{visibility:visible} }
 /* 0.4.3 #6: Scenes & Schedules header on one line; the short clock note sits on its own line under it */
@@ -2940,25 +2957,25 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .un42-h b{color:var(--amber);letter-spacing:.1em}.un42-h .un42-n{font-weight:700;margin:0 4px}
 .un42 .sp42.un{border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
 /* 0.4.3 #1 + #9: the panel's master area = a full-width "CONTROLLING <Zone> ▾" chip, then ONE master row (MASTER, slider, %, mute), then All off / All on / Link all */
-.devpanel:not(.expanded) .dmaster{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px 10px;padding:6px 2px 8px}
-.devpanel:not(.expanded) .dmaster>.dvol-master{display:contents!important}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px 10px;padding:6px 2px 8px}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master{display:contents!important}
 /* 0.4.3 GO (a): no CONTROLLING chip in the normal Devices panel (render final042l); the expanded view keeps its master-row zone picker */
-.devpanel:not(.expanded) .dmaster>.dvol-master>.zs-master{display:none!important}
-.devpanel:not(.expanded) .dmaster>.dlbl{grid-column:1;grid-row:1}
-.devpanel:not(.expanded) .dmaster>.dvol-master>*:not(.zs-master){grid-row:1;min-width:0}
-.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(2){grid-column:2;width:100%}
-.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(3){grid-column:3}
-.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(4){grid-column:4}
-.devpanel:not(.expanded) .dmaster>.mallrow{grid-column:1/-1;grid-row:2;margin:0}
-.devpanel:not(.expanded) .tree42-h{margin:10px 0 8px;padding:0;border:0;min-height:26px;height:auto}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>.zs-master{display:none!important}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dlbl{grid-column:1;grid-row:1}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>*:not(.zs-master){grid-row:1;min-width:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>:nth-child(2){grid-column:2;width:100%}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>:nth-child(3){grid-column:3}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>:nth-child(4){grid-column:4}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.mallrow{grid-column:1/-1;grid-row:2;margin:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .tree42-h{margin:10px 0 8px;padding:0;border:0;min-height:26px;height:auto}
 .devpanel .tree42-h .zadd-new{width:26px;height:26px;min-height:26px;padding:0;border-color:var(--accent);color:var(--accent-text,var(--accent));font-size:16px}
 .dtagrow.ztagrow.zc42-2:not(:empty){display:flex}   /* line 2 also holds "Queue from X" and Link / Split off, not only tags */
 .drop42{text-align:left}
 .qb42.solo .qb42-t .qb42-name{color:var(--text)}   /* render: a solo box title is plain text; the linked set's title and the live status words are accent */
 .qb42.idle .qb42-head{border-bottom:1px solid var(--line);margin:0 0 8px}
-.devpanel:not(.expanded) .tree42>.pane-h.dsec-h.tree42-h{margin:10px 0 8px!important;padding:0!important;border:0!important;width:auto;max-width:100%}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .tree42>.pane-h.dsec-h.tree42-h{margin:10px 0 8px!important;padding:0!important;border:0!important;width:auto;max-width:100%}
 .sp42-nt .sp42-n{min-width:2ch}
-.devpanel:not(.expanded) .tree42-n{letter-spacing:.12em}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .tree42-n{letter-spacing:.12em}
 .tree42-n .tree42-num{color:var(--dim)}
 
 /* 0.4.4 F1/F2/F3: Scenes & Schedules column layout */
@@ -3038,7 +3055,7 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 /* 0.4.5 F27: "on Basement ▾" - the zone name in the now-playing text is the zone picker (accent text, small caret, ellipsized; no row of its own) */
 .zl-line{display:flex;align-items:baseline;gap:6px;min-width:0}
 .zl-line>:first-child{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.zlink{display:inline-flex;align-items:baseline;gap:3px;min-width:0;max-width:min(60%,200px);flex:0 0 auto;padding:0 3px;margin:0;border:0;border-radius:3px;background:none;color:var(--muted,inherit);font:inherit;font-size:.92em;line-height:inherit;cursor:pointer;white-space:nowrap}
+.zlink{display:inline-flex;align-items:baseline;gap:3px;min-width:0;max-width:min(60%,200px);flex:0 0 auto;padding:0 3px;margin:0;border:0;border-radius:3px;background:none;color:var(--dim);font:inherit;font-size:.92em;line-height:inherit;cursor:pointer;white-space:nowrap}
 .zlink[hidden]{display:none}
 .zlink .zl-on{flex:none}
 .zlink .zl-name{color:var(--accent);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3306,8 +3323,8 @@ html.pd42-open,html.pd42-open body{overflow:hidden}
 .mixbtn .ic svg{width:16px;height:16px}
 .np-volrow .mixbtn,.ns-vol .mixbtn,.npb-vol .mixbtn,.mp-vol .mixbtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2)}
 .mp-novol{justify-content:flex-start;gap:8px}
-.devpanel:not(.expanded) .dmaster{grid-template-columns:auto minmax(0,1fr) auto auto auto!important}
-.devpanel:not(.expanded) .dmaster>.dvol-master>:nth-child(5){grid-column:5}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster{grid-template-columns:auto minmax(0,1fr) auto auto auto!important}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>:nth-child(5){grid-column:5}
 .devpanel.expanded .dexp-top .dmaster .dvol-master{grid-template-columns:auto minmax(120px,1fr) minmax(38px,3.2em) 28px 28px!important}
 .dmaster .dmixbtn{width:28px;height:28px;padding:0}
 /* the mixer window: Settings-sized on PC, full screen with Done on the phone */
@@ -3415,7 +3432,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
   .desk.devfull .devpanel,.desk.tight.devfull .devpanel,.desk.roomy.devfull .devpanel{grid-row:1/3!important;display:flex;flex-direction:column}
   .desk.devfull .devpanel>.devbody{display:flex;flex-direction:column;overflow:hidden;min-height:0}
   .desk.devfull .devpanel>.devbody>.dexp-top{flex:0 0 auto}
-  .desk.devfull .devpanel .dexp-main.e42{grid-template-columns:clamp(250px,calc(22vw / var(--z,1)),380px) minmax(0,1fr) clamp(300px,27%,440px)!important;grid-template-rows:minmax(0,1fr);flex:1 1 auto;min-height:0;align-items:stretch}
+  .desk.devfull .devpanel .dexp-main.e42{grid-template-columns:clamp(250px,calc(22vw / var(--z,1)),380px) minmax(0,1fr) var(--devstdw,clamp(250px,calc(22vw / var(--z,1)),380px))!important;grid-template-rows:minmax(0,1fr);flex:1 1 auto;min-height:0;align-items:stretch}
   .desk.devfull .dexp-main.e42>.ecol{max-height:none!important;min-height:0;overflow:auto}
 }
 
@@ -3576,14 +3593,14 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 .dcol42 .spkset .spk-row{padding-right:36px} .dcol42 .spk-volline{position:relative} .dcol42 .spk-volline .spk-range{flex:none;width:100%} .dcol42 .spk-volline .spk-mute{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%)}
 
 /* F70b: regular Devices panel - MASTER on its own line, the track exactly over the zone volume bars (devices.js sets --f70l / --f70w), then %, Mute, mixer */
-.devpanel:not(.expanded) .dmaster.f70p{grid-template-columns:var(--f70w) auto auto auto!important;column-gap:5px;row-gap:4px;padding-left:var(--f70l)!important;padding-right:0}
-.devpanel:not(.expanded) .dmaster.f70p>.dlbl{grid-column:1/-1;grid-row:1}
-.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>*:not(.zs-master){grid-row:2}
-.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(2){grid-column:1;width:100%;margin:0}
-.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(3){grid-column:2;min-width:0;width:auto}
-.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(4){grid-column:3}
-.devpanel:not(.expanded) .dmaster.f70p>.dvol-master>:nth-child(5){grid-column:4}
-.devpanel:not(.expanded) .dmaster.f70p>.mallrow{grid-row:3;margin-left:calc(-1 * var(--f70l))!important}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p{grid-template-columns:var(--f70w) auto auto auto!important;column-gap:5px;row-gap:4px;padding-left:var(--f70l)!important;padding-right:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dlbl{grid-column:1/-1;grid-row:1}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dvol-master>*:not(.zs-master){grid-row:2}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dvol-master>:nth-child(2){grid-column:1;width:100%;margin:0}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dvol-master>:nth-child(3){grid-column:2;min-width:0;width:auto}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dvol-master>:nth-child(4){grid-column:3}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.dvol-master>:nth-child(5){grid-column:4}
+:is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster.f70p>.mallrow{grid-row:3;margin-left:calc(-1 * var(--f70l))!important}
 /* F70b: the controlling zone's 4 px accent edge (others 1 px) must not push its volume bar 3 px right of the others */
 .tree42 .qb42.solo.ctl{border-left-width:1px;box-shadow:inset 3px 0 0 var(--accent)}
 /* 0.4.9 F72: no page scrollbar (and no Devices shift) while the Queue slides open or closed */
@@ -3997,8 +4014,10 @@ body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:ca
   .view .lib .libsearch{margin:6px 0 14px} .view .lib .libsearch input{height:46px;font-size:15px;padding:0 16px;border-radius:12px;width:100%}
   .view .lib .libhead .tabs,.view .lib .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 0 12px;padding:0 0 2px;-webkit-overflow-scrolling:touch}
   .view .lib .tabs::-webkit-scrollbar{display:none}
-  .view .lib .tabs button{flex:none;min-height:40px;padding:0 16px;font-size:14px;font-weight:600;border-color:transparent;background:color-mix(in srgb,var(--panel2) 75%,transparent)}
-  .view .lib .tabs button.on{background:color-mix(in srgb,var(--accent) 88%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .view .lib .tabs:not(.libsrc-tabs) button{flex:none;min-height:40px;padding:0 16px;font-size:14px;font-weight:600;border-color:transparent;background:color-mix(in srgb,var(--panel2) 75%,transparent)}
+  .view .lib .tabs:not(.libsrc-tabs) button.on{background:color-mix(in srgb,var(--accent) 88%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .view .lib .libsrc-tabs.xtabs button{flex:none;min-height:40px;padding:8px 14px;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none}
+  .view .lib .libsrc-tabs.xtabs button.on{background:none;border-bottom-color:var(--hl,var(--accent));box-shadow:none;font-weight:700}
   .view .lib .tabs .wwdd{flex:none;border-radius:3px;min-height:40px}
   .view .lib .libtools{flex-wrap:nowrap;gap:8px;margin:0 0 16px}
   .view .lib .libtools > *{min-height:38px}
@@ -4224,3 +4243,178 @@ select optgroup{background:var(--panel2);color:var(--dim);font-style:normal}
 .pn-btn-square :is(.np-tablexport,.np-strip,.np-volrow,.np-vol,.np-xheart,.np-phvol,.np-tablevol,.np-heartslot) :is(.tbtn,.tbtn.play,.tbtn.tog,.mutebtn,.np-volbtn,.mixbtn,.npsleep,.eqbtn,.np-zmute),
 .pn-btn-square :is(.np-xheart,.np-heartslot)>*,
 .pn-btn-square .zl-ov,.nowcol .np-ctlpanel.pn-btn-square .zl-ov,.np-ctlpanel.np-flat.pn-btn-square .np-tablevol>.zl-ov{border-radius:3px!important}
+/* F174: a remote library tab whose server last failed is dimmed (still opens; the page shows the error) */
+.lib .tabs button.rsoff{opacity:.55}
+.lib .tabs button.rsoff::after{content:' •';color:#ff8a80}
+/* F176: queue source pill (Local / remote server name / Radio) before UP NEXT and the title; the title ellipsizes, the pill stays */
+.qsrcpill{display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:6px;padding:0 5px;border:1px solid var(--line,currentColor);border-radius:3px;color:var(--dim);opacity:.85;font-size:10px;font-weight:700;letter-spacing:.04em;line-height:14px;vertical-align:1px}
+.qsrcpill.remote{border-color:var(--accent);color:var(--accent-text,var(--accent));opacity:1}
+
+/* 0.6.1 F182: Devices tree chrome. Empty / Offline / Jukebox cards use the same solid border as active zones; Unassigned is a neutral holding zone card (no amber dash/tint). Drag accents (.droppable/.dropping) unchanged. */
+.tree42 .zempty42{border:1px solid var(--line)}
+.tree42 .qb42.empty42.ctl .zempty42{border-color:var(--accent)}
+.tree42 .un42{border:1px solid var(--line);border-radius:3px;background:color-mix(in srgb,var(--text) 3%,transparent);padding:6px 8px 8px}
+.tree42 .un42-h b{color:var(--text)}
+.tree42 .un42-h .un42-n{color:var(--dim)}
+.tree42 .un42 .sp42.un{border-color:var(--line)}
+.tree42 .un42.empty{padding:4px 6px}
+.tree42 .un42.empty .un42-h{padding:2px 0}
+.tree42 .un42.empty .drop42{display:none}
+.tree42.dragging .un42.empty .drop42{display:block;margin-top:4px;border-color:var(--line)}
+/* Keep playing (queue header) */
+.qkeep{gap:4px;align-items:center;white-space:nowrap;margin-right:6px}
+.qkeep-sel{max-width:11em;font-size:11px;padding:1px 4px}
+.qkeep.qkeep-off{opacity:.6}.qkeep.qkeep-off:hover,.qkeep.qkeep-off:focus-within{opacity:1}
+.qkeep.qkeep-off .qkeep-sel{border-color:transparent;background:transparent;color:inherit}
+.qkeep.qkeep-on .qkeep-lbl{opacity:1}.qkeep.qkeep-on .qkeep-sel{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.qsrcpill.keep{border-color:var(--accent);color:var(--accent-text,var(--accent));opacity:1;border-style:dashed}
+@media (max-width:700px){.qkeep-sel{max-width:none;min-height:36px}}
+/* Smart playlists */
+.qsrcpill.smart{border-color:var(--accent);color:var(--accent-text,var(--accent));opacity:1}
+.smart-edit{display:flex;flex-direction:column;gap:8px;min-width:min(420px,86vw)}
+.smart-rule{gap:6px;align-items:center;flex-wrap:wrap} .smart-lbl{min-width:9em}
+.smart-rule input[size]{width:5.5em} .smart-count{margin-top:4px}
+.smart-sec{margin-top:14px}
+
+/* Recently played */
+.histlist{max-height:320px;overflow:auto;margin-top:8px}
+.histrow{display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--line,rgba(127,127,127,.15))}
+
+/* Flat speaker rows inside zone cards — no inset boxes at rest */
+.tree42 .zempty42,.tree42 .qb42.empty42.ctl .zempty42{border-color:transparent;background:transparent}
+.tree42 .drop42{border-color:transparent;background:transparent}
+.tree42:not(.dragging) .zsp42>.drop42{display:none}
+.tree42.dragging .drop42{border-color:var(--line)}
+/* Offline zone = same card chrome as a playing zone; only its speakers dim */
+.tree42 .qb42.off42>.zwrap42{border:0;margin:0;padding:0 8px 8px;background:none}
+.tree42 .qb42.off42 .ze42-row{padding:8px 2px 6px;font-weight:700}
+.tree42 .qb42.off42 .ze42-gone{margin-top:0}
+/* empty / offline / Jukebox-empty: one outer qb42 frame only (unwraps like a playing solo zone) */
+.tree42 .qb42.empty42>.zwrap42.zempty42,.tree42 .qb42.empty42.jb42>.zwrap42.zempty42,.tree42 .qb42.empty42.off42>.zwrap42.zempty42,.tree42 .qb42.empty42.ctl>.zwrap42.zempty42,.tree42 .qb42.empty42>.zwrap42.zempty42.picked{border:0;border-radius:0;margin:0;padding:0 8px 8px;background:none;outline:0}
+.tree42.dragging .qb42.empty42>.zwrap42.zempty42.dropping{outline:2px solid var(--accent);outline-offset:-2px}
+
+
+/* Devices Scenes & Schedules column: header actions stay on one row (+ New schedule / + Alarm, scene pair too) */
+.ssc-col .ss-ch{flex-wrap:nowrap;min-width:0}
+.ssc-col .ss-ch>.ss-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ssc-col .ss-ch>.grow{min-width:0}
+.ssc-col .ss-ch>button,.ssc-col .ss-ch>.btn,.ssc-col .ss-ch>span:has(>button){flex:none;white-space:nowrap}
+
+/* App-wide: no thin section hairlines - spacing and type separate sections; card frames, accent tops, tab underlines, focus/drop/selected and tree elbows stay */
+.pane-h,:is(.libpanel,.devpanel,.listpanel,.np-vizpanel,.np-ctlpanel,.israil) .pane-h,.devpanel .pane-h.dsec-h,.devpanel .dss>.pane-h,.devpanel .ssc-h,.devpanel .slimsub{border-top:0!important;border-bottom:0!important}
+.devpanel.expanded .zcol-div{border-top:0!important}
+.setrow,.settings-sec .card>.setrow,.settings-sec .card>label.row,.settings-sec .card>.field{border-top:0!important;border-bottom:0!important}
+.settings-sec .card+.card::before{content:none!important}
+dialog>header{border-bottom:0}
+dialog>footer{border-top:0}
+.settings-nav{border-bottom:0}
+.dmaster,.dexp-top,.qb42.idle .qb42-head{border-bottom:0}
+.dssec,.dsconn,.zside .zscenes,.devchips{border-top:0}
+.ss-ch{border-top:0;border-bottom:0}
+.ss-row,.ss-foot,.ss-savebar{border-top:0}
+.statusbar,.tabbar,.mini,.looks-ft{border-top:0}
+.eqsws,.eqglowrow,.tcustom,.vizlooks,.sliderstyle{border-top:0}
+.qtable th,.qtable td,.histrow,.tbl th,.tbl td{border-top:0;border-bottom:0}
+.dmenu hr{border-top:0;margin:5px 0}
+
+/* Remote libraries + NAS logins: saved rows are one strip (text left, Test / Remove right); the add form is a tidy 2-column field grid with a full-width save button */
+.settings-sec .card.naslist .row.wrap.nl-saved{display:flex!important;flex-wrap:nowrap;align-items:center;gap:8px}
+.settings-sec .card.naslist .row.wrap.nl-saved>.grow{flex:1 1 auto;min-width:0}
+.settings-sec .card.naslist .row.wrap.nl-saved>.btn{flex:none;width:auto;min-height:28px;padding:2px 12px}
+.settings-sec .card.naslist .row.wrap.nl-add{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.settings-sec .card.naslist .row.wrap.nl-add>input{width:100%;min-width:0!important;max-width:none!important;margin:0;box-sizing:border-box}
+.settings-sec .card.naslist .row.wrap.nl-add>.btn{grid-column:1/-1;width:100%;margin:0}
+
+/* Queue Source column: the pill alone in its cell, truncated to the column */
+.qtable td.qsrccell .qsrcpill{max-width:100%;margin-right:0;vertical-align:middle}
+
+/* Keep playing: compact button + small modes popover (type-to-filter list, capped) */
+.qkeep .qkeep-sel{font:inherit;font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:inherit;cursor:pointer;max-width:13em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qkeep .qkeep-sel:disabled{opacity:.5;cursor:default}
+.qkeeppop{max-width:260px;max-height:min(420px,70vh);overflow:auto}
+.qkeeppop .qkeepi{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qkeeppop .qkeepback{display:inline-block;width:auto;padding:0 6px;font-size:14px;line-height:1}
+.qkeeppop .qkeepq{margin:0 6px 4px;font-size:12px;padding:3px 6px;min-width:0}
+
+/* F201: phone EQ switches - one column so each switch stays on its own label's row (iOS) */
+@media (max-width:700px){
+  .eqsws,.eqall .eqsws{grid-template-columns:1fr}
+  .eqsw{flex-wrap:nowrap}
+}
+
+/* F203: phone Queue - compact remove so titles keep their width */
+.qlist .item .more.qx{flex:none;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;font-size:15px;display:inline-flex;align-items:center;justify-content:center}
+
+/* F202: phone sheets - bounded flex scroller (min-height:0) so they scroll to the bottom */
+#p-zones .pd42-sheet>.pd42{min-height:0;flex:1 1 0}
+.npeqsheet .eqsheet-b,.eqsheet-b{min-height:0;flex:1 1 0}
+#p-zones .pd42 .spkset{min-height:0}
+
+/* F207: Devices header hierarchy — subsection labels ≤ column bar (.dsec-h 11px/700/.1em); full SCHEDULES & ALARMS (undo F191 ellipsis) */
+.ssc-col .ss-ch{flex-wrap:wrap}
+.ssc-col .ss-ch>.ss-t,.ssc-col .ss-t{font-size:11px;font-weight:700;letter-spacing:.1em;overflow:visible;text-overflow:clip;white-space:normal;min-width:0;flex:0 1 auto;overflow-wrap:break-word}
+.devpanel .slimsub{font-size:11px}.devpanel .slimsub>span:first-child{font-weight:700}
+.devpanel .un42-h,.devpanel .un42-h b{font-size:11px;letter-spacing:.1em}.devpanel .un42-h b{font-weight:700}
+
+/* F207 (t2399u): Scenes/Schedules header row = title + count; add buttons on their own row below */
+.ssc-col .ss-ch>.ss-acts{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.ssc-col .ss-ch>.ss-acts:empty{display:none}
+.ssc-col .ss-ch>.ss-acts>button,.ssc-col .ss-ch>.ss-acts>span{flex:none;white-space:nowrap}
+
+
+/* F219 A2: Devices scrollers keep 6px bar — global *:hover::-webkit-scrollbar{width:10px} shifts ~4px on WebView2 */
+.devpanel :is(.devbody,.tcol42)::-webkit-scrollbar,
+.devpanel :is(.devbody,.tcol42):hover::-webkit-scrollbar{width:6px;height:6px}
+.devpanel :is(.devbody,.tcol42)::-webkit-scrollbar-thumb:hover{width:6px}
+/* F214/F215/F216/F223: Speakers = LAST grid track on the standard Devices band.
+   --devstdw = standard .devbody OUTER width (offsetWidth; F222).
+   F223: one .tcol42 owns overflow-y:scroll standard↔expanded (pads inside; .devbody overflow:hidden + side pad 0).
+   F222 track = outer std body only (no +10+G). Roomy uses the clamp. */
+.devpanel>.devbody,.devpanel.expanded>.devbody{display:flex;flex-direction:column;overflow:hidden;padding:4px 0 0;scrollbar-gutter:auto}   /* F223: body never scrolls; sides 0 so bar sits on panel edge */
+.devpanel:not(.expanded)>.devbody>.tcol42{flex:1 1 auto;min-height:0;min-width:0;overflow-x:hidden;overflow-y:scroll;box-sizing:border-box;padding:0 10px 10px 10px;margin:0}   /* F223 C: standard Speakers scroller = same node as expanded */
+.devpanel.expanded .dexp-main.e42>.tcol42{overflow-y:scroll}   /* F220 B + F222 + F223: classic lane always on; no stable gutter */
+.devpanel.expanded .dexp-main.e42>.dcol42{padding-right:10px}
+.devpanel .dexp-main.e42{transition:grid-template-columns var(--glide) var(--glide-ease)}
+.devpanel.expanded .dexp-main.e42{grid-template-columns:clamp(220px,21%,340px) minmax(0,1fr) var(--devstdw,clamp(250px,calc(22vw / var(--z,1)),380px))!important}
+.devpanel.expanded .dexp-main.e42>.tcol42{box-sizing:border-box;padding:0 10px 10px 10px;margin:0;border-left:0;gap:0}
+.devpanel.expanded .dexp-main.e42>.tcol42>.dmaster{border:0;margin:0}
+.desk.devfull .devpanel.expanded .dexp-main.e42,.desk.roomy.devfull .devpanel.expanded .dexp-main.e42{grid-template-columns:clamp(250px,calc(22vw / var(--z,1)),380px) minmax(0,1fr) var(--devstdw,clamp(250px,calc(22vw / var(--z,1)),380px))!important}
+@media (prefers-reduced-motion:reduce){.devpanel .dexp-main.e42{transition:none}}
+.devpanel.expanded .dexp-top:empty{display:none}
+/* F215: collapse pin (Full AND Roomy) - the standard body stays right-anchored at the Speakers width while the desk glides; Roomy = clamp width */
+/* F217 t2463u: while the desk glides open, the expanded grid is wider than the still-narrow panel; overflow it to the LEFT
+   (right-anchored) so Speakers stays put and the panel grows left into viz/Library - never slides in from the viewport right */
+.desk.devhold .devpanel.devgrow.expanded .dexp-main.e42{justify-content:end}
+.desk .devpanel.devglide:not(.expanded)>.devbody{align-self:flex-end;flex:1 1 auto;width:var(--devstdw,clamp(250px,calc(22vw / var(--z,1)),380px));max-width:none;box-sizing:border-box;overflow:hidden}
+.desk.roomy .devpanel.devglide:not(.expanded)>.devbody{width:clamp(300px,27%,440px)}
+/* F215 t1108u / F216 / F217: hold panel rows/top through --glide; no overflow:hidden!important crush; no forced gutter (track math counts G once) */
+.desk.devhold .devpanel{grid-row:1/-1!important;align-self:stretch;margin-top:0}
+.desk.devhold .npbar,.desk.devhold .minicol{visibility:hidden}
+/* F219 A1 + F223: hold never crushes Speakers; .tcol42 keeps overflow-y:scroll whole glide (same node both modes). */
+.desk.devhold .devpanel>.devbody,.desk.devhold .dexp-main.e42>.ecol:not(.tcol42){overflow-x:hidden;overflow-y:hidden}
+.desk.devhold .dexp-main.e42>.tcol42,.desk.devhold .devpanel:not(.expanded)>.devbody>.tcol42{overflow-x:hidden;overflow-y:scroll}
+/* F215: Roomy expanded Devices sits back in the desk grid - never keeps the slide-over's fixed position / slide animation */
+.desk.roomy:is(.devexpanded,.devfull) .devpanel{position:static;transform:none;visibility:visible;opacity:1;width:auto;max-width:none;animation:none;box-shadow:none;border-left-width:1px;z-index:auto}
+.desk.roomy:is(.devexpanded,.devfull) .devscrim{display:none}
+
+/* F224 (t1173u): profile row buttons/name share dropdown height */
+.spk-profrow :is(.btn,.iconsq,.spk-pname),.spk-profrow .spk-prof.wwdd.wwsel{box-sizing:border-box;height:var(--fld-h-sm);min-height:var(--fld-h-sm)}
+.spk-profrow :is(.btn,.iconsq){display:inline-flex;align-items:center;justify-content:center;padding-top:0;padding-bottom:0;line-height:1;vertical-align:middle}
+.spk-profrow .spk-pname{padding-top:0;padding-bottom:0}
+/* F225: clock inset matches .ssc-next cards */
+.ssc-col .ssc-clock{padding-left:10px;padding-right:10px;box-sizing:border-box}
+/* F226: Scenes & Schedules empty-state lines inset to card padding */
+.ssc-col>p.small,.ssc-col .ss-cards>p.small,.ssc-col .ssc-scenes>p.small,.ssc-col .ss-rows>p.small,.ssc-col .ssc-rows>p.small{padding-left:10px;padding-right:10px;box-sizing:border-box}
+
+/* F229: Queue toolbar Keep playing chip height matches 22px icons (t1190u-t1194u) */
+.listpanel .plbtns .qkeep{margin-right:2px;align-self:center}
+.listpanel .plbtns .qkeep-sel{height:22px;min-height:0;line-height:20px;padding:0 6px;box-sizing:border-box;display:inline-flex;align-items:center}
+@media (max-width:700px){.listpanel .plbtns .qkeep-sel{min-height:0;height:22px}}
+
+/* F230: Repeat One visually distinct from All (stronger chrome; click = off↔all) */
+.tbtn.tog.rep-one{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.transport.pod .tbtn.tog.rep-one.on,.np-strip .tbtn.tog.rep-one.on,.mp-b.tog.rep-one.on{filter:drop-shadow(0 0 7px var(--accent))}
+
+/* F231: menubar file-menu pin icons normal size so rows match (t1197u-t1198u) */
+.mpanel .mpin{padding:1px;line-height:0;display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;min-width:16px;min-height:16px;aspect-ratio:1}
+.mpanel .mpin .ic svg{width:14px;height:14px}

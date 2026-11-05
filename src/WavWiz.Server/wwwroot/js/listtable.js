@@ -5,6 +5,7 @@ import { setChev, icon, setIcon } from './icons.js';
 import { canControl, MIME, dragInfo, dropLabel } from './ui.js';
 import { api, toast, ask, dialog, undoToast } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
+import { keepControl, openRecentQueues } from './queuetools.js';
 import { reorder, movesFor, undoMoves, dropIndex, edgeScroll, nextSelection } from './qdrag.js';
 const QMIME = 'application/x-wavwiz-qrows';
 import { pulse } from './motion.js';
@@ -14,6 +15,9 @@ import { attachQueueMenu } from './queuemenu.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, numMinFor, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
+/** F176: Local / remote server name / Radio pill (from the queue DTO's source + sourceLabel). */
+export const srcPill = q => { const src = q.source || (q.kind === 'remote' ? 'remote' : q.kind === 'radio' ? 'radio' : 'local'), lab = q.sourceLabel || (src === 'remote' ? 'Remote' : src === 'radio' ? 'Radio' : 'Local');
+  return h('span', { class: 'qsrcpill ' + src, 'data-source': src, title: src === 'local' ? 'From your local library' : `From ${lab}` }, lab); };
 export function listTable(S, ctl) {
   // 0.4.1: the zone picker above the queue: view / edit ANY zone's queue without changing the zone that is playing. view = a zone key ("g:5", "jukebox") or null (= the zone this player controls).
   let view = null, vdata = { queue: [], now: null }, vAt = 0, vBusy = false;
@@ -33,7 +37,7 @@ export function listTable(S, ctl) {
     finally { if (seq === vSeq) vBusy = false; }
   }
   /** 0.4.5 F28: switch the zone being edited (null = the Controlling zone). Clears the old zone's rows at once so they never show under the new title. */
-  function setView(key) { const cur = Z.current()?.key; view = !key || key === cur ? null : key; vdata = { queue: [], now: null }; vKey = null; vAt = 0; paintPick(); paintQz(); if (view) loadView(true); if (typeof draw === 'function') draw(); }
+  function setView(key) { const cur = Z.current()?.key; view = !key || key === cur ? null : key; vdata = { queue: [], now: null }; vKey = null; vAt = 0; paintPick(); paintQz(); if (view) loadView(true); if (typeof draw === 'function') draw(); try { keepEl.refresh(); } catch { /* not built yet */ } }
   const editingKey = () => view || Z.current()?.key || null;
   const SX = new Proxy(S, { get: (t, k) => (view && k === 'queue' ? vdata.queue : view && k === 'now' ? vdata.now : t[k]) });
   const ctlX = { ...ctl, act: (p, b, m) => (view ? qact(p, b, m) : ctl.act(p, b, m)) };
@@ -69,7 +73,9 @@ export function listTable(S, ctl) {
   // 0.5.0 F137: "Copy queue to zone" is a title-bar icon (with the save/trash/columns/lock icons) that opens a zone selector popover
   const sendBtn = h('button', { type: 'button', class: 'plus qsendic', 'data-act': 'sendqueue', hidden: true, 'aria-label': 'Copy queue to zone', title: 'Copy queue to zone (source stays as it is)', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); if (document.querySelector('.qsendpop')) return closeSend(); const r = sendBtn.getBoundingClientRect(); openSend(r.left, r.bottom + 4); } }, icon('queue'));
   void editLbl; title.append(pickSel);
-  const iconRow = h('span', { class: 'row plbtns' }, btns, sendBtn, pickBtn, lockBtn);
+  if (typeof window !== 'undefined') window.addEventListener('wavwiz:queuechanged', () => { if (view) loadView(true); });
+  const keepEl = keepControl({ zid: () => viewZid(), can: () => canControl(S) });   // Keep playing: Off | similar | a playlist | a station
+  const iconRow = h('span', { class: 'row plbtns' }, keepEl, btns, sendBtn, pickBtn, lockBtn);
   function paintPick() {
     const cs = Z.choicesNow(), cur = Z.current(), many = cs.length > 1; sendBtn.hidden = !many; if (!many) closeSend(); pickSel.hidden = !many; title.classList.toggle('haspick', many); qlbl.textContent = many ? 'Queue:' : 'QUEUE'; if (!many) { view = null; try { root.classList.remove('qviewing'); } catch { /* before the panel exists */ } return; }
     if (view && !cs.some(c => c.key === view)) view = null;
@@ -191,15 +197,13 @@ export function listTable(S, ctl) {
     btns.replaceChildren(h('span', { class: 'qsave row' }, name, h('button', { class: 'btn sm primary', type: 'button', onclick: go }, 'Save'), h('button', { class: 'btn sm', type: 'button', onclick: done }, 'Cancel')));
     name.focus();
   }
-  const clearQueue = async () => { if (!view) return clearQueueFlow(S, ctl); const n = V.queue.length; if (n && await ask(`Clear ${n} track${n === 1 ? '' : 's'}?`, `This empties ${viewChoice()?.name || 'that zone'}'s queue.`, { ok: 'Clear', danger: true })) { const snap = V.queue.slice(); await qact('/queue/clear'); undoToast(`Cleared ${n} track${n === 1 ? '' : 's'}`, async () => {   // 0.4.2: Undo also works on another zone's queue (adds go to that zone)
-      const items = snap.filter(q => q.refId != null && (q.kind === 'track' || q.kind === 'radio'));
-      for (let i = 0; i < items.length;) { const q = items[i]; if (q.kind === 'radio') { await qapi('/queue/add', { method: 'POST', body: { kind: 'radio', id: q.refId } }); i++; continue; } let j = i; while (j < items.length && items[j].kind === 'track' && j - i < 500) j++; await qapi('/queue/add', { method: 'POST', body: { kind: 'tracks', ids: items.slice(i, j).map(x => x.refId) } }); i = j; }
-      toast(`Restored ${n} track${n === 1 ? '' : 's'}`); loadView(true); }); } };
+  const clearQueue = async () => { if (!view) return clearQueueFlow(S, ctl); const n = V.queue.length; if (n && await ask(`Clear ${n} track${n === 1 ? '' : 's'}?`, `This empties ${viewChoice()?.name || 'that zone'}'s queue. You can undo it for a few seconds afterwards.`, { ok: 'Clear', danger: true })) await qact('/queue/clear'); };   // Undo: server snapshot + toast (queuetools.js)
   const cellFor = (id, q, i, isCur, can, last) => {
     const lc = last ? ' lastc' : '';
     switch (id) {
       case 'num': return h('td', { class: 'num' + lc }, can && !L.locked ? h('span', { class: 'qgrip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '⋮⋮') : null, isCur ? '▶' : i + 1);
-      case 'title': return h('td', { class: 'ell' + lc, title: q.title }, i === nextIdx ? h('span', { class: 'qnextpill', title: 'Plays next' }, 'UP NEXT') : null, q.title);   // 0.4.8 F50
+      case 'source': return h('td', { class: 'ell qsrccell' + lc }, srcPill(q));   // own column (toggle / reorder like the rest)
+      case 'title': return h('td', { class: 'ell' + lc, title: q.title }, i === nextIdx ? h('span', { class: 'qnextpill', title: 'Plays next' }, 'UP NEXT') : null, q.title);   // 0.4.8 F50; F176 source pill first
       case 'artist': return h('td', { class: 'ell' + lc, title: q.artist || '' }, q.artist || '');
       case 'album': return h('td', { class: 'ell' + lc, title: q.album || '' }, q.album || '');
       case 'genre': return h('td', { class: 'ell' + lc }, q.genre || '');
@@ -214,7 +218,7 @@ export function listTable(S, ctl) {
     const total = V.queue.reduce((a, q) => a + (q.durationMs || 0), 0);
     meta.textContent = V.queue.length ? `${V.queue.length} track${V.queue.length === 1 ? '' : 's'} • ${fmtDur(total)}` : '';
     // 0.3.5 J9 #9 + 0.3.6 K1: Save as playlist / Clear are compact icon buttons (tooltips); the name field is inline in the header; kept across redraws while typing
-    if (!btns.querySelector('.qsave')) btns.replaceChildren(can && V.queue.length ? [h('button', { class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: () => inlineSave() }, icon('save')), h('button', { class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: L.locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: L.locked || undefined, onclick: () => { if (!L.locked) clearQueue(); } }, icon('trash'))] : null);
+    if (!btns.querySelector('.qsave')) btns.replaceChildren(h('button', { class: 'plus', 'data-act': 'recentqueues', 'aria-label': 'Recent queues', title: 'Recent queues…', onclick: () => openRecentQueues({ zid: viewZid(), can }) }, icon('history')), can && V.queue.length ? [h('button', { class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: () => inlineSave() }, icon('save')), h('button', { class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: L.locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: L.locked || undefined, onclick: () => { if (!L.locked) clearQueue(); } }, icon('trash'))] : null);
     if (!V.queue.length) { tbody.replaceChildren(h('tr', { class: 'empty' }, h('td', { colspan: Math.max(1, ids.length) }, 'The queue is empty. Pick something in the library on the left (double-click a song, or use ⋯ > Add to queue).'))); return; }
     if (dragging) return;   // never redraw under a drag
     if (pdrag) return;   // F113: nor under a pointer row-reorder session

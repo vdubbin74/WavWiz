@@ -3,7 +3,7 @@
 // Built here: the in-panel summary with Restore / Cancel, Back up now (a snapshot on the server), Restore from a saved backup, and the Undo restore toast
 // (the server saves a "before restore" snapshot first, so Undo is one call).
 import { h, api, toast } from './util.js';
-import { undoToast } from './settingsui.js';
+import { undoToast, exportBackup } from './settingsui.js';
 import { pulse } from './motion.js';
 
 let panel = null;
@@ -68,10 +68,10 @@ export async function restoreBackup(S, done) {
   showPanel('Restore backup', h('p', { class: 'small dim' }, 'Pick a backup saved on this server:'), h('div', { class: 'bk-list' }, rows),
     h('div', { class: 'row bk-bar' }, h('span', { class: 'grow' }), h('button', { type: 'button', class: 'btn', onclick: closePanel }, 'Cancel')));
 }
-/** Export settings: downloads one .wavwizbackup file (the browser's own download). */
+/** Export settings: Save As for one .wavwizbackup file (browser download where Save As is missing). */
 export function exportSettings(S) {
   if (adminOnlyToast(S)) return;
-  const a = h('a', { href: '/api/v1/backup', download: '' }); document.body.append(a); a.click(); a.remove(); toast('Exporting your settings…');
+  return exportBackup();
 }
 /** Back up now: saves a snapshot on the server (the last 10 are kept). */
 export async function backUpNow(S) {

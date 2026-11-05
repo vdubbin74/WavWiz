@@ -105,6 +105,13 @@ public sealed class Db
         """
         ALTER TABLE scene ADD COLUMN layout TEXT;
         """,
+        // v9 (after 0.6.1): local play history (what played where; feeds "Recently played", "not played lately" smart rules and optional Last.fm).
+        """
+        CREATE TABLE play_history(id INTEGER PRIMARY KEY, group_id TEXT NOT NULL, kind TEXT NOT NULL, track_id INTEGER, location TEXT, title TEXT NOT NULL, artist TEXT NOT NULL, album TEXT NOT NULL,
+            duration_ms INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL, finished_at TEXT, lastfm INTEGER NOT NULL DEFAULT 0);
+        CREATE INDEX ix_play_history_started ON play_history(started_at);
+        CREATE INDEX ix_play_history_track ON play_history(track_id, started_at);
+        """,
     };
 
     public SqliteConnection Open()

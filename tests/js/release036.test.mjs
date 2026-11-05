@@ -45,7 +45,9 @@ test('K9 Now Playing controls start collapsed until the user chooses', async () 
 
 test('K10 playlist columns: defaults, picker, lock, reorder, resize, sort', async () => {
   const c = await imp('plcols');
-  const d = c.defaultLayout(); assert.deepEqual(c.visible(d), ['num', 'title', 'artist', 'album', 'genre', 'time']);
+  const d = c.defaultLayout(); assert.deepEqual(c.visible(d), ['num', 'source', 'title', 'artist', 'album', 'genre', 'time']);   // Source: own column after # on the wide queue
+  assert.deepEqual(c.normLayout({ order: ['num', 'title', 'artist', 'time'], hidden: [] }).order.slice(0, 3), ['num', 'source', 'title'], 'an old saved layout gets Source after #');
+  assert.ok(c.normLayout({ order: ['num', 'title'], hidden: ['album'] }, true).hidden.includes('source'), 'old narrow layout: Source starts hidden');
   const n = c.defaultLayout(true); assert.deepEqual(c.visible(n), ['num', 'title', 'artist', 'time'], 'the side / narrow playlist has fewer default columns');
   let l = c.toggleCol(d, 'year'); assert.ok(c.visible(l).includes('year'));
   l = c.toggleCol(l, 'year'); assert.ok(!c.visible(l).includes('year'));

@@ -1,4 +1,4 @@
-WavWiz - THIRD-PARTY NOTICES (BETA 0.6.0)
+WavWiz - THIRD-PARTY NOTICES (BETA 0.1.1)
 
 WavWiz itself is licensed as stated in LICENSE.txt. It includes or uses the following third-party components. (0.0.7: the butterchurn / MilkDrop visualizer and its presets were removed; all visualizers - Particle burst, Waveform river, Speaker cone, Ring - are original WavWiz code.) Each keeps its own license and copyright.
 Full texts are in this folder (Licenses\ next to the program, and /licenses/ in the web page) or are quoted below.
@@ -148,23 +148,3 @@ Spotify Premium account (signed in on their phone; WavWiz stores no Spotify acco
 wavwiz-hook.exe (MIT, WavWiz) forwards librespot's track events to the WavWiz server on this PC.
 
 No receiver component is GPL-licensed.
-
-============================================================
-Docker / Linux server image (0.6.0): vdubbin74/wavwiz-server
-============================================================
-Based on mcr.microsoft.com/dotnet/aspnet:10.0 (Debian; .NET MIT). FFmpeg in the image is the
-Debian "ffmpeg" package installed by apt, NOT the WavWiz LGPL-only Windows build. Debian's build is
-configured with GPL options, so in the image FFmpeg is under the GPL (v2+ / v3+). It runs as a separate
-program (/usr/bin/ffmpeg). Source: https://sources.debian.org/src/ffmpeg/ ; license texts in
-/usr/share/doc/*/copyright inside the image. The other Debian packages keep their own licenses.
-
-============================================================
-Services WavWiz talks to (not bundled)
-============================================================
-Subsonic / OpenSubsonic API (Navidrome, Airsonic-Advanced, Gonic, Funkwhale): WavWiz is a client
-only and includes no code from those servers. Navidrome (https://www.navidrome.org, GPL-3.0) and
-OpenSubsonic (https://opensubsonic.netlify.app) are separate projects. Subsonic is a trademark of its owner.
-Home Assistant (https://www.home-assistant.io) drives WavWiz through its public REST API; no Home
-Assistant code is included. Home Assistant is a trademark of the Open Home Foundation.
-Tailscale: optional, user-installed; not bundled. Tailscale is a trademark of Tailscale Inc.
-WavWiz is not affiliated with or endorsed by any of these projects or companies.

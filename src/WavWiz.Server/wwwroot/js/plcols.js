@@ -4,6 +4,7 @@ export const PL_KEY = 'wavwiz.plcols.v2', PL_KEY_NARROW = 'wavwiz.plcols.narrow.
 /** id, header text, picker text, default fraction, kind (text | num | time), query field */
 export const PL_COLS = [
   { id: 'num', head: '#', pick: '#', frac: 0.05, kind: 'num' },
+  { id: 'source', head: 'SOURCE', pick: 'Source', frac: 0.11, kind: 'text', f: 'sourceLabel' },   // queue source (Local / remote server / Radio / Keep playing)
   { id: 'title', head: 'TITLE', pick: 'Title', frac: 0.30, kind: 'text', f: 'title' },
   { id: 'artist', head: 'ARTIST', pick: 'Artist', frac: 0.21, kind: 'text', f: 'artist' },
   { id: 'album', head: 'ALBUM', pick: 'Album', frac: 0.21, kind: 'text', f: 'album' },
@@ -16,12 +17,13 @@ export const ALL_IDS = PL_COLS.map(c => c.id);
 export const byId = id => PL_COLS.find(c => c.id === id);
 /** Default look: the 0.3.5 columns (year and track # off). The narrow (side) playlist starts with fewer: # title artist time. */
 export function defaultLayout(narrow = false) {
-  return { order: ALL_IDS.slice(), hidden: narrow ? ['album', 'year', 'genre', 'track'] : ['year', 'track'], fracs: Object.fromEntries(PL_COLS.map(c => [c.id, c.frac])), locked: false };
+  return { order: ALL_IDS.slice(), hidden: narrow ? ['source', 'album', 'year', 'genre', 'track'] : ['year', 'track'], fracs: Object.fromEntries(PL_COLS.map(c => [c.id, c.frac])), locked: false };
 }
 export function normLayout(v, narrow = false) {
   const d = defaultLayout(narrow); if (!v || typeof v !== 'object') return d;
   const order = Array.isArray(v.order) ? v.order.filter((x, i, a) => ALL_IDS.includes(x) && a.indexOf(x) === i) : [];
-  for (const id of ALL_IDS) if (!order.includes(id)) order.push(id);
+  for (const id of ALL_IDS) if (!order.includes(id)) { const n = order.indexOf('num'); if (id === 'source' && n >= 0) order.splice(n + 1, 0, id); else order.push(id); }   // a saved layout from before the Source column gets it right after #
+  if (narrow && Array.isArray(v.order) && !v.order.includes('source') && Array.isArray(v.hidden) && !v.hidden.includes('source')) v = { ...v, hidden: [...v.hidden, 'source'] };   // narrow side queue: Source starts hidden there too
   let hidden = Array.isArray(v.hidden) ? v.hidden.filter(x => ALL_IDS.includes(x)) : d.hidden;
   if (hidden.length >= ALL_IDS.length) hidden = d.hidden;           // never hide everything
   const fracs = { ...d.fracs }; if (v.fracs && typeof v.fracs === 'object') for (const id of ALL_IDS) { const f = v.fracs[id]; if (typeof f === 'number' && f > 0 && f < 1) fracs[id] = f; }
@@ -76,7 +78,8 @@ export const CLEAR_LOCK_HINT = 'Locked - unlock the queue (padlock) to clear it'
 export const sortChipText = (name, dir) => `Sorted by ${name} ${dir === 'desc' ? '▼' : '▲'}`;
 export const SORT_LOCK_HINT = 'Sorting is locked while the queue is locked (click the padlock to unlock)';
 export function nextSort(cur, id) { if (!cur || cur.id !== id) return { id, dir: 'asc' }; if (cur.dir === 'asc') return { id, dir: 'desc' }; return null; }
-const keyOf = (c, q, i) => (c.id === 'num' ? i : c.kind === 'text' ? String(q[c.f] ?? '').toLocaleLowerCase() : Number(q[c.f] ?? -1));
+const srcKey = q => String(q.sourceLabel || q.source || (q.kind === 'remote' ? 'remote' : q.kind === 'radio' ? 'radio' : 'local')).toLocaleLowerCase();
+const keyOf = (c, q, i) => (c.id === 'num' ? i : c.id === 'source' ? srcKey(q) : c.kind === 'text' ? String(q[c.f] ?? '').toLocaleLowerCase() : Number(q[c.f] ?? -1));
 /** Returns the ORIGINAL indexes in display order (stable). */
 export function sortedIndexes(queue, sort) {
   const idx = queue.map((_, i) => i); if (!sort) return idx; const c = byId(sort.id); if (!c) return idx; const s = sort.dir === 'desc' ? -1 : 1;

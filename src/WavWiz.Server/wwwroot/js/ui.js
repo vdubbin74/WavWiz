@@ -1,5 +1,6 @@
 import { dndMode, pointerDragSource, pointerDropTarget } from './pdrag.js';
 import { h, api, toast, dialog } from './util.js';
+import { isFav, toggleFav } from './fav.js';
 
 export const canControl = S => S.auth && S.auth.role !== 'view';
 /** 0.2.0 item 28: admin-only controls are shown READ-ONLY (disabled, with this hint) to everyone else - never hidden. */
@@ -37,14 +38,18 @@ export function sheet(title, actions) {
   const esc = ev => { if (ev.key === 'Escape') close(); };
   const el = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
     h('div', { class: 'scrim', onclick: close }),
-    h('div', { class: 'panel' }, h('h4', null, title), actions.filter(Boolean).map(a => h('button', { class: 'act' + (a.danger ? ' err' : ''), onclick: async () => { close(); await a.onclick(); } }, a.text))));
-  document.addEventListener('keydown', esc); document.body.append(el); el.querySelector('button.act')?.focus(); return close;
+    h('div', { class: 'panel' }, h('h4', null, title), actions.filter(Boolean).map(a => h('button', { class: 'act' + (a.danger ? ' err' : ''), disabled: a.disabled || undefined, title: a.title || undefined, onclick: async () => { if (a.disabled) return; close(); await a.onclick(); } }, a.text))));
+  document.addEventListener('keydown', esc); document.body.append(el); el.querySelector('button.act:not([disabled])')?.focus() || el.querySelector('button.act')?.focus(); return close;
 }
 
+/** F175: remote (Subsonic / Navidrome) refs can be queued but not saved in WavWiz playlists yet. */
+export const REMOTE_PL_MSG = 'Remote songs can’t go in playlists yet';
+export const isRemoteRef = ref => ref?.kind === 'remote';
 /** 0.3.5 J9 #8: Add to playlist = a small dropdown next to the song row (no window); "New playlist…" is typed in place. */
 let lastPt = { x: 0, y: 0 };
 if (typeof document !== 'undefined') document.addEventListener('pointerdown', ev => { lastPt = { x: ev.clientX, y: ev.clientY }; }, true);
 export async function pickPlaylist(S, ref, title = 'Add to playlist') {
+  if (isRemoteRef(ref)) return toast(REMOTE_PL_MSG, true);   // F175
   let lists = []; try { lists = await api('/playlists'); } catch (e) { return toast(e.message, true); }
   document.querySelector('.pldrop')?.remove();
   const close = () => { box.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); };
@@ -71,10 +76,24 @@ export const dragInfo = { count: null, title: '', kind: '', ref: null };  // 0.4
 export const songsLabel = n => `${n} song${n === 1 ? '' : 's'}`;
 /** "Drop here: 17 songs at #4" (pure; no count known -> "Drop here at #4"). */
 export const dropLabel = (count, at) => `Drop here${count != null ? ': ' + songsLabel(count) : ''} at #${at + 1}`;
+/** F236: local single-track ref → Favorites menu action (reuse fav.js). */
+export function trackIdFromRef(ref) {
+  if (!ref) return null;
+  if (ref.kind === 'tracks' && Array.isArray(ref.ids) && ref.ids.length === 1) return ref.ids[0];
+  return null;
+}
+export function favActionForTrack(S, trackId, title = '') {
+  if (trackId == null || trackId === '') return null;
+  const on = isFav('track', trackId);
+  const text = on ? '♡  Remove from Favorites' : '♥  Add to Favorites';
+  if (!canControl(S)) return { text, disabled: true, title: 'Only Control or Admin access can change favorites.' };
+  return { text, onclick: () => toggleFav(S, 'track', trackId) };
+}
 export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '' } = {}) {
   const openMenu = () => {
     if (!canControl(S)) return toast('Your access is view-only, so you can browse but not play.', false);
-    sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, ...menu]);
+    const fav = favActionForTrack(S, trackIdFromRef(ref), title);
+    sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, fav, ...menu]);
   };
   if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(); } }, '⋯'));
   el.addEventListener('contextmenu', ev => { ev.preventDefault(); openMenu(); });
@@ -103,6 +122,41 @@ export function longPress(el, fn, ms = 520) {
   el.addEventListener('touchend', ev => { cancel(); if (fired) { ev.preventDefault(); } });
   el.addEventListener('touchcancel', cancel);
   el.addEventListener('click', ev => { if (fired) { ev.stopImmediatePropagation(); ev.preventDefault(); fired = false; } }, true);
+}
+
+/** F230: primary click cycles off↔all only (never lands on One). */
+export const repeatClickNext = m => ({ off: 'all', all: 'off', one: 'off' }[m || 'off']);
+
+/** F230: labels / title / icon name for a Repeat mode (caller applies setIcon). */
+export function repeatChrome(mode) {
+  const m = mode || 'off';
+  return {
+    on: m !== 'off', one: m === 'one', icon: m === 'one' ? 'repeatOne' : 'repeat',
+    aria: m === 'off' ? 'Repeat off' : m === 'all' ? 'Repeat all · whole queue' : 'Repeat one',
+    title: m === 'off' ? 'Repeat off — click for all; long-press for one track'
+      : m === 'all' ? 'Repeat all · whole queue — click to turn off; long-press for one track'
+      : 'Repeat one track — click to turn off',
+  };
+}
+
+/** F230: long-press (pointer) or Alt-click → Repeat One. Suppresses the following click when long-press fires. */
+export function wireRepeatOne(el, onOne, ms = 520) {
+  let t = null, sx = 0, sy = 0, fired = false;
+  const cancel = () => { clearTimeout(t); t = null; };
+  const fire = () => { if (fired) return; fired = true; cancel(); try { navigator.vibrate?.(15); } catch { /* optional */ } onOne(); };
+  el.addEventListener('pointerdown', ev => {
+    if (ev.button != null && ev.button !== 0) return;
+    if (ev.altKey) return;   // Alt-click uses the click path
+    fired = false; sx = ev.clientX; sy = ev.clientY;
+    t = setTimeout(fire, ms);
+  });
+  el.addEventListener('pointermove', ev => { if (t != null && (Math.abs(ev.clientX - sx) > 9 || Math.abs(ev.clientY - sy) > 9)) cancel(); });
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('click', ev => {
+    if (fired) { ev.preventDefault(); ev.stopImmediatePropagation(); fired = false; return; }
+    if (ev.altKey) { ev.preventDefault(); ev.stopImmediatePropagation(); onOne(); }
+  }, true);
 }
 
 export function dropTarget(el, onRef, accept = ev => ev.dataTransfer?.types?.includes(MIME)) {

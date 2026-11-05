@@ -21,7 +21,20 @@ public sealed class ZoneReceivers : IDisposable
     public const string Prefix = "WavWiz – ";
     private readonly Services _s; private readonly Action<string>? _log; private readonly object _l = new();
     private readonly Dictionary<long, AirPlayReceiver> _ap = new(); private readonly Dictionary<long, SpotifyReceiver> _sp = new();
-    private bool _disposed;
+    private bool _disposed; private string? _gateSig;
+    /// <summary>Zone ids (playback groups) with at least one active speaker right now; null = no gate (tests / early start).</summary>
+    public Func<HashSet<long>>? ActiveZones;
+    /// <summary>True when any speaker the house "Everywhere" receiver can play to is active.</summary>
+    public Func<bool>? AnyActive;
+
+    /// <summary>Active speaker: online like Devices (live player session, or a connected AirPlay-out sink), and its chosen output not unavailable. Muted / volume 0 still counts.</summary>
+    public static bool IsActive(Zones.ZoneDto d) => d.Connected && !d.OutputUnavailable;
+    /// <summary>Zone ids that have at least one active speaker as a member. Unassigned speakers belong to no zone.</summary>
+    public static HashSet<long> ActiveZoneIds(IEnumerable<Zones.ZoneDto> devices) => devices.Where(IsActive).SelectMany(d => d.GroupIds ?? new()).ToHashSet();
+    /// <summary>Everywhere links every zone into the house group, and Unassigned speakers already play in the house group, so any active speaker counts.</summary>
+    public static bool AnyActiveSpeaker(IEnumerable<Zones.ZoneDto> devices) => devices.Any(IsActive);
+    /// <summary>Should a zone's receiver run: toggle on AND (no gate wired, or the zone has an active speaker).</summary>
+    public static bool ZoneGate(bool toggle, long zoneId, HashSet<long>? active) => toggle && (active == null || active.Contains(zoneId));
     public ZoneReceivers(Services s, Action<string>? log) { _s = s; _log = log; }
 
     public sealed record ZoneCfg(bool AirPlay, bool Spotify);
@@ -82,6 +95,9 @@ public sealed class ZoneReceivers : IDisposable
         lock (_l)
         {
             var cfg = Config(); var zones = _s.Links.ZoneList().ToDictionary(z => z.Id, z => z.Name); bool announce = false;
+            HashSet<long>? active = null; try { active = ActiveZones?.Invoke(); } catch { }
+            // only while Phone casting is on AND the zone has a live speaker: no speaker -> the name leaves phones (a cast in progress ends cleanly)
+            cfg = cfg.ToDictionary(kv => kv.Key, kv => new ZoneCfg(ZoneGate(kv.Value.AirPlay, kv.Key, active), ZoneGate(kv.Value.Spotify, kv.Key, active)));
             foreach (var id in _ap.Keys.Where(k => !zones.ContainsKey(k) || !cfg.TryGetValue(k, out var c) || !c.AirPlay).ToList()) { _ap[id].Stop(); _ap[id].Dispose(); _ap.Remove(id); announce = true; }
             foreach (var id in _sp.Keys.Where(k => !zones.ContainsKey(k) || !cfg.TryGetValue(k, out var c) || !c.Spotify).ToList()) { _sp[id].Apply(); _sp[id].Dispose(); _sp.Remove(id); announce = true; }
             foreach (var (id, c) in cfg)
@@ -107,8 +123,27 @@ public sealed class ZoneReceivers : IDisposable
                     else { sp.Rename(name); sp.Bind(); }
                 }
             }
+            if (HouseGate()) announce = true;
+            _gateSig = Sig(active);
             if (announce) _s.Discovery?.AnnounceSoon();
         }
+    }
+    private string Sig(HashSet<long>? active) { bool any; try { any = AnyActive?.Invoke() ?? true; } catch { any = true; } return (any ? "1" : "0") + ":" + (active == null ? "*" : string.Join(",", active.OrderBy(x => x))); }
+    /// <summary>House "WavWiz – Everywhere" AirPlay: runs only while AirPlay is on in server settings AND some speaker is active. True when it started/stopped.</summary>
+    private bool HouseGate()
+    {
+        var h = _s.AirPlay; if (h == null || !_s.Cfg.AirPlay || IsLoopbackOnly()) return false;
+        bool any; try { any = AnyActive?.Invoke() ?? true; } catch { any = true; }
+        if (any && !h.Running) { h.Start(); _ = Task.Run(async () => { for (int i = 0; i < 20 && !h.Ready; i++) await Task.Delay(500); if (h.Ready) _s.Discovery?.AnnounceSoon(); }); return true; }
+        if (!any && h.Running) { h.Stop(); _log?.Invoke("airplay: no live speaker - \"" + AirPlayReceiver.Name + "\" hidden until one is online"); return true; }
+        return false;
+    }
+    /// <summary>Called every couple of seconds: re-Sync only when the set of zones with a live speaker (or "any speaker") changed.</summary>
+    public void Tick()
+    {
+        if (_disposed || ActiveZones == null) return;
+        HashSet<long>? a; try { a = ActiveZones(); } catch { return; }
+        if (Sig(a) != _gateSig) Sync();
     }
     private bool IsLoopbackOnly() => System.Net.IPAddress.TryParse(_s.Cfg.BindAddress.Trim('[', ']'), out var ip) && System.Net.IPAddress.IsLoopback(ip) && !_s.Cfg.TestTreatAllClientsAsRemote;
 

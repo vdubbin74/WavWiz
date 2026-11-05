@@ -80,6 +80,22 @@ export function settingsSearch(body, { show, showSub }) {
 }
 
 /** §7.1: Settings > General > Backup. Export one file; Import shows what will change, then asks. Admin only. */
+/** Export backup: Save As (File System Access) first, then fetch /api/v1/backup into the picked file; old browser download where the picker is missing. Cancel is silent. */
+export async function exportBackup() {
+  const d = new Date(), p2 = n => String(n).padStart(2, '0'), name = `WavWiz-${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.wavwizbackup`;
+  if (typeof window.showSaveFilePicker !== 'function') {
+    const a = h('a', { href: '/api/v1/backup', download: name }); document.body.append(a); a.click(); a.remove(); toast('Exporting your settings…'); return;
+  }
+  let handle;
+  try { handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'WavWiz backup', accept: { 'application/octet-stream': ['.wavwizbackup'] } }] }); }
+  catch (e) { if (e?.name !== 'AbortError') toast('Could not open Save As. ' + (e?.message || ''), true); return; }
+  try {
+    const r = await fetch('/api/v1/backup', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`The server answered ${r.status}.`);
+    const blob = await r.blob(), w = await handle.createWritable(); await w.write(blob); await w.close();
+    toast('Backup saved.');
+  } catch (e) { if (e?.name !== 'AbortError') toast('Backup not saved. ' + (e?.message || ''), true); }
+}
 export function backupCard(S, { admin, done } = {}) {
   const file = h('input', { type: 'file', accept: '.wavwizbackup', hidden: true });
   const info = h('div', { class: 'small', 'aria-live': 'polite' });
@@ -94,7 +110,7 @@ export function backupCard(S, { admin, done } = {}) {
   });
   return h('div', { class: 'card', id: 'sec-backup' }, h('h3', null, 'Backup ', admin ? null : adminTag()),
     learn('Save your settings, playlists, scenes, schedules, alarms, EQ presets and device names and delays in one file.', 'The file never holds passwords, certificates, private keys or paired-device tokens. The Jukebox PIN is kept only as a hash. Import shows what will change before anything is replaced.'),
-    h('div', { class: 'row wrap' }, adminOnly(S, h('a', { class: 'btn primary', href: '/api/v1/backup', download: '', role: 'button', 'aria-disabled': String(!admin), onclick: ev => { if (!admin) ev.preventDefault(); } }, 'Export backup…'), admin),
+    h('div', { class: 'row wrap' }, adminOnly(S, h('button', { class: 'btn primary', type: 'button', 'aria-disabled': String(!admin), onclick: ev => { ev.preventDefault(); if (admin) exportBackup(); } }, 'Export backup…'), admin),
       adminOnly(S, h('button', { class: 'btn', type: 'button', onclick: () => file.click() }, 'Import backup…'), admin), file), info);
 }
 

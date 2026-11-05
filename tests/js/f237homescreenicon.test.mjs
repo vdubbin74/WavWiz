@@ -1,0 +1,22 @@
+// F237: iPhone Home Screen uses logo-180 (sizes + SW shell + cache-bust), not letter W.
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const root = new URL('../../src/WavWiz.Server/', import.meta.url);
+const html = readFileSync(new URL('wwwroot/index.html', root), 'utf8');
+assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/assets\/logo-180\.png\?v=f237"/);
+assert.match(html, /rel="apple-touch-icon-precomposed" sizes="180x180" href="\/assets\/logo-180\.png\?v=f237"/);
+const sw = readFileSync(new URL('wwwroot/sw.js', root), 'utf8');
+assert.match(sw, /SHELL = \[[^\]]*\/assets\/logo-192\.png/);
+assert.match(sw, /SHELL = \[[^\]]*\/assets\/logo-180\.png/);
+const man = readFileSync(new URL('wwwroot/manifest.webmanifest', root), 'utf8');
+assert.match(man, /logo-180\.png\?v=f237[\s\S]*180x180/);
+assert.ok(man.indexOf('logo-180.png?v=f237') < man.indexOf('logo-192.png'), '180 prepended before 192');
+const phone = readFileSync(new URL('Api/PhoneApi.cs', root), 'utf8');
+assert.match(phone, /logo-180\.png\?v=f237/);
+assert.match(phone, /apple-touch-icon sizes=180x180/);
+assert.match(phone, /apple-touch-icon-precomposed sizes=180x180/);
+assert.ok(phone.indexOf('logo-180.png?v=f237') < phone.indexOf('logo-192.png'), 'phone manifest 180 first');
+const a2 = readFileSync(new URL('wwwroot/js/a2hs.js', root), 'utf8');
+assert.match(a2, /logo-180\.png\?v=f237/);
+assert.match(a2, /setAttribute\('sizes', '180x180'\)/);
+console.log('f237homescreenicon ok');

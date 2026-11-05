@@ -235,6 +235,9 @@ public sealed class Conductor : IDisposable
         }
     }
 
+    // F200: Next / Previous / Jump / Seek are user-driven and ALWAYS hard-cut: StartAt disposes the old QueueSource
+    // (incl. any in-flight _xf / _fadeInLeft) and builds a fresh one. Never route a user skip through
+    // TryStartCrossfade, reuse an active _xf, or "skip" by seeking to the end. Only natural end-of-track crossfades.
     private void StartAt(int index, long startMs)
     {
         DisposeSource();
@@ -494,7 +497,7 @@ public sealed class Conductor : IDisposable
             var np = NowNoLock();
             var real = _queue.Where(q => !IsReceiver(q.Kind)).ToList();
             var items = real.Select(q => new { k = q.Kind, id = q.RefId, u = q.RefId == null ? q.Location : null, t = q.RefId == null ? q.Title : null,
-                ar = q.Kind == "remote" ? q.Artist : null, al = q.Kind == "remote" ? q.Album : null, d = q.Kind == "remote" ? q.DurationMs : (long?)null, img = q.Kind == "remote" ? q.ArtUrl : null, n = q.Kind == "remote" ? q.TrackNo : null }).ToList();   // F164: remote songs keep their tags (no secret: u is subsonic:{server}:{song})
+                ar = q.Kind == "remote" ? q.Artist : null, al = q.Kind == "remote" ? q.Album : null, d = q.Kind == "remote" ? q.DurationMs : (long?)null, img = q.Kind == "remote" ? q.ArtUrl : null, n = q.Kind == "remote" ? q.TrackNo : null, g = q.Kind == "remote" ? q.Genre : null, y = q.Kind == "remote" ? q.Year : null, o = q.Origin }).ToList();   // F164: remote songs keep their tags (no secret: u is subsonic:{server}:{song})
             int idx = Math.Clamp(np.Index, 0, Math.Max(0, items.Count - 1));
             // 0.4.2: the list is saved in its real order (shuffle never permutes it); the shuffle flag, the songs played in this cycle and the history are saved as positions in that list
             int[] played, hist; lock (_shl) { played = real.Select((q, i) => (q, i)).Where(x => _played.Contains(x.q.Id)).Select(x => x.i).ToArray(); hist = _history.Select(h => real.FindIndex(q => q.Id == h)).Where(i => i >= 0).ToArray(); }
@@ -506,11 +509,13 @@ public sealed class Conductor : IDisposable
     public void ForgetSaved() { try { _db.DeleteSetting(LastQueueSettingKey); _lastSaved = null; } catch { } }
     public void SaveLast() { try { var json = BuildLastJson(); if (json != _lastSaved) { _db.SetSetting(LastQueueSettingKey, json); _lastSaved = json; } } catch { /* a failed save never disturbs playback */ } }
     /// <summary>Puts the saved queue back (paused at the saved track and position). Returns the number of tracks restored.</summary>
-    public int RestoreLast()
+    public int RestoreLast() { try { var raw = _db.Setting(LastQueueSettingKey); return string.IsNullOrWhiteSpace(raw) ? 0 : RestoreJson(raw, false, null); } catch { return 0; } }
+    /// <summary>Queue undo / Recent queues: replaces the queue with a saved snapshot (a <see cref="BuildLastJson"/> string), paused at its saved song. Returns the number of items put back.</summary>
+    public int RestoreSnapshot(string json, string notice) => RestoreJson(json, true, notice);
+    private int RestoreJson(string raw, bool replace, string? notice)
     {
         try
         {
-            var raw = _db.Setting(LastQueueSettingKey); if (string.IsNullOrWhiteSpace(raw)) return 0;
             using var doc = System.Text.Json.JsonDocument.Parse(raw); var root = doc.RootElement;
             if (!root.TryGetProperty("items", out var arr) || arr.ValueKind != System.Text.Json.JsonValueKind.Array) return 0;
             var list = new List<QueueItem>(); int want = root.TryGetProperty("index", out var ix) ? ix.GetInt32() : 0, newIdx = 0;
@@ -525,8 +530,9 @@ public sealed class Conductor : IDisposable
                 else if (kind == "remote" && e.TryGetProperty("u", out var ru) && ru.GetString() is { Length: > 0 } rl && rl.StartsWith("subsonic:"))
                 {
                     string? P(string n) => e.TryGetProperty(n, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
-                    it = new QueueItem(0, "remote", rl, P("t") ?? "Remote song", P("ar") ?? "", P("al") ?? "", e.TryGetProperty("d", out var dv) && dv.TryGetInt64(out var dl) ? dl : 0, null, null, null, P("img"), e.TryGetProperty("n", out var nv) && nv.TryGetInt32(out var ni) ? ni : null);
+                    it = new QueueItem(0, "remote", rl, P("t") ?? "Remote song", P("ar") ?? "", P("al") ?? "", e.TryGetProperty("d", out var dv) && dv.TryGetInt64(out var dl) ? dl : 0, null, P("g"), e.TryGetProperty("y", out var yv) && yv.ValueKind == System.Text.Json.JsonValueKind.Number && yv.TryGetInt32(out var yi) ? yi : null, P("img"), e.TryGetProperty("n", out var nv) && nv.ValueKind == System.Text.Json.JsonValueKind.Number && nv.TryGetInt32(out var ni) ? ni : null);
                 }
+                if (it != null && e.TryGetProperty("o", out var op) && op.ValueKind == System.Text.Json.JsonValueKind.String) it = it with { Origin = op.GetString() };
                 if (pos == want) newIdx = list.Count;
                 if (it != null) { posToList[pos] = list.Count; list.Add(it); }
                 pos++;
@@ -535,7 +541,8 @@ public sealed class Conductor : IDisposable
             long posMs = root.TryGetProperty("posMs", out var pm) ? pm.GetInt64() : 0;
             lock (_l)
             {
-                if (_queue.Count > 0) return 0;
+                if (_queue.Count > 0 && !replace) return 0;
+                if (replace) { if (_state != PlayState.Stopped) { Engine.Stop(30_000); DisposeSourceLater(); } _state = PlayState.Stopped; _queue.Clear(); _pausedMs = 0; }
                 _queue.AddRange(list.Select(WithId)); _index = Math.Clamp(newIdx, 0, _queue.Count - 1); ResetShuffleState();
                 try
                 {   // 0.4.2: a v2 save carries the play mode; an older save (v1: shuffle was never saved, and a shuffled-in-place list is kept exactly as it was) just starts with shuffle off
@@ -550,7 +557,7 @@ public sealed class Conductor : IDisposable
                 }
                 catch { _shuffle = false; }
                 _pausedMs = _queue[_index].Kind == "radio" ? 0 : Math.Clamp(posMs, 0, Math.Max(0, _queue[_index].DurationMs - 1000)); _state = PlayState.Paused;
-                _notice = $"Restored your last queue ({_queue.Count} track{(_queue.Count == 1 ? "" : "s")}), paused where you left off."; Bump();
+                _notice = notice ?? $"Restored your last queue ({_queue.Count} track{(_queue.Count == 1 ? "" : "s")}), paused where you left off."; Bump();
             }
             Pub("queue"); Pub("now"); return list.Count;
         }

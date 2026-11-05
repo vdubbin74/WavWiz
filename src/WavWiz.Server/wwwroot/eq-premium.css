@@ -52,7 +52,7 @@
 .eqarea[data-eqstyle=faders] .eqb-knob::before{content:"";position:absolute;left:8px;right:8px;top:4px;bottom:4px;border-top:1px solid rgba(0,0,0,.35);border-bottom:1px solid rgba(0,0,0,.35);pointer-events:none}
 .eqarea[data-eqstyle=faders] .eqb.sel .eqb-knob{border-color:color-mix(in srgb,var(--accent) 70%,#000)!important;box-shadow:0 0 0 2px var(--accent),0 0 10px color-mix(in srgb,var(--accent) 35%,transparent),0 4px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.25)!important}
 .eqarea[data-eqstyle=faders] .eqb.sel,.eqarea[data-eqstyle=faders] .eqb:focus-visible{border-color:transparent;background:color-mix(in srgb,var(--accent) 6%,transparent)}
-.eqarea[data-eqstyle=faders] .eqb-val{top:-30px;width:46px;padding:4px 0;border-radius:12px;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+.eqarea[data-eqstyle=faders] .eqb-val{top:-30px;left:2px;right:2px;width:auto;max-width:min(46px,calc(100% - 4px));margin:0 auto;box-sizing:border-box;padding:4px 0;border-radius:12px;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
 .eqarea[data-eqstyle=faders] .eqb.sel .eqb-val{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 .eqarea[data-eqstyle=faders]:has(.eqb.sel) .eqb:not(.sel){opacity:.9}
 .eqarea[data-eqstyle=faders] .eqa-curve path.eqa-line{stroke-width:1.25;opacity:.55;filter:none}

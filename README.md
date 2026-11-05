@@ -86,7 +86,7 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 - **Admin mode** — File → Sign in as admin… unlocks house settings on any paired device without signing out; admin-only items are read-only (never hidden) for everyone else.
 - **Privacy-first** — Local network only by default. Optional private remote access via Tailscale (you bring your own Tailscale setup); WavWiz does not open ports to the public internet for you.
 
-AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. Navidrome, Subsonic, Home Assistant and Tailscale are trademarks of their owners. WavWiz is not affiliated with any of them. Third-party credits: [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
+AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. WavWiz is not affiliated with either.
 
 ---
 

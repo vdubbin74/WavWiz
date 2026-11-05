@@ -58,6 +58,8 @@ public sealed class JukeboxService
     private volatile bool _starting;
     /// <summary>0.4.9 F76 fix: running, or starting (speakers being borrowed) - while false, no speaker may stay in the Jukebox zone.</summary>
     public bool Active => Running || _starting;
+    /// <summary>The queue the Jukebox autofill owns while it runs (Keep playing leaves that one alone).</summary>
+    public Playback.Conductor? Owns => Active ? Cond : null;
     /// <summary>0.4.9 F76 fix: borrows these speakers (device ids) into the Jukebox zone for this session.</summary>
     public Action<List<long>>? Borrow;
     public string? Code { get; private set; }

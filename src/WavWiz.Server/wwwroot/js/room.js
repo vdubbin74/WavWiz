@@ -321,12 +321,22 @@ export function askPhoneRole(done) {
   document.body.append(box); try { box.showModal(); } catch { box.setAttribute('open', ''); } return box;
 }
 const ROLE_LABEL = { speaker: 'Play music here', remote: 'Use as remote', mic: 'Use as a calibration mic' };
+/** F241: dock role banners in #app immediately above .mini (or .tabbar) — in-flow phone chrome, not body fixed toast. */
+function dockRoleBanner(el) {
+  const app = document.getElementById('app');
+  if (!app) { document.body.append(el); return; }
+  const before = app.querySelector(':scope > .mini') || app.querySelector(':scope > .tabbar');
+  if (before) app.insertBefore(el, before); else app.append(el);
+}
 /** 0.5.0 phone remote (phones only; the PC tray Remote mode stays retired): a slim banner while this phone is a silent remote. */
 export function showRemoteBanner() {
   if (document.querySelector('.remote-banner')) return;
-  const bar = h('div', { class: 'remote-banner', role: 'status' }, h('span', { class: 'grow' }, 'Remote — this phone is silent'),
+  // F240: dtag-style REMOTE chip + dim sentence + outlined Play music here (not Highlight toast)
+  const bar = h('div', { class: 'remote-banner', role: 'status' },
+    h('span', { class: 'dtag' }, 'REMOTE'),
+    h('span', { class: 'grow' }, 'this phone is silent'),
     h('button', { class: 'btn', onclick: () => { setPhoneRole(localStorage, 'speaker'); try { localStorage.setItem(wantKey, '1'); } catch { /* ignore */ } bar.remove(); unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => showUnlock(e.message)); } }, 'Play music here'));
-  document.body.append(bar);
+  dockRoleBanner(bar);
 }
 /** F92: after picking Use as remote, bring Now Playing (the F68 remote layout) to the front. main.js listens. */
 function goNow() { try { window.dispatchEvent(new CustomEvent('wavwiz:go', { detail: 'now' })); } catch { /* ok */ } }
@@ -336,7 +346,7 @@ function showMicBanner() {
   const bar = h('div', { class: 'mic-banner', role: 'status' }, h('span', { class: 'grow' }, 'This phone is set as a calibration mic, so it does not play music.'),
     h('a', { class: 'btn primary', href: '/calmic.html' }, 'Open calibration mic'),
     h('button', { class: 'btn', onclick: () => { setPhoneRole(localStorage, 'speaker'); bar.remove(); unlockAudio(); startPhoneAsDevice(defaultRoomName()).catch(e => toast(e.message, true)); } }, 'Play music here'));
-  document.body.append(bar);
+  dockRoleBanner(bar);
 }
 /** Menu > Phone role… (phones only): switch between speaker, remote and calibration mic. */
 export function changePhoneRole() {

@@ -201,7 +201,8 @@ function outputLine(z) {
 // and (CSS) the speaker Volume bar has the same width as the bars below it. With nothing picked it uses the last measured place (else the column's inset).
 let f70ref = null;
 export function alignMaster(body) {
-  if (body && !body.querySelector(':scope > .dexp-top')) { alignPanelMaster(body); return; }
+  if (body && !body.querySelector(':scope > .dexp-top')) { const tc = body.querySelector(':scope > .tcol42'); alignPanelMaster(tc || body); return; }   // F223: standard MASTER lives in .tcol42
+  { const tc = body?.querySelector(':scope > .dexp-main > .tcol42'); if (tc) { alignPanelMaster(tc); return; } }   // F211: expanded MASTER lives in the Speakers column
   const top = body?.querySelector(':scope > .dexp-top'), m = top?.querySelector('.dmaster'), ms = m?.querySelector('.dvol-master input[type=range]'), col = body?.querySelector('.dexp-main .dcol42');
   if (!ms || !col || !col.offsetParent) return;
   const cr = col.getBoundingClientRect(), bars = [...col.querySelectorAll('.spk-row input[type=range], .zp42-row input[type=range]')].filter(i => i.offsetParent && i.getBoundingClientRect().width > 0 && !i.closest('.spk-volline'));
@@ -236,7 +237,7 @@ function alignPanelMaster(body) {
 }
 let f70raf = 0, f70ro = null;
 const alignMasterSoon = body => { if (!HASWIN) return; cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body));
-  if (!f70ro && window.ResizeObserver) { f70ro = new ResizeObserver(() => { cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); }); f70ro.observe(body); window.addEventListener('resize', () => { cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); setTimeout(() => alignMaster(body), 250); }); new MutationObserver(() => { cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); }).observe(body, { childList: true, subtree: true }); } };
+  if (!f70ro && window.ResizeObserver) { f70ro = new ResizeObserver(() => { cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); }); f70ro.observe(body); window.addEventListener('resize', () => { cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); setTimeout(() => alignMaster(body), 250); }); new MutationObserver(recs => { if (recs.every(m => m.target?.closest?.('.sscol,.ssc-col') || m.target?.parentElement?.closest?.('.sscol,.ssc-col'))) return; /* F227 A3: Scenes-only mutations never retune MASTER */ cancelAnimationFrame(f70raf); f70raf = requestAnimationFrame(() => alignMaster(body)); }).observe(body, { childList: true, subtree: true }); } };
 // 0.4.9 F78: a phone is casting to "WavWiz – Everywhere": a slim bar on top of every Devices panel (sender, title, artist, Stop). Hidden otherwise.
 const castKeep = new WeakMap();   // 0.4.9 F82: per container - the same cast bar node while the session lasts; only its song line is patched
 export function castBar(S, ctl, host) {
@@ -522,7 +523,7 @@ const SCR = new Map(); let scrDrawing = 0;
 const scrKey = x => x === document.scrollingElement ? 'page' : (typeof x.className === 'string' && x.className.trim() ? '.' + x.className.trim().split(/\s+/).filter(c => !/^(drop|over|hl|on|sel|focus)/.test(c)).map(c => CSS.escape(c)).join('.') : null);
 let scrUser = 0; const userNow = () => performance.now() - scrUser < 400;   // a wheel / touch / key / scrollbar drag just now: that scroll is the user's
 if (typeof document !== 'undefined' && document.addEventListener) for (const t of ['wheel', 'touchmove', 'keydown', 'pointerdown']) document.addEventListener(t, () => { scrUser = performance.now(); }, { capture: true, passive: true });
-if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('scroll', ev => { if (scrDrawing && !userNow()) return; const x = ev.target === document ? document.scrollingElement : ev.target; const k = x?.nodeType === 1 && scrKey(x); if (k) SCR.set(k, x.scrollTop); }, true);
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('scroll', ev => { if (scrDrawing && !userNow()) return; const x = ev.target === document ? document.scrollingElement : ev.target; if (!userNow() && x?.nodeType === 1 && x.querySelector?.('.apds.open')) return;   /* F233: AirPlay paint clamps must not poison Speakers SCR */ const k = x?.nodeType === 1 && scrKey(x); if (k) SCR.set(k, x.scrollTop); }, true);
 export function keepScroll(el, why = '') {
   if (!el?.querySelectorAll) return () => {};
   const scrollers = () => { const out = []; for (let x = el; x; x = x.parentElement) out.push(x); for (const x of el.querySelectorAll('*')) if (x.scrollHeight > x.clientHeight) out.push(x); return out; };
@@ -796,17 +797,24 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 /** 0.4.2: the tree + detail pane, shared by the side panel and the phone page. X = { spk, zsel, size, draw(force), setSpk(id) } (live state of the caller). */
 /** 0.4.9 F82: copy the live parts (now-playing lines, volume bars and %, tag rows) of a freshly built tree into the shown one, node for
  *  node; 0 (caller rebuilds) when the two do not line up. A part the user is using (focus, a dragged slider) is left alone. */
-const LIVE42 = ['.zl-now', '.qb42-vol', '.sp42-v', '.sp42-tags', '.ztagrow'];
+const LIVE42 = ['.zl-now', '.qb42-t', '.qb42-vol', '.sp42-v', '.sp42-tags', '.ztagrow'];   // F232: title PLAYING/PAUSED with live now
 export function patchLive42(cur, fresh) {
   const pairs = [];
   for (const sel of LIVE42) { const a = cur.querySelectorAll(sel), b = fresh.querySelectorAll(sel); if (a.length !== b.length) return 0; a.forEach((x, i) => pairs.push([x, b[i]])); }
   const ae = document.activeElement; let all = 1;
   for (const [x, y] of pairs) { if (x.outerHTML === y.outerHTML) continue; if ((ae && x.contains(ae)) || x.querySelector('input:active') || hov42(x)) { all = 2; continue; } x.replaceWith(y); }
+  // F232: idle class + aria-label live with play/pause (sig42 skips now.state so titles used to stick)
+  for (const y of fresh.querySelectorAll('section.qb42[data-leader-id]')) {
+    const x = cur.querySelector(`section.qb42[data-leader-id="${CSS.escape(y.dataset.leaderId)}"]`);
+    if (!x) continue;
+    x.classList.toggle('idle', y.classList.contains('idle'));
+    const al = y.getAttribute('aria-label'); if (al != null) x.setAttribute('aria-label', al);
+  }
   return all;   // 1 = all patched, 2 = some part in use (patched later), 0 = rebuild
 }
 /** F151: same layout (the same rows in the same order) -> replace only the rows / zone cards / box shells that changed, return 1 (2 = a row in
  *  use was left for later); 0 = layout differs, caller rebuilds. */
-const hov42 = x => !!x.querySelector?.('button:hover,a:hover,[role=switch]:hover,[title]:hover');   // F151b: pointer on a control: defer the swap (keeps cursor + tooltip)
+const hov42 = x => !!(typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches && x.querySelector?.('button:hover,a:hover,[role=switch]:hover,[title]:hover'));   // F151b + F210: only real hover (phone sticky :hover must not defer swaps)
 const ROWS42 = '.qb42,.zcard42,.sp42';
 const rowId42 = x => (x.dataset.leaderId || '') + '|' + (x.dataset.groupId || '') + '|' + (x.dataset.deviceId || '') + '|' + x.tagName;
 export function patchRows42(cur, fresh) {
@@ -916,13 +924,38 @@ export function devicesPanel(S, ctl) {
   root.append(h('div', { class: 'prail', 'aria-hidden': 'true' }, h('span', { class: 'prail-ic' }, '◉'), h('span', { class: 'prail-t' }, 'DEVICES'), h('span', { class: 'prail-n', title: 'Devices online / total' })),
     h('div', { class: 'pane-h devhead' }, expBtn, h('button', { type: 'button', class: 'btn sm libswap', title: 'Show the queue here again', onclick: ev => { ev.stopPropagation(); ctl.libSwap?.(false); } }, '‹ Queue'), h('span', { class: 'grow devtitle' }), count, h('span', { class: 'devtitle' }, 'DEVICES'), colBtn), body);   // 0.3.5 J11
   root.addEventListener('click', ev => { if (size === 'collapsed' && !ev.target.closest('.devcol')) ctl.toggleDev?.(false); });
+  // F215/F216: measure the standard body only when settled in standard (not mid-glide, not Roomy).
+  // F222 t1155u: --devstdw = standard body OUTER width (offsetWidth, includes classic SB lane) = the Speakers grid track. No gutter math.
+  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold')) return;
+    const w = body.offsetWidth; if (w < 200) return;
+    root._stdw = Math.round(w); root._stdwGood = root._stdw; };   // F221 C: sticky last-good
   const setSize = (s, highlight = null) => {
+    // F215/F216: --devstdw cached while standard (Full only; never measured after applyPanels flips classes, never in Roomy - clamp there)
+    const desk = root.closest?.('.desk'), roomy = !!desk?.classList.contains('roomy');
+    if (roomy) { root.style.removeProperty('--devstdw'); }
+    else {
+      // F220 C t1143u: before std→expanded, sync measure if missing or tiny so first expand never sticks a stale/narrow Speakers track
+      if (size === 'standard' && s === 'expanded' && (!root._stdw || root._stdw < 240)) cacheStd();
+      const sw = root._stdw || root._stdwGood;   // F221 C: fall back to last-good, never blank mid-session
+      if (sw) root.style.setProperty('--devstdw', sw + 'px');
+    }
+    // F215: pin Speakers + panel rows/top through --glide both ways (Full and Roomy)
+    if (HASWIN && desk && ((size === 'expanded') !== (s === 'expanded'))) {
+      clearTimeout(root._glideT); desk.classList.add('devhold');
+      if (size === 'expanded' && s === 'standard') root.classList.add('devglide'); else root.classList.remove('devglide');
+      // F217 t2463u: expand grows LEFT from the panel's left edge - Speakers right edge pinned (not pulled in from the viewport right)
+      root.classList.toggle('devgrow', s === 'expanded');
+      const g = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--glide')) || 250;
+      root._glideT = setTimeout(() => { root.classList.remove('devglide', 'devgrow'); desk.classList.remove('devhold'); if (size === 'standard') cacheStd(); }, g + 60);
+    }
     size = s; hl = highlight;
     setChev(colBtn, s === 'collapsed' ? 'l' : 'r'); colBtn.setAttribute('aria-expanded', String(s !== 'collapsed'));
     colBtn.setAttribute('aria-label', arrowLabel('Devices', s));
     paintExpandBtn(expBtn, 'Devices', s === 'expanded');
     root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';
-    root.classList.toggle('expanded', s === 'expanded'); draw(true);
+    root.classList.toggle('expanded', s === 'expanded');
+    draw(true);
+    if (s === 'standard') requestAnimationFrame(cacheStd);   // F215: cache while settled standard
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };
   // 0.2.3 U11: a skipped redraw used to be dropped, so a device removed (revoked/forgotten) while a slider, menu or zone editor was open stayed on the
@@ -948,21 +981,32 @@ export function devicesPanel(S, ctl) {
     const busy = { v: false };
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
     if (size === 'collapsed') { body.replaceChildren(); return; }
+    // F223: one Speakers scroller both modes — reuse .tcol42 (or migrate .tcol42s); MOVE into .dexp-main on expand; never mint a fresh one
+    const speakersHost = () => {
+      let t = body.querySelector('.tcol42');
+      if (t) { t.classList.add('ecol'); t.classList.remove('tcol42s'); return t; }
+      const old = kid(body, 'tcol42s') || body.querySelector('.tcol42s');
+      if (old) { old.classList.remove('tcol42s'); old.classList.add('tcol42', 'ecol'); return old; }
+      return h('div', { class: 'tcol42 ecol' });
+    };
     // 0.4.2: ONE tree (zones hold their speakers). Standard = the tree; Expanded = Scenes & Schedules | detail pane | the same tree.
     const groups = orderedGroups(S.groups || []);
     if (size === 'expanded') {
       body.classList.remove('rich');
       const etop = kid(body, 'dexp-top') || h('div', { class: 'dexp-top' }), emain = kid(body, 'dexp-main') || h('div', { class: 'dexp-main e42' });
       emain.classList.add('e42'); emain.classList.remove('e1', 'spk-open');
-      reconcile(etop, [castBar(S, ctl, etop), keepSection(kid(etop, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));   // F163: the AirPlay strip moved under the Speakers tree (tcol)
+      reconcile(etop, [castBar(S, ctl, etop), btHint(S, ctl), keepMic(kid(etop, 'dmicline'), S)].filter(Boolean));   // F211: MASTER moved to the top of the Speakers column (tcol42)   // F163: the AirPlay strip moved under the Speakers tree (tcol)
       alignMasterSoon(body);
       const sscol = kid(emain, 'sscol') || h('div', { class: 'sscol ecol' });
       if (!sscol.firstChild) sscol.append(scenesColumn(S, { refresh: ctl.refreshAll, zones: () => S.zones, groups: () => S.groups || [] })); else sscol.firstChild._refresh?.();
       const dcol = kid(emain, 'dcol42') || h('div', { class: 'dcol42 ecol', 'aria-label': 'Settings of the selected zone or speaker' });
       paintDetail(dcol, groups);
-      const tcol = kid(emain, 'tcol42') || h('div', { class: 'tcol42 ecol' });
-      const tn = treeNode(force); if (tcol.firstChild !== tn) { tcol.replaceChildren(tn); restoreScroll(tcol); }
-      { const ap = airplayDevicesStrip(S, ctl); if (ap && tn.nextSibling !== ap) tn.after(ap); }   // F163: quiet Add AirPlay… right after the tree (Unassigned)
+      const tcol = speakersHost();   // F223: same node as standard — move into Speakers column
+      // F211: the Speakers column = [MASTER, tree, AirPlay strip] - the same MASTER strip and tree as the side panel; MASTER is kept while busy
+      const tn = treeNode(force), hadTree = tcol.contains(tn);
+      const ap = airplayDevicesStrip(S, ctl);
+      reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn, ap || null].filter(Boolean));
+      if (!hadTree) restoreScroll(tcol);
       reconcile(emain, [sscol, dcol, tcol]);
       reconcile(body, [etop, emain]);
       if (busy.v) later();
@@ -970,15 +1014,28 @@ export function devicesPanel(S, ctl) {
     }
     // 0.3.3 G10 (slim): one-line master, Speakers / Unassigned / Zones subheads with counts, 2-line rows (~56 px), output name in the tooltip
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
-    reconcile(body, [castBar(S, ctl, body), keepSection(kid(body, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(body, 'dmicline'), S), (() => { const n = treeNode(force); const w = kid(body, 'tcol42s') || h('div', { class: 'tcol42s' }); if (w.firstChild !== n) { w.replaceChildren(n); } return w; })(), ssCompact(S, ctl)]);
+    // F223: .devbody is not the scroller — persistent .tcol42 holds MASTER+tree (+ bits that used to scroll with body)
+    const tcol = speakersHost();
+    const tn = treeNode(force), hadTree = tcol.contains(tn);
+    reconcile(tcol, [castBar(S, ctl, tcol), keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(tcol, 'dmicline'), S), tn, ssCompact(S, ctl)].filter(Boolean));
+    if (!hadTree) restoreScroll(tcol);
+    reconcile(body, [tcol]);
     alignMasterSoon(body);
     // 0.3.8 L46 (option A): with few devices the cards grow and show what is playing in each; many devices stay compact
     const rich = S.zones.length + groups.length <= 8; body.classList.toggle('rich', rich);
     const it = S.now?.item, np = it?.title ? `▶ ${it.title}${it.artist ? ' · ' + it.artist : ''}` : 'Nothing playing'; body.style.setProperty('--np', JSON.stringify(np));
     if (busy.v) later();
   }
+  if (HASWIN) {   // F214: a stale standard measure never survives a resize or a roomy toggle
+    const clearStd = () => { root._stdw = 0; if (!root._stdwGood) root.style.removeProperty('--devstdw'); if (size === 'standard') requestAnimationFrame(cacheStd); };
+    window.addEventListener('resize', clearStd);
+    let deskObs = null, wasRoomy = null;
+    const hookDesk = () => { const d = root.closest?.('.desk'); if (!d || deskObs || !window.MutationObserver) return; wasRoomy = d.classList.contains('roomy');
+      deskObs = new MutationObserver(() => { const r = d.classList.contains('roomy'); if (r !== wasRoomy) { wasRoomy = r; root._stdwGood = 0; clearStd(); } }); deskObs.observe(d, { attributes: true, attributeFilter: ['class'] }); };
+    requestAnimationFrame(hookDesk); setTimeout(hookDesk, 500);
+  }
   setSize(size); if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(draw, draw));
-  return { el: root, draw, setSize, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
+  return { el: root, draw, setSize, cacheStd, measureStd: cacheStd, get size() { return size; }, setCollapsed: c => setSize(c ? 'collapsed' : (size === 'collapsed' ? 'standard' : size)) };
 }
 
 /** 0.3.9 L51: "Now playing in each zone" strip of the expanded view. The server has ONE stream, so every zone that is on while something plays shows that
@@ -1264,7 +1321,7 @@ function zoneCtx(S, ctl, g, card, ms, { onEdit = null } = {}) {
   attachCtx(card, () => {
     const admin = isAdmin(S), can = canControl(S), muted = zoneMuted(S.zones, g), on = zoneOn(S.zones, g), linked = (g.linked || []).length > 0, canLink = (S.groups || []).length > 1;
     const act = { settings: () => (onEdit ? onEdit(g.id) : editZone(S, g, ctl.refreshAll)), rename: () => promptName(`Rename zone ${g.name}`, g.name, async v => { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); ctl.refreshAll?.(); }),
-      mute: () => ctl.act(`/groups/${g.id}/mute`, { muted: !muted }), off: () => { for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: !on }, 'PATCH'); },
+      mute: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); }, off: () => { for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: !on }, 'PATCH'); },
       split: () => Z.splitOff(g, ctl.refreshAll), link: () => Z.linkMenu(card, S, g, ctl.refreshAll), remove: () => confirmRemoveZone(S, g, ctl.refreshAll) };
     return zoneMenuItems({ admin, can, muted, on, linked, canLink }).map(it => it.sep ? it : { ...it, onclick: act[it.id] });
   }, `${g.name} zone actions`);
@@ -1378,7 +1435,7 @@ function jukeboxCard(S, ctl) {
   const pill = onPill('Jukebox zone', on, can, () => { const want = !ms.some(z => z.enabled); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
   const lvl = ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0;
   const bar = capBar('Jukebox zone volume', lvl, 100, can && ms.length > 0, v => api('/jukebox/zone/volume', { method: 'POST', body: { set: v } }).catch(e => toast(e.message, true)), 'Moves every speaker of the Jukebox zone together');
-  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', onclick: ev => { ev.stopPropagation(); api('/jukebox/zone/mute', { method: 'POST', body: { muted: !muted } }).then(() => ctl.refreshAll()).catch(e => toast(e.message, true)); } }, icon(muted ? 'mute' : 'volume')), can && ms.length > 0, 'Your access is view-only.');
+  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', 'data-icon': muted ? 'mute' : 'volume', onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => ids.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can && ms.length > 0, 'Your access is view-only.');
   const inZone = z => (S.groups || []).find(g => (g.deviceIds || []).includes(z.id))?.name;
   const pick = async (z, checked) => { const next = new Set(picks); checked ? next.add(z.id) : next.delete(z.id); try { await api('/jukebox/zone', { method: 'PUT', body: { deviceIds: [...next] } }); ctl.refreshAll(); } catch (e) { toast(e.message, true); } };
   const rows = (S.zones || []).slice(0, 200).map(z => h('label', { class: 'jbrow' + (picks.has(z.id) ? ' on' : ''), 'data-device-id': z.id }, ro(h('input', { type: 'checkbox', checked: picks.has(z.id), 'aria-label': `${z.name} plays the Jukebox`, onchange: ev => pick(z, ev.target.checked) }), admin, 'Only an admin can pick the Jukebox devices.'),
@@ -1406,7 +1463,7 @@ export function receiverBlock(g, admin) {
     const sw = (k, label, st) => ro(h('label', { class: 'row zsmember' }, h('input', { type: 'checkbox', checked: !!st?.enabled, 'data-recv': k, 'aria-label': label,
       onchange: async ev => { try { const r = await api(`/receivers/zones/${g.id}`, { method: 'PUT', body: { [k]: ev.target.checked } }); draw(r.zones.find(z => z.zoneId === g.id)); } catch (e) { ev.target.checked = !ev.target.checked; msg.textContent = e.message; } } }),
       h('span', null, label), h('span', { class: 'small dim grow' }, st?.enabled ? (st.running ? (st.inSession ? ' · playing' : ' · ready') : st.installed === false ? ' · not installed' : ' · starting…') : '')), admin, 'Only an admin can change this.');
-    wrap.replaceChildren(h('div', { class: 'dlbl' }, 'PHONE CASTING'), h('p', { class: 'small dim' }, `Shows as “${row.name}” on phones. Plays in this zone only.`), sw('airplay', 'AirPlay', row.airplay), sw('spotify', 'Spotify Connect', row.spotify), msg);
+    wrap.replaceChildren(h('div', { class: 'dlbl' }, 'PHONE CASTING'), h('p', { class: 'small dim' }, `Shows as “${row.name}” on phones. Plays in this zone only. Shows on AirPlay only when this zone has a live speaker.`), sw('airplay', 'AirPlay', row.airplay), sw('spotify', 'Spotify Connect', row.spotify), msg);
   };
   api('/receivers/zones').then(r => { const row = (r.zones || []).find(z => z.zoneId === g.id); if (row) draw(row); }).catch(() => {});
   return wrap;

@@ -14,6 +14,7 @@ import { airplayOutCard } from './airplayout.js';   // 0.5.0 stage 10 (WIP)
 import { changePhoneRole } from './room.js';   // F100
 import { isPhoneUa } from './phonejoin.js';
 import { phoneRole } from './calmic-core.js';
+import { historyCard, lastFmCard } from './history.js';
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -75,7 +76,7 @@ export async function openSettings(S, refresh, nav, section) {
   let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
   const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
   d.el.querySelector('header .grow').after(search.el);
-  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-remote' : section === 'airplay' ? 'sec-airplay-out' : null;   // F159: airplay   // F117
+  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-away' : section === 'airplay' ? 'sec-airplay-out' : null;   // F159: airplay   // F117
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
@@ -152,18 +153,19 @@ export async function openSettings(S, refresh, nav, section) {
       h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } } }, 'Rescan now'),
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
     panes.library.push(admin ? nasCard() : h('div', { class: 'card', id: 'sec-nas' }, h('h3', null, 'Network share logins (NAS) ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add share logins.')));
-    panes.library.push(admin ? remoteCard() : h('div', { class: 'card', id: 'sec-remote' }, h('h3', null, 'Remote libraries ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add remote libraries.')));   // F164
+    panes.library.push(admin ? remoteCard() : h('div', { class: 'card', id: 'sec-remote-libs' }, h('h3', null, 'Remote libraries ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add remote libraries.')));   // F164
     panes.library.push(onlineArtCard(settings, admin));
     panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings), streamQualityCard(settings, admin));
     panes.library.push(acoustIdCard(settings));
+    panes.library.push(historyCard(S), lastFmCard(admin));
 
     // Network
     panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Home network'),
       h('p', { class: 'dim small' }, 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.'),
       h('p', { class: 'small' }, `Listening on ${st.bind}`),
-      h('button', { class: 'btn', onclick: () => body.querySelector('#sec-remote')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, 'Away-from-home access (Tailscale)')));
+      h('button', { class: 'btn', onclick: () => { const go = () => body.querySelector('#sec-away')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); const tab = body.querySelector('#stab-network'); if (tab && tab.getAttribute('aria-selected') !== 'true') { tab.click(); requestAnimationFrame(go); } else go(); } }, 'Away-from-home access (Tailscale)')));
     // F117: Away-from-home access is a normal Network card, right after Home network (local, then remote)
-    { const rv = remoteView(S); panes.network.push(h('div', { class: 'card setpage', id: 'sec-remote' }, rv.el)); }
+    { const rv = remoteView(S); panes.network.push(h('div', { class: 'card setpage', id: 'sec-away' }, rv.el)); }
     panes.network.push(networkCard({ auth: { role: admin ? 'admin' : 'view' } }));      // 0.1.3: Private/Public, re-detect, use the new address
     // 0.1.2: AirPlay + Spotify Connect with level (0…+6 dB) arrows
     const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : rc.airplay.installed ? 'Not running - see Diagnostics.' : 'Not installed on this PC.') : '';
@@ -346,7 +348,7 @@ function crossfadeCard(settings, admin) {
     oninput: ev => { out.textContent = +ev.target.value ? `${ev.target.value} s` : 'Off'; },
     onchange: async ev => { try { await api('/settings', { method: 'PUT', body: { 'playback.crossfadeSec': +ev.target.value } }); savedMark(ev.target); } catch (e) { toast('Not saved. ' + e.message, true); } } });
   return h('div', { class: 'card', id: 'sec-crossfade' }, h('h3', null, 'Crossfade ', admin ? null : adminTag()),
-    learn('Blends the end of a song into the next one. Off (0 s) by default.', 'Songs of the same album that play in order stay gapless and are never crossfaded. All speakers stay in sync: the fade happens before the music is sent.'),
+    learn('Blends the end of a song into the next one. Off (0 s) by default.', 'Songs of the same album that play in order stay gapless and are never crossfaded. Skipping a song is always a hard cut. All speakers stay in sync: the fade happens before the music is sent.'),
     h('div', { class: 'row' }, r, out));
 }
 
@@ -380,22 +382,22 @@ export function streamQualityCard(settings, admin) {
 
 /** F164: Subsonic / OpenSubsonic servers (Navidrome, Airsonic, Gonic…). WavWiz is the client; the password is stored like NAS logins (Windows DPAPI). */
 function remoteCard() {
-  const box = h('div', { class: 'card naslist', id: 'sec-remote' }), list = h('div');
+  const box = h('div', { class: 'card naslist', id: 'sec-remote-libs' }), list = h('div');
   const url = h('input', { type: 'text', placeholder: 'http://192.168.1.20:4533', 'aria-label': 'Server address', style: 'min-width:200px' });
   const user = h('input', { type: 'text', placeholder: 'User name', autocomplete: 'off', 'aria-label': 'User name' });
   const pw = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'new-password', 'aria-label': 'Password' });
-  const label = h('input', { type: 'text', placeholder: 'Label (optional)', 'aria-label': 'Label', style: 'max-width:140px' });
+  const label = h('input', { type: 'text', placeholder: 'Label (optional)', 'aria-label': 'Label' });
   async function load() {
     let r; try { r = await api('/remote/servers'); } catch (e) { list.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
     if (!r.available) list.replaceChildren(h('p', { class: 'small dim' }, 'Saved remote library logins need the server to run on Windows.'));
-    else list.replaceChildren(...(r.servers.length ? r.servers.map(x => h('div', { class: 'row wrap' + (x.lastError ? ' dim' : ''), style: 'margin:4px 0' },
+    else list.replaceChildren(...(r.servers.length ? r.servers.map(x => h('div', { class: 'row wrap nl-saved' + (x.lastError ? ' dim' : ''), style: 'margin:4px 0' },
       h('div', { class: 'grow' }, h('b', null, x.label), ' ', h('span', { class: 'mono small dim' }, x.url), ' as ', h('b', null, x.user), h('div', { class: 'small ' + (x.lastError ? 'err' : 'dim') }, x.lastError || (x.online ? 'Online' : 'Saved'))),
       h('button', { class: 'btn', onclick: async () => { try { const t = await api('/remote/servers/test', { method: 'POST', body: { id: x.id } }); toast(t.ok ? 'Connected' : t.error, !t.ok); load(); } catch (e) { toast(e.message, true); } } }, 'Test'),
       h('button', { class: 'btn danger', onclick: async () => { try { await api('/remote/servers/remove', { method: 'POST', body: { id: x.id } }); load(); } catch (e) { toast(e.message, true); } } }, 'Remove'))) : [h('p', { class: 'small dim' }, 'No remote libraries.')]));
   }
   box.append(h('h3', null, 'Remote libraries'),
     h('p', { class: 'dim small' }, 'Play music from a Subsonic / OpenSubsonic server such as Navidrome. WavWiz connects as a client (it is not a Subsonic server); songs stream from the server and show under Library > Remote. Your local folders are never changed. The password is encrypted by Windows for the WavWiz service on this PC and is never shown again.'),
-    list, h('div', { class: 'row wrap', style: 'margin-top:8px;gap:6px' }, url, user, pw, label,
+    list, h('div', { class: 'row wrap nl-add', style: 'margin-top:8px;gap:6px' }, url, user, pw, label,
       h('button', { class: 'btn primary', onclick: async ev => { const b = ev.currentTarget; b.disabled = true; try { const r = await api('/remote/servers', { method: 'POST', body: { url: url.value, user: user.value, password: pw.value, label: label.value } }); pw.value = ''; toast(r.message); load(); } catch (e) { toast(e.message, true); } finally { b.disabled = false; } } }, 'Connect & save')));
   load(); return box;
 }
@@ -409,14 +411,14 @@ function nasCard() {
   async function load() {
     let r; try { r = await api('/library/nas'); } catch (e) { list.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
     if (!r.available) list.replaceChildren(h('p', { class: 'small dim' }, 'Saved network-share logins need the server to run on Windows.'));
-    else list.replaceChildren(...(r.shares.length ? r.shares.map(x => h('div', { class: 'row wrap', style: 'margin:4px 0' },
+    else list.replaceChildren(...(r.shares.length ? r.shares.map(x => h('div', { class: 'row wrap nl-saved', style: 'margin:4px 0' },
       h('div', { class: 'grow' }, h('span', { class: 'mono' }, x.share), ' as ', h('b', null, x.user), h('div', { class: 'small ' + (x.lastError ? 'err' : 'dim') }, x.lastError || (x.connected ? 'Connected' : 'Saved'))),
       h('button', { class: 'btn', onclick: async () => { try { const t = await api('/library/nas/test', { method: 'POST', body: { share: x.share } }); toast(t.ok ? 'Connected' : t.error, !t.ok); load(); } catch (e) { toast(e.message, true); } } }, 'Test'),
       h('button', { class: 'btn danger', onclick: async () => { try { await api('/library/nas/remove', { method: 'POST', body: { share: x.share } }); load(); } catch (e) { toast(e.message, true); } } }, 'Forget'))) : [h('p', { class: 'small dim' }, 'No saved logins.')]));
   }
   box.append(h('h3', null, 'Network share logins (NAS)'),
     h('p', { class: 'dim small' }, 'If your music is on a NAS or another PC that asks for a user name and password, save it here first, then add the folder above. The password is encrypted by Windows for the WavWiz service on this PC and is never shown again or sent anywhere.'),
-    list, h('div', { class: 'row wrap', style: 'margin-top:8px;gap:6px' }, share, user, pw,
+    list, h('div', { class: 'row wrap nl-add', style: 'margin-top:8px;gap:6px' }, share, user, pw,
       h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/library/nas', { method: 'POST', body: { share: share.value, user: user.value, password: pw.value } }); pw.value = ''; toast(r.message); load(); } catch (e) { toast(e.message, true); } } }, 'Connect & save')));
   load(); return box;
 }

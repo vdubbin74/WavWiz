@@ -88,6 +88,8 @@ function place(el, x, y, r) {
 }
 /** Show a menu at (x, y) (clamped into the window). Items: { id, label, ic?, onclick | sub:[{label,onclick}], danger, disabled, hint, sep }. A disabled item is dim, with its hint as a tooltip. Esc closes (submenu first); Up/Down move, Right opens a submenu, Left closes it. */
 export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
+  // F199: inside a showModal() <dialog> (Settings) the menu must live in the dialog's top layer, or it paints under it.
+  const host = from?.closest?.('dialog') || document.body;
   closeCtx();
   const subs = []; let subEl = null;
   const closeSub = () => { if (subEl) { subEl.remove(); subs.splice(subs.indexOf(subEl), 1); subEl = null; } };
@@ -103,11 +105,11 @@ export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
   };
   const openSub = (b, it, hover) => {
     closeSub(); if (b.disabled) return;
-    const m = mk(it.sub, it.label); m.classList.add('ctx-sub'); document.body.append(m); subs.push(m); subEl = m;
+    const m = mk(it.sub, it.label); m.classList.add('ctx-sub'); host.append(m); subs.push(m); subEl = m;
     const r = b.getBoundingClientRect(); place(m, r.right - 2, r.top - 4, r);
     if (!hover) m.querySelector('.ctx-item:not([disabled])')?.focus();
   };
-  const el = mk(items, label); document.body.append(el); place(el, x, y);
+  const el = mk(items, label); host.append(el); place(el, x, y);
   const off = ev => { if (!el.contains(ev.target) && !subs.some(s => s.contains(ev.target))) closeCtx(); };
   const key = ev => {
     if (ev.key === 'Escape') { ev.stopPropagation(); if (subEl) { const c = el.querySelector('.has-sub.cur'); closeSub(); c?.focus(); return; } closeCtx(); return; }

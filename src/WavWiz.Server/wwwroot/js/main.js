@@ -1,4 +1,6 @@
 import { wsel } from './wwselect.js';
+import { keepControl, openRecentQueues } from './queuetools.js';
+let pKeep = null;
 import { viewForMode } from './viewmode.js';
 import './marquee.js';   // 0.4.8 F62: shared now-playing marquee (main app + phone)
 import { libCountLabel } from './libcount.js';   // 0.4.4 F7
@@ -15,7 +17,7 @@ import { openEq } from './eq.js';
 import { createNow } from './now.js';
 import { centerEq } from './centerview.js';   // 0.5.0 F128: phone Sound / EQ sheet
 import { openSpeakerSettings, editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
-import { listTable } from './listtable.js';
+import { listTable, srcPill } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
 import { loadLayout, saveLayout, setLocked } from './plcols.js';
@@ -346,6 +348,7 @@ function applyPanels(first = false) {
     : tight ? (P6.exp ? { ...P6, auto: false } : { ...P6, lib: tightLib ? P6.lib : 'rail', dev: 'normal', auto: false }) : effective(P6, window.innerWidth, { opened: lastOpened }), ls = shown(e, 'lib'), ds = shown(e, 'dev');
   paintDevTab();
   desk.classList.toggle('libcollapsed', ls === 'rail'); desk.classList.toggle('libexpanded', ls === 'expanded');
+  if (ds === 'expanded' && !roomy && !desk.classList.contains('devexpanded')) devp.cacheStd?.();   // F221 A t1148u: measure Speakers width while desk is still standard, BEFORE the expand flip
   desk.classList.toggle('devcollapsed', ds === 'rail'); desk.classList.toggle('devexpanded', ds === 'expanded');
   desk.classList.toggle('roomyopen', roomy && ds === 'normal');   // 0.4.9 F65: Roomy keeps Full's narrow Devices bar in the grid; opened from it, Devices slides out over the side (as the 0.4.5-0.4.7 slide-over did)
   desk.classList.toggle('autorail', !!e.auto);
@@ -577,6 +580,7 @@ export function openMini() {
   window.open('/mini.html', 'wavwiz-mini', 'popup,width=420,height=145');
 }
 
+if (typeof window !== 'undefined') window.addEventListener('wavwiz:queuechanged', () => refreshAll());
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
 // 0.4.0: the selected zone (Now Playing bar, Queue, mini, hotkeys) - Z.init wires the API zone; a change redraws what shows a zone
 Z.init(S, { refreshNow: () => refreshNow(), manage: () => { if (wide()) setDevSize('expanded'); else go('devices'); } });
@@ -673,15 +677,15 @@ function drawQueue() {
     const playing = i === cur && S.now?.state !== 'stopped';
     const rowEl = h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, onclick: () => can && act('/stream/jump', { index: i }) },
       dragOk ? h('span', { class: 'qgrip', role: 'button', 'aria-label': `Drag ${q.title} to reorder`, title: 'Drag to reorder', onclick: ev => ev.stopPropagation() }, '⋮⋮') : null,
-      h('span', { class: 'num' }, playing ? '▶' : i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))), h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''),
-      can && !locked ? h('button', { class: 'more', 'aria-label': 'Move up', disabled: i === 0, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i - 1 }); } }, '▲') : null,
-      can && !locked ? h('button', { class: 'more', 'aria-label': 'Move down', disabled: i === S.queue.length - 1, onclick: ev => { ev.stopPropagation(); act('/queue/move', { from: i, to: i + 1 }); } }, '▼') : null,
-      can ? h('button', { class: 'more', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
+      h('span', { class: 'num' }, playing ? '▶' : i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, srcPill(q), q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))), h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''),
+      can ? h('button', { class: 'more qx', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
     if (can) attachQueueMenu(rowEl, S, { refreshAll, showInLibrary }, i, () => !!loadLayout(true).locked);   // 0.3.8 L48 long-press
     return rowEl;
   });
+  const phoneKeep = () => (pKeep ??= keepControl({ can: () => canControl(S) }));   // Keep playing on the phone Queue page
   const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
   root.replaceChildren(h('div', { class: 'row wrap' }, ...(pp => pp ? [h('h2', { class: 'pqhead row', style: 'margin:0' }, h('span', { class: 'pqlbl' }, 'Queue:'), pp)] : [h('h2', { class: 'grow', style: 'margin:0' }, 'Queue', h('span', { class: 'qzone dim', 'data-qzone': '' }, Z.queueSuffixNow()))])(phonePick()) /* 0.4.8 F60: "Queue: [zone ▾]", the zone named once */, h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
+    phoneKeep(), h('button', { class: 'btn', 'data-act': 'recentqueues', onclick: () => openRecentQueues({ can: canControl(S) }) }, 'Recent queues…'),
     can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear'), lockBtn] : null),
     S.queue.length ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
   qReorder?.destroy(); qReorder = null;

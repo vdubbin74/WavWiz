@@ -67,4 +67,66 @@ public class F164RemoteLibraryTests
         var sid = System.Text.Json.JsonSerializer.SerializeToElement(rs.List()[0]).GetProperty("id").GetString();
         Assert.Contains("p=enc:", rs.StreamUrl("subsonic:" + sid + ":x")!);
     }
+
+    /// <summary>F175: dragging a remote album / song onto the queue = POST /queue/add with "at"; entries land at the drop line as Kind=remote, mixed with local.</summary>
+    [Fact]
+    public async Task F175_remote_queue_add_inserts_at_drop_position_mixed_with_local()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        using var t = new TempDir(); var rs = new SubsonicService(S.Db, t.Path, new FakeProt(), new FakeNavidrome());
+        Assert.Null(await rs.Save("http://nas:4533", "trevor", "pa55", "Navidrome")); S.Remote = rs;
+        var sid = System.Text.Json.JsonSerializer.SerializeToElement(rs.List()[0]).GetProperty("id").GetString()!;
+        long t1 = await E2ETests.AddClickTrack(f, admin), t2 = await E2ETests.AddClickTrack(f, admin);
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "tracks", ids = new[] { t1, t2 } })).StatusCode);
+        // song row drag (same shape as Add to queue) dropped between the two local songs
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "remote", server = sid, songs = new[] { new { id = "s9", title = "Kelly", artist = "Air", album = "Moon Safari", durationMs = 1000 } }, at = 1 })).StatusCode);
+        // album tile drag dropped at the top
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "remote", server = sid, album = "al1", at = 0 })).StatusCode);
+        var q = S.Conductor.Queue().ToList();
+        Assert.Equal(5, q.Count);
+        Assert.Equal(new[] { "remote", "remote", "track", "remote", "track" }, q.Select(x => x.Kind).ToArray());
+        Assert.StartsWith("subsonic:" + sid + ":s1", q[0].Location); Assert.StartsWith("subsonic:" + sid + ":s2", q[1].Location);
+        Assert.StartsWith("subsonic:" + sid + ":s9", q[3].Location);
+    }
+
+    /// <summary>F176: queue DTO carries a source pill: local "Local", remote = server display name (removed server -> "Remote"); no Location / secrets.</summary>
+    [Fact]
+    public async Task F176_queue_dto_has_source_and_label()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        using var t = new TempDir(); var rs = new SubsonicService(S.Db, t.Path, new FakeProt(), new FakeNavidrome());
+        Assert.Null(await rs.Save("http://nas:4533", "trevor", "pa55", "Navidrome")); S.Remote = rs;
+        var sid = System.Text.Json.JsonSerializer.SerializeToElement(rs.List()[0]).GetProperty("id").GetString()!;
+        long t1 = await E2ETests.AddClickTrack(f, admin);
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "tracks", ids = new[] { t1 } })).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "remote", server = sid, songs = new[] { new { id = "s9", title = "Kelly", artist = "Air", album = "Moon Safari", durationMs = 1000 } } })).StatusCode);
+        var raw = await admin.GetStringAsync("/api/v1/queue");
+        Assert.DoesNotContain("pa55", raw); Assert.DoesNotContain("subsonic:", raw);
+        var items = System.Text.Json.JsonDocument.Parse(raw).RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal("local", items[0].GetProperty("source").GetString()); Assert.Equal("Local", items[0].GetProperty("sourceLabel").GetString());
+        Assert.Equal("remote", items[1].GetProperty("source").GetString()); Assert.Equal("Navidrome", items[1].GetProperty("sourceLabel").GetString());
+        Assert.Equal(sid, items[1].GetProperty("serverId").GetString());
+        Assert.True(rs.Remove(sid));
+        var gone = System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/queue")).RootElement.GetProperty("items")[1];
+        Assert.Equal("remote", gone.GetProperty("source").GetString()); Assert.Equal("Remote", gone.GetProperty("sourceLabel").GetString());
+    }
+
+    /// <summary>F238: remote album detail uses local albhead/albcover chrome — never cover(..., 'lg') (full-bleed giant art).</summary>
+    [Fact]
+    public void F238_remote_album_page_uses_albcover_not_cover_lg()
+    {
+        var js = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "library.js"));
+        var i = js.IndexOf("async function remoteAlbumPage", StringComparison.Ordinal);
+        Assert.True(i >= 0, "remoteAlbumPage missing");
+        var body = js.Substring(i, Math.Min(2200, js.Length - i));
+        Assert.Contains("'albcover'", body);
+        Assert.Contains("albhead", body);
+        Assert.Contains("albmeta", body);
+        Assert.Contains("albacts", body);
+        Assert.Contains("albcols", body);
+        Assert.Contains("dominantColor", body);
+        Assert.DoesNotContain("cover(r.album.artUrl, 'lg'", body);
+        Assert.Contains("rplay(sid, songs)", body); // Play kept
+        Assert.Contains("rsongList(sid, songs, true)", body); // F175 song rows kept
+    }
 }

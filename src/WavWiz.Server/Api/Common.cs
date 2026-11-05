@@ -23,6 +23,10 @@ public sealed class Services
     public Features.BackupService Backup = null!;
     public Features.DeviceProfileService Profiles = null!;   // 0.3.6 K6
     public Features.JukeboxService Jukebox = null!;
+    public Features.KeepPlayingService Keep = null!;
+    public Features.QueueHistoryService QHistory = null!;
+    public Features.SmartPlaylistService Smart = null!;
+    public Features.PlayHistoryService History = null!;   // local play history + optional Last.fm   // rule-based playlists   // queue undo + recent queues   // Keep playing (everyday queue autofill)
     public Features.SpeakerFollowService Speakers = null!;
     public Features.RadioFinderService RadioFinder = null!;
     public Features.TagFixService TagFix = null!;

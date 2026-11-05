@@ -371,31 +371,46 @@ export function scenesColumn(S, { refresh } = {}) {
   const reload = () => { editing = null; load(true); refresh?.(); };
   function draw() {
     const next = data.rows.filter(r => r.enabled && r.nextRunAt).sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0];
+    // F227: signature skip - no full remount when scenes/rows/clock-minute/next/chrome are unchanged; live text is patched in place (mirrors ssCompact F151 el._k)
+    const sig = JSON.stringify([data.scenes.map(x => [x.id, x.name, x.icon, !!x.active, (x.members || []).map(m => [m.deviceId, m.enabled, m.volume, m.profileId])]),
+      data.rows.map(r => [r.id, r.name, r.enabled, r.time, r.days, r.onceDate, r.alarm, r.nextRunAt, r.skippedRunAt, r.lastRunAt, r.lastResult, r.payload]),
+      data.now ? data.now.slice(0, 16) : null, next?.id ?? null, admin, ctlOk, (S.zones || []).map(z => [z.id, z.name])]);
+    if (!editing && root._k === sig && root.firstChild) { patchLive(next); return; }
+    root._k = editing ? null : sig;
     // 0.4.3 #6: the header is the title alone (one line); the clock note is its own short line under it
     const head = h('div', { class: 'pane-h dsec-h ssc-h' }, h('span', { class: 'ssc-title' }, 'SCENES & SCHEDULES'));
     const clockLine = h('div', { class: 'small dim ss-clock ssc-clock', title: 'Times use the server PC’s clock' }, `Server PC clock: ${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'}`);
-    const nextBar = next ? h('div', { class: 'ss-next ssc-next' }, h('span', { class: 'grow ell' }, h('b', null, 'Next up: '), `${next.name}, ${whenLabel(next.nextRunAt, data.now, locale)} (${countdown(next.nextRunAt, data.now)})`, h('span', { class: 'dim' }, ' · ' + summary(next, { ...data, zones: S.zones || [] }))),
+    const nextBar = next ? h('div', { class: 'ss-next ssc-next' }, h('span', { class: 'grow ell' }, h('b', null, 'Next up: '), h('span', { class: 'ssc-nwhen' }, nextWhen(next)), h('span', { class: 'dim' }, ' · ' + summary(next, { ...data, zones: S.zones || [] }))),
       h('button', { class: 'btn sm', type: 'button', disabled: !ctlOk, onclick: () => skip(next) }, 'Skip next')) : h('p', { class: 'small dim' }, 'Nothing scheduled.');
     const sceneHost = h('div', { class: 'ss-cards ssc-scenes' });
     const btn = (t, fn, cls = 'btn sm') => adminOnly(S, h('button', { class: cls, type: 'button', onclick: fn }, t));
     const scHead = h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCENES'), h('span', { class: 'dim' }, String(data.scenes.length)), h('span', { class: 'grow' }),
-      btn('+ From current setup', async () => { await freshProfiles(); editing = { kind: 'capture' }; draw(); }), btn('+ New scene', async () => { await freshProfiles(); editing = { kind: 'scene', id: null }; draw(); }, 'btn sm accent-o'));
+      h('div', { class: 'ss-acts' }, btn('+ From current setup', async () => { await freshProfiles(); editing = { kind: 'capture' }; draw(); }), btn('+ New scene', async () => { await freshProfiles(); editing = { kind: 'scene', id: null }; draw(); }, 'btn sm accent-o')));
     if (editing?.kind === 'capture') sceneHost.append(captureForm());
     if (editing?.kind === 'scene' && editing.id == null) sceneHost.append(sceneEditor(null));
     for (const sc of data.scenes) sceneHost.append(editing?.kind === 'scene' && editing.id === sc.id ? sceneEditor(sc) : sceneRow(sc));
     if (!data.scenes.length && !editing) sceneHost.append(h('p', { class: 'dim small' }, 'No scenes yet. A scene remembers which speakers are on and how loud they are.'));
     const rowsHost = h('div', { class: 'ss-rows ssc-rows' });
     const shHead = h('div', { class: 'ss-ch' }, h('span', { class: 'ss-t' }, 'SCHEDULES & ALARMS'), h('span', { class: 'dim' }, String(data.rows.length)), h('span', { class: 'grow' }),
-      btn('+ Alarm', () => openEdit(null, 'play'), 'btn sm accent-o'), btn('+ New schedule', () => openEdit(null, 'scene'), 'btn sm accent-o'));
+      h('div', { class: 'ss-acts' }, btn('+ Alarm', () => openEdit(null, 'play'), 'btn sm accent-o'), btn('+ New schedule', () => openEdit(null, 'scene'), 'btn sm accent-o')));
     const newHost = h('div', { class: 'ssc-newsched' });
     rowsHost.append(newHost);
     const hosts = new Map();
     for (const r of data.rows) { const x = h('div', { class: 'ssc-slot' }, schedRow(r)); hosts.set(r.id, x); rowsHost.append(x); }
     if (!data.rows.length) rowsHost.append(h('p', { class: 'dim small' }, 'No schedules yet. Add an alarm to wake up to music, or a schedule to switch scenes.'));
     const last = data.rows.filter(r => r.lastRunAt).sort((a, b) => b.lastRunAt.localeCompare(a.lastRunAt))[0];
+    // F227: a real redraw keeps the Devices scroller where it was (idle bottom-scroll must not bounce)
+    const scr = []; for (let e = root.parentElement; e; e = e.parentElement) if (e.scrollTop) scr.push([e, e.scrollTop]);
     root.replaceChildren(head, clockLine, nextBar, scHead, sceneHost, shHead, rowsHost, last ? h('div', { class: 'small dim ss-foot' }, `Last ran: ${last.name}, ${whenLabel(last.lastRunAt, data.now, locale)} · ${last.lastResult === 'OK' ? 'OK' : (last.lastResult || '')}`) : null);
+    for (const [e, t] of scr) if (e.scrollTop !== t) e.scrollTop = t;
     if (editing?.kind === 'sched') { const host = editing.id == null ? newHost : hosts.get(editing.id); const r = data.rows.find(x => x.id === editing.id) || null;
       if (host) openScheduleEditor(S, r, editing.kind2, data, reload, host, () => { editing = null; draw(); }); }
+  }
+  const nextWhen = next => `${next.name}, ${whenLabel(next.nextRunAt, data.now, locale)} (${countdown(next.nextRunAt, data.now)})`;
+  function patchLive(next) {   // F227 A2: textContent-only patch, no replaceChildren
+    const ck = root.querySelector('.ssc-clock'), t = `Server PC clock: ${data.now ? fmtHm(data.now.slice(11, 16), locale) : '—'}`;
+    if (ck && ck.textContent !== t) ck.textContent = t;
+    const nw = root.querySelector('.ssc-nwhen'); if (nw && next) { const v = nextWhen(next); if (nw.textContent !== v) nw.textContent = v; }
   }
   function openEdit(r, kind) { editing = { kind: 'sched', id: r ? r.id : null, kind2: kind }; draw(); root.querySelector('.ss-inline')?.scrollIntoView?.({ block: 'nearest' }); }
   function sceneRow(sc) {

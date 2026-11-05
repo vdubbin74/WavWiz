@@ -28,9 +28,29 @@ test('F91: menu switch stops the speaker for remote and mic', () => {
   const fn = room.slice(room.indexOf('export function changePhoneRole'));
   assert.match(fn, /r === 'mic'\) \{ await stopPhoneDevice\(\); location\.href = '\/calmic\.html'/);
   assert.match(fn, /r === 'remote'\) \{ await stopPhoneDevice\(\); showRemoteBanner\(\)/);
-  assert.match(room, /'Remote — this phone is silent'/);
+  assert.match(room, /class: 'dtag'/, 'REMOTE chip');
+  assert.match(room, /'this phone is silent'/);
 });
-test('F91: remote banner uses the theme Highlight, no hard-coded gold, 3px corners', () => {
+test('F240/F91: remote banner is dtag-style (panel/line), z below drawer, no Highlight fill', () => {
   const rule = css.match(/\.remote-banner\{[^}]*\}/)[0];
-  assert.match(rule, /var\(--hl,var\(--accent\)\)/); assert.match(rule, /border-radius:3px/); assert.doesNotMatch(rule, /gold|#ffd|#f5c|#e6b/i);
+  assert.match(rule, /var\(--panel/);
+  assert.match(rule, /var\(--line\)/);
+  assert.match(rule, /z-index:25/);
+  assert.match(rule, /flex:none/);
+  assert.doesNotMatch(rule, /position:fixed/);
+  assert.doesNotMatch(rule, /background:var\(--hl/);
+  assert.doesNotMatch(rule, /gold|#ffd|#f5c|#e6b/i);
+  const mic = css.match(/\.mic-banner\{[^}]*\}/)[0];
+  assert.match(mic, /z-index:25/, 'mic banner also under drawer');
+  assert.doesNotMatch(mic, /position:fixed/);
+});
+test('F241: remote banner docks in #app above .mini/.tabbar (in-flow, not body fixed)', () => {
+  assert.match(room, /function dockRoleBanner/);
+  assert.match(room, /getElementById\('app'\)/);
+  assert.match(room, /:scope > \.mini|:scope > \.tabbar/);
+  assert.match(room, /dockRoleBanner\(bar\)/);
+  assert.ok(!/document\.body\.append\(bar\)/.test(room.slice(room.indexOf('export function showRemoteBanner'), room.indexOf('function goNow'))), 'showRemoteBanner does not body.append');
+  assert.doesNotMatch(css, /F162: on Library\/Devices/);
+  assert.doesNotMatch(css, /body:has\(\.remote-banner\) \.desk/);
+  assert.doesNotMatch(css, /70px \+ var\(--minih/);
 });

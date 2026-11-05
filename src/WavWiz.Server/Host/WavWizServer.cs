@@ -59,6 +59,12 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Sleep.CondFor = s.Links.CondFor; s.Sleep.DevicesOf = s.Links.DevicesOf;
         s.Jukebox = new Features.JukeboxService(db, cond, events) { Zone = s.Links.JukeboxConductor };
         // 0.4.9 F76 fix: the Jukebox only borrows speakers while it runs; on exit (and here at startup, when it never runs) they go back to their zones
+        s.QHistory = new Features.QueueHistoryService(db, events);
+        s.Smart = new Features.SmartPlaylistService(db);
+        s.History = new Features.PlayHistoryService(db, s.Registry, events, cfg.LastFmHandler) { ZoneName = gid => s.Registry.NameOf(gid) };
+        s.History.RemoteScrobble = async loc => { if (s.Remote == null || Library.SubsonicService.ServerIdOf(loc) is not { } sid) return; var song = loc[(Library.SubsonicService.Scheme.Length + sid.Length + 1)..]; await s.Remote.Call(sid, "scrobble", "id=" + Uri.EscapeDataString(song) + "&submission=true"); };
+        s.Keep = new Features.KeepPlayingService(db, s.Registry, events) { JukeboxOwns = () => s.Jukebox.Owns };
+        s.Keep.Pools["smart"] = id => s.Smart.Resolve(id); s.Keep.PoolNames["smart"] = id => s.Smart.Get(id)?.Name;
         s.Links.JukeboxRunning = () => s.Jukebox.Active; s.Jukebox.Borrow = ids => s.Links.SetJukeboxDevices(ids); s.Jukebox.Release = () => { var jc = s.Links.JukeboxConductor(); s.Links.Apply(); try { jc?.Stop(); } catch { } events.Publish("zones"); }; s.Links.Apply();
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
@@ -72,9 +78,10 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Remote = new Library.SubsonicService(db, cfg.DataDir); Playback.Conductor.RemoteResolver = s.Remote.StreamUrl;     // F164
         s.AirPlay = new Receivers.AirPlayReceiver(s, u._log.Write); s.Spotify = new Receivers.SpotifyReceiver(s, u._log.Write);
         s.ZoneRecv = new Receivers.ZoneReceivers(s, u._log.Write); s.Links.Applied += () => s.ZoneRecv.Sync();
+        s.ZoneRecv.ActiveZones = () => Receivers.ZoneReceivers.ActiveZoneIds(s.Zones.Zones()); s.ZoneRecv.AnyActive = () => Receivers.ZoneReceivers.AnyActiveSpeaker(s.Zones.Zones());   // AirPlay names show only with a live speaker
         s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!).Concat(s.ZoneRecv.MdnsGroups(host, ip).Select(g => g.ToList()));
         s.Discovery.Start();
-        if (!System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(cfg.BindAddress.Trim('[', ']'))) || cfg.TestTreatAllClientsAsRemote) { s.AirPlay.Start(); s.Spotify.Apply(); s.ZoneRecv.Sync(); }
+        if (!System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(cfg.BindAddress.Trim('[', ']'))) || cfg.TestTreatAllClientsAsRemote) { s.Spotify.Apply(); s.ZoneRecv.Sync(); }   // Sync starts house AirPlay too, once a speaker is live
         _ = Task.Run(async () => { for (int i = 0; i < 20 && !(s.AirPlay?.Ready ?? true); i++) await Task.Delay(500); if (s.AirPlay?.Ready == true) s.Discovery?.AnnounceSoon(); });
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args ?? Array.Empty<string>(), ContentRootPath = AppContext.BaseDirectory });
@@ -144,7 +151,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var addrs = app.Urls; u.HttpUrl = $"http://{cfg.BindAddress}:{PortOf(app, false, cfg)}"; u.HttpsUrl = $"https://{cfg.BindAddress}:{PortOf(app, true, cfg)}";
         if (cfg.HttpPort == 0) cfg.HttpPort = PortOf(app, false, cfg); if (cfg.HttpsPort == 0) cfg.HttpsPort = PortOf(app, true, cfg);      // ephemeral ports (tests): every page and the discovery answer must say the real port
         int nasTick = 0;
-        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } try { s.Jukebox.Tick(); } catch (Exception ex) { u._log.Write("jukebox: " + ex.Message); } }, null, 1000, 1000);
+        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } try { s.Jukebox.Tick(); } catch (Exception ex) { u._log.Write("jukebox: " + ex.Message); } try { s.Keep.Tick(); } catch (Exception ex) { u._log.Write("keep playing: " + ex.Message); } try { s.History.Tick(); } catch (Exception ex) { u._log.Write("history: " + ex.Message); } if (nasTick % 2 == 0) try { s.ZoneRecv?.Tick(); } catch (Exception ex) { u._log.Write("receivers: " + ex.Message); } }, null, 1000, 1000);
         if ((lib.TrackCount() == 0 || lib.NeedsUpgradeScan()) && Convert.ToInt32(db.Scalar("SELECT COUNT(*) FROM library_root")) > 0) SystemApi.StartScan(s);
         u._rescan = new Timer(_ =>
         {

@@ -33,7 +33,8 @@ export function installMedia({ S, api, act, masterLevel, allMuted } = {}) {
   if (ms) {
     for (const [name, key] of [['play', 'playpause'], ['pause', 'playpause'], ['nexttrack', 'next'], ['previoustrack', 'prev']]) { try { ms.setActionHandler(name, () => run(key)); } catch { /* unsupported action */ } }
     const paint = () => {
-      const it = S.now?.item; try { ms.playbackState = S.now?.state === 'playing' ? 'playing' : S.now?.state === 'paused' ? 'paused' : 'none'; if (it && typeof MediaMetadata !== 'undefined') ms.metadata = new MediaMetadata({ title: it.title || '', artist: it.artist || '', album: it.album || '' }); } catch { /* ignore */ }
+      // F206: playbackState only - art.js setMediaSession is the single MediaMetadata owner (artwork-less metadata here flashed the logo on iOS)
+      try { const st = S.now?.state === 'playing' ? 'playing' : S.now?.state === 'paused' ? 'paused' : 'none'; if (ms.playbackState !== st) ms.playbackState = st; } catch { /* ignore */ }
     };
     paint(); setInterval(paint, 2000);
   }

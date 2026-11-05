@@ -10,18 +10,85 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-11-04 (beta)
+
+### Changed
+- Library sources: Local | Remote | Radio | Playlists as top tabs above search (underline chrome; expand keeps the same lines). Remote server chip stays on the tools row when you have two or more servers.
+- Remote album detail matches the local album page (sized cover + header — no giant full-width art).
+- Phone remote banner uses quiet dtag-style chrome (like ANALOG / HDMI tags), docks flush above the bottom mini/tabbar on Now/Library/Devices, and sits under the hamburger menu.
+- Radio stations use the same tiles/list look as Artists and Albums.
+- Right-click Add / Remove Favorites on Library songs and Queue songs (local tracks).
+- iPhone Add to Home Screen uses the WavWiz logo (180×180) instead of a letter “W”.
+
+### Fixed
+- Devices: Now Playing title and idle state follow play/pause live.
+- Devices: Speakers scroll position holds while the Add AirPlay list refreshes.
+- Menubar pin icons are square and match the panel pin size.
+
+## [0.6.5] - 2026-11-04 (beta)
+
+### Changed
+- Repeat: a click switches between Off and All; Repeat One is a long-press or Alt-click.
+- Keep playing: Similar songs from Navidrome continue into your local library; the Keep playing chip matches the icon height.
+- Devices: the Speakers list stays put and expands or collapses smoothly (Roomy and standard layouts).
+
+### Fixed
+- Menubar file-menu pin icons are normal size again and match the menu rows.
+- Scenes & Schedules clock and empty-state messages sit properly inside their cards.
+- Devices no longer twitches when the page refreshes.
+- Profile Save button lines up with its row; Devices scrollbars stay steady.
+
+## [0.6.4] - 2026-11-04 (beta)
+
+### Changed
+- Devices and lock-screen polish: speaker boxes are back, zone mute toggles live, and lock-screen artwork stays stable.
+
+## [0.6.3] - 2026-11-04 (beta)
+
+### Changed
+- Keep playing is quieter when Off and uses a compact menu instead of a long list.
+- Devices and Settings polish: flatter speaker rows, cleaner dividers, tidier remote-library and Away (Tailscale) settings.
+- Export backup uses Save As to pick where the zip goes, when the browser supports it.
+- The desktop queue has a Source column showing where each song comes from.
+- Now Playing holds up to eight pinned shortcuts (was five).
+- Phone: EQ switches line up with their labels; Queue titles get their width back (drag or long-press to reorder; remove is a smaller ✕).
+
+### Fixed
+- Themed Settings dropdowns (like Volume leveling) open and save again.
+- Skipping a song is always a hard cut, even with crossfade on.
+- Phone: speaker settings and Sound / EQ sheets scroll all the way to the bottom again.
+
+## [0.6.2] - 2026-11-04 (beta)
+
+### Added
+- Keep playing: when the queue runs out, add songs from a playlist, similar music, a radio station or a smart playlist.
+- Undo after Clear or Play now, and Recent queues to bring back an earlier queue.
+- Smart playlists: lists that fill themselves from rules like genre, year, artist or recently added. Play them, add them to the queue, or let Keep playing use one.
+- Recently played: WavWiz remembers what each zone played (the last 500 songs). Optional Last.fm scrobbling, off unless you turn it on; your Last.fm keys stay on your server. Songs from a Navidrome or Subsonic library are also reported back to it.
+
+### Changed
+- Phone casting (AirPlay and Spotify) and "WavWiz – Everywhere" show on AirPlay only while a speaker is live.
+
+## [0.6.1] - 2026-11-03 (beta)
+- Remote libraries as named Library tabs.
+- Drag remote albums and songs to the queue.
+- Queue source pills (Local / remote name / Radio).
+- About / What's new updated for 0.6.1.
+- EQ faders readable in the narrow Devices card.
+- Devices tree: solid borders for empty/offline zones; Unassigned looks like a normal holding zone.
+
 ## [0.6.0] - 2026-11-01 (beta)
 
 ### Added
-- F172: Library tiles and Remote view preferences; Tools available without Remote.
-- F166/F167: Linux Server builds (x64/arm64), systemd unit, Docker image + compose; see docs/LINUX.md and docs/DOCKER.md.
-- F170: AirPlay outputs now appear as real Speakers (join zones, volume/mute/delay, persist + reconnect).
-- F165: Home Assistant control — `/api/v1/ha/players` (master + one per zone: play/pause/stop/next/prev, volume 0-100, mute, now playing + art URL, queue peek) with a revocable Control token from Settings > Paired devices & tokens > **Home Assistant token…**; docs/HOME-ASSISTANT.md and an optional minimal `media_player` component in integrations/ha.
-- F164: **Remote libraries** — Subsonic / OpenSubsonic client (Navidrome first). Settings → Library → Remote libraries (DPAPI-stored login, token auth with legacy fallback); Library → Remote browses albums / artists / search and plays via ffmpeg URL streaming; covers cached; offline servers dim without touching the local library. See docs/REMOTE-LIBRARIES.md.
+- Remote libraries (Navidrome / Subsonic). See docs/REMOTE-LIBRARIES.md.
+- Home Assistant control. See docs/HOME-ASSISTANT.md.
+- Linux / Docker server. See docs/LINUX.md and docs/DOCKER.md.
+- AirPlay outputs as Speakers in zones.
+- Library tile and Remote view preferences.
 
 ### Fixed
-- F171: collapsed Now Playing Mix Cassette art visible on desktop.
-- F173: clean uninstall from Apps & Features — entry, Start Menu/desktop shortcuts, install folder and service are fully removed; stray old WavWiz/Unison entries are scrubbed on install; `ProgramData\WavWiz\uninstall.log`.
+- Cleaner Mix Cassette when Now Playing is collapsed.
+- Clean uninstall from Apps & Features.
 
 ### Checksums
 - `WavWiz-Setup-0.6.0.exe` - 103,928,970 bytes
@@ -34,7 +101,7 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ### Changed
 - Settings -> Network AirPlay hint names Sonos/WiiM and UDP 319/320; firewall commands get Copy buttons.
-- Evening fixes F145-F158.
+- Evening UI polish across Library, Devices, Queue and Now Playing.
 
 ### Checksums
 - `WavWiz-Setup-0.5.2.exe` - 103,895,834 bytes
@@ -61,86 +128,86 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
   - AirPlay 2 speakers (**experimental, off by default**): transient pairing, WavWiz acts as the speakers' PTP clock (several speakers share one clock), buffered AAC audio via the bundled ffmpeg for near-instant pause and seek, realtime ALAC fallback.
   - Settings > Network > "AirPlay speakers (experimental)": AirPlay 2 and buffered-audio switches, connected speakers, and Windows firewall rules (UDP 319/320 for PTP).
   - Help > Diagnostics (admin): AirPlay speakers found on the network with version, codecs and route, plus Connect / Disconnect for audio tests.
-- **New Now Playing.** A flatter desktop panel: art left, title over a labeled Artist · Album line, thin progress, transport beside, "on Zone ▾" picker back next to the titles; mute, mixer, Sound / EQ and Sleep share that line. Slightly bigger art and transport. (F130, F132, F134)
-- **Mix-and-match looks.** Settings > Appearance > Now Playing: pick Track bar (line · wave · led · eq), Buttons (round · soft · square · ring), Color intensity (Subtle · Spicy · Max) and Album art (square, spinning disc, record sleeve, Cassette, Tape, Jacket). Replaces Classic / Center / Stack / Horizon, and applies live to mini players and compact strips too. (F94–F98, F104)
-- **Shortcuts strip.** The header pin row is now one Shortcuts button that slides a horizontal pin strip (pins + Home) in from the right on every Now Playing size, including collapsed and condensed; on expanded it opens on the title bar. Scrolls when full; drag / right-click reordering kept. (F133–F135e)
-- **Standalone mini player redesign.** NOW PLAYING title bar with the Shortcuts pin and a Transparency toggle; volume slider left of the transport; play / prev / next docked to the right edge with Shuffle and Repeat (off → all → one). Transparency switches the same slider to window opacity (returns to volume after 6 s). Slim mode stays compact. (F138, F139, F140)
-- **Phone as a remote.** A third phone role, Use as remote: silent, opens straight to Now Playing with a remote banner. Switch any time from the menu or Settings > Devices > Phone role. (F91, F92, F100)
-- **Premium polish pass.** Phone Now Playing (bigger hero art with cover bloom, full-width Up next), Scenes & Schedules sheet, Library (rounded art and rows, pill tabs, better phone layout), and premium EQ looks (LED bars, console-style Studio faders, Spectrum) with live response curve and theme colors. (F102, F103, F105, F107, F108)
+- **New Now Playing.** A flatter desktop panel: art left, title over a labeled Artist · Album line, thin progress, transport beside, "on Zone ▾" picker back next to the titles; mute, mixer, Sound / EQ and Sleep share that line. Slightly bigger art and transport.
+- **Mix-and-match looks.** Settings > Appearance > Now Playing: pick Track bar (line · wave · led · eq), Buttons (round · soft · square · ring), Color intensity (Subtle · Spicy · Max) and Album art (square, spinning disc, record sleeve, Cassette, Tape, Jacket). Replaces Classic / Center / Stack / Horizon, and applies live to mini players and compact strips too.
+- **Shortcuts strip.** The header pin row is now one Shortcuts button that slides a horizontal pin strip (pins + Home) in from the right on every Now Playing size, including collapsed and condensed; on expanded it opens on the title bar. Scrolls when full; drag / right-click reordering kept.
+- **Standalone mini player redesign.** NOW PLAYING title bar with the Shortcuts pin and a Transparency toggle; volume slider left of the transport; play / prev / next docked to the right edge with Shuffle and Repeat (off → all → one). Transparency switches the same slider to window opacity (returns to volume after 6 s). Slim mode stays compact.
+- **Phone as a remote.** A third phone role, Use as remote: silent, opens straight to Now Playing with a remote banner. Switch any time from the menu or Settings > Devices > Phone role.
+- **Premium polish pass.** Phone Now Playing (bigger hero art with cover bloom, full-width Up next), Scenes & Schedules sheet, Library (rounded art and rows, pill tabs, better phone layout), and premium EQ looks (LED bars, console-style Studio faders, Spectrum) with live response curve and theme colors.
 
 ### Added
-- Player: borderless fullscreen - F11 or Devices > Fullscreen; Esc exits. Always starts windowed. (F120)
-- Queue: "Copy queue to zone" is a title-bar icon with a zone list and "Start playing it there"; Up next shows in the Queue title bar on every Queue form. (F137)
-- Themes: Crimson Lounge and Ocean Abyss added; Daylight reworked for contrast. Blue Steel and Lime Circuit removed (saved picks load Midnight Neon). (F114)
-- Now Playing / Up next: tracks with no cover show the artist photo, then a generated album cover, instead of a bare note icon. (F123)
-- Phone: Sound / EQ opens a full-screen EQ sheet. (F128)
+- Player: borderless fullscreen - F11 or Devices > Fullscreen; Esc exits. Always starts windowed.
+- Queue: "Copy queue to zone" is a title-bar icon with a zone list and "Start playing it there"; Up next shows in the Queue title bar on every Queue form.
+- Themes: Crimson Lounge and Ocean Abyss added; Daylight reworked for contrast. Blue Steel and Lime Circuit removed (saved picks load Midnight Neon).
+- Now Playing / Up next: tracks with no cover show the artist photo, then a generated album cover, instead of a bare note icon.
+- Phone: Sound / EQ opens a full-screen EQ sheet.
 
 ### Changed
-- Settings reorganized: General · Appearance · Playback · Library · Devices · Network · Jukebox · Diagnostics · About; Access folded into Network; admin password under General; File > Settings lists the sections. (F117)
-- "All sound settings" opens the speaker's settings page instead of a panel under the EQ; Trim, Auto pre-gain and Limiter now live there. (F109)
-- Collapsed Library and Devices rails share one flat soft-tab look ("LIBRARY · N", "DEVICES · N ZONES"). (F106)
-- Installer: finish page offers "Open WavWiz Player" first (browser optional), "WavWiz Player (BETA)" desktop shortcut, refreshed info page, Private-network tip on the address page, and a WebView2 download offer when it is missing. FIRST-RUN.txt updated. (F121, F122)
-- Phone: Settings no longer scrolls sideways; Visualizer setting hidden on phone; Now Playing art sized so controls and Up next stay on screen. (F100, F125)
-- Pins use a solid accent chip when on, quiet outline when off. (F124)
-- Diagnostics updates in place instead of rebuilding every 15 s. (F111)
-- What's New / About say 0.5.0. (F118)
+- Settings reorganized: General · Appearance · Playback · Library · Devices · Network · Jukebox · Diagnostics · About; Access folded into Network; admin password under General; File > Settings lists the sections.
+- "All sound settings" opens the speaker's settings page instead of a panel under the EQ; Trim, Auto pre-gain and Limiter now live there.
+- Collapsed Library and Devices rails share one flat soft-tab look ("LIBRARY · N", "DEVICES · N ZONES").
+- Installer: finish page offers "Open WavWiz Player" first (browser optional), "WavWiz Player (BETA)" desktop shortcut, refreshed info page, Private-network tip on the address page, and a WebView2 download offer when it is missing. FIRST-RUN.txt updated.
+- Phone: Settings no longer scrolls sideways; Visualizer setting hidden on phone; Now Playing art sized so controls and Up next stay on screen.
+- Pins use a solid accent chip when on, quiet outline when off.
+- Diagnostics updates in place instead of rebuilding every 15 s.
+- What's New / About say 0.5.0.
 
 ### Fixed
-- Queue: drag-to-reorder works again in the WavWiz Player; Time column header stays pinned while scrolling. (F113, F115)
-- Now Playing LED / wave / EQ track bars advance again while playing. (F98c)
-- Condensed player: round buttons and cassette hubs no longer squash; more room for title/artist. (F98b, F99)
-- Library: tabs and Expand / Collapse keep the theme style. (F116, F131)
-- Offline first load keeps Scenes, rails and EQ styling. (F106b)
+- Queue: drag-to-reorder works again in the WavWiz Player; Time column header stays pinned while scrolling.
+- Now Playing LED / wave / EQ track bars advance again while playing.
+- Condensed player: round buttons and cassette hubs no longer squash; more room for title/artist.
+- Library: tabs and Expand / Collapse keep the theme style.
+- Offline first load keeps Scenes, rails and EQ styling.
 
 ### Known limits
 - AirPlay 2 output is experimental. Sonos, WiiM and similar AirPlay 2 speakers are still being tested. HomePod and Apple TV are not supported yet (they need a pairing flow), nor are FairPlay-only or NTP-timed AirPlay 2 speakers.
 
 ## [0.4.9] - 2026-10-23 (beta)
-- Library: the tab row fits again after you collapse and reopen the Library. (F64)
-- Roomy layout: Devices slides out over the side again from the narrow bar; click outside it or press Escape to fold it. (F65)
-- Mixer: every slider in a card uses the same track, so they line up. (F66)
-- Phone: a simpler 7-item menu and a slimmer Now Playing (no EQ or visualizer). (F67)
-- Phone: Now Playing works as a full-screen remote. (F68)
-- Devices: active zones come first in one saved order you set; offline and empty zones use compact rows; a Move menu, and click-to-map with a Back button; drag by the handle only. (F69)
-- Devices: the master volume slider lines up with the other bars, and its buttons get their own space to the right of the track; speaker mute sits inside the card. (F70)
-- Calibration: the test sound plays at full volume even past the volume caps, and your volume is always restored afterward. (F71)
-- Queue: expanding or collapsing the Queue no longer shifts Devices. (F72)
-- Queue: "Up next" shows the track shuffle will really play next. (F73)
-- No scrollbar flash or Devices shift during any slide, expand or collapse. (F74)
-- Mini player: no longer cut off when it opens narrow or on high-DPI displays. (F75)
-- Jukebox: shows as a zone in Devices; Settings > Jukebox sets its default speakers and whether it shows in Devices; "Start Jukebox" lets you pick speakers; leaving the kiosk with the PIN offers "Switch to app" or "Exit", and "Return to Jukebox" takes you back. (F76)
-- Streaming quality: Settings > Playback > Streaming quality picks Studio (24-bit / 48 kHz) or Studio Max (24-bit / 96 kHz). Players that can't play 96 kHz automatically get 48 kHz in sync with the rest; calibration, radio, AirPlay and Spotify stay at 48 kHz. (F77)
+- Library: the tab row fits again after you collapse and reopen the Library.
+- Roomy layout: Devices slides out over the side again from the narrow bar; click outside it or press Escape to fold it.
+- Mixer: every slider in a card uses the same track, so they line up.
+- Phone: a simpler 7-item menu and a slimmer Now Playing (no EQ or visualizer).
+- Phone: Now Playing works as a full-screen remote.
+- Devices: active zones come first in one saved order you set; offline and empty zones use compact rows; a Move menu, and click-to-map with a Back button; drag by the handle only.
+- Devices: the master volume slider lines up with the other bars, and its buttons get their own space to the right of the track; speaker mute sits inside the card.
+- Calibration: the test sound plays at full volume even past the volume caps, and your volume is always restored afterward.
+- Queue: expanding or collapsing the Queue no longer shifts Devices.
+- Queue: "Up next" shows the track shuffle will really play next.
+- No scrollbar flash or Devices shift during any slide, expand or collapse.
+- Mini player: no longer cut off when it opens narrow or on high-DPI displays.
+- Jukebox: shows as a zone in Devices; Settings > Jukebox sets its default speakers and whether it shows in Devices; "Start Jukebox" lets you pick speakers; leaving the kiosk with the PIN offers "Switch to app" or "Exit", and "Return to Jukebox" takes you back.
+- Streaming quality: Settings > Playback > Streaming quality picks Studio (24-bit / 48 kHz) or Studio Max (24-bit / 96 kHz). Players that can't play 96 kHz automatically get 48 kHz in sync with the rest; calibration, radio, AirPlay and Spotify stay at 48 kHz.
 - AirPlay: the all-zones speaker is now called **WavWiz – Everywhere** (was "WavWiz – Whole House"); phones see the new name on the same speaker.
 - AirPlay / Spotify Connect: sending to **WavWiz – Everywhere** plays in every zone again even when zones have their own music (they get it back when the phone stops); a zone's own name plays in that zone. The installer firewall rules now cover the per-zone receiver ports, and the log says when a phone connects but no audio arrives (firewall).
-- Devices: while a phone casts to **WavWiz – Everywhere**, a "Casting: AirPlay Everywhere" bar on top of Devices shows the sender, title and artist with a Stop button, and the zones playing it get an AIRPLAY tag. (F78)
-- Settings: the Settings window loads again after an AirPlay Everywhere session ends. (F78 fix)
+- Devices: while a phone casts to **WavWiz – Everywhere**, a "Casting: AirPlay Everywhere" bar on top of Devices shows the sender, title and artist with a Stop button, and the zones playing it get an AIRPLAY tag.
+- Settings: the Settings window loads again after an AirPlay Everywhere session ends.
 - AirPlay: casts to two zones play side by side; a zone's own AirPlay or Spotify cast keeps playing when someone casts to **WavWiz – Everywhere** (the zone joins in when its cast ends), and ending Everywhere puts the other zones back without touching a zone still casting.
-- Volume Mixer: zone cards stack in one column so every slider is long, and a speaker's status tags (REF, OFFLINE, BT, MUTED) sit on their own line under its full name instead of running into the slider. (F79)
-- Devices: the grab hand shows only on the ⋮ drag handles of zones and speakers; the rest of a zone card shows the normal pointer. (F80)
-- Phone pages (Devices, Library, Queue, Mixer, Scenes) scroll again on iPhone: the F68 Now Playing clip and forced layout now apply only on the Now page; the animation page clip has a hard timeout (F81)
-- Devices keeps its scroll position: now-playing, progress, levels and cast (AirPlay / Spotify) updates are patched into the zone tree in place instead of rebuilding it; any redraw of a Devices panel (Classic, Roomy, Full, expanded, phone) restores every scroller, also when content fills in a moment later, and keeps focus; window.__wwScrollLog records each restore (F82)
-- Queue beside the expanded Library: expanding the Library opens a collapsed queue in the right column (collapsing the Library restores it); that column has one show / hide button, and its header drops the Up next chip so the zone picker, pin, Copy and count fit at every scale (F83)
-- Now Playing bar: album covers load instead of the black record placeholder; a cover that is not ready yet (online lookup, cache rebuild) is fetched again, also when the server announces new art, and follows every track change (F84)
-- Now Playing bar (right column): the leftover Transparency chip is gone, the mixer button sits with the transport, and the freed row shows the Now Playing layout picked in Settings (Classic, Center, Stack, Horizon) in compact form, in the theme colors; click it to seek (F85)
-- Player window: two rows instead of three - transport, mute, volume, %, Transparency and Home share one row, less padding; the window opens at and shrinks to the new height (about 89 CSS px) at any scale (F86)
+- Volume Mixer: zone cards stack in one column so every slider is long, and a speaker's status tags (REF, OFFLINE, BT, MUTED) sit on their own line under its full name instead of running into the slider.
+- Devices: the grab hand shows only on the ⋮ drag handles of zones and speakers; the rest of a zone card shows the normal pointer.
+- Phone pages (Devices, Library, Queue, Mixer, Scenes) scroll again on iPhone: the phone Now Playing clip and forced layout now apply only on the Now page; the animation page clip has a hard timeout
+- Devices keeps its scroll position: now-playing, progress, levels and cast (AirPlay / Spotify) updates are patched into the zone tree in place instead of rebuilding it; any redraw of a Devices panel (Classic, Roomy, Full, expanded, phone) restores every scroller, also when content fills in a moment later, and keeps focus; window.__wwScrollLog records each restore
+- Queue beside the expanded Library: expanding the Library opens a collapsed queue in the right column (collapsing the Library restores it); that column has one show / hide button, and its header drops the Up next chip so the zone picker, pin, Copy and count fit at every scale
+- Now Playing bar: album covers load instead of the black record placeholder; a cover that is not ready yet (online lookup, cache rebuild) is fetched again, also when the server announces new art, and follows every track change
+- Now Playing bar (right column): the leftover Transparency chip is gone, the mixer button sits with the transport, and the freed row shows the Now Playing layout picked in Settings (Classic, Center, Stack, Horizon) in compact form, in the theme colors; click it to seek
+- Player window: two rows instead of three - transport, mute, volume, %, Transparency and Home share one row, less padding; the window opens at and shrinks to the new height (about 89 CSS px) at any scale
 
 ## [0.4.8] - 2026-10-22 (beta)
-- Queue: the full-screen Queue has its own player bar along the bottom. (F48)
-- Master Volume mixer: every zone and speaker in one window, with each speaker's Delay and Max volume right there. (F49)
-- Queue: "Up next" sits where it fits and never overlaps the pin button. (F50)
-- Speakers: the Delay box is smaller and tidier. (F51)
-- Devices: a + button to add a zone, and cleaner dividers in the list. (F52)
-- Expanded Devices (Full and Roomy) runs full height with no now-playing player (Now Playing is on the home page); Scenes runs full height too and is as wide as the Devices panel. (F53)
-- Player bars: the volume slider is gone from the play bars (the standalone mini player keeps its slider); a mixer button opens Master Volume instead. (F54)
-- Mini player: fits at 200% display scaling, with small corner icons. (F55)
-- Phone: "All sound settings" opens full screen with a Close button; the button stays small but is easy to tap (44 px). (F56)
-- CD ripper: only offered on the PC running WavWiz, not on phones or other browsers. (F57)
-- Roomy layout uses the same Devices bar as Classic. (F58)
-- Devices: the collapsed Devices count reads vertically, in the same color as the Library count. (F59)
-- Queue: a "Queue: [zone]" dropdown picks which zone's queue you see, in every size and on the phone, with "(playing)" next to the zone that's playing; the zone name no longer shows twice. (F60)
-- Zone and speaker cards show what's playing right away instead of every ~10 seconds. (F61)
-- Long song titles and artists scroll smoothly everywhere they are shown, including the phone and the mini player (off when "reduce motion" is on). (F62)
-- Mixer: 2 columns, no overlaps, longer sliders. Nothing in the Master Volume window overlaps at any size, including 200% scaling at the 67% Display size, and narrow cards stack each speaker's slider under its name. (F63)
+- Queue: the full-screen Queue has its own player bar along the bottom.
+- Master Volume mixer: every zone and speaker in one window, with each speaker's Delay and Max volume right there.
+- Queue: "Up next" sits where it fits and never overlaps the pin button.
+- Speakers: the Delay box is smaller and tidier.
+- Devices: a + button to add a zone, and cleaner dividers in the list.
+- Expanded Devices (Full and Roomy) runs full height with no now-playing player (Now Playing is on the home page); Scenes runs full height too and is as wide as the Devices panel.
+- Player bars: the volume slider is gone from the play bars (the standalone mini player keeps its slider); a mixer button opens Master Volume instead.
+- Mini player: fits at 200% display scaling, with small corner icons.
+- Phone: "All sound settings" opens full screen with a Close button; the button stays small but is easy to tap (44 px).
+- CD ripper: only offered on the PC running WavWiz, not on phones or other browsers.
+- Roomy layout uses the same Devices bar as Classic.
+- Devices: the collapsed Devices count reads vertically, in the same color as the Library count.
+- Queue: a "Queue: [zone]" dropdown picks which zone's queue you see, in every size and on the phone, with "(playing)" next to the zone that's playing; the zone name no longer shows twice.
+- Zone and speaker cards show what's playing right away instead of every ~10 seconds.
+- Long song titles and artists scroll smoothly everywhere they are shown, including the phone and the mini player (off when "reduce motion" is on).
+- Mixer: 2 columns, no overlaps, longer sliders. Nothing in the Master Volume window overlaps at any size, including 200% scaling at the 67% Display size, and narrow cards stack each speaker's slider under its name.
 
 ## [0.4.7] - 2026-10-21 (beta)
 - Library: the side tab row (Artists / Albums / Genres / Folders) shows on a cold first start instead of an empty box. It is measured after layout and re-measured when the panel is shown, pinned, the layout or display size changes and fonts finish loading; with no width yet it shows every tab instead of moving them all into "⋯".

@@ -1,10 +1,53 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.5.0';
+export const WHATS_NEW_VERSION = '0.6.6';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.6.6
+  ['Library sources at the top', 'Local, Remote, Radio and Playlists are nice tabs above search. Expanding the Library keeps them on the same lines; Remote still has a server chip in the tools row.'],
+  ['Remote albums match local', 'Remote album pages use the same sized cover and header as local albums — no giant full-width art.'],
+  ['Quieter remote banner', 'On a phone set as remote, the status bar looks like the ANALOG/HDMI tags — outlined and on-theme — docks flush above the bottom menu on Now, Library and Devices, and stays under the hamburger.'],
+  ['Favorites from the menu', 'Right-click a song in the Library or Queue to Add or Remove Favorites (local tracks).'],
+  ['Home Screen logo on iPhone', 'Add to Home Screen shows the WavWiz logo again — delete the old icon and re-add after updating.'],
+  ['Devices play/pause stays live', 'The Devices Now Playing title and idle state follow play and pause without sticking.'],
+  ['AirPlay list scroll', 'The Speakers list keeps its scroll place while the Add AirPlay list refreshes.'],
+  ['Menu pins match the panel', 'Menubar pin icons are square and match the panel pin size.'],
+  // 0.6.5
+  ['Speakers stay put', 'On Devices, the Speakers list keeps its place and expands or collapses smoothly, in Roomy and standard layouts.'],
+  ['Repeat is simpler', 'Click Repeat to switch between Off and All. Long-press or Alt-click for Repeat One.'],
+  ['Keep playing from Navidrome', 'Similar songs from a Navidrome library now carry on into your local library, and the Keep playing chip matches the icon height.'],
+  ['Menu pin icons', 'Pin icons in the menubar file menu are back to normal size and line up with the menu rows.'],
+  ['Scenes and Schedules polish', 'The clock and empty-state messages sit neatly inside their cards, and Devices no longer twitches when it refreshes.'],
+  ['More Devices polish', 'Profile Save lines up properly, scrollbars stay steady, and other small layout fixes.'],
+  // 0.6.3
+  ['Keep playing menu', 'The Keep playing control is quieter when Off, and picks from a compact menu instead of a giant list.'],
+  ['Devices and Settings polish', 'Flatter speaker rows, cleaner dividers, tidier remote-library and Away (Tailscale) settings.'],
+  ['Export backup Save As', 'Export backup lets you pick where the zip goes with Save As when the browser supports it.'],
+  ['Queue Source column', 'The desktop queue shows where each song comes from.'],
+  ['More Now Playing pins', 'Pin up to eight shortcuts on Now Playing (was five).'],
+  ['Settings dropdowns', 'Themed Settings menus (like Volume leveling) open and save again.'],
+  ['Skip never crossfades', 'Skipping a song is always a hard cut; natural end can still crossfade.'],
+  ['Phone polish', 'EQ switches line up with their labels; Queue titles get their width back (drag or long-press to reorder); speaker and Sound/EQ sheets scroll to the bottom.'],
+  // 0.6.2
+  ['Keep playing', 'When the queue runs out, WavWiz keeps going from a playlist, similar music, a radio station or a smart playlist.'],
+  ['Undo and Recent queues', 'Undo after Clear or Play now, and bring back an earlier queue from Recent queues.'],
+  ['Smart playlists', 'Lists that fill themselves from rules like genre, year, artist or recently added.'],
+  ['Play history and Last.fm', 'WavWiz remembers what each zone played. Optional Last.fm scrobbling, off unless you turn it on.'],
+  ['AirPlay only with a live speaker', 'Phone casting (AirPlay and Spotify) and Everywhere on AirPlay only show while a speaker is live.'],
+  // 0.6.1 (only what shipped)
+  ['Remote libraries in the Library menu', 'Each Navidrome / Subsonic server you add gets its own tab at the top of the Library, named by its label.'],
+  ['Drag remote music to the queue', 'Drag remote albums and songs onto the queue. They mix with your local songs in one list.'],
+  ['See where each song comes from', 'Queue rows show a small pill: Local, the remote server\'s name, or Radio.'],
+  ['What\'s new is up to date', 'About and What\'s new now describe this release.'],
+  // 0.6.0 (only what shipped)
+  ['Remote libraries', 'Play from Navidrome and other Subsonic-compatible servers. Add one in Settings > Library > Remote libraries.'],
+  ['Home Assistant', 'Control WavWiz from Home Assistant.'],
+  ['Linux / Docker server', 'Run the WavWiz server on Linux (amd64) with the Docker Hub image.'],
+  ['AirPlay speakers in zones', 'AirPlay outputs show up as Speakers you can add to a zone.'],
+  ['Cleaner uninstall', 'Uninstall removes WavWiz from Programs, the Start Menu and Program Files.'],
+  ['Library tiles and a tidier Tools menu', 'Artists, Genres, Years and Remote can show as tiles, and the ⋯ Tools menu holds only the tools.'],
   // 0.5.0 (only what shipped)
   ['Mix-and-match Now Playing', 'Settings > Appearance > Now Playing: pick a Track bar, Buttons, Album art (Square · Disc · Tape · Jacket) and Color intensity (Subtle · Spicy · Max). Mini players follow the same mix.'],
   ['Phone remote + Now Playing', 'Use as remote keeps the phone silent and in control. Phone Now Playing gets bigger hero art, cover bloom, cleaner Up next, and no dead overlay controls.'],

@@ -1,6 +1,7 @@
 import { h, api, toast, dialog, fmtTime, fmtDur, ask } from './util.js';
 import { cover, trackArt, isLive } from './art.js';
-import { canControl, dropTarget, sheet, playNow, addToQueue, MIME } from './ui.js';
+import { smartSection } from './smartpl.js';
+import { canControl, dropTarget, sheet, playNow, addToQueue, MIME, isRemoteRef, REMOTE_PL_MSG } from './ui.js';
 
 const PLMIME = 'application/x-wavwiz-plitem';
 
@@ -15,13 +16,16 @@ export function playlistsView(S) {
     const create = async fromQueue => { const name = nm.value.trim(); if (!name) return toast('Type a name first.', true); if (await act(() => api('/playlists', { method: 'POST', body: { name, fromQueue } }), 'Playlist created')) { nm.value = ''; drawList(); } };
     root.replaceChildren(h('h2', null, 'Playlists'), h('p', { class: 'dim small' }, canControl(S) ? 'Drag songs, albums or artists from the Library onto a playlist (or use the ⋯ menu / long-press on a phone).' : 'Your access is view-only.'),
       canControl(S) ? h('div', { class: 'card' }, h('div', { class: 'row wrap' }, h('div', { class: 'grow plname' }, nm), h('button', { class: 'btn primary', onclick: () => create(false) }, 'Create empty'), h('button', { class: 'btn', onclick: () => create(true) }, 'Save the queue'))) : null,
-      lists.length ? lists.map(p => {
-        const card = h('div', { class: 'card item', style: 'cursor:default' }, h('div', { class: 't', style: 'cursor:pointer', onclick: () => drawOne(p.id) }, h('div', { class: 't1 ell' }, '♫ ' + p.name), h('div', { class: 't2' }, `${p.count} item${p.count === 1 ? '' : 's'}`)),
+      lists.length ? h('ul', { class: 'list' }, lists.map(p => {
+        const card = h('li', { class: 'item', style: 'cursor:default' },
+          h('span', { class: 'cover sm' }, '♫'),
+          h('div', { class: 't', style: 'cursor:pointer', onclick: () => drawOne(p.id) }, h('div', { class: 't1 ell' }, p.name), h('div', { class: 't2' }, `${p.count} item${p.count === 1 ? '' : 's'}`)),
           canControl(S) ? [h('button', { class: 'btn primary', onclick: () => act(() => api('/stream/play', { method: 'POST', body: { kind: 'playlist', id: p.id } })) }, '▶'), h('button', { class: 'btn', onclick: () => act(() => api('/queue/add', { method: 'POST', body: { kind: 'playlist', id: p.id } }), 'Added to the queue') }, '＋')] : null,
           h('button', { class: 'btn', 'aria-label': 'Open ' + p.name, onclick: () => drawOne(p.id) }, 'Open'));
-        if (canControl(S)) dropTarget(card, ref => act(() => api(`/playlists/${p.id}/items`, { method: 'POST', body: ref }), `Added to ${p.name}`).then(drawList));
+        if (canControl(S)) dropTarget(card, ref => isRemoteRef(ref) ? toast(REMOTE_PL_MSG, true) : act(() => api(`/playlists/${p.id}/items`, { method: 'POST', body: ref }), `Added to ${p.name}`).then(drawList));
         return card;
-      }) : h('p', { class: 'dim' }, 'No playlists yet.'));
+      })) : h('p', { class: 'dim' }, 'No playlists yet.'));
+    const sm = await smartSection(canControl(S), drawList); if (sm && openId == null) root.append(sm);   // rule-based lists, marked Smart
   }
 
   async function drawOne(id, focusIndex) {
@@ -46,13 +50,13 @@ export function playlistsView(S) {
         el.addEventListener('drop', async ev => {
           el.classList.remove('dragover'); const from = ev.dataTransfer.getData(PLMIME), lib = ev.dataTransfer.getData(MIME);
           if (from !== '') { ev.preventDefault(); move(+from, i); }
-          else if (lib) { ev.preventDefault(); await act(() => api(`/playlists/${id}/items`, { method: 'POST', body: { ...JSON.parse(lib), position: i } }), 'Added'); drawOne(id); }
+          else if (lib) { ev.preventDefault(); if (isRemoteRef(JSON.parse(lib))) return toast(REMOTE_PL_MSG, true); await act(() => api(`/playlists/${id}/items`, { method: 'POST', body: { ...JSON.parse(lib), position: i } }), 'Added'); drawOne(id); }
         });
       }
       ul.append(el);
     });
     const tail = h('div', { class: 'card', style: 'text-align:center;color:var(--dim)' }, canControl(S) ? 'Drop songs here to add them to the end' : 'End of playlist');
-    if (canControl(S)) dropTarget(tail, async ref => { await act(() => api(`/playlists/${id}/items`, { method: 'POST', body: ref }), 'Added'); drawOne(id); });
+    if (canControl(S)) dropTarget(tail, async ref => { if (isRemoteRef(ref)) return toast(REMOTE_PL_MSG, true); await act(() => api(`/playlists/${id}/items`, { method: 'POST', body: ref }), 'Added'); drawOne(id); });
     root.replaceChildren(h('div', { class: 'crumbs' }, h('button', { class: 'btn', onclick: drawList }, '‹ Playlists')),
       h('div', { class: 'row wrap' }, h('div', { class: 'grow' }, nm), canControl(S) ? [h('button', { class: 'btn', onclick: () => act(() => api('/playlists/' + id, { method: 'PUT', body: { name: nm.value } }), 'Renamed').then(() => drawOne(id)) }, 'Rename'), h('button', { class: 'btn primary', onclick: () => act(() => api('/stream/play', { method: 'POST', body: { kind: 'playlist', id } })) }, '▶ Play'),
         h('button', { class: 'btn danger', onclick: async () => { if (await ask('Delete playlist', `Delete the playlist “${p.name}”? The songs stay in your library.`)) { await act(() => api('/playlists/' + id, { method: 'DELETE' }), 'Deleted'); drawList(); } } }, 'Delete')] : null),

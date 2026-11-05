@@ -8,7 +8,5 @@ Third-party software included with WavWiz is described in THIRD-PARTY-NOTICES.tx
 include FFmpeg (LGPL), shairplay / AirPlay receiver (LGPL and related), and
 librespot (MIT). Those components keep their own licenses and copyrights.
 
-AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB. Navidrome, Subsonic,
-Home Assistant, Tailscale and FFmpeg are trademarks of their respective owners. WavWiz is not
-affiliated with, endorsed by, or sponsored by any of them.
-The Docker image uses Debian's FFmpeg package (GPL build); see THIRD-PARTY-NOTICES.txt.
+AirPlay is a trademark of Apple Inc. Spotify is a trademark of Spotify AB.
+WavWiz is not affiliated with, endorsed by, or sponsored by Apple or Spotify.

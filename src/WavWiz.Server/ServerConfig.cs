@@ -5,6 +5,8 @@ namespace WavWiz.Server;
 /// <summary>server.json under the data folder (BOM-less UTF-8, written by the installer and the first-run page). Environment variables override for tests.</summary>
 public sealed class ServerConfig
 {
+    /// <summary>Tests only: answers Last.fm calls instead of the internet.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public HttpMessageHandler? LastFmHandler { get; set; }
     public string DataDir { get; set; } = DefaultDataDir();
     public string BindAddress { get; set; } = "127.0.0.1";
     public bool AllowAllInterfaces { get; set; }

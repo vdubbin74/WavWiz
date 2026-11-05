@@ -64,6 +64,15 @@ export function boot(win = globalThis) {
     if (fromUrl) { const u = new URL(win.location.href); u.searchParams.delete('wr'); win.history?.replaceState?.(null, '', u.pathname + (u.search || '') + u.hash); }
     const id = st.getItem(ROOM_KEY); const link = doc.querySelector('link[rel=manifest]');
     if (link && id && /^[A-Za-z0-9._-]{6,80}$/.test(id) && !isStandalone(win)) link.setAttribute('href', '/api/v1/phone/manifest?wr=' + encodeURIComponent(id));
+    // F237: keep apple-touch-icon at 180 + cache-bust so iOS does not fall back to a “W” monogram
+    const ICON = '/assets/logo-180.png?v=f237';
+    for (const rel of ['apple-touch-icon', 'apple-touch-icon-precomposed']) {
+      let ic = doc.querySelector(`link[rel="${rel}"]`);
+      if (!ic && rel === 'apple-touch-icon') { ic = doc.createElement('link'); ic.setAttribute('rel', rel); doc.head?.append(ic); }
+      if (!ic) continue;
+      ic.setAttribute('sizes', '180x180');
+      if (!String(ic.getAttribute('href') || '').includes('logo-180.png?v=f237')) ic.setAttribute('href', ICON);
+    }
   } catch { /* never block the app */ }
 }
 if (typeof document !== 'undefined') boot();

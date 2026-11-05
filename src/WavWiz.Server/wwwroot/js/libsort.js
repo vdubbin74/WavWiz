@@ -9,16 +9,18 @@ export const SORTS = {
   folders: [['name', 'Name'], ['count', 'Song count']],
   favorites: [['recent', 'Recently hearted'], ['name', 'Name']],
   remote: [['name', 'Album name'], ['artist', 'Artist'], ['year', 'Year (newest)'], ['server', 'Server order']],
+  radio: [['name', 'Name']],
+  playlists: [['name', 'Name']],
   songs: [['track', 'Track no.'], ['title', 'Title'], ['length', 'Length'], ['added', 'Date added']],
 };
-export const DEFAULT_SORT = { artists: 'name', albums: 'artist', genres: 'name', years: 'name', recent: 'recent', folders: 'name', favorites: 'recent', remote: 'name', songs: 'track' };
+export const DEFAULT_SORT = { artists: 'name', albums: 'artist', genres: 'name', years: 'name', recent: 'recent', folders: 'name', favorites: 'recent', remote: 'name', radio: 'name', playlists: 'name', songs: 'track' };
 export const LIB_KEY = 'wavwiz.libprefs.v1';
 const coll = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 export const cmpName = (a, b) => coll.compare(String(a ?? ''), String(b ?? ''));
 
 // 0.2.1 F4 + F8: the Expanded Library opens in tiles on every tab (Large tiles by default). Settings > Library > Library view sets the default
 // view, the tile size, the default album sort and whether a tab remembers its own Tiles/List choice. All per browser (this device).
-export const VIEW_TABS = ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites', 'remote'];
+export const VIEW_TABS = ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites', 'remote', 'radio', 'playlists'];
 export const TILE_SIZES = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
 export const DEF_SORTS = [['artist', 'Artist A–Z'], ['name', 'Album A–Z'], ['recent', 'Recently added'], ['year', 'Year']];
 export const LIB_VIEW_DEFAULTS = Object.freeze({ defView: 'grid', tileSize: 'large', defSort: 'artist', remember: true });

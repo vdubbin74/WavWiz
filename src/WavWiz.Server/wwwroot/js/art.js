@@ -159,19 +159,73 @@ export function artTrackId(x) {
 }
 
 // ---- Media Session (lock-screen / notification controls + cover) ----
-export function setMediaSession(now, handlers) {
+// F206: one metadata owner; MediaMetadata rewritten only when track/title/art/state class changes; position forced only on
+// track/state/duration change, from the caller's smooth clock (posMs = localPos clock like tickPos), never raw stale positionMs every paint.
+// F212: metaKey has no play/pause class (iOS reloads artwork on every MediaMetadata write -> logo flash + 0:00 jump); last good art kept per track;
+// new 512 art is preloaded and applied on load. Any metadata write re-publishes the stable position right after (never 0 unless it is 0).
+let msMetaKey = '', msForceKey = '', msTrackKey = '', msArt = null, msArtWant = '', msLastPos = null;
+const msArtwork = (it, url512) => url512 ? [96, 192, 384, 512].map(s => ({ src: itemArtUrl(it, s) || url512, sizes: `${s}x${s}`, type: 'image/jpeg' })) : null;
+const msLogo = () => [{ src: '/assets/logo-512.png', sizes: '512x512', type: 'image/png' }];
+function msWrite(ms, title, it, artwork) {
+  ms.metadata = new MediaMetadata({ title, artist: it.artist || '', album: it.album || 'WavWiz', artwork });
+  if (msLastPos) { const L = msLastPos; updateMediaSessionPosition(L.now, Number(L.posMs) + (L.now?.state === 'playing' ? performance.now() - L.at : 0), true); }   // F212: metadata write must not leave the scrubber at 0:00
+}
+export function setMediaSession(now, handlers, posMs) {
   if (!('mediaSession' in navigator)) return;
   try {
-    const it = now?.item;
-    if (!it) { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; return; }
-    const art = itemArtUrl(it, 512);
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: (it.kind === 'radio' ? (now.liveTitle || it.title) : it.title) || 'WavWiz', artist: it.artist || '', album: it.album || 'WavWiz',
-      artwork: art
-        ? [96, 192, 384, 512].map(s => ({ src: itemArtUrl(it, s), sizes: `${s}x${s}`, type: 'image/jpeg' }))
-        : [{ src: '/assets/logo-512.png', sizes: '512x512', type: 'image/png' }],
-    });
-    navigator.mediaSession.playbackState = now.state === 'playing' ? 'playing' : now.state === 'paused' ? 'paused' : 'none';
-    for (const [a, fn] of Object.entries(handlers || {})) { try { navigator.mediaSession.setActionHandler(a, fn); } catch { /* action not supported on this browser */ } }
+    const ms = navigator.mediaSession, it = now?.item;
+    if (!it) {
+      if (msMetaKey !== 'none') { msMetaKey = 'none'; ms.metadata = null; ms.playbackState = 'none'; }
+      msForceKey = ''; msTrackKey = ''; msArt = null; msArtWant = ''; msLastPos = null; updateMediaSessionPosition(now, 0, true); return;
+    }
+    const title = (it.kind === 'radio' ? (now.liveTitle || it.title) : it.title) || 'WavWiz';
+    const stateCls = now.state === 'playing' ? 'playing' : now.state === 'paused' ? 'paused' : 'none';
+    const trackKey = String(it.id ?? it.refId ?? '');
+    if (trackKey !== msTrackKey) { msTrackKey = trackKey; msArt = null; msArtWant = ''; }
+    const art = itemArtUrl(it, 512) || msArt;   // F212: slim poll (no art) on the same track keeps the last good art
+    msLastPos = { now, posMs: posMs ?? now.positionMs, at: performance.now() };
+    const textKey = [trackKey, title, it.artist || '', it.album || ''].join('\u0001');
+    const metaKey = textKey + '\u0001' + (art || '');
+    if (metaKey !== msMetaKey || !ms.metadata) {
+      const textSame = msMetaKey.startsWith(textKey + '\u0001') && ms.metadata;
+      msMetaKey = metaKey;
+      if (art && art !== msArt && typeof Image === 'function') {
+        // soft preload: keep current artwork (prior art of this track, or logo for a brand-new track) until the 512 picture has loaded
+        if (!textSame) msWrite(ms, title, it, msArt ? msArtwork(it, msArt) : msLogo());
+        if (msArtWant !== art) {
+          msArtWant = art; const img = new Image(), tk = trackKey, artwork = msArtwork(it, art);
+          img.onload = () => { if (msTrackKey !== tk || msArtWant !== art) return; msArt = art; msWrite(ms, title, it, artwork); };
+          img.onerror = () => { if (msArtWant === art) msArtWant = ''; };
+          img.src = art;
+        }
+      } else {
+        if (art) msArt = art;
+        msWrite(ms, title, it, art ? msArtwork(it, art) : msLogo());
+      }
+    }
+    if (ms.playbackState !== stateCls) ms.playbackState = stateCls;
+    for (const [a, fn] of Object.entries(handlers || {})) { try { ms.setActionHandler(a, fn); } catch { /* action not supported on this browser */ } }
+    const forceKey = `${trackKey}|${Number(now.durationMs)}|${now.state}`;
+    if (forceKey !== msForceKey) { msForceKey = forceKey; updateMediaSessionPosition(now, posMs ?? now.positionMs, true); }   // F204/F206: else tickPos throttled updates own it
   } catch { /* old browser */ }
+}
+/** F206: true once setMediaSession owns metadata (media.js must not write artwork-less metadata). */
+export const mediaSessionOwnsMetadata = () => msMetaKey !== '';
+// F204: lock-screen scrubber (iOS shows 0:00 / -0:01 without setPositionState). Single owner: setMediaSession + now.js tickPos.
+let msPosAt = 0, msPosKey = '';
+export function updateMediaSessionPosition(now, posMs, force = false) {
+  const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
+  if (!ms || typeof ms.setPositionState !== 'function') return;
+  try {
+    const it = now?.item, durMs = Number(now?.durationMs);
+    if (!it || isLive(it) || !Number.isFinite(durMs) || durMs <= 0) {   // live/radio/unknown: never publish duration 0
+      if (msPosKey !== 'none') { msPosKey = 'none'; try { ms.setPositionState(); } catch { /* clear unsupported */ } }
+      return;
+    }
+    const key = `${it.id ?? it.refId ?? ''}|${durMs}|${now.state}`, t = performance.now();
+    if (!force && key === msPosKey && t - msPosAt < 1000) return;   // ~1s throttle; immediate on track/state/duration change
+    msPosKey = key; msPosAt = t; if (String(it.id ?? it.refId ?? '') === msTrackKey) msLastPos = { now, posMs, at: t };
+    const duration = durMs / 1000, p = Number(posMs) / 1000;
+    ms.setPositionState({ duration, playbackRate: 1, position: Math.min(duration, Math.max(0, Number.isFinite(p) ? p : 0)) });
+  } catch { /* old browser / invalid state */ }
 }

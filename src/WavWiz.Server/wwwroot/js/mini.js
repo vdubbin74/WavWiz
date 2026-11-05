@@ -4,10 +4,11 @@ import './marquee.js';   // 0.4.8 F62: shared now-playing marquee
 // seek, prev / play / next, mute, volume, pin (always on top, Player only), open the full app, close. Slim size (300x48) when the window is short.
 // It never joins as a speaker (F2: opening or closing it never adds a second stream). In WavWiz Player it talks to its window over
 // chrome.webview (drag, pin, full app, close, position); in a browser it is a popup window.
-import { h, api } from './util.js';
+import { h, api, toast } from './util.js';
 import * as Z from './zones40.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { icon, setIcon } from './icons.js';
+import { repeatClickNext, repeatChrome, wireRepeatOne } from './ui.js';
 import { itemArtUrl, setArtCv } from './art.js';
 import { fmtTime } from './util.js';
 import { loadNpPrefs, waveBars, eqBars, NP_KEY, applyNpClasses, applyNpColor } from './npstyle.js';   // 0.4.9 F85b
@@ -149,9 +150,13 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   if (!embedded) Z.init(mz, { refreshNow: () => poll(), manage: () => toMain({ run: 'devices' }) });   // 0.4.5 F27: no zone chip on the shortcuts row; the zone name on the song line is the picker
   async function pollZones() { if (embedded || mzN++ % 3) return; try { const [g, jb] = await Promise.all([api('/groups'), api('/jukebox/zone').catch(() => null)]); mz.groups = g; mz.jb = jb; Z.sync(); } catch { /* keep the last list */ } }
   // 0.5.0 F139: shuffle / repeat toggles for both condensed and standalone
+  // F230: click = off↔all only; One via long-press / Alt-click
   { const tog = (ic, label, fn) => { const x = b('tog ' + ic, ic, label, fn); x.setAttribute('aria-pressed', 'false'); return x; };
     shufB = tog('shuffle', 'Shuffle', () => act('/stream/shuffle', { on: !now?.shuffle }));
-    repB = tog('repeat', 'Repeat', () => act('/stream/repeat', { mode: { off: 'all', all: 'one', one: 'off' }[now?.repeat ?? 'off'] })); }
+    const setRep = mode => act('/stream/repeat', { mode });
+    repB = tog('repeat', 'Repeat off', () => setRep(repeatClickNext(now?.repeat)));
+    repB.title = 'Repeat off — click for all; long-press for one track';
+    wireRepeatOne(repB, () => { setRep('one'); toast('Repeat one track'); }); }
   if (embedded) {
     // 0.5.0 F136: the condensed (under-Queue) player wears the flat Now Playing card chrome: a NOW PLAYING title bar with the Shortcuts pin on the
     // right (F135e: the horizontal pin strip opens leftward ON that bar), then art | titles + labeled Artist / Album + seek, the full transport
@@ -202,7 +207,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
       railBar.style.setProperty('--p', (now?.durationMs ? Math.min(1, (now.positionMs || 0) / now.durationMs) : 0) * 100 + '%');
       setIcon(play, now?.state === 'playing' ? 'pause' : 'play');
       if (shufB) { shufB.classList.toggle('on', !!now?.shuffle); shufB.setAttribute('aria-pressed', String(!!now?.shuffle)); }
-      if (repB) { const r = now?.repeat || 'off'; repB.classList.toggle('on', r !== 'off'); repB.setAttribute('aria-pressed', String(r !== 'off')); setIcon(repB, r === 'one' ? 'repeatOne' : 'repeat'); }
+      if (repB) { const c = repeatChrome(now?.repeat); repB.classList.toggle('on', c.on); repB.classList.toggle('rep-one', c.one); repB.setAttribute('aria-pressed', String(c.on)); repB.setAttribute('aria-label', c.aria); repB.title = c.title; setIcon(repB, c.icon); }
       artBox.setPlaying(now?.state === 'playing'); artBox.setFrac(now?.durationMs ? (now.positionMs || 0) / now.durationMs : 0); root.classList.toggle('playing', now?.state === 'playing');
       paintNpl(now); pos.textContent = fmtTime(now?.positionMs || 0); dur.textContent = fmtTime(now?.durationMs || 0);
       if (!dragging && now?.durationMs) seek.value = String(Math.round((now.positionMs || 0) / now.durationMs * 1000));

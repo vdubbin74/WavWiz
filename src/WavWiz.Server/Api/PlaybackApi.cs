@@ -5,10 +5,20 @@ namespace WavWiz.Server.Api;
 
 public static class PlaybackApi
 {
-    private static object QueueDto(Conductor cond)
+    private static object QueueDto(Services s, Conductor cond)
     {
-        var q = cond.Queue(); var now = cond.Now();
-        return new { items = q.Select((x, i) => new { id = x.Id, index = i, kind = x.Kind, title = x.Title, artist = x.Artist, album = x.Album, genre = x.Genre, year = x.Year, trackNo = x.TrackNo, durationMs = x.DurationMs, refId = x.RefId, artUrl = x.ArtUrl }), index = now.Index };
+        var q = cond.Queue(); var now = cond.Now(); Dictionary<string, string>? labels = null;
+        // F176: source pill per row: local / remote (server display name; removed server -> "Remote") / radio. serverId only, never the stream URL / Location.
+        (string Src, string Label, string? Sid) Source(QueueItem x)
+        {
+            if (x.Origin == Features.KeepPlayingService.Origin) return ("keep", Features.KeepPlayingService.Label, x.Kind == "remote" ? Library.SubsonicService.ServerIdOf(x.Location) : null);   // Keep playing added it
+            if (x.Kind == "radio") return ("radio", "Radio", null);
+            if (x.Kind != "remote") return ("local", "Local", null);
+            var sid = Library.SubsonicService.ServerIdOf(x.Location);
+            labels ??= s.Remote?.Labels() ?? new();
+            return ("remote", sid != null && labels.TryGetValue(sid, out var l) && !string.IsNullOrWhiteSpace(l) ? l : "Remote", sid);
+        }
+        return new { items = q.Select((x, i) => { var src = Source(x); return new { id = x.Id, index = i, kind = x.Kind, title = x.Title, artist = x.Artist, album = x.Album, genre = x.Genre, year = x.Year, trackNo = x.TrackNo, durationMs = x.DurationMs, refId = x.RefId, artUrl = x.ArtUrl, source = src.Src, sourceLabel = src.Label, serverId = src.Sid }; }), index = now.Index, keepPlaying = s.Keep?.Get(cond.GroupId) };
     }
 
     public static List<QueueItem> ResolveItems(Services s, JsonElement b, out string? error)
@@ -57,6 +67,12 @@ public static class PlaybackApi
                     if (list.Count == 0) error = "no songs given";
                     return list;
                 }
+            case "smart":
+                {   // a smart playlist: the same rule resolver as Keep playing -> Smart
+                    var id = b.Long("id") ?? 0; if (s.Smart.Get(id) == null) { error = "smart playlist not found"; return new(); }
+                    var ids = s.Smart.Resolve(id); if (ids.Count == 0) { error = "No songs match these rules yet."; return new(); }
+                    return s.Conductor.TracksToItems(ids);
+                }
             case "playlist":
                 {
                     var id = b.Long("id") ?? 0; return PlaylistItems(s, id);
@@ -94,8 +110,8 @@ public static class PlaybackApi
 
     public static void Map(RouteGroupBuilder g, Services s)
     {
-        g.MapGet("/stream", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(new { zoneId = cd.GroupId, now = cd.Now(), queue = QueueDto(cd), leadMs = cd.LeadMs })).Req(Role.View);
-        g.MapGet("/queue", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(QueueDto(cd))).Req(Role.View);
+        g.MapGet("/stream", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(new { zoneId = cd.GroupId, now = cd.Now(), queue = QueueDto(s, cd), leadMs = cd.LeadMs })).Req(Role.View);
+        g.MapGet("/queue", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(QueueDto(s, cd))).Req(Role.View);
 
         // ---- 0.4.0 playback groups (UI word: zones). Link = listen to another group's music; split (unlink) = own music, own queue. ----
         g.MapGet("/stream/zones", () => Results.Json(Groups(s))).Req(Role.View);
@@ -118,7 +134,8 @@ public static class PlaybackApi
             if (err != null) return Ext.Bad(err); if (items.Count == 0) return Ext.Bad("nothing to play");
             int index = (int)(b.Long("index") ?? 0); long start = b.Long("startMs") ?? 0;
             if (b.Bool("enqueue") == true) { cd.Add(items, b.Bool("next") == true); return Results.Json(new { ok = true, added = items.Count }); }
-            cd.PlayItems(items, index, start); MarkFirstSound(s); return Results.Json(new { ok = true });
+            var undo = s.QHistory.Snapshot(cd, "Before Play now");   // Play now replaces the queue: keep what was there for Undo / Recent queues
+            cd.PlayItems(items, index, start); MarkFirstSound(s); return Results.Json(new { ok = true, queueUndo = undo });
         }).Req(Role.Control);
 
         g.MapPost("/queue/add", async (HttpContext c) =>
@@ -140,13 +157,33 @@ public static class PlaybackApi
             var items = src.Queue().ToList(); if (items.Count == 0) return Ext.Bad("This queue is empty.", 409);
             int idx = src.Now().Index;
             if (play) dst.PlayItems(items, Math.Clamp(idx, 0, items.Count - 1), 0); else dst.Add(items, false);
-            if (move) src.Clear();
-            return Results.Json(new { ok = true, sent = items.Count, moved = move, playing = play, zoneId = dst.GroupId });
+            string? undo = null; if (move) { undo = s.QHistory.Snapshot(src, "Before move to another zone"); src.Clear(); }
+            return Results.Json(new { ok = true, sent = items.Count, moved = move, playing = play, zoneId = dst.GroupId, queueUndo = undo });
         }).Req(Role.Control);
 
         g.MapDelete("/queue/{index:int}", (int index, HttpContext c) => Zone(s, c, default, out var cd) ?? (cd.Remove(index) ? Results.Json(new { ok = true }) : Ext.Bad("no such queue position", 404))).Req(Role.Control);
         g.MapPost("/queue/move", async (HttpContext c) => { var b = await c.Request.Body(); return Zone(s, c, b, out var cd) ?? (cd.Move((int)(b.Long("from") ?? -1), (int)(b.Long("to") ?? -1)) ? Results.Json(new { ok = true }) : Ext.Bad("bad positions")); }).Req(Role.Control);
-        g.MapPost("/queue/clear", async (HttpContext c) => { var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; cd.Clear(); return Results.Json(new { ok = true }); }).Req(Role.Control);
+        g.MapPost("/queue/clear", async (HttpContext c) => { var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; var undo = s.QHistory.Snapshot(cd, "Before Clear"); cd.Clear(); return Results.Json(new { ok = true, queueUndo = undo }); }).Req(Role.Control);
+        // queue undo (one level, Control role like Clear) and Recent queues (10 per playback group)
+        g.MapPost("/queue/undo", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad;
+            var (n, tok, err) = s.QHistory.Undo(cd, b.Str("token")); return err != null && n == 0 ? Ext.Bad(err, 409) : Results.Json(new { ok = true, restored = n, queueUndo = tok });
+        }).Req(Role.Control);
+        g.MapGet("/queue/recent", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(s.QHistory.Recent(cd.GroupId).Select(x => new { id = x.Id, at = x.At, reason = x.Reason, count = x.Count, titles = x.Titles }))).Req(Role.View);
+        g.MapPost("/queue/recent/restore", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad;
+            var (n, tok, err) = s.QHistory.Restore(cd, b.Str("id") ?? ""); return err != null && n == 0 ? Ext.Bad(err, 404) : Results.Json(new { ok = true, restored = n, queueUndo = tok });
+        }).Req(Role.Control);
+
+        // Keep playing: per playback group (linked boxes share the leader's group, so one setting and one fill)
+        g.MapGet("/queue/keep", (HttpContext c) => Zone(s, c, default, out var cd) ?? Results.Json(s.Keep.Get(cd.GroupId))).Req(Role.View);
+        g.MapPut("/queue/keep", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad;
+            var err = s.Keep.Set(cd.GroupId, b.Str("mode"), b.Long("id")); return err != null ? Ext.Bad(err) : Results.Json(s.Keep.Get(cd.GroupId));
+        }).Req(Role.Control);
 
         void Simple(string path, Action<Conductor> act) => g.MapPost(path, async (HttpContext c) => { var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; act(cd); return Results.Json(new { ok = true }); }).Req(Role.Control);
         Simple("/stream/pause", cd => cd.Pause()); Simple("/stream/resume", cd => cd.Resume()); Simple("/stream/stop", cd => cd.Stop());
@@ -249,6 +286,32 @@ public static class PlaybackApi
             }
             return Results.Json(new { id, matched, missing, note = missing > 0 ? $"{missing} entries were not found in your library and were skipped." : null });
         }).Req(Role.Control);
+
+        // ---- smart playlists (rules over the local library) ----
+        static Features.SmartPlaylistService.Rules Rules(JsonElement b) { try { return b.Prop("rules") is JsonElement r && r.ValueKind == JsonValueKind.Object ? r.Deserialize<Features.SmartPlaylistService.Rules>(new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new() : new(); } catch { return new(); } }
+        g.MapGet("/smart", () => Results.Json(s.Smart.All().Select(x => new { id = x.Id, name = x.Name, rules = x.Rules, count = s.Smart.Resolve(x.Rules).Count, smart = true }))).Req(Role.View);
+        g.MapPost("/smart/preview", async (HttpContext c) => { var b = await c.Request.Body(); var r = Rules(b); Features.SmartPlaylistService.Clean(r); return Results.Json(s.Smart.Preview(r)); }).Req(Role.View);
+        g.MapPost("/smart", async (HttpContext c) => { var b = await c.Request.Body(); var (sp, err) = s.Smart.Save(null, b.Str("name"), Rules(b)); return err != null ? Ext.Bad(err) : Results.Json(new { id = sp!.Id }); }).Req(Role.Control);
+        g.MapPut("/smart/{id:long}", async (long id, HttpContext c) => { var b = await c.Request.Body(); var (sp, err) = s.Smart.Save(id, b.Str("name"), Rules(b)); return err != null ? Ext.Bad(err) : Results.Json(new { id = sp!.Id }); }).Req(Role.Control);
+        g.MapDelete("/smart/{id:long}", (long id) => s.Smart.Delete(id) ? Results.Json(new { ok = true }) : Ext.Bad("not found", 404)).Req(Role.Control);
+
+        // ---- play history (local) + Last.fm (opt-in; the secret and session key never leave the server) ----
+        g.MapGet("/history", (HttpContext c) =>
+        {
+            string? gid = null; if (!string.IsNullOrWhiteSpace(c.Request.Query["zoneId"].FirstOrDefault())) { if (Zone(s, c, default, out var cd) is { } bad) return bad; gid = cd.GroupId; }
+            return Results.Json(s.History.Recent(gid, int.TryParse(c.Request.Query["limit"].FirstOrDefault(), out var l) ? l : 100));
+        }).Req(Role.View);
+        g.MapDelete("/history", () => { s.History.ClearAll(); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapGet("/lastfm", () => Results.Json(s.History.LastFm.Status())).Req(Role.Admin);
+        g.MapPut("/lastfm", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); s.History.LastFm.SetKeys(b.Str("apiKey"), b.Str("secret"));
+            if (b.Bool("enabled") is bool on) s.History.LastFm.SetEnabled(on);
+            return Results.Json(s.History.LastFm.Status());
+        }).Req(Role.Admin);
+        g.MapPost("/lastfm/connect", async () => { var (url, err) = await s.History.LastFm.Begin(); return err != null ? Ext.Bad(err) : Results.Json(new { url }); }).Req(Role.Admin);
+        g.MapPost("/lastfm/finish", async () => { var err = await s.History.LastFm.Finish(); return err != null ? Ext.Bad(err, 409) : Results.Json(s.History.LastFm.Status()); }).Req(Role.Admin);
+        g.MapPost("/lastfm/disconnect", () => { s.History.LastFm.Disconnect(); return Results.Json(s.History.LastFm.Status()); }).Req(Role.Admin);
 
         // ---- radio ----
         g.MapGet("/radio", () => Results.Json(s.Db.Query("SELECT id,name,url,genre,favorite,logo_url FROM radio_station ORDER BY favorite DESC, name COLLATE NOCASE",

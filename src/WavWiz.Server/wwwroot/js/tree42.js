@@ -2,7 +2,7 @@
 // Every zone is a neutral "Queue: <Zone>" box (now playing + one volume + the zone card + its speakers). Zones that play the same music (linked) share ONE accent box
 // "Queue: <Leader> · IN SYNC". The Controlling zone's whole box (card + speakers) gets a thick accent edge; the selected speaker row gets its own highlight.
 import { h, api, toast } from './util.js';
-import { icon } from './icons.js';
+import { icon, setIcon } from './icons.js';
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { loadOrder, saveOrder, zoneOrderAfterDrop } from './devorder.js';
@@ -72,7 +72,7 @@ export function treeEl(S, ctl, kit, st) {
   // ---- context menus
   const zoneCtx = (g, el) => attachCtx(el, () => {
     const ms = zoneMembers(S.zones, g), others = groups.filter(o => o.id !== g.id && o.playbackId !== g.playbackId), muted = zoneMuted(S.zones, g);
-    const act = { playpause: () => playPause(g), mute: () => ctl.act(`/groups/${g.id}/mute`, { muted: !muted }), control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g), delete: () => confirmRemoveZone(S, g, done) };
+    const act = { playpause: () => playPause(g), mute: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); }, control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g), delete: () => confirmRemoveZone(S, g, done) };
     return zoneMenu42({ admin, can, playing: g.now?.state === 'playing', muted, controlling: isControlling(g, cur), order: orderOf(g), linked: (g.linked || []).length > 0, others: others.map(o => ({ id: o.id, name: o.name })) })
       .map(it => it.sep ? it : it.sub ? { ...it, sub: it.sub.map(s => ({ ...s, onclick: () => linkTo(g, s.zone) })) } : { ...it, onclick: act[it.id] });
   }, `${g.name} zone actions`);
@@ -141,8 +141,8 @@ export function treeEl(S, ctl, kit, st) {
     const sync = h('span', { class: 'sr-only' }, '');
     const lvl = ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0, muted = ms.length > 0 && ms.every(z => z.muted);
     const bar = capBar(linked ? 'Shared volume' : `${lead.name} zone volume`, lvl, linked ? null : zoneCap(S.zones, lead), can, v => { for (const g of all) ctl.act(`/groups/${g.id}/volume`, { set: v }); }, linked ? 'Moves every linked zone together' : 'Moves every speaker in this zone together (keeps their balance)');
-    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`), title: muted ? 'Unmute' : 'Mute',
-      onclick: ev => { ev.stopPropagation(); for (const g of all) ctl.act(`/groups/${g.id}/mute`, { muted: !muted }); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
+    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`), title: muted ? 'Unmute' : 'Mute', 'data-icon': muted ? 'mute' : 'volume',
+      onclick: ev => { ev.stopPropagation(); const cur = all.flatMap(g => zoneMembers(S.zones, g)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; for (const g of all) ctl.act(`/groups/${g.id}/mute`, { muted: m }); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`)); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
     const selectLead = () => controlZone(lead.id);
     const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
       h('div', { class: 'qb42-head' }, title, Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: selectLead, selected: sel }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)),
@@ -154,7 +154,7 @@ export function treeEl(S, ctl, kit, st) {
   // 0.5.2 F160: an OFFLINE zone (speakers, none online) keeps the compact Offline header but lists its real speakers as dimmed .gone rows (Move / Remove still work)
   const emptyBox = (g, off = false, box = null) => {
     const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).map(z => spRow(z, zg.id))) : [];
-    const wrap = h('section', { class: 'qb42 empty42' + (off ? ' off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
+    const wrap = h('section', { class: 'qb42 empty42' + (off ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
         h('div', { class: 'ze42-row' }, h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
           h('span', { class: 'small dim ze42-note' }, off ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })),
@@ -190,8 +190,8 @@ export function treeEl(S, ctl, kit, st) {
   const jbBox = () => {
     const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB);
     const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); } }, 'Jukebox');
-    if (jbRank > 0) {
-      const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
+    if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
+      const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
           h('div', { class: 'ze42-row', onclick: open }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
             ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.')),
@@ -201,15 +201,15 @@ export function treeEl(S, ctl, kit, st) {
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
     const lvl = Math.round(jbMs.reduce((a, z) => a + z.volume, 0) / jbMs.length), muted = jbMs.every(z => z.muted), on = jbMs.some(z => z.enabled);
     const bar = capBar('Jukebox zone volume', lvl, null, can, v => api('/jukebox/zone/volume', { method: 'POST', body: { set: v } }).catch(e => toast(e.message, true)), 'Moves every speaker of the Jukebox zone together');
-    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', title: muted ? 'Unmute' : 'Mute',
-      onclick: ev => { ev.stopPropagation(); api('/jukebox/zone/mute', { method: 'POST', body: { muted: !muted } }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true)); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
+    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', title: muted ? 'Unmute' : 'Mute', 'data-icon': muted ? 'mute' : 'volume',
+      onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => jbIds.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
     const pill = onPill('Jukebox zone', on, can, () => { const want = !jbMs.some(z => z.enabled); for (const z of jbMs) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
     const title = h('div', { class: 'qb42-t qb42-pick', role: 'button', tabindex: 0, title: 'Control the Jukebox', 'aria-label': 'Control the Jukebox', 'aria-pressed': String(sel), onclick: pick, onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(ev); } } },
-      h('b', { class: 'qb42-name' }, 'Queue: Jukebox'), h('span', { class: 'qb42-st dim' }, now?.state === 'playing' ? ' · PLAYING' : ' · IDLE'));
+      h('b', { class: 'qb42-name' }, 'Queue: Jukebox'), h('span', { class: 'qb42-st dim' }, jbRank === 1 ? ' · OFFLINE' : now?.state === 'playing' ? ' · PLAYING' : ' · IDLE'));
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': JB, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.pill42,.tog')) return; open(); } },
       h('span', { class: 'zgut42', 'aria-hidden': 'true' }, ''),
       h('div', { class: 'zc42-body' },
-        h('div', { class: 'zc42-1' }, h('span', { class: 'dot ok', title: `${jbMs.filter(z => z.connected).length} of ${jbMs.length} online` }), nameBtn, h('span', { class: 'zcount42', 'aria-label': `${jbMs.length} speakers` }, icon('volume'), String(jbMs.length)), h('span', { class: 'zacts' }, pill)),
+        h('div', { class: 'zc42-1' }, h('span', { class: 'dot ' + (jbRank === 1 ? 'off' : 'ok'), title: `${jbMs.filter(z => z.connected).length} of ${jbMs.length} online` }), nameBtn, h('span', { class: 'zcount42', 'aria-label': `${jbMs.length} speakers` }, icon('volume'), String(jbMs.length)), h('span', { class: 'zacts' }, pill)),
         h('div', { class: 'dtagrow ztagrow zc42-2' }, sel ? Z.controllingTag() : null, h('span', { class: 'dtag zjb', title: 'Guests choose the songs; they play only on these speakers' }, 'JUKEBOX'))));
     const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' }, card,
       h('div', { class: 'zsp42', role: 'list', 'aria-label': 'Speakers in the Jukebox' }, jbMs.map(z => spRow(z, JB))));
@@ -218,7 +218,7 @@ export function treeEl(S, ctl, kit, st) {
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; pick(ev); });
     return el;
   };
-  const boxEls = model.boxes.map(b => [rank(b), rank(b) > 0 ? emptyBox(b.leader, rank(b) === 1, b) : queueBox(b)]);
+  const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? emptyBox(b.leader, false, b) : queueBox(b)]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
   if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox()]); }
   root.append(...boxEls.map(x => x[1]));
   if (!model.boxes.length) root.append(h('p', { class: 'dim small pad' }, 'Zones hold speakers, like “Downstairs”. An administrator can create one with +.'));
@@ -309,7 +309,7 @@ export function zonePane(S, ctl, kit, g, st) {
   const saveName = ro(h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'zone-rename', onclick: async () => { const v = name.value.trim(); if (!v) { toast('Type a name first', true); return; } try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); toast('Zone renamed'); done(); } catch (e) { toast(e.message, true); } } }, 'Rename'), admin, 'Only an administrator can rename a zone.');
   const on = zoneOn(S.zones, g), pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); pill._set(want); });
   const muted = zoneMuted(S.zones, g), bar = capBar(`${g.name} zone volume`, zoneLevel(S.zones, g), zoneCap(S.zones, g), can, v => ctl.act(`/groups/${g.id}/volume`, { set: v }));
-  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, onclick: () => ctl.act(`/groups/${g.id}/mute`, { muted: !muted }) }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
+  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, 'data-icon': muted ? 'mute' : 'volume', onclick: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute zone ' : 'Mute zone ') + g.name); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
   const others = (S.groups || []).filter(o => o.id !== g.id);
   root.append(
     h('div', { class: 'zp42-row' }, h('span', { class: 'dlbl' }, 'NAME'), name, saveName, h('span', { class: 'grow' }), h('span', { class: 'dlbl' }, 'ENABLED'), pill),

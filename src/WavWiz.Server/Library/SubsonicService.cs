@@ -34,6 +34,10 @@ public sealed class SubsonicService
     private void Store(List<Saved> l) => _db.SetSetting(Key, JsonSerializer.Serialize(l));
     private Saved? Get(string id) => Load().FirstOrDefault(x => x.Id == id);
     public static string Display(Saved s) => string.IsNullOrWhiteSpace(s.Label) ? new Uri(s.Url).Host : s.Label!;
+    /// <summary>F176: server id -> display name (Label, else host), for queue source pills. No secrets.</summary>
+    public Dictionary<string, string> Labels() => Load().GroupBy(x => x.Id).ToDictionary(g => g.Key, g => { try { return Display(g.First()); } catch { return "Remote"; } });
+    /// <summary>F176: server id from a queue Location "subsonic:{serverId}:{songId}" (null if not a remote location).</summary>
+    public static string? ServerIdOf(string? location) { if (location == null || !location.StartsWith(Scheme)) return null; var r = location[Scheme.Length..]; var i = r.IndexOf(':'); return i > 0 ? r[..i] : null; }
 
     public List<object> List()
     {

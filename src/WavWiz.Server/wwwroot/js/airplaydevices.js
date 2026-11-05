@@ -70,14 +70,18 @@ export function airplayDevicesStrip(S, ctl) {
     box.classList.toggle('open', open); toggle.setAttribute('aria-expanded', String(open)); body.hidden = !open;
     const vis = on ? devs.filter(d => !apSelf(d)) : [];
     count.textContent = on && vis.length ? ` · ${vis.length} found` : '';
+    // F233: Speakers .tcol42 is the scroller — hold scrollTop across body rebuilds while Add AirPlay is open
+    const sc = open ? box.closest('.tcol42') : null, top = sc ? sc.scrollTop : 0;
+    const put = () => { if (!sc) return; sc.scrollTop = top; requestAnimationFrame(() => { sc.scrollTop = top; }); };
     if (!open) { body.replaceChildren(); return; }
-    if (!on) { body.replaceChildren(h('div', { class: 'row wrap small dim' }, h('span', { class: 'grow' }, 'To add Sonos / WiiM / AirPlay speakers, turn on AirPlay 2 speakers in Settings → Network.'), h('button', { class: 'btn sm', type: 'button', 'data-act': 'apds-settings', onclick: openSet }, 'Open settings'))); return; }
+    if (!on) { body.replaceChildren(h('div', { class: 'row wrap small dim' }, h('span', { class: 'grow' }, 'To add Sonos / WiiM / AirPlay speakers, turn on AirPlay 2 speakers in Settings → Network.'), h('button', { class: 'btn sm', type: 'button', 'data-act': 'apds-settings', onclick: openSet }, 'Open settings'))); put(); return; }
     const seen = new Set(devs.map(d => d.id));
     const selfN = devs.filter(apSelf).length;
     const rows = devs.filter(d => showSelf || !apSelf(d)).map(row).concat([...outs.values()].filter(o => !seen.has(o.key)).map(o => row({ id: o.key, name: o.name, addresses: [o.address], route: 'raop' })));
     body.replaceChildren(h('div', { class: 'row wrap' }, h('span', { class: 'grow small dim' }, 'Sonos, WiiM, and other AirPlay speakers on this Wi‑Fi. Add one to use it like any WavWiz output.'), again),
       h('div', { class: 'apds-list' }, rows.length ? rows : h('div', { class: 'small dim' }, 'Looking for speakers… answers usually arrive within a few seconds.')),
       selfN ? h('button', { class: 'linkbtn small dim apds-self', type: 'button', 'data-act': 'apds-self', onclick: () => { showSelf = !showSelf; paint(); } }, showSelf ? 'Hide this PC' : 'Show this PC') : null);
+    put();
   }
   async function doAct(x, added) {
     if (busy.has(x.id)) return; busy.set(x.id, added ? 'Removing…' : 'Adding…'); paint();

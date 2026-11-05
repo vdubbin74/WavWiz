@@ -1,10 +1,10 @@
-// WavWiz 0.3.7 L5 / L8 / L11 / L23: Home + up to FIVE pinned shortcuts. One module for the Now Playing bar, the embedded mini player and the standalone mini player.
+// WavWiz 0.3.7 L5 / L8 / L11 / L23: Home + up to EIGHT pinned shortcuts. One module for the Now Playing bar, the embedded mini player and the standalone mini player.
 // Layout (every size): the Home icon sits in the far RIGHT corner, a separator, then the pins stacking LEFTWARD (first pinned closest to the separator).
 // Pins are remembered per device (localStorage, shared by every window of this app, so the standalone mini player shows the same ones).
 import { h } from './util.js';
 import { icon } from './icons.js';
 
-export const MAX_PINS = 5;
+export const MAX_PINS = 8;
 export const PINS_KEY = 'wavwiz.pins.v1';
 /** Everything that can be pinned: app destinations only. `go` is the id main.js runs through ONE function (runShortcut) that collapses expanded views and brings the target to the front. */
 export const PINNABLE = [
