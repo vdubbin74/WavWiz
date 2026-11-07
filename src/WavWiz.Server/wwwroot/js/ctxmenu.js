@@ -88,8 +88,9 @@ function place(el, x, y, r) {
 }
 /** Show a menu at (x, y) (clamped into the window). Items: { id, label, ic?, onclick | sub:[{label,onclick}], danger, disabled, hint, sep }. A disabled item is dim, with its hint as a tooltip. Esc closes (submenu first); Up/Down move, Right opens a submenu, Left closes it. */
 export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
-  // F199: inside a showModal() <dialog> (Settings) the menu must live in the dialog's top layer, or it paints under it.
-  const host = from?.closest?.('dialog') || document.body;
+  // F199/F246: popovers belong to their nearest modal (top-layer dialog or phone sheet),
+  // so their stacking, focus and teardown stay inside that modal. Desktop still uses body.
+  const host = from?.closest?.('dialog,.pd42-sheet') || document.body;
   closeCtx();
   const subs = []; let subEl = null;
   const closeSub = () => { if (subEl) { subEl.remove(); subs.splice(subs.indexOf(subEl), 1); subEl = null; } };

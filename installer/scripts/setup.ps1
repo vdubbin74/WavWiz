@@ -2,7 +2,8 @@
 .SYNOPSIS  Post-copy setup run by the WavWiz installer (installer\WavWiz.iss) as the installing, elevated user. Windows PowerShell 5.1 compatible.
 .PARAMETER Root       Install folder ({app}) containing Server\ and/or Player\ (already copied) and scripts\.
 .PARAMETER Role       server | player | both
-.PARAMETER LanIp      The home-network address the server listens on (chosen in the wizard; never 0.0.0.0).
+.PARAMETER LanIp      Explicit listen address from the wizard when the user set/changed one. Omit to preserve an existing server.json bind (including an opted-in all-interfaces bind). Never newly enables all-interfaces binding.
+.PARAMETER AllInterfaces 1 = the wizard's 'Home network + Tailscale/VPN (all networks)' choice (F268): bindAddress 0.0.0.0 + allowAllInterfaces. Only from that explicit choice.
 .PARAMETER ServerHost For a Player-only install: the server's address. With role both the player uses this PC's server address.
 .PARAMETER NoDialog   1 = silent install: do not show windows (notices are still written to setup-notices.txt).
 .PARAMETER NoStart    1 = do not start the service (used by tests / advanced users).
@@ -11,7 +12,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = '', [ValidateSet('server', 'player', 'both')][string]$Role = 'both', [string]$LanIp = '', [string]$ServerHost = '',
+    [string]$Root = '', [ValidateSet('server', 'player', 'both')][string]$Role = 'both', [string]$LanIp = '', [int]$AllInterfaces = 0, [string]$ServerHost = '',
     [int]$HttpPort = 47800, [int]$HttpsPort = 47443, [int]$AudioPort = 47801, [int]$ClockPort = 47802,
     [int]$NoDialog = 0, [int]$NoStart = 0, [string]$SetupVersion = '', [string]$DoneFile = ''
 )
@@ -27,7 +28,7 @@ try {
     try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'setup.pid') ([string]$PID) } catch { }   # lets the wizard stop this process if it ever hangs
     foreach ($f in 'setup-notices.txt', 'first-run-url.txt', 'last-setup-error.txt') { try { Remove-Item -LiteralPath (Join-Path (Get-WavWizDataRoot) $f) -Force -ErrorAction SilentlyContinue } catch { } }
     Set-Step 'setup: starting'
-    Say "== WavWiz BETA setup ($(Get-Date -Format s)) version=$SetupVersion role=$Role lanIp=$LanIp =="
+    Say "== WavWiz BETA setup ($(Get-Date -Format s)) version=$SetupVersion role=$Role lanIp=$LanIp network=$(if ($AllInterfaces) { 'all' } else { 'home' }) =="
     if (-not (Test-IsAdmin)) { Stop-Setup 'Setup must run elevated (the installer requests administrator rights).' }
     Set-Step 'setup: checking the installed files'
     $pf = Get-PreflightReport -Root $Root -Role $Role
@@ -45,16 +46,29 @@ try {
     try { [void](Remove-StrayWavWizArp) } catch { Say ("ARP scrub skipped: " + $_.Exception.Message) }
 
     if ($Role -in 'server', 'both') {
-        if (-not $LanIp) {
-            # a re-run without an explicit address keeps the address already in server.json; detection is only for a first install
-            $cfgFile = Join-Path (Get-WavWizDataRoot) 'server.json'; $haveAddr = $false
-            if (Test-Path -LiteralPath $cfgFile) { try { $haveAddr = [bool]((Read-TextFile $cfgFile) | ConvertFrom-Json).bindAddress } catch { } }
-            if ($haveAddr) { Say 'No address was passed; keeping the address in the existing server.json.' }
+        if ($AllInterfaces) { $LanIp = ''; Say 'Network choice from Setup: Home network + Tailscale/VPN (all networks).' }
+        elseif (-not $LanIp) {
+            # Omit -LanIp: preserve a usable existing bind, or let Get-ServerConfigPlan safely loopback-repair
+            # missing/null/empty/invalid bind. LAN detection is only for a true first install (no server.json yet).
+            $cfgFile = Join-Path (Get-WavWizDataRoot) 'server.json'; $cfgExists = $false; $haveUsableBind = $false
+            if (Test-Path -LiteralPath $cfgFile) {
+                try {
+                    $existingCfg = (Read-TextFile $cfgFile) | ConvertFrom-Json
+                    $cfgExists = $true
+                    $ba = [string]$existingCfg.bindAddress
+                    if ($ba -and (Test-IPv4 $ba)) { $haveUsableBind = $true }
+                } catch { }
+            }
+            if ($cfgExists) {
+                if ($haveUsableBind) { Say 'No address was passed; keeping the address in the existing server.json.' }
+                else { Say 'No address was passed; existing server.json has no usable bindAddress - safe loopback plan (no LAN detection on upgrade).' }
+            }
             else { $LanIp = Get-LanIPv4 10; if ($LanIp) { Say "No address was passed; detected $LanIp." } }
         }
         Set-Step 'setup: server install (own process, 240 s limit)'
         $sp = @{ Root = $Root; LanIp = $LanIp; HttpPort = $HttpPort; HttpsPort = $HttpsPort; AudioPort = $AudioPort; ClockPort = $ClockPort; NonInteractive = $true }
         if ($NoStart) { $sp.NoStart = $true }
+        if ($AllInterfaces) { $sp.AllInterfaces = $true }
         $r = Invoke-SubScript -Script (Join-Path $PSScriptRoot 'install-server.ps1') -Params $sp -TimeoutSec $ServerLimitSec -Label 'server install'
         foreach ($o in $r.Objects) {
             if ($o.Kind -eq 'notice') { $notices.Add([string]$o.Value) }
@@ -64,14 +78,14 @@ try {
         Set-Step 'setup: server install finished'
     }
     if ($Role -in 'player', 'both') {
-        $host2 = $ServerHost; if ($Role -eq 'both' -and $bind) { $host2 = $bind }
+        $host2 = $ServerHost; if ($Role -eq 'both' -and $bind) { $host2 = Get-ConnectHost $bind }   # F268b: wildcard -> LAN address
         Set-Step 'setup: player install (own process, 90 s limit)'
         $pp = @{ Root = $Root; ServerHost = $host2; HttpPort = $port; AudioPort = $AudioPort; NonInteractive = $true }
         $r = Invoke-SubScript -Script (Join-Path $PSScriptRoot 'install-player.ps1') -Params $pp -TimeoutSec $PlayerLimitSec -Label 'player install'
         foreach ($o in $r.Objects) { if ($o.Kind -eq 'notice') { $notices.Add([string]$o.Value) } }
         Set-Step 'setup: player install finished'
     }
-    if ($bind) { try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'first-run-url.txt') ("http://${bind}:$port/") } catch { } }
+    if ($bind) { $ch = Get-ConnectHost $bind; try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'first-run-url.txt') ("http://${ch}:$port/") } catch { } }   # F268b: never the wildcard listen address
     if ($notices.Count -gt 0) {
         # shown by the installer wizard itself (a window from this hidden process is not reliable); no secrets in it
         try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'setup-notices.txt') (($notices | ForEach-Object { '- ' + $_ }) -join "`r`n`r`n") } catch { }

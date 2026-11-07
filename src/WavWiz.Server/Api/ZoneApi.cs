@@ -168,7 +168,7 @@ public static class ZoneApi
             }
             var (sess, err) = s.Cal.Start(mode, refId, mode == "pc-mic" ? "pc" : b.Str("micSource"), mode == "pc-mic" ? "raw" : b.Str("micProcessing"), only);
             if (sess == null) return Ext.Bad(err!, err!.Contains("offline") ? 409 : 400);
-            if (link != null && CalPhoneApi.LinkOf(c) != null) { sess.LinkToken = link.Token; sess.MicDevice = link.Device; link.SessionId = sess.Id; s.Events.Publish("calmics"); }
+            if (link != null && CalPhoneApi.LinkOf(c) != null) { sess.LinkToken = link.Token; sess.MicDevice = link.Device; link.SessionId = sess.Id; s.Events.Publish("calmics"); if (link.State == "left") { s.Cal.End(sess, "left"); return Ext.Bad("The calibration page was closed.", 409); } }   // F260-A: a create that lands after the page left is ended at once
             if (micPc != null && mic != null)
             {
                 sess.MicPlayerId = micPc.Id; sess.MicId = mic.Id; sess.MicName = mic.Name; sess.MicBluetooth = mic.Bluetooth; sess.MicSource = "pc:" + mic.Kind;

@@ -10,6 +10,35 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-11-06 (beta)
+
+### Changed
+- Display size (F270): the 75 % “Small” choice is removed (a saved Small opens at Default 100 %); the panels' fine brushed texture is drawn in zoom-corrected steps and left out at any size other than 100 %, so no banding lines at 67 %. (The 67 % Devices hover flicker is not fixed yet: it did not reproduce in headless Chrome.)
+- Devices (F269): a dragged speaker lands in its new zone at once (optimistic move, no wait for the next poll or for the pointer to leave the list), and dragging it straight back to its previous zone works (the source zone is read when the drag starts).
+- Installer (F268b): with “Home network + Tailscale/VPN” Setup no longer fails with exit code 1 — the readiness check probes http://127.0.0.1 instead of the wildcard listen address, and the first-run link and this PC's player use the LAN address (never 0.0.0.0).
+- Installer network page (F268): two plain choices instead of typing an address — “Home network only (recommended)” (this PC's detected LAN address; the fresh-install default) and “Home network + Tailscale/VPN (all networks)” (bindAddress 0.0.0.0 + allowAllInterfaces + 100.64.0.0/10, plus a Tailscale/VPN web firewall rule; no number shown), with an “Advanced: a specific address” escape. Upgrades preselect what server.json already has and keep it; the detected LAN address never replaces an existing all-networks setting unless “Home network only” is picked. install.log names the choice.
+- Devices (F267): an idle zone's “Nothing playing” line is the same full-width bar as a playing one, with an empty track and --:-- / --:--, so idle and playing cards line up.
+- Devices (F266): every zone box, playing or idle, folds to one compact row (▸/▾ beside the zone title) with a green dot when a speaker is on and online; the fold is remembered per zone and keeps the Controlling accent. Replaces the idle “▸ n / ▾ speakers” toggle that misaligned the volume and Nothing-playing lines.
+- Devices (PC app, F265): hovering anything in a playing zone (mute, now playing, ON/OFF, PLAYING, REF and other controls) no longer flickers the pointer or drops its tooltip on status updates; hover is detected from the real mouse, and nothing inside the hovered zone is swapped until the pointer leaves.
+- Phone Speaker Settings (F264): More ▾ menu sized to its items and kept on screen; one-line “Zone” picker that updates (with the breadcrumb) right after a move; one Save beside the profile picker (name field only for ＋ New…); Rename moved into More ▾; repeated hint, SPEAKER chip and profile helper text removed; tighter spacing.
+- Phone app is portrait-only (F262-fix): on a physically landscape phone (screen orientation, not a keyboard-shrunk viewport) a full-screen “Rotate your phone to portrait” overlay hides the app and blocks input (orientation lock where supported, manifest `portrait`); returning to portrait realigns an open Speaker Settings / Sound sheet without touching other scroll positions. Speaker Settings taps no longer land below the controls after rotating on iPhone (the sheet now pins the page with a real scroll lock and re-lays out over ~0.7 s after each rotation).
+- Phone Queue header: title + zone on one row, meta line alone, Keep playing row, then a 2×2 of square 44 px Save / Recent / Clear / Lock (desktop unchanged).
+- Close × buttons are square with a white X; focus ring uses the theme accent (Sound sheet keeps its ring on open).
+- Phone Now Playing “on …” zone pill is vertically centered in its chip.
+- Phone chrome through F250: Now Playing song actions, Queue grips/reorder, Library hierarchy, Devices and Sound sheets.
+- Installer / upgrade: opted-in `bindAddress` (including `0.0.0.0`) is preserved; Home Screen certificates derive SANs from real endpoints.
+
+### Fixed
+- Master volume thumbs stay centered; mixer sheet scroll holds across paint.
+- Phone Queue no longer flashes album art on identical re-paints.
+- Phone Speaker Settings header no longer crunches the title and action buttons.
+- Phone calibration mic page always has a way out: header close, Stop & exit and Back to player; exiting ends the session and stops the microphone (music stays paused, never auto-resumed).
+- Devices hover hosts are kept across polls.
+
+### Added
+- Optional remote HTTPS identity (off by default): exact-name certificate from Tailscale (after a one-time Certificate Transparency notice) or your own PFX, served with its intermediates; WavWiz's own certificate stays the fallback.
+- Opt-in `?diag=1` Speaker settings geometry capture (diagnostic tooling only, not a fix).
+
 ## [0.6.6] - 2026-11-04 (beta)
 
 ### Changed

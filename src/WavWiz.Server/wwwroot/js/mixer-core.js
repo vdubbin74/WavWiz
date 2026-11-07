@@ -20,3 +20,54 @@ export function tags(z) {
   const t = []; if (z.isReference || z.reference || z.ref) t.push('REF'); if (z.muted) t.push('MUTED'); if (!z.connected) t.push('OFFLINE');
   const o = (z.outputs || []).find(x => x.active) || (z.outputs || [])[0]; if (o && /bluetooth|\bbt\b/i.test(`${o.kind || ''} ${o.name || ''}`)) t.push('BT'); return t;
 }
+/** Deduplicate speakers by id so linked/overlap rows never double-write the same device. */
+export function uniqueMembers(list) {
+  const m = new Map();
+  for (const z of list || []) if (z != null && z.id != null && !m.has(z.id)) m.set(z.id, z);
+  return [...m.values()];
+}
+/**
+ * Phone max-based zone participants (NP/mixer contract): unique members with enabled !== false.
+ * Desktop average path keeps its own zoneMembers/zoneLevel helpers untouched.
+ */
+export function phoneZoneMembers(zones, deviceIds) {
+  const ids = new Set(deviceIds || []);
+  return uniqueMembers((zones || []).filter(z => ids.has(z.id) && z.enabled !== false));
+}
+/** Rounded max level for a phone zone/NP slider. */
+export const phoneZoneLevel = zs => Math.round(groupLevel((zs || []).map(z => z.volume)));
+/**
+ * Phone max-based zone drag sender (NP + phone Devices). Snapshot ratios on first apply of a gesture;
+ * cancel() drops pending PATCHes (membership/permission/zone change, refresh, close).
+ * act(z, body) performs the real write; can() gates Control; keyOf(zs) fingerprints membership.
+ */
+export function phoneZoneVolWriter({ act, can, keyOf, delay = 90 } = {}) {
+  const timers = new Map();
+  let base = null, startKey = null;
+  // keyOf() must read LIVE membership/caps/selection (not the drag snapshot) so mid-drag zone/member changes drop stale writes.
+  const liveKey = () => (typeof keyOf === 'function' ? keyOf() : '');
+  const cancel = (clearBase = true) => { for (const t of timers.values()) clearTimeout(t); timers.clear(); if (clearBase) { base = null; startKey = null; } };
+  const send = (z, body, k) => {
+    clearTimeout(timers.get(z.id));
+    timers.set(z.id, setTimeout(() => {
+      timers.delete(z.id);
+      // P8-amend R3: drop if membership/caps changed since schedule OR since gesture start
+      if (!can?.() || (keyOf && (k !== liveKey() || (startKey != null && startKey !== liveKey())))) return;
+      act?.(z, body);
+    }, delay));
+  };
+  const apply = (zs, to) => {
+    if (!zs?.length || !can?.()) { cancel(); return; }
+    const k = liveKey() || JSON.stringify(zs.map(z => [z.id, z.volCap ?? 100, z.enabled]));
+    // P8-amend R3: membership replaced mid-gesture → abort entire write (do not re-base onto survivors)
+    if (startKey != null && startKey !== k) { cancel(); return; }
+    if (startKey == null) startKey = k;
+    if (!base || base.key !== k) base = { zs: [...zs], vols: zs.map(z => z.volume), key: k };
+    const next = scaleTo(base.vols, to, base.zs.map(z => z.volCap ?? 100));
+    for (const [i, z] of base.zs.entries()) {
+      const v = next[i];
+      if (z.volume !== v || timers.has(z.id)) { z.volume = v; send(z, { volume: Math.round(v) }, k); }
+    }
+  };
+  return { apply, cancel, resetBase: () => { base = null; startKey = null; }, get pending() { return timers.size; } };
+}

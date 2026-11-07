@@ -21,6 +21,9 @@ ok('tree42 jukebox mute live-reads jb members', has(t42, '(S.zones || []).filter
 ok('devices zoneCtx mute live-reads zoneMuted', has(dev, 'mute: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); }'));
 ok('devices jukebox mute live-reads members', has(dev, '(S.zones || []).filter(z => ids.has(z.id))', "api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } })"));
 ok('devices hov42 requires real hover media', has(dev, "matchMedia('(hover: hover)').matches"));
+ok('tree42 sp42-mute live-finds zone (DIG mute)', t42.includes('(S.zones || []).find(x => x.id === z.id)') && t42.includes('muted: next') && t42.includes('setIcon(mb'));
+ok('tree42 no stale speaker !z.muted PATCH', !t42.includes("ctl.act(`/zones/${z.id}`, { muted: !z.muted }, 'PATCH')"));
+ok('devices speakerCtx mute live-finds (DIG mute)', dev.includes('const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted;'));
 ok('devices leave-alone paths still live-read zoneMuted', (dev.split('const m = !zoneMuted(S.zones, g); for (const z of ms) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m });').length - 1) >= 2);
 
 const mime = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html', '.json': 'application/json' };

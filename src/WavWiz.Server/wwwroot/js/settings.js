@@ -111,6 +111,14 @@ export async function openSettings(S, refresh, nav, section) {
             h('p', { class: 'small mono dim' }, 'Certificate fingerprint (SHA-256): ' + st.tls.rootSha256))),
         admin ? h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Certificate refreshed. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Refresh certificate (after an address change)')) : null)
         : h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up HTTPS')), admin ? null : adminTag()),
+      // F261: remote HTTPS (Tailscale / own certificate) - status text; enabling Tailscale shows the Certificate Transparency disclosure once
+      st.tls.remote ? h('div', { id: 'sec-remote-tls' }, h('p', { class: 'small' + (st.tls.remote.error ? ' warn-t' : '') }, st.tls.remote.text),
+        st.tls.remote.caveat ? h('p', { class: 'small dim' }, st.tls.remote.caveat) : null,
+        admin ? h('div', { class: 'row wrap' }, st.tls.remote.mode === 'off'
+          ? h('button', { class: 'btn', onclick: async () => {
+              const r = st.tls.remote; if (!r.ctAcknowledged && !confirm(r.ctDisclosure + '\n\nTurn on remote HTTPS with Tailscale?')) return;
+              try { await api('/tls/remote', { method: 'POST', body: { mode: 'tailscale', acknowledgeCt: !r.ctAcknowledged } }); toast('Remote HTTPS turned on.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Use Tailscale HTTPS for remote access…')
+          : h('button', { class: 'btn ghost', onclick: async () => { try { await api('/tls/remote', { method: 'POST', body: { mode: 'off' } }); toast('Remote HTTPS turned off.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Turn off remote HTTPS')) : null) : null,
       // 0.3.0 §7.2: the redirect option lives under Advanced, with a warning. Default stays off.
       h('details', { class: 'advanced', id: 'sec-redirect' }, h('summary', { class: 'small' }, 'Advanced'),
         h('p', { class: 'warn-t small', role: 'note' }, 'Turning this on can stop phones and calibration from loading. Leave off unless you know you need it.'),

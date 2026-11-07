@@ -271,6 +271,20 @@ function Set-ServerFirewall([string]$Exe, [int[]]$TcpPorts, [int[]]$UdpPorts) {
     [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'add', 'rule', "name=$name", 'dir=in', 'action=allow', 'protocol=TCP', ('localport=' + ($TcpPorts -join ',')), 'profile=private', 'remoteip=localsubnet', "program=$Exe", 'enable=yes') -Label 'netsh add TCP rule' -TimeoutSec 30)
     [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'add', 'rule', "name=$name (UDP)", 'dir=in', 'action=allow', 'protocol=UDP', ('localport=' + ($UdpPorts -join ',')), 'profile=private', 'remoteip=localsubnet', "program=$Exe", 'enable=yes') -Label 'netsh add UDP rule' -TimeoutSec 30)
 }
+# F268: all-networks choice -> one extra web rule for Tailscale/VPN peers (100.64.0.0/10), scoped to the server program and its web ports.
+$script:VpnFirewallName = 'WavWiz Server (Tailscale/VPN web)'
+# F268b: a wildcard bind (0.0.0.0 / ::) is a LISTEN address, never a host to connect to.
+function Test-WildcardBind([string]$Bind) { return ($Bind.Trim('[', ']') -in @('0.0.0.0', '::')) }
+# local readiness probes on this PC: wildcard -> 127.0.0.1 (the server listens there too)
+function Get-ProbeHost([string]$Bind) { if (Test-WildcardBind $Bind) { return '127.0.0.1' }; return $Bind }
+# what a person / another PC / the local player is told to connect to: wildcard -> this PC's LAN address (127.0.0.1 if none found)
+function Get-ConnectHost([string]$Bind) { if (Test-WildcardBind $Bind) { $ip = ''; try { $ip = Get-LanIPv4 10 } catch { }; if ($ip) { return $ip }; return '127.0.0.1' }; return $Bind }
+function Test-AllNetworksConfig($Config) { return ([string]$Config['bindAddress'] -in @('0.0.0.0', '::', '[::]')) }
+function Set-ServerVpnFirewall([string]$Exe, [int[]]$TcpPorts, [bool]$Enable) {
+    $net = Get-SystemTool 'netsh.exe'
+    [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$($script:VpnFirewallName)") -Label 'netsh delete old Tailscale/VPN rule' -AllowFail -TimeoutSec 30)
+    if ($Enable) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'add', 'rule', "name=$($script:VpnFirewallName)", 'dir=in', 'action=allow', 'protocol=TCP', ('localport=' + ($TcpPorts -join ',')), 'profile=private,public', 'remoteip=100.64.0.0/10', "program=$Exe", 'enable=yes') -Label 'netsh add Tailscale/VPN rule' -TimeoutSec 30) }
+}
 function Get-ServerUdpPorts($Config) {
     # clock always; discovery (UDP 47803 'where is WavWiz?' + mDNS 5353) unless the owner switched it off in server.json (discovery: false)
     $ports = New-Object System.Collections.Generic.List[int]
@@ -299,7 +313,7 @@ function Set-ReceiverFirewall([string]$ServerExe, $Config) {
 }
 function Remove-ServerFirewall {
     $net = Get-SystemTool 'netsh.exe'; $name = $script:FirewallNames[0]
-    foreach ($n in @($name, "$name (UDP)") + $script:ReceiverFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete rule' -AllowFail -TimeoutSec 30) }
+    foreach ($n in @($name, "$name (UDP)", $script:VpnFirewallName) + $script:ReceiverFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete rule' -AllowFail -TimeoutSec 30) }
 }
 
 # ---- files and ACLs
@@ -376,20 +390,49 @@ function ConvertTo-HashtableDeep($o) {
     return $o
 }
 function Get-ServerConfigPlan {
-    param([string]$ExistingJson, [string]$LanIp, [string]$FfmpegPath, [int]$HttpPort, [int]$HttpsPort, [int]$AudioPort, [int]$ClockPort)
+    param([string]$ExistingJson, [string]$LanIp, [string]$FfmpegPath, [int]$HttpPort, [int]$HttpsPort, [int]$AudioPort, [int]$ClockPort, [switch]$AllInterfaces)
     $notes = New-Object System.Collections.Generic.List[string]; $cfg = [ordered]@{}; $existing = $false; $changed = $false
     if ($ExistingJson -and $ExistingJson.Trim()) {
         try { $cfg = ConvertTo-HashtableDeep (($ExistingJson.TrimStart([char]0xFEFF)) | ConvertFrom-Json); $existing = $true } catch { throw "server.json exists but is not valid JSON ($($_.Exception.Message)); it was left untouched. Fix or delete it, then run the installer again." }
         if ($null -eq $cfg) { $cfg = [ordered]@{} }
     }
     $has = { param($k) $cfg.Contains($k) -and $null -ne $cfg[$k] -and "$($cfg[$k])" -ne '' }
-    # bind address: never 0.0.0.0 (the user must opt in by editing server.json themselves); an explicit -LanIp wins, an existing valid address is kept
-    if ($LanIp) {
+    # bind address: 0.0.0.0 only via -AllInterfaces (the wizard's explicit all-networks choice, F268); an opt-in in server.json is preserved when -LanIp is omitted.
+    # Explicit -LanIp (a single usable IPv4) may override. Missing/invalid existing bind is handled safely (loopback), never widened to all-interfaces or a guessed LAN here.
+    $bindAction = 'none'
+    $prevBind = $(if (& $has 'bindAddress') { [string]$cfg['bindAddress'] } else { '' })
+    $prevBindOk = $prevBind -and (Test-IPv4 $prevBind)   # includes opted-in 0.0.0.0
+    if ($AllInterfaces) {
+        # F268: the wizard's 'Home network + Tailscale/VPN (all networks)' choice. Only ever from that explicit choice (or a preserved
+        # existing all-networks bind); never from LAN detection. Adds the Tailscale/CGNAT range to extraAllowedSubnets when missing.
+        $isAll = ($prevBind -eq '0.0.0.0') -and ("$($cfg['allowAllInterfaces'])" -eq 'True')
+        if ($prevBind -ne '0.0.0.0') { $cfg['bindAddress'] = '0.0.0.0'; $changed = $true }
+        if ("$($cfg['allowAllInterfaces'])" -ne 'True') { $cfg['allowAllInterfaces'] = $true; $changed = $true }
+        $subs = @(); if ($cfg.Contains('extraAllowedSubnets') -and $null -ne $cfg['extraAllowedSubnets']) { $subs = @($cfg['extraAllowedSubnets']) }
+        if (-not ($subs -contains '100.64.0.0/10')) { $cfg['extraAllowedSubnets'] = @($subs + '100.64.0.0/10'); $changed = $true }
+        if ($isAll -or ($prevBind -eq '0.0.0.0')) { $bindAction = 'preserved' }
+        elseif ($prevBindOk) {
+            $bindAction = 'changed'
+            $notes.Add("The server now listens on the home network + Tailscale/VPN (all networks) instead of only $prevBind. If you had created the phone certificate (Settings > Phone & HTTPS), create it again - it is tied to the address.")
+        } else { $bindAction = 'set' }
+    } elseif ($LanIp) {
         if ($LanIp -eq '0.0.0.0' -or -not (Test-IPv4 $LanIp)) { throw "The address '$LanIp' is not a usable single IPv4 address (0.0.0.0 'all interfaces' is never set by the installer)." }
-        if ((& $has 'bindAddress') -and $cfg['bindAddress'] -ne $LanIp) { $notes.Add("The listening address changed from $($cfg['bindAddress']) to $LanIp. If you had created the phone certificate (Settings > Phone & HTTPS), create it again - it is tied to the address.") }
-        if (-not (& $has 'bindAddress') -or $cfg['bindAddress'] -ne $LanIp) { $cfg['bindAddress'] = $LanIp; $changed = $true }
-    } elseif (-not (& $has 'bindAddress')) {
-        $cfg['bindAddress'] = '127.0.0.1'; $changed = $true
+        if ($prevBindOk -and $prevBind -eq $LanIp) {
+            $bindAction = 'preserved'
+        } elseif ($prevBindOk -and $prevBind -ne $LanIp) {
+            $notes.Add("The listening address changed from $prevBind to $LanIp. If you had created the phone certificate (Settings > Phone & HTTPS), create it again - it is tied to the address.")
+            $cfg['bindAddress'] = $LanIp; $changed = $true; $bindAction = 'changed'
+        } else {
+            $cfg['bindAddress'] = $LanIp; $changed = $true; $bindAction = 'set'
+        }
+    } elseif ($prevBindOk) {
+        $bindAction = 'preserved'
+    } elseif ($prevBind) {
+        # invalid/non-IPv4 existing value: do not keep garbage and do not invent a LAN or 0.0.0.0
+        $cfg['bindAddress'] = '127.0.0.1'; $changed = $true; $bindAction = 'repaired-loopback'
+        $notes.Add("bindAddress in server.json ('$prevBind') was not a usable IPv4 address, so WavWiz listens on this PC only (127.0.0.1) until you set a home-network address (Repair) or edit server.json.")
+    } else {
+        $cfg['bindAddress'] = '127.0.0.1'; $changed = $true; $bindAction = 'set-loopback'
         $notes.Add('No home-network address was found, so WavWiz listens on this PC only (127.0.0.1). Phones and other PCs cannot connect until you set the address: run the installer again (Repair) or edit bindAddress in server.json and restart the WavWiz service.')
     }
     foreach ($kv in @(@('httpPort', $HttpPort), @('httpsPort', $HttpsPort), @('audioPort', $AudioPort), @('clockPort', $ClockPort))) {
@@ -400,7 +443,7 @@ function Get-ServerConfigPlan {
         $curOk = $cur -and (Test-Path -LiteralPath $cur)
         if (-not $curOk) { $cfg['ffmpegPath'] = $FfmpegPath; $changed = $true; if ($cur) { $notes.Add("ffmpegPath in server.json ($cur) did not exist; it now points at the ffmpeg that ships with WavWiz.") } }
     }
-    return [pscustomobject]@{ Config = $cfg; Existing = $existing; Changed = $changed; Notes = $notes.ToArray() }
+    return [pscustomobject]@{ Config = $cfg; Existing = $existing; Changed = $changed; Notes = $notes.ToArray(); BindAction = $bindAction; PreviousBindAddress = $prevBind }
 }
 function Test-HttpReady([string]$Url, [int]$TimeoutSec = 40) {
     if ((Test-TestHost) -and $env:WAVWIZ_TEST_PROBE_URL) { $Url = $env:WAVWIZ_TEST_PROBE_URL }

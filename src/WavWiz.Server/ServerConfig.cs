@@ -32,6 +32,14 @@ public sealed class ServerConfig
     /// <summary>0.5.0: AirPlay speakers as outputs. AirPlay 2 speakers are experimental (off by default); buffered AAC uses FfmpegPath, realtime ALAC otherwise.</summary>
     public bool AirPlay2Experimental { get; set; }
     public bool AirPlay2Buffered { get; set; } = true;
+    /// <summary>F261: optional remote HTTPS identity, served by exact SNI next to the local-CA leaf. "off" (default), "tailscale" (tailscale cert, needs the CT acknowledgement) or "pfx" (own certificate at RemoteCertPath; its password is DPAPI-protected in tls/remote-pfx.pwd, never here).</summary>
+    public string RemoteCertMode { get; set; } = "off";
+    /// <summary>F261: exact remote host name (e.g. box.tailnet.ts.net or music.example.com). Tailscale mode may fill it from Status.CertDomains when there is exactly one.</summary>
+    public string? RemoteHost { get; set; }
+    /// <summary>F261: path of the own PFX (pfx mode).</summary>
+    public string? RemoteCertPath { get; set; }
+    /// <summary>F261: when the admin acknowledged that a Tailscale certificate publishes the host name in public Certificate Transparency logs (ISO-8601). Empty = not acknowledged; tailscale mode stays inactive.</summary>
+    public string? RemoteCertCtAcknowledgedAt { get; set; }
     /// <summary>Tests only: behave as if every client were another PC (not serialized). Lets a loopback test exercise the 'other device' paths such as the https redirect and pairing codes.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool TestTreatAllClientsAsRemote { get; set; }
 
@@ -43,6 +51,8 @@ public sealed class ServerConfig
                                      : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WavWiz-server");
 
     public string ConfigPath => Path.Combine(DataDir, "server.json");
+    /// <summary>F261-A: the server.json this config was read from (an explicit path may differ from DataDir).</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string? LoadedFrom { get; set; }
     /// <summary>0.1.2: library DB is wavwiz.db. On first start after upgrade, rename unison.db → wavwiz.db (library + password kept).</summary>
     public string DbPath
     {
@@ -78,6 +88,7 @@ public sealed class ServerConfig
         {
             var text = File.ReadAllText(path).TrimStart('\uFEFF');           // tolerate a BOM written by some editors
             cfg = JsonSerializer.Deserialize<ServerConfig>(text, J) ?? cfg;
+            cfg.LoadedFrom = path;
             if (string.IsNullOrWhiteSpace(cfg.DataDir) || (dir == null && !Directory.Exists(cfg.DataDir) && explicitPath == null)) cfg.DataDir = Path.GetDirectoryName(path)!;
         }
         if (dir != null) cfg.DataDir = dir;
@@ -104,6 +115,20 @@ public sealed class ServerConfig
     {
         Directory.CreateDirectory(DataDir);
         File.WriteAllText(ConfigPath, JsonSerializer.Serialize(this, J), new System.Text.UTF8Encoding(false));
+    }
+
+    /// <summary>F261-A M1: writes ONLY the four remote-certificate keys into the on-disk server.json (read-modify-write), so environment overrides
+    /// (WAVWIZ_BIND, WAVWIZ_ALLOW_ALL_INTERFACES, ports, ...) and every other field on disk are never changed by the remote-HTTPS settings.</summary>
+    private string RemoteKeysPath => LoadedFrom ?? ConfigPath;
+    public void SaveRemoteCertKeys()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(RemoteKeysPath)!);
+        System.Text.Json.Nodes.JsonObject root;
+        try { root = File.Exists(RemoteKeysPath) ? System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(RemoteKeysPath).TrimStart('\uFEFF')) as System.Text.Json.Nodes.JsonObject ?? throw new InvalidOperationException() : new(); }
+        catch (Exception e) when (e is JsonException or InvalidOperationException) { throw new InvalidOperationException("server.json could not be read, so the remote HTTPS settings were not saved."); }
+        void Set(string k, string? v) { foreach (var old in root.Select(p => p.Key).Where(x => string.Equals(x, k, StringComparison.OrdinalIgnoreCase)).ToList()) root.Remove(old); root[k] = v; }
+        Set("remoteCertMode", RemoteCertMode); Set("remoteHost", RemoteHost); Set("remoteCertPath", RemoteCertPath); Set("remoteCertCtAcknowledgedAt", RemoteCertCtAcknowledgedAt);
+        var tmp = RemoteKeysPath + ".tmp"; File.WriteAllText(tmp, root.ToJsonString(J), new System.Text.UTF8Encoding(false)); File.Move(tmp, RemoteKeysPath, true);
     }
 
     /// <summary>Spec 13: never 0.0.0.0 / :: unless the user explicitly opted in.</summary>

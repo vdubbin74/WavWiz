@@ -1,5 +1,5 @@
 { "id": "/", "name": "WavWiz", "short_name": "WavWiz", "description": "Play your music in sync on every speaker in the house.",
-  "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#000614", "theme_color": "#FF3C00",
+  "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait", "background_color": "#000614", "theme_color": "#FF3C00",
   "icons": [
     { "src": "/assets/logo-180.png?v=f237", "sizes": "180x180", "type": "image/png", "purpose": "any" },
     { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

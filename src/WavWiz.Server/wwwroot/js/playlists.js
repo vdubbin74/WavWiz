@@ -6,7 +6,7 @@ import { canControl, dropTarget, sheet, playNow, addToQueue, MIME, isRemoteRef, 
 const PLMIME = 'application/x-wavwiz-plitem';
 
 /** Saved playlists: create, play, rename, delete, add by drag/menu, and reorder / remove songs (drag on desktop, arrows on phone). */
-export function playlistsView(S) {
+export function playlistsView(S, opts = {}) {
   const root = h('div'); let openId = null;
   const act = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, true); return null; } };
 
@@ -63,6 +63,8 @@ export function playlistsView(S) {
       h('p', { class: 'dim small' }, `${items.length} items${total ? ' • ' + fmtDur(total) : ''}`), items.length ? ul : h('p', { class: 'dim' }, 'Empty. Add songs from the Library.'), tail);
   }
   window.addEventListener('wavwiz:playlists', () => { openId ? drawOne(openId) : drawList(); });
-  drawList();
+  // F250-P2: a lazy phone Library adapter owns its first/serialized reload.
+  // Direct routes and desktop retain the original eager initialization.
+  if (!opts.deferInitial) drawList();
   return { el: root, reload: () => (openId ? drawOne(openId) : drawList()) };
 }

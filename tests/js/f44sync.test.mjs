@@ -44,8 +44,8 @@ test('F44: pairClocksEdge pairs on the step, falls back without one; outputDelay
   assert.equal(R.pairClocksEdge([{ ctxSec: 1, perfMs: 10 }, { ctxSec: 1, perfMs: 11 }]).edge, undefined);
   assert.equal(R.outputDelaySec({ outputLatency: 0.02, baseLatency: 0.005 }), 0.02); assert.equal(R.outputDelaySec({ outputLatency: 0, baseLatency: 0.005 }), 0.005); assert.equal(R.outputDelaySec({}), 0);
 });
-test('F44: OffsetEstimator.reset forgets; start/resume/visibility/statechange all re-measure (room.js)', async () => {
+test('F44: OffsetEstimator.reset forgets; start/resume/unhealthy visibility/statechange re-measure (room.js)', async () => {
   const e = new R.OffsetEstimator(); e.add(0, 5000, 5100, 10000); e.reset(); assert.equal(e.offsetUs, null); assert.equal(e.samples.length, 0);
   const { readFileSync } = await import('node:fs'); const s = readFileSync(`${js}/room.js`, 'utf8');
-  for (const w of ["resync('start')", "resync('visible')", "'ctx ' + this._lastSt + '>running'", 'wavwiz.sync.log', 'outputDelaySec(this.ctx)']) assert.ok(s.includes(w), w);
+  for (const w of ["resync('start')", "resync('visible recovery')", "'ctx ' + this._lastSt + '>running'", 'wavwiz.sync.log', 'outputDelaySec(this.ctx)']) assert.ok(s.includes(w), w);
 });

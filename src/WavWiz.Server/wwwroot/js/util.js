@@ -64,7 +64,7 @@ export const fmtDur = ms => { const s = Math.floor(ms / 1000), hh = Math.floor(s
 export function dialog(title, body, buttons = [], opts = {}) {
   const d = h('dialog', { 'aria-label': title, class: opts.cls || '' });
   const close = () => { d.close(); d.remove(); opts.onClose && opts.onClose(); };
-  d.append(h('header', null, h('span', { class: 'grow' }, title), h('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: close }, '✕')));
+  d.append(h('header', null, h('span', { class: 'grow' }, title), h('button', { class: 'iconbtn ww-close', 'aria-label': 'Close', onclick: close }, '✕')));
   d.append(h('div', { class: 'body' }, body));
   if (buttons.length) d.append(h('footer', null, buttons.map(b => h('button', { class: 'btn ' + (b.cls || ''), onclick: async ev => { const r = b.onclick ? await b.onclick(ev, d) : null; if (r !== false && !b.keep) close(); } }, b.text))));
   d.addEventListener('cancel', () => { opts.onClose && opts.onClose(); });

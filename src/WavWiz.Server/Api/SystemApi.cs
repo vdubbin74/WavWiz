@@ -16,13 +16,13 @@ public static class SystemApi
     private static readonly HashSet<string> StringSettings = new() { "server.name", "acoustid.apiKey" };
     private static readonly Dictionary<string, string[]> ChoiceSettings = new() { ["playback.replayGain"] = Media.Loudness.Modes, ["calibration.micDefault"] = new[] { "pc", "phone", "ear" }, ["playback.streamRate"] = new[] { "48000", "96000" } };     // 0.4.9 F77     // 0.1.3
 
-    public static object StatusDto(Services s) => new
+    public static object StatusDto(Services s, bool admin = false) => new
     {
         appVersion = WavWizInfo.Version, artCv = Library.ArtService.UrlVersion, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
         uptimeSec = (long)(DateTime.UtcNow - s.Started).TotalSeconds, bind = s.Cfg.BindAddress,
         ports = new { http = s.Cfg.HttpPort, https = s.Cfg.HttpsPort, audio = s.Audio.Port, clock = s.Clock.Port },
         ffmpeg = new { ok = File.Exists(s.FfmpegPath) || s.FfmpegPath == "ffmpeg", path = s.FfmpegPath },
-        tls = new { enabled = s.Ca.Enabled, rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewedAt = s.Ca.RegeneratedFromLegacyAt },
+        tls = new { enabled = s.Ca.Enabled, rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewedAt = s.Ca.RegeneratedFromLegacyAt, renewalError = s.Ca.LastRenewalError, remote = admin ? s.RemoteTls?.Status() : s.RemoteTls?.PublicStatus() },   // F261-A L4: host name and errors for admins only
         library = new { tracks = s.Library.TrackCount(), scanning = s.Scanning, progress = s.Library.Progress is { } p ? new { done = p.Done, total = p.Total, root = p.Root } : null },
         playersConnected = s.Audio.Sessions.Count, state = s.Conductor.State.ToString().ToLowerInvariant(),
         warnings = Warnings(s),
@@ -40,7 +40,7 @@ public static class SystemApi
 
     public static void Map(RouteGroupBuilder g, WebApplication app, Services s)
     {
-        g.MapGet("/status", () => Results.Json(StatusDto(s))).Req(Role.View);
+        g.MapGet("/status", (HttpContext c) => Results.Json(StatusDto(s, ZoneApi.IsAdmin(c)))).Req(Role.View);
 
         // ---- library ----
         g.MapGet("/library/roots", () => Results.Json(s.Library.Roots())).Req(Role.View);
@@ -119,7 +119,26 @@ public static class SystemApi
             if (!IPAddress.TryParse(s.Cfg.BindAddress, out var ip) || IPAddress.IsLoopback(ip) && b.Bool("allowLoopback") != true)
                 return Ext.Bad("Choose the PC's LAN address first (installer or server.json 'bindAddress'); a certificate for 127.0.0.1 is useless on a phone.", 409);
             try { s.Ca.Enable(ip, b.Bool("recreate") == true); } catch (Exception e) { return Ext.Bad("Could not create the certificate: " + e.Message, 500); }
-            return Results.Json(new { ok = true, rootSha256 = s.Ca.RootSha256, setupUrl = $"http://{ip}:{s.Cfg.HttpPort}/tls/setup", note = "HTTPS uses the new certificate for new connections; restart the WavWiz service to apply it to the HTTPS port immediately." });
+            return Results.Json(new { ok = true, rootSha256 = s.Ca.RootSha256, setupUrl = $"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/tls/setup", note = "HTTPS uses the new certificate for new connections; restart the WavWiz service to apply it to the HTTPS port immediately." });
+        }).Req(Role.Admin);
+
+        // F261: remote HTTPS identity (default off). Tailscale needs the one-time Certificate Transparency acknowledgement; the PFX password is DPAPI-protected, never in server.json or logs.
+        g.MapPost("/tls/remote", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body(); var rt = s.RemoteTls; if (rt == null) return Ext.Bad("Remote HTTPS is unavailable.", 503);
+            var mode = (b.Str("mode") ?? "off").Trim().ToLowerInvariant();
+            if (mode is not ("off" or "tailscale" or "pfx")) return Ext.Bad("mode must be off, tailscale or pfx", 400);
+            if (mode == "tailscale" && string.IsNullOrWhiteSpace(s.Cfg.RemoteCertCtAcknowledgedAt))
+            {
+                if (b.Bool("acknowledgeCt") != true) return Results.Json(new { ok = false, needsAck = true, error = "Acknowledge the Certificate Transparency disclosure first.", disclosure = Tls.RemoteCertStore.CtDisclosure }, statusCode: 409);
+                s.Cfg.RemoteCertCtAcknowledgedAt = DateTimeOffset.UtcNow.ToString("o");
+            }
+            if (b.Str("host") is { } host) s.Cfg.RemoteHost = Tls.RemoteCertStore.NormalizeHost(host);
+            if (b.Str("certPath") is { } cp) s.Cfg.RemoteCertPath = string.IsNullOrWhiteSpace(cp) ? null : cp.Trim();
+            if (b.Str("pfxPassword") is { } pw) { try { rt.SetPfxPassword(pw); } catch (InvalidOperationException e) { return Ext.Bad(e.Message, 409); } }
+            s.Cfg.RemoteCertMode = mode; try { s.Cfg.SaveRemoteCertKeys(); } catch (InvalidOperationException e) { return Ext.Bad(e.Message, 500); }   // F261-A M1: never cfg.Save()
+            await rt.RefreshAsync();
+            return Results.Json(new { ok = true, remote = rt.Status() });
         }).Req(Role.Admin);
 
         PhoneApi.Map(app, s);

@@ -14,9 +14,10 @@ import { speakerSettings } from './spkset.js';
 import { airplayDevicesStrip } from './airplaydevices.js';   // F159
 import { mixerButton } from './mixer.js';   // 0.4.8 F49
 import { pulse } from './motion.js';
+import { lockBody, unlockBody } from './sheetlock.js';   // F262-fix-B: real iOS body lock under the sheet
 import { itemArtUrl } from './art.js';
 import * as Z from './zones40.js';
-import { attachCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
+import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
@@ -121,7 +122,7 @@ export function btHint(S, ctl) {
   return h('div', { class: 'dbthint', role: 'status', 'data-k': zs.map(z => z.id).join(',') }, zs.map(z => h('div', { class: 'row' },
     h('span', { class: 'grow small' }, h('b', null, z.name), ': Bluetooth reconnected - recalibrate?'),
     ro(h('button', { class: 'btn sm', onclick: () => { btState.pending.delete(z.id); openCalibration(S, ctl.refreshAll, z.id); ctl.redraw?.(); } }, 'Recalibrate'), canTune(S, z), OWN_HINT),
-    h('button', { class: 'btn sm ghost', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { btState.pending.delete(z.id); ev.target.closest('.row').remove(); } }, '✕'))));
+    h('button', { class: 'btn sm ghost ww-close', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { btState.pending.delete(z.id); ev.target.closest('.row').remove(); } }, '✕'))));
 }
 const two = n => String(n).padStart(2, '0');
 /** "6:40 PM" today, "Oct 9" before (pure, local time). */
@@ -622,6 +623,22 @@ function cardSettings(S, ctl, z) {
   };
   return el;
 }
+/** F264: where a popup menu goes (viewport px). Below the button, right edges aligned; flips up when it does not fit below;
+ *  clamped 8 px inside the screen; maxHeight when neither side fits. Pure. */
+export function menuPlace(btn, menu, vp, gap = 4, pad = 8) {
+  const w = Math.min(menu.width, vp.w - 2 * pad);
+  let left = btn.right - w; left = Math.max(vp.x + pad, Math.min(vp.x + vp.w - pad - w, left));
+  const below = vp.y + vp.h - pad - (btn.bottom + gap), above = btn.top - gap - (vp.y + pad);
+  const up = menu.height > below && above > below;
+  const room = up ? above : below, maxHeight = menu.height > room ? Math.max(80, room) : 0;
+  const hgt = maxHeight || menu.height;
+  const top = up ? btn.top - gap - hgt : btn.bottom + gap;
+  return { left: Math.round(left), top: Math.round(top), up, maxHeight };
+}
+/** F264: what the speaker page's Zone row shows (its zone + the zone list). Pure. */
+export const zoneSig = (z, groups) => JSON.stringify([(groups || []).find(g => (g.deviceIds || []).includes(z.id))?.id ?? null, (groups || []).map(g => [g.id, g.name])]);
+/** F264: apply one accepted PATCH /groups/{id} (movePlan op) to the local state. Pure on S. */
+export function applyGroupOp(S, op) { const g = (S.groups || []).find(x => x.id === op.id); if (g) { g.deviceIds = [...op.deviceIds]; if (op.name != null) g.name = op.name; } return g || null; }
 /** More ▾ - Rename, Set as reference, Delay history, Forget (admin-only items stay visible, read-only, for everyone else). */
 function moreMenu(S, ctl, z, cur, histHost = null) {
   const admin = isAdmin(S);
@@ -636,7 +653,18 @@ function moreMenu(S, ctl, z, cur, histHost = null) {
   const btn = h('button', { type: 'button', class: 'btn dmorebtn', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); menu.hidden ? open() : close(); } }, 'More ▾');
   const outside = ev => { if (!wrap.contains(ev.target)) close(); };
   const esc = ev => { if (ev.key === 'Escape' && !menu.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); btn.focus(); } };
-  function open() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); menu.querySelector('button:not([disabled])')?.focus(); }
+  // F264: place the open menu in viewport coordinates (fixed), sized to its content, clamped to the screen, flipped up when no room below.
+  function place() {
+    if (!btn.closest('.pd42-sheet')) return;   // phone sheet only (fixed, no transformed ancestors); desktop keeps the CSS anchor
+    const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1, v = window.visualViewport;
+    Object.assign(menu.style, { position: 'fixed', left: '0px', top: '0px', right: 'auto', bottom: 'auto', maxHeight: '' });
+    const b = btn.getBoundingClientRect(), m = menu.getBoundingClientRect();
+    const pos = menuPlace(b, { width: m.width, height: m.height }, { x: v?.offsetLeft || 0, y: v?.offsetTop || 0, w: v?.width || innerWidth, h: v?.height || innerHeight });
+    menu.style.left = pos.left / z + 'px'; menu.style.top = pos.top / z + 'px';
+    if (pos.maxHeight) { menu.style.maxHeight = pos.maxHeight / z + 'px'; menu.style.overflowY = 'auto'; }
+    menu.dataset.dir = pos.up ? 'up' : 'down';
+  }
+  function open() { menu.hidden = false; place(); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); menu.querySelector('button:not([disabled])')?.focus(); }
   function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); flushSoon(); }
   wrap.append(btn, menu); return wrap;
 }
@@ -798,12 +826,22 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 /** 0.4.9 F82: copy the live parts (now-playing lines, volume bars and %, tag rows) of a freshly built tree into the shown one, node for
  *  node; 0 (caller rebuilds) when the two do not line up. A part the user is using (focus, a dragged slider) is left alone. */
 const LIVE42 = ['.zl-now', '.qb42-t', '.qb42-vol', '.sp42-v', '.sp42-tags', '.ztagrow'];   // F232: title PLAYING/PAUSED with live now
+/** DIG-R1: collapse/expand lives on .zsp42 / .qb42-exp — outside patchRows42 skel — so compare explicitly. */
+export function foldSig42(root) {
+  return [...root.querySelectorAll('section.qb42[data-leader-id]')].map(e => {
+    const list = e.querySelector('.zsp42');
+    return [e.dataset.leaderId, e.classList.contains('zfold42') ? 'F' : '', e.classList.contains('idle') ? 1 : 0, e.classList.contains('qb42-folded') ? 1 : 0,
+      list ? (list.hidden ? 1 : 0) : 0, list?.classList.contains('zsp42-collapsed') ? 1 : 0, e.querySelector('.qb42-exp') ? 1 : 0].join(':');
+  }).join('|');
+}
 export function patchLive42(cur, fresh) {
+  // DIG-R1: structural fold/expand/idle must rebuild (fresh listeners) before any in-place live patch
+  if (foldSig42(cur) !== foldSig42(fresh)) return 0;
   const pairs = [];
   for (const sel of LIVE42) { const a = cur.querySelectorAll(sel), b = fresh.querySelectorAll(sel); if (a.length !== b.length) return 0; a.forEach((x, i) => pairs.push([x, b[i]])); }
   const ae = document.activeElement; let all = 1;
-  for (const [x, y] of pairs) { if (x.outerHTML === y.outerHTML) continue; if ((ae && x.contains(ae)) || x.querySelector('input:active') || hov42(x)) { all = 2; continue; } x.replaceWith(y); }
-  // F232: idle class + aria-label live with play/pause (sig42 skips now.state so titles used to stick)
+  for (const [x, y] of pairs) { if (x.matches('.zl-now') && Z.patchNowLine(x, y)) continue; if (x.outerHTML === y.outerHTML) continue; if ((ae && x.contains(ae)) || x.querySelector('input:active') || hovZone42(x)) { all = 2; continue; } x.replaceWith(y); }
+  // F232: idle class + aria-label live with play/pause when fold structure already matches
   for (const y of fresh.querySelectorAll('section.qb42[data-leader-id]')) {
     const x = cur.querySelector(`section.qb42[data-leader-id="${CSS.escape(y.dataset.leaderId)}"]`);
     if (!x) continue;
@@ -814,18 +852,30 @@ export function patchLive42(cur, fresh) {
 }
 /** F151: same layout (the same rows in the same order) -> replace only the rows / zone cards / box shells that changed, return 1 (2 = a row in
  *  use was left for later); 0 = layout differs, caller rebuilds. */
-const hov42 = x => !!(typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches && x.querySelector?.('button:hover,a:hover,[role=switch]:hover,[title]:hover'));   // F151b + F210: only real hover (phone sticky :hover must not defer swaps)
+// F265: real-mouse hover, not the media query alone. On the PC app (WebView2 on a touch-capable / pen PC) `(hover: hover)` can be
+// false although a mouse is in use, so hov42 never saw the pointer: every status poll swapped the hovered zone mute, now-line,
+// ON/OFF pill, PLAYING title and REF tag (cursor flicker, tooltip gone after ~1 s). The last pointer's type decides; touch still never defers.
+let lastPtr42 = null;
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function')
+  for (const t of ['pointermove', 'pointerover', 'pointerdown']) document.addEventListener(t, e => { lastPtr42 = e.pointerType || 'mouse'; }, { capture: true, passive: true });
+/** F265: may :hover be trusted? last pointer mouse/pen = yes, touch = no; none seen yet = any-hover / hover media. Pure on (ptr, mm). */
+export const hoverReal = (ptr, mm = typeof matchMedia === 'function' ? matchMedia : null) =>
+  ptr ? ptr !== 'touch' : !!(mm && (mm('(any-hover: hover)').matches || mm('(hover: hover)').matches));
+const hov42 = x => !!(hoverReal(lastPtr42) && x?.matches?.(':hover'));   // F151b + F210 + F265: pointer anywhere in the part (PLAYING text, REF tag, mute, pill, now-line) keeps it until it leaves; touch never defers
+/** F265: zone-wide - while the pointer is anywhere in a zone box/card, nothing inside it is swapped (layout shifts under the pointer also flicker). */
+const hovZone42 = x => hov42(x) || hov42(x?.closest?.('section.qb42,.zcard42'));
 const ROWS42 = '.qb42,.zcard42,.sp42';
 const rowId42 = x => (x.dataset.leaderId || '') + '|' + (x.dataset.groupId || '') + '|' + (x.dataset.deviceId || '') + '|' + x.tagName;
 export function patchRows42(cur, fresh) {
   if (cur.outerHTML === fresh.outerHTML) return 1;
+  if (foldSig42(cur) !== foldSig42(fresh)) return 0;   // DIG-R1: skel drops .zsp42 collapse markers
   const a = [...cur.querySelectorAll(ROWS42)], b = [...fresh.querySelectorAll(ROWS42)];
   if (a.length !== b.length || a.some((x, i) => rowId42(x) !== rowId42(b[i]))) return 0;
   const LS = LIVE42.join(','), la = [...cur.querySelectorAll(LS)], lb = [...fresh.querySelectorAll(LS)]; if (la.length !== lb.length) return 0;
   const skel = t => { const c = t.cloneNode(true); for (const n of c.querySelectorAll(LS)) n.replaceChildren(); for (const n of [...c.querySelectorAll(ROWS42)].reverse()) { if (!n.querySelector(ROWS42)) n.replaceChildren(); for (const at of [...n.attributes]) n.removeAttribute(at.name); } return c.outerHTML; };
   if (skel(cur) !== skel(fresh)) return 0;   // something outside the rows changed: rebuild
   const html = b.map(y => y.outerHTML), lhtml = lb.map(y => y.outerHTML), shell = x => x.cloneNode(false).outerHTML;
-  const ae = document.activeElement, inUse = x => (ae && x.contains(ae)) || !!x.querySelector('input:active') || !!(dragEl && x.contains(dragEl)) || hov42(x);
+  const ae = document.activeElement, inUse = x => (ae && x.contains(ae)) || !!x.querySelector('input:active') || !!(dragEl && x.contains(dragEl)) || hovZone42(x);
   let all = 1;
   // leaf rows whose contents changed are swapped whole (fresh listeners); an outer box only gets its attributes copied
   for (let i = a.length - 1; i >= 0; i--) {
@@ -834,7 +884,7 @@ export function patchRows42(cur, fresh) {
     if (shell(x) !== shell(y)) { for (const at of [...x.attributes]) if (!y.hasAttribute(at.name)) x.removeAttribute(at.name); for (const at of [...y.attributes]) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value); }
   }
   // live parts outside the swapped rows (box heads: now playing, volume)
-  la.forEach((x, i) => { if (!cur.contains(x) || x.outerHTML === lhtml[i]) return; if (inUse(x)) { all = 2; return; } x.replaceWith(lb[i]); });
+  la.forEach((x, i) => { if (!cur.contains(x)) return; if (x.matches('.zl-now') && Z.patchNowLine(x, lb[i])) return; if (x.outerHTML === lhtml[i]) return; if (inUse(x)) { all = 2; return; } x.replaceWith(lb[i]); });
   return all;
 }
 function tree42Kit(S, ctl, X) {
@@ -844,20 +894,28 @@ function tree42Kit(S, ctl, X) {
   // an AirPlay session sends those all the time (metadata, progress, the phone's volume) and each used to rebuild the whole tree
   const live42 = () => JSON.stringify([S.cast?.active ? [S.cast.kind, S.cast.zones, S.cast.name] : 0, (S.zones || []).map(z => Math.round(z.volume)),
     (S.groups || []).map(g => [g.now?.state, g.now?.title, g.now?.artist, g.now?.durationMs, Math.floor((g.now?.positionMs || 0) / 10000), (g.now?.positionMs || 0) > 0]), S.jb?.own ? [S.jb.now?.title, S.jb.now?.state] : null]);
+  const openSig42 = () => { let a = '', b = ''; try { a = sessionStorage.getItem('wavwiz.qb42.open') || ''; } catch { /* */ } try { b = localStorage.getItem('wavwiz.zfold') || ''; } catch { /* */ } return a + '|' + b; };   // F266: zone folds rebuild the tree   // DIG-R1: idle expand preference participates in cache
   const sig42 = () => JSON.stringify([!!S.cast?.active, (S.zones || []).map(z => [z.id, z.name, z.enabled, z.connected, z.muted, z.volLocked, z.volCap, z.room?.state, z.reference, chosenOutput(z)?.notCalibrated, z.outputs?.length]),
-    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id)]);   // 0.4.6 F30: a zone reorder (local) redraws the tree
+    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), openSig42()]);   // 0.4.6 F30 + DIG-R1 open pref
   const st42 = { get spk() { return X.spk; }, get zone() { return X.zsel; },
     onZone: id => { X.zsel = id; X.spk = null; try { sessionStorage.removeItem('wavwiz.spk'); } catch { /* private mode */ } if (X.size === 'expanded' || X.size === 'phone') X.draw(true); else { X.f69from = X.size; ctl.setDevSize?.('expanded'); } },
     onSpk: id => { const z = (S.zones || []).find(x => x.id === id); const g = (S.groups || []).find(x => (x.deviceIds || []).includes(id)); X.zsel = g ? g.id : null; if (X.size === 'expanded' || X.size === 'phone') X.setSpk(id); else { X.f69from = X.size; X.spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } void z; } };
-  const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock };
+  // F250-P8: phone Devices inventory uses max-based bars (kit.phoneMaxBars); desktop Full/Roomy/Expanded keep average zoneLevel.
+  const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock, phoneMaxBars: X.size === 'phone' };
+  let topen = '', tmem = '';
+  // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
+  const memSig42 = () => JSON.stringify((S.groups || []).map(g => [g.id, g.deviceIds || []]));
   const treeNode = force => {
-    const sg = sig42(), lv = live42(); if (!force && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
+    const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42(), memMoved = !!tnode && mem !== tmem;
+    // DIG-R1: open preference change always rebuilds (foldSig also guards patch paths)
+    if (!force && openSg === topen && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
     // F151: a status flap (online / buffering / muted / cap) changed sig42 but not the tree's layout: swap only the rows that differ instead of
     // rebuilding the whole tree (that rebuild was the occasional "Devices reloads" flash: art re-decoded, scroll + hover reset)
-    if (!force && tnode && tnode.isConnected) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { tsig = sg; if (r === 1) tlive = lv; return tnode; } }
-    if (!force && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b: pointer on a tree control: defer the full rebuild (tsig unchanged -> retried next tick)
+    if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
+    // DIG-amend2 R1: explicit idle expand (openSg!==topen) must rebuild even while pointer stays on Show speakers; keep hover defer only for background refreshes.
+    if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b (F269: never for a membership move)
     const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : '' } : null;
-    tnode = treeEl(S, ctl, kit42, st42); tsig = sg; tlive = lv; tnode._top = top;
+    tnode = treeEl(S, ctl, kit42, st42); tsig = sg; tlive = lv; topen = openSg; tmem = mem; tnode._top = top;
     if (keep) queueMicrotask(() => { if (document.activeElement?.closest?.('.tree42')) return;   // 0.4.9 F82: the same control (speaker, else zone, by its first class) gets focus back
       const scope = keep.id ? tnode.querySelector(`[data-device-id="${keep.id}"]`) : keep.gid ? tnode.querySelector(`[data-group-id="${keep.gid}"]`) : tnode;
       const t = (keep.cls && scope?.querySelector('.' + CSS.escape(keep.cls))) || (keep.id ? scope?.querySelector('.sp42-n') : null); t?.focus({ preventScroll: true }); });
@@ -882,7 +940,7 @@ function tree42Kit(S, ctl, X) {
       pnl = h('div', { class: 'd42-pane', 'data-key': key });
       if (spZ) {
         const sp = speakerSettings(S, ctl, spZ, { onDone: () => X.setSpk(null), outputPicker: zz => outputPicker(S, ctl, zz), promptName, onRename: z => promptName(`Rename ${z.name}`, z.name, async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }),
-          tags: z => tagEls3(cardTags3(z)), zoneRow: z => zoneRow42(z, groups),
+          tags: z => tagEls3(cardTags3(z)), zoneRow: z => zoneRow42(z, orderedGroups(S.groups || [])),   // F264: live groups, not the build-time snapshot
           calibrate: zz => h('button', { type: 'button', class: 'btn calbtn' + (zz.badge === 'recheck' || zz.badge === 'uncalibrated' ? ' primary' : ''), disabled: !(canTune(S, zz) && zz.connected && !zz.reference) || undefined, title: zz.reference ? 'This is the reference speaker.' : '', onclick: () => openCalibration(S, ctl.refreshAll, zz.id, { quick: true }) }, 'Calibrate'),
           calhelp: () => calHelpLink('calhelp-dev'),   // 0.4.5 F29
           more: zz => moreMenu(S, ctl, zz, chosenOutput(zz), null) });
@@ -892,15 +950,31 @@ function tree42Kit(S, ctl, X) {
       pnl._sig = sig42();
       const was = dcol.querySelector('.d42-pane');   // F151: a rebuilt pane that looks the same keeps the shown one (its fade-in replayed = flash)
       if (was && was.dataset.key === key && !spZ && !jbSel && was.innerHTML === pnl.innerHTML) { was._sig = pnl._sig; pnl.firstChild?._destroy?.(); pnl = was; }
-    } else if (spZ) pnl.firstChild?._patch?.(spZ);
-    reconcile(dcol, [crumbEl, hint, pnl]);
+    } else if (spZ) { pnl.firstChild?._patch?.(spZ); pnl.firstChild?._resumeLive?.(); }   // DIG-amend2 R3b: same-key reopen restarts meters after teardown
+    // F263: polling minted fresh breadcrumb/hint nodes even when their markup was identical.
+    // Their handlers read X at click time; retaining equal chrome cannot retain a stale zone object.
+    const chrome = el => { const old = dcol.querySelector(':scope > .' + el.className.split(' ')[0]); return old?.outerHTML === el.outerHTML ? old : el; };
+    reconcile(dcol, [chrome(crumbEl), chrome(hint), pnl]);
   }
   /** The speaker page's ZONE row: which zone it is in + Move to zone. */
   function zoneRow42(z, groups) {
-    const mine = groups.find(g => (g.deviceIds || []).includes(z.id)), admin = isAdmin(S);
-    const sel = wsel({ class: 'spk-zsel', 'aria-label': 'Move to zone', 'data-act': 'move-zone', onchange: async ev => { const v = ev.target.value, to = v === '' ? null : +v; try { for (const op of movePlan(S.groups, z.id, to)) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); toast(to == null ? `${z.name} is now unassigned` : `${z.name} moved`); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } },
+    const mine = groups.find(g => (g.deviceIds || []).includes(z.id)), admin = isAdmin(S), was = mine ? String(mine.id) : '';
+    // F264: after a successful move apply the new membership to S.groups at once (row, breadcrumb, tree repaint now, not on the next poll);
+    // a failed move puts the select back on the current zone.
+    const sel = wsel({ class: 'spk-zsel', 'aria-label': 'Zone (choose another to move this speaker)', 'data-act': 'move-zone', onchange: async ev => {
+      const v = ev.target.value, to = v === '' ? null : +v;
+      try {
+        for (const op of movePlan(S.groups, z.id, to)) { await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); applyGroupOp(S, op); }
+        if (X.spk === z.id) X.zsel = to;
+        toast(to == null ? `${z.name} is now unassigned` : `${z.name} moved`);
+        try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* */ }
+        ctl.refreshAll?.();
+      } catch (e) { try { ev.target.value = was; } catch { /* */ } toast(e.message, true); ctl.refreshAll?.(); }
+    } },
       h('option', { value: '', selected: !mine }, 'Unassigned'), ...groups.map(g => h('option', { value: g.id, selected: mine?.id === g.id }, g.name)));
-    return h('div', { class: 'spk-zonerow' }, h('span', { class: 'dlbl' }, 'ZONE'), h('b', { class: 'spk-zname' }, mine?.name || 'Unassigned'), h('span', { class: 'dlbl' }, 'MOVE TO ZONE'), ro(sel, admin, 'Only an administrator can change zones.'));
+    const row = h('div', { class: 'spk-zonerow' }, h('span', { class: 'dlbl' }, 'Zone'), ro(sel, admin, 'Only an administrator can change zones.'));   // F264: one row; the select shows the current zone
+    row._zsig = zoneSig(z, groups);
+    return row;
   }
   return { treeNode, restoreScroll, paintDetail, sig42 };
 }
@@ -1083,17 +1157,105 @@ export function devicesView(S, ctl) {
   // 0.4.6 F41: zone / speaker settings open as a full-width sheet over the tree (header: Back + title + Done); the tree stays underneath, so closing
   // always lands on it where it was. Fits 390 px.
   // 0.4.9 F69: the sheet is a history entry, so the browser / iOS back gesture closes it too
-  const closeSheet = () => { if (history.state?.pd42) { history.back(); return; } X.zsel = null; X.setSpk(null); };
-  window.addEventListener('popstate', () => { if ((X.spk != null || X.zsel != null) && !history.state?.pd42) { X.zsel = null; X.setSpk(null); } });
+  // F246: sheet is portaled to document.body while open so fixed+z-index clears .mini/.tabbar stacking (not a 96px pad)
+  // DIG-R3: outer Back discards+tears down; outer Done commits like inner Done; F246 portal/focus ownership preserved
+  const sheetSp = () => pdet.querySelector('.spkset');
+  const navCloseSheet = () => { if (history.state?.pd42) { history.back(); return; } X.zsel = null; X.setSpk(null); };
+  // DIG-amend2 R3: commit failure keeps sheet open; successful Done marks baseline so popstate must not discard.
+  let sheetCommitted = false;
+  const endSheetSession = async (mode) => {
+    const sp = sheetSp();
+    if (!sp) return true;
+    try {
+      if (mode === 'commit' && sp._commitSession) {
+        const ok = await sp._commitSession();
+        if (ok === false) return false;   // R3e: failed sound save — retain retryable edit
+      } else if (mode === 'discard' && sp._discardSession) await sp._discardSession();
+    } catch { /* keep closing on unexpected errors */ }
+    try { sp._teardownLive?.(); } catch { /* */ }
+    return true;
+  };
+  const closeSheetBack = async () => { sheetCommitted = false; try { pdet.querySelectorAll('.vbar input').forEach(i => i._p8cancel?.()); } catch { /* */ } await endSheetSession('discard'); navCloseSheet(); };
+  const closeSheetDone = async () => {
+    const ok = await endSheetSession('commit');
+    if (ok === false) return;
+    sheetCommitted = true;
+    navCloseSheet();
+  };
+  window.addEventListener('popstate', async () => {
+    if ((X.spk != null || X.zsel != null) && !history.state?.pd42) {
+      if (sheetCommitted) { sheetCommitted = false; X.zsel = null; X.setSpk(null); return; }
+      await endSheetSession('discard');
+      X.zsel = null; X.setSpk(null);
+    }
+  });
   const ptitle = h('b', { class: 'pd42-title ell' });
   const pwrap = h('div', { class: 'pd42-wrap pd42-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Settings' },
-    h('div', { class: 'pd42-head' }, h('button', { type: 'button', class: 'btn sm pd42-close', 'data-act': 'pd-close', onclick: closeSheet }, '‹ Back'), ptitle,
-      h('button', { type: 'button', class: 'btn sm pd42-done', 'data-act': 'pd-done', onclick: closeSheet }, 'Done')), pdet);
-  pwrap.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.stopPropagation(); closeSheet(); } });
-  let wasSel = spk != null, treeTop = 0;
+    h('div', { class: 'pd42-head' }, h('button', { type: 'button', class: 'btn sm pd42-close', 'data-act': 'pd-close', onclick: () => { void closeSheetBack(); } }, '‹ Back'), ptitle,
+      h('button', { type: 'button', class: 'btn sm pd42-done', 'data-act': 'pd-done', onclick: () => { void closeSheetDone(); } }, 'Done')), pdet);
+  // F246: own focus, keyboard and app inertness for the lifetime of the portaled sheet.
+  let wasSel = false, treeTop = 0, opener = null, lastTrigger = null, lockedApp = null, appWasInert = false;
+  const focusable = () => [...pwrap.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')]
+    .filter(e => !e.disabled && e.tabIndex >= 0 && e.getClientRects().length && !e.closest('[inert]'));
+  const focusFirst = () => (focusable()[0] || pwrap).focus({ preventScroll: true });
+  const nestedDialog = () => document.querySelector('dialog[open]');
+  const containFocus = ev => { if (!pwrap.contains(ev.target) && !nestedDialog()) focusFirst(); };
+  const guardKeys = ev => { if (!pwrap.contains(ev.target) && !nestedDialog()) { ev.preventDefault(); ev.stopImmediatePropagation(); focusFirst(); } };
+  pwrap.tabIndex = -1;
+  pwrap.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Escape') { ev.preventDefault(); void closeSheetBack(); }
+    if (ev.key === 'Tab') {
+      const fs = focusable(), i = fs.indexOf(document.activeElement);
+      if (!fs.length || i < 0 || (ev.shiftKey ? i === 0 : i === fs.length - 1)) {
+        ev.preventDefault(); (ev.shiftKey ? fs.at(-1) : fs[0])?.focus({ preventScroll: true });
+      }
+    }
+  });
+  root.addEventListener('click', ev => { if (!wasSel) lastTrigger = ev.target.closest('button,[role=button],[tabindex]'); }, true);
+  const rememberOpener = () => {
+    const e = root.contains(document.activeElement) ? document.activeElement : lastTrigger;
+    opener = e ? { el: e, id: e.closest('[data-device-id]')?.dataset.deviceId, gid: e.closest('[data-group-id]')?.dataset.groupId,
+      cls: typeof e.className === 'string' ? e.className.trim().split(/\s+/)[0] : '' } : null;
+  };
+  const returnFocus = () => {
+    if (!root.isConnected || !opener) return;
+    const scope = opener.id ? root.querySelector(`[data-device-id="${CSS.escape(opener.id)}"]`) : opener.gid ? root.querySelector(`[data-group-id="${CSS.escape(opener.gid)}"]`) : root;
+    const e = opener.el.isConnected ? opener.el : (opener.cls && scope?.querySelector('.' + CSS.escape(opener.cls)));
+    (e || root.querySelector('.tree42 button'))?.focus({ preventScroll: true }); opener = null;
+  };
+  const detachWatch = new MutationObserver(() => { if (!root.isConnected) hide(); });
+  const unlock = () => {
+    if (pwrap.querySelector('.ctxmenu')) closeCtx();
+    pwrap.remove(); document.documentElement.classList.remove('pd42-open');
+    unlockBody();
+    if (lockedApp) lockedApp.inert = appWasInert;
+    lockedApp = null; detachWatch.disconnect();
+    document.removeEventListener('focusin', containFocus, true); document.removeEventListener('keydown', guardKeys, true);
+  };
+  // Navigation / breakpoint changes must not navigate history or refocus a departing page.
+  function hide() {
+    clearTimeout(pending); pending = 0;
+    // F250-P8-amend R2 + amend2: cancel phone Devices/zonePane timers (outer+inner), including body-portaled sheet
+    try {
+      root.querySelectorAll('.qb42-vol input, .zpane42 .vbar input, .pd42-sheet .vbar input').forEach(i => i._p8cancel?.());
+      // Portaled .pd42-sheet lives on document.body, not under root — still cancel its pane writer
+      pwrap.querySelectorAll('.qb42-vol input, .zpane42 .vbar input, .vbar input').forEach(i => i._p8cancel?.());
+    } catch { /* */ }
+    // DIG-R3: navigation/resize/detach discard the speaker session + spectrum before portal unlock
+    const sp = sheetSp();
+    if (sp) { try { sp._discardSession?.(); } catch { /* */ } try { sp._teardownLive?.(); } catch { /* */ } try { sp._destroy?.(); } catch { /* */ } }
+    spk = null; zsel = null; wasSel = false; opener = null; lastTrigger = null;
+    try { sessionStorage.removeItem('wavwiz.spk.phone'); } catch { /* private mode */ }
+    if (history.state?.pd42) { const { pd42, ...rest } = history.state; try { history.replaceState(rest, ''); } catch { /* sandboxed */ } }
+    unlock();
+  }
+  const activePhone = () => root.isConnected && window.innerWidth <= 900 && (S.view == null || S.view === 'devices');
+  window.addEventListener('resize', () => { if (!activePhone()) hide(); });
   const scroller = el => { for (let e = el.parentElement; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) return e; } return document.scrollingElement; };
   function draw() { const back = keepScroll(root, 'page'); try { draw0(); } finally { back(); } }   // 0.4.9 F82
   function draw0() {
+    if (!activePhone()) { hide(); return; }
     const gone = [...list.querySelectorAll('[data-zone-id]')].some(el => !S.zones.some(z => String(z.id) === el.dataset.zoneId));
     if (!gone && root.querySelector('.dmenu:not([hidden])')) return later();
     if (!gone && root.querySelector('.tree42.dragging, .tree42 .vbar input:active, .spkset input[type=range]:active, .spkset .spk-range:active')) return later();   // 0.4.4 F23: never under a dragged slider
@@ -1103,20 +1265,32 @@ export function devicesView(S, ctl) {
     const sel42 = X.spk != null || X.zsel != null;
     // 0.4.6 F41: opening a speaker / zone remembers where the tree was scrolled; closing returns to the tree at that spot (the standalone PWA has no Back)
     const sc = scroller(root);
-    if (sel42 && !wasSel) { treeTop = sc ? sc.scrollTop : 0; if (!history.state?.pd42) try { history.pushState({ ...(history.state || {}), pd42: 1 }, ''); } catch { /* sandboxed */ } }
-    if (!sel42 && wasSel) { const t = treeTop; requestAnimationFrame(() => { const c = scroller(root); if (c) c.scrollTop = t; }); }
+    const opening = sel42 && !wasSel, closing = !sel42 && wasSel;
+    if (opening) { rememberOpener(); treeTop = sc ? sc.scrollTop : 0; if (!history.state?.pd42) try { history.pushState({ ...(history.state || {}), pd42: 1 }, ''); } catch { /* sandboxed */ } }
+    if (closing) { const t = treeTop; requestAnimationFrame(() => { if (!activePhone() || wasSel) return; const c = scroller(root); if (c) c.scrollTop = t; returnFocus(); }); }
     wasSel = sel42;
     if (sel42) { T.paintDetail(pdet, orderedGroups(S.groups || [])); const z = X.spk != null ? (S.zones || []).find(x => x.id === X.spk) : null, g = X.zsel != null ? (S.groups || []).find(x => x.id === X.zsel) : null;
       ptitle.textContent = z ? `Speaker: ${z.name}` : g ? `Zone: ${g.name}` : 'Settings'; pwrap.setAttribute('aria-label', ptitle.textContent); }
     document.documentElement.classList.toggle('pd42-open', sel42);
-    reconcile(list, [T.treeNode(false), airplayDevicesStrip(S, ctl), sel42 ? pwrap : null].filter(Boolean));   // F159: AirPlay speakers under the speakers   // 0.4.4 F23: the same wrap every tick (a new one re-attached the open speaker page: flash, scroll + focus lost)
+    // F246: portal sheet to body (true viewport modal above .mini/.tabbar). Keep the same wrap node (F23).
+    reconcile(list, [T.treeNode(false), airplayDevicesStrip(S, ctl)].filter(Boolean));   // F159: AirPlay speakers under the speakers
+    if (sel42) {
+      if (pwrap.parentNode !== document.body) document.body.append(pwrap);
+      if (opening) {
+        lockedApp = document.getElementById('app'); appWasInert = !!lockedApp?.inert;
+        if (lockedApp) lockedApp.inert = true;
+        lockBody();
+        document.addEventListener('focusin', containFocus, true); document.addEventListener('keydown', guardKeys, true);
+        detachWatch.observe(document.body, { childList: true, subtree: true }); focusFirst();
+      }
+    } else unlock();
     const live = S.zones.some(z => z.enabled && z.connected);
     foot.replaceChildren(h('span', { class: 'dot ' + (live ? 'ok' : 'warn') }), live ? 'Synced playback active' : 'No device is switched on and connected', h('span', { class: 'grow' }),
       canControl(S) ? h('button', { class: 'btn', onclick: () => openCalibration(S, ctl.refreshAll) }, '🎤 Calibrate') : null);
     if (busy.v) later();
   }
   if (HASWIN) window.addEventListener('wavwiz:devredraw', () => whenIdle(() => { if (root.isConnected) draw(); }, draw));
-  return { el: root, draw };
+  return { el: root, draw, hide };
 }
 export { roomPillClass, roomPill };
 
@@ -1272,7 +1446,7 @@ function onTagAct(ev) {
   ev.preventDefault(); ev.stopPropagation();
   // 0.4.4 F25: MUTED = unmute this speaker right here (row, card, speaker page; panel, expanded and phone)
   if (tag.dataset.tagAct === 'muted') { const id = +(tag.closest('[data-zone-id]')?.dataset.zoneId); if (id) api(`/zones/${id}`, { method: 'PATCH', body: { muted: false } }).then(() => { tag.remove(); }).catch(e => toast(e.message, true)); return; }
-  const kind = tag.dataset.tagAct, page = tag.closest('#p-zones') ? tagNav.page : tagNav.panel; if (!page) return;
+  const kind = tag.dataset.tagAct, page = tag.closest('#p-zones, .pd42-sheet') ? tagNav.page : tagNav.panel; if (!page) return;   // F246: sheet may be portaled to body
   const spk = tag.closest('[data-zone-id]'), grp = tag.closest('[data-group-id]');
   if (kind === 'zctl') { const gid = grp?.dataset.groupId; if (gid && Z.current()?.key !== 'g:' + gid) Z.select('g:' + gid); return; }
   if (spk && !spk.matches('[data-group-id]')) { const id = +spk.dataset.zoneId; if (!spk.closest('.spkset') && !tag.closest('.spkset')) page.spk(id); focusLater(kind, () => document.querySelector(`.spkset[data-zone-id="${id}"]`)); return; }
@@ -1293,10 +1467,12 @@ function capBar(label, value, cap, can, send, title) {
   const wrap = h('div', { class: 'vbar' }, vol);
   const paint = (v, c) => { wrap.classList.toggle('capped', c != null); wrap.style.setProperty('--v', v + '%'); if (c != null) wrap.style.setProperty('--cap', c + '%'); else wrap.style.removeProperty('--cap');
     vol.dataset.cap = c != null ? String(c) : ''; vol.setAttribute('aria-valuemax', String(c ?? 100)); };
+  // F250-P8-amend R2: expose cancel of the outer 100ms stage so phone adapters can kill it with the inner writer
+  const cancelSend = () => { clearTimeout(vol._t); vol._t = 0; };
   vol.addEventListener('input', () => { const c = vol.dataset.cap ? +vol.dataset.cap : null; const v = clampToCap(+vol.value, c); if (v !== +vol.value) vol.value = String(v);
     pct.textContent = v + '%'; wrap.style.setProperty('--v', v + '%'); clearTimeout(vol._t); vol._t = setTimeout(() => send(v), 100); });
   ro(vol, can, 'Your access is view-only.'); paint(Math.round(value), cap);
-  return { wrap, vol, pct, patch: (v, c) => { if (idle(vol)) { vol.value = String(v); pct.textContent = Math.round(v) + '%'; paint(Math.round(v), c); } else paint(+vol.value, c); } };
+  return { wrap, vol, pct, cancelSend, patch: (v, c) => { if (idle(vol)) { vol.value = String(v); pct.textContent = Math.round(v) + '%'; paint(Math.round(v), c); } else paint(+vol.value, c); } };
 }
 // 0.4.1: dropping a zone card on the middle of another zone card links the two zones
 setLinkHandler(async (fromId, toId) => { if (!fromId || fromId === toId) return; try { await api(`/groups/${fromId}/link`, { method: 'POST', body: { with: Number(toId) } }); toast('Zones linked: they play the same music, in sync'); window.dispatchEvent(new CustomEvent('wavwiz:zones-changed')); } catch (e) { toast(e.message, true); } });
@@ -1311,7 +1487,7 @@ function speakerCtx(S, ctl, z, card, openIt) {
   attachCtx(card, () => {
     const admin = isAdmin(S), can = canControl(S);
     const act = { settings: () => openIt?.(), rename: () => promptName(`Rename ${z.name}`, z.name, async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }),
-      mute: () => ctl.act(`/zones/${z.id}`, { muted: !z.muted }, 'PATCH'), off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH'),
+      mute: () => { const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH'); }, off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH'),
       calibrate: () => openCalibration(S, ctl.refreshAll, z.id, { quick: true }), move: () => addToZoneMenu(S, ctl, z, card, S.groups || []), remove: () => forget(ctl, z) };
     return speakerMenuItems({ admin, can, muted: !!z.muted, on: !!z.enabled, canCalibrate: canTune(S, z) && z.connected }).map(it => it.sep ? it : { ...it, onclick: act[it.id] });
   }, `${z.name} actions`);

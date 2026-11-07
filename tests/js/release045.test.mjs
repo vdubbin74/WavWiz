@@ -58,7 +58,7 @@ test('version: badge, footer and title come from the server build version; build
 
 test('T2 Display size: Extra small 67 % added; Small / Default / Large stay; no 50 %', async () => {
   const U = await imp('uiscale');
-  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['tiny', 0.67], ['small', 0.75], ['compact', 1], ['large', 1.25]]);
+  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['tiny', 0.67], ['compact', 1], ['large', 1.25]]);
   assert.ok(!U.SCALES.some(s => s[2] < 0.67)); assert.equal(U.scaleFactor('tiny'), 0.67); assert.equal(U.migrateScale('tiny'), 'tiny'); assert.equal(U.migrateScale('compact'), 'compact');
 });
 

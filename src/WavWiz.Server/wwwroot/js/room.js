@@ -44,13 +44,29 @@ export class PhoneRoom {
     this.eq = new EqChain(this.ctx, this.gain); this.applyEq();      // 0.4.3 #10: the speaker's EQ (music only; the test chime stays dry)
     this._onCtx = () => { this.emit(); const st = this.ctx.state; if (st === 'running' && this._lastSt && this._lastSt !== 'running') this.resync('ctx ' + this._lastSt + '>running'); this._lastSt = st; }; this._lastSt = this.ctx.state; this.ctx.addEventListener?.('statechange', this._onCtx);   // 0.4.6 F44: suspended / interrupted -> running re-measures
     this.running = true;
-    this.vis = () => { this.emit(); if (!document.hidden && this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); if (!document.hidden) { this.kickNet(); this.resync('visible'); } };   // 0.4.6 F44: back from the background re-measures
+    this.vis = () => { this.emit(); if (!document.hidden) this.onVisible().catch(() => {}); };   // F244: a healthy foreground return must not restart scheduled audio
     document.addEventListener('visibilitychange', this.vis);
     this.timer = setInterval(() => { this.pairNow(); this.watchdog(); this.sendStatus(); this.emit(); }, 1000);
     this.clockTimer = setInterval(() => this.pingClock(), 1000);
     await this.syncClock(); await this.connect(); this.resync('start');   // F44: the full re-measure runs in the background (start stays as fast as before)
   }
   get audioReady() { return this.ctx?.state === 'running'; }
+
+  /** F244: visibility alone is not a discontinuity. Keep the epoch, offset and queued sources if
+   * the context kept running and both links are recent. pairNow handles measured clock drift
+   * with an edge re-pair (no schedule reset); real suspend/link loss retains the F44 hard recovery. */
+  async onVisible() {
+    if (!this.running || document.hidden) return;
+    const now = Date.now(), suspended = this.ctx.state !== 'running';
+    const recent = t => Number.isFinite(t) && now - t >= 0 && now - t <= 15000;
+    const healthy = !suspended && this.ws?.readyState === 1 && this.cws?.readyState === 1 &&
+      recent(this.rx) && recent(this.clockRx) && this.est.ready && this.pair;
+    this.watchdog(); this.kickNet();
+    if (healthy) { this.pairNow(); this.pingClock(); return; }
+    if (suspended) { try { await this.ctx.resume(); } catch { return; } }
+    if (!this.running || this.ctx.state !== 'running') return;
+    await this.resync('visible recovery');
+  }
 
   pairNow() { const reads = []; for (let i = 0; i < 6; i++) reads.push({ ctxSec: this.ctx.currentTime, perfMs: performance.now() }); const p = pairClocks(reads);
     if (!this.pair?.edge || this.ctx.state !== 'running') { this.pair = p; return; }
@@ -63,10 +79,13 @@ export class PhoneRoom {
   /** 0.4.6 F44: every start / resume / wake re-measures (clock offset from fresh samples, edge pairing, output delay) and restarts the schedule,
    *  so the delay the user set stays the same launch after launch. The measurements are logged (console + the last 10 in localStorage). */
   async resync(why = 'start') {
+    if (!this.running) return;
     if (this._rs) return this._rs;
     this._rs = (async () => { try {
       this.est.reset(); for (let i = 0; i < 12; i++) { this.pingClock(); await sleep(60); } await sleep(150);
+      if (!this.running) return;
       if (this.ctx.state === 'running') await this.pairEdge(); else this.pairNow();
+      if (!this.running) return;
       this.dropAudio?.(); this.sched?.reset(); this.epoch = null;
       const d = { at: new Date().toISOString(), why, offsetUs: Math.round(this.est.offsetUs ?? NaN), rttUs: Math.round(this.est.rttUs ?? NaN), samples: this.est.samples.map(x => [Math.round(x.off), Math.round(x.rtt)]),
         baseLatencyMs: +((this.ctx.baseLatency || 0) * 1000).toFixed(2), outputLatencyMs: +((this.ctx.outputLatency || 0) * 1000).toFixed(2), appliedOutMs: +(outputDelaySec(this.ctx) * 1000).toFixed(2),
@@ -88,7 +107,7 @@ export class PhoneRoom {
     await sleep(300); this.pairNow();
     if (!this.est.ready) throw new Error('Only a few clock replies came back - the Wi-Fi is too unstable right now. Try again closer to the router.');
   }
-  retryClock() { clearTimeout(this._crt); this._crt = setTimeout(() => { if (this.running && !this.cws) this.syncClock().then(() => { this.clockTries = 0; }).catch(() => this.retryClock()); }, backoffMs(this.clockTries = (this.clockTries || 0) + 1)); }
+  retryClock() { clearTimeout(this._crt); this._crt = setTimeout(() => { if (this.running && !this.cws) this.syncClock().then(() => { this.clockTries = 0; if (this.running) this.resync('clock reconnect'); }).catch(() => this.retryClock()); }, backoffMs(this.clockTries = (this.clockTries || 0) + 1)); }
   pingClock() { try { if (this.cws?.readyState === 1) this.cws.send(JSON.stringify({ type: 'clock.ping', seq: ++this.pseq || (this.pseq = 1), t0: performance.now() * 1000 })); } catch { /* reconnect logic handles it */ } }
 
   async connect() {

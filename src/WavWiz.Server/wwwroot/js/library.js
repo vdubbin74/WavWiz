@@ -71,12 +71,13 @@ export function dominantOf(d) {
  * favorites) on songs and albums with a Favorites tab, Albums as a cover grid or a list, and the Expanded view (setExpanded) with
  * every tab, a toolbar (filter, sort, flip, grid/list, count) and a big cover grid. */
 export function libraryView(S, opts = {}) {
+  const phone = !!opts.phone;            // F250-P2: opt-in full-page presentation, never desktop panels
   const compact = !!opts.compact;       // desktop left panel: ARTISTS / ALBUMS / GENRES / FOLDERS + a count, Years / Recently added / Favorites under "more"
   let expanded = false;
   let P = loadLibPrefs(); const seed = (Date.now() & 0xffff) || 1;
   const session = {};      // 0.2.1 F4: a Tiles/List pick that is not remembered (Remember view per tab off) lasts until the page reloads
   const st = { tab: (compact ? S.libTabC : S.libTab) || (compact ? 'artists' : 'albums'), stack: [], q: '', count: null, kind: null, dirty: false };
-  const root = h('div', { class: compact ? 'lib compact' : 'lib' }), head = h('div'), tools = h('div', { class: 'libtools' }), crumbs = h('div', { class: 'crumbs' }),
+  const root = h('div', { class: compact ? 'lib compact' : (phone ? 'lib phone-library' : 'lib') }), head = h('div'), tools = h('div', { class: 'libtools' }), crumbs = h('div', { class: 'crumbs' }),
     content = h('div', { class: 'libcontent' }), strip = h('nav', { class: 'azstrip', 'aria-label': 'Jump to letter', hidden: true }), countEl = h('div', { class: 'libcount small dim' });
   // 0.2.1 F5: the filter box is ONE persistent element. Redraws never re-create or re-parent it while you type (that dropped focus after
   // every keystroke); filtering is debounced, and focus + caret are restored if a layout switch ever has to move it.
@@ -306,7 +307,7 @@ export function libraryView(S, opts = {}) {
     const on = isPlayingTrack(t);
     const el = h('li', { class: 'item' + (on ? ' playing' : ''), onclick: ev => { if (on) pulse(ev.currentTarget); return canControl(S) ? playNow({ kind: 'tracks', ids: shown.map(x => x.id), index: i }) : toast('Your access is view-only.'); } }, h('span', { class: 'num' }, on ? '▮▮▮' : t.trackNo ?? i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, t.title), h('div', { class: 't2 ell' }, (albumPage ? [t.artist] : [t.artist, t.album]).filter(Boolean).join(' • '))),
       heartBtn(S, 'track', t.id, t.title), h('span', { class: 'dur' }, fmtTime(t.durationMs)));
-    return attachItem(S, el, refTracks([t.id]), t.title);
+    return attachItem(S, el, refTracks([t.id]), t.title, { phoneSong: phone ? { ...t, kind: 'track', refId: t.id } : null });
   });
   async function foldersPage(path) {
     const r = await api('/library/folders' + (path ? '?path=' + encodeURIComponent(path) : ''));
@@ -341,7 +342,7 @@ export function libraryView(S, opts = {}) {
   const rplay = (sid, songs, index = 0) => canControl(S) ? playNow({ kind: 'remote', server: sid, songs: songs.map(rsong), index }) : toast('Your access is view-only.');
   // F175: remote albums / songs drag onto the WavWiz queue like local rows (queue drop POSTs the ref to /queue/add with the drop position)
   const rdrag = (el, sid, al, more = false) => attachItem(S, el, { kind: 'remote', server: sid, album: al.id }, al.album, { more, count: al.tracks ?? null, kind: 'Remote album' });
-  const rsongDrag = (el, sid, t) => attachItem(S, el, { kind: 'remote', server: sid, songs: [rsong(t)] }, t.title, { more: false, count: 1, kind: 'Remote song' });
+  const rsongDrag = (el, sid, t) => attachItem(S, el, { kind: 'remote', server: sid, songs: [rsong(t)] }, t.title, { more: false, count: 1, kind: 'Remote song', phoneSong: phone ? { ...t, kind: 'remote' } : null });
   const rbadge = () => h('span', { class: 'small dim rbadge' }, ' · Remote');
   const ralbumRow = sid => al => { const el = h('li', { class: 'item', onclick: () => push({ title: al.album, kind: null, load: () => remoteAlbumPage(sid, al) }) }, cover(al.artUrl, 'sm', '♫', { album: al.album, artist: al.artist }),
       h('div', { class: 't' }, h('div', { class: 't1 ell' }, al.album), h('div', { class: 't2 ell' }, [al.artist, al.year || null, al.tracks != null ? `${al.tracks} song${al.tracks === 1 ? '' : 's'}` : null].filter(Boolean).join(' • '), rbadge())),
@@ -445,6 +446,9 @@ export function libraryView(S, opts = {}) {
 
   /** F239: tools = Remote server chip (2+) + Sort / flip / tiles — sources live in libsrcslot above search. */
   function drawTools(kind) {
+    // Phone adapters expose their own supported controls. Do not advertise
+    // a Library sort/view/filter that cannot operate their station/playlist DOM.
+    if (phone && (st.source === 'radio' || st.source === 'playlists')) { tools.replaceChildren(); return; }
     const kids = [];
     if (st.source === 'remote' && RS.length >= 2) {
       const cur = rsById(st.rsid) || RS[0];
@@ -475,10 +479,13 @@ export function libraryView(S, opts = {}) {
   async function draw() {
     if (!visible()) { st.dirty = true; return; }       // hidden copy (phone vs desktop layout): draw when it is shown
     st.dirty = false; const my = ++drawing; st.count = null; jump = null; strip.hidden = true; strip.replaceChildren();
+    if (phone) countEl.textContent = '';  // no stale count while a different source/detail loads
     root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded); root.dataset.tiles = P.tileSize;
     root.dataset.source = st.source;
     srcSlot.replaceChildren(srcTabs());
     const hideCats = st.source === 'radio' || st.source === 'playlists';
+    head.hidden = phone && hideCats;
+    searchField.hidden = phone && hideCats;  // Radio keeps its real finder; Playlists its create/open tools
     tabsSlot.hidden = hideCats; if (!hideCats) tabsSlot.replaceChildren(tabs()); else tabsSlot.replaceChildren();
     placeSearch();
     search.placeholder = st.source === 'remote' ? (expanded ? 'Filter remote…' : 'Search the remote library…')
@@ -502,8 +509,8 @@ export function libraryView(S, opts = {}) {
       if (my !== drawing) return;
       content.replaceChildren(...nodes); drawTools(pageKind());
       content.classList.toggle('grid', !!content.querySelector('.tilegrid'));
-      const lab = COUNT_LABEL[st.tab];
-      countEl.textContent = compact && !expanded && st.count != null && !st.stack.length && !st.q && lab ? `${st.count} ${lab}` : '';
+      const lab = COUNT_LABEL[phone ? st.kind : st.tab] || (phone && st.kind === 'remote' ? (st.count === 1 ? 'result' : 'results') : null);
+      countEl.textContent = ((compact && !expanded && !st.stack.length) || phone) && st.count != null && !st.q && lab ? `${st.count} ${lab}` : '';
     } catch (e) { if (my === drawing) content.replaceChildren(h('p', { class: 'err' }, e.message)); }
   }
   window.addEventListener('wavwiz:library', () => { loadRS().finally(() => draw()); });   // F174: servers added / removed / renamed -> tabs follow

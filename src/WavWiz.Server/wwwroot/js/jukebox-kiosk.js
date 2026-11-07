@@ -75,7 +75,7 @@ async function hostControls(S) {
       h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api(JBQ(`/queue/${x.index}`), { method: 'DELETE' })) }, 'Remove'),
       x.guest ? h('button', { class: 'btn sm danger', disabled: !ctl, onclick: async () => { if (await ask('Ban this guest', `Stop requests from ${x.by || 'this guest'}?`, { ok: 'Ban', danger: true })) act(async () => { await api('/jukebox/ban', { method: 'POST', body: { guest: x.guest } }); toast('Banned.'); }); } }, 'Ban guest') : null));
     panel.replaceChildren(
-      h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Jukebox'), h('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Close', onclick: close }, '✕')),
+      h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Jukebox'), h('button', { type: 'button', class: 'btn sm ghost ww-close', 'aria-label': 'Close', onclick: close }, '✕')),
       h('div', { class: 'row wrap' },
         h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } })) }, b.locked ? 'Unlock queue' : 'Lock queue'),
         h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),

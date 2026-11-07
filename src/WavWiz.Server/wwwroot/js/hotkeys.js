@@ -36,7 +36,7 @@ const ACTIVATES = 'button,a[href],summary,[role=button],[role=switch],[role=menu
 /** Pure-ish: is the event from a place where shortcuts must stay quiet? */
 export function blocked(ev, doc = globalThis.document) {
   if (isTyping(ev.target)) return true;
-  if (doc?.querySelector?.('dialog[open],.sheet,.dlg,.jb')) return true;
+  if (doc?.querySelector?.('dialog[open],.sheet,.dlg,.jb,.pd42-sheet')) return true;
   if (ev.code === 'Space' && ev.target?.closest?.(ACTIVATES)) return true;
   return false;
 }

@@ -23,15 +23,35 @@ const order = m => window.__wwCalMic.order.push(m);
 
 let code = calCode(location.search), plan = null, sid = null, stopped = false, state = 'opened', helloTimer = 0, mic = null, wake = null, hidden = false;
 
-async function call(path, { method = 'GET', body, raw } = {}) {
+async function call(path, { method = 'GET', body, raw, keepalive } = {}) {
   const headers = { 'X-WavWiz-Cal': code || '' };
   let payload; if (raw) { payload = raw; headers['Content-Type'] = 'application/octet-stream'; } else if (body !== undefined) { payload = JSON.stringify(body); headers['Content-Type'] = 'application/json'; }
-  const r = await fetch('/api/v1' + path, { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' });
+  const r = await fetch('/api/v1' + path, { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store', keepalive: !!keepalive });
   let j = null; try { j = await r.json(); } catch { /* empty */ }
   if (!r.ok) { const e = new Error((j && (j.error || j.message)) || `HTTP ${r.status}`); e.status = r.status; throw e; }
   return j;
 }
 let lastErr = null;
+// F260: one way out of calibration from any screen (header close, Stop & exit, start/error cards, swipe-back).
+let canceled = false, exiting = false, pending = null, creating = null;
+// F260-A L2: history.back only when the previous page is the player root; never calmic itself or another page
+export function backTarget(ref, origin, histLen) { try { const u = new URL(ref); if (u.origin === origin && (u.pathname === '/' || u.pathname === '/index.html') && histLen > 1) return 'back'; } catch { /* no referrer */ } return 'root'; }
+const toPlayer = () => { if (backTarget(document.referrer, location.origin, history.length) === 'back') history.back(); else location.replace('/'); };
+const within = (p, ms) => Promise.race([p, new Promise(res => setTimeout(() => res(undefined), ms))]);   // F260-A H1: no network hang can trap the exit
+export const EXIT_END_MS = 2500, EXIT_CREATE_MS = 1500;
+export async function exitCal() {
+  if (exiting) { toPlayer(); return; }   // a second tap always navigates
+  exiting = true; canceled = true; clearInterval(helloTimer); releaseMic(pending);
+  // 'left' first: the server ends this link's sessions (and any session created after it) without waiting for our /end (F260-A M1)
+  if (code && !stopped) { stopped = true; try { fetch(`/api/v1/calibration/phone-link/${code}/hello`, { method: 'POST', keepalive: true, headers: { 'X-WavWiz-Cal': code, 'Content-Type': 'application/json' }, body: JSON.stringify({ state: 'left' }) }).catch(() => {}); } catch { /* best effort */ } }
+  let canResume = false;
+  if (!sid && creating) { const s0 = await within(creating.catch(() => null), EXIT_CREATE_MS); if (s0 && s0.id) sid = s0.id; }
+  if (sid) { const id = sid; sid = null; const r = await within(call(`/calibration/sessions/${id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true }).catch(() => null), EXIT_END_MS); canResume = !!(r && r.canResume); }
+  // 0.3.7 L21: never auto-resume; tell the user the music is still paused and let them resume it from the player
+  if (canResume) return show(h('div', { class: 'card' }, h('h2', { text: 'Calibration canceled' }), h('p', { text: 'The music is still paused. Press Play in the player to resume it.' }), h('button', { class: 'btn primary big', type: 'button', onclick: toPlayer }, 'Back to player')));
+  toPlayer();
+}
+function backBtn() { return h('button', { class: 'btn ghost', type: 'button', onclick: () => exitCal() }, 'Back to player'); }
 function diag() { return h('p', { class: 'small mono diag', id: 'diag', 'aria-live': 'polite', text: diagLine({ secure: !!window.isSecureContext, protocol: location.protocol, err: lastErr }) }); }
 /** Exit the finished cal flow into WavWiz as speaker or remote (same roles/labels as askPhoneRole in room.js) (replace so Back doesn't re-enter calmic). */
 function exitRow() { const go = r => () => { releaseMic?.(); location.replace('/?role=' + r); }; return h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: go('speaker') }, 'Play music here'), h('button', { class: 'btn', type: 'button', onclick: go('remote') }, 'Use as remote')); }
@@ -111,7 +131,7 @@ function ready(note) {
     h('p', { text: 'On the WavWiz PC, an administrator opens Devices › Calibrate speakers › Use your phone. Scan that QR code with this phone.' })));
   if (!ref || !others.length) return show(h('div', { class: 'card warn' }, h('h2', { text: 'Nothing to measure yet' }),
     h('p', { text: !ref ? 'No speaker is playing right now. Start WavWiz on your speakers, then reload this page.' : 'Only one speaker is connected. Calibration lines up two or more speakers.' }),
-    h('button', { class: 'btn', onclick: () => location.reload() }, 'Reload')));
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => location.reload() }, 'Reload'), backBtn())));
   // 0.3.0 section 10: getUserMedia is called DIRECTLY in this tap handler, before any await, with the audio session set in the same handler.
   const start = h('button', { class: 'btn big', id: 'start', type: 'button' }, 'Allow microphone');
   start.addEventListener('click', () => {
@@ -126,22 +146,22 @@ function ready(note) {
     h('div', { class: 'card' }, h('h2', { text: 'Stand where you usually listen' }),
       h('ul', { class: 'fix' }, h('li', { text: 'Hold the phone at ear height and keep still.' }), h('li', { text: 'Keep the room quiet. Music pauses while WavWiz measures.' }), h('li', { text: 'Keep this page open. The screen stays on.' })),
       h('p', { class: 'small', text: `Reference: ${ref.name}. Measures:` }), h('div', { class: 'spk' }, others.map(z => h('span', { text: z.name }))),
-      h('p', { class: 'small', text: 'Tap Allow microphone, then tap Allow when the phone asks.' }), start));
+      h('p', { class: 'small', text: 'Tap Allow microphone, then tap Allow when the phone asks.' }), start, h('div', { class: 'row' }, backBtn())));
 }
 
 // ------------------------------------------------------------ measure
 const CHECKS = [['mic', 'Microphone allowed'], ['clock', 'Clock synced with the server'], ['heard', 'Test sounds heard']];
 async function run(started) {
-  if (stopped) return;
+  if (stopped || canceled) return;
+  pending = started;
   const env2 = environment();
   const checks = h('ul', { class: 'checks' }, CHECKS.map(([k, t]) => h('li', { 'data-k': k, text: t })));
   const mark = (k, s, extra) => { const li = checks.querySelector(`[data-k="${k}"]`); li.className = s; if (extra) li.textContent = `${CHECKS.find(c => c[0] === k)[1]} · ${extra}`; };
   const now = h('div', { class: 'now', 'aria-live': 'polite' }, 'Asking for the microphone…'), sub = h('p', { class: 'small', text: 'Tap Allow if the phone asks.' });
   const bar = h('div', { class: 'bar' }, h('i')), notes = h('ul', { class: 'notes' });
   const note = (t, warn) => notes.append(h('li', { class: warn ? 'warn-t' : '', text: t }));
-  const stopBtn = h('button', { class: 'btn ghost', onclick: () => cancel() }, 'Stop');
+  const stopBtn = h('button', { class: 'btn ghost', type: 'button', onclick: () => exitCal() }, 'Stop & exit');   // F260
   show(h('div', { class: 'card' }, now, sub, bar, checks, notes, h('div', { class: 'row' }, h('span', { class: 'grow' }), stopBtn)));
-  let canceled = false; const cancel = async () => { canceled = true; releaseMic(); if (sid) { try { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'canceled' } }); } catch { /* gone */ } sid = null; } ready(); };
   const onVis = () => { if (document.visibilityState === 'hidden') hidden = true; };
   document.addEventListener('visibilitychange', onVis);
   try {
@@ -152,6 +172,7 @@ async function run(started) {
     mark('mic', 'run');
     try { mic = await openMicFirst({ nav: navigator, win: window, started, track: m => { track(m); order(m); } }); lastErr = null; }
     catch (e) { lastErr = e; throw new CalError(e && e.name === 'NoAudioApi' ? 'NO_AUDIO_API' : classifyMicError(e), `${e && e.name}: ${e && e.message}`); }
+    if (canceled) { releaseMic(); return; }   // F260-A L1
     if (!mic.stream.getAudioTracks()[0]) throw new CalError('MIC_NONE', 'no audio track');
     if (!mic.rawOk) note('This phone kept some of its sound processing on; the result may be a little less exact.', true);
     if (mic.ctx.state !== 'running') {   // some phones need a second tap to start the (recording-only) audio engine
@@ -163,12 +184,14 @@ async function run(started) {
     const rec = await makeRecorder(mic.ctx, mic.stream, note);
     mark('mic', 'ok', mic.label || ''); state = 'measuring'; hello(state);
     try { wake = await navigator.wakeLock?.request('screen'); } catch { track('no wake lock'); }
+    if (canceled) { releaseMic(); return; }   // F260-A L1
     // 4. clock
     mark('clock', 'run'); now.textContent = 'Syncing the clock…'; sub.textContent = '';
     let off = await syncClock(); mark('clock', 'ok', `round trip ${off.rttMs.toFixed(1)} ms`);
     if (off.rttMs > 60) note('The Wi-Fi round trip is slow; the result may be less exact.', true);
     // 5. session (the music pauses on the server side)
-    try { const s = await call('/calibration/sessions', { method: 'POST', body: { mode: 'phone', referenceZoneId: plan.reference.id, micSource: 'phone', micProcessing: mic.rawOk ? 'raw' : 'processed', linkToken: code } }); sid = s.id; }
+    if (canceled) return;
+    try { creating = call('/calibration/sessions', { method: 'POST', body: { mode: 'phone', referenceZoneId: plan.reference.id, micSource: 'phone', micProcessing: mic.rawOk ? 'raw' : 'processed', linkToken: code } }); const s = await creating; creating = null; sid = s.id; if (canceled) { sid = null; call(`/calibration/sessions/${s.id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true }).catch(() => {}); return; } }
     catch (e) { throw new CalError('SESSION_FAILED', e.message); }
     order('session'); note('Music is paused while calibrating.');
     const steps = buildPlan(plan); let done = 0, heard = 0, failed = 0;
@@ -256,11 +279,12 @@ async function run(started) {
     const copy = h('button', { class: 'btn ghost small', onclick: async () => { try { await navigator.clipboard.writeText(detailsText(err, env, { log: log.join('\n') })); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } } }, 'Copy details');
     show(h('div', { class: 'card bad', role: 'alert' }, h('h2', { text: d.title }), denied, h('p', { text: d.why }), h('ul', { class: 'fix' }, d.fix.map(f => h('li', { text: f }))),
       d.link ? h('p', null, h('a', { href: d.link.href, text: d.link.text })) : null,
-      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => ready() }, 'Try again'), copy), h('p', { class: 'small', text: `Code: ${err.code}${err.detail && !/^[A-Z_]+$/.test(err.detail) ? ' · ' + err.detail : ''}` })));
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => ready() }, 'Try again'), copy, backBtn()), h('p', { class: 'small', text: `Code: ${err.code}${err.detail && !/^[A-Z_]+$/.test(err.detail) ? ' · ' + err.detail : ''}` })));
   }
 }
 
-function releaseMic() {
+function releaseMic(started) {
+  if (!mic && started) started.promise.then(st => st.getTracks().forEach(t => t.stop()), () => {});
   try { mic?.stream.getTracks().forEach(t => t.stop()); } catch { /* ok */ }
   try { mic?.ctx.close(); } catch { /* ok */ }
   try { wake?.release(); } catch { /* ok */ }
@@ -328,5 +352,10 @@ function results(fin, failed, retry) {
     h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: async () => { releaseMic(); if (sid) { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'redo' } }).catch(() => {}); sid = null; } ready(); } }, 'Redo'), h('span', { class: 'grow' })), save));
 }
 
-window.addEventListener('pagehide', () => { if (code && !stopped) { try { fetch(`/api/v1/calibration/phone-link/${code}/hello`, { method: 'POST', keepalive: true, headers: { 'X-WavWiz-Cal': code, 'Content-Type': 'application/json' }, body: JSON.stringify({ state: 'left' }) }); } catch { /* best effort */ } } });
+window.addEventListener('pagehide', () => { if (!sid && creating) { canceled = true; creating.then(x => x && x.id && call(`/calibration/sessions/${x.id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true })).catch(() => {}); }   // best effort; the server also ends it on 'left' (F260-A M1)
+  if (sid) { const id = sid; sid = null; canceled = true; releaseMic(); call(`/calibration/sessions/${id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true }).catch(() => {}); }   // F260: swipe-back must not leave music paused
+  if (code && !stopped) { try { fetch(`/api/v1/calibration/phone-link/${code}/hello`, { method: 'POST', keepalive: true, headers: { 'X-WavWiz-Cal': code, 'Content-Type': 'application/json' }, body: JSON.stringify({ state: 'left' }) }); } catch { /* best effort */ } } });
 boot().catch(e => show(h('div', { class: 'card bad' }, h('h2', { text: 'Something went wrong' }), h('p', { text: String(e && e.message || e) }))));
+document.getElementById('calx')?.addEventListener('click', () => exitCal());   // F260
+// F260-A L3: a canceled page restored from the back/forward cache goes to the player instead of a dead start button
+window.addEventListener('pageshow', ev => { if (ev && ev.persisted && (canceled || exiting)) location.replace('/'); });

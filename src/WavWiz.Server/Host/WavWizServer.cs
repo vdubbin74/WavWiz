@@ -43,6 +43,8 @@ public sealed class WavWizServer : IAsyncDisposable
         try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
         catch (Exception e) { u._log.Write("TLS: certificate rename/migration failed (" + e.Message + "); the old certificate stays in use"); }
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
+        s.RemoteTls = new Tls.RemoteCertStore(cfg, Library.SecretProtectors.For(cfg.DataDir), null, u._log.Write);   // F261: default off
+        if (s.RemoteTls.Active) _ = Task.Run(() => s.RemoteTls.RefreshAsync());
         s.Claim = new HeadlessClaim(cfg.DataDir, cfg.Headless, auth.SetupRequired, u._log.Write);     // F166: claim.txt + 15-min LAN window (Linux/Docker)
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live
@@ -92,7 +94,14 @@ public sealed class WavWizServer : IAsyncDisposable
         {
             k.AddServerHeader = false; k.Limits.MaxRequestBodySize = 16 * 1024 * 1024; k.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
             k.Listen(bindIp, cfg.HttpPort);
-            k.Listen(bindIp, cfg.HttpsPort, o => o.UseHttps(new HttpsConnectionAdapterOptions { ServerCertificateSelector = (_, _) => ca.CurrentServerCert(bindIp), SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13 }));
+            var localCtx = new Tls.CertContextCache();
+            // F261-A2: exact SNI -> remote leaf + its supplied intermediates (prebuilt context, no I/O here); anything else -> local-CA leaf
+            k.Listen(bindIp, cfg.HttpsPort, o => o.UseHttps(new TlsHandshakeCallbackOptions { OnConnection = ctx => ValueTask.FromResult(new System.Net.Security.SslServerAuthenticationOptions
+            {
+                ServerCertificateContext = s.RemoteTls?.SelectContext(ctx.ClientHelloInfo.ServerName) ?? (ca.CurrentServerCert(bindIp) is { } leaf ? localCtx.For(leaf) : null),
+                EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13,
+                ApplicationProtocols = new() { System.Net.Security.SslApplicationProtocol.Http2, System.Net.Security.SslApplicationProtocol.Http11 },
+            }) }));
         });
         var app = builder.Build(); u.App = app;
 

@@ -8,13 +8,17 @@ namespace WavWiz.Server.Tls;
 
 /// <summary>
 /// Per-install local certificate authority (spec 8.4 / 13). Phones need HTTPS to use the microphone, so the server issues a certificate for its own LAN IP
-/// from a private root the user installs on their phone. The root carries a critical NameConstraints extension (only this server's IP + names), so even if
+/// from a private root the user installs on their phone. The root carries a critical NameConstraints extension (only this server's endpoint IPs + names), so even if
 /// its key leaked it could not be used to impersonate other sites. The key never leaves the data folder (restricted ACL / 0600).
 /// </summary>
 public sealed class LocalCa
 {
     private readonly string _dir; private readonly object _l = new();
     private X509Certificate2? _serverCert, _bootstrap;
+    private readonly Func<IPAddress, IReadOnlyList<IPAddress>> _endpoints;
+    private readonly Action<string, string> _replacePfx;
+    private DateTime _retryRenewalAfter;
+    public string? LastRenewalError { get; private set; }
     /// <summary>0.2.4: the root is stored (and downloaded) as wavwiz-root-ca.crt; 0.0.1..0.2.3 used unison-root-ca.crt, read once by <see cref="MigrateLegacy"/>.</summary>
     public const string CaFileName = "wavwiz-root-ca.crt", MobileConfigFileName = "wavwiz-root-ca.mobileconfig";
     public string CaCertPath => Path.Combine(_dir, CaFileName);
@@ -24,7 +28,9 @@ public sealed class LocalCa
     private string ServerPfxPath => Path.Combine(_dir, "server.pfx");
     private string StatePath => Path.Combine(_dir, "tls-state.txt");
 
-    public LocalCa(string dataDir) { _dir = Path.Combine(dataDir, "tls"); Directory.CreateDirectory(_dir); }
+    public LocalCa(string dataDir) : this(dataDir, CertificateEndpoints.Resolve) { }
+    internal LocalCa(string dataDir, Func<IPAddress, IReadOnlyList<IPAddress>> endpoints, Action<string, string>? replacePfx = null)
+    { _dir = Path.Combine(dataDir, "tls"); Directory.CreateDirectory(_dir); _endpoints = endpoints; _replacePfx = replacePfx ?? ((from, to) => File.Move(from, to, true)); }
 
     public bool Enabled => File.Exists(CaCertPath) && File.Exists(ServerPfxPath);
     public byte[]? RootDer => File.Exists(CaCertPath) ? X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath)).RawData : null;
@@ -95,12 +101,69 @@ public sealed class LocalCa
         return w.Encode();
     }
 
+    /// <summary>F257: the endpoint IPs the root's critical NameConstraints permit (exact ip/mask subtrees). No constraint = all permitted.
+    /// Lets a leaf-only reissue under the EXISTING root add the LAN IP (and the Tailscale IP only where permitted) instead of refusing outright.</summary>
+    internal static IReadOnlyList<IPAddress> PermittedBy(X509Certificate2 root, IReadOnlyList<IPAddress> endpoints)
+    {
+        var ext = root.Extensions.Cast<X509Extension>().FirstOrDefault(e => e.Oid?.Value == "2.5.29.30");
+        if (ext == null) return endpoints;
+        var nets = new List<(byte[] Addr, byte[] Mask)>();
+        try
+        {
+            var seq = new AsnReader(ext.RawData, AsnEncodingRules.DER).ReadSequence();
+            var permittedTag = new Asn1Tag(TagClass.ContextSpecific, 0);
+            if (!seq.HasData || !seq.PeekTag().HasSameClassAndValue(permittedTag)) return endpoints;
+            var permitted = seq.ReadSequence(permittedTag);
+            while (permitted.HasData)
+            {
+                var sub = permitted.ReadSequence();
+                var tag = sub.PeekTag();
+                if (tag.HasSameClassAndValue(new Asn1Tag(TagClass.ContextSpecific, 7)))
+                {
+                    var b = sub.ReadOctetString(new Asn1Tag(TagClass.ContextSpecific, 7)); var n = b.Length / 2;
+                    nets.Add((b[..n], b[n..]));
+                }
+            }
+        }
+        catch (AsnContentException) { return []; }
+        if (nets.Count == 0) return endpoints;
+        return endpoints.Where(ip =>
+        {
+            var a = CertificateEndpoints.Normalize(ip).GetAddressBytes();
+            return nets.Any(net => net.Addr.Length == a.Length && Enumerable.Range(0, a.Length).All(i => (a[i] & net.Mask[i]) == (net.Addr[i] & net.Mask[i])));
+        }).ToArray();
+    }
+
+    /// <summary>F257: required leaf identities under the existing root: all wanted endpoints the root permits. At least one non-loopback must remain,
+    /// otherwise the root (e.g. one created for 0.0.0.0) cannot cover LAN/Tailscale and only an explicit CA recreation + phone re-trust can fix it.</summary>
+    private IReadOnlyList<IPAddress> LeafEndpoints(IPAddress ip)
+    {
+        var wanted = _endpoints(ip);
+        if (!File.Exists(CaCertPath)) return wanted;
+        using var root = X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath));
+        var ok = PermittedBy(root, wanted);
+        if (wanted.Any(a => !IPAddress.IsLoopback(a)) && !ok.Any(a => !IPAddress.IsLoopback(a)))
+            throw new InvalidOperationException("The existing CA's name constraints permit none of this server's LAN/Tailscale addresses (" + string.Join(", ", wanted.Where(a => !IPAddress.IsLoopback(a))) + "). Explicit CA recreation and phone re-trust are required; the existing CA and leaf are unchanged.");
+        return ok;
+    }
+
     /// <summary>Create (or re-create) the root CA and a server certificate for <paramref name="ip"/>. Existing trust on phones keeps working only if the CA is not re-created.</summary>
     public void Enable(IPAddress ip, bool recreateCa = false)
     {
         lock (_l)
         {
-            if (recreateCa || !File.Exists(CaCertPath) || !File.Exists(CaKeyPath)) { CreateRoot(ip); try { File.Delete(RegeneratedMarkerPath); } catch { } }
+            var endpoints = _endpoints(ip);
+            if (!recreateCa && File.Exists(CaCertPath) != File.Exists(CaKeyPath))
+                throw new InvalidOperationException("The existing CA or its key is missing; restore it from backup. Trust will not be reset automatically.");
+            if (!recreateCa && !File.Exists(CaCertPath) && File.Exists(ServerPfxPath))
+                throw new InvalidOperationException("An existing leaf has no local CA; it will not be replaced automatically. Use your certificate administrator.");
+            if (recreateCa || !File.Exists(CaCertPath)) { CreateRoot(ip); try { File.Delete(RegeneratedMarkerPath); } catch { } }
+            if (!recreateCa && File.Exists(ServerPfxPath))
+            {
+                using var current = LoadPfx();
+                EnsureOwned(current);
+                if (Usable(current) && current.NotAfter.ToUniversalTime() >= DateTime.UtcNow.AddDays(30) && CertificateEndpoints.Covers(current, endpoints)) { LastRenewalError = null; return; }
+            }
             IssueServer(ip);
         }
     }
@@ -112,24 +175,29 @@ public sealed class LocalCa
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, true, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign, true));
         req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
-        var dns = new[] { "localhost", "wavwiz.local", Environment.MachineName.ToLowerInvariant(), Environment.MachineName.ToLowerInvariant() + ".local" }.Distinct();
-        // this server's IP (any future IP in the same /24 would need a new CA by design: the constraint is the safety net)
-        req.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.30"), NameConstraints(new[] { ip, IPAddress.Loopback }, dns), true));
+        var dns = CertificateEndpoints.DnsNames();
+        // Exact endpoint constraints remain the safety net. A newly discovered address outside an
+        // existing root's constraints requires explicit CA recreation/re-trust, NEVER silent widening.
+        req.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.30"), NameConstraints(_endpoints(ip), dns), true));
         using var ca = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(10));
         File.WriteAllText(CaCertPath, ca.ExportCertificatePem());
         File.WriteAllText(CaKeyPath, rsa.ExportPkcs8PrivateKeyPem());
         Restrict(CaKeyPath);
     }
 
-    private void IssueServer(IPAddress ip)
+    private void IssueServer(IPAddress ip, IReadOnlyList<IPAddress>? permitted = null)
     {
+        var endpoints = permitted ?? _endpoints(ip);
+        if (endpoints.Any(CertificateEndpoints.Wildcard)) throw new InvalidOperationException("Wildcard addresses cannot be certificate identities.");
         using var caCert = X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath));
         using var caKey = RSA.Create(); caKey.ImportFromPem(File.ReadAllText(CaKeyPath));
         using var ca = caCert.CopyWithPrivateKey(caKey);
         using var key = RSA.Create(2048);
-        var req = new CertificateRequest("CN=WavWiz server " + ip, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        var san = new SubjectAlternativeNameBuilder(); san.AddIpAddress(ip); san.AddIpAddress(IPAddress.Loopback);
-        foreach (var d in new[] { "localhost", "wavwiz.local", Environment.MachineName.ToLowerInvariant(), Environment.MachineName.ToLowerInvariant() + ".local" }.Distinct()) san.AddDnsName(d);
+        var identity = endpoints.FirstOrDefault(a => !IPAddress.IsLoopback(a)) ?? IPAddress.Loopback;
+        var req = new CertificateRequest("CN=WavWiz server " + identity, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var san = new SubjectAlternativeNameBuilder();
+        foreach (var endpoint in endpoints) san.AddIpAddress(endpoint);
+        foreach (var d in CertificateEndpoints.DnsNames()) san.AddDnsName(d);
         req.CertificateExtensions.Add(san.Build());
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
@@ -138,28 +206,79 @@ public sealed class LocalCa
         req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
         var serial = RandomNumberGenerator.GetBytes(16); serial[0] &= 0x7F;
         // iOS/Android require <= 398 days
-        using var leaf = req.Create(ca, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(397), serial);
+        var expires = new DateTimeOffset(caCert.NotAfter.ToUniversalTime());
+        if (expires <= DateTimeOffset.UtcNow.AddDays(30)) throw new InvalidOperationException("The existing CA expires too soon; explicit CA renewal and phone re-trust are required. Existing certificates are unchanged.");
+        using var leaf = req.Create(ca, DateTimeOffset.UtcNow.AddMinutes(-5), expires < DateTimeOffset.UtcNow.AddDays(397) ? expires : DateTimeOffset.UtcNow.AddDays(397), serial);
+        // A same-CA signature is insufficient if the old root's critical NameConstraints forbid
+        // LAN/Tailscale SANs (notably roots created for 0.0.0.0). Refuse, retain trust/files, report.
+        if (!ChainsTo(leaf, caCert, false)) throw new InvalidOperationException("The existing CA cannot validate the required endpoint SANs (check its name constraints and validity). Explicit CA recreation and phone re-trust are required; the existing CA and leaf are unchanged.");
         using var withKey = leaf.CopyWithPrivateKey(key);
-        File.WriteAllBytes(ServerPfxPath, withKey.Export(X509ContentType.Pfx));
-        Restrict(ServerPfxPath);
-        File.WriteAllText(StatePath, ip.ToString());
-        _serverCert?.Dispose(); _serverCert = null;
+        var temp = ServerPfxPath + ".new-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+            if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            using (var file = new FileStream(temp, options)) { }
+            Restrict(temp);
+            File.WriteAllBytes(temp, withKey.Export(X509ContentType.Pfx));
+            using (var check = X509CertificateLoader.LoadPkcs12FromFile(temp, null))
+                if (!check.HasPrivateKey || !CertificateEndpoints.Covers(check, endpoints)) throw new InvalidOperationException("Staged leaf validation failed; existing certificates are unchanged.");
+            _replacePfx(temp, ServerPfxPath); // same-directory atomic replacement, only after all validation
+        }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
+        try { File.WriteAllText(StatePath, ip.ToString()); } catch { /* SANs, not this hint, determine reuse */ }
+        _serverCert?.Dispose(); _serverCert = null; LastRenewalError = null; _retryRenewalAfter = default;
     }
 
-    /// <summary>Certificate Kestrel should present; renews when the IP changed or less than 30 days remain; a throw-away self-signed one before TLS is set up.</summary>
+    private static bool Usable(X509Certificate2 c) => c.HasPrivateKey && c.NotBefore.ToUniversalTime() <= DateTime.UtcNow && c.NotAfter.ToUniversalTime() > DateTime.UtcNow;
+    private static bool ChainsTo(X509Certificate2 leaf, X509Certificate2 root, bool ignoreTime)
+    {
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust; chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; chain.ChainPolicy.DisableCertificateDownloads = true;
+        chain.ChainPolicy.VerificationFlags = ignoreTime ? X509VerificationFlags.IgnoreNotTimeValid : X509VerificationFlags.NoFlag;
+        return chain.Build(leaf) && chain.ChainElements[^1].Certificate.RawData.AsSpan().SequenceEqual(root.RawData);
+    }
+    private void EnsureOwned(X509Certificate2 leaf)
+    {
+        using var root = X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath));
+        if (!File.Exists(StatePath) || !ChainsTo(leaf, root, true))
+            throw new InvalidOperationException("The current leaf is not verifiably managed by this local CA; it will not be replaced automatically. Restore the managed certificate/CA or use your certificate administrator.");
+    }
+
+    /// <summary>Reuse actual SAN coverage, renew the managed leaf within the existing root's constraints.
+    /// Failure retains a usable current certificate (and its files), never silently replaces the CA.</summary>
     public X509Certificate2 CurrentServerCert(IPAddress? ip)
     {
         lock (_l)
         {
+            X509Certificate2? current = null;
             if (Enabled)
             {
                 try
                 {
-                    if (ip != null && (!File.Exists(StatePath) || File.ReadAllText(StatePath).Trim() != ip.ToString() ||
-                        (_serverCert ??= LoadPfx()).NotAfter < DateTime.Now.AddDays(30))) IssueServer(ip);
-                    return _serverCert ??= LoadPfx();
+                    current = _serverCert ??= LoadPfx();
+                    if (ip != null)
+                    {
+                        // Failed renewal must not generate a new RSA key on every TLS handshake.
+                        // Explicit Refresh certificate (Enable) bypasses this short retry backoff.
+                        if (DateTime.UtcNow < _retryRenewalAfter) return Usable(current) ? current : (_bootstrap ??= Bootstrap());
+                        // F257: stale = SAN misses a LAN/Tailscale IP the EXISTING root permits -> reissue only the leaf for that permitted set.
+                        var wanted = _endpoints(ip); var endpoints = LeafEndpoints(ip);
+                        if (!Usable(current) || current.NotAfter.ToUniversalTime() < DateTime.UtcNow.AddDays(30) || !CertificateEndpoints.Covers(current, endpoints))
+                        { EnsureOwned(current); IssueServer(ip, endpoints); current = _serverCert ??= LoadPfx(); }
+                        var omitted = wanted.Where(a => !endpoints.Contains(a)).ToArray();
+                        LastRenewalError = omitted.Length == 0 ? null : "The existing CA's name constraints do not permit " + string.Join(", ", omitted) + "; the certificate covers " + string.Join(", ", endpoints) + " only. Explicit CA recreation and phone re-trust are required to add them.";
+                        if (omitted.Length > 0) _retryRenewalAfter = DateTime.UtcNow.AddSeconds(30);
+                    }
+                    if (Usable(current)) return current;
                 }
-                catch { /* fall through to bootstrap so the port still answers */ }
+                catch (Exception e)
+                {
+                    _retryRenewalAfter = DateTime.UtcNow.AddSeconds(30);
+                    LastRenewalError = e is InvalidOperationException ? e.Message : "Certificate renewal failed; existing CA and leaf retained. Check CA/key availability, certificate validity and file permissions.";
+                    if (current != null && Usable(current)) return current;
+                }
             }
             return _bootstrap ??= Bootstrap();
         }
@@ -207,7 +326,7 @@ public sealed class LocalCa
 """;
     }
 
-    private static void Restrict(string path)
+    internal static void Restrict(string path)
     {
         try
         {

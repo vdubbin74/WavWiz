@@ -5,7 +5,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = '', [string]$DataDir = '', [string]$LanIp = '',
+    [string]$Root = '', [string]$DataDir = '', [string]$LanIp = '', [switch]$AllInterfaces,
     [int]$HttpPort = 47800, [int]$HttpsPort = 47443, [int]$AudioPort = 47801, [int]$ClockPort = 47802,
     [switch]$NoStart, [switch]$NonInteractive
 )
@@ -30,12 +30,33 @@ Rename-WavWizLibraryDb $DataDir
 Set-Step 'server: server.json (merge with any existing file)'
 $cfgPath = Join-Path $DataDir 'server.json'
 $existingJson = ''; if (Test-Path -LiteralPath $cfgPath) { $existingJson = Read-TextFile $cfgPath }
-$plan = Get-ServerConfigPlan -ExistingJson $existingJson -LanIp $LanIp -FfmpegPath $ffmpeg -HttpPort $HttpPort -HttpsPort $HttpsPort -AudioPort $AudioPort -ClockPort $ClockPort
-if ($plan.Existing) { Say 'Keeping the existing server.json (your settings are not overwritten).' }
+$plan = Get-ServerConfigPlan -ExistingJson $existingJson -LanIp $LanIp -FfmpegPath $ffmpeg -HttpPort $HttpPort -HttpsPort $HttpsPort -AudioPort $AudioPort -ClockPort $ClockPort -AllInterfaces:$AllInterfaces
+$bindNow = [string]$plan.Config['bindAddress']
+if ($plan.BindAction -eq 'preserved') {
+    Write-InstallLog ("bindAddress preserved: {0}" -f $bindNow)
+    if ($AllInterfaces) { Write-InstallLog 'network choice: Home network + Tailscale/VPN (all networks) - kept' }
+} elseif ($plan.BindAction -eq 'changed') {
+    Write-InstallLog ("bindAddress deliberately changed: {0} -> {1}" -f $plan.PreviousBindAddress, $bindNow)
+    if ($AllInterfaces) { Write-InstallLog 'network choice: Home network + Tailscale/VPN (all networks) - chosen in Setup' }
+} elseif ($plan.BindAction) {
+    Write-InstallLog ("bindAddress {0}: {1}" -f $plan.BindAction, $bindNow)
+}
+if ($plan.Existing) {
+    if ($plan.BindAction -eq 'preserved' -and -not $plan.Changed) {
+        Say 'Keeping the existing server.json (your settings are not overwritten).'
+    } elseif ($plan.BindAction -eq 'changed') {
+        if ($AllInterfaces) { Say ("Updating server.json: listening on the home network + Tailscale/VPN (all networks) instead of only {0} (your choice in Setup); unrelated settings are kept." -f $plan.PreviousBindAddress) }
+        else { Say ("Updating bindAddress in server.json from {0} to {1} (explicit address from Setup); unrelated settings are kept." -f $plan.PreviousBindAddress, $bindNow) }
+    } elseif ($plan.Changed) {
+        Say 'Merging into the existing server.json (unrelated settings kept; only missing or installer-directed keys change).'
+    } else {
+        Say 'Keeping the existing server.json (your settings are not overwritten).'
+    }
+}
 if ($plan.Changed -or -not $plan.Existing) {
     if ($plan.Existing) { try { Copy-Item -LiteralPath $cfgPath -Destination ($cfgPath + '.bak') -Force } catch { } }
     Write-Utf8NoBom $cfgPath (($plan.Config | ConvertTo-Json -Depth 6) + "`r`n")
-    Say "server.json written (bindAddress $($plan.Config['bindAddress']))."
+    Say "server.json written (bindAddress $bindNow)."
 } else { Write-InstallLog 'server.json already up to date; not rewritten.' }
 foreach ($n in $plan.Notes) { Say "NOTE: $n"; [pscustomobject]@{ Kind = 'notice'; Value = $n } }
 $bind = [string]$plan.Config['bindAddress']; $hp = [int]$plan.Config['httpPort']; if ($hp -le 0) { $hp = $HttpPort }
@@ -57,6 +78,7 @@ if ($exists) {
 
 Set-Step 'server: firewall rules (private networks, local subnet only)'
 Set-ServerFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['httpsPort'], [int]$plan.Config['audioPort']) (Get-ServerUdpPorts $plan.Config)
+Set-ServerVpnFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['httpsPort']) (Test-AllNetworksConfig $plan.Config)
 Set-Step 'server: firewall rules for the AirPlay and Spotify Connect receivers (private networks, local subnet only)'
 Set-ReceiverFirewall $exe $plan.Config
 
@@ -65,8 +87,9 @@ else {
     Set-Step 'server: starting the service and waiting for it to answer (40 s limit)'
     [void](Invoke-Sc 'start' @('start', $svc) -AllowFail)
     if (-not (Wait-ServiceState $svc 'RUNNING' 30)) { throw "The $svc service did not reach RUNNING. See $(Join-Path $DataDir 'logs\wavwiz-server.log') and $(Join-Path $DataDir 'startup-error.txt') (if present), and the Windows Event Viewer > Application log." }
-    $probe = Test-HttpReady ("http://${bind}:$hp/api/v1/auth/state") 40
-    if (-not $probe.Ok) { throw "The service is running but the web page at http://${bind}:$hp/ does not answer ($($probe.Detail)). See $(Join-Path $DataDir 'logs\wavwiz-server.log')." }
+    $probeHost = Get-ProbeHost $bind   # F268b: never probe the wildcard listen address
+    $probe = Test-HttpReady ("http://${probeHost}:$hp/api/v1/auth/state") 40
+    if (-not $probe.Ok) { throw "The service is running but the web page at http://${probeHost}:$hp/ does not answer ($($probe.Detail)). See $(Join-Path $DataDir 'logs\wavwiz-server.log')." }
     Say "Server is up ($($probe.Detail))."
 }
 Complete-Step

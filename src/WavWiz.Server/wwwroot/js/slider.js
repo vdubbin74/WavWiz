@@ -33,6 +33,9 @@ export function installSliderGuard(doc = document) {
   doc.addEventListener('keyup', ev => { if (isRange(ev.target)) setTimeout(release, 0); }, true);
   doc.addEventListener('wheel', ev => {
     const r = ev.target; if (!isRange(r) || !(r.matches(':hover') || doc.activeElement === r)) return;
+    // DIG §11: in the Master volume mixer, wheel only nudges ranges inside the focused (.ctl) box
+    const inMixer = r.closest?.('dialog.mixer-dlg');
+    if (inMixer && !r.closest?.('.mv-master.ctl, .mv-card.ctl')) return;
     ev.preventDefault(); if (locked(r)) return;
     const v = wheelValue({ value: r.value, min: r.min || 0, max: r.max || 100, step: r.step || 1, coarse: r.dataset.coarse }, ev.deltaY || -ev.deltaX, ev.shiftKey);
     if (String(v) === r.value) return;

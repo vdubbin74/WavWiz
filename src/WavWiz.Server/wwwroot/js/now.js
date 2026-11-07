@@ -1,3 +1,4 @@
+import { openNowSongMenu, currentSongContext } from './npsongmenu.js';
 import { holdPage } from './motion.js';
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
@@ -14,7 +15,7 @@ import { loadCenter, saveCenter, toggleLabel, centerEq } from './centerview.js';
 import { kioskOpen } from './jukebox-kiosk.js';
 import { mountMini } from './mini.js';
 import { loadPanels, savePanels } from './panels.js';
-import { scaleTo, changed, groupLevel, members } from './mixer-core.js';   // 0.4.9 F68: the phone remote's zone volume scales like the Volume Mixer's zone slider
+import { scaleTo, phoneZoneMembers, phoneZoneLevel } from './mixer-core.js';   // 0.4.9 F68 + F250-P8: phone NP max-based; Jukebox bound via same contract
 import { zoneLink, current as currentZone } from './zones40.js';   // 0.4.5 F27: the inline "on <zone> ▾" is the only Controlling picker in Now Playing views
 import { loadEqLock, saveEqLock } from './eqstyle.js';
 import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, resetLooks, stepPct, ovSvg } from './looks.js';
@@ -105,7 +106,7 @@ export function createNow(S, ctl) {
   const pnEq = h('div', { class: 'pn-eq', role: 'slider', 'aria-label': 'Position', tabindex: 0, onclick: ev => seekFrac(fracAt(pnEq, ev)) }, eqBase, eqClip);
   // keyboard: left / right nudge 5 s on any of the bar seeks
   const keySeek = ev => { const d = { ArrowLeft: -5000, ArrowRight: 5000 }[ev.key]; const n0 = S.now; if (!d || !n0?.durationMs) return; ev.preventDefault();
-    const pos = n0.state === 'playing' ? S.localPos + (performance.now() - S.localAt) : n0.positionMs; seekFrac((pos + d) / n0.durationMs); };
+    const pos = smoothPosition(n0); seekFrac((pos + d) / n0.durationMs); };
   for (const s of [pnWave, pnLed, pnEq]) s.addEventListener('keydown', keySeek);
   // 0.5.0 F130: labeled ARTIST · ALBUM line (desktop flat NP); album part omitted when missing
   const aaArtist = h('span', { class: 'np-aav ell' }), aaAlbum = h('span', { class: 'np-aav ell' });
@@ -117,35 +118,55 @@ export function createNow(S, ctl) {
     h('div', { class: 'pn-lcdrow' }, trackNo, lcdRev), pnLed, pnPill, pnWave, pnEq,
     h('div', { class: 'np-tableseek' }, prog, h('div', { class: 'np-times' }, elv, ovAA, rev)));
   const tableXport = h('div', { class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' }, xHeart, shuffle, prev, play, next, repeat);
+  const phoneZoneVol = zoneVolRow();
   const tableVol = h('div', { class: 'np-tablevol' },
     h('div', { class: 'np-vollbl sr-only' }, 'Volume'),
     h('div', { class: 'np-volrow' }, muteBtn, mkMix(), h('div', { class: 'np-vol' }, eqBtn), mkSleep()),   /* 0.4.8 F54: no volume slider in the play bars - the mixer button is in its place */
-    zoneLink('zl-ov'),   // 0.5.0 F130: "on <zone> ▾" sits bottom-right under mute / mixer / EQ / Sleep (same F119 picker; phone grid-area unchanged)
-    zoneVolRow());   // 0.4.9 F68: phone only (CSS) - full-width volume of the zone being controlled
+    zoneLink('zl-ov'));   // 0.5.0 F130: "on <zone> ▾" sits bottom-right under mute / mixer / EQ / Sleep (same F119 picker; phone grid-area unchanged)
   // 0.4.9 F68: phone remote - one volume + mute for the zone in the "on <zone>" picker; same scaling (scaleTo / caps) as the Volume Mixer's zone slider
-  function zoneGroup() { const c = currentZone(); return c?.kind === 'zone' ? (S.groups || []).find(g => g.id === c.id) || null : null; }
-  function zoneMembers() { const g = zoneGroup(); return g ? members(S.zones, g).filter(z => z.enabled !== false) : []; }
+  // F250-P8: selected zone OR Jukebox; same max-based members as phone Devices (enabled !== false, unique).
+  function zoneGroup() {
+    const c = currentZone();
+    if (c?.kind === 'zone') return (S.groups || []).find(g => g.id === c.id) || null;
+    if (c?.kind === 'jukebox' && S.jb) return { id: -1, name: 'Jukebox', deviceIds: S.jb.deviceIds || [], jukebox: true };
+    return null;
+  }
+  function zoneMembers() { const g = zoneGroup(); return g ? phoneZoneMembers(S.zones, g.deviceIds) : []; }
   function zoneVolRow() {
-    let base = null; const timers = new Map();
-    const send = (z, body) => { clearTimeout(timers.get(z.id)); timers.set(z.id, setTimeout(() => act(`/zones/${z.id}`, body, 'PATCH'), 90)); };
-    const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: 0, class: 'np-zvol', 'aria-label': 'Zone volume' });
+    let base = null, pointerTarget = null; const timers = new Map();
+    const target = () => JSON.stringify([currentZone()?.key, currentZone()?.playbackId,
+      zoneMembers().map(z => [z.id, z.volCap ?? 100, z.enabled])]);
+    const cancel = (endGesture = false) => { for (const t of timers.values()) clearTimeout(t); timers.clear(); base = null; if (endGesture) pointerTarget = null; };
+    const send = (z, body) => { const key = target(); clearTimeout(timers.get(z.id)); timers.set(z.id, setTimeout(() => {
+      timers.delete(z.id); if (canControl(S) && key === target()) act(`/zones/${z.id}`, body, 'PATCH');
+    }, 90)); };
+    const r = h('input', { type: 'range', min: 0, max: 100, step: 1, value: 0, class: 'np-zvol', 'aria-label': 'Selected zone volume' });
     const pct = h('span', { class: 'np-zpct' }, '—');
     const mute = h('button', { type: 'button', class: 'tbtn tog np-zmute', 'aria-label': 'Mute this zone', 'aria-pressed': 'false', onclick: () => {
-      const g = zoneGroup(), zs = zoneMembers(); if (!g || !canControl(S)) return; const m = !(zs.length && zs.every(z => z.muted)); for (const z of zs) z.muted = m;
-      api(`/groups/${g.id}/mute`, { method: 'POST', body: { muted: m } }).catch(e => toast(e.message, true)); drawZoneVol(); } }, icon('volume'));
-    r.addEventListener('pointerdown', () => { base = null; });
+      const g = zoneGroup(), zs = zoneMembers(); if (!g || !zs.length || !canControl(S)) return; const m = !zs.every(z => z.muted); for (const z of zs) z.muted = m;
+      // F250-P8: Jukebox mute uses real /jukebox/zone/mute; normal zones keep /groups/{id}/mute.
+      const muteReq = g.jukebox
+        ? api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } })
+        : api(`/groups/${g.id}/mute`, { method: 'POST', body: { muted: m } });
+      muteReq.catch(e => toast(e.message, true)); drawZoneVol(); } }, icon('volume'));
+    r.addEventListener('pointerdown', () => { cancel(); pointerTarget = target(); });
     r.addEventListener('input', () => {
-      const zs = zoneMembers(); if (!zs.length || !canControl(S)) return;
-      if (!base) base = { zs, vols: zs.map(z => z.volume) };
+      if (pointerTarget && pointerTarget !== target()) { cancel(); drawZoneVol(); return; }
+      const zs = zoneMembers(); if (!zs.length || !canControl(S)) { cancel(); return; }
+      if (base && base.key !== target()) { cancel(); drawZoneVol(); return; }
+      if (!base) base = { zs, vols: zs.map(z => z.volume), key: target() };
       const next = scaleTo(base.vols, +r.value, base.zs.map(z => z.volCap ?? 100));
-      for (const [i, v] of changed(base.vols, next)) { const z = base.zs[i]; z.volume = v; send(z, { volume: Math.round(v) }); }
+      for (const [i, z] of base.zs.entries()) { const v = next[i]; if (z.volume !== v || timers.has(z.id)) { z.volume = v; send(z, { volume: Math.round(v) }); } }
       pct.textContent = r.value + '%'; r.style.setProperty('--v', r.value + '%'); });
-    r.addEventListener('change', () => { base = null; });
-    E.zoneVol = { r, pct, mute };
+    r.addEventListener('change', () => { base = null; pointerTarget = null; });
+    r.addEventListener('pointerup', () => { pointerTarget = null; });
+    r.addEventListener('pointercancel', () => { cancel(); pointerTarget = null; });
+    window.addEventListener('wavwiz:zonesync', () => { cancel(); drawZoneVol(); });
+    E.zoneVol = { r, pct, mute, cancel: () => cancel(true) };
     return h('div', { class: 'np-phvol', role: 'group', 'aria-label': 'Zone volume' }, mute, h('div', { class: 'np-zvolw' }, r, pct));
   }
   function drawZoneVol() {
-    const zv = E.zoneVol; if (!zv) return; const zs = zoneMembers(), v = Math.round(groupLevel(zs.map(z => z.volume))), muted = !!zs.length && zs.every(z => z.muted);
+    const zv = E.zoneVol; if (!zv) return; const zs = zoneMembers(), v = phoneZoneLevel(zs), muted = !!zs.length && zs.every(z => z.muted);
     zv.r.disabled = zv.mute.disabled = !canControl(S) || !zs.length;
     if (document.activeElement !== zv.r) { zv.r.value = String(v); zv.r.style.setProperty('--v', v + '%'); }
     zv.pct.textContent = zs.length ? v + '%' : '—';
@@ -218,11 +239,47 @@ export function createNow(S, ctl) {
     h('div', { class: 'np-row' },
       h('div', { class: 'np-meta' }, art, h('div', { class: 'titles' }, t1, t2, zoneLink('zl-meta'), genre, t3))),
     ctlPanel, upnext, strip, checklist);
+  // F250-P5: a presentation of this persistent Now instance, not a second
+  // player/clock. Full phone view deliberately maps saved NP looks to square
+  // art + a line seek; preferences remain untouched for desktop/mini previews.
+  let songMenu = null;
+  const closePhone = () => { songMenu?.close(); songMenu = null; E.zoneVol.cancel(); };
+  const phoneCollapse = h('button', { type: 'button', class: 'np-phone-collapse', 'aria-label': 'Collapse Now Playing', onclick: () => ctl.go('now:collapse') }, '⌄');
+  const phoneMore = h('button', { type: 'button', class: 'np-phone-more', 'aria-label': 'Current song actions', 'aria-haspopup': 'menu', disabled: true,
+    onclick: () => { songMenu?.close(); songMenu = openNowSongMenu(S, ctl, phoneMore); } }, '⋯');
+  const phoneArt = h('div', { class: 'np-phone-art' });
+  const phoneTitle = h('h1', {}, 'Nothing playing'), phoneArtist = h('div', { class: 'np-phone-artist' }), phoneHeart = h('span', { class: 'np-phone-heart' }, idleHeart());
+  const phoneFill = h('i'), phoneElapsed = h('span', {}, '--:--'), phoneDuration = h('span', {}, '--:--');
+  const canSeekPhone = () => canControl(S) && !!S.now?.item && !isLive(S.now.item) && Number.isFinite(S.now.durationMs) && S.now.durationMs > 0;
+  const phoneSeek = h('div', { class: 'np-phone-seek', role: 'slider', tabindex: 0, 'aria-label': 'Song position', 'aria-valuemin': 0, 'aria-valuemax': 100,
+    onclick: ev => { if (canSeekPhone()) seekFrac(fracAt(phoneSeek, ev)); } }, phoneFill);
+  phoneSeek.addEventListener('keydown', ev => { if (canSeekPhone()) keySeek(ev); });
+  const proxy = (label, source, name) => h('button', { type: 'button', class: 'np-phone-' + name, 'aria-label': label,
+    onclick: () => { if (canControl(S)) source.click(); } }, icon(name));
+  const phoneShuffle = proxy('Shuffle', shuffle, 'shuffle'), phonePrev = proxy('Previous', prev, 'prev'), phonePlay = proxy('Play', play, 'play'), phoneNext = proxy('Next', next, 'next'), phoneRepeat = proxy('Repeat off', repeat, 'repeat');
+  wireRepeatOne(phoneRepeat, () => { if (canControl(S)) oneRepeat(); });
+  const phoneZone = h('span', { class: 'np-phone-zone-name' });
+  const phoneMedia = matchMedia('(max-width:900px)');
+  const phoneFull = h('section', { class: 'np-phone-full', hidden: !phoneMedia.matches, 'aria-label': 'Full Now Playing' },
+    h('header', { class: 'np-phone-head' }, phoneCollapse, h('b', {}, 'Now Playing'), phoneMore),
+    h('div', { class: 'np-phone-zone' }, phoneZone, zoneLink('zl-fullphone')),
+    phoneArt, h('div', { class: 'np-phone-titles' }, h('div', {}, phoneTitle, phoneArtist), phoneHeart),
+    h('div', { class: 'np-phone-progress' }, phoneSeek, h('div', { class: 'np-phone-times' }, phoneElapsed, phoneDuration)),
+    h('div', { class: 'np-phone-transport', role: 'group', 'aria-label': 'Transport' }, phoneShuffle, phonePrev, phonePlay, phoneNext, phoneRepeat), phoneZoneVol,
+    h('div', { class: 'np-phone-actions' }, h('button', { type: 'button', onclick: () => ctl.go('queue') }, 'Queue'), h('button', { type: 'button', class: 'np-phone-sound', onclick: () => ctl.openEq?.() }, 'Sound')),
+    h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), h('div', { class: 'row wrap' }, mkMix(), mkSleep(), mkSc('np-phone-shortcuts'))));
+  el.prepend(phoneFull);
+  phoneMedia.addEventListener('change', () => { phoneFull.hidden = !phoneMedia.matches; if (!phoneMedia.matches) closePhone(); });
+  window.addEventListener('wavwiz:zonesync', () => { songMenu?.close(); songMenu = null; phoneMore.disabled = !currentSongContext(S); });
+  window.addEventListener('resize', () => { if (!matchMedia('(max-width:900px)').matches) closePhone(); });
   E.ovTitles = ovTitles;
 
   const miniArtB = npArtBox({ cls: 'npa-sm npa-phone' }), miniCover = h('div', { class: 'mini-art' }, miniArtB.el), miniT = h('div', { class: 't1 ell' }, 'Nothing playing'), miniS = h('div', { class: 't2 ell' });
-  const miniPlay = h('button', { class: 'tbtn play mini-play', 'aria-label': 'Play or pause', onclick: ev => { ev.stopPropagation(); play.click(); } }, icon('play'));
-  const mini = h('div', { class: 'mini', onclick: () => ctl.go('now') }, miniCover, h('div', { class: 'grow' }, miniT, h('div', { class: 'zl-line' }, miniS, zoneLink('zl-phone'))), miniPlay);
+  // F250-P1: one persistent projection of this Now instance, not another player.
+  // Native body button is keyboard-reachable; the zone picker is not nested in it.
+  const miniPlay = h('button', { type: 'button', class: 'tbtn play mini-play', disabled: true, 'aria-label': 'Play', onclick: ev => { ev.stopPropagation(); if (canControl(S)) play.click(); } }, icon('play'));
+  const miniOpen = h('button', { type: 'button', class: 'mini-open', 'aria-label': 'Open Now Playing', onclick: ev => { ev.stopPropagation(); ctl.go('now'); } }, miniCover, h('div', { class: 'grow' }, miniT, miniS));
+  const mini = h('section', { class: 'mini', 'aria-label': 'Now playing', onclick: () => ctl.go('now') }, miniOpen, h('div', { class: 'mini-zone' }, zoneLink('zl-phone')), miniPlay);
 
   // 0.2.0 items 16 + 27: full-width Now Playing bar for the expanded Library / Devices views (art, titles, transport, seek + times,
   // this-device volume, Mute, More). Same Classic button style as the panel.
@@ -348,7 +405,7 @@ export function createNow(S, ctl) {
   let fullMini = null;
   function fullscreen() {
     if (overlay) return closeFull();
-    overlay = h('div', { class: 'vizfull', role: 'dialog', 'aria-label': 'Visualizer full screen' }, h('button', { class: 'x', onclick: closeFull }, '✕ Close'));
+    overlay = h('div', { class: 'vizfull', role: 'dialog', 'aria-label': 'Visualizer full screen' }, h('button', { class: 'x ww-close', onclick: closeFull }, '✕ Close'));
     overlay.prepend(host); document.body.append(overlay); stage.classList.remove('viz'); viz?.resize();
     overlay.addEventListener('dblclick', closeFull); overlay.addEventListener('click', ev => { if (ev.target === host || ev.target.tagName === 'CANVAS') viz?.next(); });
     try { overlay.requestFullscreen?.().catch(() => {}); } catch { /* optional */ }
@@ -388,6 +445,12 @@ export function createNow(S, ctl) {
     genre.title = it ? [it.album, it.year].filter(Boolean).join(' • ') : '';
     genre.classList.toggle('on', n.state === 'playing');
     t3.textContent = n.notice || '';
+    phoneTitle.textContent = t1.textContent; phoneArtist.textContent = t2.textContent;
+    const choice = currentZone(); phoneZone.textContent = choice?.name || 'No zone selected';
+    // zoneLink intentionally hides its picker for one choice; keep its real name.
+    phoneZone.hidden = !!choice && (S.groups?.length || 0) + (S.jb?.own ? 1 : 0) > 1;
+    phoneMore.disabled = !currentSongContext(S);
+    if (songMenu && !songMenu.valid()) { songMenu.close(); songMenu = null; }
     const src = itemArtUrl(it, 768), srcMd = itemArtUrl(it, 384), srcSm = itemArtUrl(it, 96);
     const npk = npKey(it, src);   // 0.5.0 F123: key includes artist + album so a new track with the same (missing) art rebuilds
     if (coverHolder.dataset.src !== npk) {
@@ -399,6 +462,7 @@ export function createNow(S, ctl) {
       coverHolder.replaceChildren(npCover(it, 768, ''));
       art.replaceChildren(npCover(it, 384, 'md', realMd));
       miniArtB.setCover(npCover(it, 96, 'sm', realSm));
+      phoneArt.replaceChildren(npCover(it, 768, ''));
       pnCover.replaceChildren(npCover(it, 384, 'md')); pnRefl.replaceChildren(npCover(it, 384, 'md'));
       sArtB.setCover(npCover(it, 96, 'sm'));
     }
@@ -414,10 +478,15 @@ export function createNow(S, ctl) {
     ctlPanel.classList.toggle('playing', n.state === 'playing'); for (const b of [sArtB, miniArtB, barArtB]) b.setPlaying(n.state === 'playing');
     const favId = it?.kind === 'track' && !isReceiver(it) ? it.refId : null;
     if (npHeart.dataset.id !== String(favId ?? '')) { npHeart.dataset.id = barHeart.dataset.id = String(favId ?? ''); npHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); xHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); sHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); barHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); }
+    if (phoneHeart.dataset.id !== String(favId ?? '')) { phoneHeart.dataset.id = String(favId ?? ''); phoneHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); }
+    phoneHeart.querySelector('button').disabled = !favId || !canControl(S);
     miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
     const playing = n.state === 'playing'; setIcon(play, playing ? 'pause' : 'play'); setIcon(miniPlay, playing ? 'pause' : 'play'); play.classList.toggle('playing', playing);
-    for (const b of [shuffle, sShuffle]) { b.classList.toggle('on', !!n.shuffle); b.setAttribute('aria-pressed', String(!!n.shuffle)); }
-    for (const b of [repeat, sRepeat]) {   // F230: clear All vs One chrome
+    miniPlay.disabled = !canControl(S); miniPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play'); miniPlay.title = canControl(S) ? (playing ? 'Pause' : 'Play') : 'Your access is view-only';
+    setIcon(phonePlay, playing ? 'pause' : 'play'); phonePlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    for (const b of [phoneShuffle, phonePrev, phonePlay, phoneNext, phoneRepeat]) b.disabled = !canControl(S);
+    for (const b of [shuffle, sShuffle, phoneShuffle]) { b.classList.toggle('on', !!n.shuffle); b.setAttribute('aria-pressed', String(!!n.shuffle)); }
+    for (const b of [repeat, sRepeat, phoneRepeat]) {   // F230: clear All vs One chrome
       const c = repeatChrome(n.repeat); b.classList.toggle('on', c.on); b.classList.toggle('rep-one', c.one);
       b.setAttribute('aria-pressed', String(c.on)); b.setAttribute('aria-label', c.aria); b.title = c.title; setIcon(b, c.icon); }
     setIcon(sPlay, playing ? 'pause' : 'play'); sPlay.classList.toggle('playing', playing);
@@ -427,7 +496,7 @@ export function createNow(S, ctl) {
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
     setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
       seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') },
-      n.state === 'playing' ? S.localPos + (performance.now() - S.localAt) : n.positionMs);   // F206: same clock as tickPos
+      smoothPosition(n), S._smooth);   // F248: paused and playing share the reconciled ingest clock
     // Up next
     // 0.4.9 F73: the server says what really plays next (shuffle pick, Repeat All wrap, Repeat One); the list neighbour only for an older server
     const qi = n.index ?? -1; const nxt = 'nextIndex' in n ? (n.nextIndex >= 0 ? (S.queue?.[n.nextIndex]?.id === n.nextTrack?.id && S.queue?.[n.nextIndex] || n.nextTrack || null) : null)
@@ -450,22 +519,29 @@ export function createNow(S, ctl) {
     nextBlock.title = nxt ? ['Up next', nxt.title, nxt.artist].filter(Boolean).join(' · ') : 'Nothing queued after this';
     window.dispatchEvent(new CustomEvent('wavwiz:upnext'));
   }
+  const smoothPosition = n => Number.isFinite(S.localPos) ? S.localPos + ((S._smooth?.state || n.state) === 'playing' ? Math.max(0, performance.now() - S.localAt) : 0) : n.positionMs;
   function tickPos() {
     const n = S.now; if (!n) return;
-    let pos = n.positionMs; if (n.state === 'playing') pos = S.localPos + (performance.now() - S.localAt);
-    const live = isLive(n.item), dur = n.durationMs;
+    const pos = smoothPosition(n);
+    const live = isLive(n.item), dur = Number.isFinite(n.durationMs) && n.durationMs > 0 ? n.durationMs : S._smooth?.durationMs;
     elv.textContent = n.item ? fmtTime(pos) : '--:--'; rev.textContent = !n.item ? '-:--' : live ? 'LIVE' : '-' + fmtTime(Math.max(0, dur - pos));
     const frac = live || !dur ? 0 : Math.min(1, pos / dur); fill.style.width = barFill.style.width = frac * 100 + '%'; knob.style.left = barKnob.style.left = frac * 100 + '%'; setVizProgress(live || !dur ? null : frac);
     barElv.textContent = sElv.textContent = elv.textContent; barRev.textContent = rev.textContent;
     sDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
     sFill.style.width = sLedFill.style.width = frac * 100 + '%'; sKnob.style.left = frac * 100 + '%'; sWaveClip.style.clipPath = sEqClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`; ctlStrip.style.setProperty('--ns-frac', frac.toFixed(4));
+    phoneElapsed.textContent = elv.textContent;
+    phoneDuration.textContent = !n.item ? '--:--' : live ? 'LIVE' : fmtTime(dur || 0);
+    phoneFill.style.width = frac * 100 + '%';
+    const seekable = canSeekPhone();
+    phoneSeek.setAttribute('aria-disabled', String(!seekable)); phoneSeek.tabIndex = seekable ? 0 : -1;
+    phoneSeek.setAttribute('aria-valuenow', String(Math.round(frac * 100))); phoneSeek.setAttribute('aria-valuetext', phoneElapsed.textContent + ' of ' + phoneDuration.textContent);
     pillElv.textContent = clockVal.textContent = elv.textContent; lcdRev.textContent = rev.textContent;
     pillDur.textContent = !n.item ? '-:--' : live ? 'LIVE' : fmtTime(dur || 0);
     ringVal.style.strokeDashoffset = String(100 - frac * 100); ctlPanel.style.setProperty('--np-frac', frac.toFixed(4)); for (const b of [sArtB, miniArtB, barArtB]) b.setFrac(frac);   // F96: sleeve vinyl
     ledFill.style.width = frac * 100 + '%';
     waveClip.style.clipPath = eqClip.style.clipPath = `inset(0 ${100 - frac * 100}% 0 0)`;
     for (const s of [pnWave, pnLed, pnEq]) s.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
-    updateMediaSessionPosition(n, pos, false);   // F204: lock-screen scrubber, throttled ~1s inside the helper
+    updateMediaSessionPosition(n, pos, false, S._smooth);   // F204: lock-screen scrubber, throttled ~1s inside the helper
   }
   // 0.2.1 F11: no speaker status chips, live dot or "muted" tag in the panel header - device status lives in the Devices panel
   // (this device's Mute button still shows its own state). Kept as a hook: the zone refresh still repaints this device's volume / mute.
@@ -492,7 +568,7 @@ export function createNow(S, ctl) {
   /** 0.3.5: Playback > Sound / EQ shows the EQ in the center panel; Playback > Sleep timer opens the Sleep menu. */
   function showCenter(m) { setCenter(m); stage.scrollIntoView?.({ block: 'nearest' }); }
   function openSleepMenu() { const b = [...document.querySelectorAll('.npsleep')].find(x => x.getClientRects().length) || null; openSleep(S, null, b); }
-  return { el, mini, npbar, nextBlock, showCenter, toggleCtl, openSleep: openSleepMenu, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
+  return { el, mini, npbar, hidePhone: closePhone, nextBlock, showCenter, toggleCtl, openSleep: openSleepMenu, ctlStrip, ctlPanel, draw, drawMine, tickPos, drawStrip, drawChecklist, stage, get viz() { return viz; } };
 }
 
 /** 0.3.3 G5: true while the expanded Playlist (with Now Playing slid up) covers the EQ / visualizer. */

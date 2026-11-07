@@ -7,11 +7,12 @@ const SCALE_KEY = 'wavwiz.uiscale';
 // Small, Compact (now "Default") and Large keep their names; Medium (112 %) stays as it was until another size is picked; Extra large (TV)
 // becomes Large, the new maximum.
 // 0.4.5 T2: a 67 % card before Small (for big TVs at 200 % Windows scaling); no 50 %.
-export const SCALES = [['tiny', 'Extra small', 0.67], ['small', 'Small', 0.75], ['compact', 'Default', 1], ['large', 'Large', 1.25]];
+// F270: the 75 % 'Small' choice is gone; a saved 'small' becomes Default (100 %).
+export const SCALES = [['tiny', 'Extra small', 0.67], ['compact', 'Default', 1], ['large', 'Large', 1.25]];
 export const LEGACY_SCALES = { medium: 1.12 };
 export const scaleFactor = id => (SCALES.find(([x]) => x === id)?.[2]) ?? LEGACY_SCALES[id] ?? 1;
 /** A saved value from any earlier version -> today's id ('medium' kept as is). Pure. */
-export const migrateScale = v => (v === 'xlarge' ? 'large' : SCALES.some(([id]) => id === v) || v in LEGACY_SCALES ? v : 'compact');
+export const migrateScale = v => (v === 'xlarge' ? 'large' : v === 'small' ? 'compact' : SCALES.some(([id]) => id === v) || v in LEGACY_SCALES ? v : 'compact');
 export function loadScale() {
   try { const v = localStorage.getItem(SCALE_KEY); if (v != null) return migrateScale(v); } catch { /* ignore */ }
   return 'compact';

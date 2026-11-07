@@ -371,10 +371,11 @@ export function scenesColumn(S, { refresh } = {}) {
   const reload = () => { editing = null; load(true); refresh?.(); };
   function draw() {
     const next = data.rows.filter(r => r.enabled && r.nextRunAt).sort((a, b) => new Date(a.nextRunAt) - new Date(b.nextRunAt))[0];
+    // F263: clock-minute changes are patched by patchLive; only a new day changes relative schedule labels.
     // F227: signature skip - no full remount when scenes/rows/clock-minute/next/chrome are unchanged; live text is patched in place (mirrors ssCompact F151 el._k)
     const sig = JSON.stringify([data.scenes.map(x => [x.id, x.name, x.icon, !!x.active, (x.members || []).map(m => [m.deviceId, m.enabled, m.volume, m.profileId])]),
       data.rows.map(r => [r.id, r.name, r.enabled, r.time, r.days, r.onceDate, r.alarm, r.nextRunAt, r.skippedRunAt, r.lastRunAt, r.lastResult, r.payload]),
-      data.now ? data.now.slice(0, 16) : null, next?.id ?? null, admin, ctlOk, (S.zones || []).map(z => [z.id, z.name])]);
+      data.now ? data.now.slice(0, 10) : null, next?.id ?? null, admin, ctlOk, (S.zones || []).map(z => [z.id, z.name])]);
     if (!editing && root._k === sig && root.firstChild) { patchLive(next); return; }
     root._k = editing ? null : sig;
     // 0.4.3 #6: the header is the title alone (one line); the clock note is its own short line under it

@@ -73,7 +73,11 @@ test('F45: fine -/+ and a typed box on the Delay slider only (1 ms, clamped, hol
 });
 test('F46: collapse / expand cancels drags and ignores stray presses; row drops need a live session; qreorder needs a real move', () => {
   const l = src('listtable'), q = src('qreorder'); assert.match(l, /const settling = \(\) => performance\.now\(\) - toggledAt < 600/); assert.match(l, /if \(rows && !dragging\) return;/);
-  assert.match(l, /th\.addEventListener\('click', \(\) => \{ if \(th\._drag\) \{ th\._drag = false; return; \} if \(settling\(\)\) return;/); assert.match(q, /e\.type === 'pointercancel' \|\| !moved/);
+  assert.match(l, /th\.addEventListener\('click', \(\) => \{ if \(th\._drag\) \{ th\._drag = false; return; \} if \(settling\(\)\) return;/); // P3 separates owned cancellation from pointerup; real shipped-module behavior
+  // (including no-move/cancel/foreign pointers) lives in ui/f250queue.test.mjs.
+  assert.match(q, /const pointerCancel = ev => \{ if \(ev\.pointerId === session\?\.id\) cancel\(\); \}/);
+  assert.match(q, /const ok = session\?\.moved && inside\(session\)/);
+  assert.match(q, /if \(ok && s\.destination\) void commit/);
 });
 test('F47: scene editor - Update on its own row, Delete / Duplicate left, Cancel / Save right', () => {
   const s = src('scenesched'); assert.match(s, /class: 'row ss-updrow'/); assert.match(s, /class: 'ss-left'/); assert.match(s, /class: 'ss-right'/); assert.match(css(), /0\.4\.6 F47: scene editor action rows/);

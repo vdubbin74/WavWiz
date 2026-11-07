@@ -111,6 +111,7 @@ public static class CalPhoneApi
             if (l.Stopped) return Results.Json(new { ok = false, stop = true, byAdmin = l.ByAdmin, https = c.Request.IsHttps });
             bool changed = l.State != st || l.LastSeen is null || now - l.LastSeen >= Fresh;
             l.State = st; l.Device = dev; l.LastSeen = now;
+            if (st == "left") foreach (var x in s.Cal.Open.Where(x => x.LinkToken == l.Token)) s.Cal.End(x, "left");   // F260-A: the page closed - end its session even if the phone's own /end never arrived (music stays paused, never auto-resumed)
             if (changed) { s.Events.Publish("calphone", new { token = l.Token, state = st, device = dev }); s.Events.Publish("calmics"); }
             return Results.Json(new { ok = true, stop = false, byAdmin = l.ByAdmin, https = c.Request.IsHttps });
         }).Req(Role.View);

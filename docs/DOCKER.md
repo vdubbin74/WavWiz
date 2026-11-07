@@ -1,9 +1,9 @@
-# WavWiz server in Docker (0.6.0, F166/F167)
+# WavWiz server in Docker (0.6.7, F166/F167)
 
 Headless WavWiz **server** for a home server, NAS or Raspberry Pi 4/5 (4 GB+). Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 The container has **no local speakers**: audio plays on WavWiz Players (Windows PCs), phones/browsers, and AirPlay 1 speakers.
 
-Image: `docker.io/vdubbin74/wavwiz-server` (tags `0.6.0`, `latest`), `linux/amd64` + `linux/arm64`.
+Image: `docker.io/vdubbin74/wavwiz-server` (tags `0.6.7`, `latest`), `linux/amd64` + `linux/arm64`.
 
 ## Quick start
 
@@ -11,7 +11,7 @@ Image: `docker.io/vdubbin74/wavwiz-server` (tags `0.6.0`, `latest`), `linux/amd6
 # docker-compose.yml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.6
+    image: docker.io/vdubbin74/wavwiz-server:0.6.7
     container_name: wavwiz
     network_mode: host          # recommended: discovery (UDP) + mDNS need it
     user: "10001:10001"
@@ -84,7 +84,7 @@ Host networking shares ports with the host, so on a machine already running WavW
 ```yaml
 services:
   wavwiz-sbs:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.6
+    image: docker.io/vdubbin74/wavwiz-server:0.6.7
     network_mode: host
     user: "10001:10001"
     environment:
@@ -112,6 +112,6 @@ CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers an
 ## Building the image
 
 ```sh
-docker build -t docker.io/vdubbin74/wavwiz-server:0.6.6 .
-docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.6 .   # needs QEMU/binfmt for the arm64 runtime stage
+docker build -t docker.io/vdubbin74/wavwiz-server:0.6.7 .
+docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.7 .   # needs QEMU/binfmt for the arm64 runtime stage
 ```

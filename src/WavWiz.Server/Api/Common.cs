@@ -9,7 +9,7 @@ public sealed class Services
     public required ServerConfig Cfg; public required Db Db; public required AuthService Auth; public required EventHub Events;
     public required Library.LibraryService Library; public required Playback.Conductor Conductor; public required Playback.ConductorRegistry Registry;   // Conductor = the default (house) group; Registry = every playback group (0.4.0)
      public required Net.AudioHost Audio; public required Net.ClockHost Clock;
-    public required Zones.ZoneManager Zones; public required Dsp.DspService Dsp; public required Calibration.CalibrationService Cal; public required Tls.LocalCa Ca;
+    public required Zones.ZoneManager Zones; public required Dsp.DspService Dsp; public required Calibration.CalibrationService Cal; public required Tls.LocalCa Ca; public Tls.RemoteCertStore? RemoteTls;   // F261
     public DateTime Started = DateTime.UtcNow; public string FfmpegPath = ""; public Host.HeadlessClaim? Claim;     // F166
     public volatile bool Scanning; public Library.ScanResult? LastScan; public CancellationTokenSource Stop = new();
     public required Library.ArtService Art;

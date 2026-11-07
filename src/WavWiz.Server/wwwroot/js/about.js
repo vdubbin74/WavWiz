@@ -1,10 +1,20 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.6.6';
+export const WHATS_NEW_VERSION = '0.6.7';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.6.7
+  ['Phone Queue header', 'Title and zone share one row; Keep playing sits under the info line; Save, Recent, Clear and Lock are matching 44 px squares in a 2×2 grid.'],
+  ['Square close buttons', 'Close × controls are square with a white X. Focus uses your theme accent ring (Sound sheet keeps its ring on open).'],
+  ['Now Playing zone pill', 'The “on …” zone pill on phone Now Playing sits centered in its chip.'],
+  ['Master volume thumbs', 'Master volume thumbs stay centered; the mixer sheet holds its scroll while levels refresh.'],
+  ['Queue art stays put', 'Phone Queue no longer flashes album art when the same queue paints again.'],
+  ['Speaker Settings header', 'Phone Speaker Settings keeps the title and actions on one unclipped row.'],
+  ['Phone chrome', 'Now Playing song actions, Queue grips, Library sources and Devices/Sound sheets follow the reviewed phone layouts.'],
+  ['Upgrade keeps your bind', 'An opted-in server bind address (including 0.0.0.0) is preserved across upgrades.'],
+  ['Home Screen certificate', 'Add to Home Screen certificates pick up real endpoint names so the icon trust prompt matches how you reach the server.'],
   // 0.6.6
   ['Library sources at the top', 'Local, Remote, Radio and Playlists are nice tabs above search. Expanding the Library keeps them on the same lines; Remote still has a server chip in the tools row.'],
   ['Remote albums match local', 'Remote album pages use the same sized cover and header as local albums — no giant full-width art.'],
@@ -240,7 +250,7 @@ export function openWhatsNew(onClose) {
   document.querySelector('.wncard')?.remove();
   const close = () => { card.remove(); onClose?.(); };
   const card = h('section', { class: 'wncard', role: 'region', 'aria-label': `What's new in WavWiz ${WHATS_NEW_VERSION}` },
-    h('div', { class: 'wn-h' }, h('b', null, `What's new in WavWiz ${WHATS_NEW_VERSION} BETA`), h('span', { class: 'grow' }), h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Got it'), h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Dismiss', onclick: close }, '✕')),
+    h('div', { class: 'wn-h' }, h('b', null, `What's new in WavWiz ${WHATS_NEW_VERSION} BETA`), h('span', { class: 'grow' }), h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Got it'), h('button', { class: 'iconbtn ww-close', type: 'button', 'aria-label': 'Dismiss', onclick: close }, '✕')),
     h('ul', { class: 'wn-list' }, WHATS_NEW.slice(0, 6).map(([t, x]) => h('li', null, h('b', null, h('span', { class: 'newchip' }, 'NEW'), t), h('div', { class: 'small dim' }, x)))));
   const top = document.querySelector('.topbar'); if (top) top.after(card); else document.body.prepend(card);
   return { el: card, close };

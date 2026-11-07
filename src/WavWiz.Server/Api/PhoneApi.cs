@@ -14,7 +14,16 @@ public static class PhoneApi
     public static string PhoneHost(HttpContext c, Services s)
     {
         var h = c.Request.Host.Host;
-        if (h is "localhost" or "127.0.0.1" or "::1" or "[::1]" && IPAddress.TryParse(s.Cfg.BindAddress, out var ip) && !IPAddress.IsLoopback(ip)) return ip.ToString();
+        if (h is "localhost" or "127.0.0.1" or "::1" or "[::1]" && IPAddress.TryParse(s.Cfg.BindAddress, out var ip) && !IPAddress.IsLoopback(ip))
+        {
+            if (!Tls.CertificateEndpoints.Wildcard(ip)) return ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + ip + "]" : ip.ToString();
+            try
+            {
+                var endpoint = Tls.CertificateEndpoints.Resolve(ip).FirstOrDefault(a => !IPAddress.IsLoopback(a));
+                if (endpoint != null) return endpoint.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + endpoint + "]" : endpoint.ToString();
+            }
+            catch { /* keep the request host, never advertise a wildcard */ }
+        }
         return h;
     }
 

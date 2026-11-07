@@ -135,6 +135,51 @@ Test 'Get-ServerConfigPlan: invalid JSON is an error that says the file was left
     $threw = ''; try { [void](Get-ServerConfigPlan -ExistingJson '{ not json' -LanIp '' -FfmpegPath '' -HttpPort 1 -HttpsPort 2 -AudioPort 3 -ClockPort 4) } catch { $threw = $_.Exception.Message }
     Has $threw 'left untouched'
 }
+Test 'Get-ServerConfigPlan: LAN upgrade with LanIp omitted preserves LAN bind + unrelated keys (BindAction=preserved)' {
+    $json = '{"bindAddress":"192.168.1.50","allowAllInterfaces":false,"leadMs":777,"extraAllowedSubnets":["10.0.0.0/8"],"httpPort":47850,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"customKey":"keep"}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '192.168.1.50'; Eq $p.BindAction 'preserved'; Eq $p.Config['leadMs'] 777; Eq $p.Config['customKey'] 'keep'; Eq $p.Config['httpPort'] 47850
+    Eq $p.Changed $false
+}
+Test 'Get-ServerConfigPlan: opted-in wildcard upgrade with LanIp omitted preserves 0.0.0.0 + allowAllInterfaces (no LAN replace)' {
+    $json = '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '0.0.0.0'; Eq $p.Config['allowAllInterfaces'] $true; Eq $p.Config['extraAllowedSubnets'][0] '100.64.0.0/10'
+    Eq $p.BindAction 'preserved'; Eq $p.Changed $false
+}
+Test 'Get-ServerConfigPlan: explicit LanIp override changes opted-in 0.0.0.0; unrelated keys kept; BindAction=changed' {
+    $json = '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"customKey":"keep"}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '192.168.1.169' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '192.168.1.169'; Eq $p.BindAction 'changed'; Eq $p.PreviousBindAddress '0.0.0.0'
+    Eq $p.Config['allowAllInterfaces'] $true 'unrelated key lost'; Eq $p.Config['leadMs'] 800; Eq $p.Config['customKey'] 'keep'
+    Has ($p.Notes -join '|') 'changed from 0.0.0.0 to 192.168.1.169'
+}
+Test 'Get-ServerConfigPlan: fresh install with LanIp sets LAN only (no allowAllInterfaces / no all-interfaces)' {
+    $p = Get-ServerConfigPlan -ExistingJson '' -LanIp '10.0.0.9' -FfmpegPath '/x/ffmpeg' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '10.0.0.9'; Eq $p.BindAction 'set'; Eq $p.Existing $false
+    if ($p.Config.Contains('allowAllInterfaces') -and $p.Config['allowAllInterfaces']) { throw 'fresh install must not enable allowAllInterfaces' }
+}
+Test 'Get-ServerConfigPlan: invalid existing bindAddress is repaired to loopback (no silent LAN / 0.0.0.0 widen)' {
+    $json = '{"bindAddress":"not-an-ip","leadMs":12,"httpPort":47800}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '127.0.0.1'; Eq $p.BindAction 'repaired-loopback'; Eq $p.Config['leadMs'] 12
+    Has ($p.Notes -join '|') 'not a usable IPv4'
+}
+Test 'Get-ServerConfigPlan: existing config missing bindAddress key -> loopback (no guessed LAN)' {
+    $json = '{"leadMs":321,"custom":"keep","httpPort":47800}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '127.0.0.1'; Eq $p.BindAction 'set-loopback'; Eq $p.Config['leadMs'] 321; Eq $p.Config['custom'] 'keep'; Eq $p.Existing $true
+}
+Test 'Get-ServerConfigPlan: existing bindAddress null -> loopback (no guessed LAN)' {
+    $json = '{"bindAddress":null,"leadMs":322,"custom":"keep"}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '127.0.0.1'; Eq $p.BindAction 'set-loopback'; Eq $p.Config['leadMs'] 322; Eq $p.Config['custom'] 'keep'
+}
+Test 'Get-ServerConfigPlan: existing bindAddress empty string -> loopback (no guessed LAN)' {
+    $json = '{"bindAddress":"","leadMs":323,"custom":"keep"}'
+    $p = Get-ServerConfigPlan -ExistingJson $json -LanIp '' -FfmpegPath '' -HttpPort 47800 -HttpsPort 47443 -AudioPort 47801 -ClockPort 47802
+    Eq $p.Config['bindAddress'] '127.0.0.1'; Eq $p.BindAction 'set-loopback'; Eq $p.Config['leadMs'] 323; Eq $p.Config['custom'] 'keep'
+}
 
 Write-Host 'non-interactive: prompt functions never throw and never wait'
 foreach ($mode in @(
@@ -246,7 +291,331 @@ Test 'existing server.json + re-run WITHOUT an address (the wizard in Repair mod
     $r = Invoke-Setup $sb @{ LanIp = '' }; Fail-IfNotOk $r $sb
     Eq ((Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json).bindAddress) '10.9.8.7'
     Has (Get-Log $sb) 'keeping the address in the existing server.json'
+    Has (Get-Log $sb) 'bindAddress preserved: 10.9.8.7'
 }
+Test 'wizard/argument path: opted-in 0.0.0.0 upgrade with LanIp omitted preserves wildcard + allowAllInterfaces; log says preserved not overwritten-keep-lie' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    $ff = (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/'
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') ('{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"ffmpegPath":"' + $ff + '"}')
+    $r = Invoke-Setup $sb @{ LanIp = '' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '0.0.0.0'; Eq $cfg.allowAllInterfaces $true; Eq $cfg.extraAllowedSubnets[0] '100.64.0.0/10'; Eq $cfg.leadMs 800
+    $log = Get-Log $sb
+    Has $log 'bindAddress preserved: 0.0.0.0'
+    Has $log 'Keeping the existing server.json (your settings are not overwritten).'
+    HasNot $log 'deliberately changed'
+    HasNot $log 'Updating bindAddress in server.json'
+}
+Test 'wizard/argument path: explicit LanIp override of opted-in 0.0.0.0; unrelated keys kept; log distinguishes deliberate change' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"customKey":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = $lanIp }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress $lanIp; Eq $cfg.allowAllInterfaces $true; Eq $cfg.customKey 'keep'; Eq $cfg.leadMs 800
+    Has (Get-Log $sb) ("bindAddress deliberately changed: 0.0.0.0 -> " + $lanIp)
+    Has (Get-Log $sb) 'Updating bindAddress in server.json'
+    HasNot (Get-Log $sb) 'Keeping the existing server.json (your settings are not overwritten).'
+}
+Test 'wizard/argument path: fresh install with LanIp is LAN-safe (no 0.0.0.0, no allowAllInterfaces invent)' {
+    $sb = New-Sandbox; $r = Invoke-Setup $sb @{ LanIp = $lanIp }; Fail-IfNotOk $r $sb
+    $raw = Get-Content (Join-Path $sb.Data 'server.json') -Raw
+    $cfg = $raw | ConvertFrom-Json
+    Eq $cfg.bindAddress $lanIp; HasNot $raw '0.0.0.0'
+    if (($cfg.PSObject.Properties.Name -contains 'allowAllInterfaces') -and [bool]$cfg.allowAllInterfaces) { throw 'fresh install enabled allowAllInterfaces' }
+}
+Test 'WavWiz.iss (F268): -LanIp omitted when the chosen address equals the existing bind; confirmed blank carries 127.0.0.1; /LANIP seed wins; typed 0.0.0.0 = all networks' {
+    $iss = Get-Content (Join-Path $repo 'installer/WavWiz.iss') -Raw
+    Has $iss "ExistingBindSeeded := ExistingBindAddress;"
+    Has $iss "else if ChosenLanAddress = '' then"
+    Has $iss "Params := Params + ' -LanIp 127.0.0.1'"
+    Has $iss '(ExistingBindSeeded = '''') or (CompareText(ChosenLanAddress, ExistingBindSeeded) <> 0)'
+    Has $iss "else if Cli <> '' then SpecRadio.Checked := True"
+    Has $iss "LanEdit.Text := ''; AllIfRadio.Checked := True; UpdateNetChoice;"
+    if ($iss -match "\(V = '0\.0\.0\.0'\) or \(not IsIPv4\(V\)\)") { throw 'old unconditional 0.0.0.0 Next refusal still present' }
+    if ($iss -match "\(Trim\(LanEdit\.Text\) <> ''\) and \(\(ExistingBindSeeded") { throw 'old nonempty-only -LanIp gate still present (confirmed blank would omit)' }
+}
+Test 'setup-chain R1: existing server.json missing bindAddress + LanIp omitted -> 127.0.0.1 (no LAN detect)' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"leadMs":321,"custom":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = '' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.leadMs 321; Eq $cfg.custom 'keep'
+    Has (Get-Log $sb) 'no usable bindAddress'
+    HasNot (Get-Log $sb) ("detected $lanIp")
+    HasNot (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $lanIp
+}
+Test 'setup-chain R1: existing bindAddress null + LanIp omitted -> 127.0.0.1 (no LAN detect)' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":null,"leadMs":322,"custom":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = '' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.leadMs 322; Eq $cfg.custom 'keep'
+    Has (Get-Log $sb) 'no usable bindAddress'
+    HasNot (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $lanIp
+}
+Test 'setup-chain R1: existing bindAddress empty + LanIp omitted -> 127.0.0.1 (no LAN detect)' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"","leadMs":323,"custom":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = '' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.leadMs 323; Eq $cfg.custom 'keep'
+    Has (Get-Log $sb) 'no usable bindAddress'
+    HasNot (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $lanIp
+}
+Test 'wizard/argument R2: confirmed-cleared wildcard (explicit 127.0.0.1) overrides opted-in 0.0.0.0; unrelated keys kept' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"customKey":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = '127.0.0.1' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.allowAllInterfaces $true; Eq $cfg.extraAllowedSubnets[0] '100.64.0.0/10'; Eq $cfg.customKey 'keep'; Eq $cfg.leadMs 800
+    Has (Get-Log $sb) 'bindAddress deliberately changed: 0.0.0.0 -> 127.0.0.1'
+}
+Test 'wizard/argument R2: confirmed-cleared LAN (explicit 127.0.0.1) overrides existing LAN bind' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"192.168.1.50","leadMs":50,"httpPort":47800,"customKey":"keep"}'
+    $r = Invoke-Setup $sb @{ LanIp = '127.0.0.1' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.leadMs 50; Eq $cfg.customKey 'keep'
+    Has (Get-Log $sb) 'bindAddress deliberately changed: 192.168.1.50 -> 127.0.0.1'
+}
+Test 'wizard/argument R2: confirmed-cleared fresh (explicit 127.0.0.1) binds loopback; no detected LAN' {
+    $sb = New-Sandbox
+    $r = Invoke-Setup $sb @{ LanIp = '127.0.0.1' }; Fail-IfNotOk $r $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'
+    HasNot (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $lanIp
+    Has (Get-Log $sb) 'bindAddress'
+}
+
+# R3 callback-aware wizard→args→setup: silent Inno still runs CurPageChanged→DetectLan.
+# F268: models InitializeWizard /LANIP + /NETWORK seeds, DetectLan preselection (Home network only / Home network + Tailscale/VPN /
+# Advanced specific address) and the CurStepChanged emit. Emitted 'ALL' = -AllInterfaces 1.
+function Get-WizardLanIpArgsAfterCallbacks {
+    param(
+        [AllowNull()][string]$ExistingBind,
+        [string]$CliLanIp = '',
+        [string]$CliNetwork = '',
+        [string]$DetectedLan = '192.168.77.5',
+        # what the person does on the page: '' = accept defaults, 'lan' = Home network only, 'all' = + Tailscale/VPN, 'spec' = Advanced
+        [string]$Choice = '',
+        [string]$TypedLan = "<none>",
+        [switch]$Silent,
+        [switch]$Detail
+    )
+    $cli = ([string]$CliLanIp).Trim(); $net = ([string]$CliNetwork).Trim().ToLowerInvariant(); $existing = [string]$ExistingBind
+    $detected = ''
+    if ((-not $Silent) -or (-not $existing) -or ($cli -eq '' -and $net -eq 'home')) { $detected = [string]$DetectedLan }
+    if ($cli -eq '0.0.0.0') { $cli = ''; if (-not $net) { $net = 'all' } }
+    $lanEdit = $cli; $radio = ''
+    if ($net -eq 'all') { $radio = 'all' }
+    elseif ($cli) { $radio = 'spec' }
+    elseif ($net -eq 'home' -and $detected) { $radio = 'home' }
+    elseif ($existing -eq '0.0.0.0') { $radio = 'all' }
+    elseif ($existing) { if ($detected -and $existing -ieq $detected) { $radio = 'home' } else { $lanEdit = $existing; $radio = 'spec' } }
+    elseif ($detected) { $radio = 'home' } else { $radio = 'spec' }
+    $initial = $radio
+    if ($Choice -eq 'lan') { $radio = 'home' } elseif ($Choice -eq 'all') { $radio = 'all' } elseif ($Choice -eq 'spec') { $radio = 'spec'; if (-not $lanEdit.Trim()) { $lanEdit = $detected } }
+    if ($TypedLan -ne "<none>") { $radio = 'spec'; $lanEdit = $TypedLan }
+    # NextButtonClick: typed 0.0.0.0 = the all-networks choice
+    if ($radio -eq 'spec' -and $lanEdit.Trim() -eq '0.0.0.0') { $lanEdit = ''; $radio = 'all' }
+    $chosen = $(if ($radio -eq 'home') { $detected } else { $lanEdit.Trim() })
+    $emitted = New-Object System.Collections.Generic.List[string]
+    if ($radio -eq 'all') { [void]$emitted.Add('ALL') }
+    elseif ($chosen -eq '') { [void]$emitted.Add('127.0.0.1') }
+    elseif ((-not $existing) -or ($chosen -ine $existing)) { [void]$emitted.Add($chosen) }
+    $url = ''
+    if ($radio -eq 'all') { $url = $detected } elseif ($chosen -ne '' -and $chosen -ne '127.0.0.1') { $url = $chosen }
+    if ($Detail) { return [pscustomobject]@{ Emitted = $emitted; LanEdit = $lanEdit; Initial = $initial; Radio = $radio; AllChecked = ($radio -eq 'all'); KeepAll = ($radio -eq 'all'); Url = $(if ($url) { "https://${url}:47443" } else { '' }) } }
+    # Comma unary keeps the List intact (PowerShell would otherwise unwrap/enumerate it).
+    return , $emitted
+}
+function Invoke-SetupFromWizardCallbacks($sb, [AllowNull()][string]$ExistingBind, [string]$CliLanIp, [string]$Choice = '', [string]$TypedLan = "<none>", [switch]$Silent, [string]$DetectedLan = '192.168.77.5') {
+    $emitted = Get-WizardLanIpArgsAfterCallbacks -ExistingBind $ExistingBind -CliLanIp $CliLanIp -Choice $Choice -TypedLan $TypedLan -Silent:$Silent -DetectedLan $DetectedLan
+    $p = @{ LanIp = '' }
+    if ($emitted.Count -eq 1) { if ($emitted[0] -eq 'ALL') { $p.AllInterfaces = '1' } else { $p.LanIp = $emitted[0] } }
+    return [pscustomobject]@{ Emitted = $emitted; Result = (Invoke-Setup $sb $p) }
+}
+
+Test 'callback-aware R3: silent /LANIP=192.168.1.169 on existing LAN survives DetectLan and changes bind (LAN→different LAN)' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"192.168.1.50","leadMs":50,"httpPort":47800,"customKey":"keep","extraAllowedSubnets":["100.64.0.0/10"]}'
+    $w = Invoke-SetupFromWizardCallbacks $sb '192.168.1.50' '192.168.1.169'
+    Eq ($w.Emitted -join ',') '192.168.1.169' 'wizard must emit -LanIp after DetectLan (not omit)'
+    Fail-IfNotOk $w.Result $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '192.168.1.169'; Eq $cfg.leadMs 50; Eq $cfg.customKey 'keep'; Eq $cfg.extraAllowedSubnets[0] '100.64.0.0/10'
+    Has (Get-Log $sb) 'bindAddress deliberately changed: 192.168.1.50 -> 192.168.1.169'
+}
+
+Test 'callback-aware R3: silent /LANIP=127.0.0.1 on opted-in wildcard survives DetectLan and narrows to loopback' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":777,"httpPort":47800,"customKey":"keep"}'
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' '127.0.0.1'
+    Eq ($w.Emitted -join ',') '127.0.0.1' 'wizard must emit -LanIp 127.0.0.1 after DetectLan (not preserve wildcard)'
+    Fail-IfNotOk $w.Result $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '127.0.0.1'; Eq $cfg.allowAllInterfaces $true; Eq $cfg.extraAllowedSubnets[0] '100.64.0.0/10'; Eq $cfg.customKey 'keep'; Eq $cfg.leadMs 777
+    Has (Get-Log $sb) 'bindAddress deliberately changed: 0.0.0.0 -> 127.0.0.1'
+}
+
+Test 'callback-aware R3 control: silent no-/LANIP on opted-in wildcard still preserves after DetectLan seed' {
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    $ff = (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/'
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') ('{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":777,"httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"customKey":"keep","ffmpegPath":"' + $ff + '"}')
+    $before = Get-Content (Join-Path $sb.Data 'server.json') -Raw
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' ''
+    Eq ($w.Emitted -join ',') 'ALL' 'no-arg silent on existing wildcard = all-networks choice (kept, never the detected LAN)'
+    Fail-IfNotOk $w.Result $sb
+    Eq (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $before 'no-arg silent must not rewrite config bytes'
+    $cfg = $before | ConvertFrom-Json
+    Eq $cfg.bindAddress '0.0.0.0'; Eq $cfg.allowAllInterfaces $true; Eq $cfg.customKey 'keep'; Eq $cfg.leadMs 777
+    Has (Get-Log $sb) 'bindAddress preserved: 0.0.0.0'
+    HasNot (Get-Log $sb) 'deliberately changed'
+}
+
+# ---- F257/F268: network page = two plain choices (+ Advanced); all-networks never shows 0.0.0.0; existing 0.0.0.0 is never replaced by the detected LAN ----
+$f257wild = '{"bindAddress":"0.0.0.0","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":777,"httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"customKey":"keep","ffmpegPath":"FF"}'
+Test 'F268 WavWiz.iss: Home network only / Home network + Tailscale/VPN / Advanced radios; -AllInterfaces 1; 0.0.0.0 never shown' {
+    $iss = Get-Content (Join-Path $repo 'installer/WavWiz.iss') -Raw
+    Has $iss "LanOnlyRadio.Caption := 'Home network only (recommended)'"
+    Has $iss "AllIfRadio.Caption := 'Home network + Tailscale/VPN (all networks)'"
+    Has $iss "SpecRadio.Caption := 'Advanced: a specific address (127.0.0.1 = this PC only):'"
+    Has $iss "LanOnlyRadio.Caption := 'Home network only (recommended) - this PC: ' + DetectedLanIp"
+    Has $iss "ConnUrlLabel.Caption := 'Phones on your home network connect at:  ' + ConnUrl(U) + '   (read-only, for information)'"
+    Has $iss "Result := AllIfRadio.Checked;"
+    Has $iss "Params := Params + ' -AllInterfaces 1';"
+    Has $iss "else if ExistingBindSeeded = '0.0.0.0' then AllIfRadio.Checked := True"
+    Has $iss "if (DetectedLanIp <> '') and (CompareText(ExistingBindSeeded, DetectedLanIp) = 0) then LanOnlyRadio.Checked := True"
+    if ($iss -notmatch "(?s)DetectLan;\s*if KeepAllInterfaces then") { throw 'CurStepChanged does not re-read saved bind before the emit decision (silent)' }
+    HasNot $iss 'is not offered by this installer'
+    HasNot $iss "Caption := '0.0.0.0"
+    HasNot $iss 'Visible := False; AllIfRadio'
+}
+Test 'F268 PCBOXV2 case: upgrade over 0.0.0.0 with defaults keeps all networks; detected LAN never overrides; config bytes unchanged' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -DetectedLan '192.168.1.169' -Detail
+    Eq $d.Initial 'all'; Eq $d.LanEdit ''; Eq $d.Url 'https://192.168.1.169:47443'; Eq ($d.Emitted -join ',') 'ALL'
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    $ff = (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/'
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') ($f257wild -replace '"FF"', ('"' + $ff + '"'))
+    $before = Get-Content (Join-Path $sb.Data 'server.json') -Raw
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' '' -DetectedLan '192.168.1.169'; Fail-IfNotOk $w.Result $sb
+    Eq (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $before 'wildcard kept byte-for-byte'
+    $log = Get-Log $sb
+    Has $log 'bindAddress preserved: 0.0.0.0'; Has $log 'network choice: Home network + Tailscale/VPN (all networks) - kept'; HasNot $log 'deliberately changed'
+    Has (Get-Rules $sb) 'WavWiz Server (Tailscale/VPN web)'; Has (Get-Rules $sb) 'remoteip=100.64.0.0/10'
+}
+Test 'F268 typing 0.0.0.0 in Advanced = the all-networks choice' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -TypedLan '0.0.0.0' -Detail
+    Eq $d.KeepAll $true; Eq ($d.Emitted -join ',') 'ALL'
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '' -TypedLan '0.0.0.0' -Detail
+    Eq $d.KeepAll $true; Eq ($d.Emitted -join ',') 'ALL'
+}
+Test 'F268 explicit Home network only on an all-networks upgrade: emits the detected LAN, config changes deliberately, VPN rule removed' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -DetectedLan $lanIp -Choice 'lan' -Detail
+    Eq $d.AllChecked $false; Eq ($d.Emitted -join ',') $lanIp; Eq $d.Url ("https://${lanIp}:47443")
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') $f257wild
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' '' -Choice 'lan'; Fail-IfNotOk $w.Result $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress $lanIp; Eq $cfg.customKey 'keep'
+    Has (Get-Log $sb) ("bindAddress deliberately changed: 0.0.0.0 -> " + $lanIp)
+    HasNot (Get-Rules $sb) 'Tailscale/VPN'
+}
+Test 'F268 Advanced with an empty box emits 127.0.0.1 (this PC only), no URL shown' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -TypedLan '' -Detail
+    Eq ($d.Emitted -join ',') '127.0.0.1'; Eq $d.Url ''
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') $f257wild
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' '' -TypedLan ''; Fail-IfNotOk $w.Result $sb
+    Eq ((Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json).bindAddress) '127.0.0.1'
+}
+Test 'F268 silent upgrade (no /LANIP) on all networks: no detection, kept, server.json untouched' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -Silent -Detail
+    Eq $d.KeepAll $true; Eq ($d.Emitted -join ',') 'ALL'
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    $ff = (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/'
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') ($f257wild -replace '"FF"', ('"' + $ff + '"'))
+    $before = Get-Content (Join-Path $sb.Data 'server.json') -Raw
+    $w = Invoke-SetupFromWizardCallbacks $sb '0.0.0.0' '' -Silent; Fail-IfNotOk $w.Result $sb
+    Eq (Get-Content (Join-Path $sb.Data 'server.json') -Raw) $before
+    HasNot (Get-Log $sb) 'deliberately changed'
+}
+Test 'F268 silent /LANIP on all networks selects that address explicitly; /NETWORK=home picks the detected LAN' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -CliLanIp $lanIp -Silent -Detail
+    Eq $d.AllChecked $false; Eq ($d.Emitted -join ',') $lanIp
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '0.0.0.0' -CliNetwork 'home' -Silent -Detail
+    Eq $d.Radio 'home'; Eq ($d.Emitted -join ',') '192.168.77.5'
+}
+Test 'F268 fresh install: Home network only preselected with the detected LAN; never 0.0.0.0' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '' -DetectedLan $lanIp -Detail
+    Eq $d.Initial 'home'; Eq $d.KeepAll $false; Eq ($d.Emitted -join ',') $lanIp
+    $sb = New-Sandbox; $w = Invoke-SetupFromWizardCallbacks $sb '' '' -DetectedLan $lanIp; Fail-IfNotOk $w.Result $sb
+    $raw = Get-Content (Join-Path $sb.Data 'server.json') -Raw
+    HasNot $raw '0.0.0.0'; HasNot (Get-Rules $sb) 'Tailscale/VPN'
+}
+Test 'F268 fresh install, person picks Home network + Tailscale/VPN: 0.0.0.0 + allowAllInterfaces + 100.64.0.0/10 + VPN web rule' {
+    $sb = New-Sandbox; $w = Invoke-SetupFromWizardCallbacks $sb '' '' -Choice 'all'; Fail-IfNotOk $w.Result $sb
+    Eq ($w.Emitted -join ',') 'ALL'
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '0.0.0.0'; Eq $cfg.allowAllInterfaces $true; Eq ($cfg.extraAllowedSubnets -join ',') '100.64.0.0/10'
+    $rules = Get-Rules $sb; Has $rules 'WavWiz Server (Tailscale/VPN web)'; Has $rules 'remoteip=100.64.0.0/10'
+}
+Test 'F268 upgrade over a LAN address (PCBOXV2 today: 192.168.1.169): Home network only preselected; picking all networks switches + keeps keys' {
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '192.168.1.169' -DetectedLan '192.168.1.169' -Detail
+    Eq $d.Initial 'home'; Eq ($d.Emitted -join ',') ''
+    $d = Get-WizardLanIpArgsAfterCallbacks -ExistingBind '192.168.1.50' -DetectedLan '192.168.1.169' -Detail
+    Eq $d.Initial 'spec'; Eq $d.LanEdit '192.168.1.50'; Eq ($d.Emitted -join ',') ''
+    $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
+    Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{"bindAddress":"192.168.1.169","allowAllInterfaces":true,"extraAllowedSubnets":["100.64.0.0/10"],"leadMs":800,"httpPort":47800,"customKey":"keep"}'
+    $w = Invoke-SetupFromWizardCallbacks $sb '192.168.1.169' '' -Choice 'all' -DetectedLan '192.168.1.169'; Fail-IfNotOk $w.Result $sb
+    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
+    Eq $cfg.bindAddress '0.0.0.0'; Eq $cfg.allowAllInterfaces $true; Eq ($cfg.extraAllowedSubnets -join ',') '100.64.0.0/10'; Eq $cfg.customKey 'keep'; Eq $cfg.leadMs 800
+    $log = Get-Log $sb
+    Has $log 'bindAddress deliberately changed: 192.168.1.169 -> 0.0.0.0'; Has $log 'network choice: Home network + Tailscale/VPN (all networks) - chosen in Setup'
+    Has $log 'listening on the home network + Tailscale/VPN (all networks) instead of only 192.168.1.169'
+}
+
+Test 'F257-A R1 WavWiz.iss layout: intro, radios, edit, URL and tip stack top-to-bottom with no vertical overlap (all ScaleY)' {
+    $iss = Get-Content (Join-Path $repo 'installer/WavWiz.iss') -Raw
+    $ctl = [ordered]@{
+        Intro = "L\.SetBounds\(0, 0, NetPage\.SurfaceWidth, ScaleY\((\d+)\)\);\s*L\.Caption := 'Phones and other PCs"
+        LanOnlyRadio = 'LanOnlyRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
+        AllIfRadio = 'AllIfRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
+        SpecRadio = 'SpecRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
+        LanEdit = 'LanEdit\.SetBounds\(ScaleX\(\d+\), ScaleY\((\d+)\), ScaleX\(\d+\), ScaleY\((\d+)\)\)'
+        ConnUrlLabel = 'ConnUrlLabel\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
+        PrivTip = 'PrivTip\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, NetPage\.SurfaceHeight - ScaleY\((\d+)\)\)'
+    }
+    $prevBottom = 0; $prev = ''
+    foreach ($k in $ctl.Keys) {
+        $m = [regex]::Match($iss, $ctl[$k]); if (-not $m.Success) { throw "$k bounds not found / not ScaleY-based" }
+        if ($k -eq 'Intro') { $top = 0; $h = [int]$m.Groups[1].Value }
+        elseif ($k -eq 'PrivTip') { $top = [int]$m.Groups[1].Value; $h = 0; Eq ([int]$m.Groups[2].Value) $top 'PrivTip height must be SurfaceHeight - its own Top' }
+        else { $top = [int]$m.Groups[1].Value; $h = [int]$m.Groups[2].Value }
+        if ($top -lt $prevBottom) { throw "$k top $top overlaps $prev (bottom $prevBottom)" }
+        $prevBottom = $top + $h; $prev = $k
+    }
+}
+# mirror of WavWiz.iss ExistingHttpsPort (R2): '' = unknown -> no full URL
+function Get-IssHttpsPort([string]$json, [switch]$NoFile) {
+    if ($NoFile) { return '47443' }
+    $p = $json.IndexOf('"httpsPort"'); if ($p -lt 0) { return '' }
+    $s = $json.Substring($p + 11); $c = $s.IndexOf(':'); if ($c -lt 0) { return '' }
+    $m = [regex]::Match($s.Substring($c + 1).Trim(), '^\d+'); if (-not $m.Success) { return '' }
+    $n = [int]$m.Value; if ($n -ge 1 -and $n -le 65535) { return [string]$n } else { return '' }
+}
+Test 'F257-A R2 port: custom saved httpsPort is used; unknown port omits the full URL; no hardcoded :47443 in the URL text' {
+    $iss = Get-Content (Join-Path $repo 'installer/WavWiz.iss') -Raw
+    Has $iss "P := Pos('`"httpsPort`"', S)"
+    Has $iss "if (Ip <> '') and (Port <> '') then Result := 'https://' + Ip + ':' + Port;"
+    if ($iss -match "':47443") { throw 'URL text still hardcodes :47443' }
+    Eq (Get-IssHttpsPort '{"bindAddress":"0.0.0.0","httpsPort": 50443,"httpPort":47800}') '50443' 'custom saved port'
+    Eq (Get-IssHttpsPort '{"bindAddress":"0.0.0.0","httpPort":47800}') '' 'unknown port -> no URL'
+    Eq (Get-IssHttpsPort '{"httpsPort":"x"}') '' 'garbage port -> no URL'
+    Eq (Get-IssHttpsPort -NoFile) '47443' 'fresh install uses setup.ps1 default'
+    Has (Get-Content (Join-Path $repo 'installer/scripts/setup.ps1') -Raw) '[int]$HttpsPort = 47443'
+}
+
 Test 'a broken existing server.json stops the install BEFORE any service or rule is touched, with the file name in the message' {
     $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null; Write-Utf8NoBom (Join-Path $sb.Data 'server.json') '{ broken'
     $r = Invoke-Setup $sb; Eq $r.ExitCode 1; Eq $r.Done '1'
@@ -299,6 +668,31 @@ Test 'missing ffmpeg in the install: pre-flight stops the install before anythin
     $sb = New-Sandbox; Remove-Item (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe')
     $r = Invoke-Setup $sb; Eq $r.ExitCode 1; Has (Get-Log $sb 'last-setup-error.txt') 'Server\ffmpeg\ffmpeg.exe'; HasNot (Get-Calls $sb) 'tool sc.exe'
 }
+# ---- F268b: a wildcard bind is never used as a host to connect to ----
+Test 'F268b Get-ProbeHost / Get-ConnectHost: 0.0.0.0 and :: map to 127.0.0.1 (probe) / LAN (connect); single addresses pass through' {
+    $sb = New-Sandbox
+    $code = ". '$scripts/lib.ps1'; `"RESULT `$(Get-ProbeHost '0.0.0.0') `$(Get-ProbeHost '::') `$(Get-ProbeHost '[::]') `$(Get-ProbeHost '192.168.1.5') `$(Get-ConnectHost '0.0.0.0') `$(Get-ConnectHost '10.0.0.2')`""
+    $r = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-Command', $code)
+    Has $r.Output "RESULT 127.0.0.1 127.0.0.1 127.0.0.1 192.168.1.5 $lanIp 10.0.0.2"
+}
+Test 'F268b all networks: readiness probe goes to 127.0.0.1 (not 0.0.0.0); first-run URL and local player use the LAN address' {
+    $sb = New-Sandbox
+    $r = Invoke-Setup $sb @{ LanIp = ''; AllInterfaces = '1' }; Fail-IfNotOk $r $sb
+    Eq ((Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json).bindAddress) '0.0.0.0'
+    Eq ((Get-Content (Join-Path $sb.Data 'first-run-url.txt') -Raw).Trim()) "http://${lanIp}:47800/"
+    $pd = Get-Content (Join-Path $sb.Data 'player-defaults.json') -Raw
+    Has $pd $lanIp; HasNot $pd '0.0.0.0'
+    # with no probe override the real probe runs: its URL must name 127.0.0.1
+    $sb2 = New-Sandbox
+    $r2 = Invoke-Setup $sb2 @{ LanIp = ''; AllInterfaces = '1' } @{ WAVWIZ_TEST_PROBE_URL = $null; WAVWIZ_TEST_PROBE_TIMEOUT = '1' }
+    $all = $r2.Output + (Get-Log $sb2) + (Get-Log $sb2 'last-setup-error.txt')
+    if ($r2.ExitCode -ne 0) { Has $all 'http://127.0.0.1:47800/' }
+    HasNot $all 'http://0.0.0.0'
+}
+Test 'F268b installer scripts never build a connect URL from the raw bind' {
+    foreach ($f in 'install-server.ps1', 'setup.ps1') { $t = Get-Content (Join-Path $scripts $f) -Raw; HasNot $t 'http://${bind}' $f; HasNot $t '$host2 = $bind' $f }
+}
+
 Test 'bad LAN address passed explicitly is rejected with a clear message; 0.0.0.0 is never accepted' {
     foreach ($bad in '0.0.0.0', '999.1.1.1') { $sb = New-Sandbox; $r = Invoke-Setup $sb @{ LanIp = $bad }; Eq $r.ExitCode 1 $bad; Has (Get-Log $sb 'last-setup-error.txt') 'not a usable single IPv4'; HasNot (Get-Calls $sb) 'tool sc.exe create' }
 }

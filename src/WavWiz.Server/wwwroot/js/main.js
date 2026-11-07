@@ -6,6 +6,8 @@ import './marquee.js';   // 0.4.8 F62: shared now-playing marquee (main app + ph
 import { libCountLabel } from './libcount.js';   // 0.4.4 F7
 import './sliderstyle.js';   // 0.3.3 G11
 import './pwa.js';
+import { installOrientationGuard } from './orientlock.js';   // F262-fix: phone is portrait-only
+installOrientationGuard();
 import './a2hs.js';   // 0.4.1 E   // 0.3.4 H1
 import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
@@ -15,7 +17,7 @@ import { isPhone } from './viz.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
-import { centerEq } from './centerview.js';   // 0.5.0 F128: phone Sound / EQ sheet
+import { openPhoneSound } from './phonesound.js';   // F250-P7: composed phone Sound modal
 import { openSpeakerSettings, editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
 import { listTable, srcPill } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
@@ -35,7 +37,7 @@ import { adminChip, refreshAuth } from './elevate.js';
 import { liveSocket } from './wsconn.js';
 import { openAbout, maybeWhatsNew } from './about.js';
 import { libraryView } from './library.js';
-import { artPushed, setArtCv } from './art.js';
+import { artPushed, setArtCv, artCv, reconcileSmoothPosition, npCover } from './art.js';
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
@@ -184,16 +186,73 @@ applyNpColor(loadNpPrefs()); // F94
 window.addEventListener('wavwiz:npstyle', () => { applyNpColor(loadNpPrefs()); paintMiniStyle(); });
 window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.npstyle.v1') { applyNpColor(loadNpPrefs()); paintMiniStyle(); } });
 
+// F250-P1: phone destinations are routes except Settings, which owns a dialog,
+// not S.view. Keep the mounted page/scroll/player intact while it is open.
+function createPhoneTabs() {
+  return h('nav', { class: 'tabbar', 'aria-label': 'Main navigation' },
+    [['library', 'library', 'Library'], ['queue', 'queue', 'Queue'], ['devices', 'devices', 'Devices'], ['settings', 'gear', 'Settings']].map(([k, ic, label]) =>
+      h('button', { type: 'button', 'data-k': k, ...(k === 'settings' ? { 'aria-haspopup': 'dialog', 'aria-expanded': 'false' } : {}),
+        onclick: ev => k === 'settings' ? openPhoneSettings(ev.currentTarget) : go(k) }, icon(ic), h('span', null, label))));
+}
+function openPhoneSettings(from) {
+  const view = S.view;
+  // Safari does not always focus a tapped button; give native dialog restoration
+  // an explicit opener. Never re-go(view) on close (that would reload the page).
+  from.focus({ preventScroll: true });
+  openSettings(S, refreshAll, go).catch(handleErr);
+  const dlg = document.querySelector('dialog.settings-dlg[open]');
+  if (!dlg) return;
+  from.setAttribute('aria-expanded', 'true');
+  dlg.addEventListener('close', () => {
+    from.setAttribute('aria-expanded', 'false');
+    // Settings can deliberately navigate or the viewport can become desktop.
+    if (!wide() && S.view === view && from.isConnected) from.focus({ preventScroll: true });
+  }, { once: true });
+}
+
+// F250-P2: full-page phone Library only. Lazily own separate adapters so a
+// direct route or the desktop panel can never steal its mounted DOM/state.
+function createPhoneLibrary() {
+  let radio, playlists;
+  const lib = libraryView(S, { phone: true, extras: {
+    get radio() { return radio ||= radioTab(S, act); },
+    get playlists() {
+      if (!playlists) {
+        const view = playlistsView(S, { deferInitial: true });
+        let loading = null;
+        // An initial source/RS refresh can arrive together. Coalesce only this
+        // adapter's reload so smartSection cannot append twice to one draw.
+        playlists = { el: view.el, reload: () => loading || (loading = view.reload().finally(() => { loading = null; })) };
+      }
+      return playlists;
+    }
+  } });
+  // Informational cue, not another zone owner. The existing mini/Now picker
+  // still selects the controlling zone through zones40.
+  const zone = h('span', { class: 'libzone small' });
+  const paintZone = () => { const name = Z.current()?.name; zone.textContent = name || 'No zone selected'; zone.setAttribute('aria-label', name ? `Controlling ${name}` : 'No zone selected'); };
+  lib.el.prepend(h('header', { class: 'libpage-heading' }, h('h1', null, 'Library'), zone));
+  const reload = lib.reload;
+  lib.reload = () => { paintZone(); return reload(); };
+  window.addEventListener('wavwiz:zonesync', paintZone);
+  paintZone();
+  return lib;
+}
+
 async function startMain() {
   installSliderGuard(document);     // 0.3.0 §9/§7.8: drag-safe sliders + wheel fine-tune everywhere
   const connDot = h('span', { class: 'dot', id: 'conn' }), connTxt = h('span', { id: 'conntxt', class: 'small dim' }, 'Connecting…');
   const control = canControl(S);
   const ctl = { openQueue: () => openQueue(), act, refreshAll, showInLibrary: (t, q) => showInLibrary(t, q), go, openSetup, openEq: () => showEq(), runShortcut: id => runShortcut(id), goHome: () => goHome(), checklistGo, pill: roomPill, saveQueue, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f), listStep: d => listStepUi(d), libCollapsed: () => desk?.classList.contains('libcollapsed'), devCollapsed: () => desk?.classList.contains('devcollapsed'), libSwap: v => libSwap(v) };
   nowc = createNow(S, ctl); devv = devicesView(S, ctl); devp = devicesPanel(S, ctl); listt = listTable(S, ctl);
-  views.library = libraryView(S); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
-  views.queue = { el: h('div', { id: 'p-list' }), reload: drawQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
+  // F262 capture tooling ONLY: no diagnostic module, listeners or buffer without this exact opt-in.
+  if (new URLSearchParams(location.search).get('diag') === '1')
+    void import('./f262diag.js').then(m => m.installCapture()).catch(() => {}); // optional diagnostic init only
+
+  views.library = createPhoneLibrary(); views.playlists = playlistsView(S); views.cleanup = cleanupView(S); views.diag = diagnosticsView(S);
+  views.queue = { el: h('div', { id: 'p-list', class: 'phone-queue' }), reload: drawQueue, hide: hidePhoneQueue, show: showPhoneQueue }; views.radio = radioTab(S, act);   // 0.3.5 J9: one Radio page (stations + finder)
   views.finder = radioFinderView(S, act); views.tags = tagsView(S); views.rip = ripView(S); views.remote = remoteView(S);
-  views.devices = { el: devv.el, reload: () => devv.draw() }; views.about = { el: h('div', { id: 'p-about' }), reload: () => openAboutInto(views.about.el) };
+  views.devices = { el: devv.el, reload: () => devv.draw(), hide: () => devv.hide() }; views.about = { el: h('div', { id: 'p-about' }), reload: () => openAboutInto(views.about.el) };
   // 0.3.5 J9: the desktop Library panel hosts Playlists, Radio and (expanded) the tools as tabs
   libC = libraryView(S, { compact: true, extras: { playlists: playlistsView(S), radio: radioTab(S, act), rip: ripView(S), tags: tagsView(S), cleanup: cleanupView(S) } });
   content = h('main', { class: 'view', id: 'view', tabindex: -1 });
@@ -224,22 +283,23 @@ async function startMain() {
   desk.addEventListener('transitionend', ev => { if (ev.target === desk && /grid-template/.test(ev.propertyName)) { nowc.viz?.resize?.(); placeNext(); } });   // §6: the viz resizes once the move has finished
   listt.setCollapsed?.(P6.list);
   wireNextBlock();
-  tabs = h('nav', { class: 'tabbar', 'aria-label': 'Sections' }, [['now', '♪', 'Now'], ['library', '☰', 'Library'], ['devices', '◉', 'Devices']].map(([k, ic, t]) => h('button', { 'data-k': k, onclick: () => go(k) }, h('b', null, ic), t)));
+  tabs = createPhoneTabs();
   drawerEl = buildDrawer();
   app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
   const applyMode = () => {   // 0.3.9 L52: keep the view state valid on both sides of the breakpoint (idle or playing)
     const m = viewForMode({ wide: wide(), view: S.view, hasContent: !!content.firstChild });
-    if (m.clearContent) { content.replaceChildren(); S.view = m.view; desk.dataset.view = m.view; tabs.querySelectorAll('button').forEach(b => b.classList.remove('on')); }
+    if (m.clearContent) { views[S.view]?.hide?.(); content.replaceChildren(); S.view = m.view; desk.dataset.view = m.view; tabs.querySelectorAll('button').forEach(b => { b.classList.remove('on'); b.removeAttribute('aria-current'); }); }
     else if (m.view !== S.view || desk.dataset.view !== m.view) go(m.view, true);
-    else if (!tabs.querySelector('button.on')) go(m.view, true);
+    // Now and drawer-only pages have no bottom destination: do not remount on resize.
+    else if (!content.firstChild) go(m.view, true);
   };
   window.addEventListener('resize', () => { applyMode(); applyPanels(); });
   try { matchMedia('(max-width:900px)').addEventListener('change', () => { applyMode(); applyPanels(); }); } catch { /* old engines */ }
   applyMode();
   window.addEventListener('keydown', ev => {
     if (ev.key === 'Escape') toggleDrawer(false);
-    const nk = !document.querySelector('dialog[open],.sheet,.dlg,.jb') && newKindForKey(ev, isTypingTarget(ev.target)); if (nk) { ev.preventDefault(); openNew(nk); return; }   // K17
-    if (!wide() || document.querySelector('dialog[open],.sheet,.dlg,.jb')) return;
+    const nk = !document.querySelector('dialog[open],.sheet,.dlg,.jb,.pd42-sheet') && newKindForKey(ev, isTypingTarget(ev.target)); if (nk) { ev.preventDefault(); openNew(nk); return; }   // K17
+    if (!wide() || document.querySelector('dialog[open],.sheet,.dlg,.jb,.pd42-sheet')) return;
     const n = keyAction(P6, ev); if (n) { ev.preventDefault(); setPanels(n, ev.code === 'BracketRight' ? 'dev' : 'lib'); }
   });
   applyPanels(true);
@@ -490,26 +550,12 @@ export function goHome() {
   try { window.focus(); } catch { /* ignore */ }
   setTimeout(() => pulse(desk), reduced() ? 0 : GLIDE.ms);
 }
-// 0.5.0 F128: phone NP hides .np-vizpanel (F102), so Sound / EQ opens a full-screen sheet hosting centerEq
+// F250-P7: same Now instance remains mounted/playing below the owned modal.
 let eqSheet = null;
-export function closePhoneEqSheet() {
-  const s = eqSheet; if (!s) return; eqSheet = null;
-  document.removeEventListener('keydown', s.onKey, true);
-  try { s.eq?.destroy(); } catch {}
-  s.el.remove(); document.documentElement.classList.remove('eqsheet-lock');
-}
+export function closePhoneEqSheet() { eqSheet?.close(); }
 export function openPhoneEqSheet() {
-  if (eqSheet) { eqSheet.x.focus(); return eqSheet; }   // don't stack
-  const x = h('button', { type: 'button', class: 'iconbtn eqsheet-x', 'aria-label': 'Close', title: 'Close', onclick: () => closePhoneEqSheet() }, '\u2715');
-  const body = h('div', { class: 'eqsheet-b' });
-  const el = h('div', { class: 'eqsheet open npeqsheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Sound / EQ' }, h('header', { class: 'eqsheet-h' }, h('b', {}, 'Sound / EQ'), x), body);
-  const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePhoneEqSheet(); } };
-  document.documentElement.classList.add('eqsheet-lock');
-  document.body.append(el);
-  eqSheet = { el, x, body, onKey, eq: null };
-  eqSheet.eq = centerEq(S, body);
-  document.addEventListener('keydown', onKey, true);
-  x.focus();
+  if (eqSheet) { eqSheet.x.focus(); return eqSheet; }
+  eqSheet = openPhoneSound(S, { mount: el => document.body.append(el), from: nowc.el?.querySelector('.np-phone-sound') || document.activeElement, refreshAll, onClose: () => { eqSheet = null; } });
   return eqSheet;
 }
 export function showEq() {
@@ -562,15 +608,26 @@ export function go(k, force) {
   }
   if (k === 'scenes' || k === 'schedules' || k === 'alarms') return openScenesSchedules(S, refreshAll);   // phone sheet
   if (k === 'eq') return showEq();
-  if (S.view !== k) views[S.view]?.hide?.();
+  // F250-P5: one return bookmark on the existing router, not browser history.
+  // Keep the prior DOM mounted under Now, preserving Library source/filter state.
+  const returning = k === 'now:collapse' ? go.phoneNowReturn : null;
+  if (k === 'now:collapse') k = returning?.view || 'library'; // direct/startup fallback
+  if (k === 'now' && S.view !== 'now') go.phoneNowReturn = { view: S.view, el: content.firstChild, scroll: desk.scrollTop, focus: document.activeElement };
+  if (S.view !== k) { views[S.view]?.hide?.(); if (S.view === 'now') nowc.hidePhone?.(); }
   S.view = k; desk.dataset.view = k;
-  if (k !== 'now') { const v = views[k]; content.replaceChildren(v.el); v.reload?.(); }
+  if (k !== 'now') {
+    const v = views[k];
+    if (returning && returning.el === content.firstChild && returning.el === v?.el) v.show?.();
+    else { content.replaceChildren(v.el); v.reload?.(); }
+    go.phoneNowReturn = null;
+  }
   else if (!content.firstChild) content.replaceChildren(views.library.el);
-  tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.k === k; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   navButtons.forEach(b => b.classList.toggle('on', b.dataset.k === k));
   document.querySelectorAll('.navwide [data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === k));
-  if (k === 'now') { nowc.drawChecklist(); }
-  window.scrollTo(0, 0);
+  if (k === 'now') { nowc.drawChecklist(); nowc.el?.querySelector('.np-phone-collapse')?.focus({ preventScroll: true }); }
+  if (returning) { desk.scrollTop = returning.scroll; if (returning.focus?.isConnected) returning.focus.focus({ preventScroll: true }); }
+  else window.scrollTo(0, 0);
 }
 const checklistGo = a => go(a);
 /** 0.3.2 F3: the mini player (replaces Remote mode). In a browser it is a small popup window; WavWiz Player has its own (tray > Mini player).
@@ -586,8 +643,25 @@ export async function refreshAll() { await Promise.allSettled([refreshNow(), ref
 Z.init(S, { refreshNow: () => refreshNow(), manage: () => { if (wide()) setDevSize('expanded'); else go('devices'); } });
 window.addEventListener('wavwiz:zone', () => { devv.draw(); devp.draw(); nowc.draw(); listt.draw(); });
 let zonesSoon = 0; const refreshZonesSoon = () => { clearTimeout(zonesSoon); zonesSoon = setTimeout(refreshZones, 150); };   // 0.4.8 F61: was 500 ms; device cards follow a track change in well under 1 s
-async function refreshNow() { try { const r = await api('/stream'); S.now = r.now; S.queue = r.queue.items; S.localPos = r.now.positionMs; S.localAt = performance.now(); whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
-async function refreshZones() { try { const [z, g, jb, cast] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast)]); S.jb = jb; S.cast = cast;   /* 0.4.9 F78 */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
+async function refreshNow() { try { const responseZone = globalThis.__wavwizZoneKey, responseRoute = S._streamRoute;
+    // Phone Queue edits outlive DOM engines. Reads started before/during a write
+    // cannot re-enable stale indices, even if their HTTP response arrives late.
+    // Capture every request's generation: a wide-started read may return on phone.
+    const edit = S._phoneQueueEdit, read = edit?.readToken(), startedPhone = matchMedia('(max-width:900px)').matches;
+    const r = await api('/stream');
+    // F250-P5 amendment: provenance follows the resolved API request target,
+    // not the visual zone. Route identity also rejects A → B → A races, while
+    // linked selections sharing one stream need no playing tick/new evidence.
+    // Wide desktop retains its existing ingest behavior.
+    const phone = matchMedia('(max-width:900px)').matches, phoneRead = startedPhone || phone;
+    if (phone && responseRoute !== S._streamRoute) return;
+    if (phoneRead && edit && !edit.canRead(read)) return;
+    S._nowZoneKey = responseZone; S._nowRoute = responseRoute; S.now = r.now; S.queue = r.queue.items; if (phoneRead) edit?.didRead(read);
+    // F248: ingest server position into the smooth clock; do not let valid-duration zero blips poison localPos.
+    const at = performance.now(), rec = reconcileSmoothPosition(S._smooth, r.now, r.now?.positionMs, at);
+    S._smooth = rec; S.localPos = rec.posMs; S.localAt = rec.at;
+    whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
+async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast)]); S.jb = jb; S.cast = cast;   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
   nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); } catch (e) { handleErr(e); } }
@@ -668,30 +742,162 @@ async function maybeAutoSetup(tries = 0) {
 }
 
 // ---------------------------------------------------------------- Queue
-let qReorder = null;
+let qReorder = null, qMenus = [], qSettled = null, qRenderedZone = null, qPendingRefresh = false, qResume = null, qPaintSig = null;   // F252: skip identical phone Queue paints (keeps row <img>s)
+// F250-P3 amendment: transaction ownership belongs to the phone controller,
+// never a disposable row/drag engine. The optional menu adapter shares it with
+// the phone current-song actions; desktop/native table callers do not opt in.
+const qZoneKey = () => JSON.stringify([Z.zoneIdFor(Z.current())]); // linked choices edit the same actual queue
+const qOccurrence = q => q && JSON.stringify([q.id, q.kind, q.refId, q.location]);
+// F252-amend2: shared complete rendered-input signature for drawQueue skip AND qResume retained return.
+const qRowSig = q => [qOccurrence(q), q?.title, q?.artist, q?.album, q?.durationMs, q?.artUrl, q?.source, q?.sourceLabel, q?.kind, q?.refId];
+const qNowItemSig = it => it == null ? null : [qOccurrence(it), it.title, it.artist, it.album, it.artUrl, it.source, it.sourceLabel, it.kind, it.refId];
+function qPaintSignature() {
+  const can = canControl(S);
+  const locked0 = !!loadLayout(true).locked, busy0 = qEdit.pending();
+  const zone0 = Z.current(), choices0 = Z.choicesNow();
+  const nowItem = S.now?.item, hasNow0 = !!nowItem && S.now?.state !== 'stopped';
+  return JSON.stringify([
+    [zone0?.key, zone0?.playbackId, zone0?.name],
+    choices0.map(c => [c.key, c.playbackId, c.name]),
+    S.queue.map(qRowSig),
+    S.now?.index ?? -1, S.now?.state ?? null, hasNow0, qNowItemSig(nowItem),
+    can, locked0, busy0, artCv()]);
+}
+const qEdits = new Map(), qReadGenerations = new Map();
+const qEdit = S._phoneQueueEdit = {
+  pending: () => qEdits.has(qZoneKey()),
+  readToken: () => { const zone = qZoneKey(), tx = qEdits.get(zone); return { zone, generation: qReadGenerations.get(zone) || 0, tx, settled: !!tx?.settled }; },
+  canRead: read => !!read && read.zone === qZoneKey() && read.generation === (qReadGenerations.get(read.zone) || 0) && (!read.tx || read.settled) &&
+    (!qEdits.has(read.zone) || (qEdits.get(read.zone) === read.tx && read.settled)),
+  didRead: read => {
+    const tx = qEdits.get(read.zone); if (!tx || tx !== read.tx || !read.settled) return;
+    qEdits.delete(read.zone);
+    // Resolve the actual resulting occurrence, not a stale destination index.
+    const index = tx.move && tx.occurrence != null ? S.queue.findIndex(q => qOccurrence(q) === tx.occurrence) : -1;
+    qSettled = { index, zone: read.zone, keyboard: tx.keyboard, error: tx.error };
+  },
+  run: async (path, body, method = 'POST', action = null) => {
+    // Queue's existing Play next policy is lock-independent; ordinary moves/removes are not.
+    const playNext = action === 'next' && path === '/queue/move' && method === 'POST';
+    if (qEdit.pending() || !canControl(S) || (loadLayout(true).locked && !playNext)) return false;
+    const zone = qZoneKey(), tx = { settled: false, move: path === '/queue/move',
+      occurrence: body?.from != null ? qOccurrence(S.queue[body.from]) : null,
+      keyboard: document.activeElement?.classList.contains('qgrip'), error: null };
+    qEdits.set(zone, tx); qReadGenerations.set(zone, (qReadGenerations.get(zone) || 0) + 1);
+    qMenus.forEach(m => m.close());
+    if (S.view === 'queue' && !wide()) drawQueue();
+    try { await api(path, { method, body }); } catch (e) { tx.error = e.message || 'Could not reorder'; }
+    // Even a rejected/ambiguous response needs a fresh snapshot before retry.
+    // A failed refresh leaves the fence in place until an ordinary poll succeeds.
+    tx.settled = true;
+    await refreshNow();
+    if (S.view === 'queue' && !wide() && qEdits.has(zone)) drawQueue();
+    if (tx.error) { toast(tx.error, true); return false; }
+    return !qEdits.has(zone);
+  }
+};
+function hidePhoneQueue() {
+  // Ownership ends BEFORE detach/row replacement (including harmless refresh).
+  qPendingRefresh = false; qReorder?.destroy(); qReorder = null;
+  qMenus.forEach(m => m.destroy()); qMenus = [];
+  qPaintSig = null;   // F252: next show / forced rebuild must not inherit a stale skip
+}
+// Rebind retained rows after hide(), never revive a canceled gesture/menu.
+// An intervening data/access/lock/transaction change requires a fresh render.
+function showPhoneQueue() { if (!qReorder && !qResume?.()) drawQueue(); }
 function drawQueue() {
+  // A complete ordered occurrence+zone snapshot proves an identical poll safe.
+  // Do not tear an owned grip out from under a long drag on every stream tick.
+  // F252: also skip teardown when the painted row signature is unchanged (WS tick /stream),
+  // so phone Queue album <img> nodes are not recreated every second. Drag deferral clears
+  // qPaintSig so the deferred post-drag redraw still replaces row closures.
+  // F252-amend R1: row/menu validity uses occurrence (not object ===) so a skipped paint
+  // after fresh JSON still allows jump/ellipsis. R2/R3: signature includes Now item +
+  // zone name + choices inventory so summary/header/picker stay correct.
+  // F252-amend2: qResume uses the same qPaintSignature() so retained Now→collapse
+  // cannot certify stale badges/zone chrome after an accepted fresh JSON change.
+  if (qReorder?.active && qReorder.isCurrent()) { qPendingRefresh = true; qPaintSig = null; return; }
   const root = views.queue.el; const can = canControl(S);
+  const sig = qPaintSignature();
+  // Do not skip while a Queue menu/sheet is open: unlock+drawQueue after an in-menu lock
+  // must tear it down (same sig as last unlocked paint would otherwise no-op).
+  if (sig === qPaintSig && root.firstChild && !document.querySelector('dialog.songsheet[open], .qmenu')) return;
+  hidePhoneQueue();
   const total = S.queue.reduce((a, q) => a + (q.durationMs || 0), 0), cur = S.now?.index ?? -1;
-  const lay = loadLayout(true), locked = !!lay.locked, dragOk = canDragRows({ can, locked });   // 0.3.7 L29: the same lock as the desktop table (per layout)
+  const lay = loadLayout(true), locked = !!lay.locked, busy = qEdit.pending(), dragOk = canDragRows({ can: can && !busy, locked });
+  const zone = Z.current(), zoneKey = () => JSON.stringify([Z.current()?.key, Z.current()?.playbackId]);
+  const renderedZone = zoneKey(); qRenderedZone = renderedZone;
+  const renderedOcc = S.queue.map(qOccurrence), renderedNow = JSON.stringify([S.now?.index, S.now?.state, qNowItemSig(S.now?.item)]), bindMenus = [];
+  const sameOcc = (i, occ) => qOccurrence(S.queue[i]) === occ;   // F252-amend R1: value identity after JSON refresh
   const rows = S.queue.map((q, i) => {
-    const playing = i === cur && S.now?.state !== 'stopped';
-    const rowEl = h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, onclick: () => can && act('/stream/jump', { index: i }) },
-      dragOk ? h('span', { class: 'qgrip', role: 'button', 'aria-label': `Drag ${q.title} to reorder`, title: 'Drag to reorder', onclick: ev => ev.stopPropagation() }, '⋮⋮') : null,
-      h('span', { class: 'num' }, playing ? '▶' : i + 1), h('div', { class: 't' }, h('div', { class: 't1 ell' }, srcPill(q), q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))), h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''),
-      can ? h('button', { class: 'more qx', 'aria-label': 'Remove', onclick: ev => { ev.stopPropagation(); act(`/queue/${i}`, undefined, 'DELETE'); } }, '✕') : null);
-    if (can) attachQueueMenu(rowEl, S, { refreshAll, showInLibrary }, i, () => !!loadLayout(true).locked);   // 0.3.8 L48 long-press
+    const playing = i === cur && S.now?.state !== 'stopped', occ = qOccurrence(q);
+    const grip = h('button', { type: 'button', class: 'qgrip', disabled: !dragOk, 'aria-label': `Reorder ${q.title}`, 'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown', oncontextmenu: ev => { ev.preventDefault(); ev.stopPropagation(); }, title: 'Drag to reorder; Alt+Up or Alt+Down to move', 'aria-pressed': 'false', onclick: ev => ev.stopPropagation() }, '⠿');
+    const more = can ? h('button', { type: 'button', class: 'more qmore', 'aria-label': `Actions for ${q.title}`, 'aria-haspopup': 'menu' }, '⋯') : null;
+    const rowEl = h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, 'data-qtitle': q.title, onclick: () => canControl(S) && !qEdit.pending() && zoneKey() === renderedZone && sameOcc(i, occ) && act('/stream/jump', { index: i }) },
+      grip, npCover(q, 96, 'qrow-art'), h('span', { class: 'num', 'aria-label': `Queue position ${i + 1}` }, playing ? (S.now.state === 'playing' ? '▶' : 'Ⅱ') : i + 1),
+      h('div', { class: 't' }, h('div', { class: 't1 ell' }, srcPill(q), q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))),
+      h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''), more);
+    if (can) bindMenus.push(() => attachQueueMenu(rowEl, S, { refreshAll, showInLibrary, queueEdit: qEdit }, i, () => !!loadLayout(true).locked, {
+      menuButton: more, suppressed: () => qReorder?.blocked(), valid: () => S.view === 'queue' && !wide() && zoneKey() === renderedZone && sameOcc(i, occ),
+      onOpen: () => qReorder?.cancel()
+    }));
     return rowEl;
   });
-  const phoneKeep = () => (pKeep ??= keepControl({ can: () => canControl(S) }));   // Keep playing on the phone Queue page
+  const phoneKeep = () => (pKeep ??= keepControl({ can: () => canControl(S) }));
   const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
-  root.replaceChildren(h('div', { class: 'row wrap' }, ...(pp => pp ? [h('h2', { class: 'pqhead row', style: 'margin:0' }, h('span', { class: 'pqlbl' }, 'Queue:'), pp)] : [h('h2', { class: 'grow', style: 'margin:0' }, 'Queue', h('span', { class: 'qzone dim', 'data-qzone': '' }, Z.queueSuffixNow()))])(phonePick()) /* 0.4.8 F60: "Queue: [zone ▾]", the zone named once */, h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''} • editable from any device`),
-    phoneKeep(), h('button', { class: 'btn', 'data-act': 'recentqueues', onclick: () => openRecentQueues({ can: canControl(S) }) }, 'Recent queues…'),
-    can && S.queue.length ? [h('button', { class: 'btn', onclick: saveQueue }, 'Save queue as a playlist'), h('button', { class: 'btn', onclick: () => clearQueueFlow(S, { act, refreshAll }) }, 'Clear'), lockBtn] : null),
+  const item = S.now?.item, state = S.now?.state, hasNow = !!item && state !== 'stopped';
+  // Projection only: shared Now state/actions, no player/clock/Media Session mount.
+  // Keep the very same cover node for an unchanged item/source/zone, including
+  // its in-flight decode or last-good fallback. Stop clears the cache. All item
+  // fields participate so a real occurrence/source/art metadata change replaces it.
+  const artKey = hasNow ? JSON.stringify([renderedZone, item]) : null;
+  if (root._qSummaryArt?.key !== artKey || !hasNow) root._qSummaryArt = hasNow ? { key: artKey, el: npCover(item, 192, 'qsummary-art') } : null;
+  const summary = h('section', { class: 'qsummary', 'aria-label': 'Now playing summary' },
+    h('h2', {}, hasNow ? (state === 'playing' ? 'Now playing' : 'Paused') : 'Nothing playing'),
+    hasNow ? h('div', { class: 'qsummary-card' }, root._qSummaryArt.el, h('div', { class: 't' }, h('b', { class: 'ell' }, item.title), h('div', { class: 'small dim ell' }, item.artist || ''), h('span', { class: 'small dim' }, 'On ' + (zone?.name || 'selected zone'))),
+      h('button', { type: 'button', class: 'iconbtn qsummary-play', disabled: !can, 'aria-label': state === 'playing' ? 'Pause' : 'Resume', onclick: () => canControl(S) && zoneKey() === renderedZone && act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/resume') }, icon(state === 'playing' ? 'pause' : 'play'))) : h('p', { class: 'small dim' }, 'Choose a song from the queue or Library.'));
+  // F256: phone Queue head — title+zone / meta / Keep / 2×2 square actions (no Save pill)
+  const saveBtn = can && S.queue.length ? h('button', { class: 'btn qsave-open', onclick: saveQueue }, 'Save as playlist') : null;
+  const recentBtn = h('button', { class: 'btn', 'data-act': 'recentqueues', onclick: () => openRecentQueues({ can: canControl(S) }) }, 'Recent queues…');
+  const clearBtn = can && S.queue.length ? h('button', { class: 'btn', disabled: busy, onclick: () => !qEdit.pending() && clearQueueFlow(S, { act, refreshAll }) }, 'Clear') : null;
+  root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line' }, h('h1', {}, 'Queue'), phonePick() || h('span', { class: 'qzone small dim' }, zone?.name || 'No zone selected')),
+    h('div', { class: 'qcount-line' }, h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''}`)),
+    h('div', { class: 'qkeep-line', 'aria-label': 'Keep playing' }, phoneKeep()),
+    h('div', { class: 'qactions', 'aria-label': 'Queue tools' }, saveBtn, recentBtn, clearBtn, can && S.queue.length ? lockBtn : null)),
+    summary, h('h2', { class: 'qrows-heading' }, 'Queue', h('span', { class: 'small dim' }, ' · all tracks')),
     S.queue.length ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
-  qReorder?.destroy(); qReorder = null;
   const list = root.querySelector('.qlist');
-  if (list) qReorder = attachReorder(list, { can: () => canControl(S), locked: () => !!loadLayout(true).locked, onMove: async mv => { await act('/queue/move', mv); } });
+  qResume = () => {
+    // F252-amend2: complete signature (metadata/sourceLabel/choices/artCv) — not only occurrences.
+    if (qPaintSignature() !== sig) return false;
+    if (zoneKey() !== renderedZone || S.queue.length !== renderedOcc.length || !renderedOcc.every((occ, i) => qOccurrence(S.queue[i]) === occ) ||
+      renderedNow !== JSON.stringify([S.now?.index, S.now?.state, qNowItemSig(S.now?.item)]) || can !== canControl(S) || locked !== !!loadLayout(true).locked || busy !== qEdit.pending()) return false;
+    qMenus = bindMenus.map(bind => bind());
+    if (list) qReorder = attachReorder(list, {
+      guardRoot: root, can: () => canControl(S) && !qEdit.pending(), locked: () => !!loadLayout(true).locked, active: () => S.view === 'queue' && !wide(),
+      // Full ordered occurrence snapshot, NOT refId identity (duplicates are valid).
+      identity: () => JSON.stringify([zoneKey(), S.queue]), onStart: () => qMenus.forEach(m => m.close()),
+      onEnd: () => queueMicrotask(() => { if (qPendingRefresh && S.view === 'queue' && !wide()) { qPendingRefresh = false; drawQueue(); } }),
+      onMove: mv => qEdit.run('/queue/move', mv),
+      onError: e => toast(e.message || 'Could not reorder', true),
+      announce: text => { const el = root.querySelector('.qresult'); if (el) el.textContent = text; }
+    });
+    qPaintSig = sig;   // F252-amend2: hide cleared skip; resume that kept DOM restores it
+    return true;
+  };
+  qResume();
+  const result = h('div', { class: 'phone-qstatus qresult', role: 'status', 'aria-live': 'polite' }, busy ? 'Updating queue — waiting for the current order…' : ''); root.append(result);
+  if (qSettled && qSettled.zone !== qZoneKey()) qSettled = null;
+  if (qSettled && qSettled.zone === qZoneKey()) {
+    const { index, keyboard, error } = qSettled, row = rows[index]; qSettled = null;
+    if (error) result.textContent = `Could not reorder: ${error}`;
+    else if (!row) result.textContent = 'Queue updated';
+    if (row && !error) { row.classList.add('qsettled'); result.textContent = `Moved ${S.queue[index]?.title} to #${index + 1}`; row.scrollIntoView({ block: 'nearest' }); if (keyboard) row.querySelector('.qgrip')?.focus({ preventScroll: true }); }
+  }
+  qPaintSig = sig;   // F252: remember what this paint drew
 }
+// A selected-zone switch cancels immediately, before its async stream refresh.
+window.addEventListener('wavwiz:zonesync', () => { if (qRenderedZone !== JSON.stringify([Z.current()?.key, Z.current()?.playbackId])) { qReorder?.cancel(); qMenus.forEach(m => m.close()); } });
 /** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
 function phonePick() {
   const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;

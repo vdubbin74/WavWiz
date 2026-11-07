@@ -59,6 +59,9 @@ export const selectedGroupId = () => { const c = current(); return c?.kind === '
 /** Apply the selection: the API zone, the chips, and (when the stream we show changed) a reload of Now Playing + Queue. Call after zones data changed. */
 export function sync() {
   if (!S) return; const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
+  // F250-P5: a response/action capability is tied to this actual API route.
+  // Keep it through linked visual selections; rotate on every routing change.
+  if (!S._streamRoute || S._streamRoute.target !== pid) S._streamRoute = { target: pid };
   // 0.4.1: a selected zone that no longer exists is forgotten (back to the first zone), not kept in storage
   if ((S.groups || []).length && loadSel() && c && loadSel() !== c.key) saveSel(null);
   if (pid !== lastPid) { const first = lastPid === undefined; lastPid = pid; if (!first) ctl.refreshNow?.(); }
@@ -123,11 +126,23 @@ export function nowLine(now, { at = Date.now(), onSelect = null, selected = fals
   const b = h('div', { class: 'zl-now' + (has ? '' : ' empty') + (onSelect ? ' tap' : ''), role: onSelect ? 'button' : null, tabindex: onSelect ? 0 : null, 'aria-label': has ? `Now playing in this zone: ${now.title}` : 'Nothing playing in this zone', title: onSelect && !selected ? 'Control this zone' : null },
     h('span', { class: 'zl-ico', 'aria-hidden': 'true' }, now?.state === 'playing' ? '▶' : has ? '❚❚' : '▷'),
     h('span', { class: 'zl-t ell' }, has ? h('b', null, now.title) : 'Nothing playing', has && now.artist ? h('span', { class: 'dim' }, ' · ' + now.artist) : null),
-    has ? h('span', { class: 'zl-bar', style: `--p:${(frac * 100).toFixed(1)}%` }, h('i')) : null,
-    has && !now.live && dur ? h('span', { class: 'zl-time small dim' }, `${fmtTime(pos)} / ${fmtTime(dur)}`) : null);
+    // F267: idle keeps the same layout as playing - an empty track and placeholder time, so idle and playing lines match
+    h('span', { class: 'zl-bar', style: `--p:${(frac * 100).toFixed(1)}%` }, h('i')),
+    has && !now.live && dur ? h('span', { class: 'zl-time small dim' }, `${fmtTime(pos)} / ${fmtTime(dur)}`) : !has ? h('span', { class: 'zl-time small dim zl-ph', 'aria-hidden': 'true' }, '--:-- / --:--') : null);
   b._zl = { now, at }; liveLines.add(b); startLineTick();   // 0.4.8 F61: time + bar tick live (the tree only rebuilds on real changes)
   if (onSelect) { b.addEventListener('click', ev => { ev.stopPropagation(); onSelect(); }); b.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); onSelect(); } }); }
   return b;
+}
+// F263: refresh the same zone's now-line without replacing its hovered click/tooltip host.
+// Callers pair lines only inside the same tree layout; the listener selects a stable zone id.
+export function patchNowLine(b, fresh) {
+  if (!b?._zl || !fresh?._zl || b.getAttribute('role') !== fresh.getAttribute('role')) return false;
+  const content = n => JSON.stringify([n?.state, n?.title, n?.artist, n?.durationMs, !!n?.live]);
+  if (content(b._zl.now) !== content(fresh._zl.now)) b.replaceChildren(...fresh.childNodes);
+  for (const a of [...b.attributes]) if (!fresh.hasAttribute(a.name)) b.removeAttribute(a.name);
+  for (const a of [...fresh.attributes]) if (b.getAttribute(a.name) !== a.value) b.setAttribute(a.name, a.value);
+  b._zl = fresh._zl; liveLines.delete(fresh); liveLines.add(b); paintLine(b);
+  return true;
 }
 // 0.4.1: a link icon chip instead of the long "LINKED WITH ..." text; the text is its tooltip and screen-reader label
 export const linkBadge = g => (g.linked || []).length ? h('span', { class: 'dtag zlink zicon', title: linkText(g.linked) + ' - these zones play the same song in sync', 'aria-label': linkText(g.linked), role: 'img' }, icon('link')) : null;

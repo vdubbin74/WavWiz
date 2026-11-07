@@ -56,7 +56,7 @@ a{color:var(--accent2-text,var(--accent2))}
 @media (prefers-reduced-motion:reduce){ .desk{transition:none} }
 .libpanel{grid-area:1/1/2/2} .view{display:none} .nowcol{grid-area:1/2/2/3} .devpanel{grid-area:1/3/2/4} .listpanel{grid-area:2/1/3/4}
 .libpanel,.nowcol,.devpanel,.listpanel,.np-vizpanel,.np-ctlpanel{min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;
-  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.10)),repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 1px,rgba(0,0,0,.016) 1px 3px),var(--panel);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 8px rgba(0,0,0,.35)}
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.10)),repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 calc(1px / var(--z,1)),rgba(0,0,0,.016) calc(1px / var(--z,1)) calc(3px / var(--z,1))),var(--panel);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 8px rgba(0,0,0,.35)}
 .view{padding:12px;overflow:auto}
 .nowcol{padding:0 12px 10px;gap:8px;overflow:auto}
 .libpanel .libbody,.devpanel .devbody{flex:1;min-height:0;overflow:auto;padding:4px 10px 10px}
@@ -1770,7 +1770,7 @@ body.jb-kiosk #app{visibility:hidden}
 .libpanel .prail-t{transform:rotate(180deg)}
 .libpanel.israil .prail{justify-content:center}
 /* F5 / F4: one mute button everywhere - round, same size, amber when muted (devices, master, zones) */
-.devpanel .mutebtn.on,#p-zones .mutebtn.on,.dcard .mutebtn.on,.drow .mutebtn.on,.zcard .mutebtn.on,.dvol-master .mutebtn.on{background:color-mix(in srgb,var(--amber) 16%,transparent);border-color:var(--amber);color:var(--amber)}
+.devpanel .mutebtn.on,#p-zones .mutebtn.on,.pd42-sheet .mutebtn.on,.dcard .mutebtn.on,.drow .mutebtn.on,.zcard .mutebtn.on,.dvol-master .mutebtn.on{background:color-mix(in srgb,var(--amber) 16%,transparent);border-color:var(--amber);color:var(--amber)}
 .dvol-master .mastermute{visibility:visible;pointer-events:auto}
 /* F6: sections (Master / Devices / Zones / Scenes & Schedules) separated by ~12px and a thin subtle divider */
 .devpanel .devbody .pane-h.dsec-h,.devpanel .devbody .dss>.pane-h{margin:12px -10px 6px;padding:8px 12px 4px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent);color:var(--accent-text,var(--accent));font-weight:700;letter-spacing:.1em;font-size:11px}
@@ -2943,9 +2943,10 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 .zsp42>.sp42::before{content:"";position:absolute;left:-11px;top:50%;width:10px;border-top:1px solid var(--line)}
 .sp42{flex-wrap:nowrap;gap:6px;min-height:28px;padding:0 8px 0 0;border:1px solid var(--line);background:color-mix(in srgb,var(--text) 4%,var(--panel))}
 .sp42 .dgrip42{flex:0 0 18px;width:18px;align-self:stretch;border-radius:3px 0 0 3px;background:color-mix(in srgb,var(--text) 10%,var(--panel));color:var(--text);font:700 15px/1 system-ui,sans-serif}
-.sp42-nt{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;padding:3px 0}
-.sp42-nt .sp42-n{flex:0 1 auto;min-width:40px;font-weight:700}
-.sp42-tags{flex:0 0 auto;order:0;padding-left:0;flex-wrap:nowrap}
+/* DIG tags-own-line: always stack tags under the device name (F79 mixer parity) — mute/MUTED no longer forces a wrap jump */
+.sp42-nt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;flex-wrap:nowrap;align-items:flex-start;justify-content:center;gap:2px;padding:3px 0}
+.sp42-nt .sp42-n{display:block;max-width:100%;flex:none;min-width:0;font-weight:700}
+.sp42-tags{flex:none;width:100%;max-width:100%;order:0;padding-left:0;flex-wrap:wrap}
 /* the ⋯ actions button is not in the render: it floats over the right end on hover / keyboard focus (always shown on touch) */
 .sp42{position:relative}
 .sp42-menu{position:absolute;right:2px;top:50%;transform:translateY(-50%);opacity:0;background:var(--panel);height:22px}
@@ -3227,19 +3228,49 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 .libpanel .lnk,.lib .lnk,.lib a{color:var(--accent-text,var(--accent))}
 .sheet .panel{border-radius:3px!important}.sheet button.act{border-radius:3px;color:var(--ink)}.sheet button.act:focus-visible{outline:1px solid var(--accent);background:var(--accent-soft)}
 /* 0.4.6 F41: the phone Devices views never run wider than the screen (390 px): every column may shrink, long rows wrap. */
-#p-zones,#p-zones .dgrid,#p-zones .pd42-wrap,#p-zones .pd42,#p-zones .tree42{max-width:100%;min-width:0;box-sizing:border-box}
+#p-zones,#p-zones .dgrid,#p-zones .pd42-wrap,#p-zones .pd42,#p-zones .tree42,.pd42-sheet,.pd42-sheet .pd42{max-width:100%;min-width:0;box-sizing:border-box}
 #p-zones{overflow-x:hidden}
-#p-zones .pd42 *{min-width:0;max-width:100%}
-#p-zones .pd42 :is(.row,.zrow,.dvol,.zp42-list li){flex-wrap:wrap}
-#p-zones .pd42 :is(input[type=range],.vbar){width:100%}
-/* 0.4.6 F41: the phone zone / speaker settings sheet */
-#p-zones .pd42-sheet{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--bg);border-top:3px solid var(--accent);padding-top:var(--safe-t);overflow:hidden}
-#p-zones .pd42-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
-#p-zones .pd42-head .pd42-title{flex:1 1 auto;min-width:0;text-align:center;font-size:14px}
-#p-zones .pd42-head .btn{border-radius:3px;flex:none}
-#p-zones .pd42-head .pd42-done{border-color:var(--accent);color:var(--accent-text,var(--accent))}
-#p-zones .pd42-sheet>.pd42{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:10px 10px calc(16px + var(--safe-b));overscroll-behavior:contain}
+:is(#p-zones,.pd42-sheet) .pd42 *{min-width:0;max-width:100%}
+:is(#p-zones,.pd42-sheet) .pd42 :is(.row,.zrow,.dvol,.zp42-list li){flex-wrap:wrap}
+:is(#p-zones,.pd42-sheet) .pd42 :is(input[type=range],.vbar){width:100%}
+/* 0.4.6 F41 + F246: phone zone / speaker settings sheet — viewport modal on body above .mini/.tabbar (z like npeqsheet) */
+.pd42-sheet{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;background:var(--bg);border-top:3px solid var(--accent);padding-top:var(--safe-t);overflow:hidden}
+.pd42-sheet .pd42-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+.pd42-sheet .pd42-head .pd42-title{flex:1 1 auto;min-width:0;text-align:center;font-size:14px}
+.pd42-sheet .pd42-head .btn{border-radius:3px;flex:none}
+.pd42-sheet .pd42-head .pd42-done{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.pd42-sheet>.pd42{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:10px 10px calc(16px + var(--safe-b));overscroll-behavior:contain}
 html.pd42-open,html.pd42-open body{overflow:hidden}
+/* F246: block phone chrome under the portaled sheet (F241 banners stay in-flow when sheet closed) */
+html.pd42-open #app{pointer-events:none}
+/* F246: html overflow alone does not lock the nested desktop/page scrollers. */
+html.pd42-open #app,html.pd42-open .desk{overflow:hidden}
+html.pd42-open .pd42-sheet{pointer-events:auto}
+/* F253: phone Speaker Settings head — title own row; actions nowrap / never clip under .pd42 * shrink */
+.pd42-sheet .spk-head{
+  flex-wrap:wrap;
+  align-items:center;
+  row-gap:8px;
+  column-gap:8px;
+}
+.pd42-sheet .spk-title{
+  flex:1 0 100%;
+  min-width:0;
+  line-height:1.25;
+}
+.pd42-sheet .spk-head > .grow{flex:1 1 auto;min-width:8px}
+.pd42-sheet .spk-head :is(.spk-rename,.spk-cancel,.spk-done,.spk-preview,.spk-status){
+  flex:0 0 auto;
+  min-width:auto;
+  max-width:none;
+  white-space:nowrap;
+}
+.pd42-sheet .spk-preview:not([hidden]){
+  padding:2px 8px;
+  border:1px solid var(--line);
+  border-radius:3px;
+  background:var(--panel2);
+}
 /* 0.4.6 F42: EQ card header - nothing overlaps the 4 view buttons on narrow screens: the name keeps row 1 (clear of the buttons), the preset picker and
    All sound settings share row 2; on touch every control in the header + the view buttons is at least 44 px. */
 @media (max-width:760px){
@@ -3261,7 +3292,7 @@ html.pd42-open,html.pd42-open body{overflow:hidden}
   .hamburger{min-width:44px}
 }
 @media (max-width:760px){
-  :is(dialog,.sheet .panel,.drawer nav,.pagebody,.ctxmenu,#p-zones .pd42){-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  :is(dialog,.sheet .panel,.drawer nav,.pagebody,.ctxmenu,#p-zones .pd42,.pd42-sheet .pd42){-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   dialog.page,dialog.page .pagebody{max-width:100%;overflow-x:hidden}
   :where(select){background-color:var(--fld-bg);color:var(--fld-ink);border:1px solid var(--fld-line);border-radius:3px}
   :where(input[type=checkbox],input[type=radio],input[type=range],progress){accent-color:var(--accent)}
@@ -3330,7 +3361,7 @@ html.pd42-open,html.pd42-open body{overflow:hidden}
 /* the mixer window: Settings-sized on PC, full screen with Done on the phone */
 dialog.mixer-dlg>.body{overflow:auto!important;display:block!important}
 .mv-body{display:flex;flex-direction:column;gap:14px;outline:none;min-width:0}
-.mv-master{border:1px solid var(--accent);border-radius:3px;padding:10px 12px;background:var(--panel2)}
+.mv-master{border:1px solid var(--line);border-radius:3px;padding:10px 12px;background:var(--panel2)}
 .mv-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .mv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
 .mv-card{border:1px solid var(--line);border-radius:3px;background:var(--panel2);padding:10px 12px;min-width:0}
@@ -3346,7 +3377,7 @@ dialog.mixer-dlg>.body{overflow:auto!important;display:block!important}
 .mv-chev{width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--accent-text,var(--accent));cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .mv-chev .ic svg{width:14px;height:14px;transition:transform .15s} .mv-chev[aria-expanded=true]{border-color:var(--accent)} .mv-chev[aria-expanded=true] .ic svg{transform:rotate(180deg)}
 input.mv-s{width:100%;min-width:0;margin:0;accent-color:var(--accent)}
-input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
+input.mv-s::-webkit-slider-thumb{width:22px;height:22px;margin-top:-8px}
 .mv-tag{flex:none;padding:0 5px;border:1px solid var(--line);border-radius:3px;font-size:10px;font-weight:800;letter-spacing:.06em;line-height:15px;color:var(--dim)}
 .mv-tag.t-ref{border-color:var(--accent);color:var(--accent-text,var(--accent))} .mv-tag.t-muted{border-color:var(--amber);color:var(--amber)}
 .mv-off{opacity:.45} .mv-zmuted input.mv-vol{opacity:.6}
@@ -3360,7 +3391,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
   .mv-row,.mv-zrow,.mv-sub .mv-row{grid-template-columns:minmax(0,1fr) 3.2em 44px 36px;grid-template-areas:"n p m c" "s s s s";row-gap:4px;padding:6px 0}
   .mv-mrow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s"}
   .mv-row>.n{grid-area:n} .mv-row>.mv-pct{grid-area:p} .mv-row>.mv-m{grid-area:m;width:44px;height:44px} .mv-row>.mv-chev{grid-area:c;width:36px;height:36px} .mv-row>input{grid-area:s}
-  input.mv-s::-webkit-slider-thumb{width:30px;height:30px}
+  input.mv-s::-webkit-slider-thumb{width:30px;height:30px;margin-top:-12px}
   .mv-drow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "s s"} .mv-drow>.n{grid-area:n} .mv-drow>input{grid-area:s} .mv-drow>:last-child{grid-area:v}
   .mv-sub{margin-left:8px;padding-left:8px}
   .mv-grid{grid-template-columns:minmax(0,1fr)}
@@ -3582,7 +3613,7 @@ input.mv-s::-webkit-slider-thumb{width:22px;height:22px}
 .tree42.dragging .zempty42 .ze42-drop{display:block;margin-top:4px}
 .tree42 .zempty42 .ze42-gone{margin-top:4px}
 .tree42 .qb42.empty42.ctl .zempty42{border-color:var(--accent)}
-#p-zones .pd42-head .pd42-close{border-color:var(--accent);color:var(--accent-text,var(--accent));font-weight:600}
+.pd42-sheet .pd42-head .pd42-close{border-color:var(--accent);color:var(--accent-text,var(--accent));font-weight:600}
 
 .d42-back{color:var(--accent-text,var(--accent));border-color:var(--accent);border-radius:3px;margin-right:8px} .dpath42{display:flex;align-items:center}
 /* 0.4.9 F70: expanded Devices - master bar lined up with the middle column's setting bars (devices.js alignMaster sets the inset and widths) */
@@ -4346,9 +4377,9 @@ dialog>footer{border-top:0}
 .qlist .item .more.qx{flex:none;min-width:36px;min-height:36px;width:36px;height:36px;padding:0;font-size:15px;display:inline-flex;align-items:center;justify-content:center}
 
 /* F202: phone sheets - bounded flex scroller (min-height:0) so they scroll to the bottom */
-#p-zones .pd42-sheet>.pd42{min-height:0;flex:1 1 0}
+.pd42-sheet>.pd42{min-height:0;flex:1 1 0}
 .npeqsheet .eqsheet-b,.eqsheet-b{min-height:0;flex:1 1 0}
-#p-zones .pd42 .spkset{min-height:0}
+:is(#p-zones,.pd42-sheet) .pd42 .spkset{min-height:0}
 
 /* F207: Devices header hierarchy — subsection labels ≤ column bar (.dsec-h 11px/700/.1em); full SCHEDULES & ALARMS (undo F191 ellipsis) */
 .ssc-col .ss-ch{flex-wrap:wrap}
@@ -4418,3 +4449,441 @@ dialog>footer{border-top:0}
 /* F231: menubar file-menu pin icons normal size so rows match (t1197u-t1198u) */
 .mpanel .mpin{padding:1px;line-height:0;display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;min-width:16px;min-height:16px;aspect-ratio:1}
 .mpanel .mpin .ic svg{width:14px;height:14px}
+
+
+/* F250-P1: existing full-page phone chrome only. In-flow siblings preserve
+   room.js banner docking and F246 body-owned modal stacking; no fixed footer. */
+@media (max-width:900px){
+  #app{height:calc(100vh / var(--z,1));height:calc(100dvh / var(--z,1))}
+  #app>.topbar,#app>.tabbar,#app>.mini{flex:none}
+  #app>.desk{min-height:0;overscroll-behavior-y:contain}
+  #app>.tabbar{border-top:1px solid var(--line);gap:2px;padding:4px 8px calc(4px + var(--safe-b));background:var(--panel)}
+  #app>.tabbar>button{position:relative;min-width:0;min-height:52px;gap:4px;padding:6px 2px;border-radius:8px;line-height:1.2}
+  #app>.tabbar>button>.ic svg{width:22px;height:22px}
+  #app>.tabbar>button.on{background:var(--accent-soft);font-weight:700}
+  #app>.tabbar>button.on::before{content:'';position:absolute;top:0;width:24px;height:3px;border-radius:2px;background:currentColor}
+  #app>.tabbar>button[aria-expanded=true]{color:var(--accent-text,var(--accent))}
+  #app>.mini{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center;gap:0 10px;min-width:0;margin:6px 8px;border:1px solid var(--line);border-radius:12px;padding:6px 8px;background:var(--panel2)}
+  #app>.desk[data-view=now]~.mini{display:none}
+  #app>.mini>.mini-open{grid-area:1/1;display:flex;align-items:center;gap:10px;min-width:0;min-height:48px;width:100%;padding:0;text-align:left;background:none;border:0;cursor:pointer}
+  #app>.mini .mini-art{flex:none}
+  #app>.mini .npa-box{--npa:44px}
+  #app>.mini .t1{font-size:14px;font-weight:650;line-height:1.4}
+  #app>.mini .t2{font-size:12px;color:var(--dim);line-height:1.4}
+  #app>.mini>.mini-zone{grid-area:2/1;min-width:0;padding-left:54px;line-height:1}
+  #app>.mini .zl-phone{max-width:100%;min-height:26px;margin:0}
+  #app>.mini>.mini-play{grid-area:1/2/3/3;width:44px;height:44px;min-width:44px;min-height:44px;padding:0}
+  #app>.mini>.mini-play:disabled{opacity:.45;cursor:not-allowed}
+  #app>.mini .mini-open:focus-visible,#app>.mini .zl-phone:focus-visible,#app>.mini>.mini-play:focus-visible,#app>.tabbar>button:focus-visible{outline:2px solid var(--hl,var(--accent));outline-offset:2px}
+}
+
+/* F250-P2: opt-in full-page Library only, through the existing phone boundary.
+   P1 already reserves the in-flow mini/nav; remove the old 96px footer reserve.
+   Source-specific Radio/Playlists controls are the existing adapters, not skins. */
+@media (max-width:900px){
+  .view .lib.phone-library{min-width:0;padding-bottom:12px}
+  .view .phone-library .libpage-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin:0 0 10px}
+  .view .phone-library .libpage-heading h1{font-size:1.65rem;line-height:1.2;margin:0;letter-spacing:-.02em}
+  .view .phone-library .libzone{min-width:0;max-width:100%;overflow-wrap:anywhere;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--dim)}
+  .view .phone-library .libsrcslot{margin:0 0 8px}
+  .view .phone-library .libsrc-tabs.xtabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:0;margin:0;padding:0 0 2px;scrollbar-width:thin}
+  .view .phone-library .libsrc-tabs.xtabs button{flex:1 0 auto;min-height:44px;padding:8px 10px;font-size:14px;color:var(--ink);background:none;border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none}
+  .view .phone-library .libsrc-tabs.xtabs button.on{border-bottom-color:var(--hl,var(--accent));font-weight:700}
+  .view .phone-library .libsearch{margin:0 0 10px}
+  .view .phone-library .libsearch input{min-height:44px;width:100%;font-size:1rem;padding:10px 12px;border-radius:12px}
+  .view .phone-library .libhead[hidden],.view .phone-library .libsearch[hidden]{display:none}
+  .view .phone-library .libhead{min-width:0;min-height:0;margin:0 0 10px}
+  .view .phone-library .libhead .tabs{max-width:100%;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:0;padding:0 0 4px;scrollbar-width:thin}
+  .view .phone-library .libhead .tabs button{flex:none;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--ink);box-shadow:none}
+  .view .phone-library .libhead .tabs button.on{border-color:var(--hl,var(--accent));background:var(--accent-soft);color:var(--accent-text,var(--accent));font-weight:700}
+  .view .phone-library .libtools{flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .view .phone-library .libtools .wwdd,.view .phone-library .libtools .libflip{min-height:44px;max-width:100%;padding:8px 10px}
+  .view .phone-library .libtools .libsort{max-width:170px}
+  .view .phone-library .libtools .libview{margin-left:auto;flex:none}
+  .view .phone-library .libtools .seg button{min-width:44px;min-height:44px}
+  .view .phone-library .libtools>.grow{display:none}
+  .view .phone-library .libcount:empty,.view .phone-library .crumbs:empty{display:none}
+  .view .phone-library .libcount{margin:0 0 10px}
+  .view .phone-library .crumbs{flex-wrap:wrap;gap:8px;margin:0 0 10px;min-width:0}
+  .view .phone-library .crumbs button{min-height:44px}
+  .view .phone-library .crumbs b{min-width:0;max-width:100%}
+  .view .phone-library .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+  .view .phone-library .tile .t1{font-size:1rem;margin-top:7px}
+  .view .phone-library .tile .tileplay,.view .phone-library .tile .heart{width:44px;height:44px}
+  .view .phone-library .list .item{padding:10px 4px;gap:8px;min-width:0}
+  .view .phone-library .list .item .cover.sm{width:48px;height:48px;flex:none}
+  .view .phone-library .list .item .t1{font-size:1rem}
+  .view .phone-library .list .item .heart,.view .phone-library .list .item .more{min-width:44px;min-height:44px}
+  .view .phone-library .albhead{padding:16px;gap:16px}
+  .view .phone-library .albhead .cover.albcover{width:min(180px,32%);flex:none;height:auto;aspect-ratio:1}
+  .view .phone-library .albmeta{min-width:0}
+  .view .phone-library .albacts{flex-wrap:wrap;gap:10px}
+  .view .phone-library .albacts button{min-height:44px}
+  .view .phone-library .libextra{min-width:0}
+  .view .phone-library .libextra .row{flex-wrap:wrap}
+  .view .phone-library .libextra input{min-width:0;max-width:100%}
+  .view .phone-library .libextra .item{flex-wrap:wrap}
+  .view .phone-library button:focus-visible,.view .phone-library input:focus-visible{outline:2px solid var(--hl,var(--accent));outline-offset:2px}
+}
+@media (max-width:600px){
+  .view .phone-library .albhead{flex-direction:column;align-items:center;text-align:center}
+  .view .phone-library .albhead .cover.albcover{width:min(64%,220px);margin:0 auto}
+  .view .phone-library .albmeta{align-items:center;width:100%}
+  .view .phone-library .albacts{justify-content:center}
+}
+
+/* F250-P3: full-page compact Queue only. Desktop table/drag styles unchanged. */
+@media(max-width:900px){
+  .view .phone-queue{min-width:0;max-width:100%;padding:6px 0 12px}
+  .phone-queue .qpage-heading{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .phone-queue .qtitle-line,.phone-queue .qcount-line{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+  .phone-queue h1{font-size:26px;line-height:1.2;margin:0}
+  /* F256: phone Queue head — square actions, stable rows */
+  .phone-queue .qtitle-line .pqwrap{flex:0 1 auto;max-width:55%;min-width:0;margin:0 0 0 auto}
+  .phone-queue .qtitle-line .qzone{margin:0;max-width:55%;overflow-wrap:anywhere;margin-left:auto}
+  .phone-queue .qtitle-line .qzpick{min-height:44px;width:100%;font-size:14px;border-radius:3px;box-sizing:border-box}
+  .phone-queue .qcount-line{justify-content:flex-start}
+  .phone-queue .qkeep-line{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+  .phone-queue .qkeep-line .qkeep{margin:0;flex:1 1 auto;min-width:0;gap:8px}
+  .phone-queue .qkeep-line .qkeep-sel{min-height:44px;flex:1 1 140px;font-size:14px;padding:0 10px;border-radius:3px;box-sizing:border-box}
+  .phone-queue .qactions{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px;margin:0 0 10px;align-items:stretch}
+  .phone-queue .qactions>.btn,.phone-queue .qsave-open{min-height:44px;height:100%;border-radius:3px;width:100%;white-space:normal;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;text-align:center;padding:8px 10px}
+  .phone-queue .qsave-open{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+  .phone-queue .qsecondary{gap:8px;margin:8px 0 18px} /* legacy class retained if present */
+  .phone-queue :is(.qsecondary,.qcount-line,.qsave,.qactions,.qkeep-line) button{min-height:44px}
+  .phone-queue .qsave{flex-wrap:wrap;margin-bottom:12px}
+  .phone-queue .qsave input{min-width:0;flex:1 1 140px}
+  .phone-queue .qsummary{margin:14px 0 22px}
+  .phone-queue :is(.qsummary h2,.qrows-heading){font-size:16px;font-weight:600;margin:0 0 10px}
+  .phone-queue .qsummary-card{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);padding:10px;min-width:0}
+  .phone-queue .qsummary-card .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+  .phone-queue .qsummary-art{width:64px;height:64px;flex:0 0 64px;border-radius:8px}
+  .phone-queue .qsummary-play{width:44px;height:44px;flex:0 0 44px;border:1px solid var(--line);border-radius:50%}
+  .phone-queue .qlist{position:relative;gap:0;overflow:visible}
+  .phone-queue .qlist>.item{display:grid;grid-template-columns:44px 42px minmax(0,1fr) 44px;column-gap:7px;row-gap:2px;align-items:center;min-height:76px;padding:8px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;position:relative}
+  .phone-queue .qlist>.item.cur{background:color-mix(in srgb,var(--accent) 8%,var(--panel));border-radius:10px;box-shadow:inset 3px 0 var(--accent)}
+  .phone-queue .qlist>.item>.qgrip{grid-column:1;grid-row:1/3;display:flex;align-items:center;justify-content:center;width:44px;height:48px;min-width:44px;min-height:44px;margin:0;padding:0;opacity:1;border:0;border-radius:8px;background:transparent;color:var(--dim);font-size:26px;cursor:grab;touch-action:none;user-select:none;-webkit-touch-callout:none}
+  .phone-queue .qlist>.item>.qgrip:disabled{opacity:.4;cursor:default}
+  .phone-queue .qlist>.item>.qgrip:active{cursor:grabbing;background:var(--panel2)}
+  .phone-queue .qlist>.item>.qrow-art{grid-column:2;grid-row:1/3;width:42px;height:42px;border-radius:7px}
+  .phone-queue .qlist>.item>.t{grid-column:3;grid-row:1;min-width:0;align-self:end}
+  .phone-queue .qlist>.item .t1{font-size:14px;font-weight:600}
+  .phone-queue .qlist>.item .t2{font-size:12px;margin-top:3px}
+  .phone-queue .qlist>.item>.num{grid-column:2;grid-row:2;z-index:1;align-self:end;justify-self:end;padding:1px 3px;border-radius:4px;background:var(--panel);color:var(--ink);font-size:10px;min-width:14px;text-align:center}
+  .phone-queue .qlist>.item>.dur{grid-column:3;grid-row:2;margin:0;font-size:11px;align-self:start;color:var(--dim)}
+  .phone-queue .qlist>.item>.qmore{grid-column:4;grid-row:1/3;width:44px;height:48px;min-width:44px;margin:0;padding:0;font-size:26px;background:transparent;color:var(--dim);border:0;border-radius:8px}
+  .phone-queue :is(.qgrip,.qmore,.qsummary-play):focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .phone-queue .qlist>.item.dragging{opacity:.55;outline:2px dashed var(--accent);outline-offset:-2px;box-shadow:none;z-index:1;pointer-events:auto}
+  .phone-qins{position:fixed;height:4px;background:var(--accent);border:1px solid var(--ink);border-radius:4px;z-index:8999;pointer-events:none;box-shadow:0 0 0 1px var(--panel)}
+  .phone-qins::before{content:'';position:absolute;left:0;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:1px solid var(--ink)}
+  .phone-qins>span{position:absolute;bottom:6px;left:6px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;box-shadow:0 2px 8px #0004}
+  .phone-qins.label-below>span{bottom:auto;top:6px}
+  .phone-qins.noop{background:var(--dim)}
+  .phone-qghost{position:fixed;z-index:8998;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:8px 10px;background:var(--panel);color:var(--ink);border:2px solid var(--accent);border-radius:10px;box-shadow:0 6px 20px #0005;font-size:12px;pointer-events:none}
+  .phone-qstatus{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;pointer-events:none}
+  .phone-queue .qsettled{animation:qsettled 1.8s ease-out}
+  @keyframes qsettled{from{outline:3px solid var(--accent);outline-offset:-3px}to{outline:0 solid transparent}}
+  @media(prefers-reduced-motion:reduce){.phone-queue .qsettled{animation:none;outline:2px solid var(--accent);outline-offset:-2px}}
+}
+
+/* F250-P5: full phone NP is a projection of the persistent Now instance.
+   Square hero/line seek is an explicit phone mapping, not a saved-look reset.
+   Wide desktop and the P1 mini keep their existing presentation/preferences. */
+.np-phone-full,.np-phone-full[hidden]{display:none}
+@media(max-width:900px){
+  #app>.desk[data-view=now]~:is(.mini,.tabbar){display:none}
+  #app>.desk[data-view=now]{overflow-y:auto!important;overflow-x:hidden!important}
+  #app>.desk[data-view=now]>#p-now{display:block!important;height:auto!important;min-height:100%;margin:0!important;padding:8px 12px calc(16px + var(--safe-b))!important;overflow:visible!important;box-sizing:border-box}
+  #p-now::before{display:none!important}
+  #p-now>:not(.np-phone-full,.checklist){display:none!important}
+  #p-now>.np-phone-full{display:flex;flex-direction:column;gap:14px;width:100%;max-width:460px;margin:0 auto;min-width:0}
+  .np-phone-full button{font:inherit;color:var(--ink);cursor:pointer;min-height:44px;min-width:44px}
+  .np-phone-full button:disabled{opacity:.45;cursor:not-allowed}
+  .np-phone-full :is(button,summary,[role=slider]):focus-visible{outline:2px solid var(--hl,var(--accent));outline-offset:2px}
+  .np-phone-head{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;text-align:center}
+  .np-phone-head b{font-size:1.1rem;font-weight:650}
+  .np-phone-head button{border:0;background:none;font-size:28px;padding:0;border-radius:50%;line-height:1}
+  .np-phone-zone{display:flex;justify-content:center;min-height:32px;align-items:center;font-size:.85rem;color:var(--dim)}
+  .np-phone-zone-name,.np-phone-zone .zl-fullphone{max-width:100%;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--panel2);color:var(--dim);overflow-wrap:anywhere}
+  .np-phone-zone-name[hidden],.np-phone-zone .zl-fullphone[hidden]{display:none}
+  .np-phone-zone .zl-fullphone{min-height:44px;margin:0;align-items:center;justify-content:center;box-sizing:border-box;padding:0 12px;line-height:1.2} /* F255 */
+  .np-phone-zone .zl-fullphone .zs-car{line-height:1;font-size:1em} /* F255 caret with label */
+  .np-phone-art{align-self:center;width:min(100%,max(180px,calc(100dvh / var(--z,1) - 560px)));aspect-ratio:1;border-radius:14px;overflow:hidden;background:var(--panel2);box-shadow:0 8px 24px color-mix(in srgb,var(--bg) 45%,transparent)}
+  .np-phone-art>.cover{width:100%;height:100%;border-radius:inherit;aspect-ratio:1;object-fit:cover}
+  .np-phone-titles{display:flex;align-items:center;gap:12px;min-width:0}
+  .np-phone-titles>div{flex:1;min-width:0}
+  .np-phone-titles h1{margin:0;font-size:1.5rem;line-height:1.2;font-weight:750;overflow-wrap:anywhere;letter-spacing:-.02em}
+  .np-phone-artist{color:var(--dim);font-size:1rem;line-height:1.4;margin-top:5px;overflow-wrap:anywhere}
+  .np-phone-heart{flex:none}
+  .np-phone-heart>.heart{width:44px;height:44px;background:none;border:0}
+  .np-phone-progress{min-width:0}
+  .np-phone-seek{position:relative;width:100%;height:32px;cursor:pointer;touch-action:pan-y;--seek-color:var(--accent)}
+  .np-phone-seek::before{content:'';position:absolute;left:0;right:0;top:14px;height:4px;border-radius:99px;background:var(--line)}
+  .np-phone-seek>i{display:block;position:absolute;top:14px;left:0;height:4px;border-radius:99px;background:var(--seek-color);pointer-events:none}
+  .np-phone-seek>i::after{content:'';position:absolute;right:-5px;top:-3px;width:10px;height:10px;border-radius:50%;background:var(--seek-color)}
+  .np-phone-seek[aria-disabled=true]{opacity:.45;cursor:default}
+  .np-phone-times{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--dim)}
+  .np-phone-transport{display:flex;align-items:center;justify-content:space-between;gap:clamp(0px,calc((100% - 244px)/4),6px)}
+  .np-phone-transport>button{border:0;background:none;padding:10px 0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;width:44px;flex:0 1 44px}
+  .np-phone-transport>button .ic svg{width:24px;height:24px}
+  .np-phone-transport>.np-phone-play{width:68px;flex-basis:68px;aspect-ratio:1;height:auto;border:2px solid var(--accent);color:var(--accent-text,var(--accent));background:var(--accent-soft)}
+  .np-phone-transport>.np-phone-play .ic svg{width:30px;height:30px}
+  .np-phone-transport>button.on{color:var(--accent-text,var(--accent));background:var(--accent-soft);box-shadow:inset 0 -3px currentColor}
+  .np-phone-full>.np-phvol{display:flex;align-items:center;gap:10px;min-width:0}
+  .np-phone-full .np-zmute{width:44px;height:44px;flex:none;background:none;border:0}
+  .np-phone-full .np-zvolw{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+  .np-phone-full .np-zvol{width:100%;flex:1;min-width:0;min-height:44px;margin:0;accent-color:var(--accent)}
+  .np-phone-full .np-zpct{font:12px var(--mono);color:var(--dim);min-width:3ch;text-align:right}
+  .np-phone-actions{display:flex;gap:10px}
+  .np-phone-actions>button{flex:1;border:1px solid var(--line);border-radius:999px;background:var(--panel2);padding:12px;min-height:52px}
+  .np-phone-extras{color:var(--dim);font-size:.85rem}
+  .np-phone-extras>summary{min-height:44px;padding:12px 4px;cursor:pointer}
+  .np-phone-extras>.row{padding:8px 0}
+}
+
+/* F250-P6: explicit phone song modal only. Native top layer owns inertness;
+   no global .sheet/.pldrop/ctxmenu/desktop popup changes. */
+@media (max-width:900px){
+  dialog.songsheet{position:fixed;inset:auto 0 0;margin:0 auto;padding:0;width:min(560px,calc(100vw / var(--z,1)));max-width:calc(100vw / var(--z,1));height:auto;max-height:calc((100vh - max(16px,var(--safe-t))) / var(--z,1));max-height:calc((100dvh - max(16px,var(--safe-t))) / var(--z,1));border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;background:var(--panel);color:var(--ink);overflow:hidden;box-sizing:border-box;box-shadow:0 -10px 40px color-mix(in srgb,var(--bg) 45%,transparent)}
+  dialog.songsheet[open]{display:flex;flex-direction:column}
+  dialog.songsheet::backdrop{background:color-mix(in srgb,var(--bg) 65%,transparent)}
+  .songsheet-handle{flex:none;align-self:center;width:36px;height:4px;margin:10px 0 0;border-radius:4px;background:var(--dim);opacity:.65}
+  dialog.songsheet>.songsheet-head{flex:none;display:flex;gap:12px;align-items:center;padding:12px 12px 16px;background:transparent;border:0;min-width:0}
+  .songsheet-art{flex:none;width:64px;height:64px;border-radius:8px;overflow:hidden}
+  .songsheet-meta{min-width:0;flex:1;overflow-wrap:anywhere}
+  .songsheet-meta h2{font-size:1.05rem;margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .songsheet-meta>.dim{font-size:.85rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .songsheet-close{flex:none;align-self:flex-start;min-width:44px;min-height:44px;border:0;background:transparent;color:var(--ink);border-radius:8px;font-size:1.2rem;cursor:pointer}
+  .songsheet-actions{min-height:0;min-width:0;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 12px calc(12px + var(--safe-b));scroll-padding-bottom:calc(12px + var(--safe-b))}
+  .songsheet-actions>button{display:block;width:100%;min-height:48px;padding:14px 10px;text-align:left;white-space:normal;overflow-wrap:anywhere;background:transparent;color:var(--ink);border:0;border-top:1px solid var(--line);border-radius:0;font-size:1rem;line-height:1.3;cursor:pointer}
+  .songsheet-actions>button:hover,.songsheet-actions>button:focus-visible,.songsheet-close:focus-visible{background:var(--accent-soft);outline:2px solid var(--accent);outline-offset:-2px}
+  .songsheet-actions>button:disabled{opacity:.45;cursor:not-allowed}
+  .songsheet-actions>button.danger{color:var(--red)}
+  dialog.songsheet>.songsheet-picker{position:absolute;inset:10px 10px calc(10px + var(--safe-b));width:auto;min-width:0;max-width:none;max-height:none;z-index:2;padding:8px;background:var(--panel2);border:2px solid var(--accent);border-radius:12px}
+  .songsheet-picker>button{min-height:44px;font-size:1rem;white-space:normal}
+  .songsheet-picker .pl-new{flex-wrap:wrap}.songsheet-picker .pl-new input{width:100%;flex-basis:100%}
+}
+
+/* F250-P7: owned phone Sound modal, not F246 speaker or desktop editor CSS. */
+@media (max-width:900px){
+  dialog.eqsheet.npeqsheet{inset:auto;top:calc((var(--sound-vtop,0px) + max(8px,env(safe-area-inset-top))) / var(--z,1));left:calc(max(8px,env(safe-area-inset-left)) / var(--z,1));right:calc(max(8px,env(safe-area-inset-right)) / var(--z,1));bottom:auto;margin:0 auto;width:auto;max-width:650px;height:calc((var(--sound-vh,100dvh) - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom))) / var(--z,1));max-height:none;padding:0;overflow:visible;border:1px solid var(--line);border-radius:22px;background:var(--panel);color:var(--ink);box-shadow:0 12px 60px color-mix(in srgb,var(--bg) 65%,transparent);box-sizing:border-box}
+  html.eqsheet-lock:has(dialog.npeqsheet[open]) #app>#desk{overflow:hidden!important}
+  dialog.npeqsheet:not([open]){display:none}
+  dialog.npeqsheet::backdrop{background:color-mix(in srgb,var(--bg) 65%,transparent)}
+  dialog.npeqsheet .eqsheet-h{padding:10px 12px;border-radius:22px 22px 0 0;background:var(--panel);color:var(--ink)}
+  dialog.npeqsheet .eqsheet-x{min-width:44px;min-height:44px;border-radius:3px;color:var(--ink);flex-shrink:0} /* F254 square */
+  dialog.npeqsheet .eqsheet-b{min-height:0;padding:12px 14px max(20px,env(safe-area-inset-bottom));border-radius:0 0 22px 22px;scroll-padding:12px;touch-action:pan-y;overflow-anchor:none}
+  .npeqsheet .phone-sound{min-width:0;display:flex;flex-direction:column;gap:14px}
+  .npeqsheet .sound-identity{font-weight:700;margin:0;overflow-wrap:anywhere;line-height:1.5}
+  .npeqsheet .sound-help,.npeqsheet .sound-status{margin:0;line-height:1.45}
+  .npeqsheet .sound-status{min-height:1.45em}
+  .npeqsheet .sound-status.bad{color:var(--red,var(--ink))}
+  .npeqsheet .sound-target-label{display:grid;gap:8px;font-size:.9em;color:var(--dim)}
+  .npeqsheet .sound-targets:empty{display:none}
+  .npeqsheet .wwsel{min-width:0;max-width:100%;min-height:44px}
+  .npeqsheet .sound-target-label>.wwsel,.npeqsheet .sound-output>.wwsel{width:100%}
+  .npeqsheet .eqarea{height:auto;min-height:0;width:100%;box-sizing:border-box}
+  .npeqsheet .eqarea{display:flex;flex-direction:column}
+  .npeqsheet .eqarea .eqa-plot{flex:none;min-height:180px;height:210px;padding:30px 0 26px 28px;box-sizing:border-box}
+  .npeqsheet .eqall{position:static;inset:auto;max-height:none;padding:14px 0 0;overflow:visible;border:0;background:transparent}
+  .npeqsheet .eqall-top{display:flex;flex-wrap:wrap;gap:10px}
+  .npeqsheet .eqall-top>.eqlbl{flex-basis:100%}
+  .npeqsheet .eqall-preset{width:100%;flex:1 1 100%}
+  .npeqsheet .eqall-name{min-width:0;width:100%;flex:1 1 120px;min-height:44px;box-sizing:border-box}
+  .npeqsheet .eqknobs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+  .npeqsheet .eqknob{min-width:0}.npeqsheet .eqknob input{max-width:100%;width:100%;min-height:44px}
+  .npeqsheet .eqsws{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px}
+  .npeqsheet .eqsw{min-height:48px}.npeqsheet .eqsw>span:last-child{min-width:0}
+  .npeqsheet .eqfoot{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .npeqsheet .sound-footer{padding-top:4px}.npeqsheet .sound-footer>.btn{flex:1 1 140px}
+  .npeqsheet .btn{min-height:44px;white-space:normal}
+  .npeqsheet .sound-output h3{font-size:1em;margin:0 0 8px}.npeqsheet .sound-output p{overflow-wrap:anywhere}
+  .npeqsheet :is(button,input,[tabindex]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .npeqsheet .ctxmenu{max-width:calc(100vw - 24px);box-sizing:border-box}.npeqsheet .ctx-item{min-height:44px;white-space:normal}
+}
+
+
+/* F254: shared dismiss/close × — square 3px, ink (not red), theme --accent focus ring */
+.ww-close,
+.eqsheet-x,
+.songsheet-close,
+.vizfull .x,
+.mp-b.mp-x,
+.mp:not(.embedded) .mp-side .mp-x,
+.bk-h > button[aria-label="Close"],
+.wn-h > button.iconbtn[aria-label="Dismiss"],
+button.btn.sm[aria-label="Close"],
+button.btn.sm.ghost[aria-label="Close"],
+button.btn.sm.ghost[aria-label="Dismiss"]{
+  border-radius:3px;
+  color:var(--ink);
+  box-sizing:border-box;
+}
+.ww-close:hover,
+.mp-b.mp-x:hover,
+.mp:not(.embedded) .mp-side .mp-x:hover{
+  color:var(--ink);
+}
+.ww-close:focus-visible,
+.eqsheet-x:focus-visible,
+.songsheet-close:focus-visible,
+.vizfull .x:focus-visible,
+.mp-b.mp-x:focus-visible,
+.mp:not(.embedded) .mp-side .mp-x:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+dialog.npeqsheet .eqsheet-x{border-radius:3px} /* F254 was 50% */
+.songsheet-close{border-radius:3px}
+.vizfull .x{border-radius:3px;color:#fff} /* fullscreen stays light on black */
+@media (max-width:900px),(pointer:coarse){
+  .ww-close,
+  dialog.npeqsheet .eqsheet-x,
+  .songsheet-close,
+  .vizfull .x,
+  .mp-b.mp-x,
+  .mp:not(.embedded) .mp-side .mp-x,
+  .mp:not(.embedded) .mp-side .mp-b.mp-x,
+  dialog>header .iconbtn[aria-label="Close"],
+  .wn-h > button.iconbtn[aria-label="Dismiss"],
+  .bk-h > button[aria-label="Close"],
+  button.btn.sm[aria-label="Close"],
+  button.btn.sm.ghost[aria-label="Close"],
+  button.btn.sm.ghost[aria-label="Dismiss"]{
+    min-width:44px;min-height:44px;width:44px;height:44px;padding:0;
+  }
+}
+
+/* ===== DIG pile (Devices/mixer) — 2026-11-05 (+ DIG-R2 rail amend) ===== */
+/* Idle zone QueueBox: collapse speaker list; expand control inside existing head (no width change) */
+.qb42-exp{flex:none;align-self:center;margin:0 4px 0 0;padding:2px 6px;min-height:22px;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--dim);font:700 11px/1.2 system-ui,sans-serif;letter-spacing:.04em;cursor:pointer}
+.qb42-exp:hover,.qb42-exp:focus-visible,.qb42-exp.open{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.qb42-exp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.qb42.idle .qb42-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.zsp42.zsp42-collapsed,.zsp42[hidden]{display:none!important}
+.qb42.qb42-folded.idle .qb42-head{margin-bottom:0}
+
+/* Mixer: selected highlight mirrors Controlling QueueBox WITHOUT shifting rails (inset bar, not thicker border-left) */
+.mv-master.ctl,.mv-card.ctl{border:1px solid var(--accent);box-shadow:inset 3px 0 0 var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel2))}
+.mv-ph{width:32px;height:26px;visibility:hidden;pointer-events:none;flex:none}
+.mv-ph.mv-ph-chev{width:26px} /* match .mv-chev column so master/Max rails == speaker */
+
+/* Mixer: All-zones row uses F66 5-col template (mute/chev placeholders) so master track matches zone/speaker */
+.mv-row.mv-mrow{grid-template-columns:minmax(6.5em,auto) minmax(0,1fr) 3.2em 32px 26px}
+.mv-body{--mvn:clamp(8em,26cqi,15em);container-type:inline-size}
+/* DIG-R2: card size-container made --mvn's 26cqi resolve against padded card content (shorter than body) → master/zone rails diverged by ~7px at 761.
+   Drop nested size containment so F66 --mvn cqi uses .mv-body for master and cards alike. Phone stack stays @media 760. */
+.mv-body .mv-card{container-type:normal;--mvn:clamp(8em,26cqi,15em)}
+.mv-master .mv-row.mv-mrow{grid-template-columns:var(--mvn) minmax(0,1fr) 3.2em 32px 26px}
+@media (max-width:760px){
+  .mv-row.mv-mrow,.mv-master .mv-row.mv-mrow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s"}
+  .mv-mrow>.mv-ph{display:none}
+}
+
+/* DIG-R2: drawer chrome must not inset Max off the speaker rail; Delay stays free */
+.mv-drawer{padding:8px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;margin:2px 0 8px}
+.mv-drawer .mv-drow.mv-caprow{grid-template-columns:calc(var(--mvn,9em) - var(--mvi,29px)) minmax(0,1fr) 3.2em 32px 26px;gap:10px}
+.mv-drawer .mv-drow.mv-caprow>.mv-pct{width:3.2em;text-align:right;box-sizing:border-box}
+.mv-sub.flat .mv-drawer .mv-drow.mv-caprow{grid-template-columns:var(--mvn,9em) minmax(0,1fr) 3.2em 32px 26px}
+.mv-drawer .mv-drow.mv-delayrow{grid-template-columns:minmax(0,9em) minmax(0,1fr) auto;padding:0} /* Delay length free */
+/* phone / narrow card: Max slider pulls back over .mv-sub indent like speaker volume */
+@media (max-width:760px){
+  /* DIG-amend2 R2: beat .mv-sub.flat five-col Max so unassigned phone Max matches Volume rail */
+  .mv-drawer .mv-drow.mv-caprow,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:4px;padding:6px 0}
+  .mv-drawer .mv-drow.mv-caprow>.n,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.n{grid-area:n}
+  .mv-drawer .mv-drow.mv-caprow>input.mv-cap,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>input.mv-cap{grid-area:s}
+  .mv-drawer .mv-drow.mv-caprow>.mv-pct,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
+  .mv-drawer .mv-drow.mv-caprow>.mv-ph,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.mv-ph{display:none}
+  .mv-card .mv-sub .mv-drawer .mv-drow.mv-caprow>input.mv-cap{width:calc(100% + var(--mvi));max-width:none;margin-left:calc(-1 * var(--mvi))}
+}
+@container (max-width:420px){
+  /* DIG-amend2 R2: same flat Max override under narrow card container */
+  .mv-drawer .mv-drow.mv-caprow,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:2px;padding:4px 0}
+  .mv-drawer .mv-drow.mv-caprow>.n,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.n{grid-area:n}
+  .mv-drawer .mv-drow.mv-caprow>input.mv-cap,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>input.mv-cap{grid-area:s}
+  .mv-drawer .mv-drow.mv-caprow>.mv-pct,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
+  .mv-drawer .mv-drow.mv-caprow>.mv-ph,
+  .mv-sub.flat .mv-drawer .mv-drow.mv-caprow>.mv-ph{display:none}
+  .mv-card .mv-sub .mv-drawer .mv-drow.mv-caprow>input.mv-cap{width:calc(100% + var(--mvi));max-width:none;margin-left:calc(-1 * var(--mvi))}
+}
+
+/* DIG-R2: F79 one-column + card-local @container 420cqi stacked speaker rows while All-zones master stayed 5-col (761 fail).
+   On desktop/mid widths only, restore F66 5-col under the card container so master/zone/speaker/Max share rails.
+   Phone @media (max-width:760px) keeps its stacked layout (do not override inside 760). */
+@media (min-width:761px){
+  @container (max-width:420px){
+    .mv-card .mv-row.mv-zrow,.mv-card .mv-row.mv-spk,.mv-card .mv-sub .mv-row.mv-spk{
+      grid-template-columns:var(--mvn) minmax(0,1fr) 3.2em 32px 26px;grid-template-areas:none;row-gap:unset;padding:unset}
+    .mv-card .mv-sub .mv-row.mv-spk{grid-template-columns:calc(var(--mvn) - var(--mvi)) minmax(0,1fr) 3.2em 32px 26px}
+    .mv-card .mv-row.mv-zrow>.n,.mv-card .mv-row.mv-spk>.n,
+    .mv-card .mv-row>.mv-pct,.mv-card .mv-row>.mv-m,.mv-card .mv-row>.mv-chev,
+    .mv-card .mv-row.mv-zrow>input,.mv-card .mv-row.mv-spk>input{grid-area:auto}
+    .mv-card .mv-sub .mv-row.mv-spk>input{width:auto;max-width:none;margin-left:0}
+    .mv-drawer .mv-drow.mv-caprow{grid-template-columns:calc(var(--mvn,9em) - var(--mvi,29px)) minmax(0,1fr) 3.2em 32px 26px;grid-template-areas:none;row-gap:unset;padding:unset}
+    .mv-drawer .mv-drow.mv-caprow>.n,.mv-drawer .mv-drow.mv-caprow>input.mv-cap,.mv-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:auto}
+    .mv-drawer .mv-drow.mv-caprow>.mv-ph{display:block;visibility:hidden}
+    .mv-card .mv-sub .mv-drawer .mv-drow.mv-caprow>input.mv-cap{width:auto;margin-left:0}
+  }
+}
+
+/* F262-fix-B: the fixed Speaker Settings sheet is sized by its inset box only (no vh height, no transform), so WebKit has no
+   stale transformed/fixed layer to hit-test after rotation; html.ww-bodylock = sheetlock.js pins the body (real iOS scroll lock). */
+.pd42-sheet{top:0;bottom:0;height:auto;transform:none}
+html.ww-bodylock body{overflow:hidden}
+/* F262-fix: phone app is portrait-only. orientlock.js sets html.ww-rotate-block only on a physically landscape phone
+   (screen signal, not the keyboard-shrunk viewport), so the rule is class-gated, not media-gated. */
+.ww-rotate { display: none; }
+html.ww-rotate-block body > *:not(#ww-rotate) { visibility: hidden !important; pointer-events: none !important; }
+html.ww-rotate-block, html.ww-rotate-block body { overflow: hidden !important; touch-action: none; }
+html.ww-rotate-block .ww-rotate:not([hidden]) { display: flex; position: fixed; inset: 0; z-index: 2147483647; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; background: #000614; color: #fff; font-size: 20px; font-weight: 600; pointer-events: auto; touch-action: none; }
+
+/* F264: phone Speaker Settings. More ▾ menu sizes to its content (the sheet's `.pd42 *{max-width:100%}` squeezed it to the
+   button width), stays on top with a solid background; devices.js places it fixed + clamped in the viewport. */
+:is(#p-zones,.pd42-sheet) .pd42 .dmore .dmenu,.dmore .dmenu{min-width:max-content;max-width:calc(100vw - 16px);white-space:nowrap;z-index:9600;background:var(--panel);opacity:1}
+:is(#p-zones,.pd42-sheet) .pd42 .dmore .dmenu button,.dmore .dmenu button{max-width:none;white-space:nowrap}
+/* F264: Zone row = "Zone" + the select, always one line; long names ellipsize. */
+:is(#p-zones,.pd42-sheet) .pd42 .spk-zonerow,.spk-zonerow{flex-wrap:nowrap;min-width:0}
+.spk-zonerow>.dlbl{flex:none}
+.spk-zonerow .spk-zsel{flex:1 1 auto;min-width:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* F264 phone Speaker Settings cleanup (sheet-scoped; desktop unchanged): one-row header (Rename lives in More ▾),
+   no repeated hint / SPEAKER chip / profile helper text, tighter spacing and fewer nested boxes. */
+.pd42-sheet .dhint42,.pd42-sheet .spk-head .spk-rename,.pd42-sheet .spk-tags .dtag.role,.pd42-sheet .spk-profrow .spk-hint,.pd42-sheet .spk-profrow>.grow{display:none}
+.pd42-sheet .spk-head{flex-wrap:nowrap;gap:6px;padding:4px 0}
+.pd42-sheet .spk-head .spk-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
+.pd42-sheet .spk-profrow{flex-wrap:nowrap;gap:6px;padding:4px 0;background:none;border:0}
+.pd42-sheet .spk-profrow .spk-pwrap{flex:1 1 auto;min-width:0}.pd42-sheet .spk-profrow .spk-prof{min-width:0;width:100%}
+.pd42-sheet .spk-profrow .spk-pname{flex:1 1 auto;min-width:0;width:auto}
+.pd42-sheet .spk-zonerow{padding:2px 0;gap:8px}
+.pd42-sheet .spk-tags:empty{display:none}
+.pd42-sheet>.pd42{padding-top:6px}
+.pd42-sheet .spkset :is(.spk-body,.spk-left,.spk-right)>*{margin-top:6px}
+
+/* F266: every zone box folds to one compact row (empty-zone look) with a green dot when a speaker is on + online.
+   The fold toggle sits on the title row, so the now-playing line and volume row keep their own full-width rows. */
+.qb42-trow{display:flex;align-items:center;gap:6px;min-width:0}
+.qb42-trow>.qb42-t{flex:1 1 auto;min-width:0}
+.zfold42-t{flex:none;width:22px;height:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--dim);font:700 11px/1 system-ui,sans-serif;cursor:pointer}
+.zfold42-t:hover,.zfold42-t:focus-visible{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.zfold42-t:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tree42 .qb42.zfold42 .ze42-row{gap:8px}
+.tree42 .qb42.zfold42 .ze42-note{flex:0 1 auto;min-width:0}
+.zfold42-dot.ok{background:var(--green,#2ecc71);box-shadow:0 0 0 2px color-mix(in srgb,var(--green,#2ecc71) 25%,transparent)}
+.qb42.idle .qb42-head{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
+/* F266: a folded box keeps the Controlling look - solo uses the same .qb42.solo.ctl rules; a linked set mirrors the selected zone's accent edge. */
+.tree42 .qb42.zfold42.linked.ctlz{box-shadow:inset 3px 0 0 var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+/* F267: the idle "Nothing playing" line is the same full-width bar as a playing one (empty track, --:-- time) */
+.qb42-head>.zl-now,.qb42.idle .qb42-head>.zl-now{align-self:stretch;width:auto;flex:none;justify-content:flex-start}
+.zl-now.empty .zl-bar i{width:0}
+
+/* F270: at a Display size other than 100 % the 1px/3px brushed texture lands on fractional device pixels and shows as banding lines: drop it there (flat panel). */
+html:not([data-uiscale=compact]) :is(.libpanel,.nowcol,.devpanel,.listpanel,.np-vizpanel,.np-ctlpanel){background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.10)),var(--panel)}

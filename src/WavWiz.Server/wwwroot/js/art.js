@@ -159,73 +159,165 @@ export function artTrackId(x) {
 }
 
 // ---- Media Session (lock-screen / notification controls + cover) ----
-// F206: one metadata owner; MediaMetadata rewritten only when track/title/art/state class changes; position forced only on
-// track/state/duration change, from the caller's smooth clock (posMs = localPos clock like tickPos), never raw stale positionMs every paint.
-// F212: metaKey has no play/pause class (iOS reloads artwork on every MediaMetadata write -> logo flash + 0:00 jump); last good art kept per track;
-// new 512 art is preloaded and applied on load. Any metadata write re-publishes the stable position right after (never 0 unless it is 0).
-let msMetaKey = '', msForceKey = '', msTrackKey = '', msArt = null, msArtWant = '', msLastPos = null;
-const msArtwork = (it, url512) => url512 ? [96, 192, 384, 512].map(s => ({ src: itemArtUrl(it, s) || url512, sizes: `${s}x${s}`, type: 'image/jpeg' })) : null;
-const msLogo = () => [{ src: '/assets/logo-512.png', sizes: '512x512', type: 'image/png' }];
-function msWrite(ms, title, it, artwork) {
-  ms.metadata = new MediaMetadata({ title, artist: it.artist || '', album: it.album || 'WavWiz', artwork });
-  if (msLastPos) { const L = msLastPos; updateMediaSessionPosition(L.now, Number(L.posMs) + (L.now?.state === 'playing' ? performance.now() - L.at : 0), true); }   // F212: metadata write must not leave the scrubber at 0:00
+// F243: queue ids are not track identity. Keep last-good artwork and duration across slim/empty polls;
+// async covers may publish only for the current track AND request. Tests are not iPhone runtime proof.
+// F248: valid-duration zero/backward candidates are a reproducible smooth-clock poison. Reconcile at
+// ingestion (refreshNow) and again here; do not blanket-ignore seeks — use version/index/track evidence
+// or bounded confirmation so repeat/seek/reconnect still land.
+let msMetaKey = '', msForceKey = '', msTrackKey = '', msArt = null, msArtWant = '', msLastPos = null, msCurrent = null, msGeneration = 0;
+export function mediaSessionTrackKey(it) {
+  if (!it) return '';
+  // Receivers reuse their queue entry for multiple songs; radio artwork belongs to the station.
+  if (isReceiver(it)) return [it.kind, it.refId || it.location || '', it.title || '', it.artist || '', it.album || ''].join('\u0001');
+  // Library and saved radio IDs come from separate tables. Slim library polls can use
+  // kind:'url', so keep their art/ref IDs in the library domain, not the queue shape.
+  const domain = it.kind === 'radio' ? 'radio' : it.kind === 'remote' ? 'remote' : 'library';
+  const id = it.kind === 'radio' ? it.refId : artTrackId(it) ?? it.refId;
+  if (id != null && id !== '') return domain + ':ref:' + id;
+  const loc = it.path || it.location || it.url;
+  return domain + (loc ? ':loc:' + loc : ':queue:' + (it.id ?? [it.kind, it.title, it.artist, it.album].join('\u0001')));
 }
-export function setMediaSession(now, handlers, posMs) {
+/** F248: reconcile once per authoritative poll; writers consume this result, never confirm it again. */
+export function reconcileSmoothPosition(prev, now, candidateMs, at = 0) {
+  const state = now?.state || 'none', version = now?.version, index = now?.index;
+  const trackKey = now?.item ? mediaSessionTrackKey(now.item) : '';
+  const duration = Number(now?.durationMs), candidate = candidateMs == null ? NaN : Number(candidateMs);
+  const accept = pos => ({ posMs: Number.isFinite(pos) ? pos : 0, at, version, index, trackKey, state,
+    durationMs: Number.isFinite(duration) && duration > 0 ? duration : 0, pending: null, pendingAt: null });
+  if (state === 'stopped' || state === 'none') return accept(0);
+  if (!prev || !prev.trackKey || (trackKey && trackKey !== prev.trackKey)) return accept(candidate);
+  const predicted = Number(prev.posMs) + (prev.state === 'playing' ? Math.max(0, at - Number(prev.at || 0)) : 0);
+  // A missing non-stop item or incomplete duration is not a new track, stop, or seek to zero.
+  // Do not consume version/index evidence until a complete finite clock arrives (Pause also bumps version).
+  if (!now?.item || !Number.isFinite(candidate) || (!isLive(now.item) && prev.durationMs > 0 && !(Number.isFinite(duration) && duration > 0)))
+    return { ...prev, posMs: predicted, at, state, pending: null, pendingAt: null };
+  if (Number.isFinite(index) && Number.isFinite(prev.index) && index !== prev.index) return accept(candidate);
+  // Conductor version is a mutation counter (Seek / StartAt / Pause / Resume, etc.), NOT a sample ID.
+  // Natural same-index Repeat One and one-item All do NOT bump it.
+  if (version != null && prev.version != null && Number(version) !== Number(prev.version)) return accept(candidate);
+  // Policy: allow up to 2000ms of backward jitter; larger corrections need event evidence or confirmation.
+  if (candidate >= predicted - 2000) return accept(candidate);
+  // Consecutive low samples must agree with the pending clock's progression. There is no 2.5s expiry:
+  // delayed polls at 3s+ must still recover on the next coherent sample. A good poll clears pending;
+  // backwards/non-progressing or disagreeing low samples start fresh instead of confirming.
+  const gap = at - Number(prev.pendingAt ?? at);
+  const pendingPosition = Number(prev.pending) + (prev.state === 'playing' ? gap : 0);
+  if (prev.pending != null && gap > 0 && (prev.state !== 'playing' || candidate > prev.pending) && Math.abs(candidate - pendingPosition) <= 2000) return accept(candidate);
+  return { ...accept(predicted), pending: candidate, pendingAt: at };
+}
+function msClockPrev() {
+  if (!msLastPos) return null;
+  return { posMs: msLastPos.posMs, at: msLastPos.at, version: msLastPos.version, index: msLastPos.index,
+    trackKey: msTrackKey, state: msLastPos.now?.state, durationMs: msLastPos.now?.durationMs,
+    pending: msLastPos.pending, pendingAt: msLastPos.pendingAt, sample: msLastPos.sample };
+}
+function msApplyClock(now, candidate, at, clock = null, sample = now) {
+  let rec;
+  if (clock) {
+    // refreshNow already reconciled this poll. Draw, tick and asynchronous artwork writes are consumers.
+    const pos = Number.isFinite(candidate) ? candidate : Number(clock.posMs) + (clock.state === 'playing' ? Math.max(0, at - clock.at) : 0);
+    rec = { ...clock, posMs: pos, at };
+  } else if (msLastPos && msLastPos.sample === sample) {
+    // Compatibility callers without the ingest clock: one snapshot object is one poll, not one sample per writer.
+    rec = { ...msClockPrev(), posMs: msElapsed(), at };
+  } else rec = reconcileSmoothPosition(msClockPrev(), now, candidate, at);
+  msLastPos = { now, posMs: rec.posMs, at: rec.at, version: rec.version, index: rec.index,
+    pending: rec.pending, pendingAt: rec.pendingAt, sample: clock?.sample || sample };
+  return rec.posMs;
+}
+// Do not mislabel PNG art as JPEG; the browser can determine its actual MIME type.
+const msArtwork = (it, url512) => [96, 192, 384, 512].map(s => ({ src: itemArtUrl(it, s) || url512, sizes: `${s}x${s}` }));
+const msLogo = () => [{ src: '/assets/logo-512.png', sizes: '512x512', type: 'image/png' }];
+const msElapsed = () => msLastPos ? Number(msLastPos.posMs) + (msLastPos.now.state === 'playing' ? performance.now() - msLastPos.at : 0) : 0;
+function msWrite(ms) {
+  if (!msCurrent) return;
+  const { title, it } = msCurrent, artwork = msArt?.artwork || msLogo();
+  const key = JSON.stringify([msTrackKey, title, it.artist || '', it.album || 'WavWiz', artwork]);
+  if (key === msMetaKey && ms.metadata) return;
+  ms.metadata = new MediaMetadata({ title, artist: it.artist || '', album: it.album || 'WavWiz', artwork }); msMetaKey = key;
+  if (msLastPos) updateMediaSessionPosition(msLastPos.now, msElapsed(), true, msClockPrev());
+}
+function msDurationBlip(now) {
+  const duration = Number(now?.durationMs);
+  return now?.item && mediaSessionTrackKey(now.item) === msTrackKey && !isLive(now.item) &&
+    (now.state === 'playing' || now.state === 'paused') && !(Number.isFinite(duration) && duration > 0) && msLastPos?.now.durationMs > 0;
+}
+function msPositionNow(now) {
+  if (msDurationBlip(now))
+    return { ...now, durationMs: msLastPos.now.durationMs };
+  return now;
+}
+export function setMediaSession(now, handlers, posMs, clock = null) {
   if (!('mediaSession' in navigator)) return;
   try {
-    const ms = navigator.mediaSession, it = now?.item;
+    const ms = navigator.mediaSession, it = now?.item, sample = now;
     if (!it) {
-      if (msMetaKey !== 'none') { msMetaKey = 'none'; ms.metadata = null; ms.playbackState = 'none'; }
-      msForceKey = ''; msTrackKey = ''; msArt = null; msArtWant = ''; msLastPos = null; updateMediaSessionPosition(now, 0, true); return;
-    }
-    const title = (it.kind === 'radio' ? (now.liveTitle || it.title) : it.title) || 'WavWiz';
-    const stateCls = now.state === 'playing' ? 'playing' : now.state === 'paused' ? 'paused' : 'none';
-    const trackKey = String(it.id ?? it.refId ?? '');
-    if (trackKey !== msTrackKey) { msTrackKey = trackKey; msArt = null; msArtWant = ''; }
-    const art = itemArtUrl(it, 512) || msArt;   // F212: slim poll (no art) on the same track keeps the last good art
-    msLastPos = { now, posMs: posMs ?? now.positionMs, at: performance.now() };
-    const textKey = [trackKey, title, it.artist || '', it.album || ''].join('\u0001');
-    const metaKey = textKey + '\u0001' + (art || '');
-    if (metaKey !== msMetaKey || !ms.metadata) {
-      const textSame = msMetaKey.startsWith(textKey + '\u0001') && ms.metadata;
-      msMetaKey = metaKey;
-      if (art && art !== msArt && typeof Image === 'function') {
-        // soft preload: keep current artwork (prior art of this track, or logo for a brand-new track) until the 512 picture has loaded
-        if (!textSame) msWrite(ms, title, it, msArt ? msArtwork(it, msArt) : msLogo());
-        if (msArtWant !== art) {
-          msArtWant = art; const img = new Image(), tk = trackKey, artwork = msArtwork(it, art);
-          img.onload = () => { if (msTrackKey !== tk || msArtWant !== art) return; msArt = art; msWrite(ms, title, it, artwork); };
-          img.onerror = () => { if (msArtWant === art) msArtWant = ''; };
-          img.src = art;
-        }
-      } else {
-        if (art) msArt = art;
-        msWrite(ms, title, it, art ? msArtwork(it, art) : msLogo());
+      // An incomplete playing/paused poll is not a stop. Retain metadata AND the moving/frozen clock.
+      if (msCurrent && now?.state !== 'stopped' && now?.state !== 'none') {
+        const state = now?.state === 'paused' || now?.state === 'playing' ? now.state : msLastPos?.now.state;
+        updateMediaSessionPosition({ ...msLastPos?.now, state }, msElapsed(), true, msClockPrev());
+        if (state) ms.playbackState = state;
+        return;
       }
+      if (msMetaKey !== 'none') { msMetaKey = 'none'; ms.metadata = null; ms.playbackState = 'none'; }
+      msForceKey = ''; msTrackKey = ''; msArt = null; msArtWant = ''; msLastPos = null; msCurrent = null; msGeneration++;
+      updateMediaSessionPosition(now, 0, true); return;
+    }
+    const trackKey = mediaSessionTrackKey(it), changed = trackKey !== msTrackKey;
+    if (changed) { msTrackKey = trackKey; msArt = null; msArtWant = ''; msLastPos = null; msGeneration++; }
+    const stateCls = now.state === 'playing' ? 'playing' : now.state === 'paused' ? 'paused' : 'none';
+    const durationBlip = msDurationBlip(now);
+    now = msPositionNow(now);
+    const rawPosition = posMs ?? now.positionMs;
+    // F243 duration blip OR F248 suspicious valid-duration zero: reconcile decides; never trust raw blindly.
+    const candidate = durationBlip || rawPosition == null ? NaN : Number(rawPosition);
+    const position = msApplyClock(now, candidate, performance.now(), clock, sample);
+    msCurrent = { title: (it.kind === 'radio' ? (now.liveTitle || it.title) : it.title) || 'WavWiz', it };
+    const art = itemArtUrl(it, 512) || msArt?.url;
+    if (art !== msArtWant) { msArtWant = art || ''; msGeneration++; }
+    if (art && art !== msArt?.url && typeof Image === 'function') {
+      // Never replace the last-good cover with a logo during an art refresh of the same track.
+      msWrite(ms);
+      if (msPending !== msGeneration) {
+        msPending = msGeneration;
+        const img = new Image(), gen = msGeneration, artwork = msArtwork(it, art);
+        img.onload = () => { if (gen !== msGeneration || trackKey !== msTrackKey) return; msArt = { url: art, artwork }; msWrite(ms); };
+        img.onerror = () => { if (gen === msGeneration) msPending = -1; };
+        img.src = art;
+      }
+    } else {
+      if (art && !msArt) msArt = { url: art, artwork: msArtwork(it, art) };
+      msWrite(ms);
     }
     if (ms.playbackState !== stateCls) ms.playbackState = stateCls;
-    for (const [a, fn] of Object.entries(handlers || {})) { try { ms.setActionHandler(a, fn); } catch { /* action not supported on this browser */ } }
+    for (const [a, fn] of Object.entries(handlers || {})) { try { ms.setActionHandler(a, fn); } catch { /* unsupported action */ } }
     const forceKey = `${trackKey}|${Number(now.durationMs)}|${now.state}`;
-    if (forceKey !== msForceKey) { msForceKey = forceKey; updateMediaSessionPosition(now, posMs ?? now.positionMs, true); }   // F204/F206: else tickPos throttled updates own it
+    if (forceKey !== msForceKey) { msForceKey = forceKey; updateMediaSessionPosition(now, position, true, msClockPrev()); }
   } catch { /* old browser */ }
 }
+let msPending = -1;
 /** F206: true once setMediaSession owns metadata (media.js must not write artwork-less metadata). */
 export const mediaSessionOwnsMetadata = () => msMetaKey !== '';
-// F204: lock-screen scrubber (iOS shows 0:00 / -0:01 without setPositionState). Single owner: setMediaSession + now.js tickPos.
+// F204/F243/F248: scrubber uses reconciled smooth clock, stable identity, and last valid duration.
 let msPosAt = 0, msPosKey = '';
-export function updateMediaSessionPosition(now, posMs, force = false) {
+export function updateMediaSessionPosition(now, posMs, force = false, clock = null) {
   const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
   if (!ms || typeof ms.setPositionState !== 'function') return;
   try {
+    if (!now?.item && msCurrent && now?.state !== 'stopped' && now?.state !== 'none') return;
+    const sample = now, durationBlip = msDurationBlip(now);
+    now = msPositionNow(now);
     const it = now?.item, durMs = Number(now?.durationMs);
-    if (!it || isLive(it) || !Number.isFinite(durMs) || durMs <= 0) {   // live/radio/unknown: never publish duration 0
-      if (msPosKey !== 'none') { msPosKey = 'none'; try { ms.setPositionState(); } catch { /* clear unsupported */ } }
+    if (!it || isLive(it) || !Number.isFinite(durMs) || durMs <= 0) {
+      if (msPosKey !== 'none') { msPosKey = 'none'; ms.setPositionState(); }
       return;
     }
-    const key = `${it.id ?? it.refId ?? ''}|${durMs}|${now.state}`, t = performance.now();
-    if (!force && key === msPosKey && t - msPosAt < 1000) return;   // ~1s throttle; immediate on track/state/duration change
-    msPosKey = key; msPosAt = t; if (String(it.id ?? it.refId ?? '') === msTrackKey) msLastPos = { now, posMs, at: t };
-    const duration = durMs / 1000, p = Number(posMs) / 1000;
-    ms.setPositionState({ duration, playbackRate: 1, position: Math.min(duration, Math.max(0, Number.isFinite(p) ? p : 0)) });
+    const trackKey = mediaSessionTrackKey(it), key = `${trackKey}|${durMs}|${now.state}`, t = performance.now();
+    if (!force && key === msPosKey && t - msPosAt < 1000) return;
+    const p = Number(posMs), candidate = durationBlip || !Number.isFinite(p) ? NaN : p;
+    const position = trackKey === msTrackKey ? msApplyClock(now, candidate, t, clock, sample) : (Number.isFinite(p) ? p : 0);
+    msPosKey = key; msPosAt = t;
+    const duration = durMs / 1000;
+    ms.setPositionState({ duration, playbackRate: 1, position: Math.min(duration, Math.max(0, position / 1000)) });
   } catch { /* old browser / invalid state */ }
 }

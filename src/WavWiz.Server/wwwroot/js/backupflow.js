@@ -11,7 +11,7 @@ const closePanel = () => { panel?.remove(); panel = null; };
 const showPanel = (title, ...kids) => {
   const was = !!panel; closePanel();
   panel = h('section', { class: 'bkpanel' + (was ? '' : ' in'), role: 'region', 'aria-label': title },
-    h('div', { class: 'bk-h' }, h('b', null, title), h('span', { class: 'grow' }), h('button', { type: 'button', class: 'btn sm', 'aria-label': 'Close', onclick: closePanel }, '✕')), ...kids);
+    h('div', { class: 'bk-h' }, h('b', null, title), h('span', { class: 'grow' }), h('button', { type: 'button', class: 'btn sm ww-close', 'aria-label': 'Close', onclick: closePanel }, '✕')), ...kids);
   document.body.append(panel); return panel;
 };
 const when = iso => { try { return new Date(iso).toLocaleString(); } catch { return iso || ''; } };

@@ -1,7 +1,7 @@
 ; WavWiz (BETA) installer. Compile:  ISCC /DAppVersion=0.0.4 /DDistDir=<dist> /DRepoDir=<repo> /DOutDir=<out> installer\WavWiz.iss   (build\make-installer.ps1 does this; works under Wine)
 ; FULL self-contained installer only: the target PCs have no .NET. There is no slim / framework-dependent variant.
 #ifndef AppVersion
-  #define AppVersion "0.4.9"
+  #define AppVersion "0.6.7"
 #endif
 #ifndef RepoDir
   #define RepoDir ".."
@@ -124,6 +124,12 @@ var
   NetPage, HostPage: TWizardPage;
   LanEdit, HostEdit: TNewEdit;
   LanDetected: Boolean;
+  { F257/F268: listening choice (LanOnlyRadio = home network only, AllIfRadio = home network + Tailscale/VPN, SpecRadio = advanced
+    specific address in LanEdit) is separate from the connection URL (ConnUrlLabel, read-only) }
+  AllIfRadio, LanOnlyRadio, SpecRadio: TNewRadioButton;
+  ConnUrlLabel: TNewStaticText;
+  DetectedLanIp: String;
+  ExistingBindSeeded: String; { bind already in server.json when DetectLan seeded the box; empty = fresh install }
   SetupFailed: Boolean;
   UninstPurgeFlag: Boolean;
   UninstNeedsReboot: Boolean; { F173 }
@@ -222,6 +228,30 @@ begin
   if not IsIPv4(Result) then Result := '';
 end;
 
+{ F257-A R2: HTTPS port for the read-only connection URL. Upgrade: the saved "httpsPort" from server.json, '' when it cannot be read
+  (then no full URL is shown). Fresh install (no server.json): setup.ps1's default 47443. }
+function ExistingHttpsPort: String;
+var A: AnsiString; S: String; P, I, N: Integer;
+begin
+  Result := '';
+  if not LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\server.json'), A) then
+    if not LoadStringFromFile(ExpandConstant('{commonappdata}\Unison\server.json'), A) then begin Result := '47443'; Exit; end;
+  S := String(A); P := Pos('"httpsPort"', S); if P = 0 then Exit;
+  S := Copy(S, P + 11, 40); P := Pos(':', S); if P = 0 then Exit;
+  S := Trim(Copy(S, P + 1, 40)); I := 1;
+  while (I <= Length(S)) and (S[I] >= '0') and (S[I] <= '9') do I := I + 1;
+  N := StrToIntDef(Copy(S, 1, I - 1), 0);
+  if (N >= 1) and (N <= 65535) then Result := IntToStr(N);
+end;
+
+{ F257-A R2: full https URL only when both the address and the port are known, else '' }
+function ConnUrl(Ip: String): String;
+var Port: String;
+begin
+  Result := ''; Port := ExistingHttpsPort;
+  if (Ip <> '') and (Port <> '') then Result := 'https://' + Ip + ':' + Port;
+end;
+
 { F122: WebView2 runtime check (registry, same keys as install-player.ps1) + flag file written by install-player.ps1 }
 function WebView2Missing: Boolean;
 var K, Pv: String;
@@ -317,39 +347,114 @@ begin
   Why := 'The setup script did not finish within ' + IntToStr(TotalLimitMs div 1000) + ' seconds.';
 end;
 
-procedure DetectLan;
-var Exe, OutFile, Why, Last: String; Code: Integer; A: AnsiString;
+{ F257: run detect-lan.ps1 once (convenience only); returns '' when nothing usable was found }
+function RunLanDetect: String;
+var Exe, OutFile: String; Code: Integer; A: AnsiString;
 begin
-  if LanDetected then Exit;
-  LanDetected := True;
-  if ExistingBindAddress <> '' then begin LanEdit.Text := ExistingBindAddress; Exit; end;
-  if LanEdit.Text <> '' then Exit;
+  Result := '';
   try
     ExtractTemporaryFile('lib.ps1'); ExtractTemporaryFile('detect-lan.ps1');
     OutFile := ExpandConstant('{tmp}\wavwiz-lan.txt');
     DeleteFile(OutFile);
     Exe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-    { 12 s at most, hidden, never waits for input; failure just leaves the box empty }
+    { 12 s at most, hidden, never waits for input; failure just leaves the result empty }
     Exec(Exe, '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\detect-lan.ps1')) + ' -OutFile ' + QuoteArg(OutFile), '', SW_HIDE, ewNoWait, Code);
     Code := 0;
     while (Code < 24) and (not FileExists(OutFile)) do begin Sleep(500); Code := Code + 1; end;
     if FileExists(OutFile) then
-      if LoadStringFromFile(OutFile, A) then if IsIPv4(Trim(String(A))) then LanEdit.Text := Trim(String(A));
+      if LoadStringFromFile(OutFile, A) then if IsIPv4(Trim(String(A))) then Result := Trim(String(A));
   except
     { detection is a convenience only }
   end;
 end;
 
+{ F268: True when the 'Home network + Tailscale/VPN (all networks)' choice is selected (bindAddress 0.0.0.0 + allowAllInterfaces). }
+function KeepAllInterfaces: Boolean;
+begin
+  Result := AllIfRadio.Checked;
+end;
+
+{ F268: the address that will be passed to setup.ps1 for the non-wildcard choices ('' = this PC only / 127.0.0.1) }
+function ChosenLanAddress: String;
+begin
+  if LanOnlyRadio.Checked then Result := DetectedLanIp else Result := Trim(LanEdit.Text);
+end;
+
+{ F257: read-only connection URL, shown separately from the listening interface. Never an editable 0.0.0.0. }
+procedure UpdateNetChoice;
+var U: String;
+begin
+  LanEdit.Enabled := SpecRadio.Checked;
+  if DetectedLanIp <> '' then
+    LanOnlyRadio.Caption := 'Home network only (recommended) - this PC: ' + DetectedLanIp
+  else
+    LanOnlyRadio.Caption := 'Home network only (recommended) - address not found, use Advanced below';
+  U := '';
+  if KeepAllInterfaces then U := DetectedLanIp
+  else if IsIPv4(ChosenLanAddress) and (ChosenLanAddress <> '127.0.0.1') then U := ChosenLanAddress;
+  if ConnUrl(U) <> '' then
+    ConnUrlLabel.Caption := 'Phones on your home network connect at:  ' + ConnUrl(U) + '   (read-only, for information)'
+  else if KeepAllInterfaces then
+    ConnUrlLabel.Caption := 'Phones connect at this PC''s home-network address (see WavWiz Settings > Phone & HTTPS for the exact link). This does not change what the server listens on.'
+  else
+    ConnUrlLabel.Caption := '';
+end;
+
+procedure NetChoiceClick(Sender: TObject);
+begin
+  if SpecRadio.Checked and (Trim(LanEdit.Text) = '') then LanEdit.Text := DetectedLanIp;
+  UpdateNetChoice;
+end;
+
+procedure LanEditChange(Sender: TObject);
+begin
+  UpdateNetChoice;
+end;
+
+{ F268: preselect the choice. Upgrade: match the existing server.json (0.0.0.0 -> all networks; the detected LAN address -> home
+  network only; any other address -> Advanced with that address). The detected LAN address NEVER replaces an existing 0.0.0.0 unless
+  the person picks 'Home network only'. Fresh: home network only. /LANIP=x (silent) -> Advanced x; /NETWORK=all|home picks a choice. }
+procedure DetectLan;
+var Cli, Net: String;
+begin
+  if LanDetected then Exit;
+  LanDetected := True;
+  Cli := Trim(LanEdit.Text);
+  Net := Lowercase(Trim(ExpandConstant('{param:NETWORK|}')));
+  ExistingBindSeeded := ExistingBindAddress;
+  if (not WizardSilent) or (ExistingBindSeeded = '') or ((Cli = '') and (Net = 'home')) then DetectedLanIp := RunLanDetect;
+  if Cli = '0.0.0.0' then begin Cli := ''; LanEdit.Text := ''; if Net = '' then Net := 'all'; end;
+  if Net = 'all' then AllIfRadio.Checked := True
+  else if Cli <> '' then SpecRadio.Checked := True
+  else if (Net = 'home') and (DetectedLanIp <> '') then LanOnlyRadio.Checked := True
+  else if ExistingBindSeeded = '0.0.0.0' then AllIfRadio.Checked := True
+  else if ExistingBindSeeded <> '' then
+  begin
+    if (DetectedLanIp <> '') and (CompareText(ExistingBindSeeded, DetectedLanIp) = 0) then LanOnlyRadio.Checked := True
+    else begin LanEdit.Text := ExistingBindSeeded; SpecRadio.Checked := True; end;
+  end
+  else if DetectedLanIp <> '' then LanOnlyRadio.Checked := True
+  else SpecRadio.Checked := True;
+  UpdateNetChoice;
+end;
+
 procedure InitializeWizard;
 var L: TNewStaticText;
 begin
-  NetPage := CreateCustomPage(wpSelectComponents, 'Home-network address (BETA)', 'Which address should the WavWiz server listen on?');
-  L := TNewStaticText.Create(NetPage); L.Parent := NetPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, NetPage.SurfaceWidth, ScaleY(96));
-  L.Caption := 'Phones and other PCs reach WavWiz at this PC''s home-network address, usually like 192.168.1.20. WavWiz listens ONLY on the address you choose here - never on "all interfaces" - and only answers devices on your own network.' + #13#10#13#10 +
-               'The box is filled in automatically when the address can be found. If it is empty or wrong, type the address of this PC (see Windows Settings > Network). 127.0.0.1 means "this PC only": phones then cannot connect.';
-  LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(0, ScaleY(110), ScaleX(200), ScaleY(23));
+  NetPage := CreateCustomPage(wpSelectComponents, 'Network access (BETA)', 'Which devices may reach the WavWiz server?');
+  L := TNewStaticText.Create(NetPage); L.Parent := NetPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, NetPage.SurfaceWidth, ScaleY(56));
+  L.Caption := 'Phones and other PCs on your home network always work. Choose the second option if you also want to reach WavWiz from your phone through Tailscale or another VPN when you are away. An upgrade keeps the setting you already have.';
+  { F268: two plain choices (+ an advanced escape); the all-networks choice never shows an address }
+  LanOnlyRadio := TNewRadioButton.Create(NetPage); LanOnlyRadio.Parent := NetPage.Surface; LanOnlyRadio.SetBounds(0, ScaleY(60), NetPage.SurfaceWidth, ScaleY(17));
+  LanOnlyRadio.Caption := 'Home network only (recommended)'; LanOnlyRadio.OnClick := @NetChoiceClick;
+  AllIfRadio := TNewRadioButton.Create(NetPage); AllIfRadio.Parent := NetPage.Surface; AllIfRadio.SetBounds(0, ScaleY(82), NetPage.SurfaceWidth, ScaleY(17));
+  AllIfRadio.Caption := 'Home network + Tailscale/VPN (all networks)'; AllIfRadio.OnClick := @NetChoiceClick;
+  SpecRadio := TNewRadioButton.Create(NetPage); SpecRadio.Parent := NetPage.Surface; SpecRadio.SetBounds(0, ScaleY(110), NetPage.SurfaceWidth, ScaleY(17));
+  SpecRadio.Caption := 'Advanced: a specific address (127.0.0.1 = this PC only):'; SpecRadio.OnClick := @NetChoiceClick;
+  LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(ScaleX(18), ScaleY(130), ScaleX(200), ScaleY(23)); LanEdit.OnChange := @LanEditChange;
+  ConnUrlLabel := TNewStaticText.Create(NetPage); ConnUrlLabel.Parent := NetPage.Surface; ConnUrlLabel.WordWrap := True; ConnUrlLabel.AutoSize := False; ConnUrlLabel.SetBounds(0, ScaleY(162), NetPage.SurfaceWidth, ScaleY(28)); ConnUrlLabel.Caption := '';
   { F122: Private-network tip (static) + amber warning when a Public profile is found }
-  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(142), NetPage.SurfaceWidth, ScaleY(60));
+  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(194), NetPage.SurfaceWidth, NetPage.SurfaceHeight - ScaleY(194)); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
   HostPage := CreateCustomPage(NetPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
   L := TNewStaticText.Create(HostPage); L.Parent := HostPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, HostPage.SurfaceWidth, ScaleY(70));
@@ -400,14 +505,29 @@ begin
     if (not WantServer) and (not WantPlayer) then begin SuppressibleMsgBox('Choose at least one part to install.', mbError, MB_OK, IDOK); Result := False; Exit; end;
   if CurPageID = NetPage.ID then
   begin
+    if KeepAllInterfaces then Exit; { F268: all networks; no address to validate or show }
+    if LanOnlyRadio.Checked then
+    begin
+      if DetectedLanIp = '' then
+      begin
+        SuppressibleMsgBox('This PC''s home-network address could not be found. Choose "Advanced" and type it (see Windows Settings > Network), or choose "Home network + Tailscale/VPN".', mbError, MB_OK, IDOK);
+        Result := False;
+      end;
+      Exit;
+    end;
     V := Trim(LanEdit.Text);
     if V = '' then
     begin
       if SuppressibleMsgBox('No address was entered. WavWiz will then listen on this PC only (127.0.0.1) and phones cannot connect until you set an address. Continue anyway?', mbConfirmation, MB_YESNO, IDYES) <> IDYES then Result := False;
     end
-    else if (V = '0.0.0.0') or (not IsIPv4(V)) then
+    else if V = '0.0.0.0' then
     begin
-      SuppressibleMsgBox('Please enter one IPv4 address such as 192.168.1.20. "0.0.0.0" (all interfaces) is not offered by this installer.', mbError, MB_OK, IDOK); Result := False;
+      { F268: typed 0.0.0.0 = the 'Home network + Tailscale/VPN (all networks)' choice }
+      LanEdit.Text := ''; AllIfRadio.Checked := True; UpdateNetChoice;
+    end
+    else if not IsIPv4(V) then
+    begin
+      SuppressibleMsgBox('Please enter one IPv4 address such as 192.168.1.20.', mbError, MB_OK, IDOK); Result := False;
     end;
   end;
   if CurPageID = HostPage.ID then
@@ -420,7 +540,8 @@ end;
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   Result := 'WavWiz (BETA) {#AppVersion}' + NewLine + NewLine + MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine;
-  if WantServer then Result := Result + 'Server will listen on: ' + IfThenStr(Trim(LanEdit.Text) = '', '127.0.0.1 (this PC only)', Trim(LanEdit.Text)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
+  if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
+  else if WantServer then Result := Result + 'Network access: ' + IfThenStr(LanOnlyRadio.Checked, 'Home network only (' + ChosenLanAddress + ')', IfThenStr(ChosenLanAddress = '', '127.0.0.1 (this PC only)', ChosenLanAddress)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
   if WantPlayer and (not WantServer) then Result := Result + 'Player will connect to: ' + IfThenStr(Trim(HostEdit.Text) = '', '(ask on first start)', Trim(HostEdit.Text)) + NewLine + NewLine;
   Result := Result + MemoTasksInfo;
 end;
@@ -575,7 +696,20 @@ begin
   Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{app}\scripts\setup.ps1')) + ' -Root ' + QuoteArg(ExpandConstant('{app}')) + ' -Role ' + RoleCode + ' -SetupVersion {#AppVersion}';
   if WantServer then
   begin
-    if Trim(LanEdit.Text) <> '' then Params := Params + ' -LanIp ' + Trim(LanEdit.Text);
+    { F268: all networks -> -AllInterfaces 1 (setup.ps1 keeps an existing 0.0.0.0 byte-for-byte, or sets 0.0.0.0 + allowAllInterfaces).
+      Otherwise omit -LanIp when the chosen address equals the existing bind (preserve), pass it when fresh/changed, and pass
+      127.0.0.1 for a confirmed-blank Advanced box. The detected LAN address is only passed when 'Home network only' is selected. }
+    { make sure the saved bind was read even if the network page never ran (silent upgrade) }
+    DetectLan;
+    if KeepAllInterfaces then
+    begin
+      Log('F268: network choice = Home network + Tailscale/VPN (all networks)');
+      Params := Params + ' -AllInterfaces 1';
+    end
+    else if ChosenLanAddress = '' then
+      Params := Params + ' -LanIp 127.0.0.1'
+    else if (ExistingBindSeeded = '') or (CompareText(ChosenLanAddress, ExistingBindSeeded) <> 0) then
+      Params := Params + ' -LanIp ' + ChosenLanAddress;
   end
   else if Trim(HostEdit.Text) <> '' then Params := Params + ' -ServerHost ' + Trim(HostEdit.Text);
   if WizardSilent then Params := Params + ' -NoDialog 1';

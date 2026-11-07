@@ -114,8 +114,8 @@ test('B13-B16: one Appearance grid - per-row counts, 16:10 cards up to 170 px, 1
 });
 test('B16: Small 75 %, Default 100 % (default), Large 125 % (max); earlier saved choices are kept', async () => {
   const U = await imp('uiscale');
-  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['tiny', 0.67], ['small', 0.75], ['compact', 1], ['large', 1.25]]);
-  assert.equal(U.migrateScale('compact'), 'compact'); assert.equal(U.migrateScale('large'), 'large'); assert.equal(U.migrateScale('small'), 'small');
+  assert.deepEqual(U.SCALES.map(s => [s[0], s[2]]), [['tiny', 0.67], ['compact', 1], ['large', 1.25]]);
+  assert.equal(U.migrateScale('compact'), 'compact'); assert.equal(U.migrateScale('large'), 'large'); assert.equal(U.migrateScale('small'), 'compact');   // F270: 75 % removed -> Default
   assert.equal(U.migrateScale('medium'), 'medium'); assert.equal(U.scaleFactor('medium'), 1.12, 'kept until another size is picked');
   assert.equal(U.migrateScale('xlarge'), 'large', 'capped at the new maximum'); assert.equal(U.migrateScale('junk'), 'compact');
   assert.ok(Math.max(...U.SCALES.map(s => s[2])) <= 1.25);

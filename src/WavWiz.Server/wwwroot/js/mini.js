@@ -71,7 +71,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   paintVol(0);
   const pin = b('mp-pin', 'pin', 'Keep on top', () => { pinned = !pinned; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } send('pin', { on: pinned }); paintPin(); });
   const full = b('mp-full', 'expandOut', 'Open the full app', () => { if (!send('full')) { try { window.opener?.focus(); } catch { /* ignore */ } if (!window.opener) window.open('/', 'wavwiz-main'); } });
-  const close = h('button', { type: 'button', class: 'mp-b mp-x', 'aria-label': 'Close', title: 'Close', onclick: () => { if (!send('close')) window.close(); } }, '✕');
+  const close = h('button', { type: 'button', class: 'mp-b mp-x ww-close', 'aria-label': 'Close', title: 'Close', onclick: () => { if (!send('close')) window.close(); } }, '✕');
   if (!host && !embedded) { pin.disabled = true; pin.title = 'Keep on top works in the WavWiz Player window'; }
   // 0.3.3 G4b: window transparency - 100 % (opaque) by default, 30 % minimum, solid while the pointer is over the window, remembered.
   // The Opacity button swaps the bottom slider between Volume and Opacity (back to Volume after 6 s without a change).

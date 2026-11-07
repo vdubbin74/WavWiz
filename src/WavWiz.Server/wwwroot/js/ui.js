@@ -1,5 +1,6 @@
 import { dndMode, pointerDragSource, pointerDropTarget } from './pdrag.js';
-import { h, api, toast, dialog } from './util.js';
+import { openSongSheet } from './songsheet.js';
+import { h, api, toast, dialog, getApiZone } from './util.js';
 import { isFav, toggleFav } from './fav.js';
 
 export const canControl = S => S.auth && S.auth.role !== 'view';
@@ -48,25 +49,29 @@ export const isRemoteRef = ref => ref?.kind === 'remote';
 /** 0.3.5 J9 #8: Add to playlist = a small dropdown next to the song row (no window); "New playlist…" is typed in place. */
 let lastPt = { x: 0, y: 0 };
 if (typeof document !== 'undefined') document.addEventListener('pointerdown', ev => { lastPt = { x: ev.clientX, y: ev.clientY }; }, true);
-export async function pickPlaylist(S, ref, title = 'Add to playlist') {
+export async function pickPlaylist(S, ref, title = 'Add to playlist', scope = null) {
+  if (scope && !scope.valid()) return null;
   if (isRemoteRef(ref)) return toast(REMOTE_PL_MSG, true);   // F175
   let lists = []; try { lists = await api('/playlists'); } catch (e) { return toast(e.message, true); }
-  document.querySelector('.pldrop')?.remove();
-  const close = () => { box.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); };
-  const outside = ev => { if (!box.contains(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') close(); };
-  const add = async id => { try { const r = await api(`/playlists/${id}/items`, { method: 'POST', body: ref }); toast(`Added ${r.added} item(s)`); close(); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); } catch (e) { toast(e.message, true); } };
+  if (scope && !scope.valid()) return null;
+  (scope?.host || document).querySelector('.pldrop')?.remove();
+  let closed = false;
+  const close = reason => { if (closed) return; closed = true; box.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', esc, true); scope?.onClose?.(reason); };
+  const outside = ev => { if (!box.contains(ev.target)) close(); }, esc = ev => { if (ev.key === 'Escape') { if (scope) { ev.preventDefault(); ev.stopImmediatePropagation(); } close(scope ? 'escape' : undefined); } };
+  const add = async id => { if (scope && (closed || !scope.valid())) { close(); return; } try { const r = await api(`/playlists/${id}/items`, { method: 'POST', body: ref }); toast(`Added ${r.added} item(s)`); close('done'); window.dispatchEvent(new CustomEvent('wavwiz:playlists')); } catch (e) { toast(e.message, true); } };
   const nm = h('input', { type: 'text', placeholder: 'New playlist name', maxlength: 80, 'aria-label': 'New playlist name', onkeydown: ev => { if (ev.key === 'Enter') create(); } });
-  const create = async () => { const name = nm.value.trim(); if (!name) { nm.focus(); return; } try { const p = await api('/playlists', { method: 'POST', body: { name } }); await add(p.id); } catch (e) { toast(e.message, true); } };
+  const create = async () => { if (scope && (closed || !scope.valid())) { close(); return; } const name = nm.value.trim(); if (!name) { nm.focus(); return; } try { const p = await api('/playlists', { method: 'POST', body: { name } }); await add(p.id); } catch (e) { toast(e.message, true); } };
   const newRow = h('div', { class: 'pl-new', hidden: true }, nm, h('button', { class: 'btn sm primary', type: 'button', onclick: create }, 'Add'));
   const box = h('div', { class: 'pldrop mpanel', role: 'menu', 'aria-label': title },
     h('div', { class: 'pl-h small dim' }, title),
     ...lists.map(p => h('button', { type: 'button', role: 'menuitem', onclick: () => add(p.id) }, h('span', { class: 'grow ell' }, p.name), h('span', { class: 'small dim' }, String(p.count)))),
     h('button', { type: 'button', role: 'menuitem', class: 'pl-newbtn', onclick: () => { newRow.hidden = false; nm.focus(); } }, 'New playlist…'), newRow);
-  document.body.append(box);
+  (scope?.host || document.body).append(box);
   const r = box.getBoundingClientRect(), z = Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
   const vw = innerWidth / z, vh = innerHeight / z, x = lastPt.x / z, y = lastPt.y / z;
   box.style.left = Math.max(4, Math.min(x, vw - r.width - 4)) + 'px'; box.style.top = Math.max(4, Math.min(y, vh - r.height - 4)) + 'px';
-  setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); }, 0);
+  if (scope) { box.classList.add('songsheet-picker'); box.style.left = ''; box.style.top = ''; box.querySelector('button')?.focus(); }
+  setTimeout(() => { if (scope && closed) return; document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', esc, true); }, 0);
   return { el: box, close };
 }
 
@@ -89,10 +94,27 @@ export function favActionForTrack(S, trackId, title = '') {
   if (!canControl(S)) return { text, disabled: true, title: 'Only Control or Admin access can change favorites.' };
   return { text, onclick: () => toggleFav(S, 'track', trackId) };
 }
-export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '' } = {}) {
+export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '', phoneSong = null } = {}) {
   const openMenu = () => {
     if (!canControl(S)) return toast('Your access is view-only, so you can browse but not play.', false);
     const fav = favActionForTrack(S, trackIdFromRef(ref), title);
+    if (phoneSong && matchMedia('(max-width:900px)').matches) {
+      const zone = getApiZone(), identity = JSON.stringify(ref), view = S.view, route = S._streamRoute;
+      const valid = () => el.isConnected && S.view === view && route === S._streamRoute && getApiZone() === zone && JSON.stringify(ref) === identity;
+      const build = () => [
+        { id: 'play', label: 'Play now', onclick: () => playNow(ref) },
+        { id: 'next', label: 'Play next', onclick: () => playNext(ref) },
+        { id: 'add', label: 'Add to queue', onclick: () => addToQueue(ref) },
+        { id: 'playlist', label: 'Add to playlist…', keepOpen: true, disabled: isRemoteRef(ref), hint: isRemoteRef(ref) ? REMOTE_PL_MSG : undefined },
+        ...[favActionForTrack(S, trackIdFromRef(ref), title)].filter(Boolean).map(a => ({ ...a, id: 'favorite', label: a.text.replace(/^[♡♥]  /, ''), hint: a.title })),
+        ...menu.filter(Boolean).map((a, i) => ({ ...a, id: 'extra:' + i, label: a.text, hint: a.title }))
+      ].map(a => ({ ...a, disabled: a.disabled || !canControl(S) }));
+      return openSongSheet({ item: phoneSong, from: el.querySelector('.more') || el, valid, items: build, run: async (it, modal) => {
+        if (!valid() || !canControl(S)) { modal.close(); return; }
+        if (it.id === 'playlist') await modal.playlist(opts => pickPlaylist(S, ref, 'Add to playlist', { ...opts, valid: () => opts.valid() && canControl(S) }));
+        else await it.onclick?.();
+      } });
+    }
     sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, fav, ...menu]);
   };
   if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(); } }, '⋯'));

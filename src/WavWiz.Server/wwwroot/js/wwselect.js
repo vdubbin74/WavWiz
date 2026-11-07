@@ -57,7 +57,7 @@ export function wsel(attrs, ...kids) {
     m.classList.add('wwsel-menu'); m.style.minWidth = Math.max(190, r.width) + 'px';
     m.querySelectorAll('.ctx-item').forEach(e => { const it = e._it; if (it?.cur) e.classList.add('cur-val'); if (it?.heading) { e.classList.add('ctx-heading'); e.removeAttribute('title'); } });
     m.querySelector('.ctx-item.cur-val:not([disabled])')?.focus();
-    new MutationObserver((_, ob) => { if (!m.isConnected) { b.setAttribute('aria-expanded', 'false'); ob.disconnect(); } }).observe(document.body, { childList: true });
+    new MutationObserver((_, ob) => { if (!m.isConnected) { b.setAttribute('aria-expanded', 'false'); ob.disconnect(); } }).observe(document.body, { childList: true, subtree: true });
   });
   b.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && ev.altKey === false && b.getAttribute('aria-expanded') !== 'true') { ev.preventDefault(); b.click(); } });
   setOpts(kids, false);

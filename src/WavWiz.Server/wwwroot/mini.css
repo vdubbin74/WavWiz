@@ -26,7 +26,7 @@ html:has(>body.minibody),body.minibody{margin:0;height:100%;overflow:hidden;back
 .mp .mutebtn{width:24px;height:24px;border-radius:50%}
 .mp .mutebtn.on{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent)}
 .mp .mp-side{display:grid;grid-template-columns:24px 24px;gap:4px;flex:none}
-.mp .mp-x{color:var(--dim)} .mp .mp-x:hover{color:var(--ink)}
+.mp .mp-x{color:var(--ink);border-radius:3px} .mp .mp-x:hover{color:var(--ink)} /* F254: ink dismiss, not dim */
 /* slim 300x48: art, title, prev/play/next + mute, expand, close */
 .mp.slim{padding:4px 6px;gap:6px}
 .mp.slim .mp-art{width:38px;height:38px}
@@ -80,7 +80,7 @@ body.minibody .mp{width:min(420px,100vw);max-width:100vw}
 .mp:not(.embedded) .mp-side .mp-b:hover{color:var(--ink);border-color:var(--line);background:var(--panel2)}
 .mp:not(.embedded) .mp-side .mp-b:focus-visible{outline:1px solid var(--accent);outline-offset:0}
 .mp:not(.embedded) .mp-side .mp-pin.on{color:var(--accent-text,var(--accent))}
-.mp:not(.embedded) .mp-side .mp-x:hover{color:var(--red,#e5484d)}
+.mp:not(.embedded) .mp-side .mp-x:hover{color:var(--ink)} /* F254: dismiss close, not destructive red */
 .mp:not(.embedded):not(.slim) .mp-t{padding-right:62px}
 .mp:not(.embedded):not(.slim) .mp-ctl{align-self:flex-end;flex:none}
 .mp.slim:not(.embedded){padding-right:66px}
@@ -268,3 +268,28 @@ body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;m
    pill + circle sizes (.mp-flat .mp-b 50% / .tog 999px, .mp-ctlr .tog 999px / .play 50%, zone link 999px) ignored the setting. */
 :is(.mp,.minicol).pn-btn-square :is(.mp-tr,.mp-ctl,.mp-ctlr,.mp-ex,.mp-vol) :is(.mp-b,.mutebtn,.mixbtn,.eqbtn,.zlink),
 :is(.mp,.minicol).pn-btn-square .zlink{border-radius:3px!important}
+
+/* F254 amend R1: standalone Mini dismiss × matches app-wide ww-close
+   (mini.css loads after app.css; prior .mp-side 18px + red hover beat shared aliases). */
+.mp .mp-x,
+.mp:not(.embedded) .mp-side .mp-x{
+  color:var(--ink);
+  border-radius:3px;
+  box-sizing:border-box;
+}
+.mp .mp-x:hover,
+.mp:not(.embedded) .mp-side .mp-x:hover{
+  color:var(--ink);
+}
+.mp .mp-x:focus-visible,
+.mp:not(.embedded) .mp-side .mp-x:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+@media (max-width:900px),(pointer:coarse){
+  .mp .mp-x,
+  .mp:not(.embedded) .mp-side .mp-x,
+  .mp:not(.embedded) .mp-side .mp-b.mp-x{
+    width:44px;height:44px;min-width:44px;min-height:44px;padding:0;
+  }
+}
