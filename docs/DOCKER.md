@@ -1,9 +1,23 @@
 # WavWiz server in Docker (0.6.7, F166/F167)
 
-Headless WavWiz **server** for a home server, NAS or Raspberry Pi 4/5 (4 GB+). Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
+Headless WavWiz **server** (not the Windows Player) for a home server, NAS, or mini PC on **64-bit Intel/AMD (`linux/amd64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 The container has **no local speakers**: audio plays on WavWiz Players (Windows PCs), phones/browsers, and AirPlay 1 speakers.
 
-Image: `docker.io/vdubbin74/wavwiz-server` (tags `0.6.7`, `latest`), `linux/amd64` + `linux/arm64`.
+**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.7`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
+
+**ARM64 / Raspberry Pi:** planned for **0.7.0**, subject to hardware verification. Not available on Docker Hub yet.
+
+## Limits vs the Windows app
+
+Docker is a **server only** build. It does not do everything the full Windows app does:
+
+- **Headless:** no local speakers or microphone on the Docker host (use a WavWiz Player PC's mic or a phone for calibration).
+- **No CD ripping**, **no Windows share logins**, **no Linux Player**.
+- **No AirPlay 2 / Sonos / HomePod output.**
+- **Windows Docker Desktop:** no real `network_mode: host`, so discovery (mDNS, AirPlay, Players finding the server) is weaker. Use published ports, see [Windows Docker Desktop (step-by-step)](#windows-docker-desktop-step-by-step).
+- **Want PC speakers or richer output?** Pair a Windows Player (or run the full Windows app).
+
+**Still included:** web UI, zones, scenes, schedules, alarms, Jukebox, Remote, and playback to Windows Players, phones/browsers and AirPlay 1 speakers.
 
 ## Quick start
 
@@ -31,6 +45,55 @@ docker compose logs wavwiz      # shows the claim code once
 ```
 
 Open `http://<host-ip>:47800/`.
+
+
+## Windows Docker Desktop (step-by-step)
+
+Docker Desktop on Windows does **not** give real `network_mode: host` to the browser — use published ports. This walkthrough matches a first-time home PC setup.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and leave it running.
+2. In File Explorer open your user folder `C:\Users\<you>` (for example `C:\Users\trevo`). Create a folder `wavwiz`, and inside it create `wavwiz-data`.
+3. Turn on file extensions: **View → Show → File name extensions** (or Folder Options → View → uncheck “Hide extensions for known file types”).
+4. In `wavwiz`, create a new text file named exactly `docker-compose.yml` (not `.yml.txt`). Paste:
+
+```yaml
+services:
+  wavwiz:
+    image: docker.io/vdubbin74/wavwiz-server:0.6.7
+    container_name: wavwiz
+    user: "10001:10001"
+    restart: unless-stopped
+    ports:
+      - "47800:47800"
+      - "47443:47443"
+      - "47801:47801"
+      - "47802:47802/udp"
+      - "47803:47803/udp"
+    environment:
+      WAVWIZ_DATA: /data
+      TZ: America/Chicago
+    volumes:
+      - ./wavwiz-data:/data
+      - "D:/Music:/music:ro"
+```
+
+5. Change `"D:/Music:/music:ro"` to your real music folder (the example uses `D:/Music`):
+   - Quote the whole left/right mount.
+   - Use **forward** slashes: `D:/Music`, never `D:\Music`.
+   - Put a slash right after the drive colon (`D:/Music`, not `D:Music`), and no slash before the drive letter (not `/D:/Music`).
+   - Wrong paths show as “too many colons” or “invalid volume specification”.
+6. Open PowerShell:
+
+```powershell
+cd C:\Users\<you>\wavwiz   # e.g. C:\Users\trevo\wavwiz
+docker compose up -d
+docker compose logs wavwiz
+```
+
+7. Open `http://localhost:47800/` in a browser on that PC. Use the claim code from the logs (or `wavwiz-data\claim.txt`) if asked.
+8. In **Settings → Library**, add the folder **`/music`** (the path inside the container), then scan. Do not enter `D:\Music` in the app.
+
+**Limits on Windows Desktop:** automatic discovery / mDNS / AirPlay advertising are weaker without host networking. Add players by address/QR if they do not find the server. For full discovery, prefer Linux or a Linux VM with `network_mode: host` (see Quick start above).
 
 ## First run (claim)
 
@@ -105,13 +168,16 @@ services:
 
 Auto-update is off. `docker compose pull && docker compose up -d`. (Watchtower works too if you like.) Back up first: Settings > Backup.
 
-## Not on Linux (0.6.0)
+## Not on Linux
 
-CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers and microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins, Linux Player. These are hidden or labelled in the UI.
+Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers and microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins, Linux Player. These are hidden or labelled in the UI.
 
-## Building the image
+## Building the image (local / experimental)
+
+The Dockerfile can cross-build `linux/amd64` and `linux/arm64`, but **Hub does not publish an arm64 tag today**, and arm64/Pi is **not** a supported or hardware-verified configuration yet (planned for 0.7.0). Use these only for local experiments:
 
 ```sh
 docker build -t docker.io/vdubbin74/wavwiz-server:0.6.7 .
-docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.7 .   # needs QEMU/binfmt for the arm64 runtime stage
+# Experimental multi-arch local build only (needs QEMU/binfmt for arm64). Not published on Hub; not a supported configuration yet.
+docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.7 .
 ```
