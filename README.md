@@ -8,13 +8,13 @@
 [![Beta](https://img.shields.io/badge/status-public%20beta-orange.svg)](CHANGELOG.md)
 [![Website](https://img.shields.io/badge/website-wavwiz.com-0b1020.svg)](https://wavwiz.com)
 
-**Whole-home audio wizardry.**
+**Multi-zone audio for Windows.**
 
-WavWiz turns an always-on Windows PC into a whole-home music server. Your library and internet radio play in sync on your PCs, phones, and tablets. Phones play from the browser, with no app to install. No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
+WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an always-on Windows PC (or an optional Linux/Docker server on 64-bit Intel/AMD) and play through Windows WavWiz Players or any modern browser on phones, tablets, Macs and Linux PCs, with no app to install. Zones can play different music or link for sync. Each speaker gets its own delay, volume and EQ. Sources: local folders, NAS shares, internet radio, Subsonic/Navidrome. AirPlay in from iPhone, iPad and Mac; AirPlay 1 speaker output; AirPlay 2 output is experimental and off by default (HomePod and Apple TV unsupported). No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
 
-> **Public beta.** Expect rough edges and frequent updates. Phone-mic calibration on an iPhone is still in testing; calibrating with the PC's microphone is recommended. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
+> **Public beta.** Expect rough edges and frequent updates. The Windows installer is not code-signed yet (SmartScreen may warn; SHA-256 checksums are on the release). Phone-mic calibration on an iPhone is still in testing; calibrating with the PC's microphone is recommended. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
-**Download:** [latest release for Windows](https://github.com/vdubbin74/WavWiz/releases/latest) · **Website:** [wavwiz.com](https://wavwiz.com) · **Repo:** [github.com/vdubbin74/WavWiz](https://github.com/vdubbin74/WavWiz)
+**Download:** [latest Windows release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Docker (amd64 server):** [`vdubbin74/wavwiz-server`](https://hub.docker.com/r/vdubbin74/wavwiz-server) · **Website:** [wavwiz.com](https://wavwiz.com) · **Docs:** [First run](docs/FIRST-RUN.md) · [Docker](docs/DOCKER.md) · [Home Assistant](docs/HOME-ASSISTANT.md)
 
 ---
 
@@ -60,9 +60,31 @@ WavWiz turns an always-on Windows PC into a whole-home music server. Your librar
 
 ---
 
+## Who it's for
+
+- Homes, shops, restaurants and offices with a Windows PC that stays on, that want multi-zone music without buying into a speaker ecosystem
+- People who already own PCs, speakers, phones and tablets
+- Linux/NAS owners who only need the headless server (pair Windows Players or browsers for sound). The Docker image is `linux/amd64` only today; ARM64 / Raspberry Pi is planned for 0.7.0 and not available yet. See [docs/DOCKER.md](docs/DOCKER.md)
+
+## How it compares
+
+| If you use… | How WavWiz differs |
+| --- | --- |
+| **Music Assistant** | Music Assistant works best alongside Home Assistant on HAOS/Linux. WavWiz is a native Windows app and server with its own browser UI; Home Assistant control is optional, via the REST API and a custom component in this repo (not on HACS yet). See [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md). |
+| **Snapcast** | Snapcast syncs an audio stream to clients; you add the music server and UI. WavWiz includes the library, zones, UI, AirPlay in and Windows Players. |
+| **Lyrion (LMS)** | LMS is a mature, Linux-friendly server with a large plugin ecosystem. WavWiz is newer and Windows-first, aimed at a PC you already leave on. |
+| **Roon** | Roon is a paid audiophile suite. WavWiz is free and MIT-licensed. |
+| **Sonos** | Sonos is a hardware ecosystem. WavWiz plays to speakers you already own; AirPlay 2 output (including Sonos) is experimental and off by default. |
+
+## Built with AI
+
+AI coding agents wrote the code. The developer (vdubbin74) owns the idea, the design decisions and the testing. The docs and website were written with AI help too.
+
+---
+
 ## Features
 
-- **Whole-home sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. Every browser that opens WavWiz joins as a speaker by itself. No sync measurements are published yet.
+- **Multi-zone sync** — Every device plays the same stream against a shared clock, and WavWiz keeps correcting each device's drift: Windows PCs with WavWiz Player, plus phones, tablets, and Macs in the browser. Every browser that opens WavWiz joins as a speaker by itself. No sync measurements are published yet.
 - **Devices, zones and scenes** — Master volume and Mute all, plus volume, Mute and on/off for every speaker. In the Expanded Devices view, each device card opens its settings in place, in a wide center column: volume, volume cap, delay, balance, bass, treble, EQ, audio output, connection, Rename, Set as reference, and Forget. Save these settings as a **profile** and load them on any device; a scene can pick a profile for each device. Balance is applied by WavWiz Player. The normal Devices list stays compact; tap a device's name to jump to its card. Expanded, the Devices panel shows three bordered columns (click anywhere on a card to open it; drag cards to reorder) with a **Now playing** strip and an All off / All on / master volume row: **Scenes & Schedules** (create and edit scenes, schedules and alarms right there), **Zones** (optional groups such as “Downstairs”, each with one volume bar, Mute and an OFF | ON switch for all its speakers), and **Speakers** on the right (grouped by zone, with an Unassigned group and **+ Add to zone**). Revoking a device removes it everywhere at once; it has to pair again.
 - **Per-device delay (0–1000 ms)** — Live slider and number box so Bluetooth speakers and Wi-Fi PCs line up instead of echoing between devices; on PCs the delay is kept per audio output. **Calibrate speakers** first checks the microphone level at each spot and tells you how to fix a weak reading, then measures it with the microphone of a WavWiz Player PC (USB, headset or built-in mic; recommended), or with your phone as the microphone (scan a QR code; a mic-only page, needs the one-time HTTPS setup), or by ear. The music pauses while it measures. *Beta: phone-mic calibration on iPhone may not show the microphone prompt yet; use the PC mic for now.*
 - **AirPlay, built in** — The server appears as the AirPlay speaker **WavWiz – Everywhere**. Send audio from apps on iPhone, iPad, or Mac; it plays on every device in sync, with title and artwork on Now Playing.
