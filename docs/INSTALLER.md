@@ -72,7 +72,7 @@ The automated tests in this repository run on Linux (pwsh with shims, ISCC under
 
 ## 0.0.4 notes
 * Installer is `WavWiz-Setup-0.0.4.exe` (full, self-contained only). Upgrades 0.0.3 in place (same AppId); `ProgramData\WavWiz` (library, settings, pairings, password) is kept.
-* ffmpeg LGPL build now also includes native `flac` and `aac` encoders (CD ripper). Still no GPL/nonfree/LAME. MP3 rip option is refused with an explanation.
+* ffmpeg LGPL build includes native `flac` and `aac` encoders and, from 0.6.8, LAME 3.100 (`libmp3lame`) for MP3. Still no GPL/nonfree (no `--enable-gpl`).
 * New DB schema v4 (scenes, schedules, speaker profiles, tag-fix jobs, rip jobs, radio-finder favorites). Automatic backup before migrate.
 * Not verified on Windows: follow-speaker with real Bluetooth, CDDA ripping, Tailscale bind, MusicBrainz live lookups behind a firewall, Inno wizard pages, service start.
 
@@ -103,12 +103,6 @@ The automated tests in this repository run on Linux (pwsh with shims, ISCC under
 * Built 2026-10-29, unsigned.
 * Size: 103895834 bytes
 * SHA-256 (uppercase): 51DD1A89FA7B2DBAF16B64512C154FDF03EF07145AB493167F74DF6252E02E45
-
-## 0.6.0 BETA
-* Installer `WavWiz-Setup-0.6.0.exe` upgrades 0.5.x in place (same AppId; `ProgramData\WavWiz` is kept). Uninstall now removes the Apps & Features entry, shortcuts and install folder (F173).
-* Built 2026-11-01, unsigned.
-* Size: 103928970 bytes
-* SHA-256 (uppercase): 4EC1CA1A9065B2B08B5627862C786E367CF3531516B825AE150280B8B3F98C8B
 
 ## Upgrading over a running WavWiz (0.2.2)
 

@@ -54,7 +54,7 @@ export function wsel(attrs, ...kids) {
     });
     b.setAttribute('aria-expanded', 'true');
     const m = openCtx(r.left, r.bottom + 2, items, { label: lab, from: b });
-    m.classList.add('wwsel-menu'); m.style.minWidth = Math.max(190, r.width) + 'px';
+    m.classList.add('wwsel-menu'); m.style.minWidth = Math.max(190, r.width / (Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1)) + 'px';   // 0.6.8-#6a: CSS px under zoom
     m.querySelectorAll('.ctx-item').forEach(e => { const it = e._it; if (it?.cur) e.classList.add('cur-val'); if (it?.heading) { e.classList.add('ctx-heading'); e.removeAttribute('title'); } });
     m.querySelector('.ctx-item.cur-val:not([disabled])')?.focus();
     new MutationObserver((_, ob) => { if (!m.isConnected) { b.setAttribute('aria-expanded', 'false'); ob.disconnect(); } }).observe(document.body, { childList: true, subtree: true });

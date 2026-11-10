@@ -30,11 +30,21 @@ public sealed record ServerBeacon(string Id, string Name, string Host, int HttpP
     public List<DnsWire.Record> ToMdns(IPAddress ip)
     {
         var svc = WavWizInfo.MdnsService + ".local"; var safe = new string(Name.Where(c => c is not ('.' or '\0')).ToArray()); if (safe.Length == 0) safe = "WavWiz"; if (safe.Length > 40) safe = safe[..40];
-        var inst = safe + "." + svc; var host = (new string(Host.Where(char.IsLetterOrDigit).ToArray()) is { Length: > 0 } hh ? hh : "unison") + ".local";
+        var inst = safe + "." + svc; var host = MdnsHostName(Host);
         return new()
         {
             DnsWire.Ptr(svc, inst), DnsWire.Srv(inst, host, HttpPort), DnsWire.Txt(inst, new[] { "id=" + Id, "name=" + Name, "v=" + Version, "http=" + HttpPort, "https=" + HttpsPort, "audio=" + AudioPort }), DnsWire.A(host, ip),
         };
+    }
+
+
+    /// <summary>mDNS host label from the beacon host. A wildcard/loopback IP must not become "0000.local".</summary>
+    public static string MdnsHostName(string? host)
+    {
+        var raw = host ?? "";
+        if (IPAddress.TryParse(raw, out var ip) && (ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any) || IPAddress.IsLoopback(ip))) raw = "";
+        var hh = new string(raw.Where(char.IsLetterOrDigit).ToArray());
+        return (hh.Length > 0 ? hh : "unison") + ".local";
     }
 
     public static ServerBeacon? FromMdns(DnsWire.Message m)

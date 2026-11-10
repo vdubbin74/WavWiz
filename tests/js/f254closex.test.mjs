@@ -37,8 +37,11 @@ test('F254 INCLUDE sites mark ww-close; EXCLUDE delete ✕ do not', () => {
   assert.match(js('now.js'), /class: 'x ww-close'/);
   // destructive exclusions — no ww-close on these lines
   assert.doesNotMatch(js('playlists.js'), /Remove from playlist[\s\S]{0,80}ww-close/);
-  assert.doesNotMatch(js('radiotab.js'), /btn sm danger[\s\S]{0,40}ww-close/);
-  assert.doesNotMatch(js('radiofinder.js'), /btn danger[\s\S]{0,40}ww-close/);
+  // RADIO-2: My stations remove moved to context menu (danger item); podcast remove ✕ stays ww-close; no red danger ✕ buttons
+  assert.doesNotMatch(js('radiotab.js'), /ww-close/);
+  assert.doesNotMatch(js('radiotab.js'), /class: '[^']*danger/);
+  assert.doesNotMatch(js('radiofinder.js'), /btn danger/);
+  assert.match(js('radiofinder.js'), /btn ww-close.*Remove podcast|class: 'btn ww-close', 'aria-label': 'Remove podcast/);
   assert.doesNotMatch(js('smartpl.js'), /btn danger[\s\S]{0,40}ww-close/);
   assert.doesNotMatch(js('devices.js'), /zbtn danger[\s\S]{0,40}ww-close/);
   assert.doesNotMatch(js('listtable.js'), /class: 'rm'[\s\S]{0,40}ww-close/);
@@ -48,12 +51,14 @@ test('F254 Sound still autofocuses close (ring on open kept)', () => {
   assert.match(js('phonesound.js'), /x\.focus\(\{ preventScroll: true \}\)/);
 });
 
-test('F254 mini.css standalone .mp-x: ink (not dim/red), accent focus, phone/coarse 44', () => {
+test('F254 mini.css standalone .mp-x: ink (not dim/red), accent focus; 44px only when not the Player window', () => {
   const mini = readFileSync(join(www, 'mini.css'), 'utf8');
   assert.match(mini, /\.mp \.mp-x\{color:var\(--ink\)/);
   assert.match(mini, /\.mp:not\(\.embedded\) \.mp-side \.mp-x:hover\{color:var\(--ink\)/);
   assert.doesNotMatch(mini, /mp-x:hover\{color:var\(--red/);
   assert.match(mini, /F254 amend R1/);
   assert.match(mini, /\.mp:not\(\.embedded\) \.mp-side \.mp-x[\s\S]*?outline:2px solid var\(--accent\)/);
-  assert.match(mini, /@media \(max-width:900px\),\(pointer:coarse\)\{[\s\S]*?\.mp:not\(\.embedded\) \.mp-side \.mp-x[\s\S]*?min-width:44px/);
+  // 44px close is for in-page / embedded phone chrome, never body.minibody (the 420px Player window)
+  assert.doesNotMatch(mini, /@media \(max-width:900px\),\(pointer:coarse\)\{[\s\S]*?\.mp:not\(\.embedded\) \.mp-side \.mp-x[\s\S]*?min-width:44px/);
+  assert.match(mini, /@media \(max-width:900px\),\(pointer:coarse\)\{[\s\S]*?body:not\(\.minibody\) \.mp \.mp-x[\s\S]*?min-width:44px/);
 });

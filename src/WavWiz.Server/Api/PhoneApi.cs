@@ -19,7 +19,7 @@ public static class PhoneApi
             if (!Tls.CertificateEndpoints.Wildcard(ip)) return ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + ip + "]" : ip.ToString();
             try
             {
-                var endpoint = Tls.CertificateEndpoints.Resolve(ip).FirstOrDefault(a => !IPAddress.IsLoopback(a));
+                var endpoint = Tls.CertificateEndpoints.PreferForPhone(Tls.CertificateEndpoints.Resolve(ip), c.Connection.LocalIpAddress).FirstOrDefault();   // 0.6.8-#11g: home network before Tailscale
                 if (endpoint != null) return endpoint.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + endpoint + "]" : endpoint.ToString();
             }
             catch { /* keep the request host, never advertise a wildcard */ }
@@ -112,6 +112,21 @@ public static class PhoneApi
         return CalPhoneApi.SecureUrl(PhoneHost(c, s), s.Cfg.HttpsPort, cal, PairCode.IsMatch(pair) ? pair : null);
     }
 
+    /// <summary>0.6.8-#11g: other addresses on this server's certificate (not the one the page was opened on), for the phone's trust probe.
+    /// A browser's "visit anyway" exception covers only the host it was granted for, so a secure fetch to ANOTHER covered address
+    /// succeeds only when the phone really trusts the WavWiz CA.</summary>
+    public static IReadOnlyList<string> AltHosts(HttpContext c, Services s, string host)
+    {
+        try
+        {
+            if (!IPAddress.TryParse(s.Cfg.BindAddress, out var bind) || IPAddress.IsLoopback(bind)) return Array.Empty<string>();
+            return Tls.CertificateEndpoints.PreferForPhone(Tls.CertificateEndpoints.Resolve(bind), c.Connection.LocalIpAddress)
+                .Select(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + a + "]" : a.ToString())
+                .Where(a => !string.Equals(a, host.Trim('[', ']'), StringComparison.OrdinalIgnoreCase) && !string.Equals(a, host, StringComparison.OrdinalIgnoreCase)).Take(3).ToArray();
+        }
+        catch { return Array.Empty<string>(); }
+    }
+
     private static string Page(HttpContext c, Services s, string mode)
     {
         var host = PhoneHost(c, s); var http = $"http://{host}:{s.Cfg.HttpPort}"; var https = $"https://{host}:{s.Cfg.HttpsPort}";
@@ -120,7 +135,7 @@ public static class PhoneApi
         var h = new StringBuilder();
         h.Append("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name=theme-color content='#FF3C00'><link rel=manifest href='/manifest.webmanifest'><link rel=apple-touch-icon sizes=180x180 href='/assets/logo-180.png?v=f237'><link rel=apple-touch-icon-precomposed sizes=180x180 href='/assets/logo-180.png?v=f237'><meta name=apple-mobile-web-app-capable content=yes><meta name=mobile-web-app-capable content=yes><meta name=apple-mobile-web-app-title content=WavWiz>")
          .Append("<title>WavWiz - phone set-up</title><link rel=icon href='/favicon.ico'><link rel=stylesheet href='/tls.css'></head>")
-         .Append($"<body data-mode='{mode}' data-enabled='{(s.Ca.Enabled ? 1 : 0)}' data-host='{E(host)}' data-http='{s.Cfg.HttpPort}' data-https='{s.Cfg.HttpsPort}'><main>")
+         .Append($"<body data-mode='{mode}' data-enabled='{(s.Ca.Enabled ? 1 : 0)}' data-host='{E(host)}' data-http='{s.Cfg.HttpPort}' data-https='{s.Cfg.HttpsPort}' data-alt='{E(string.Join(",", s.Ca.Enabled ? AltHosts(c, s, c.Request.Host.Host) : Array.Empty<string>()))}'><main>")
          .Append($"<header><img src='/assets/logo-64.png' width=40 height=40 alt=''><div><h1>WavWiz</h1><small>BETA {WavWizInfo.Version} - phone set-up</small></div></header>");
         if (!s.Ca.Enabled)
         {

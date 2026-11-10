@@ -165,6 +165,18 @@ public sealed class SubsonicService
         var r = await Call(sid, "getAlbum", "id=" + Uri.EscapeDataString(albumId));
         return Arr(Obj(r, "album"), "song").Select(x => Item(sid, S(x, "id"), S(x, "title"), S(x, "artist"), S(x, "album"), (Int(x, "duration") ?? 0) * 1000L, S(x, "coverArt"), Int(x, "track"), Int(x, "year"), S(x, "genre"))).ToList();
     }
+    /// <summary>0.6.8: every song from every album of a remote artist, album order then disc/track (same as AlbumItems per album).</summary>
+    public async Task<List<QueueItem>> ArtistItems(string sid, string artistId)
+    {
+        var r = await Call(sid, "getArtist", "id=" + Uri.EscapeDataString(artistId));
+        var list = new List<QueueItem>();
+        foreach (var a in Arr(Obj(r, "artist"), "album"))
+        {
+            var id = S(a, "id"); if (string.IsNullOrEmpty(id)) continue;
+            list.AddRange(await AlbumItems(sid, id));
+        }
+        return list;
+    }
     /// <summary>"subsonic:{sid}:{songId}" → a fresh stream URL (new salt), or null when the server was removed / the password cannot be read.</summary>
     public string? StreamUrl(string location)
     {

@@ -21,3 +21,7 @@ header img{border-radius:9px} h1{font-size:22px;margin:0} h2{font-size:19px;marg
 .spin{display:inline-block;width:16px;height:16px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .a2hs-pic{vertical-align:middle;margin-right:8px}
+
+/* 0.6.8-#11g: copyable set-up address in the Home Screen app */
+#openInBrowser p:last-child{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.copyurl{flex:1 1 220px;min-width:0;font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #444;background:#0b0f1a;color:inherit}

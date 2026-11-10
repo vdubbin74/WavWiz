@@ -1,5 +1,6 @@
 import { h } from './util.js';
 import { genNode } from './gencover.js';
+import { icon } from './icons.js';
 
 const base = '/api/v1/art';
 /** 0.3.2 F10: art URL version from the server (auth state artCv). A new build = new URLs, so pictures cached by older builds are never reused. */
@@ -12,6 +13,8 @@ export const albumArt = (artist, album, size = 192) => `${base}/album?artist=${e
 /** 0.2.1 F13: artist photo (server: MusicBrainz / Wikidata, cached). 204 = none -> the generated portrait stays. */
 export const artistArt = (name, size = 384) => name ? `${base}/artist?name=${encodeURIComponent(name)}&size=${size}${cvq()}` : null;
 export const radioArt = (id, size = 192) => id ? `${base}/radio/${id}?size=${size}${cvq()}` : null;
+/** Same-origin proxy for a Radio Browser favicon. `hash` is the opaque faviconArt token the finder returned — never a raw URL (CSP is img-src 'self' data:). */
+export const remoteArt = (hash, size = 192) => hash ? `${base}/remote/${encodeURIComponent(hash)}?size=${size}${cvq()}` : null;
 
 /** 0.1.1: live sources. radio = internet station; airplay / spotify = a phone sending to the house (title/artist/artwork from the sender). */
 export const isReceiver = it => !!it && (it.kind === 'airplay' || it.kind === 'spotify');
@@ -42,16 +45,24 @@ function friendlySender(s) {
 
 /** Cover element: themed placeholder underneath, the real picture on top once it loads (no picture = placeholder stays; nothing flickers).
  * 0.2.1 F13: gen = { album, artist } draws a unique generated cover as the placeholder, gen = { portrait: name } a round artist portrait. */
+/** Themed placeholder glyph (folder / note / radio / phone) — never a system emoji, so every theme colors it. */
+export function coverGlyph(glyph = '♪') {
+  const name = glyph === '📁' || glyph === 'folder' ? 'folder'
+    : glyph === '📻' || glyph === 'radio' ? 'radio'
+    : glyph === '📱' || glyph === 'phone' ? 'phone'
+    : 'note';
+  return icon(name, 'cover-ic');
+}
 export function cover(src, cls = '', glyph = '♪', gen = null) {
   // 0.3.6 K4: while the picture loads the tile shows the dark theme placeholder (never the generated cover, never an accent gradient); the <img> stays hidden
   // until it has loaded AND decoded, then fades in (~150 ms). The generated cover is drawn only AFTER a failed load (or when there is no picture at all).
-  const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') + (src ? ' loading' : '') }, gen ? '' : glyph);
+  const box = h('div', { class: 'cover ' + cls + (gen ? ' gen' : '') + (src ? ' loading' : '') }, gen ? '' : coverGlyph(glyph));
   const showGen = () => { box.classList.remove('loading'); if (gen && !box.querySelector('.gencover') && !box.classList.contains('loaded')) box.append(gen.portrait != null ? genNode('artist', gen.portrait) : genNode('album', gen.album, gen.artist)); };
   const load = u => {
     const img = h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async', class: 'cimg' }); img.onerror = () => { img.remove(); showGen(); };
     img.onload = () => {
       if (!img.naturalWidth) { img.remove(); showGen(); return; }
-      const shown = () => { box.classList.remove('loading'); box.classList.add('loaded'); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
+      const shown = () => { box.classList.remove('loading'); box.classList.add('loaded'); box.querySelector(':scope > .ic')?.remove(); box.firstChild && box.firstChild.nodeType === 3 && (box.firstChild.textContent = ''); box.querySelector('.gencover')?.remove(); };
       (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(shown);
     };
     box.append(img);
@@ -136,9 +147,15 @@ export function artPushed(d) {
 let albumTimer = 0;
 
 /** Best art URL for a now-playing / queue item (radio favicon or track cover). */
+/** 0.6.8-#8: the radio item with the live song picture (amgArtworkURL, served by /art/radio/{id}/live) when the station sends one; k changes per song. */
+export function liveRadioItem(n) {
+  const it = n?.item; if (it?.kind !== 'radio' || !it.refId || !n.liveArt) return it;
+  let k = 0; for (const c of String(n.liveTitle || '')) k = (k * 31 + c.codePointAt(0)) >>> 0;
+  return { ...it, liveArt: k.toString(36) };
+}
 export function itemArtUrl(it, size = 192) {
   if (!it) return null;
-  if (it.kind === 'radio' && it.refId) return radioArt(it.refId, size);
+  if (it.kind === 'radio' && it.refId) return it.liveArt ? `${base}/radio/${it.refId}/live?size=${size}&k=${it.liveArt}` : radioArt(it.refId, size);
   if (it.artUrl) return it.artUrl;
   if (isReceiver(it)) return null;
   const id = artTrackId(it);

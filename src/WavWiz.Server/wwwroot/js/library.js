@@ -1,9 +1,9 @@
 import { h, api, toast, fmtTime } from './util.js';
-import { cover, trackArt, artistCover } from './art.js';
+import { cover, coverGlyph, trackArt, artistCover } from './art.js';
 import { icon } from './icons.js';
 import { pulse } from './motion.js';
 import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShuffled, addToQueue, chunked, pickPlaylist, songsLabel } from './ui.js';
-import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
+import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, fitAzLetters, visibleCssHeight, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 import { openCtx } from './ctxmenu.js';
 
@@ -39,7 +39,7 @@ export const isRsTab = k => typeof k === 'string' && k.startsWith('rs:');
 const GRID_KINDS = new Set(['albums', 'recent', 'favorites', 'artists', 'genres', 'years', 'remote', 'radio', 'playlists']);
 const COUNT_LABEL = { artists: 'artists', albums: 'albums', genres: 'genres', years: 'years', recent: 'albums', folders: 'folders', favorites: 'favorites', songs: 'songs', radio: 'stations', playlists: 'playlists' };
 
-const folderGlyph = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.innerHTML = '<path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l1.8 2h8.6A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>'; return s; };
+const folderGlyph = () => icon('folder', 'fold-ic');
 /** 0.2.1 F13: round artist photo (MusicBrainz / Wikidata via the server, cached); a generated portrait until / unless one is found. */
 const artistArt = a => artistCover(a.name, a.artTrackIds, 'lg rnd', 384);      // 0.2.2 T4d: photo, else album covers, else generated portrait
 /** 0.2.1 F13: "Artist · 2021" under album tiles. */
@@ -79,6 +79,86 @@ export function libraryView(S, opts = {}) {
   const st = { tab: (compact ? S.libTabC : S.libTab) || (compact ? 'artists' : 'albums'), stack: [], q: '', count: null, kind: null, dirty: false };
   const root = h('div', { class: compact ? 'lib compact' : (phone ? 'lib phone-library' : 'lib') }), head = h('div'), tools = h('div', { class: 'libtools' }), crumbs = h('div', { class: 'crumbs' }),
     content = h('div', { class: 'libcontent' }), strip = h('nav', { class: 'azstrip', 'aria-label': 'Jump to letter', hidden: true }), countEl = h('div', { class: 'libcount small dim' });
+    const azBubble = h('div', { class: 'azbubble', hidden: true, 'aria-hidden': 'true' });
+    const hideAzBubble = () => { azBubble.hidden = true; azBubble.textContent = ''; };
+    const showAzBubble = (letter, ev) => {
+      if (!letter) return hideAzBubble();
+      azBubble.textContent = letter;
+      azBubble.hidden = false;
+      const r = strip.getBoundingClientRect();
+      const y = (ev && (ev.clientY ?? ev.touches?.[0]?.clientY)) ?? (r.top + r.height / 2);
+      azBubble.style.top = `${Math.max(8, Math.min(r.height - 8, y - r.top))}px`;
+    };
+    const azBtnAt = ev => {
+      const pt = ev.touches?.[0] || ev.changedTouches?.[0] || ev;
+      const y = pt.clientY, buttons = [...strip.querySelectorAll('button[data-letter]')];
+      if (!buttons.length) return null;
+      let best = null, bestD = Infinity;
+      for (const b of buttons) {
+        const r = b.getBoundingClientRect(), mid = (r.top + r.bottom) / 2, d = Math.abs(mid - y);
+        if (d < bestD) { bestD = d; best = b; }
+      }
+      return best;
+    };
+    const azClipHeight = el => {
+      if (!el) return 0;
+      const ch = el.clientHeight;
+      const r = el.getBoundingClientRect?.();
+      if (!r || !(r.height > 0)) return ch || 0;
+      let vis = r.height;
+      const clip = (top, bot) => { vis = Math.min(vis, Math.max(0, Math.min(r.bottom, bot) - Math.max(r.top, top))); };
+      for (let n = el.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+        const oy = n.ownerDocument?.defaultView?.getComputedStyle?.(n)?.overflowY || '';
+        if (oy === 'auto' || oy === 'scroll' || oy === 'hidden' || oy === 'clip') {
+          const p = n.getBoundingClientRect();
+          clip(p.top, p.bottom);
+        }
+      }
+      const win = el.ownerDocument?.defaultView, vv = win?.visualViewport;
+      if (vv) clip(vv.offsetTop, vv.offsetTop + vv.height);
+      else if (win) clip(0, win.innerHeight);
+      return visibleCssHeight(ch, r.height, vis);
+    };
+    const paintAz = (idx) => {
+      const hgt = azClipHeight(strip.parentElement);
+      const plan = fitAzLetters(hgt);
+      const nLet = plan.filter(it => it.kind === 'letter').length;
+      const fs = hgt && nLet ? Math.max(6, Math.min(11, (hgt - 8) / nLet)) : 10;
+      strip.style.setProperty('--az-fs', fs + 'px');
+      strip.replaceChildren(...plan.map(it => {
+        if (it.kind === 'dot') return h('span', { class: 'azdot', 'aria-hidden': 'true' }, '·');
+        const ch = it.ch, on = idx.has(ch);
+        return h('button', { type: 'button', class: on ? '' : 'off', disabled: !on, 'data-letter': ch, 'aria-label': `Jump to ${ch}` }, ch);
+      }), azBubble);
+      strip.style.height = hgt ? hgt + 'px' : '';
+    };
+    let azScrub = false;
+    const azFrom = (ev, hop) => {
+      const btn = azBtnAt(ev); if (!btn) return;
+      const l = btn.dataset.letter;
+      showAzBubble(l, ev);
+      if (hop && !btn.disabled) jump?.(l);
+    };
+    strip.addEventListener('pointerdown', ev => {
+      if (ev.button != null && ev.button !== 0) return;
+      const btn = ev.target.closest?.('button[data-letter]');
+      azScrub = true;
+      try { strip.setPointerCapture?.(ev.pointerId); } catch { /* ignore */ }
+      if (btn) azFrom(ev, true);
+      ev.preventDefault();
+    });
+    strip.addEventListener('pointermove', ev => { if (azScrub) azFrom(ev, true); });
+    const endAz = ev => { if (!azScrub) return; azFrom(ev, true); azScrub = false; hideAzBubble(); };
+    strip.addEventListener('pointerup', endAz);
+    strip.addEventListener('pointercancel', endAz);
+    strip.addEventListener('pointerleave', ev => { if (!azScrub) hideAzBubble(); });
+    let azRaf = 0;
+    const azResize = () => {
+      const go = () => { azRaf = 0; if (!strip.hidden && strip._azIdx) paintAz(strip._azIdx); };
+      if (typeof requestAnimationFrame === 'function') { if (azRaf) return; azRaf = requestAnimationFrame(go); }
+      else go();
+    };
+
   // 0.2.1 F5: the filter box is ONE persistent element. Redraws never re-create or re-parent it while you type (that dropped focus after
   // every keystroke); filtering is debounced, and focus + caret are restored if a layout switch ever has to move it.
   const search = h('input', { type: 'search', placeholder: 'Search songs, albums and artists…', 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { const q = ev.target.value.trim(); if (q !== st.q) { st.q = q; draw(); } }, 250); } });
@@ -88,6 +168,13 @@ export function libraryView(S, opts = {}) {
   const tabsSlot = h('div', { class: 'libtabslot' }), headRow = h('div', { class: 'row libhead' }, tabsSlot);
   head.append(headRow);
   root.append(srcSlot, searchField, head, tools, countEl, crumbs, h('div', { class: 'libscroll' }, content, strip));
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(azResize).observe(strip.parentElement);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('scroll', azResize, true);
+    window.addEventListener('resize', azResize);
+    window.visualViewport?.addEventListener('resize', azResize);
+  }
+
   /** F239/t2544u: search always under source tabs — never into headRow (that jumped lines on expand). Preserve focus + caret. */
   const placeSearch = () => {
     if (searchField.parentElement === root && searchField.previousElementSibling === srcSlot) return;
@@ -246,7 +333,7 @@ export function libraryView(S, opts = {}) {
   const folderTile = f => {
     const ids = (f.artTrackIds || []).slice(0, 4), name = f.name.split(/[\\/]/).filter(Boolean).pop() || f.name;
     const el = h('li', { class: 'tile ftile', onclick: () => push({ title: name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) },
-      h('div', { class: 'tileart fmosaic' + (ids.length < 2 ? ' one' : '') }, ...(ids.length ? ids.map(id => cover(trackArt(id, 192), 'fm', '♫')) : [h('div', { class: 'cover fm' }, '📁')]),
+      h('div', { class: 'tileart fmosaic' + (ids.length < 2 ? ' one' : '') }, ...(ids.length ? ids.map(id => cover(trackArt(id, 192), 'fm', '♫')) : [h('div', { class: 'cover fm' }, coverGlyph('folder'))]),
         h('span', { class: 'fbadge', 'aria-hidden': 'true' }, folderGlyph()), playBtn(refNode('folder:' + f.path), name)),
       h('div', { class: 't1 ell', title: f.name }, name), h('div', { class: 't2' }, `${f.tracks} track${f.tracks === 1 ? '' : 's'}`));
     return attachItem(S, el, refNode('folder:' + f.path), name, { more: false, count: f.tracks ?? null, kind: 'Folder' });
@@ -255,6 +342,7 @@ export function libraryView(S, opts = {}) {
 
   // ---- lists (sorted, letter strip) ----
   let jump = null;
+  let stripPlan = null; // applied only after draw() commits, so a stale list() cannot leak the rail onto tool pages
   function list(kind, rows, make, tile = make === albumRow ? albumTile : null) {
     const key = P.sort[kind], sorted = sortRows(kind, rows, key, P.flip[kind], seed); st.count = rows.length; st.kind = kind;
     const grid = !!tile && gridOn(kind);
@@ -269,8 +357,7 @@ export function libraryView(S, opts = {}) {
     if (isLetterSort(kind, key) && sorted.length >= (expanded ? 20 : 40)) {
       const idx = letterIndex(kind, sorted, key);
       jump = l => { const i = idx.get(l); if (i == null) return; ch?.upTo?.(i); ul.children[i]?.scrollIntoView({ block: 'start' }); };
-      strip.replaceChildren(...LETTERS.map(l => h('button', { type: 'button', class: idx.has(l) ? '' : 'off', disabled: !idx.has(l), 'aria-label': `Jump to ${l}`, onclick: () => jump(l) }, l)));
-      strip.hidden = false;
+      stripPlan = idx; // letterIndex map; painted after draw() commits so height is the visible list
     }
     return ul;
   }
@@ -313,7 +400,7 @@ export function libraryView(S, opts = {}) {
     const r = await api('/library/folders' + (path ? '?path=' + encodeURIComponent(path) : ''));
     const out = [];
     if (path) out.push(h('ul', { class: 'list' }, h('li', { class: 'item', onclick: () => { st.stack.pop(); draw(); } }, h('div', { class: 't' }, h('div', { class: 't1' }, '‹ Up')))));
-    const folderRow = f => { const el = h('li', { class: 'item', onclick: () => push({ title: f.name.split(/[\\/]/).pop() || f.name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) }, h('span', { class: 'cover sm' }, '📁'), h('div', { class: 't' }, h('div', { class: 't1 ell' }, f.name), h('div', { class: 't2' }, `${f.tracks} songs`))); return attachItem(S, el, refNode('folder:' + f.path), f.name); };
+    const folderRow = f => { const el = h('li', { class: 'item', onclick: () => push({ title: f.name.split(/[\\/]/).pop() || f.name, kind: 'folders', load: () => foldersPage(f.path), folder: f.path }) }, h('span', { class: 'cover sm' }, coverGlyph('folder')), h('div', { class: 't' }, h('div', { class: 't1 ell' }, f.name), h('div', { class: 't2' }, `${f.tracks} songs`))); return attachItem(S, el, refNode('folder:' + f.path), f.name); };
     if (r.folders.length) out.push(list('folders', r.folders, folderRow, folderTile));
     if (r.tracks.length) out.push(h('div', { class: 'sec' }, 'Songs in this folder'), trackList(r.tracks));
     if (!r.folders.length && !r.tracks.length) out.push(empty('This folder has no songs WavWiz can read.'));
@@ -340,15 +427,16 @@ export function libraryView(S, opts = {}) {
   // ---- F164: Remote libraries (Subsonic / OpenSubsonic, e.g. Navidrome). WavWiz is the client; songs stream from the server, local library untouched. ----
   const rsong = x => ({ id: x.id, title: x.title, artist: x.artist, album: x.album, durationMs: x.durationMs, coverArt: x.coverArt, trackNo: x.trackNo, year: x.year, genre: x.genre });
   const rplay = (sid, songs, index = 0) => canControl(S) ? playNow({ kind: 'remote', server: sid, songs: songs.map(rsong), index }) : toast('Your access is view-only.');
-  // F175: remote albums / songs drag onto the WavWiz queue like local rows (queue drop POSTs the ref to /queue/add with the drop position)
+  // F175 / 0.6.8: remote albums, artists and songs drag onto the WavWiz queue like local rows (queue drop POSTs the ref to /queue/add with the drop position)
   const rdrag = (el, sid, al, more = false) => attachItem(S, el, { kind: 'remote', server: sid, album: al.id }, al.album, { more, count: al.tracks ?? null, kind: 'Remote album' });
-  const rsongDrag = (el, sid, t) => attachItem(S, el, { kind: 'remote', server: sid, songs: [rsong(t)] }, t.title, { more: false, count: 1, kind: 'Remote song', phoneSong: phone ? { ...t, kind: 'remote' } : null });
+  const rartistDrag = (el, sid, a, more = false) => attachItem(S, el, { kind: 'remote', server: sid, artist: a.id }, a.name, { more, count: a.albums ?? null, kind: 'Remote artist' });
+  const rsongDrag = (el, sid, t) => attachItem(S, el, { kind: 'remote', server: sid, songs: [rsong(t)] }, t.title, { more: !!phone, count: 1, kind: 'Remote song', phoneSong: phone ? { ...t, kind: 'remote' } : null });
   const rbadge = () => h('span', { class: 'small dim rbadge' }, ' · Remote');
   const ralbumRow = sid => al => { const el = h('li', { class: 'item', onclick: () => push({ title: al.album, kind: null, load: () => remoteAlbumPage(sid, al) }) }, cover(al.artUrl, 'sm', '♫', { album: al.album, artist: al.artist }),
       h('div', { class: 't' }, h('div', { class: 't1 ell' }, al.album), h('div', { class: 't2 ell' }, [al.artist, al.year || null, al.tracks != null ? `${al.tracks} song${al.tracks === 1 ? '' : 's'}` : null].filter(Boolean).join(' • '), rbadge())),
       canControl(S) ? h('button', { type: 'button', class: 'btn sm', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow({ kind: 'remote', server: sid, album: al.id }); } }, '▶') : null); return rdrag(el, sid, al, true); };
-  const rartistRow = sid => a => h('li', { class: 'item', onclick: () => rartistOpen(sid, a) },
-    cover(a.artUrl, 'sm rnd', '♪', { portrait: a.name }), h('div', { class: 't' }, h('div', { class: 't1 ell' }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge())));
+  const rartistRow = sid => a => { const el = h('li', { class: 'item', onclick: () => rartistOpen(sid, a) },
+    cover(a.artUrl, 'sm rnd', '♪', { portrait: a.name }), h('div', { class: 't' }, h('div', { class: 't1 ell' }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge()))); return rartistDrag(el, sid, a, true); };
   // F172: remote tiles (same tilegrid / tile size as the local Library): albums square, artists round
   const ralbumOpen = (sid, al) => push({ title: al.album, kind: null, load: () => remoteAlbumPage(sid, al) });
   const ralbumTile = sid => al => rdrag(h('li', { class: 'tile', onclick: () => ralbumOpen(sid, al) },
@@ -356,9 +444,9 @@ export function libraryView(S, opts = {}) {
       canControl(S) ? h('button', { type: 'button', class: 'tileplay', 'aria-label': `Play ${al.album}`, onclick: ev => { ev.stopPropagation(); playNow({ kind: 'remote', server: sid, album: al.id }); } }, '▶') : null),
     h('div', { class: 't1 ell', title: al.album }, al.album), h('div', { class: 't2 ell' }, albumSub(al), rbadge())), sid, al);
   const rartistOpen = (sid, a) => push({ title: a.name, kind: 'remote', load: async () => { const rows = await api(`/remote/${sid}/artist/${encodeURIComponent(a.id)}`); return [rows.length ? rlist(sid, 'albums', rows) : empty('No albums.')]; } });
-  const rartistTile = sid => a => h('li', { class: 'tile atile', onclick: () => rartistOpen(sid, a) },
+  const rartistTile = sid => a => rartistDrag(h('li', { class: 'tile atile', onclick: () => rartistOpen(sid, a) },
     h('div', { class: 'tileart rnd' }, cover(a.artUrl, 'lg rnd', '♪', { portrait: a.name })),
-    h('div', { class: 't1 ell', title: a.name }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge()));
+    h('div', { class: 't1 ell', title: a.name }, a.name), h('div', { class: 't2 ell' }, `${a.albums} album${a.albums === 1 ? '' : 's'}`, rbadge())), sid, a);
   /** F172: remote Albums / Newest / Artists honor the Library view (own P.sort/flip/views.remote; never touches local views.artists / albums). */
   function rlist(sid, mode, rows) {
     st.kind = 'remote'; st.count = rows.length;
@@ -478,7 +566,7 @@ export function libraryView(S, opts = {}) {
   const visible = () => root.isConnected && root.getClientRects().length > 0;
   async function draw() {
     if (!visible()) { st.dirty = true; return; }       // hidden copy (phone vs desktop layout): draw when it is shown
-    st.dirty = false; const my = ++drawing; st.count = null; jump = null; strip.hidden = true; strip.replaceChildren();
+    st.dirty = false; const my = ++drawing; st.count = null; jump = null; stripPlan = null; strip.hidden = true; strip.replaceChildren();
     if (phone) countEl.textContent = '';  // no stale count while a different source/detail loads
     root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded); root.dataset.tiles = P.tileSize;
     root.dataset.source = st.source;
@@ -508,6 +596,8 @@ export function libraryView(S, opts = {}) {
       else nodes = await (rootPage[st.tab] || rootPage.artists)();
       if (my !== drawing) return;
       content.replaceChildren(...nodes); drawTools(pageKind());
+      if (stripPlan) { strip._azIdx = stripPlan; paintAz(stripPlan); strip.hidden = false; }
+      else { strip._azIdx = null; strip.hidden = true; strip.replaceChildren(); hideAzBubble(); }
       content.classList.toggle('grid', !!content.querySelector('.tilegrid'));
       const lab = COUNT_LABEL[phone ? st.kind : st.tab] || (phone && st.kind === 'remote' ? (st.count === 1 ? 'result' : 'results') : null);
       countEl.textContent = ((compact && !expanded && !st.stack.length) || phone) && st.count != null && !st.q && lab ? `${st.count} ${lab}` : '';

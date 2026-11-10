@@ -4,7 +4,8 @@ const rd = f => readFileSync(new URL('../../src/WavWiz.Server/wwwroot/' + f, imp
 const css = rd('app.css'), now = rd('js/now.js'), sc = rd('js/shortcuts.js');
 // Shortcuts: one header toggle -> vertical side strip reusing shortcutsRow (same pins / Home / order)
 assert.match(sc, /export function shortcutsSide\(/);
-assert.match(sc, /shortcutsRow\(\{ run, home, cls: 'scside-row', vertical: true \}\)/);
+assert.match(sc, /shortcutsRow\(\{ run, home, cls: 'scside-row', vertical: !horizontal \}\)/);
+assert.match(sc, /horizontal = false/, 'shortcutsSide default remains the vertical strip');
 assert.match(sc, /if \(vertical\) return 99;/, 'vertical strip never folds pins into More');
 assert.match(sc, /class: 'scbtn sctoggle'[^\n]*onclick: \(\) => setOpen\(!open\)/);
 assert.match(sc, /strip\.hidden = !open/);

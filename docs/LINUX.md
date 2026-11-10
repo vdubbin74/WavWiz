@@ -1,4 +1,4 @@
-# WavWiz server on Linux without Docker (0.6.7, F166)
+# WavWiz server on Linux without Docker (0.6.8, F166)
 
 Headless **server only** (no Linux Player; pair a Windows Player, phone/browser, or AirPlay 1 for speakers).
 

@@ -2,8 +2,9 @@ import { openNowSongMenu, currentSongContext } from './npsongmenu.js';
 import { holdPage } from './motion.js';
 import { h, api, toast, fmtTime, fmtDur, dialog } from './util.js';
 import { openSleep } from './scenesched.js';   // 0.3.5 J8
-import { cover, npCover, npKey, itemArtUrl, setMediaSession, updateMediaSessionPosition, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
-import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, setVizProgress } from './viz.js';
+import { cover, npCover, npKey, itemArtUrl, liveRadioItem, setMediaSession, updateMediaSessionPosition, isLive, isReceiver, sourceLabel, streamingChip } from './art.js';
+import { isHandset } from './phonejoin.js';
+import { Viz, vizPrefs, saveVizPrefs, inDesktopPlayer, isPhone, isRealPhone, setVizProgress } from './viz.js';
 import { icon, setIcon, iconSvg, setChev } from './icons.js';
 import { mixerButton } from './mixer.js';
 import { shortcutsRow, shortcutsSide } from './shortcuts.js';
@@ -61,6 +62,8 @@ export function createNow(S, ctl) {
   const toggleMute = () => { const z = me(); if (!z || !canControl(S)) return; z.muted = !z.muted; act(`/zones/${z.id}`, { muted: z.muted }, 'PATCH'); drawMine(); };
   const mkMute = () => h('button', { class: 'tbtn tog mutebtn', 'aria-label': 'Mute this device', 'aria-pressed': 'false', title: 'Mute this device', onclick: toggleMute }, icon('volume'));
   // 0.3.5 J8: the Sleep timer's permanent home - a Sleep button in Now Playing (small menu of times; shows the countdown while it runs)
+  // 0.6.8-#11a: icon form (moon) for the phone row; the countdown shows beside the moon while it runs (scenesched.js paints .npsl-t)
+  function mkSleepIc() { const b = h('button', { class: 'tbtn npsleep npsleep-ic', type: 'button', 'aria-haspopup': 'menu', 'aria-label': 'Sleep timer', title: 'Sleep timer', onclick: () => { if (!canControl(S)) return toast('Your access is view-only.'); openSleep(S, null, b); } }, icon('moon'), h('span', { class: 'npsl-t' })); return b; }
   function mkSleep() { const b = h('button', { class: 'btn sm npsleep', type: 'button', 'aria-haspopup': 'menu', title: 'Sleep timer', onclick: () => { if (!canControl(S)) return toast('Your access is view-only.'); openSleep(S, null, b); } }, 'Sleep'); return b; }
   const vol = mkVol(), muteBtn = mkMute();
   const volPct = h('span', { class: 'volpct small dim' }, '');
@@ -244,7 +247,7 @@ export function createNow(S, ctl) {
   // art + a line seek; preferences remain untouched for desktop/mini previews.
   let songMenu = null;
   const closePhone = () => { songMenu?.close(); songMenu = null; E.zoneVol.cancel(); };
-  const phoneCollapse = h('button', { type: 'button', class: 'np-phone-collapse', 'aria-label': 'Collapse Now Playing', onclick: () => ctl.go('now:collapse') }, '⌄');
+  const phoneCollapse = h('button', { type: 'button', class: 'np-phone-collapse', 'aria-label': 'Collapse Now Playing', onclick: () => ctl.go('now:collapse') }, icon('chevD'));   // 0.6.8-#11b: centered square chevron
   const phoneMore = h('button', { type: 'button', class: 'np-phone-more', 'aria-label': 'Current song actions', 'aria-haspopup': 'menu', disabled: true,
     onclick: () => { songMenu?.close(); songMenu = openNowSongMenu(S, ctl, phoneMore); } }, '⋯');
   const phoneArt = h('div', { class: 'np-phone-art' });
@@ -267,10 +270,11 @@ export function createNow(S, ctl) {
     h('div', { class: 'np-phone-progress' }, phoneSeek, h('div', { class: 'np-phone-times' }, phoneElapsed, phoneDuration)),
     h('div', { class: 'np-phone-transport', role: 'group', 'aria-label': 'Transport' }, phoneShuffle, phonePrev, phonePlay, phoneNext, phoneRepeat), phoneZoneVol,
     h('div', { class: 'np-phone-actions' }, h('button', { type: 'button', onclick: () => ctl.go('queue') }, 'Queue'), h('button', { type: 'button', class: 'np-phone-sound', onclick: () => ctl.openEq?.() }, 'Sound')),
-    h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), h('div', { class: 'row wrap' }, mkMix(), mkSleep(), mkSc('np-phone-shortcuts'))));
+    h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), h('div', { class: 'row wrap np-phone-xrow' }, ...(isHandset() ? [mkSleepIc()] : [mkMix(), mkSleepIc(), mkSc('np-phone-shortcuts')]))));   // 0.6.8-#11a/d: phones drop the extra mixer (Sound + the volume row cover it), Home and pins
   el.prepend(phoneFull);
   phoneMedia.addEventListener('change', () => { phoneFull.hidden = !phoneMedia.matches; if (!phoneMedia.matches) closePhone(); });
-  window.addEventListener('wavwiz:zonesync', () => { songMenu?.close(); songMenu = null; phoneMore.disabled = !currentSongContext(S); });
+  // 0.6.8-#4: zonesync fires on every zones refresh (poll / ws); close the song menu only when its song/zone context really changed
+  window.addEventListener('wavwiz:zonesync', () => { if (songMenu && !songMenu.valid?.()) { songMenu.close(); songMenu = null; } phoneMore.disabled = !currentSongContext(S); });
   window.addEventListener('resize', () => { if (!matchMedia('(max-width:900px)').matches) closePhone(); });
   E.ovTitles = ovTitles;
 
@@ -328,7 +332,7 @@ export function createNow(S, ctl) {
   window.addEventListener('wavwiz:looks', () => { applyLooks(); syncLooks(); });
   function drawVBtns() {
     const p = vizPrefs(), locked = loadEqLock(), mode = center;
-    const want = overlayButtons(mode, { popout: !inDesktopPlayer() && !isPhone() });
+    const want = overlayButtons(mode, { popout: !inDesktopPlayer() && !isRealPhone() });   // 0.6.8-#5: pop-out is kept in a narrow PC window
     const make = {
       lock: () => ovBtn('lock', OV_LABEL.lock(locked), locked, () => { saveEqLock(!loadEqLock()); drawVBtns(); }, locked ? 'lock' : 'unlock'),
       swap: () => ovBtn('swap', OV_LABEL.swap(), mode === 'viz', () => { closeLooks(); setCenter(mode === 'eq' ? 'viz' : 'eq'); }),
@@ -430,8 +434,9 @@ export function createNow(S, ctl) {
   function draw() {
     const n = S.now; if (!n) return;
     const it = n.item, radio = it?.kind === 'radio';
-    t1.textContent = it ? (radio ? (n.liveTitle || it.title) : it.title) : 'Nothing playing';
-    t2.textContent = it ? (radio ? (n.liveTitle ? it.title : 'Internet radio') : (it.artist || ' ')) : 'Pick something from the library';
+    // 0.6.8-#8: radio = song title / "artist · station" when the station names them (plain or iHeart key=value metadata)
+    t1.textContent = it ? (radio ? (n.liveSong || n.liveTitle || it.title) : it.title) : 'Nothing playing';
+    t2.textContent = it ? (radio ? (n.liveSong && n.liveArtist ? `${n.liveArtist} · ${it.title}` : n.liveTitle ? it.title : 'Internet radio') : (it.artist || ' ')) : 'Pick something from the library';
     if (E.ovTitles) { E.ovTitles.children[0].textContent = t1.textContent; E.ovTitles.children[1].textContent = t2.textContent; }
     { const it2 = S.now?.item; ovAA.textContent = it2 && it2.kind !== 'radio' ? [it2.artist, it2.album].filter(Boolean).join(' - ') : t2.textContent.trim(); ovAA.title = ovAA.textContent; ovAl.textContent = it2 && it2.kind !== 'radio' ? it2.album || '' : ''; for (const e of [t2, ovT2]) e.dataset.album = ovAl.textContent;
       const rad = !it2 || it2.kind === 'radio'; aaArtistLbl.hidden = rad; aaArtist.textContent = rad ? t2.textContent.trim() : (it2.artist || ''); aaAlbum.textContent = ovAl.textContent; aaAlbumWrap.hidden = !ovAl.textContent; aaLine.title = [aaArtist.textContent, aaAlbum.textContent].filter(Boolean).join(' · '); }   // F102e: phone shows Artist · Album on one line
@@ -451,20 +456,21 @@ export function createNow(S, ctl) {
     phoneZone.hidden = !!choice && (S.groups?.length || 0) + (S.jb?.own ? 1 : 0) > 1;
     phoneMore.disabled = !currentSongContext(S);
     if (songMenu && !songMenu.valid()) { songMenu.close(); songMenu = null; }
-    const src = itemArtUrl(it, 768), srcMd = itemArtUrl(it, 384), srcSm = itemArtUrl(it, 96);
-    const npk = npKey(it, src);   // 0.5.0 F123: key includes artist + album so a new track with the same (missing) art rebuilds
+    const ait = liveRadioItem(n);   // 0.6.8-#8: radio song picture when the station sends one
+    const src = itemArtUrl(ait, 768), srcMd = itemArtUrl(ait, 384), srcSm = itemArtUrl(ait, 96);
+    const npk = npKey(ait, src);   // 0.5.0 F123: key includes artist + album so a new track with the same (missing) art rebuilds
     if (coverHolder.dataset.src !== npk) {
       coverHolder.dataset.src = npk;
       const nowcol = ctlPanel.closest('.nowcol');
       pnArt.style.setProperty('--np-cover', 'none'); nowcol?.style.setProperty('--np-bloom', 'none');   // F123: only a loaded track picture feeds bloom / jacket
       const realMd = u => { if (coverHolder.dataset.src === npk) pnArt.style.setProperty('--np-cover', `url("${u}")`); };   // F104: Jacket vinyl center label = cover crop
       const realSm = u => { if (coverHolder.dataset.src === npk) nowcol?.style.setProperty('--np-bloom', `url("${u}")`); };   // F102: phone cover bloom
-      coverHolder.replaceChildren(npCover(it, 768, ''));
-      art.replaceChildren(npCover(it, 384, 'md', realMd));
-      miniArtB.setCover(npCover(it, 96, 'sm', realSm));
-      phoneArt.replaceChildren(npCover(it, 768, ''));
-      pnCover.replaceChildren(npCover(it, 384, 'md')); pnRefl.replaceChildren(npCover(it, 384, 'md'));
-      sArtB.setCover(npCover(it, 96, 'sm'));
+      coverHolder.replaceChildren(npCover(ait, 768, ''));
+      art.replaceChildren(npCover(ait, 384, 'md', realMd));
+      miniArtB.setCover(npCover(ait, 96, 'sm', realSm));
+      phoneArt.replaceChildren(npCover(ait, 768, ''));
+      pnCover.replaceChildren(npCover(ait, 384, 'md')); pnRefl.replaceChildren(npCover(ait, 384, 'md'));
+      sArtB.setCover(npCover(ait, 96, 'sm'));
     }
     const wseed = it ? (it.id ?? it.title ?? '') + '' : '';
     if (pnWave.dataset.seed !== wseed) {
@@ -492,7 +498,7 @@ export function createNow(S, ctl) {
     setIcon(sPlay, playing ? 'pause' : 'play'); sPlay.classList.toggle('playing', playing);
     sT1.textContent = t1.textContent; sT2.textContent = [t2.textContent.trim(), S.now?.item?.kind !== 'radio' && S.now?.item?.album].filter(Boolean).join(' · ');   /* F130: collapsed line = Artist · Album */ ctlStrip.querySelector('.ns-titles').title = [t1.textContent, t2.textContent.trim()].filter(Boolean).join(' · ');
     drawMine(); barT1.textContent = t1.textContent; barT2.textContent = t2.textContent; barPlay.classList.toggle('playing', playing); setIcon(barPlay, playing ? 'pause' : 'play');
-    { const bk = npKey(it, srcSm); if (barCover.dataset.src !== bk) { barCover.dataset.src = bk; barArtB.setCover(npCover(it, 96, 'sm')); } }
+    { const bk = npKey(ait, srcSm); if (barCover.dataset.src !== bk) { barCover.dataset.src = bk; barArtB.setCover(npCover(ait, 96, 'sm')); } }
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
     setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
       seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') },

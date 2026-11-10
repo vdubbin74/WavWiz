@@ -7,7 +7,7 @@
 param(
     [string]$Root = '', [string]$DataDir = '', [string]$LanIp = '', [switch]$AllInterfaces,
     [int]$HttpPort = 47800, [int]$HttpsPort = 47443, [int]$AudioPort = 47801, [int]$ClockPort = 47802,
-    [switch]$NoStart, [switch]$NonInteractive
+    [switch]$NoStart, [switch]$NonInteractive, [switch]$AirPlayOut
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib.ps1')
@@ -64,23 +64,32 @@ $bind = [string]$plan.Config['bindAddress']; $hp = [int]$plan.Config['httpPort']
 Set-Step 'server: Windows service'
 $binPath = Get-ServiceBinPath $exe @('--data-dir', $DataDir)
 $exists = Test-ServiceExists $svc
+$svcAcct = Get-InstallServiceAccount $svc $exists
+Write-InstallLog ("service account {0}: {1}" -f $svcAcct.Action, $svcAcct.Account)
 if ($exists) {
     $st = Get-ServiceState $svc
     if ($st -ne 'STOPPED') { [void](Invoke-Sc 'stop (update)' @('stop', $svc) -AllowFail); if (-not (Wait-ServiceState $svc 'STOPPED' 30)) { throw "The $svc service did not stop within 30 s. Close WavWiz, then run the installer again." } }
-    [void](Invoke-Sc 'update definition' @('config', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', 'NT AUTHORITY\LocalService', 'DisplayName=', 'WavWiz Server (BETA)'))
-    Say 'Service definition updated in place.'
+    [void](Invoke-Sc 'update definition' @('config', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $svcAcct.Account, 'DisplayName=', 'WavWiz Server (BETA)'))
+    if ($svcAcct.Action -eq 'preserved') { Say ("Service definition updated in place (account kept: {0})." -f $svcAcct.Account) }
+    else { Say 'Service definition updated in place.' }
 } else {
-    [void](Invoke-Sc 'create' @('create', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', 'NT AUTHORITY\LocalService', 'DisplayName=', 'WavWiz Server (BETA)'))
+    [void](Invoke-Sc 'create' @('create', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $svcAcct.Account, 'DisplayName=', 'WavWiz Server (BETA)'))
     Say 'Service created.'
 }
 [void](Invoke-Sc 'description' @('description', $svc, 'WavWiz multi-zone synchronized music server (BETA). Listens on the local network only.'))
 [void](Invoke-Sc 'recovery' @('failure', $svc, 'reset=', '86400', 'actions=', 'restart/5000/restart/30000/restart/60000'))
+Set-Step 'server: service SID type (CD-ROM access)'
+[void](Set-WavWizServiceSidType $svc)
+Set-Step 'server: CD-ROM read access for the WavWiz service'
+Grant-WavWizCdromAccess
 
 Set-Step 'server: firewall rules (private networks, local subnet only)'
 Set-ServerFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['httpsPort'], [int]$plan.Config['audioPort']) (Get-ServerUdpPorts $plan.Config)
 Set-ServerVpnFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['httpsPort']) (Test-AllNetworksConfig $plan.Config)
 Set-Step 'server: firewall rules for the AirPlay and Spotify Connect receivers (private networks, local subnet only)'
 Set-ReceiverFirewall $exe $plan.Config
+Set-Step ('server: firewall rules for sending to AirPlay speakers (opt-in: ' + $(if ($AirPlayOut) { 'on' } else { 'off - removed if present' }) + ')')
+Set-AirPlayOutFirewall $exe ([bool]$AirPlayOut)
 
 if ($NoStart) { Say 'Not starting the service (-NoStart).' }
 else {

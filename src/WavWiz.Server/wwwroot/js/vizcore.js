@@ -330,6 +330,37 @@ export class Onset {
 const dbOf = v => 20 * Math.log10(Math.max(1e-5, v));
 
 /**
+ * 0.6.8-#17: a beat clock that follows the groove. Inter-onset intervals of the kicks are folded into 80-200 BPM, the median is the period and
+ * the share of intervals near it is the confidence. Between kicks the phase runs on, so a beat the onset detector missed (a dense mix, a soft
+ * kick) still lands as a predicted beat: push() returns true on that frame (never on a frame that already had a kick, never without a steady groove).
+ */
+export class BeatClock {
+  constructor() { this.reset(); }
+  reset() { this.t = 0; this.last = -1e9; this.iois = []; this.period = 0; this.conf = 0; this.phase = 0; }
+  get bpm() { return this.period > 0 ? 60000 / this.period : 0; }
+  static fold(ms) { let v = ms; for (let i = 0; i < 3 && v < 300; i++) v *= 2; for (let i = 0; i < 3 && v > 750; i++) v /= 2; return v >= 300 && v <= 750 ? v : 0; }
+  push(dtMs, kick) {
+    this.t += dtMs;
+    if (kick) {
+      const gap = this.t - this.last; this.last = this.t;
+      if (gap < 4000) { const v = BeatClock.fold(gap); if (v) { this.iois.push(v); if (this.iois.length > 8) this.iois.shift(); } } else this.iois = [];
+      if (this.iois.length >= 3) {
+        const srt = [...this.iois].sort((a, b) => a - b), med = srt[srt.length >> 1];
+        this.period = med; this.conf = this.iois.filter(x => Math.abs(x - med) <= med * 0.1).length / this.iois.length;
+      }
+      this.phase = 0; return false;
+    }
+    const since = this.t - this.last;
+    if (since > 6000) { this.conf = 0; this.period = 0; this.iois = []; return false; }   // the groove stopped
+    if (!(this.period > 0)) return false;
+    this.phase += dtMs / this.period;
+    if (this.phase < 1) return false;
+    this.phase -= Math.floor(this.phase);
+    return this.conf >= 0.6 && since > this.period * 0.6;
+  }
+}
+
+/**
  * Audio features for one frame from the 1024-sample waveform (or null = nothing audible). Everything is time-based (dtMs), so 30 fps phones and
  * 120 Hz screens move the same. Values: bass/mid/high/level 0..1 (after auto-gain), kick/snare (true on the frame of an onset), beat (pulse 0..1),
  * flash (bloom, decays fast), surge (speed boost), shake (camera shake), energy (smoothed loudness), idle (calm state), bands (64 log bands, fast attack /
@@ -340,10 +371,11 @@ export class Features {
   constructor() {
     this.mags = new Float64Array(512); this.raw = new Float64Array(64); this.prevRaw = new Float64Array(64); this.bands = new Float64Array(64); this.wave = new Float32Array(256);
     this.peaks = new Float64Array(64); this.peakV = new Float64Array(64); this.peakHold = new Float64Array(64);
-    this.agc = new AutoGain(); this.kickOn = new Onset(150); this.snareOn = new Onset(110); this.sensitivity = 1; this.autoGain = true; this.mood = DEFAULT_MOOD;
+    this.agc = new AutoGain(); this.kickOn = new Onset(150); this.snareOn = new Onset(110); this.clock = new BeatClock(); this.sensitivity = 1; this.autoGain = true; this.mood = DEFAULT_MOOD;
     this.lr = { rmsL: -80, rmsR: -80, pkL: -80, pkR: -80, stereo: false }; this.reset();
   }
-  reset() { this.bass = 0; this.mid = 0; this.high = 0; this.level = 0; this.rawLevel = 0; this.energy = 0; this.flash = 0; this.surge = 0; this.shake = 0; this.beat = 0; this.kick = false; this.snare = false; this.idle = true; this.idleFor = 1e9; this.kicks = 0; this.t = 0; this.gain = 1; }
+  reset() { this.bass = 0; this.mid = 0; this.high = 0; this.level = 0; this.rawLevel = 0; this.energy = 0; this.flash = 0; this.surge = 0; this.shake = 0; this.beat = 0; this.kick = false; this.snare = false; this.idle = true; this.idleFor = 1e9; this.kicks = 0; this.t = 0; this.gain = 1;
+    this.punch = 0; this.bassSlow = 0; this.groove = false; this.bpm = 0; this.phase = 0; this.beatConf = 0; this.clock?.reset(); }
   /** extra (optional): 4 bytes after the waveform from /ws/viz = dBFS rms L, rms R, peak L, peak R as (dB + 72) * 255 / 72. */
   push(wave, dtMs = 16.7, extra = null) {
     const M = moodAt(this.mood);
@@ -363,13 +395,19 @@ export class Features {
       fk /= 8; fs /= 24; this.prevRaw.set(this.raw);
       this.kick = this.kickOn.push(fk, dt, sens, 0.035, M.onsetK) && this.bass > 0.12;
       this.snare = !this.kick && this.snareOn.push(fs, dt, sens, 0.03, M.onsetK) && this.mid > 0.1;
+      // 0.6.8-#17 bass emphasis: punch = how far the bass just jumped over its slow average (the kick's thump, not a held bass note); every look
+      // sees a slightly hotter bass plus that punch, scaled by the Energy level (50 % = moderate, 100 % = the full hit)
+      const emph = M.beat;
+      this.bassSlow += (this.bass - this.bassSlow) * Math.min(1, dt / 1200);
+      this.punch = Math.max(this.punch * Math.exp(-dt / 140), Math.min(1, Math.max(0, this.bass - this.bassSlow * 1.05) * 2.4));
+      this.bass = Math.min(1, this.bass * (1 + 0.22 * emph) + this.punch * 0.3 * emph);
       if (extra && extra.length >= 4) { const d = b => b * 72 / 255 - 72; this.lr = { rmsL: d(extra[0]), rmsR: d(extra[1]), pkL: d(extra[2]), pkR: d(extra[3]), stereo: true }; }
       else { const db = dbOf(this.rawLevel); this.lr = { rmsL: db, rmsR: db, pkL: db + 3, pkR: db + 3, stereo: false }; }
     } else {
       const f = Math.pow(0.9, k);
       for (let i = 0; i < 64; i++) this.bands[i] *= f;
       for (let i = 0; i < 256; i++) this.wave[i] *= Math.pow(0.85, k);
-      this.kickOn.push(0, dt); this.snareOn.push(0, dt); this.prevRaw.fill(0);
+      this.kickOn.push(0, dt); this.snareOn.push(0, dt); this.prevRaw.fill(0); this.punch *= Math.exp(-dt / 140); this.bassSlow *= f;
       this.bass *= f; this.mid *= f; this.high *= f; this.level = 0; this.rawLevel = 0;
       this.lr = { rmsL: -80, rmsR: -80, pkL: -80, pkR: -80, stereo: false };
     }
@@ -381,6 +419,9 @@ export class Features {
     const loud = this.rawLevel > 0.006 || this.bass > 0.08;
     this.idleFor = loud ? 0 : this.idleFor + dt; this.idle = this.idleFor > 600;
     this.energy += ((this.idle ? 0 : Math.min(1, this.level * 1.2 + this.bass * 0.6)) - this.energy) * Math.min(1, M.energy * k);
+    // 0.6.8-#17 groove: the beat clock lands predicted beats between detected kicks (a soft pulse, never the full kick hit)
+    this.groove = this.clock.push(dt, this.kick) && !this.idle; this.bpm = this.clock.bpm; this.phase = this.clock.phase; this.beatConf = this.clock.conf;
+    if (this.groove) { this.beatT = Math.max(this.beatT || 0, 0.55 * M.beat); this.flashT = Math.max(this.flashT || 0, 0.22 * M.flash); }
     // 0.1.1: beat responses ease in (approach the target over a few frames instead of jumping) and are scaled by the Mood
     if (this.kick) { this.kicks++; this.beatT = M.beat; this.flashT = Math.min(1.4, 0.7 + this.bass * 0.9) * M.flash; this.surgeT = M.surge; if (this.bass > 0.3) this.shakeT = Math.min(1, 0.35 + this.bass * 1.2) * M.shake; }
     else if (this.snare) { this.flashT = Math.max(this.flashT || 0, 0.5 * M.flash); this.beatT = Math.max(this.beatT || 0, 0.6 * M.beat); }

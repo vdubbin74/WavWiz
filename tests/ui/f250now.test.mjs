@@ -168,6 +168,8 @@ test('P5 open song actions revalidate permission, ordered occurrences, ref and z
       await p.evaluate(()=>{S.auth.role='admin';S._nowZoneKey=Z.current().key;nowc.draw();});await p.locator('.np-phone-more').click();const n=await p.evaluate(()=>apiWrites.filter(w=>/^\/(queue|stream)/.test(w.path)).length);
       await p.evaluate(m=>{if(m==='permission')S.auth.role='view';if(m==='order')S.queue.push({...S.queue[0],id:'new'});if(m==='ref')S.now.item={...S.now.item,refId:88};if(m==='zone'){localStorage.setItem('wavwiz.zone','g:2');globalThis.__wavwizZoneKey='g:2';}},mutation);
       await p.locator('.qmenu [data-qm=remove]').click();assert.equal(await p.evaluate(()=>apiWrites.filter(w=>/^\/(queue|stream)/.test(w.path)).length),n,mutation);
+      // 0.6.8-#4: a zones refresh no longer closes a still-valid sheet (permission only disables items), so dismiss it like a user would
+      await p.evaluate(()=>document.querySelector('dialog.songsheet')?.close());
       await p.evaluate(async()=>{localStorage.removeItem('wavwiz.zone');Z.sync();await poll({},0);});
     }
     await p.evaluate(async()=>{const {loadLayout,saveLayout,setLocked}=await import('/js/plcols.js');saveLayout(setLocked(loadLayout(true),true),true);nowc.draw();});
@@ -425,4 +427,14 @@ test('P5 R4 supported Display and text sizes keep all five full targets in small
   }
   console.log('P5 R4 Display/text combinations',combinations);
  }finally{await clean(p);}
+});
+test('0.6.8-#4 phone Now ⋯ sheet survives a routine zones refresh (zonesync) while its song context is unchanged',async()=>{
+  const p=await fixture();try{
+    await enter(p);await p.evaluate(()=>{S.auth.role='admin';S._nowZoneKey=Z.current().key;nowc.draw();});
+    await p.locator('.np-phone-more').click();assert.equal(await p.locator('dialog.songsheet').count(),1);
+    await p.evaluate(()=>{Z.sync();Z.sync();});
+    assert.equal(await p.locator('dialog.songsheet').count(),1,'still open after zonesync');
+    await p.evaluate(()=>{localStorage.setItem('wavwiz.zone','g:2');Z.sync();});
+    assert.equal(await p.locator('dialog.songsheet').count(),0,'a real zone change still closes it');
+  }finally{await clean(p);}
 });

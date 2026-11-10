@@ -61,8 +61,13 @@ export function boot(win = globalThis) {
     const doc = win.document; if (!doc) return;
     const st = win.localStorage, fromUrl = roomFromSearch(win.location?.search || '');
     if (fromUrl && st.getItem(ROOM_KEY) !== fromUrl && isStandalone(win)) st.setItem(ROOM_KEY, fromUrl);   // the Home Screen app becomes the same device as the Safari tab
-    if (fromUrl) { const u = new URL(win.location.href); u.searchParams.delete('wr'); win.history?.replaceState?.(null, '', u.pathname + (u.search || '') + u.hash); }
+    const ios = isIosSafari(win.navigator?.userAgent, win.navigator?.maxTouchPoints);
+    if (ios && !isStandalone(win) && !st.getItem(ROOM_KEY) && win.crypto?.getRandomValues) st.setItem(ROOM_KEY, 'web-' + [...win.crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join(''));   // same form as room.js roomId()
     const id = st.getItem(ROOM_KEY); const link = doc.querySelector('link[rel=manifest]');
+    // 0.6.8-#11e: iOS Safari can build the Home Screen icon from the page address instead of the (swapped) manifest, so the Safari tab keeps
+    // ?wr=<this device> in its address; the Home Screen app adopts it above and then drops it from its own address.
+    const keepWr = !isStandalone(win) && ios && id && /^[A-Za-z0-9._-]{6,80}$/.test(id);
+    if (keepWr ? fromUrl !== id : fromUrl) { const u = new URL(win.location.href); if (keepWr) u.searchParams.set('wr', id); else u.searchParams.delete('wr'); win.history?.replaceState?.(null, '', u.pathname + (u.search || '') + u.hash); }
     if (link && id && /^[A-Za-z0-9._-]{6,80}$/.test(id) && !isStandalone(win)) link.setAttribute('href', '/api/v1/phone/manifest?wr=' + encodeURIComponent(id));
     // F237: keep apple-touch-icon at 180 + cache-bust so iOS does not fall back to a “W” monogram
     const ICON = '/assets/logo-180.png?v=f237';
@@ -73,6 +78,17 @@ export function boot(win = globalThis) {
       ic.setAttribute('sizes', '180x180');
       if (!String(ic.getAttribute('href') || '').includes('logo-180.png?v=f237')) ic.setAttribute('href', ICON);
     }
+    inlineTouchIcon(win, doc, ICON);
   } catch { /* never block the app */ }
+}
+/** F272: iOS fetches the Home Screen icon outside the page. Over https with a WavWiz certificate the phone accepted only for the page (or a CA
+ *  without full trust), that fetch fails and iOS draws a letter "W" tile. The page itself CAN read the icon, so hand iOS the bytes as a data: URL. */
+export function inlineTouchIcon(win, doc, url) {
+  if (!win?.fetch || !win.FileReader || !/iPhone|iPad|iPod|Macintosh/.test(win.navigator?.userAgent || '')) return Promise.resolve(false);
+  return win.fetch(url, { cache: 'force-cache' }).then(r => (r.ok ? r.blob() : null)).then(b => b && /^image\/png/.test(b.type || '') ? new Promise(res => {
+    const fr = new win.FileReader(); fr.onload = () => res(String(fr.result || '')); fr.onerror = () => res(''); fr.readAsDataURL(b); }) : '')
+    .then(data => { if (!data.startsWith('data:image/png')) return false;
+      for (const rel of ['apple-touch-icon', 'apple-touch-icon-precomposed']) doc.querySelectorAll(`link[rel="${rel}"]`).forEach(l => { if (/logo-180|\/apple-touch-icon/.test(l.getAttribute('href') || '') || l.dataset.inline) { l.dataset.inline = '1'; l.setAttribute('href', data); } });
+      return true; }).catch(() => false);
 }
 if (typeof document !== 'undefined') boot();

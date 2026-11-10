@@ -59,11 +59,13 @@ public static class DiagnosticsApi
         // --- ports (TCP self-connect, UDP bound) ---
         if (bindOk)
         {
+            // 0.6.8-#7: a wildcard bind (0.0.0.0 / ::) is probed on a real address of the server PC, not 0.0.0.0 (Windows refuses that) or a vague "this PC"
+            var probe = ProbeAddress(bind!); var where = $"{ServerLabel(s)} ({probe})";
             foreach (var (id, name, port) in new[] { ("http", "Web page (HTTP)", s.Cfg.HttpPort), ("https", "Secure web page (HTTPS)", s.Cfg.HttpsPort), ("audio", "Audio port", s.Audio.Port) })
             {
                 if (port == 0) continue;
-                var ok = await TcpOpen(bind!, port == 0 ? 0 : port);
-                checks.Add(new($"port-{id}", name, ok ? "ok" : "fail", ok ? $"TCP {port} accepts connections on this PC." : $"TCP {port} did not answer on this PC.", ok ? null : "Another program may be using the port. Restart the WavWiz service; if it persists, change the port in server.json."));
+                var ok = await TcpOpen(probe, port);
+                checks.Add(new($"port-{id}", name, ok ? "ok" : "fail", ok ? $"TCP {port} accepts connections on the server, {where}." : $"TCP {port} did not answer on the server, {where}.", ok ? null : "Another program may be using the port. Restart the WavWiz service; if it persists, change the port in server.json."));
             }
             checks.Add(new("port-clock", "Clock port", s.Clock.Port > 0 ? "ok" : "fail", s.Clock.Port > 0 ? $"UDP {s.Clock.Port} is open for time sync." : "The clock port could not be opened.", s.Clock.Port > 0 ? null : "Restart the WavWiz service. Without the clock, speakers cannot stay in sync."));
         }
@@ -156,7 +158,27 @@ public static class DiagnosticsApi
         {
             generatedAt = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss zzz"), version = WavWizInfo.Version, channel = WavWizInfo.Channel, os = System.Runtime.InteropServices.RuntimeInformation.OSDescription, checks, devices,
             worst = checks.Any(c => c.Status == "fail") ? "fail" : checks.Any(c => c.Status == "warn") ? "warn" : "ok",
+            // 0.6.8-#7: the browser/player runs its own checks against THIS server (the one it is connected to), so it needs the ports + name
+            server = new { name = ServerLabel(s), httpPort = s.Cfg.HttpPort, httpsPort = s.Ca.Enabled ? s.Cfg.HttpsPort : 0 },
         };
+    }
+
+    internal static string ServerLabel(Services s) => s.ServerName is { Length: > 0 } n ? n : Environment.MachineName;
+    /// <summary>0.6.8-#7: the address a self-check connects to: the bind address, or for a wildcard bind the PC's first private LAN IPv4 (loopback if none).</summary>
+    internal static IPAddress ProbeAddress(IPAddress bind)
+    {
+        if (!bind.Equals(IPAddress.Any) && !bind.Equals(IPAddress.IPv6Any)) return bind;
+        try
+        {
+            foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up || ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) continue;
+                foreach (var u in ni.GetIPProperties().UnicastAddresses)
+                    if (u.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address) && AuthService.IsPrivateSource(u.Address, null)) return u.Address;
+            }
+        }
+        catch { }
+        return IPAddress.Loopback;
     }
 
     private static async Task<bool> TcpOpen(IPAddress ip, int port)

@@ -28,7 +28,7 @@ assert.match(src, /seedTab === 'playlists'/, 'migrates playlists tab → source'
 assert.ok(!/rk\.slice|RS_ROW2|\.\.\.rk/.test(src.match(/export function libTabs[\s\S]*?\n}/)[0]), 'libTabs no longer spreads rs ids');
 const rad = readFileSync(dir.replace(/\/?$/, '/') + 'radiotab.js', 'utf8');
 assert.match(rad, /tilegrid tg-radio|class: grid \? 'tilegrid/, 'Radio stations tiles/list');
-assert.match(rad, /stationTile|tileart/, 'Radio station tiles');
+assert.match(rad, /savedStationTile|radiostation/, 'Radio station tiles');
 const docs = readFileSync(new URL('../../docs/REMOTE-LIBRARIES.md', import.meta.url), 'utf8');
 assert.match(docs, /Local \| Remote \| Radio \| Playlists/);
 assert.match(docs, /server chip/);

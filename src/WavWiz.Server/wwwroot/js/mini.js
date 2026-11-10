@@ -132,7 +132,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const scRun = run || (id => toMain({ run: id })), scHome = home || (() => toMain({ home: true }));
   // 0.5.0 F130 (Amendment 3): the condensed (embedded) player uses the same ONE Shortcuts toggle -> vertical pin strip + Home as Now Playing; the standalone window keeps its row
   // 0.5.0 F138: the standalone window uses the same toggle + leftward horizontal strip, in its own NOW PLAYING title bar
-  const sc = (() => { const sd = shortcutsSide({ run: scRun, home: scHome, cls: 'mp-scside', onChange: o => root?.classList.toggle('scopen', o) });
+  const sc = (() => { const sd = shortcutsSide({ run: scRun, home: scHome, cls: 'mp-scside', horizontal: true, onChange: o => root?.classList.toggle('scopen', o) });
     return { el: h('div', { class: 'mp-sc mp-sctog' }, sd.toggle, sd.strip), destroy: sd.destroy }; })();
   // 0.3.8 L44: the same shortcuts inside the standalone window (Alt+M closes it, Alt+H opens the main window on Home)
   if (!embedded) installHotkeys(id => {
@@ -171,7 +171,8 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
     root.classList.add('mp-flat'); root.append(hd, body, volRow);
   } else { const hd = h('div', { class: 'mp-hd mp-sthd' }, h('span', { class: 'mp-hdt' }, 'Now playing'), opBtn, sc.el);   // F140: the Volume / Transparency selector sits in the title bar, left of the Shortcuts pin   // F138: title bar; pin / full / close stay top-right over it
     ctl.firstChild.replaceChildren(shufB, prev, play, next, repB, mute); ctl.classList.add('mp-ctlr');   // F139: full transport, docked right
-    root.classList.add('mp-sttitle'); volRow.classList.add('mp-volx'); root.append(hd, artBox.el, txt, volRow, ctl, h('div', { class: 'mp-side' }, pin, full, close)); }   // F140: one slider (volume, or transparency while selected) left of the transport
+    const dock = h('div', { class: 'mp-dock' }, volRow, ctl);   // volume immediately left of right-docked transport, one row, pins open or closed
+    root.classList.add('mp-sttitle'); volRow.classList.add('mp-volx'); root.append(hd, artBox.el, txt, dock, h('div', { class: 'mp-side' }, pin, full, close)); }
   const rail = h('div', { class: 'minirail', title: 'Now playing' }, railArt, railBar);
   applyOpacity();
   if (!embedded) host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'opacity' && Number.isFinite(+m.value)) setOpac(Math.round(+m.value * 100)); if (m.cmd === 'pin') { pinned = !!m.on; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } paintPin(); } });

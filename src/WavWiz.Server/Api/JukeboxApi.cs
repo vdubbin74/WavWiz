@@ -28,6 +28,8 @@ public static class JukeboxApi
         g.MapGet("/jukebox/board", () => Results.Json(jb.Board(true))).Req(Role.View);
         // join QR for the big screen: the guest page with this session's code
         g.MapGet("/jukebox/qr.svg", (HttpContext c) => { c.Response.Headers.CacheControl = "no-store"; return jb.Running ? Results.Content(SystemApi.QrSvg(JoinUrl(c)), "image/svg+xml") : Results.NotFound(); }).Req(Role.View);
+        // 0.6.8-#6d: the view-only TV page (guest code, no sign-in) shows the same join QR
+        g.MapGet("/jukebox/guest/qr.svg", (HttpContext c) => { c.Response.Headers.CacheControl = "no-store"; return jb.Guest(c) ? Results.Content(SystemApi.QrSvg(JoinUrl(c)), "image/svg+xml") : Results.NotFound(); }).Anon();
         g.MapGet("/jukebox/join", (HttpContext c) => jb.Running ? Results.Json(new { url = JoinUrl(c) }) : Results.NotFound()).Req(Role.View);
         string JoinUrl(HttpContext c) => $"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/jukebox.html?j={jb.Code}";
 

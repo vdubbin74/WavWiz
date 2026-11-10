@@ -37,7 +37,7 @@ export async function api(path, opts = {}) {
   let r;
   try { r = await fetch('/api/v1' + path, init); } catch (e) { throw new ApiError('Cannot reach the WavWiz server. Check that it is running and you are on the home network.', 0); }
   let data = null; const text = await r.text(); try { data = text ? JSON.parse(text) : null; } catch { /* not json */ }
-  if (!r.ok) throw new ApiError((data && data.error) || `Unexpected answer from the server (${r.status}).`, r.status);
+  if (!r.ok) throw Object.assign(new ApiError((data && data.error) || `Unexpected answer from the server (${r.status}).`, r.status), { data });   // 0.6.8-#14: callers can read the error body (AirPlay error class)
   if (data && data.queueUndo && typeof window !== 'undefined' && !opts.noUndo) window.dispatchEvent(new CustomEvent('wavwiz:queueundo', { detail: { path, token: data.queueUndo } }));   // queue undo toast (queuetools.js)
   return data;
 }

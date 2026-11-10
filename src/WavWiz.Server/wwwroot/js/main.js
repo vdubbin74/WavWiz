@@ -13,19 +13,20 @@ import { h, api, toast, fmtDur, dialog, ApiError } from './util.js';
 import { clearQueueFlow } from './queueclear.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { openSettings } from './settings.js';
-import { isPhone } from './viz.js';
+import { isRealPhone } from './viz.js';
 import { openCalibration } from './calibrate.js';
 import { openEq } from './eq.js';
 import { createNow } from './now.js';
 import { openPhoneSound } from './phonesound.js';   // F250-P7: composed phone Sound modal
 import { openSpeakerSettings, editZone, devicesView, devicesPanel, expandLabel, expandIcon, paintExpandBtn, masterLevel, allMuted } from './devices.js';
-import { listTable, srcPill } from './listtable.js';
+import { listTable, srcPill, queueNextIndex } from './listtable.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { attachReorder, canDragRows } from './qreorder.js';
-import { loadLayout, saveLayout, setLocked } from './plcols.js';
+import { loadLayout, saveLayout, setLocked, CLEAR_LOCK_HINT } from './plcols.js';
 import { installMiniTargets, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, holdFor, holdPage, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
+import { installTitlebar, titlebarLogo } from './titlebar.js';   // 0.6.8-#16
 import { loadNpPrefs, npVars, applyNpColor, applyNpClasses } from './npstyle.js';
 import { createMenuBar, createPhoneDrawerNav } from './menu.js';
 import { setRipAllowed, ripAllowed } from './library.js';
@@ -42,11 +43,12 @@ import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
 import { canControl, thisDevice, isAdmin } from './ui.js';
-import { isPlayerUa } from './phonejoin.js';
+import { isPlayerUa, isHandset } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
 import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
+import { jbTvChip } from './jbtv.js';
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
@@ -98,7 +100,7 @@ async function boot() {
 
 function topbar(extra, lead) {
   return h('header', { class: 'topbar' }, lead || null,
-    brandMark(), h('span', { class: 'beta', title: 'This is a BETA version', 'data-wwv': 'BETA {v}' }, VERSION_LABEL()),
+    titlebarLogo(() => brandMark()), h('span', { class: 'beta', title: 'This is a BETA version', 'data-wwv': 'BETA {v}' }, VERSION_LABEL()),
     h('span', { class: 'grow' }), extra);
 }
 
@@ -262,7 +264,9 @@ async function startMain() {
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => showEq() }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
-  const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px' }, connDot, connTxt), inline], hamburger);
+  const jbtv = jbTvChip(S);   // 0.6.8-#6d
+  const bar = topbar([menubar, jbtv.el, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px', title: 'Connecting…' }, connDot, connTxt), inline], hamburger);
+  installTitlebar(bar);   // 0.6.8-#16: Windows app only - the top bar becomes the themed window title bar
   // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
   window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });
 
@@ -315,10 +319,18 @@ async function startMain() {
   const togglePinFor = id => { const lab = pinInfo(id).label, r = pinToggle(id); toast(r.full ? `All ${MAX_PINS} shortcut slots are taken - unpin one first.` : r.pins.includes(id) ? `Pinned: ${lab}` : `Unpinned: ${lab}`, r.full); };
   const paintTitlePins = () => { const pins = loadPins(); document.querySelectorAll('.tpin').forEach(b => { const on = pins.includes(b.dataset.pin), lab = pinInfo(b.dataset.pin).label; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.title = on ? `Unpin ${lab} from shortcuts` : `Pin ${lab} to shortcuts`; b.setAttribute('aria-label', b.title); }); };
   const addTitlePins = () => {
+    if (isHandset()) return;   // 0.6.8-#11d: no pins on actual phones (a narrow PC window keeps them)
     for (const sel of ['.libpanel > .pane-h', '.devpanel > .pane-h', '.listpanel > .pane-h']) {
       const hd = document.querySelector(sel); if (!hd || hd.querySelector('.tpin')) continue;
       const id = titleId(hd), b = h('button', { type: 'button', class: 'plus tpin', 'data-pin': id, onclick: ev => { ev.stopPropagation(); togglePinFor(id); } }, icon('pin'));
-      hd.insertBefore(b, hd.querySelector(':scope > .plus, :scope > .row .plus, :scope > .row, :scope > .grow + *')); paintTitlePins();
+      const place = () => {
+        if (hd.closest('.libpanel')) { const exp = hd.querySelector(':scope > .libexp'); if (exp) { hd.insertBefore(b, exp); return; } }
+        if (hd.closest('.devpanel')) { const col = hd.querySelector(':scope > .devcol'); if (col) { hd.insertBefore(b, col); return; } }
+        if (hd.closest('.listpanel')) { const wrap = hd.querySelector(':scope > .listcolwrap, :scope > .row.listcolwrap'); if (wrap) { hd.insertBefore(b, wrap); return; } }
+        const grow = hd.querySelector(':scope > .grow'); if (grow) { grow.after(b); return; }
+        hd.append(b);
+      };
+      place(); paintTitlePins();
     }
   };
   addTitlePins(); window.addEventListener('wavwiz:pins', paintTitlePins);
@@ -389,6 +401,8 @@ function devOpen(v) { holdPage();
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && desk?.classList.contains('roomyopen') && !document.querySelector('dialog[open], .zmenu40, .ctxmenu') && !document.body.classList.contains('pdragging')) { ev.preventDefault(); toggleDev(true); return; }
   if (ev.key === 'Escape' && desk?.classList.contains('devopen') && !document.querySelector('dialog[open], .zmenu40, .ctxmenu') && !document.body.classList.contains('pdragging')) { ev.preventDefault(); devOpen(false); } });
 window.addEventListener('wavwiz:zonesync', paintDevTab);
+// 0.6.8-#6b: settings that change what Devices lists (e.g. Show Jukebox zone in Devices) re-read zones + S.jb at once
+window.addEventListener('wavwiz:zones-changed', () => { refreshZones(); });
 // 0.4.5 T1b: recompute on Appearance > Layout and on a DPR change (window moved to another monitor / Windows scaling changed); resize + Display size already call applyPanels
 window.addEventListener('wavwiz:layout', () => applyPanels());
 (function watchDpr() { try { const mq = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`); mq.addEventListener('change', () => { applyPanels(); watchDpr(); }, { once: true }); } catch { /* old browser */ } })();
@@ -445,11 +459,11 @@ function wireNextBlock() {
     const hd = listt.head.getBoundingClientRect(); let col = nowc.ctlPanel.getBoundingClientRect();
     if (!col.width) col = hd;   // F137b: Now Playing column hidden (mini NP under the narrow Queue) - center on the Queue header, still gap-checked
     if (!hd.width) { nb.hidden = true; return; }
-    // 0.4.8 F50: centered on the Now Playing column when it fits, otherwise slid into the free gap between the title and the right-hand
-    // controls (zone picker included) - never over either of them
+    // 0.4.8 F50 / 0.6.8: the free gap is between the title (and sort chip) and the track count / tools - never over either of them.
+    // Wide (any desktop Queue that is not beside the expanded Library): Up next starts after the title and fills the gap; the count stays on the right.
     const L = listt.leftEdge() + 16, Rr = listt.rightEdge() - 16, gap = Rr - L, c = col.left + col.width / 2;
     nb.classList.toggle('tight', gap < 300); const zf = pageZoom(); nb.style.maxWidth = Math.max(0, Math.round(gap / zf)) + 'px';   // rects are zoomed, styles are not (Display size)
-    const w = Math.min((nb.scrollWidth * pageZoom()) || gap, gap), x = wide ? L + w / 2 : Math.min(Math.max(c, L + w / 2), Rr - w / 2);   // wide Queue: starts right after the title
+    const w = Math.min((nb.scrollWidth * pageZoom()) || gap, gap), x = !desk.classList.contains('libexpanded') ? L + w / 2 : Math.min(Math.max(c, L + w / 2), Rr - w / 2);   // wide Queue: starts right after the title
     nb.style.left = Math.round((x - hd.left) / zf) + 'px'; nb.hidden = gap < (wide ? 160 : 110) * zf; listt.el.classList.toggle('nbshown', !nb.hidden);   // too tight: hidden, the row pill shows instead
   };
   const later = () => { if (!raf) raf = requestAnimationFrame(place); };
@@ -588,7 +602,7 @@ export function go(k, force) {
   if (k === 'diag' || k === 'remote' || k === 'about') return openSettings(S, refreshAll, go, k);
   if (k === 'sleep') return nowc.openSleep?.();       // 0.3.5 J8: Now Playing > Sleep
   // 0.2.1 F8: Theme and Visualizer live on Settings > Appearance (one home)
-  if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, (k === 'themes' || isPhone()) ? 'theme' : 'viz');   // F125: phone has no Visualizer sub
+  if (k === 'themes' || k === 'visualizer') return openSettings(S, refreshAll, go, (k === 'themes' || isRealPhone()) ? 'theme' : 'viz');   // F125: phone has no Visualizer sub (0.6.8-#5: a real phone, not a narrow PC window)
   if (k === 'finder') k = 'radio';
   if (wide()) {                               // desktop layout: Now Playing, Library, Devices & Playlist are always on screen
     if (k === 'now') return;
@@ -672,7 +686,7 @@ let wsTries = 0;
 /** 0.0.7: ticket-authenticated, self-healing UI event socket (keepalive + watchdog + backoff; see wsconn.js). */
 function connectWs() {
   const dot = document.getElementById('conn'), txt = document.getElementById('conntxt');
-  const setConn = (ok, label) => { S.connected = ok; if (dot) dot.className = 'dot ' + (ok ? 'ok' : 'bad'); if (txt) txt.textContent = label; drawStatus(); };
+  const setConn = (ok, label) => { S.connected = ok; if (dot) { dot.className = 'dot ' + (ok ? 'ok' : 'bad'); dot.title = label; } if (txt) { txt.textContent = label; txt.title = label; } const wrap = dot?.closest?.('.conn'); if (wrap) wrap.title = label; drawStatus(); };
   let downTimer = null;
   S.live = liveSocket('/ws', {
     onOpen: () => { clearTimeout(downTimer); setConn(true, 'Connected'); if (wsTries++) refreshAll(); },
@@ -694,6 +708,7 @@ function connectWs() {
       else if (m.type === 'calphone') window.dispatchEvent(new CustomEvent('wavwiz:calphone', { detail: m.data }));   // 0.2.2 T9
       else if (m.type === 'calrun' || m.type === 'miclevel' || m.type === 'calmics') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.2.5 PC-mic run, live mic level, calibration-mic list
       else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b
+      else if (m.type === 'rip') window.dispatchEvent(new CustomEvent('wavwiz:rip', { detail: m.data }));   // 0.6.8 CD ripper: disc insert/eject + live job progress
     },
   });
 }
@@ -844,7 +859,6 @@ function drawQueue() {
     return rowEl;
   });
   const phoneKeep = () => (pKeep ??= keepControl({ can: () => canControl(S) }));
-  const lockBtn = h('button', { class: 'btn' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)', onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, locked ? 'Locked' : 'Lock');
   const item = S.now?.item, state = S.now?.state, hasNow = !!item && state !== 'stopped';
   // Projection only: shared Now state/actions, no player/clock/Media Session mount.
   // Keep the very same cover node for an unchanged item/source/zone, including
@@ -856,16 +870,27 @@ function drawQueue() {
     h('h2', {}, hasNow ? (state === 'playing' ? 'Now playing' : 'Paused') : 'Nothing playing'),
     hasNow ? h('div', { class: 'qsummary-card' }, root._qSummaryArt.el, h('div', { class: 't' }, h('b', { class: 'ell' }, item.title), h('div', { class: 'small dim ell' }, item.artist || ''), h('span', { class: 'small dim' }, 'On ' + (zone?.name || 'selected zone'))),
       h('button', { type: 'button', class: 'iconbtn qsummary-play', disabled: !can, 'aria-label': state === 'playing' ? 'Pause' : 'Resume', onclick: () => canControl(S) && zoneKey() === renderedZone && act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/resume') }, icon(state === 'playing' ? 'pause' : 'play'))) : h('p', { class: 'small dim' }, 'Choose a song from the queue or Library.'));
-  // F256: phone Queue head — title+zone / meta / Keep / 2×2 square actions (no Save pill)
-  const saveBtn = can && S.queue.length ? h('button', { class: 'btn qsave-open', onclick: saveQueue }, 'Save as playlist') : null;
-  const recentBtn = h('button', { class: 'btn', 'data-act': 'recentqueues', onclick: () => openRecentQueues({ can: canControl(S) }) }, 'Recent queues…');
-  const clearBtn = can && S.queue.length ? h('button', { class: 'btn', disabled: busy, onclick: () => !qEdit.pending() && clearQueueFlow(S, { act, refreshAll }) }, 'Clear') : null;
+  // 0.6.8: compact Queue head — same icon row as the desktop header (∞ / recent / save / clear / lock) beside the track count; Up next on one ellipsis line.
+  const nTracks = S.queue.length;
+  const trackLabel = `${nTracks} track${nTracks === 1 ? '' : 's'}${total ? ' • ' + fmtDur(total) : ''}`;
+  const lockTip = locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)';
+  const lockBtn = h('button', { type: 'button', class: 'plus pllock' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: lockTip, 'aria-label': lockTip, onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, icon(locked ? 'lock' : 'unlock'));
+  const recentBtn = h('button', { type: 'button', class: 'plus', 'data-act': 'recentqueues', 'aria-label': 'Recent queues', title: 'Recent queues…', onclick: () => openRecentQueues({ can: canControl(S) }) }, icon('history'));
+  const saveBtn = can && nTracks ? h('button', { type: 'button', class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: saveQueue }, icon('save')) : null;
+  const clearBtn = can && nTracks ? h('button', { type: 'button', class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: locked || busy || undefined, onclick: () => { if (!locked && !qEdit.pending()) clearQueueFlow(S, { act, refreshAll }); } }, icon('trash')) : null;
+  const tools = h('span', { class: 'row plbtns pq-tools', 'aria-label': 'Queue tools' }, phoneKeep(), recentBtn, saveBtn, clearBtn, can && nTracks ? lockBtn : null);
+  const nextIdx = queueNextIndex(S.now, S.queue), nxt = nextIdx >= 0 ? S.queue[nextIdx] : null;
+  const upNext = h('div', { class: 'plnext pq-upnext' + (nxt ? '' : ' none'), 'aria-label': 'Up next', title: nxt ? ['Up next', nxt.title, nxt.artist].filter(Boolean).join(' · ') : 'Nothing queued after this' },
+    h('span', { class: 'pln-lbl' }, 'UP NEXT'),
+    h('span', { class: 'pln-t1 ell' }, nxt ? (nxt.title || 'Untitled') : 'Nothing queued after this'),
+    nxt?.artist ? h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·') : null,
+    nxt?.artist ? h('span', { class: 'pln-t2 ell' }, nxt.artist) : null);
+  root.classList.toggle('pq-handset', !!isRealPhone());
   root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line' }, h('h1', {}, 'Queue'), phonePick() || h('span', { class: 'qzone small dim' }, zone?.name || 'No zone selected')),
-    h('div', { class: 'qcount-line' }, h('span', { class: 'dim small' }, `${S.queue.length} tracks${total ? ' • ' + fmtDur(total) : ''}`)),
-    h('div', { class: 'qkeep-line', 'aria-label': 'Keep playing' }, phoneKeep()),
-    h('div', { class: 'qactions', 'aria-label': 'Queue tools' }, saveBtn, recentBtn, clearBtn, can && S.queue.length ? lockBtn : null)),
+    h('div', { class: 'qcount-line' }, h('span', { class: 'dim small qcount' }, trackLabel), tools),
+    upNext),
     summary, h('h2', { class: 'qrows-heading' }, 'Queue', h('span', { class: 'small dim' }, ' · all tracks')),
-    S.queue.length ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
+    nTracks ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
   const list = root.querySelector('.qlist');
   qResume = () => {
     // F252-amend2: complete signature (metadata/sourceLabel/choices/artCv) — not only occurrences.

@@ -1,7 +1,7 @@
 ; WavWiz (BETA) installer. Compile:  ISCC /DAppVersion=0.0.4 /DDistDir=<dist> /DRepoDir=<repo> /DOutDir=<out> installer\WavWiz.iss   (build\make-installer.ps1 does this; works under Wine)
 ; FULL self-contained installer only: the target PCs have no .NET. There is no slim / framework-dependent variant.
 #ifndef AppVersion
-  #define AppVersion "0.6.7"
+  #define AppVersion "0.6.8"
 #endif
 #ifndef RepoDir
   #define RepoDir ".."
@@ -127,6 +127,7 @@ var
   { F257/F268: listening choice (LanOnlyRadio = home network only, AllIfRadio = home network + Tailscale/VPN, SpecRadio = advanced
     specific address in LanEdit) is separate from the connection URL (ConnUrlLabel, read-only) }
   AllIfRadio, LanOnlyRadio, SpecRadio: TNewRadioButton;
+  AirPlayOutCheck: TNewCheckBox; { 0.6.8-#14g: opt-in firewall rules for sending to AirPlay speakers }
   ConnUrlLabel: TNewStaticText;
   DetectedLanIp: String;
   ExistingBindSeeded: String; { bind already in server.json when DetectLan seeded the box; empty = fresh install }
@@ -454,7 +455,11 @@ begin
   LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(ScaleX(18), ScaleY(130), ScaleX(200), ScaleY(23)); LanEdit.OnChange := @LanEditChange;
   ConnUrlLabel := TNewStaticText.Create(NetPage); ConnUrlLabel.Parent := NetPage.Surface; ConnUrlLabel.WordWrap := True; ConnUrlLabel.AutoSize := False; ConnUrlLabel.SetBounds(0, ScaleY(162), NetPage.SurfaceWidth, ScaleY(28)); ConnUrlLabel.Caption := '';
   { F122: Private-network tip (static) + amber warning when a Public profile is found }
-  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(194), NetPage.SurfaceWidth, NetPage.SurfaceHeight - ScaleY(194)); { F257-A R1: fills the rest of the page at any DPI }
+  { 0.6.8-#14g: opt-in, remembered on reinstall (previous-data), /AIRPLAYOUT=1|0 for silent installs }
+  AirPlayOutCheck := TNewCheckBox.Create(NetPage); AirPlayOutCheck.Parent := NetPage.Surface; AirPlayOutCheck.SetBounds(0, ScaleY(192), NetPage.SurfaceWidth, ScaleY(17));
+  AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall (UDP 319-320 + audio; home network only)';
+  AirPlayOutCheck.Checked := Trim(ExpandConstant('{param:AIRPLAYOUT|' + GetPreviousData('AirPlayOut', '0') + '}')) = '1';
+  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(214), NetPage.SurfaceWidth, NetPage.SurfaceHeight - ScaleY(214)); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
   HostPage := CreateCustomPage(NetPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
   L := TNewStaticText.Create(HostPage); L.Parent := HostPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, HostPage.SurfaceWidth, ScaleY(70));
@@ -537,11 +542,18 @@ begin
   end;
 end;
 
+{ 0.6.8-#14g: remember the AirPlay speakers firewall choice for the next install }
+procedure RegisterPreviousData(PreviousDataKey: Integer);
+begin
+  if AirPlayOutCheck.Checked then SetPreviousData(PreviousDataKey, 'AirPlayOut', '1') else SetPreviousData(PreviousDataKey, 'AirPlayOut', '0');
+end;
+
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   Result := 'WavWiz (BETA) {#AppVersion}' + NewLine + NewLine + MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine;
   if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
   else if WantServer then Result := Result + 'Network access: ' + IfThenStr(LanOnlyRadio.Checked, 'Home network only (' + ChosenLanAddress + ')', IfThenStr(ChosenLanAddress = '', '127.0.0.1 (this PC only)', ChosenLanAddress)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
+  if WantServer and AirPlayOutCheck.Checked then Result := Result + 'Firewall: AirPlay speakers allowed (UDP 319-320 + audio, home network only)' + NewLine + NewLine;   { 0.6.8-#14g }
   if WantPlayer and (not WantServer) then Result := Result + 'Player will connect to: ' + IfThenStr(Trim(HostEdit.Text) = '', '(ask on first start)', Trim(HostEdit.Text)) + NewLine + NewLine;
   Result := Result + MemoTasksInfo;
 end;
@@ -710,6 +722,7 @@ begin
       Params := Params + ' -LanIp 127.0.0.1'
     else if (ExistingBindSeeded = '') or (CompareText(ChosenLanAddress, ExistingBindSeeded) <> 0) then
       Params := Params + ' -LanIp ' + ChosenLanAddress;
+    if AirPlayOutCheck.Checked then Params := Params + ' -AirPlayOut 1';   { 0.6.8-#14g }
   end
   else if Trim(HostEdit.Text) <> '' then Params := Params + ' -ServerHost ' + Trim(HostEdit.Text);
   if WizardSilent then Params := Params + ' -NoDialog 1';

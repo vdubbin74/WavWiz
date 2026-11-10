@@ -1,5 +1,5 @@
 import { h, api, toast, dialog, fmtTime, fmtDur, ask } from './util.js';
-import { cover, trackArt, isLive } from './art.js';
+import { cover, coverGlyph, trackArt, isLive } from './art.js';
 import { smartSection } from './smartpl.js';
 import { canControl, dropTarget, sheet, playNow, addToQueue, MIME, isRemoteRef, REMOTE_PL_MSG } from './ui.js';
 
@@ -18,7 +18,7 @@ export function playlistsView(S, opts = {}) {
       canControl(S) ? h('div', { class: 'card' }, h('div', { class: 'row wrap' }, h('div', { class: 'grow plname' }, nm), h('button', { class: 'btn primary', onclick: () => create(false) }, 'Create empty'), h('button', { class: 'btn', onclick: () => create(true) }, 'Save the queue'))) : null,
       lists.length ? h('ul', { class: 'list' }, lists.map(p => {
         const card = h('li', { class: 'item', style: 'cursor:default' },
-          h('span', { class: 'cover sm' }, '♫'),
+          h('span', { class: 'cover sm' }, coverGlyph('note')),
           h('div', { class: 't', style: 'cursor:pointer', onclick: () => drawOne(p.id) }, h('div', { class: 't1 ell' }, p.name), h('div', { class: 't2' }, `${p.count} item${p.count === 1 ? '' : 's'}`)),
           canControl(S) ? [h('button', { class: 'btn primary', onclick: () => act(() => api('/stream/play', { method: 'POST', body: { kind: 'playlist', id: p.id } })) }, '▶'), h('button', { class: 'btn', onclick: () => act(() => api('/queue/add', { method: 'POST', body: { kind: 'playlist', id: p.id } }), 'Added to the queue') }, '＋')] : null,
           h('button', { class: 'btn', 'aria-label': 'Open ' + p.name, onclick: () => drawOne(p.id) }, 'Open'));

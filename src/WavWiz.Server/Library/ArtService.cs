@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Net;
 using System.Net.Http;
 namespace WavWiz.Server.Library;
 
@@ -224,12 +225,21 @@ public sealed class ArtService
         finally { _gate.Release(); }
     }
 
-    /// <summary>Fetch a remote image (e.g. Radio Browser favicon), resize to JPEG, cache under artcache/remote-*.</summary>
+    /// <summary>Test hook: when this returns true the host is treated as fetchable (still http(s) only). Redirect hops are still checked with <see cref="RemoteUrlGuard"/> unless they also pass this hook.</summary>
+    public Func<Uri, bool>? AllowRemoteHost { get; set; }
+
+    const int RemoteMaxBytes = 8_000_000;
+    const int RemoteMaxHops = 5;
+
+    bool RemoteAllowed(Uri u) => AllowRemoteHost?.Invoke(u) == true || RemoteUrlGuard.IsSafeRemoteUrl(u.AbsoluteUri);
+
+    /// <summary>Fetch a remote image (e.g. Radio Browser favicon), resize to JPEG, cache under artcache/remote-*.
+    /// SSRF: only http(s); loopback/private/link-local/CGNAT hosts are refused; redirects are followed manually and re-checked each hop. 8 MB cap, 8 s timeout.</summary>
     public async Task<byte[]?> GetRemoteAsync(string? url, int size, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme is not ("http" or "https")) return null;
+        if (!Uri.TryCreate((url ?? "").Trim(), UriKind.Absolute, out var start) || start.Scheme is not ("http" or "https") || !RemoteAllowed(start)) return null;
         size = SnapSize(size);
-        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(u.AbsoluteUri))).ToLowerInvariant();
+        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(start.AbsoluteUri))).ToLowerInvariant();
         var file = Path.Combine(_cache, $"remote-v{CacheVersion}-{hash}-{size}.jpg");
         if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
         if (_none.ContainsKey("r:" + hash)) return null;
@@ -237,18 +247,50 @@ public sealed class ArtService
         try
         {
             if (File.Exists(file)) return await File.ReadAllBytesAsync(file, ct);
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(8) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd("WavWiz/" + WavWiz.Core.WavWizInfo.Version);
-            byte[] raw;
-            try { raw = await http.GetByteArrayAsync(u, ct); }
+            byte[]? raw;
+            try { raw = await FetchRemoteBytes(http, start, ct); }
             catch { _none["r:" + hash] = true; return null; }
-            if (raw.Length < 32 || raw.Length > 8_000_000) { _none["r:" + hash] = true; return null; }
+            if (raw == null || raw.Length < 32 || raw.Length > RemoteMaxBytes) { _none["r:" + hash] = true; return null; }
             var jpg = await ResizeAsync(raw, size, ct);
             if (jpg == null) { _none["r:" + hash] = true; return null; }
             var tmp = file + "." + Environment.CurrentManagedThreadId + ".tmp"; await File.WriteAllBytesAsync(tmp, jpg, ct); File.Move(tmp, file, true);
             return jpg;
         }
         finally { _gate.Release(); }
+    }
+
+    async Task<byte[]?> FetchRemoteBytes(HttpClient http, Uri start, CancellationToken ct)
+    {
+        var current = start;
+        for (int hop = 0; hop <= RemoteMaxHops; hop++)
+        {
+            if (!RemoteAllowed(current)) return null;
+            using var req = new HttpRequestMessage(HttpMethod.Get, current);
+            using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            if ((int)resp.StatusCode is >= 300 and < 400)
+            {
+                var loc = resp.Headers.Location; if (loc == null) return null;
+                current = loc.IsAbsoluteUri ? loc : new Uri(current, loc);
+                continue;
+            }
+            if (!resp.IsSuccessStatusCode) return null;
+            if (resp.Content.Headers.ContentLength is long cl && (cl < 32 || cl > RemoteMaxBytes)) return null;
+            await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var ms = new MemoryStream();
+            var buf = new byte[8192];
+            int n; long total = 0;
+            while ((n = await stream.ReadAsync(buf, ct)) > 0)
+            {
+                total += n;
+                if (total > RemoteMaxBytes) return null;
+                ms.Write(buf, 0, n);
+            }
+            return ms.ToArray();
+        }
+        return null;
     }
 
     /// <summary>0.3.2 F10/F11: swscale flags that are correct on the shipped ffmpeg build.</summary>

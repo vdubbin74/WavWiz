@@ -1,5 +1,6 @@
 import { dndMode, pointerDragSource, pointerDropTarget } from './pdrag.js';
 import { openSongSheet } from './songsheet.js';
+import { openCtx } from './ctxmenu.js';
 import { h, api, toast, dialog, getApiZone } from './util.js';
 import { isFav, toggleFav } from './fav.js';
 
@@ -35,10 +36,11 @@ export const addToQueue = ref => act('/queue/add', ref, 'Added to the queue');
 
 /** Bottom sheet (phone) / centered menu (desktop). */
 export function sheet(title, actions) {
+  let pressed = false;   // 0.6.8-#4: only a press that started after the sheet opened closes it from the scrim (not the opening tap's trailing click)
   const close = () => { el.remove(); document.removeEventListener('keydown', esc); };
   const esc = ev => { if (ev.key === 'Escape') close(); };
   const el = h('div', { class: 'sheet', role: 'dialog', 'aria-label': title },
-    h('div', { class: 'scrim', onclick: close }),
+    h('div', { class: 'scrim', onpointerdown: () => { pressed = true; }, onclick: () => { if (pressed) close(); } }),
     h('div', { class: 'panel' }, h('h4', null, title), actions.filter(Boolean).map(a => h('button', { class: 'act' + (a.danger ? ' err' : ''), disabled: a.disabled || undefined, title: a.title || undefined, onclick: async () => { if (a.disabled) return; close(); await a.onclick(); } }, a.text))));
   document.addEventListener('keydown', esc); document.body.append(el); el.querySelector('button.act:not([disabled])')?.focus() || el.querySelector('button.act')?.focus(); return close;
 }
@@ -95,10 +97,24 @@ export function favActionForTrack(S, trackId, title = '') {
   return { text, onclick: () => toggleFav(S, 'track', trackId) };
 }
 export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '', phoneSong = null } = {}) {
-  const openMenu = () => {
-    if (!canControl(S)) return toast('Your access is view-only, so you can browse but not play.', false);
-    const fav = favActionForTrack(S, trackIdFromRef(ref), title);
-    if (phoneSong && matchMedia('(max-width:900px)').matches) {
+  // Desktop right-click used to open sheet() — a centered dialog (far from the cursor).
+  // Now: shared openCtx at the pointer; keyboard / ⋯ anchors to the focused control; phone keeps the existing bottom sheet.
+  const isPhone = () => matchMedia('(max-width:900px)').matches;
+  const favItem = () => favActionForTrack(S, trackIdFromRef(ref), title);
+  const ctxItems = () => {
+    const fav = favItem();
+    return [
+      { id: 'play', ic: 'play', label: 'Play', onclick: () => playNow(ref) },
+      { id: 'next', ic: 'queue', label: 'Play next', onclick: () => playNext(ref) },
+      { id: 'add', ic: 'plus', label: 'Add to queue', onclick: () => addToQueue(ref) },
+      { id: 'playlist', ic: 'plus', label: 'Add to playlist…', disabled: isRemoteRef(ref), hint: isRemoteRef(ref) ? REMOTE_PL_MSG : undefined, onclick: () => pickPlaylist(S, ref) },
+      ...[fav].filter(Boolean).map(a => ({ id: 'favorite', label: String(a.text || '').replace(/^[♡♥]  /, ''), disabled: a.disabled, hint: a.title, onclick: a.onclick })),
+      ...menu.filter(Boolean).map((a, i) => ({ id: 'extra:' + i, label: a.text, disabled: a.disabled, hint: a.title, danger: a.danger, onclick: a.onclick })),
+    ].map(a => ({ ...a, disabled: a.disabled || !canControl(S) }));
+  };
+  const openPhoneSheet = () => {
+    const fav = favItem();
+    if (phoneSong) {
       const zone = getApiZone(), identity = JSON.stringify(ref), view = S.view, route = S._streamRoute;
       const valid = () => el.isConnected && S.view === view && route === S._streamRoute && getApiZone() === zone && JSON.stringify(ref) === identity;
       const build = () => [
@@ -115,10 +131,23 @@ export function attachItem(S, el, ref, title, { menu = [], more = true, count = 
         else await it.onclick?.();
       } });
     }
-    sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, fav, ...menu]);
+    return sheet(title, [{ text: '▶  Play now', onclick: () => playNow(ref) }, { text: '⏭  Play next', onclick: () => playNext(ref) }, { text: '＋  Add to queue', onclick: () => addToQueue(ref) }, { text: '♫  Add to playlist…', onclick: () => pickPlaylist(S, ref) }, fav, ...menu]);
   };
-  if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(); } }, '⋯'));
-  el.addEventListener('contextmenu', ev => { ev.preventDefault(); openMenu(); });
+  const openAt = (x, y, from) => {
+    if (!canControl(S)) return toast('Your access is view-only, so you can browse but not play.', false);
+    if (isPhone()) return openPhoneSheet();
+    return openCtx(x, y, ctxItems(), { label: title, from: from || el });
+  };
+  const openMenu = ev => {
+    const pointer = ev && ev.clientX != null && (ev.type === 'contextmenu' || ev.type === 'touchstart' || ev.type === 'touchend' || ev.type === 'pointerdown');
+    if (pointer) return openAt(ev.clientX, ev.clientY, ev.currentTarget || el);
+    const t = (typeof document !== 'undefined' && document.activeElement && el.contains(document.activeElement)) ? document.activeElement : (ev?.currentTarget || el);
+    const r = t.getBoundingClientRect();
+    return openAt(r.left, ev?.type === 'click' ? r.bottom + 2 : r.top, t);
+  };
+  if (more) el.append(h('button', { class: 'more', 'aria-label': 'More actions for ' + title, onclick: ev => { ev.stopPropagation(); openMenu(ev); } }, '⋯'));
+  el.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); openMenu(ev); });
+  el.addEventListener('keydown', ev => { if ((ev.key === 'F10' && ev.shiftKey) || ev.key === 'ContextMenu') { ev.preventDefault(); openMenu(ev); } });
   longPress(el, openMenu);
   if (canControl(S)) {   // 0.4.5 F8: pointer-event drag too (touch / pen everywhere; every input in the WavWiz Player window, where HTML5 DnD did not reach the queue)
     el.classList.add('ldrag');   // 0.4.5: grab cursor on every draggable Library row / tile (songs and categories)
@@ -139,7 +168,7 @@ export function attachItem(S, el, ref, title, { menu = [], more = true, count = 
 export function longPress(el, fn, ms = 520) {
   let t = null, sx = 0, sy = 0, fired = false;
   const cancel = () => { clearTimeout(t); t = null; };
-  el.addEventListener('touchstart', ev => { fired = false; const p = ev.touches[0]; sx = p.clientX; sy = p.clientY; t = setTimeout(() => { fired = true; try { navigator.vibrate?.(15); } catch { /* optional */ } fn(); }, ms); }, { passive: true });
+  el.addEventListener('touchstart', ev => { fired = false; const p = ev.touches[0]; sx = p.clientX; sy = p.clientY; t = setTimeout(() => { fired = true; try { navigator.vibrate?.(15); } catch { /* optional */ } fn({ clientX: sx, clientY: sy, type: 'touchstart', currentTarget: el }); }, ms); }, { passive: true });
   el.addEventListener('touchmove', ev => { const p = ev.touches[0]; if (Math.abs(p.clientX - sx) > 9 || Math.abs(p.clientY - sy) > 9) cancel(); }, { passive: true });
   el.addEventListener('touchend', ev => { cancel(); if (fired) { ev.preventDefault(); } });
   el.addEventListener('touchcancel', cancel);

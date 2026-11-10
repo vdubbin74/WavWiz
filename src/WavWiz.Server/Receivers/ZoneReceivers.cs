@@ -154,6 +154,14 @@ public sealed class ZoneReceivers : IDisposable
         foreach (var p in sps) if (p.MdnsRecords(host, ip) is { } g) yield return g;
     }
 
+    /// <summary>RAOP ports this server is advertising (house + per-zone), for recognising our own receivers.</summary>
+    public IReadOnlyCollection<int> AirPlayPorts()
+    {
+        var p = new HashSet<int>();
+        if (_s.AirPlay is { Port: > 0 } h) p.Add(h.Port);
+        lock (_l) foreach (var a in _ap.Values) if (a.Port > 0) p.Add(a.Port);
+        return p;
+    }
     public AirPlayReceiver? AirPlayOf(long zoneId) { lock (_l) return _ap.GetValueOrDefault(zoneId); }
     public SpotifyReceiver? SpotifyOf(long zoneId) { lock (_l) return _sp.GetValueOrDefault(zoneId); }
     /// <summary>Artwork of a zone receiver ("airplay:3" / "spotify:3").</summary>

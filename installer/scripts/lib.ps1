@@ -263,6 +263,28 @@ function Wait-ServiceState([string]$Name, [string]$Want, [int]$TimeoutSec = 30) 
     return ((Get-ServiceState $Name) -eq $Want)
 }
 
+# Fresh installs use Local Service (least privilege). A reinstall keeps whatever account
+# is already set, the same way bindAddress is preserved. Never silently reset to LocalService
+# (or promote to LocalSystem).
+$script:DefaultServiceAccount = 'NT AUTHORITY\LocalService'
+function Get-ServiceAccount([string]$Name) {
+    $r = Invoke-Sc 'query config' @('qc', $Name) -AllowFail
+    if ($r.ExitCode -ne 0) { return $null }
+    $m = [regex]::Match([string]$r.Output, 'SERVICE_START_NAME\s*:\s*(.+)')
+    if (-not $m.Success) { return $null }
+    $acct = $m.Groups[1].Value.Trim()
+    if (-not $acct) { return $null }
+    return $acct
+}
+function Get-InstallServiceAccount([string]$Name, [bool]$Exists) {
+    if ($Exists) {
+        $acct = Get-ServiceAccount $Name
+        if ($acct) { return [pscustomobject]@{ Account = $acct; Action = 'preserved' } }
+        Write-InstallLog 'service account was not readable from sc.exe qc; defaulting to LocalService'
+    }
+    return [pscustomobject]@{ Account = $script:DefaultServiceAccount; Action = 'default' }
+}
+
 # ---- firewall (netsh advfirewall: no CIM, bounded). Rules are Private-profile, local-subnet only, scoped to the server program. Delete-then-add = idempotent.
 function Set-ServerFirewall([string]$Exe, [int[]]$TcpPorts, [int[]]$UdpPorts) {
     $net = Get-SystemTool 'netsh.exe'; $name = $script:FirewallNames[0]
@@ -311,9 +333,23 @@ function Set-ReceiverFirewall([string]$ServerExe, $Config) {
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[2]), 'protocol=TCP', "program=$librespot") + $common) -Label 'netsh add Spotify Connect rule' -TimeoutSec 30)
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[3]), 'protocol=UDP', 'localport=5353', "program=$librespot") + $common) -Label 'netsh add Spotify Connect mDNS rule' -TimeoutSec 30)
 }
+# 0.6.8-#14g: OPT-IN rules for sending to AirPlay speakers (AirPlay 2 needs PTP on the fixed UDP ports 319-320; the AirPlay 1/2 audio,
+# control and timing ports are ephemeral). Same style: Private profile, local subnet only, scoped to the server program. Delete-then-add
+# = idempotent; not chosen -> the rules are removed. The two older hand-made rules from Settings > AirPlay speakers are replaced.
+$script:AirPlayOutFirewallNames = @('WavWiz AirPlay speakers (PTP)', 'WavWiz AirPlay speakers (audio)')
+$script:AirPlayOutLegacyNames = @('WavWiz AirPlay PTP', 'WavWiz AirPlay audio')
+function Set-AirPlayOutFirewall([string]$Exe, [bool]$Enable) {
+    $net = Get-SystemTool 'netsh.exe'
+    foreach ($n in $script:AirPlayOutFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete old AirPlay speakers rule' -AllowFail -TimeoutSec 30) }
+    if (-not $Enable) { return }
+    foreach ($n in $script:AirPlayOutLegacyNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete hand-made AirPlay rule' -AllowFail -TimeoutSec 30) }
+    $common = @('dir=in', 'action=allow', 'profile=private', 'remoteip=localsubnet', "program=$Exe", 'enable=yes')
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayOutFirewallNames[0]), 'protocol=UDP', 'localport=319-320') + $common) -Label 'netsh add AirPlay speakers PTP rule' -TimeoutSec 30)
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayOutFirewallNames[1]), 'protocol=UDP') + $common) -Label 'netsh add AirPlay speakers audio rule' -TimeoutSec 30)
+}
 function Remove-ServerFirewall {
     $net = Get-SystemTool 'netsh.exe'; $name = $script:FirewallNames[0]
-    foreach ($n in @($name, "$name (UDP)", $script:VpnFirewallName) + $script:ReceiverFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete rule' -AllowFail -TimeoutSec 30) }
+    foreach ($n in @($name, "$name (UDP)", $script:VpnFirewallName) + $script:ReceiverFirewallNames + $script:AirPlayOutFirewallNames + $script:AirPlayOutLegacyNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete rule' -AllowFail -TimeoutSec 30) }
 }
 
 # ---- files and ACLs
@@ -331,6 +367,389 @@ function Grant-ServiceDataAccess([string]$Dir) {
     # LocalService (S-1-5-19) needs to write the database, logs and certificates. Only ADDS a grant: inherited access (the player reads player-defaults.json) stays.
     [void](Invoke-Native -File (Get-SystemTool 'icacls.exe') -ArgList @($Dir, '/grant', '*S-1-5-19:(OI)(CI)M', '/T', '/C', '/Q') -Label 'icacls grant LocalService on data folder' -TimeoutSec 120)
 }
+
+# ---- CD-ROM read access for NT SERVICE\WavWizServer (least privilege; not LocalSystem) ----
+# Opening \\.\E: checks the CD-ROM device object's DACL (\Device\CdRomN). By default that
+# DACL allows Administrators and Interactive Users (and System), not LocalService; SetNamedSecurityInfo
+# on the live object does not survive reboot. Class security (SPCRP_SECURITY_SDS on the CDROM setup
+# class {4d36e965-e325-11ce-bfc1-08002be10318}) is persistent and applies to new instances (replug).
+# The per-service SID is only in the process token when sidtype is unrestricted (default is none).
+$script:CdromClassGuid = '4d36e965-e325-11ce-bfc1-08002be10318'
+$script:CdromAccessRights = 'GR'
+# Fallback DACL used only when the class has no Security value and no live device SDDL can be read.
+# Matches the Vista+ IMAPI default: System + Administrators + Interactive Users (read/write/execute).
+$script:CdromClassSecurityFallback = 'D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGWGX;;;IU)'
+$script:CdromSecurityRegKey = 'SOFTWARE\WavWiz'
+$script:CdromSecurityBackupName = 'CdromClassSecurityBackup'
+$script:CdromSecurityBaseName = 'CdromClassSecurityBase'
+$script:CdromSecurityUnset = 'UNSET'
+
+# S-1-5-80 + SHA-1(UTF-16LE uppercase service name) as five little-endian DWORDs (per-service SID).
+function Get-WavWizServiceSid([string]$ServiceName = $script:ServiceName) {
+    $sha = [Security.Cryptography.SHA1]::Create()
+    try {
+        $hash = $sha.ComputeHash([Text.Encoding]::Unicode.GetBytes($ServiceName.ToUpperInvariant()))
+        $ids = New-Object string[] 5
+        for ($i = 0; $i -lt 5; $i++) { $ids[$i] = [BitConverter]::ToUInt32($hash, $i * 4).ToString() }
+        return 'S-1-5-80-' + ($ids -join '-')
+    } finally { $sha.Dispose() }
+}
+
+function Get-SddlAllowAcesForSid([string]$Sddl, [string]$Sid) {
+    $list = New-Object System.Collections.Generic.List[string]
+    if ([string]::IsNullOrWhiteSpace($Sddl) -or [string]::IsNullOrWhiteSpace($Sid)) { return ,$list.ToArray() }
+    $rx = [regex]('\(A;[^;]*;[^;]*;[^;]*;[^;]*;' + [regex]::Escape($Sid) + '(?:;[^)]*)?\)')
+    foreach ($m in $rx.Matches($Sddl)) { $list.Add($m.Value) }
+    return ,$list.ToArray()
+}
+function Test-SddlAllowsSid([string]$Sddl, [string]$Sid) {
+    if ([string]::IsNullOrWhiteSpace($Sddl) -or [string]::IsNullOrWhiteSpace($Sid)) { return $false }
+    return [regex]::IsMatch($Sddl, '\(A;[^;]*;[^;]*;[^;]*;[^;]*;' + [regex]::Escape($Sid) + '(?:;[^)]*)?\)')
+}
+function Test-SddlEmptyDacl([string]$Sddl) {
+    if ([string]::IsNullOrWhiteSpace($Sddl)) { return $true }
+    return -not [regex]::IsMatch($Sddl, '\([A-Z]+;')
+}
+function Add-SddlAllowAce([string]$Sddl, [string]$Sid, [string]$Rights = 'GR') {
+    if (Test-SddlAllowsSid $Sddl $Sid) { return $Sddl }
+    $ace = '(A;;' + $Rights + ';;;' + $Sid + ')'
+    $base = $Sddl
+    if ([string]::IsNullOrWhiteSpace($base)) { $base = $script:CdromClassSecurityFallback }
+    $dm = [regex]::Match($base, 'D:')
+    if ($dm.Success) {
+        $sacl = $base.IndexOf('S:', $dm.Index)
+        if ($sacl -ge 0) { return $base.Substring(0, $sacl) + $ace + $base.Substring($sacl) }
+        return $base + $ace
+    }
+    return $base + 'D:P' + $ace
+}
+function Remove-SddlAllowAce([string]$Sddl, [string]$Sid) {
+    if ([string]::IsNullOrWhiteSpace($Sddl)) { return $Sddl }
+    $out = $Sddl
+    foreach ($a in (Get-SddlAllowAcesForSid $Sddl $Sid)) { $out = $out.Replace($a, '') }
+    return $out
+}
+
+# Pure: decide the class SDDL to write and whether to record a first-time backup.
+function Get-CdromClassGrantPlan {
+    param([string]$ClassSddl, [string]$LiveSddl, [string]$ExistingBackup, [string]$Sid)
+    $classSet = -not [string]::IsNullOrWhiteSpace($ClassSddl)
+    if ($classSet) {
+        $base = Remove-SddlAllowAce $ClassSddl $Sid
+        if (Test-SddlEmptyDacl $base) { $base = $script:CdromClassSecurityFallback }
+    } elseif (-not [string]::IsNullOrWhiteSpace($LiveSddl)) {
+        $base = Remove-SddlAllowAce $LiveSddl $Sid
+        if (Test-SddlEmptyDacl $base) { $base = $script:CdromClassSecurityFallback }
+    } else {
+        $base = $script:CdromClassSecurityFallback
+    }
+    $newSddl = Add-SddlAllowAce $base $Sid
+    $already = $classSet -and (Test-SddlAllowsSid $ClassSddl $Sid)
+    $backup = $ExistingBackup
+    $writeBackup = [string]::IsNullOrWhiteSpace($ExistingBackup)
+    if ($writeBackup) {
+        if (-not $classSet) { $backup = $script:CdromSecurityUnset }
+        elseif ($already) {
+            $without = Remove-SddlAllowAce $ClassSddl $Sid
+            if (Test-SddlEmptyDacl $without) { $backup = $script:CdromSecurityUnset } else { $backup = $without }
+        } else { $backup = $ClassSddl }
+    }
+    return [pscustomobject]@{ Base = $base; NewSddl = $newSddl; Backup = $backup; WriteBackup = $writeBackup; WriteClass = (-not $already); AlreadyGranted = $already }
+}
+
+# Pure: on uninstall, drop only our ACE and restore a previously-unset class Security value when we can.
+function Get-CdromClassRevokePlan {
+    param([string]$ClassSddl, [string]$Backup, [string]$Base, [string]$Sid)
+    $without = Remove-SddlAllowAce $ClassSddl $Sid
+    $clear = $false
+    $restore = $null
+    if ($Backup -eq $script:CdromSecurityUnset) {
+        if ((Test-SddlEmptyDacl $without) -or ($Base -and $without -eq $Base) -or $without -eq $script:CdromClassSecurityFallback) { $clear = $true }
+        else { $restore = $without }
+    } elseif ($Backup) {
+        if (Test-SddlEmptyDacl $without) { $restore = $Backup } else { $restore = $without }
+    } else {
+        if (Test-SddlEmptyDacl $without) { $clear = $true } else { $restore = $without }
+    }
+    if ([string]::IsNullOrWhiteSpace($ClassSddl) -and $clear) { $restore = $null }
+    return [pscustomobject]@{ ClearClass = $clear; NewSddl = $restore; RemoveBackup = $true }
+}
+
+function Get-ServiceSidType([string]$Name = $script:ServiceName) {
+    $r = Invoke-Sc 'query sidtype' @('qsidtype', $Name) -AllowFail
+    if ($r.ExitCode -ne 0) { return 'missing' }
+    $t = [string]$r.Output
+    if ($t -match 'UNRESTRICTED') { return 'UNRESTRICTED' }
+    if ($t -match 'RESTRICTED') { return 'RESTRICTED' }
+    if ($t -match '\bNONE\b') { return 'NONE' }
+    return 'unknown'
+}
+function Set-WavWizServiceSidType([string]$Name = $script:ServiceName) {
+    [void](Invoke-Sc 'sidtype unrestricted' @('sidtype', $Name, 'unrestricted'))
+    $got = Get-ServiceSidType $Name
+    Write-InstallLog ("service SID type for {0}: {1} (NT SERVICE\{0} is in the process token only when this is UNRESTRICTED; default is NONE). Microsoft documents that the change takes effect the next time the system is started; it is also applied when the service process is created." -f $Name, $got)
+    if ($got -ne 'UNRESTRICTED') { Write-InstallLog ("warning: expected SERVICE SID TYPE UNRESTRICTED, got $got") }
+    return $got
+}
+
+function Initialize-WavWizCdromApi {
+    if (Test-TestHost) { return }
+    if ('WavWiz.CdromSec' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace WavWiz {
+  public static class CdromSec {
+    public const int SPCRP_SECURITY_SDS = 24;
+    public const uint DACL_SECURITY_INFORMATION = 4;
+    public const uint OWNER_SECURITY_INFORMATION = 1;
+    public const uint GROUP_SECURITY_INFORMATION = 2;
+    public const int SE_FILE_OBJECT = 1;
+    public const uint SDDL_REVISION_1 = 1;
+    public const int ERROR_INSUFFICIENT_BUFFER = 122;
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool SetupDiGetClassRegistryPropertyW(ref Guid ClassGuid, uint Property, IntPtr PropertyRegDataType, byte[] PropertyBuffer, uint PropertyBufferSize, out uint RequiredSize, string MachineName, IntPtr Reserved);
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool SetupDiSetClassRegistryPropertyW(ref Guid ClassGuid, uint Property, byte[] PropertyBuffer, uint PropertyBufferSize, string MachineName, IntPtr Reserved);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint GetNamedSecurityInfoW(string pObjectName, int ObjectType, uint SecurityInfo, IntPtr ppsidOwner, IntPtr ppsidGroup, IntPtr ppDacl, IntPtr ppSacl, out IntPtr ppSecurityDescriptor);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint SetNamedSecurityInfoW(string pObjectName, int ObjectType, uint SecurityInfo, IntPtr psidOwner, IntPtr psidGroup, IntPtr pDacl, IntPtr pSacl);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool ConvertSecurityDescriptorToStringSecurityDescriptorW(IntPtr SecurityDescriptor, uint RequestedStringSDRevision, uint SecurityInformation, out IntPtr StringSecurityDescriptor, out uint StringSecurityDescriptorLen);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string StringSecurityDescriptor, uint StringSDRevision, out IntPtr SecurityDescriptor, IntPtr SecurityDescriptorSize);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    public static extern bool GetSecurityDescriptorDacl(IntPtr pSecurityDescriptor, out bool lpbDaclPresent, out IntPtr pDacl, out bool lpbDaclDefaulted);
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint QueryDosDeviceW(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
+
+    public static string GetClassSecuritySds(Guid classGuid) {
+      uint needed = 0;
+      Guid g = classGuid;
+      bool ok = SetupDiGetClassRegistryPropertyW(ref g, (uint)SPCRP_SECURITY_SDS, IntPtr.Zero, null, 0, out needed, null, IntPtr.Zero);
+      int err = Marshal.GetLastWin32Error();
+      if (!ok && err != ERROR_INSUFFICIENT_BUFFER) return null;
+      if (needed == 0) return null;
+      byte[] buf = new byte[needed];
+      if (!SetupDiGetClassRegistryPropertyW(ref g, (uint)SPCRP_SECURITY_SDS, IntPtr.Zero, buf, needed, out needed, null, IntPtr.Zero))
+        throw new Win32Exception(Marshal.GetLastWin32Error(), "SetupDiGetClassRegistryProperty SECURITY_SDS");
+      return Encoding.Unicode.GetString(buf).TrimEnd('\0');
+    }
+    public static void SetClassSecuritySds(Guid classGuid, string sddl) {
+      Guid g = classGuid;
+      if (string.IsNullOrEmpty(sddl)) {
+        if (!SetupDiSetClassRegistryPropertyW(ref g, (uint)SPCRP_SECURITY_SDS, null, 0, null, IntPtr.Zero))
+          throw new Win32Exception(Marshal.GetLastWin32Error(), "SetupDiSetClassRegistryProperty SECURITY_SDS clear");
+        return;
+      }
+      byte[] buf = Encoding.Unicode.GetBytes(sddl + '\0');
+      if (!SetupDiSetClassRegistryPropertyW(ref g, (uint)SPCRP_SECURITY_SDS, buf, (uint)buf.Length, null, IntPtr.Zero))
+        throw new Win32Exception(Marshal.GetLastWin32Error(), "SetupDiSetClassRegistryProperty SECURITY_SDS write");
+    }
+    public static string GetNamedSddl(string path) {
+      IntPtr psd;
+      uint r = GetNamedSecurityInfoW(path, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out psd);
+      if (r != 0) throw new Win32Exception((int)r, "GetNamedSecurityInfo " + path);
+      try {
+        IntPtr s; uint len;
+        if (!ConvertSecurityDescriptorToStringSecurityDescriptorW(psd, SDDL_REVISION_1, OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, out s, out len))
+          throw new Win32Exception(Marshal.GetLastWin32Error(), "ConvertSecurityDescriptorToStringSecurityDescriptor");
+        try { return Marshal.PtrToStringUni(s); }
+        finally { LocalFree(s); }
+      } finally { LocalFree(psd); }
+    }
+    public static void SetNamedSddlDacl(string path, string sddl) {
+      IntPtr psd;
+      if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, out psd, IntPtr.Zero))
+        throw new Win32Exception(Marshal.GetLastWin32Error(), "ConvertStringSecurityDescriptorToSecurityDescriptor");
+      try {
+        bool present, defd; IntPtr dacl;
+        if (!GetSecurityDescriptorDacl(psd, out present, out dacl, out defd))
+          throw new Win32Exception(Marshal.GetLastWin32Error(), "GetSecurityDescriptorDacl");
+        uint r = SetNamedSecurityInfoW(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero);
+        if (r != 0) throw new Win32Exception((int)r, "SetNamedSecurityInfo " + path);
+      } finally { LocalFree(psd); }
+    }
+    public static bool DosDeviceExists(string name) {
+      StringBuilder sb = new StringBuilder(1024);
+      return QueryDosDeviceW(name, sb, sb.Capacity) != 0;
+    }
+  }
+}
+'@
+}
+
+function Get-CdromLiveStateFile { return (Join-Path $env:WAVWIZ_TEST_STATE 'cdrom-live.txt') }
+function Get-CdromClassStateFile { return (Join-Path $env:WAVWIZ_TEST_STATE 'cdrom-class-sds.txt') }
+
+function Get-CdromClassSecuritySds {
+    if (Test-TestHost) {
+        $f = Get-CdromClassStateFile
+        if (-not (Test-Path -LiteralPath $f)) { return $null }
+        $t = ([IO.File]::ReadAllText($f)).Trim()
+        if (-not $t) { return $null }
+        return $t
+    }
+    Initialize-WavWizCdromApi
+    return [WavWiz.CdromSec]::GetClassSecuritySds([guid]$script:CdromClassGuid)
+}
+function Set-CdromClassSecuritySds([AllowNull()][string]$Sddl) {
+    if (Test-TestHost) {
+        $f = Get-CdromClassStateFile
+        if ([string]::IsNullOrEmpty($Sddl)) { if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force }; return }
+        Write-Utf8NoBom $f $Sddl
+        return
+    }
+    Initialize-WavWizCdromApi
+    [WavWiz.CdromSec]::SetClassSecuritySds([guid]$script:CdromClassGuid, $Sddl)
+}
+
+function Get-CdromDevicePaths {
+    $paths = New-Object System.Collections.Generic.List[string]
+    if (Test-TestHost) {
+        $f = Get-CdromLiveStateFile
+        if (Test-Path -LiteralPath $f) {
+            foreach ($l in @(Get-Content -LiteralPath $f)) {
+                $p = ($l -split '\|', 2)[0]
+                if ($p -and -not $paths.Contains($p)) { $paths.Add($p) }
+            }
+        }
+        return ,$paths.ToArray()
+    }
+    Initialize-WavWizCdromApi
+    try {
+        foreach ($d in [IO.DriveInfo]::GetDrives()) {
+            if ($d.DriveType -eq [IO.DriveType]::CDRom) {
+                $p = '\\.\' + $d.Name.TrimEnd('\')
+                if (-not $paths.Contains($p)) { $paths.Add($p) }
+            }
+        }
+    } catch { }
+    for ($i = 0; $i -le 15; $i++) {
+        $n = 'CdRom' + $i
+        try {
+            if ([WavWiz.CdromSec]::DosDeviceExists($n)) {
+                $p = '\\.\' + $n
+                if (-not $paths.Contains($p)) { $paths.Add($p) }
+            }
+        } catch { }
+    }
+    return ,$paths.ToArray()
+}
+
+function Get-CdromObjectSddl([string]$Path) {
+    if (Test-TestHost) {
+        $f = Get-CdromLiveStateFile
+        if (Test-Path -LiteralPath $f) {
+            foreach ($l in @(Get-Content -LiteralPath $f)) {
+                $parts = $l -split '\|', 2
+                if ($parts.Count -eq 2 -and $parts[0] -eq $Path) { return $parts[1] }
+            }
+        }
+        return $null
+    }
+    Initialize-WavWizCdromApi
+    return [WavWiz.CdromSec]::GetNamedSddl($Path)
+}
+function Set-CdromObjectSddl([string]$Path, [string]$Sddl) {
+    if (Test-TestHost) {
+        $f = Get-CdromLiveStateFile
+        $keep = @()
+        if (Test-Path -LiteralPath $f) {
+            foreach ($l in @(Get-Content -LiteralPath $f)) {
+                $parts = $l -split '\|', 2
+                if ($parts.Count -ge 1 -and $parts[0] -ne $Path) { $keep += $l }
+            }
+        }
+        $keep += ($Path + '|' + $Sddl)
+        Write-Utf8NoBom $f (($keep -join "`n") + "`n")
+        return
+    }
+    Initialize-WavWizCdromApi
+    [WavWiz.CdromSec]::SetNamedSddlDacl($Path, $Sddl)
+}
+
+function Grant-WavWizCdromAccess {
+    $sid = Get-WavWizServiceSid
+    Write-InstallLog ("CD-ROM access: granting GENERIC_READ to NT SERVICE\{0} ({1}) on the CDROM class and any live CD-ROM devices" -f $script:ServiceName, $sid)
+    $alloc = Get-MachineRegValue 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' 'AllocateCDRoms'
+    $allocShown = $(if ($null -eq $alloc -or $alloc -eq '') { '(not set; default is Disabled)' } else { $alloc })
+    Write-InstallLog ("AllocateCDRoms (Devices: Restrict CD-ROM access to locally logged-on user only): " + $allocShown)
+    if ($alloc -eq '1') { Say 'NOTE: the policy "Devices: Restrict CD-ROM access to locally logged-on user only" is enabled. A service may still be unable to read CDs while someone is logged on at the console.' }
+
+    $class = Get-CdromClassSecuritySds
+    $liveSddl = $null
+    $livePaths = @(Get-CdromDevicePaths)
+    foreach ($p in $livePaths) {
+        try {
+            $s = Get-CdromObjectSddl $p
+            Write-InstallLog ("CD-ROM live SDDL {0}: {1}" -f $p, $s)
+            if (-not $liveSddl -and $s) { $liveSddl = $s }
+        } catch { Write-InstallLog ("CD-ROM live read {0}: {1}" -f $p, $_.Exception.Message) }
+    }
+    $existingBackup = Get-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBackupName
+    $plan = Get-CdromClassGrantPlan -ClassSddl $class -LiveSddl $liveSddl -ExistingBackup $existingBackup -Sid $sid
+    if ($plan.WriteBackup) {
+        Set-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBackupName $plan.Backup
+        Set-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBaseName $plan.Base
+        Write-InstallLog ("CD-ROM class security backup: " + $plan.Backup)
+        Write-InstallLog ("CD-ROM class security base: " + $plan.Base)
+    }
+    if ($plan.WriteClass) {
+        Set-CdromClassSecuritySds $plan.NewSddl
+        Write-InstallLog ("CD-ROM class security written: " + $plan.NewSddl)
+        Say 'Granted the WavWiz service read access to CD-ROM drives (kept until uninstall).'
+    } else {
+        Write-InstallLog 'CD-ROM class security already includes the WavWiz service SID; left as-is.'
+    }
+    foreach ($p in $livePaths) {
+        try {
+            $cur = Get-CdromObjectSddl $p
+            $neu = Add-SddlAllowAce $cur $sid
+            if ($neu -ne $cur) {
+                Set-CdromObjectSddl $p $neu
+                Write-InstallLog ("CD-ROM live grant {0}: {1}" -f $p, $neu)
+            } else { Write-InstallLog ("CD-ROM live already granted: " + $p) }
+        } catch { Write-InstallLog ("CD-ROM live grant {0} failed: {1}" -f $p, $_.Exception.Message) }
+    }
+}
+
+function Revoke-WavWizCdromAccess {
+    try {
+        $sid = Get-WavWizServiceSid
+        $class = $null
+        try { $class = Get-CdromClassSecuritySds } catch { Write-InstallLog ("CD-ROM class read on uninstall: " + $_.Exception.Message) }
+        $backup = Get-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBackupName
+        $base = Get-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBaseName
+        $plan = Get-CdromClassRevokePlan -ClassSddl $class -Backup $backup -Base $base -Sid $sid
+        if ($plan.ClearClass) {
+            Set-CdromClassSecuritySds $null
+            Write-InstallLog 'CD-ROM class security restored (value removed; it was not set before WavWiz).'
+        } elseif ($null -ne $plan.NewSddl) {
+            Set-CdromClassSecuritySds $plan.NewSddl
+            Write-InstallLog ("CD-ROM class security restored: " + $plan.NewSddl)
+        } else {
+            Write-InstallLog 'CD-ROM class security: nothing to revoke.'
+        }
+        foreach ($p in @(Get-CdromDevicePaths)) {
+            try {
+                $cur = Get-CdromObjectSddl $p
+                $neu = Remove-SddlAllowAce $cur $sid
+                if ($neu -ne $cur) { Set-CdromObjectSddl $p $neu; Write-InstallLog ("CD-ROM live revoke: " + $p) }
+            } catch { Write-InstallLog ("CD-ROM live revoke {0} failed: {1}" -f $p, $_.Exception.Message) }
+        }
+        try { Remove-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBackupName } catch { }
+        try { Remove-MachineRegValue $script:CdromSecurityRegKey $script:CdromSecurityBaseName } catch { }
+        Say 'Removed the WavWiz service CD-ROM read grant.'
+    } catch { Write-InstallLog ("Revoke-WavWizCdromAccess: " + $_.Exception.Message) }
+}
+
 
 # ---- network address choice
 $script:LanCandidateScript = {
@@ -574,6 +993,19 @@ function Remove-MachineRegKey([string]$SubKey) {
     if (Test-TestHost) { $keep = @(Read-RegLines | Where-Object { ($_ -split '\|', 3)[0] -ne $SubKey }); Set-Content -LiteralPath (Get-RegFile) -Value $keep; return }
     $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
     $base.DeleteSubKeyTree($SubKey, $false)
+}
+function Set-MachineRegValue([string]$SubKey, [string]$Name, [string]$Value) {
+    if (Test-TestHost) {
+        $keep = @(Read-RegLines | Where-Object { $p = $_ -split '\|', 3; -not ($p.Count -ge 2 -and $p[0] -eq $SubKey -and $p[1] -eq $Name) })
+        $keep += ($SubKey + '|' + $Name + '|' + $Value)
+        $f = Get-RegFile; $d = Split-Path -Parent $f
+        if ($d -and -not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+        Set-Content -LiteralPath $f -Value $keep
+        return
+    }
+    $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
+    $k = $base.CreateSubKey($SubKey)
+    try { $k.SetValue($Name, $Value, [Microsoft.Win32.RegistryValueKind]::String) } finally { $k.Close() }
 }
 
 # ---- F173: only ONE Apps & features entry. Stray WavWiz / Unison uninstall keys with another AppId (HKLM 64/32 + HKCU) are removed on install/upgrade. ----

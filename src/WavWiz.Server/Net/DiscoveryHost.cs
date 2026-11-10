@@ -46,8 +46,10 @@ public sealed class DiscoveryHost : IDisposable
     {
         if (!_cfg.Discovery) return;
         var bind = IPAddress.Parse(_cfg.BindAddress.Trim('[', ']'));
+        var announce = NetworkHelper.AdvertiseAddress(bind);
         var targets = new List<IPAddress> { bind };
-        if (!IPAddress.IsLoopback(bind) && DirectedBroadcast(bind) is { } bc && !bc.Equals(bind)) targets.Add(bc);
+        var bcastFrom = bind.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any) ? announce : bind;
+        if (!IPAddress.IsLoopback(bcastFrom) && !bcastFrom.Equals(IPAddress.Any) && DirectedBroadcast(bcastFrom) is { } bc && !bc.Equals(bcastFrom)) targets.Add(bc);
         foreach (var t in targets)
         {
             try
@@ -58,7 +60,9 @@ public sealed class DiscoveryHost : IDisposable
             }
             catch (Exception e) { Problem = $"discovery on {t}:{_cfg.DiscoveryPort} unavailable: {e.Message}"; _log?.Invoke(Problem); }
         }
-        if (!IPAddress.IsLoopback(bind)) StartMdns(bind);
+        // Wildcard bind: advertise and join mDNS on a real LAN address, never 0.0.0.0 (A records would be unusable and self-detection would fail).
+        var mdns = bind.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any) ? announce : bind;
+        if (!IPAddress.IsLoopback(mdns) && !mdns.Equals(IPAddress.Any) && !mdns.Equals(IPAddress.IPv6Any)) StartMdns(mdns);
     }
 
     private async Task UdpLoop(Socket s)

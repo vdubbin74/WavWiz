@@ -119,4 +119,16 @@ public class AirPlayDiscoveryTests
         Assert.Equal("967BDF9D9D3B", d.Id); Assert.Equal("Bench", d.Name); Assert.Equal(5000, d.RaopPort); Assert.Equal("ShairportSync", d.Model);
         Assert.Equal(new[] { 0, 1 }, d.Encryption); Assert.Equal("raop", d.Route); Assert.False(d.SupportsAirPlay2); Assert.Equal(4u, d.StatusFlags); Assert.False(d.PinRequired);
     }
+
+    [Fact]
+    public void Wildcard_A_record_is_not_a_device_address()
+    {
+        var st = new AirPlayBrowseState();
+        st.Ingest(Msg(Group(AirPlayBrowseState.Raop, "AABBCCDDEEFF@WavWiz – Basement", "0000.local", IPAddress.Parse("0.0.0.0"), 5000, WwRaop)), T0);
+        var d = Assert.Single(st.Devices(T0));
+        Assert.Equal("WavWiz – Basement", d.Name);
+        Assert.Empty(d.Addresses);
+        Assert.False(AirPlayBrowseState.UsableAddress("0.0.0.0"));
+        Assert.True(AirPlayBrowseState.UsableAddress("192.168.1.20"));
+    }
 }

@@ -28,6 +28,7 @@ public class F164RemoteLibraryTests
             {
                 "/rest/ping" => J(""),
                 "/rest/getArtists" => J(",\"artists\":{\"index\":[{\"name\":\"A\",\"artist\":[{\"id\":\"ar1\",\"name\":\"Air\",\"albumCount\":1,\"coverArt\":\"ar-ar1\"}]}]}"),
+                "/rest/getArtist" => J(",\"artist\":{\"id\":\"ar1\",\"name\":\"Air\",\"album\":[{\"id\":\"al1\",\"name\":\"Moon Safari\",\"artist\":\"Air\",\"year\":1998,\"songCount\":2,\"coverArt\":\"al-al1\"}]}"),
                 "/rest/getAlbumList2" => J(",\"albumList2\":{\"album\":[{\"id\":\"al1\",\"name\":\"Moon Safari\",\"artist\":\"Air\",\"year\":1998,\"songCount\":2,\"coverArt\":\"al-al1\"}]}"),
                 "/rest/getAlbum" => J(",\"album\":{\"id\":\"al1\",\"name\":\"Moon Safari\",\"artist\":\"Air\",\"song\":[{\"id\":\"s1\",\"title\":\"La femme d'argent\",\"artist\":\"Air\",\"album\":\"Moon Safari\",\"track\":1,\"duration\":430,\"coverArt\":\"al-al1\"},{\"id\":\"s2\",\"title\":\"Sexy Boy\",\"artist\":\"Air\",\"album\":\"Moon Safari\",\"track\":2,\"duration\":298}]}"),
                 "/rest/getCoverArt" => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[] { 0xFF, 0xD8, 0xFF, 1, 2 }) { Headers = { ContentType = new("image/jpeg") } } },
@@ -87,6 +88,25 @@ public class F164RemoteLibraryTests
         Assert.Equal(new[] { "remote", "remote", "track", "remote", "track" }, q.Select(x => x.Kind).ToArray());
         Assert.StartsWith("subsonic:" + sid + ":s1", q[0].Location); Assert.StartsWith("subsonic:" + sid + ":s2", q[1].Location);
         Assert.StartsWith("subsonic:" + sid + ":s9", q[3].Location);
+    }
+
+    /// <summary>0.6.8: dragging a remote artist enqueues every song from every album (album order, then disc/track).</summary>
+    [Fact]
+    public async Task Remote_artist_queue_add_enqueues_all_album_tracks_in_order()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        using var t = new TempDir(); var rs = new SubsonicService(S.Db, t.Path, new FakeProt(), new FakeNavidrome());
+        Assert.Null(await rs.Save("http://nas:4533", "trevor", "pa55", "Navidrome")); S.Remote = rs;
+        var sid = System.Text.Json.JsonSerializer.SerializeToElement(rs.List()[0]).GetProperty("id").GetString()!;
+        var items = await rs.ArtistItems(sid, "ar1");
+        Assert.Equal(2, items.Count);
+        Assert.Equal(new[] { "s1", "s2" }, items.Select(x => x.Location.Split(':').Last()).ToArray());
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/queue/add", new { kind = "remote", server = sid, artist = "ar1" })).StatusCode);
+        var q = S.Conductor.Queue().ToList();
+        Assert.Equal(2, q.Count);
+        Assert.All(q, x => Assert.Equal("remote", x.Kind));
+        Assert.StartsWith("subsonic:" + sid + ":s1", q[0].Location);
+        Assert.StartsWith("subsonic:" + sid + ":s2", q[1].Location);
     }
 
     /// <summary>F176: queue DTO carries a source pill: local "Local", remote = server display name (removed server -> "Remote"); no Location / secrets.</summary>

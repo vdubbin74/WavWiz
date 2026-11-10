@@ -69,7 +69,7 @@ test('F266 fold any zone (playing + idle) to one row, persists, green dot, unfol
  await box.locator('.qb42-trow .zfold42-t').click();await p.waitForTimeout(80);
  const f=p.locator('.tree42 section.qb42.zfold42[data-leader-id="1"]');await f.waitFor();
  assert.equal(await f.locator('.zsp42').count(),0,'speakers hidden');assert.equal(await f.locator('.qb42-vol').count(),0);
- assert.match(await f.locator('.zfold42-dot').getAttribute('class'),/\bok\b/);assert.match(await f.locator('.ze42-note').textContent(),/Song/);
+ assert.match(await f.locator('.zfold42-dot').getAttribute('class'),/\bok\b/);assert.match(await f.locator('.zl-now').textContent(),/Song/);assert.equal(await f.locator('.ze42-note').count(),0,'title is not on the name row');
  assert.equal(await p.evaluate(()=>localStorage.getItem('wavwiz.zfold')),'["1"]');
  // idle zone (Den, no members) stays the empty row; fold an idle zone with speakers: give Den a speaker that is off
  await p.evaluate(()=>{S.groups[1].deviceIds=[12];S.groups[0].deviceIds=S.groups[0].deviceIds.filter(i=>i!==12);S.zones[11].enabled=false;S.groups[1].now={state:'stopped'};v.draw(true)});

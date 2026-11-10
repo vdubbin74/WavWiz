@@ -18,6 +18,7 @@ import { lockBody, unlockBody } from './sheetlock.js';   // F262-fix-B: real iOS
 import { itemArtUrl } from './art.js';
 import * as Z from './zones40.js';
 import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
+import { swapQuestion, offerSwap } from './zoneref.js';   // 0.6.8-#15
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
@@ -87,6 +88,7 @@ export const isPhoneZone = z => !!z?.isWeb && /iPhone|iPad|Android|phone|tablet/
 // 0.5.0: the output type as the first tag (HDMI, TOSLINK, BLUETOOTH, USB, ANALOG); unknown/other shows nothing
 const OUT_TAG = { hdmi: 'HDMI', spdif: 'TOSLINK', bluetooth: 'BLUETOOTH', usb: 'USB', analog: 'ANALOG', wired: 'ANALOG' };
 export function outputTag(z) {
+  if (z && String(z.playerId || '').startsWith('airplay:')) return { k: 'otype airplay', text: 'AIRPLAY', title: 'AirPlay speaker added from this PC' };   // 0.6.8-#14c: a regular speaker, tagged like HDMI / ANALOG
   const o = z && chosenOutput(z), text = o && OUT_TAG[o.kind]; if (!text) return null;
   return { k: 'otype' + (o.kind === 'bluetooth' ? ' bt' : ''), text, title: o.kind === 'bluetooth' ? 'Bluetooth output: its delay can change when it reconnects. A wired speaker makes a steadier reference.' : `Output: ${outputLabel(o)}` };
 }
@@ -711,7 +713,7 @@ function rename(S, ctl, z, from) {
   const box = h('span', { class: 'drenamebox row' }, input, h('button', { type: 'button', class: 'btn sm primary', onclick: save }, 'Save'), h('button', { type: 'button', class: 'btn sm', onclick: done }, 'Cancel'));
   nm.replaceWith(box); input.focus(); input.select();
 }
-async function setReference(ctl, z) { try { await api('/calibration/reference', { method: 'PUT', body: { zoneId: z.id } }); toast(`${z.name} is now the reference speaker`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } }
+async function setReference(ctl, z) { try { const r = await api('/calibration/reference', { method: 'PUT', body: { zoneId: z.id } }); toast(r?.groupId ? `${z.name} is now the reference for its zone` : `${z.name} is now the reference speaker`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } }
 function forget(ctl, z) {
   dialog(`Forget “${z.name}”?`, h('div', null, h('p', null, 'Its pairing is revoked and it disappears from the device list and from any zone. Saved delays for its speakers are kept.'),
     h('p', { class: 'small dim' }, z.isWeb ? 'A browser speaker comes back by itself the next time WavWiz is opened there.' : 'The PC can be paired again from WavWiz Player (Pair again… in the tray menu) with a new 6-digit code.')),
@@ -1371,7 +1373,7 @@ function speakerRow(S, ctl, z, hl, { dim = false, groups = [], addable = false }
 }
 function addToZoneMenu(S, ctl, z, anchor, groups) {
   document.querySelector('.zaddmenu')?.remove();
-  const m = h('div', { class: 'dmenu zaddmenu', role: 'menu' }, (groups || []).length ? groups.map(g => h('button', { type: 'button', role: 'menuitem', onclick: async () => { m.remove(); try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: [...new Set([...(g.deviceIds || []), z.id])] } }); toast(`${z.name} added to ${g.name}`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, g.name))
+  const m = h('div', { class: 'dmenu zaddmenu', role: 'menu' }, (groups || []).length ? groups.map(g => h('button', { type: 'button', role: 'menuitem', onclick: async () => { m.remove(); const q = swapQuestion(S, z, g.id); try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: [...new Set([...(g.deviceIds || []), z.id])] } }); toast(`${z.name} added to ${g.name}`); ctl.refreshAll(); offerSwap(q, g.id, z, ctl.refreshAll); } catch (e) { toast(e.message, true); } } }, g.name))
     : h('p', { class: 'small dim pad' }, 'No zones yet.'), h('button', { type: 'button', role: 'menuitem', onclick: () => { m.remove(); editZone(S, null, ctl.refreshAll); } }, '+ New zone…'));
   anchor.after(m); m.querySelector('button')?.focus();
   const off = ev => { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; setTimeout(() => document.addEventListener('pointerdown', off, true), 0);
@@ -1564,10 +1566,10 @@ function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null, shared =
   const sel = Z.current()?.kind === 'zone' && Z.current().id === g.id, linked = (g.linked || []).length > 0, groups = S.groups || [];
   const linkBtn = groups.length < 2 ? null : ro(linked
     ? h('button', { type: 'button', class: 'btn sm zlinkbtn split', 'data-act': 'split', title: 'Give this zone its own music (the zones it was linked with keep playing)', onclick: ev => { ev.stopPropagation(); Z.splitOff(g, ctl.refreshAll); } }, 'Split off')
-    : h('button', { type: 'button', class: 'btn sm zlinkbtn link', 'data-act': 'link', title: 'Play the same music as another zone, in sync', onclick: ev => { ev.stopPropagation(); Z.linkMenu(ev.currentTarget, S, g, ctl.refreshAll); } }, icon('link'), ' Link'), can, 'Your access is view-only.');
+    : h('button', { type: 'button', class: 'btn sm zlinkbtn link zlinkic', 'data-act': 'link', 'aria-label': `Link ${g.name} to another zone`, title: 'Link: play the same music as another zone, in sync', onclick: ev => { ev.stopPropagation(); Z.linkMenu(ev.currentTarget, S, g, ctl.refreshAll); } }, icon('link')), can, 'Your access is view-only.');   // 0.6.8-#12
   const select = () => Z.select('g:' + g.id);
   const card = h('div', { class: 'zcard dlike dc3 zc3 hasnow' + (g.active ? ' active' : '') + (muted ? ' muted' : '') + (on ? '' : ' off') + (pick === g.id ? ' picked' : '') + (sel ? ' zsel-on' : '') + (linked ? ' zlinked' : ''), 'data-zone': g.name, 'data-group-id': g.id, 'data-playback-id': g.playbackId || 'default', title: ms.length ? ms.map(z => z.name).join(' · ') : 'No speakers yet' },
-    h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), linkBtn, edit, pill),
+    h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), edit, linkBtn, pill),   /* 0.6.8-#12: link icon right beside OFF/ON */
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, g)), sel ? Z.controllingTag() : null, Z.linkBadge(g), Z.hereTag(g))),
     shared ? null : Z.nowLine(g.now, { at: S._groupsAt || Date.now(), onSelect: select, selected: sel }),
     h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute));

@@ -6,6 +6,8 @@ import { guestId, guestApi, groupHead, artistLine, albumLine, albumName, mineLin
 import { renderResults, el } from './jukebox-view.js';
 
 const code = new URLSearchParams(location.search).get('j') || '';
+// 0.6.8-#6d: ?tv=1 = view-only big-screen board for a smart-TV browser (no name / search / vote, no player, no sign-in)
+const tv = new URLSearchParams(location.search).get('tv') === '1';
 const gid = guestId();
 const call = guestApi(code);
 const app = document.getElementById('app');
@@ -27,7 +29,22 @@ const searchIn = el('input', { class: 'jb-in jb-search', type: 'search', placeho
   oninput: () => { clearTimeout(searchIn._t); searchIn._t = setTimeout(search, 250); },
   onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(searchIn._t); search(); } } });
 const searchBox = el('label', { class: 'jbg-sbox' }, el('span', { class: 'jbg-sico', 'aria-hidden': 'true' }), searchIn);
-function build() { if (built) return; built = true; app.replaceChildren(title, npSlot, noteSlot, nameIn, searchBox, msgSlot, bodySlot, foot); }
+function build() {
+  if (built) return; built = true;
+  if (tv) { document.body.classList.add('jbtv'); app.replaceChildren(title, npSlot, noteSlot, bodySlot, foot); return; }
+  app.replaceChildren(title, npSlot, noteSlot, nameIn, searchBox, msgSlot, bodySlot, foot);
+}
+// 0.6.8-#6d: TV board - Up next + the join QR (guest-code QR endpoint, no sign-in)
+function paintTv() {
+  const b = board, next = (b.next || []).slice(0, 8);
+  bodySlot.replaceChildren(el('section', { class: 'jbtv-next' }, el('h2', { class: 'jb-gh' }, 'Up next'),
+    ...(next.length ? next.map((s, i) => el('div', { class: 'jb-row' }, el('span', { class: 'jbtv-n' }, String(i + 1)),
+      s.trackId ? el('img', { class: 'jb-thumb', src: art(s.trackId), alt: '' }) : el('div', { class: 'jb-thumb' }),
+      el('div', { class: 'jb-t' }, el('b', {}, s.title || ''), el('small', {}, [s.artist, s.by ? 'requested by ' + s.by : null].filter(Boolean).join(' · ')))))
+      : [el('p', { class: 'jb-dim' }, 'Nothing queued yet - scan the code to add a song.')])));
+  foot.replaceChildren(el('div', { class: 'jbtv-join' }, el('img', { src: `/api/v1/jukebox/guest/qr.svg?j=${encodeURIComponent(code)}`, alt: 'Scan to add a song' }),
+    el('div', {}, el('b', {}, 'Scan to add a song'), el('small', {}, location.host + '/jukebox.html?j=' + code))));
+}
 
 async function add(t, btn) {
   btn.disabled = true;
@@ -88,6 +105,7 @@ async function refresh() {
     document.body.classList.toggle('retro', retro());
     if (endedNow) { endedNow = false; built = false; }
     build(); paintNow();
+    if (tv) { paintTv(); return; }
     if (lastStyle !== board.style) { lastStyle = board.style; paintBody(); }   // results restyle only when the host switches style
   } catch (e) { if (e.status === 403) ended(e.message); }
 }

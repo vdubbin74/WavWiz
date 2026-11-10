@@ -12,9 +12,10 @@ That file is also installed next to the program (under `licenses/` with full lic
 
 | Component | Role | License (summary) | Notes |
 | --- | --- | --- | --- |
-| **FFmpeg** | Decode (and limited encode for CD rip helpers) | **LGPL** v2.1+ | Project builds an **LGPL-only** shared Windows build (no `--enable-gpl` / nonfree). Replaceable DLLs; source offer / build notes ship with the install. FFmpeg is a trademark of Fabrice Bellard; WavWiz is not endorsed by the FFmpeg project. |
+| **FFmpeg** | Decode, cover thumbnails, and CD-rip encode (FLAC, AAC, MP3) | **LGPL** v2.1+ | Project builds an **LGPL-only** shared Windows build (no `--enable-gpl` / nonfree). `--enable-libmp3lame` (LAME 3.100, also LGPL) is included; no GPL demuxers. Replaceable DLLs; source offer / build notes ship with the install. FFmpeg is a trademark of Fabrice Bellard; WavWiz is not endorsed by the FFmpeg project. |
 | **shairplay** (+ small WavWiz front end) | AirPlay receiver (`wavwiz-airplay.exe`) | **LGPL** (+ MIT/BSD/zlib parts in shairplay) | Runs as a **separate program**, not linked into the main WavWiz binary. AirPlay is a trademark of Apple Inc.; WavWiz is not affiliated with Apple. |
 | **librespot** | Optional Spotify Connect (`librespot.exe`) | **MIT** | Unofficial Spotify Connect client; **not** made or endorsed by Spotify. Requires the listener’s own **Spotify Premium** account. Separate process. Spotify is a trademark of Spotify AB. |
+| **LAME** | MP3 encode for the CD ripper (`libmp3lame`) | **LGPL** v2+ | Version 3.100, official source from SourceForge. Shared DLL next to FFmpeg; corresponding source in `licenses/source/`. |
 | **TagLib#** | Tags / cover art | **LGPL** v2.1 | Unmodified separate DLL. |
 | **NAudio**, **QRCoder**, **.NET** bits, etc. | Playback, pairing, runtime | Mostly **MIT** / Microsoft terms | Listed in `THIRD-PARTY-NOTICES.txt`. |
 | **Nunito** | Wordmark / UI font derivation | **SIL OFL 1.1** | See notices. |

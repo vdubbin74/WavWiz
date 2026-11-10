@@ -107,6 +107,9 @@ public static class FeaturesApi
         g.MapGet("/rip/formats", () => Results.Json(s.CdRip.Formats())).Req(Role.View);
         g.MapGet("/rip/jobs", () => Results.Json(s.CdRip.Jobs())).Req(Role.View);
         g.MapPost("/rip/start", async (HttpContext c) => { if (s.Cfg.TestTreatAllClientsAsRemote || !AuthService.IsThisMachine(c.Connection.RemoteIpAddress)) return Ext.Bad("CD ripping is only available in the WavWiz app on the PC.", 403); /* 0.4.8 F57 */ var b = await c.Request.Body(); var (id, err) = s.CdRip.Start(b); return err != null ? Ext.Bad(err) : Results.Json(new { id }); }).Req(Role.Admin);
+        g.MapGet("/rip/disc", async (HttpContext c, string? drive, CancellationToken ct) => Results.Json(await s.CdRip.DiscAsync(drive, CdRipService.ParseQueryFlag(c.Request.Query["refresh"]), ct))).Req(Role.View);
+        g.MapPost("/rip/jobs/{id:long}/cancel", (long id) => { var (ok, err) = s.CdRip.Cancel(id); return err != null ? Ext.Bad(err) : Results.Json(new { ok }); }).Req(Role.Admin);
+        g.MapGet("/rip/cover/{mbid}", async (string mbid, CancellationToken ct) => { var (bytes, typ, err) = await s.CdRip.CoverAsync(mbid, ct); return bytes == null ? Ext.Bad(err ?? "no cover", 404) : Results.File(bytes, typ ?? "image/jpeg"); }).Req(Role.View);
 
         // ---- B9 tag / cover auto-fill ----
         g.MapGet("/tags/status", () => Results.Json(s.TagFix.Status())).Req(Role.View);

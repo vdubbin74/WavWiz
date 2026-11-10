@@ -342,7 +342,7 @@ public sealed class CalibrationService
     public (CalSession? S, string? Error) Start(string mode, long referenceZoneId, string? micSource, string? micProcessing, long? onlyZoneId = null)
     {
         if (mode is not ("phone" or "same-recording" or "ear" or "pc-mic")) return (null, "mode must be pc-mic, phone, same-recording or ear");
-        if (referenceZoneId == 0) referenceZoneId = _zones.ReferenceZoneId;
+        if (referenceZoneId == 0) referenceZoneId = onlyZoneId is long oz ? _zones.ReferenceFor(oz) : _zones.ReferenceZoneId;   // 0.6.8-#15: a zone measures against its own reference
         var z = _zones.Zone(referenceZoneId);
         if (z == null) return (null, referenceZoneId == 0 ? "choose a reference speaker first" : "reference zone not found");
         if (!z.Connected) return (null, $"the reference speaker \"{z.Name}\" is offline - start its player first, or pick another reference");

@@ -2,7 +2,7 @@ import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
-import { networkCard, diagnosticsView } from './diag.js';
+import { networkCard, diagnosticsView, listenText } from './diag.js';
 import { pulseSel } from './motion.js';
 import { remoteView } from './remote.js';
 import { aboutBody } from './about.js';
@@ -170,7 +170,7 @@ export async function openSettings(S, refresh, nav, section) {
     // Network
     panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Home network'),
       h('p', { class: 'dim small' }, 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.'),
-      h('p', { class: 'small' }, `Listening on ${st.bind}`),
+      h('p', { class: 'small' }, `Listening on ${listenText(st.listen, st.bind)}`),   // 0.6.8-#9
       h('button', { class: 'btn', onclick: () => { const go = () => body.querySelector('#sec-away')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); const tab = body.querySelector('#stab-network'); if (tab && tab.getAttribute('aria-selected') !== 'true') { tab.click(); requestAnimationFrame(go); } else go(); } }, 'Away-from-home access (Tailscale)')));
     // F117: Away-from-home access is a normal Network card, right after Home network (local, then remote)
     { const rv = remoteView(S); panes.network.push(h('div', { class: 'card setpage', id: 'sec-away' }, rv.el)); }

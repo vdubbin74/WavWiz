@@ -59,7 +59,7 @@ export function airplayDevicesStrip(S, ctl) {
   }
   function row(x) {
     const added = outs.has(x.id), b = busy.get(x.id), self = apSelf(x), why = !added && !self ? apBlock(x, quirks) : null;
-    const actEl = self ? h('span', { class: 'dim small', title: 'This is WavWiz itself.' }, 'this server')
+    const actEl = self ? h('span', { class: 'dim small', title: 'This is WavWiz itself: it cannot be added (the audio would loop).' }, 'This server · AirPlay receiver broadcasting')
       : why ? h('span', { class: 'dim small apds-why' }, why)
       : h('button', { class: 'btn sm' + (added ? '' : ' primary'), type: 'button', 'data-act': added ? 'apds-remove' : 'apds-add', disabled: !!b, onclick: () => doAct(x, added) }, b || (added ? 'Remove' : 'Add'));
     return h('div', { class: 'row apds-row' + (self || why ? ' dim' : ''), 'data-id': x.id },
@@ -88,7 +88,7 @@ export function airplayDevicesStrip(S, ctl) {
     try {
       if (added) { await api('/dev/airplay/disconnect', { method: 'POST', body: { key: x.id } }); toast(`Removed ${x.name}`); }
       else { const r = await api('/dev/airplay/connect', { method: 'POST', body: { key: x.id } }); if (r && r.ok === false) throw new Error(r.error); toast(`Added ${x.name}`); }
-    } catch (e) { toast(added ? (e.message || `Couldn’t remove ${x.name}.`) : apErr(e.message, x.name), true); }
+    } catch (e) { toast(added ? (e.message || `Couldn’t remove ${x.name}.`) : (e.data?.text || apErr(e.message, x.name)), true); }   // 0.6.8-#14d: the server's error class wording
     busy.delete(x.id); await load(); paint(); window.dispatchEvent(new CustomEvent('wavwiz:airplay-outputs')); ctl?.refreshAll?.();
   }
   async function tick() {

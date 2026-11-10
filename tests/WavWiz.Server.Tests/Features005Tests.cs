@@ -26,7 +26,7 @@ public class Features005Tests
     }
 
     [Fact]
-    public void CdRip_Formats_default_flac_and_mp3_unavailable()
+    public void CdRip_Formats_default_flac_and_mp3_listed()
     {
         var dir = Path.Combine(Path.GetTempPath(), "wavwiz-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -42,7 +42,9 @@ public class Features005Tests
             var json = System.Text.Json.JsonSerializer.Serialize(f);
             Assert.Contains("\"defaultFormat\":\"flac\"", json);
             Assert.Contains("\"id\":\"mp3\"", json);
-            Assert.Contains("\"available\":false", json);
+            Assert.Contains("\"defaultQuality\":\"v0\"", json);
+            Assert.DoesNotContain("Not bundled", json);
+            Assert.Contains("v0", json);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }

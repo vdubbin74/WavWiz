@@ -7,7 +7,7 @@ import { LAYOUTS, loadLayout, saveLayout } from './panels.js';
 import { SLIDER_STYLES, loadSlider, applySlider } from './sliderstyle.js';
 import { NP_SEEKS, NP_BUTTONS, NP_ARTS, NP_EFFECTS, NP_COLORS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 import { npSeekMini, npBtnMini, npArtMini } from './npmini.js';
-import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap, isPhone } from './viz.js';
+import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap, isRealPhone as isPhone } from './viz.js';   // 0.6.8-#5: phone-only Appearance rules follow the device, not the window width
 import { VIZ_BLURB, vizName } from './vizcore.js';
 import { visualizerView } from './vizpage.js';
 import { themeCard } from './themes.js';

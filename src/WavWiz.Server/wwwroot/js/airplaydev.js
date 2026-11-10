@@ -10,7 +10,7 @@ export function airplayDevCard(S) {
   const self = x => /^WavWiz\s*[–-]/.test(x.name || '') && (x.addresses || []).concat(x.host ? [x.host] : []).some(a => a && (a === location.hostname || String(a).replace(/\.$/, '').toLowerCase() === location.hostname.toLowerCase()));
   async function loadOuts() { try { outs = new Set((await api('/dev/airplay/outputs')).map(o => o.key)); } catch { /* keep last */ } }
   function actCell(x) {
-    if (self(x)) return h('span', { class: 'dim small', title: 'This is WavWiz itself.' }, 'this server');
+    if (self(x)) return h('span', { class: 'dim small', title: 'This is WavWiz itself: it cannot be added (the audio would loop).' }, 'This server · AirPlay receiver broadcasting');
     const on = outs.has(x.id), b = busy.has(x.id), need = !on && (x.password || x.pin);
     return h('button', { class: 'btn sm', type: 'button', 'data-act': on ? 'disconnect' : 'connect', disabled: b || need,
       title: need ? 'Needs a password or PIN — not supported in this test UI yet.' : null, onclick: () => act(x, on) }, b ? (on ? 'Disconnecting…' : 'Connecting…') : on ? 'Disconnect' : 'Connect');

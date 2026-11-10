@@ -107,6 +107,10 @@ public sealed class Ap2Session : IAsyncDisposable
         _ctlRx = Task.Run(() => CtlLoop(_cts.Token));
     }
 
+    /// <summary>0.6.8-#14e: SET_PARAMETER with any body (DMAP metadata, artwork, progress) on the encrypted control channel.</summary>
+    public Task<RtspResponse> SetParameterAsync(byte[] body, string contentType, Dictionary<string, string>? h = null, CancellationToken ct = default) =>
+        Rtsp.SendAsync("SET_PARAMETER", Uri, h, body, contentType, ct);
+
     public Task<RtspResponse> SetVolumeAsync(double db, CancellationToken ct = default) =>
         Rtsp.SendAsync("SET_PARAMETER", Uri, null, Encoding.ASCII.GetBytes(FormattableString.Invariant($"volume: {db:0.000000}\r\n")), "text/parameters", ct);
 

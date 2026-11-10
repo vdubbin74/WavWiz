@@ -131,7 +131,14 @@ public sealed class AirPlayBrowseState
     }
 
     public List<string> AddressesOf(string host, DateTimeOffset now)
-    { lock (_lock) return _a.TryGetValue(host, out var s) ? s.Where(kv => kv.Value > now).Select(kv => kv.Key).OrderBy(x => x).ToList() : new(); }
+    { lock (_lock) return _a.TryGetValue(host, out var s) ? s.Where(kv => kv.Value > now && UsableAddress(kv.Key)).Select(kv => kv.Key).OrderBy(x => x).ToList() : new(); }
+
+    /// <summary>A reachable unicast address. 0.0.0.0 / :: are bind wildcards, not a device address.</summary>
+    public static bool UsableAddress(string? a)
+    {
+        if (string.IsNullOrWhiteSpace(a) || !IPAddress.TryParse(a.TrimEnd('.'), out var ip)) return false;
+        return !ip.Equals(IPAddress.Any) && !ip.Equals(IPAddress.IPv6Any) && !IPAddress.IsLoopback(ip);
+    }
 
     /// <summary>Merge _raop and _airplay services into devices (by MAC/deviceid, falling back to name).</summary>
     public List<AirPlayDevice> Devices(DateTimeOffset now)

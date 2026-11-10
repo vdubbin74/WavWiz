@@ -133,13 +133,13 @@ export function calibrationExtras(S, settings, { admin, put, go }) {
 export const JB_DEFAULTS = { style: 'modern', folders: [], playlists: [], perGuest: 3, voteSkip: true, votesNeeded: 3, explicitFilter: false, artistCooldownMin: 0, autofill: { kind: 'playlist', id: null, genre: '' }, beat: 50, cdSound: false, showInDevices: true, defaultSpeakers: null, hasPin: false };
 export function jukeboxPane(S, settings, { admin }) {
   const box = h('div', { class: 'jbset' });
-  let cfg = { ...JB_DEFAULTS }, roots = [], playlists = [];
+  let cfg = { ...JB_DEFAULTS }, roots = [], playlists = [], genres = [];
   const save = async (patch, el) => { cfg = { ...cfg, ...patch }; try { await api('/jukebox/config', { method: 'PUT', body: patch }); savedMark(el); paintPreview(); } catch (e) { toast('Not saved. ' + e.message, true); } };
   // 0.3.4 H4b: one preview card per style (true layout, scaled); picking a card switches the style
   const cards = h('div', { class: 'jbcards', role: 'radiogroup', 'aria-label': 'Display style' });
   function paintPreview() { cards.querySelectorAll('.jbcard').forEach(c => { const on = c.dataset.style === cfg.style; c.classList.toggle('on', on); c.setAttribute('aria-checked', String(on)); }); }
   async function load() {
-    try { [cfg, roots, playlists] = await Promise.all([api('/jukebox/config'), api('/library/roots').catch(() => []), api('/playlists').catch(() => [])]); cfg = { ...JB_DEFAULTS, ...cfg }; } catch (e) { box.replaceChildren(h('p', { class: 'err' }, 'Jukebox settings could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
+    try { [cfg, roots, playlists, genres] = await Promise.all([api('/jukebox/config'), api('/library/roots').catch(() => []), api('/playlists').catch(() => []), api('/library/genres').catch(() => [])]); cfg = { ...JB_DEFAULTS, ...cfg }; } catch (e) { box.replaceChildren(h('p', { class: 'err' }, 'Jukebox settings could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
     const A = el => adminOnly(S, el, admin);
     const card = (v, t, sub) => A(h('button', { type: 'button', role: 'radio', class: 'jbcard' + (cfg.style === v ? ' on' : ''), 'data-style': v, 'aria-checked': String(cfg.style === v), 'aria-label': `${t} style`, onclick: ev => { if (cfg.style !== v) save({ style: v }, ev.currentTarget); } },
       jbPreview(v), h('span', { class: 'jbcard-l' }, h('span', { class: 'jbradio', 'aria-hidden': 'true' }), h('span', { class: 'grow' }, h('b', null, t), h('small', null, sub)), h('span', { class: 'jbcard-live' }, 'LIVE PREVIEW'))));
@@ -147,7 +147,12 @@ export function jukeboxPane(S, settings, { admin }) {
     const tog = (k, l) => h('label', { class: 'row' }, h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg[k], 'aria-label': l, onchange: ev => save({ [k]: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })), l);
     const multi = (list, key, label, val, txt) => h('div', { class: 'jbsrc', role: 'group', 'aria-label': label }, list.length ? list.map(x => h('label', { class: 'row small' }, A(h('input', { type: 'checkbox', checked: (cfg[key] || []).includes(val(x)), onchange: ev => { const set = new Set(cfg[key] || []); ev.target.checked ? set.add(val(x)) : set.delete(val(x)); save({ [key]: [...set] }, ev.target); } })), txt(x))) : h('span', { class: 'small dim' }, 'None yet.'));
     const pin = A(h('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: 8, placeholder: cfg.hasPin ? '•••• (set)' : '4-8 digits', 'aria-label': 'Host PIN', style: 'width:120px' }));
-    const fillSel = A(wsel({ 'aria-label': 'Auto-fill from', onchange: ev => save({ autofill: { ...cfg.autofill, kind: 'playlist', id: +ev.target.value || null } }, ev.target) }, h('option', { value: '' }, 'Off'), playlists.map(p => h('option', { value: p.id, selected: cfg.autofill?.id === p.id }, p.name))));
+    // 0.6.8-#6a: the server fills from a playlist, a genre, or (neither) any allowed song - say so instead of a lone "Off"
+    const af = cfg.autofill || {}, afVal = af.id != null ? 'p:' + af.id : af.genre ? 'g:' + af.genre : '';
+    const fillSel = A(wsel({ 'aria-label': 'Auto-fill from', onchange: ev => { const v = ev.target.value; save({ autofill: v.startsWith('p:') ? { kind: 'playlist', id: +v.slice(2), genre: '' } : v.startsWith('g:') ? { kind: 'genre', id: null, genre: v.slice(2) } : { kind: 'playlist', id: null, genre: '' } }, ev.target); } },
+      h('option', { value: '', selected: afVal === '' }, 'Any allowed song'),
+      playlists.map((p, i) => h('option', { value: 'p:' + p.id, selected: afVal === 'p:' + p.id, 'data-group': i === 0 ? 'Playlists' : null }, p.name)),
+      genres.map((g, i) => h('option', { value: 'g:' + g.name, selected: afVal === 'g:' + g.name, 'data-group': i === 0 ? 'Genres' : null }, g.name))));
     box.replaceChildren(
       h('div', { class: 'card jbstyle', id: 'sec-jbstyle' }, h('h3', null, 'Display style ', admin ? null : adminTag()), h('p', { class: 'small dim' }, 'How the guest TV screen looks. Guests’ phones follow the same style.'),
         (cards.replaceChildren(card('modern', 'Modern (default)', 'Clean, follows your theme'), card('retro', 'Retro CD', 'Chrome-and-neon CD jukebox')), cards),

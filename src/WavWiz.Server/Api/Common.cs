@@ -34,7 +34,15 @@ public sealed class Services
     public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
     public Library.NasLogon? Nas;      // 0.1.3
     public Library.SubsonicService? Remote;      // F164 remote libraries (Subsonic / OpenSubsonic client)
-    public WavWiz.Core.Discovery.ServerBeacon Beacon() => new(ServerId, ServerName ?? Environment.MachineName, System.Net.IPAddress.TryParse(Cfg.BindAddress, out var ip) && !System.Net.IPAddress.IsLoopback(ip) ? Cfg.BindAddress : "", Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
+    public WavWiz.Core.Discovery.ServerBeacon Beacon()
+    {
+        var raw = Cfg.BindAddress.Trim('[', ']');
+        string host = "";
+        if (System.Net.IPAddress.TryParse(raw, out var ip) && !System.Net.IPAddress.IsLoopback(ip))
+            host = (ip.Equals(System.Net.IPAddress.Any) || ip.Equals(System.Net.IPAddress.IPv6Any) ? Net.NetworkHelper.AdvertiseAddress(ip) : ip).ToString();
+        if (host is "0.0.0.0" or "::" or "::1" or "127.0.0.1") host = "";
+        return new(ServerId, ServerName ?? Environment.MachineName, host, Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
+    }
     public string? ServerName => Db.Setting("server.name") is string s ? JsonSerializer.Deserialize<string>(s) : null;
 }
 

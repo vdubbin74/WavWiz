@@ -1,5 +1,7 @@
 // 0.0.7: pure helpers for the auto-join (kept DOM-free so they are unit tested). 0.2.0: EVERY browser (desktop, phone, TV) joins as a speaker.
 export const isPhoneUa = (ua = globalThis.navigator?.userAgent || '', touchPoints = globalThis.navigator?.maxTouchPoints || 0) => !isTvUa(ua) && (/iPhone|iPad|iPod|Android/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1));
+/** 0.6.8-#11: an actual phone (iPhone / iPod / Android phone) - not a tablet, not a narrow PC window. Phone-only trims (pins, extra buttons) key off this. */
+export const isHandset = (ua = globalThis.navigator?.userAgent || '') => !isTvUa(ua) && (/iPhone|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua)));
 /** 0.2.0 item 1: smart-TV / streaming-stick browsers (Samsung Tizen, LG webOS, Android TV / BRAVIA, Fire TV, Chromecast, HbbTV, NetCast, Hisense VIDAA). */
 export const isTvUa = (ua = globalThis.navigator?.userAgent || '') => /Tizen|Web0S|webOS|SMART-TV|SmartTV|Android TV|AndroidTV|BRAVIA|\bAFT[A-Z0-9]|CrKey|HbbTV|NetCast|VIDAA|GoogleTV|Roku|PhilipsTV|Viera|AQUOS/i.test(ua);
 /** The WavWiz Player window (WebView2) plays through its own Windows audio connection: its page must never ALSO join as a web speaker. */

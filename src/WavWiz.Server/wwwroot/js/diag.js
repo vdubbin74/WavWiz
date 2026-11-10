@@ -27,11 +27,13 @@ export function vizReport() {
 }
 function vizCard() {
   const box = h('div', { class: 'card', id: 'diag-viz' }), out = h('div');
-  const paint = () => out.replaceChildren(...vizReport().map(([t, s, d]) => h('div', { class: 'chk ' + (s === 'ok' ? 'done' : '') }, h('span', { class: 'mark', style: s === 'warn' ? 'border-color:#ffb300;color:#ffb300' : '' }, ICON[s] || '?'), h('div', { class: 'grow' }, h('b', null, t), ' ', h('span', { class: 'dim' }, d)))));
+  const paint = () => out.replaceChildren(...vizReport().map(([t, s, d]) => h('div', { class: 'chk ' + (s === 'ok' ? 'done' : '') }, h('span', { class: 'mark ' + s }, ICON[s] || '?'), h('div', { class: 'grow' }, h('b', null, t), ' ', h('span', { class: 'dim' }, d)))));
   paint(); box.append(h('div', { class: 'row wrap' }, h('h3', { class: 'grow' }, 'Visualizer (this device)'), h('button', { class: 'btn', onclick: paint }, 'Refresh')), out);
   return box;
 }
 
+/** 0.6.8-#9: "Home network + Tailscale/VPN: 192.168.1.20, 100.88.1.2 (Tailscale)" instead of a bare 0.0.0.0. */
+export const listenText = (l, bind) => l?.addresses?.length ? `${l.label}: ${l.addresses.map(a => a.address + (a.kind === 'tailscale' ? ' (Tailscale)' : a.kind === 'vpn' ? ' (VPN)' : '')).join(', ')}` : (l?.label || bind || '');
 const fmtAgo = sec => sec == null ? 'never' : sec < 90 ? `${sec} s ago` : sec < 5400 ? `${Math.round(sec / 60)} min ago` : `${Math.round(sec / 3600)} h ago`;
 /** 0.1.3: AirPlay / Spotify buffer and drop-outs, orphaned sessions, with Restart AirPlay and Clear orphans. */
 function receiversCard(S) {
@@ -69,7 +71,7 @@ export function networkCard(S) {
     let d; try { d = await api('/network' + (fresh ? '?fresh=true' : '')); } catch (e) { out.replaceChildren(h('p', { class: 'small dim' }, 'Network check is not available: ' + e.message)); return; }
     const prof = p => p === 'Unknown' ? h('span', { class: 'pill' }, 'type unknown') : h('span', { class: 'pill ' + (p === 'Public' ? 'bad' : 'ok') }, p);
     out.replaceChildren(
-      h('div', null, 'WavWiz listens on ', h('b', { class: 'mono' }, d.bind), d.status === 'ok' ? h('span', { class: 'okc' }, ' - looks good.') : null),
+      h('div', null, 'WavWiz listens on ', h('b', null, listenText(d.listen, d.bind)), d.listen?.addresses?.length && d.listen.addresses[0].address !== d.bind ? h('span', { class: 'small dim mono' }, ` (${d.bind})`) : null, d.status === 'ok' ? h('span', { class: 'okc' }, ' - looks good.') : null),
       d.problems.length ? h('ul', { class: 'warnc' }, d.problems.map(p => h('li', null, p))) : null,
       d.fixes.length ? h('div', { class: 'small' }, h('b', null, 'What to do: '), h('ul', null, d.fixes.map(p => h('li', null, p)))) : null,
       h('div', { class: 'sec' }, "This PC's home-network addresses"),
@@ -80,17 +82,47 @@ export function networkCard(S) {
   return box;
 }
 
+/** 0.6.8-#7: checks run FROM this device (browser / WavWiz Player) TO the server it is connected to - never localhost.
+ * host = the server this page came from (location), so a Player on PC-B testing a server on PC-A tests PC-A. */
+export async function clientChecks(S, server, { loc = globalThis.location, fetchFn = (...a) => fetch(...a), now = () => performance.now() } = {}) {
+  const host = loc.hostname, name = server?.name || host, rows = [];
+  rows.push({ id: 'c-server', title: 'Connected server', status: 'ok', detail: `${name} at ${loc.host}` });
+  const ping = async url => { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000), t0 = now(); try { const r = await fetchFn(url, { cache: 'no-store', signal: ctl.signal, mode: 'cors' }); const j = await r.json(); return j?.app === 'wavwiz' ? Math.round(now() - t0) : -1; } catch { return -1; } finally { clearTimeout(t); } };
+  const ms = await ping(`${loc.protocol}//${loc.host}/api/v1/ping?t=${Date.now()}`);
+  rows.push(ms >= 0 ? { id: 'c-web', title: 'Web connection from this device', status: ms > 800 ? 'warn' : 'ok', detail: `${name} answered in ${ms} ms.` }
+    : { id: 'c-web', title: 'Web connection from this device', status: 'fail', detail: `${name} did not answer from this device.`, fix: 'Check that this device and the server are on the same network.' });
+  const ws = S?.connected;
+  rows.push({ id: 'c-live', title: 'Live updates (WebSocket)', status: ws ? 'ok' : ws === false ? 'warn' : 'unknown', detail: ws ? `Connected to ${name}.` : ws === false ? `Reconnecting to ${name}…` : 'Not known yet.' });
+  if (server?.httpsPort) {
+    if (loc.protocol === 'https:') rows.push({ id: 'c-https', title: 'HTTPS from this device', status: 'ok', detail: `This page is open over HTTPS and this device trusts ${name}'s certificate.` });
+    else { const sm = await ping(`https://${host}:${server.httpsPort}/api/v1/ping?t=${Date.now()}`);
+      rows.push(sm >= 0 ? { id: 'c-https', title: 'HTTPS from this device', status: 'ok', detail: `https://${host}:${server.httpsPort} answers and is trusted here.` }
+        : { id: 'c-https', title: 'HTTPS from this device', status: 'warn', detail: `https://${host}:${server.httpsPort} was refused from this device: the certificate is not trusted here, or the port is blocked.`, fix: 'Only needed for phone microphones and phone speakers. Settings > Phone & HTTPS shows how to trust it.' }); }
+  }
+  return rows;
+}
+/** 0.6.8-#7: the Status line agrees with the rows below: problems among the checks are counted, never "Everything looks fine" next to a ✕. */
+export function statusSummary(warnings, rows) {
+  const fail = rows.filter(r => r.status === 'fail').length, warn = rows.filter(r => r.status === 'warn').length;
+  if (fail || warn) return { cls: fail ? 'err' : 'warnc', text: [fail ? `${fail} problem${fail > 1 ? 's' : ''}` : null, warn ? `${warn} warning${warn > 1 ? 's' : ''}` : null].filter(Boolean).join(' and ') + ' - see the checks below.' };
+  if (warnings?.length) return null;
+  return { cls: 'okc', text: 'Everything looks fine.' };
+}
+
 export function diagnosticsView(S) {
   const root = h('div'); let timer = null;
   // 0.2.1 F8: the Status card (moved here from Settings) - shown to everyone, even when the detailed checks need Control access
-  const statusCard = st => h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
-    h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${st.bind}`),
-    st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : h('p', { class: 'okc' }, 'Everything looks fine.'));
+  const statusCard = st => { const sum = d ? statusSummary(st.warnings, [...d.checks, ...cRows]) : (st.warnings.length ? null : { cls: 'okc', text: 'Everything looks fine.' });
+    return h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
+      h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${listenText(st.listen, st.bind)}`),
+      st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : null,
+      sum ? h('p', { class: sum.cls, 'data-sum': '1' }, sum.text) : null); };
   // F111: build() once (and on manual Refresh); the 15 s interval calls refresh(), which patches Status / checks / Devices in place.
   // Viz / Receivers / Network / AirPlay (developer) cards are never recreated by the interval, so nothing flashes or loses scroll.
-  let d = null, built = false, busy = false;
+  let d = null, built = false, busy = false, cRows = [];
+  const clientCard = h('div', { class: 'card', id: 'diag-client' });
   const statusSlot = h('div'), checkedP = h('p', { class: 'small dim' }), checksCard = h('div', { class: 'card' }), devSlot = h('div');
-  const checksNodes = () => d.checks.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark', style: c.status === 'fail' ? 'border-color:#e5483f;color:#e5483f' : c.status === 'warn' ? 'border-color:#ffb300;color:#ffb300' : '' }, ICON[c.status] || '?'),
+  const chkNodes = list => list.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark ' + c.status }, ICON[c.status] || '?'),
     h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ' + c.fix) : null)));
   const devNodes = () => {
     const open = new Set([...devSlot.querySelectorAll('details[open]')].map(x => x.dataset.dev));
@@ -99,19 +131,21 @@ export function diagnosticsView(S) {
       r.detail ? h('div', { class: 'small' }, r.detail) : null,
       r.events.length ? h('details', { 'data-dev': r.name, open: open.has(r.name) }, h('summary', { class: 'small' }, `Recent events (${r.events.length})`), h('table', { class: 'tbl' }, h('tbody', null, r.events.map(e => h('tr', null, h('td', { class: 'mono small' }, e.at), h('td', null, e.kind), h('td', null, e.text)))))) : null)) : [h('p', { class: 'dim' }, 'No devices yet.')];
   };
-  const report = () => [`WavWiz ${d.version} ${d.channel} diagnostics ${d.generatedAt}`, d.os, '', ...vizReport().map(([t, s, x]) => `[VIZ ${s.toUpperCase()}] ${t}: ${x}`), '', ...d.checks.map(c => `[${c.status.toUpperCase()}] ${c.title}: ${c.detail}${c.fix ? '  -> ' + c.fix : ''}`), '', ...d.devices.map(r => `DEVICE ${r.name} (${r.link || 'link unknown'}, ${r.remoteIp || 'no ip'}): ${r.state}; drops ${r.drops}, reconnects ${r.reconnects}, underrun events ${r.underrunEvents}\n   ` + r.events.map(e => `${e.at} ${e.kind} ${e.text}`).join('\n   '))].join('\n');
+  const report = () => [`WavWiz ${d.version} ${d.channel} diagnostics ${d.generatedAt}`, d.os, '', ...vizReport().map(([t, s, x]) => `[VIZ ${s.toUpperCase()}] ${t}: ${x}`), '', ...[...d.checks, ...cRows].map(c => `[${c.status.toUpperCase()}] ${c.title}: ${c.detail}${c.fix ? '  -> ' + c.fix : ''}`), '', ...d.devices.map(r => `DEVICE ${r.name} (${r.link || 'link unknown'}, ${r.remoteIp || 'no ip'}): ${r.state}; drops ${r.drops}, reconnects ${r.reconnects}, underrun events ${r.underrunEvents}\n   ` + r.events.map(e => `${e.at} ${e.kind} ${e.text}`).join('\n   '))].join('\n');
   // keep the nearest scrolling ancestor (the Settings content pane) where the user left it
   const keepScroll = fn => { let sc = root.parentElement; while (sc && sc.scrollHeight <= sc.clientHeight) sc = sc.parentElement; const y = sc ? sc.scrollTop : 0; fn(); if (sc) sc.scrollTop = y; };
   async function fetchAll() {
     const st = await api('/status').catch(() => null);
     let dd = null, err = null; try { dd = await api('/diagnostics'); } catch (e) { err = e; }
+    if (dd) cRows = await clientChecks(S, dd.server).catch(() => []);
     return { st, dd, err };
   }
   function patch(st) {
     keepScroll(() => {
       statusSlot.replaceChildren(...(st ? [statusCard(st)] : []));
       checkedP.textContent = `Checked ${d.generatedAt}. Nothing here leaves your network. “?” means WavWiz could not check it - never that it is fine.`;
-      checksCard.replaceChildren(...checksNodes());
+      checksCard.replaceChildren(...chkNodes(d.checks));
+      clientCard.replaceChildren(h('h3', null, `From this device to ${d.server?.name || location.hostname}`), ...chkNodes(cRows));
       devSlot.replaceChildren(...devNodes());
     });
   }
@@ -123,7 +157,7 @@ export function diagnosticsView(S) {
       if (!dd) { built = false; root.replaceChildren(...(st ? [statusCard(st)] : []), h('p', { class: 'err' }, err?.status === 403 ? 'Diagnostics need Control or Admin access.' : err?.message || 'Diagnostics are not available.')); return; }
       d = dd; devSlot.replaceChildren(); patch(st);
       keepScroll(() => root.replaceChildren(h('div', { class: 'row wrap' }, h('h2', { class: 'grow' }, 'Diagnostics'), h('button', { class: 'btn', onclick: build }, 'Refresh'), h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(report()); toast('Report copied'); } catch { toast('Could not copy automatically - select the text on the page.', true); } } }, 'Copy report')),
-        statusSlot, checkedP, checksCard,
+        statusSlot, checkedP, checksCard, clientCard,
         vizCard(), receiversCard(S), networkCard(S), ...[airplayDevCard(S)].filter(Boolean),
         h('h3', null, 'Devices'), devSlot));
       built = true;

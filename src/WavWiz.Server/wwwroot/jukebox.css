@@ -270,3 +270,16 @@
 .jb-stage .jb-logo{font-size:20px} .jb-stage .jb-logo b{font-size:30px}
 .jb-stage .jb-chip{font-size:20px;padding:7px 14px} .jb-stage .jb-chips{gap:12px}
 .jb-stage .jb-prog{height:8px} .jb-stage .jb-prog>b{width:18px;height:18px;margin:-9px 0 0 -9px}
+
+/* 0.6.8-#6d: view-only TV board (?tv=1): bigger type, no inputs, Up next + join QR, fills a 16:9 screen */
+body.jbtv main{max-width:1100px;padding:3vh 4vw}
+body.jbtv .jbg-title{font-size:clamp(24px,3.2vw,44px)}
+body.jbtv .jb-np{font-size:clamp(18px,2.2vw,30px)}
+body.jbtv .jb-np img{width:clamp(96px,14vw,220px);height:auto;aspect-ratio:1}
+body.jbtv .jb-row{font-size:clamp(15px,1.5vw,22px)}
+body.jbtv .jbtv-n{min-width:1.6em;text-align:right;color:var(--dim,inherit);font-variant-numeric:tabular-nums}
+body.jbtv .jb-foot{position:static;display:block;margin-top:3vh;background:none;border:0}
+body.jbtv .jbtv-join{display:flex;align-items:center;gap:18px}
+body.jbtv .jbtv-join img{width:clamp(110px,12vw,200px);height:auto;aspect-ratio:1;background:white;padding:8px;border-radius:3px}
+body.jbtv .jbtv-join b{display:block;font-size:clamp(18px,2vw,28px)}
+body.jbtv .jbtv-join small{font-size:clamp(13px,1.2vw,18px);opacity:.8}

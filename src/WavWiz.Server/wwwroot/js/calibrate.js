@@ -2,6 +2,7 @@ import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, undoToast } from './util.js';
 import { isAdmin, thisDevice, ADMIN_HINT } from './ui.js';
 import { isPhoneUa, isPlayerUa } from './phonejoin.js';
+import { refFor } from './zoneref.js';
 import { CAL_STEPS, EAR_LINES, GUIDE_TITLE, GUIDE_SECTIONS, stepLabel, calFix } from './calguide.js';
 import { guideGroups, guideText, countdownOn, setCountdown, COUNTDOWN_S } from './calmic-core.js';
 
@@ -46,7 +47,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   const d = dialog('Calibrate speakers', outer, [], { onClose: () => { cleanup(); opts.onClose?.(); refresh && refresh(); } });
   if (zones.length < 2) { body.replaceChildren(h('p', null, 'You need at least two connected speakers: one is the reference (the one you leave alone) and the others are measured against it.'), h('p', { class: 'dim' }, 'You can still type a delay by hand: open a speaker’s Settings and use Delay.')); return; }
 
-  const admin = isAdmin(S) || !!opts.linkAdmin, house = S.zones.find(z => z.reference) || null, mine = thisDevice(S);
+  const admin = isAdmin(S) || !!opts.linkAdmin, mine = thisDevice(S), house = refFor(S, presetZoneId ?? (!admin ? mine?.id : null));   // 0.6.8-#15: the zone's own reference
   const hold = !!(house && !house.connected);
   if (hold) {
     body.replaceChildren(h('div', { class: 'card', role: 'alert' }, h('h3', { class: 'amber' }, `The reference speaker “${house.name}” is offline`),

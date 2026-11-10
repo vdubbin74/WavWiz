@@ -6,7 +6,8 @@ namespace WavWiz.Server.Playback;
 
 public enum PlayState { Stopped, Playing, Paused }
 
-public sealed record NowPlaying(string State, int Index, long PositionMs, long DurationMs, QueueItem? Item, string? LiveTitle, string? Notice, bool Shuffle, string Repeat, long Version, int NextIndex = -1, QueueItem? NextTrack = null);
+public sealed record NowPlaying(string State, int Index, long PositionMs, long DurationMs, QueueItem? Item, string? LiveTitle, string? Notice, bool Shuffle, string Repeat, long Version, int NextIndex = -1, QueueItem? NextTrack = null,
+    string? LiveArtist = null, string? LiveSong = null, bool LiveArt = false);   // 0.6.8-#8: radio song artist/title; LiveArt = a song picture is at /art/radio/{id}/live
 
 /// <summary>
 /// Owns the queue and the house stream (spec 5.1, 10). One lock serializes the StreamEngine (single-threaded by contract); a 10 ms timer pumps it.
@@ -202,6 +203,8 @@ public sealed class Conductor : IDisposable
     }
 
     private void Bump() { Interlocked.Increment(ref _version); Arm(); }
+    /// <summary>0.6.8-#8: the song picture URL the playing station sent (amgArtworkURL), or null.</summary>
+    public string? LiveArtUrl(long stationId) { lock (_l) { var it = _index >= 0 && _index < _queue.Count ? _queue[_index] : null; return it is { Kind: "radio" } && it.RefId == stationId ? RadioLive.Parse(_liveTitle ?? _radio?.NowPlaying)?.ArtUrl : null; } }
     private void DisposeSource() { try { _source?.Dispose(); } catch { } _source = null; _radio = null; }
 
     // ---------------- queue building ----------------
@@ -472,8 +475,9 @@ public sealed class Conductor : IDisposable
         var state = _state.ToString().ToLowerInvariant();
         if (_state == PlayState.Playing && item != null && IsReceiver(item.Kind) && !LiveActiveNoLock(item)) state = "paused";      // paused on the phone; the house keeps the stream open
         int nx = item == null ? -1 : UpcomingNoLock(idx);
-        return new NowPlaying(state, idx, pos, item?.DurationMs ?? 0, item, item?.Kind == "radio" ? (_liveTitle ?? _radio?.NowPlaying) : null, _notice, _shuffle, _repeat.ToString().ToLowerInvariant(), Interlocked.Read(ref _version),
-            nx, nx >= 0 && nx < _queue.Count ? _queue[nx] : null);
+        var live = item?.Kind == "radio" ? RadioLive.Parse(_liveTitle ?? _radio?.NowPlaying) : null;   // 0.6.8-#8
+        return new NowPlaying(state, idx, pos, item?.DurationMs ?? 0, item, live?.Display, _notice, _shuffle, _repeat.ToString().ToLowerInvariant(), Interlocked.Read(ref _version),
+            nx, nx >= 0 && nx < _queue.Count ? _queue[nx] : null, live?.Artist, live?.Title, live?.ArtUrl != null);
     }
     /// <summary>0.4.9 F73: the song that will really play when this one ends - the server is the source of truth for "Up next". Shuffle: the remembered
     /// pick (made now if there is none yet; the same pick the gapless pre-open, the auto-advance and Next use). Off: the list neighbour (Repeat All wraps).

@@ -54,7 +54,10 @@ export function openSongSheet({ item, label = 'Song actions', menuClass = '', it
     if (ev.key === 'Escape' && !el.querySelector('.pldrop')) { ev.preventDefault(); ev.stopImmediatePropagation(); close(); } };
   el.addEventListener('close', close);
   el.addEventListener('cancel', ev => { ev.preventDefault(); if (picker) { picker.close(); picker = null; } else close(); });
-  el.addEventListener('click', ev => { if (ev.target === el) { const r = el.getBoundingClientRect(); if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) close(); } });
+  // 0.6.8-#4: the tap / long-press that opened the sheet can deliver a trailing click on the new backdrop. Only a press that STARTED
+  // after the sheet opened may dismiss it from the backdrop.
+  let pressed = false; el.addEventListener('pointerdown', () => { pressed = true; });
+  el.addEventListener('click', ev => { if (ev.target === el && pressed) { const r = el.getBoundingClientRect(); if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) close(); } });
   const observer = new MutationObserver(records => {
     if (!el.isConnected || (opener && !opener.isConnected)) return close('invalid');
     // Only the router data-view attribute means route invalidation; ignore ordinary art/list mutations.

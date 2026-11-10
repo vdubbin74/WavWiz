@@ -22,7 +22,7 @@ export function airplayOutCard(admin) {
         h('b', null, o.name), h('span', { class: 'dim small' }, ` ${o.kind} · ${o.address}`), o.error ? h('span', { class: 'err small' }, ' ' + o.error) : null))
         : h('div', { class: 'dim small' }, 'No AirPlay speakers connected.')),
       h('details', { class: 'apo-fw' }, h('summary', { class: 'small' }, 'Windows firewall rules'),
-        h('p', { class: 'dim small' }, 'Run once in an administrator prompt (private networks only). PTP needs UDP 319 and 320.'),
+        h('p', { class: 'dim small' }, 'Easiest: run WavWiz Setup again and tick “Allow AirPlay speakers through the firewall”. Or run these once in an administrator prompt (private networks, local subnet only). PTP needs UDP 319 and 320.'),
         ...s.firewall.map(r => h('div', { class: 'row apo-fwrow' }, h('pre', { class: 'mono small grow' }, r),
           h('button', { class: 'btn sm', type: 'button', 'data-act': 'apo-copy', title: 'Copy this command', onclick: async () => { try { await navigator.clipboard.writeText(r); toast('Copied'); } catch { toast('Couldn’t copy - select the text instead.', true); } } }, 'Copy')))));
   }

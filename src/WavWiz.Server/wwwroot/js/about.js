@@ -1,10 +1,15 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.6.7';
+export const WHATS_NEW_VERSION = '0.6.8';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.6.8
+  ['CD ripper', 'Insert a disc and the artist, album, year and track names fill in from MusicBrainz (or from the disc itself). Pick a format — FLAC, AAC, WAV or MP3 — watch live progress, and Cancel if it stalls. Your own AirPlay outputs are hidden from the Find list.'],
+  ['MP3 rips', 'LAME is bundled with WavWiz (LGPL). Choose VBR V0 (default), VBR V2 or CBR 320 kbps; tags and cover art are written into the files.'],
+  ['Keep playing icon', 'Keep playing is an infinity icon on every queue — the docked and expanded desktop Queue, every zone queue, a pinned Queue, and the phone Queue. It matches the lock button: same outline when Off, the same glow when a mode is on; tap it for the menu.'],
+  ['Radio Library', 'Your saved stations come first. Search below with genre and country pickers, and Add station / Add podcast open only when you ask.'],
   // 0.6.7
   ['Phone Queue header', 'Title and zone share one row; Keep playing sits under the info line; Save, Recent, Clear and Lock are matching 44 px squares in a 2×2 grid.'],
   ['Square close buttons', 'Close × controls are square with a white X. Focus uses your theme accent ring (Sound sheet keeps its ring on open).'],
@@ -206,7 +211,8 @@ export const WHATS_NEW = [
 ];
 
 const CREDITS = [
-  ['FFmpeg (libavcodec, libavformat, libavfilter, libswresample, libswscale)', 'LGPL 2.1+ / 3', 'Decoding of music files and radio streams, cover thumbnails, and encoding ripped CD audio to FLAC/AAC. This product uses libraries from the FFmpeg project under the LGPL; no GPL or non-free parts (libcdio demuxer not enabled). LAME/MP3 encode is not shipped.', 'https://ffmpeg.org'],
+  ['FFmpeg (libavcodec, libavformat, libavfilter, libswresample, libswscale)', 'LGPL 2.1+ / 3', 'Decoding of music files and radio streams, cover thumbnails, and encoding ripped CD audio to FLAC, AAC and MP3. This product uses libraries from the FFmpeg project under the LGPL; no GPL or non-free parts (libcdio demuxer not enabled).', 'https://ffmpeg.org'],
+  ['LAME (libmp3lame)', 'LGPL 2.0+', 'MP3 encoding for the CD ripper. Official 3.100 source from https://lame.sourceforge.io/ ; bundled as a replaceable shared library next to FFmpeg.', 'https://lame.sourceforge.io/'],
   ['libcdio / libcdio-paranoia (wavwiz-cdda helper)', 'LGPL 2.1+', 'Reading audio CDs (CDDA). Shipped as a separate helper (not inside FFmpeg — FFmpeg\'s libcdio demuxer is GPL-gated and is not enabled)', 'https://www.gnu.org/software/libcdio/'],
   ['Chromaprint (fpcalc)', 'LGPL 2.1+', 'Audio fingerprints for AcoustID tag lookup (optional; needs an AcoustID API key)', 'https://acoustid.org/chromaprint'],
   ['TagLib# (TagLibSharp)', 'LGPL 2.1', 'Reading song tags and embedded covers', 'https://github.com/mono/taglib-sharp'],

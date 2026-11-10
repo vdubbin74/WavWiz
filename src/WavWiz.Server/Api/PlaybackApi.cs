@@ -57,9 +57,10 @@ public static class PlaybackApi
                     return new() { Conductor.UrlItem(url, b.Str("name") ?? "") };
                 }
             case "remote":
-                {   // F164: {kind:"remote", server, album} or {kind:"remote", server, songs:[{id,title,artist,album,durationMs,coverArt,trackNo,year}]}
+                {   // F164/F175: {kind:"remote", server, album} | {kind:"remote", server, artist} | {kind:"remote", server, songs:[...]}
                     var sid = b.Str("server") ?? ""; if (s.Remote == null || sid == "") { error = "no remote library given"; return new(); }
                     if (b.Str("album") is { Length: > 0 } alb) { try { return s.Remote.AlbumItems(sid, alb).GetAwaiter().GetResult(); } catch (Exception e) { error = e.Message; return new(); } }
+                    if (b.Str("artist") is { Length: > 0 } art) { try { return s.Remote.ArtistItems(sid, art).GetAwaiter().GetResult(); } catch (Exception e) { error = e.Message; return new(); } }
                     var list = new List<QueueItem>();
                     if (b.Prop("songs") is JsonElement arr && arr.ValueKind == JsonValueKind.Array)
                         foreach (var x in arr.EnumerateArray().Take(5000)) if (x.Str("id") is { Length: > 0 } sgid)
@@ -187,7 +188,7 @@ public static class PlaybackApi
 
         void Simple(string path, Action<Conductor> act) => g.MapPost(path, async (HttpContext c) => { var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; act(cd); return Results.Json(new { ok = true }); }).Req(Role.Control);
         Simple("/stream/pause", cd => cd.Pause()); Simple("/stream/resume", cd => cd.Resume()); Simple("/stream/stop", cd => cd.Stop());
-        Simple("/stream/next", cd => cd.Next()); Simple("/stream/prev", cd => cd.Prev());
+        Simple("/stream/next", cd => { s.Keep.FillForSkip(cd); cd.Next(); });   // 0.6.8-#3: Skip works in Keep playing Simple("/stream/prev", cd => cd.Prev());
         g.MapPost("/stream/jump", async (HttpContext c) => { var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; cd.Jump((int)(b.Long("index") ?? -1)); return Results.Json(new { ok = true }); }).Req(Role.Control);
         g.MapPost("/stream/seek", async (HttpContext c) =>
         {

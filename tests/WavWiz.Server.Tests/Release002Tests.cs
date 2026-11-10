@@ -109,6 +109,15 @@ public class DiscoveryTests
     }
 
     [Fact]
+    public void Mdns_host_label_does_not_come_from_a_wildcard_bind()
+    {
+        Assert.Equal("unison.local", ServerBeacon.MdnsHostName("0.0.0.0"));
+        Assert.Equal("unison.local", ServerBeacon.MdnsHostName("127.0.0.1"));
+        Assert.Equal("192168120.local", ServerBeacon.MdnsHostName("192.168.1.20"));
+        Assert.Equal("mypc.local", ServerBeacon.MdnsHostName("mypc"));
+    }
+
+    [Fact]
     public async Task A_UDP_probe_finds_a_real_server_and_the_finder_remembers_which_server_it_is()
     {
         await using var f = await ServerFixture.StartAsync(c => { c.Discovery = true; c.DiscoveryPort = 0; });

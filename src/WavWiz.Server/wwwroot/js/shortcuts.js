@@ -3,6 +3,7 @@
 // Pins are remembered per device (localStorage, shared by every window of this app, so the standalone mini player shows the same ones).
 import { h } from './util.js';
 import { icon } from './icons.js';
+import { openCtx } from './ctxmenu.js';
 
 export const MAX_PINS = 8;
 export const PINS_KEY = 'wavwiz.pins.v1';
@@ -45,13 +46,23 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
   const set = p => { pins = savePins(p); draw(); try { window.dispatchEvent(new CustomEvent('wavwiz:pins')); } catch { /* ignore */ } };   // F145: title pins + menu pins repaint after a sleeve reorder / unpin
   /** 0.3.8 L37: in a very narrow window the pins nearest Home stay and the rest move into a 'more' menu. */
   let cap = 99;
-  const calcCap = () => { if (vertical) return 99; const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1; };
-  const more = btn => {
-    document.querySelector('.scpop')?.remove();
-    const rest = pins.slice(cap).map(id => { const p = pinInfo(id); return h('button', { type: 'button', class: 'btn sm', 'data-sc': id, onclick: () => { pop.remove(); run?.(id); } }, p.label); });
-    const pop = h('div', { class: 'scpop', role: 'menu' }, ...rest); const r = btn.getBoundingClientRect(); document.body.append(pop);
-    pop.style.left = Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 6)) + 'px'; pop.style.top = Math.max(4, r.top - pop.offsetHeight - 6) + 'px';
-    setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
+  const calcCap = () => {
+    if (vertical) return 99;
+    const header = el.closest('.mp-sthd, .mp-hd');
+    if (header) {
+      const side = header.parentElement?.querySelector(':scope > .mp-side');
+      const tog = header.querySelector('.sctoggle');
+      const reserved = (side?.offsetWidth || 0) + (tog?.offsetWidth || 22) + 88 + 12;
+      const inner = Math.max(0, (header.clientWidth || 0) - reserved);
+      const c = Math.max(1, Math.floor((inner - 36) / 26));
+      return c >= pins.length ? 99 : c;
+    }
+    const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1;
+  };
+  const more = (btn, ev) => {
+    const rest = pins.slice(cap).map(id => { const p = pinInfo(id); return { id, label: p.label, onclick: () => run?.(id) }; });
+    const x = ev?.clientX ?? btn.getBoundingClientRect().left, y = ev?.clientY ?? btn.getBoundingClientRect().bottom;
+    openCtx(x, y, rest, { label: 'More shortcuts', from: btn });
   };
   function draw() {
     cap = calcCap();
@@ -68,7 +79,7 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
       b.addEventListener('drop', ev => { ev.preventDefault(); if (drag >= 0) set(movePin(pins, drag, i)); drag = -1; });
       return b;
     }));
-    if (cap < pins.length) { const mb = h('button', { type: 'button', class: 'scbtn scmore', 'data-sc': 'more', 'aria-label': 'More shortcuts', title: 'More shortcuts', onclick: () => more(mb) }, '…'); el.prepend(mb); }
+    if (cap < pins.length) { const mb = h('button', { type: 'button', class: 'scbtn scmore', 'data-sc': 'more', 'aria-label': 'More shortcuts', title: 'More shortcuts', onclick: ev => { ev.stopPropagation(); more(mb, ev); } }, '…'); el.prepend(mb); }
   }
   let ro = null; try { ro = new ResizeObserver(() => { const c = calcCap(); if (c !== cap) draw(); }); if (el.parentElement) ro.observe(el.parentElement); else setTimeout(() => el.parentElement && ro?.observe(el.parentElement), 0); } catch { /* no ResizeObserver */ }
   const onStore = ev => { if (!ev.key || ev.key === PINS_KEY) { pins = loadPins(); draw(); } };
@@ -80,9 +91,9 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
 /** 0.5.0 F130: the Now Playing header shows ONE Shortcuts toggle; it opens a vertical side icon strip (same pins / order / Home as shortcutsRow).
  *  Open state is remembered per device. Returns { toggle, strip, isOpen, setOpen, destroy }. */
 export const SCSIDE_KEY = 'wavwiz.scside.v1';
-export function shortcutsSide({ run, home, cls = '', onChange } = {}) {
-  const row = shortcutsRow({ run, home, cls: 'scside-row', vertical: true });
-  row.el.setAttribute('aria-orientation', 'vertical');
+export function shortcutsSide({ run, home, cls = '', onChange, horizontal = false } = {}) {
+  const row = shortcutsRow({ run, home, cls: 'scside-row', vertical: !horizontal });
+  row.el.setAttribute('aria-orientation', horizontal ? 'horizontal' : 'vertical');
   const strip = h('div', { class: 'scside ' + cls, role: 'group', 'aria-label': 'Shortcuts strip', hidden: true }, row.el);
   let open = false; try { open = localStorage.getItem(SCSIDE_KEY) === '1'; } catch { /* ignore */ }
   const toggle = h('button', { type: 'button', class: 'scbtn sctoggle', 'data-sc': 'toggle', 'aria-label': 'Shortcuts', 'aria-haspopup': 'true', title: 'Shortcuts - pins + Home', onclick: () => setOpen(!open) }, icon('pin'));

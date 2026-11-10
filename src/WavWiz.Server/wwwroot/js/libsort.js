@@ -81,6 +81,38 @@ export function sortRows(kind, rows, key, flip = false, seed = 1) {
 export const isLetterSort = (kind, key) => kind !== 'years' && ['name', 'title', 'artist'].includes(key);
 export function letterOf(s) { const c = String(s ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').charAt(0).toUpperCase(); return c >= 'A' && c <= 'Z' ? c : '#'; }
 export const LETTERS = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+/** Pack the A–Z rail into `height` px. When every letter fits, all are shown; when short, show every other letter with dots (iPhone-style, first and last kept); when very short, keep first/last and even midpoints with dots in the gaps. Pure. */
+export function fitAzLetters(height, letters = LETTERS, minPx = 11) {
+  const n = letters.length;
+  if (!(height > 0) || n === 0) return letters.map(ch => ({ kind: 'letter', ch }));
+  const pick = idxs => {
+    const uniq = [...new Set(idxs)].sort((a, b) => a - b);
+    const out = [];
+    let prev = -1;
+    for (const i of uniq) {
+      if (prev >= 0 && i > prev + 1) out.push({ kind: 'dot' });
+      out.push({ kind: 'letter', ch: letters[i] });
+      prev = i;
+    }
+    return out;
+  };
+  if (height / n >= minPx) return letters.map(ch => ({ kind: 'letter', ch }));
+  const every = [0];
+  for (let i = 1; i < n - 1; i += 2) every.push(i);
+  if (n > 1) every.push(n - 1);
+  if (height / new Set(every).size >= minPx) return pick(every);
+  const k = Math.min(n, Math.max(3, Math.floor(height / minPx)));
+  const idx = [];
+  for (let i = 0; i < k; i++) idx.push(Math.round(i * (n - 1) / Math.max(1, k - 1)));
+  return pick(idx);
+}
+/** Visible CSS-px height of an element given its clientHeight, border-box height, and the visible border-box span in the same coordinates. Pure. */
+export function visibleCssHeight(clientHeight, rectHeight, visibleHeight) {
+  if (!(clientHeight > 0)) return 0;
+  if (!(rectHeight > 0)) return clientHeight;
+  const vis = Math.max(0, Math.min(visibleHeight, rectHeight));
+  return Math.max(0, Math.round(clientHeight * (vis / rectHeight)));
+}
 /** letter -> index of the first row with it (rows already sorted). */
 export function letterIndex(kind, rows, key) { const m = new Map(); rows.forEach((row, i) => { const l = letterOf(rowName(kind, row, key)); if (!m.has(l)) m.set(l, i); }); return m; }
 

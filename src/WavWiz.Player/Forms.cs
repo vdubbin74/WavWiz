@@ -109,10 +109,11 @@ public sealed class WebUiForm : Form
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(11, 13, 18) }; private readonly PlayerSettings _set; private string _url = "";
     private FormBorderStyle _prevBorder; private FormWindowState _prevState; private bool _full; private bool _loadedOnce; private int _retries;
     private readonly System.Windows.Forms.Timer _watch = new() { Interval = 20000 };
+    private readonly bool _chrome;   // 0.6.8-#16: themed in-page title bar (caption strip removed, frame styles kept for Snap / resize)
 
     public WebUiForm(PlayerSettings s)
     {
-        _set = s; Text = WavWizInfo.DisplayName; StartPosition = FormStartPosition.Manual; BackColor = Dark;
+        _set = s; _chrome = s.CustomTitleBar; Text = WavWizInfo.DisplayName; StartPosition = FormStartPosition.Manual; BackColor = Dark;
         AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
         try { using var st = typeof(WebUiForm).Assembly.GetManifestResourceStream("wavwiz.ico"); if (st != null) Icon = new Icon(st); } catch { }
         Controls.Add(_web);
@@ -120,7 +121,7 @@ public sealed class WebUiForm : Form
         Load += async (_, _) => { FitToScreen(); await InitAsync(); };
         DpiChanged += (_, _) => { ApplyZoom(); SyncWebView(); };
         // 0.3.2 F14: snapped / maximized / restored / moved across monitors -> re-lay out the WebView2 so it never goes black
-        Resize += (_, _) => SyncWebView(); Move += (_, _) => SyncWebView(); ResizeEnd += (_, _) => SyncWebView();
+        Resize += (_, _) => { SyncWebView(); PostWinState(); }; Move += (_, _) => SyncWebView(); ResizeEnd += (_, _) => SyncWebView();
         _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) ShowProblem("WavWiz did not answer in time.", "The window waited 20 seconds for " + _url + "."); };
         FormClosed += (_, _) => { _watch.Dispose(); };
     }
@@ -203,7 +204,8 @@ public sealed class WebUiForm : Form
             var env = await CoreWebView2Environment.CreateAsync(null, folder);
             await _web.EnsureCoreWebView2Async(env);
             var cw = _web.CoreWebView2;
-            cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version;      // the server never redirects this app to https (0.0.1 bug)
+            cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version + (_chrome ? " " + TitleBar.UaToken : "");      // the server never redirects this app to https (0.0.1 bug)
+            cw.Settings.IsNonClientRegionSupportEnabled = _chrome;   // 0.6.8-#16: app-region: drag on the page's title bar = a real caption (WebView2 1.0.2420+)
             cw.Settings.IsStatusBarEnabled = false;
             cw.NewWindowRequested += (_, e) => { e.Handled = true; if (!UiUrl.IsInternal(_url, e.Uri)) OpenInBrowser(e.Uri); };
             cw.NavigationStarting += (_, e) =>
@@ -226,7 +228,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -253,9 +255,46 @@ public sealed class WebUiForm : Form
 
     protected override void WndProc(ref Message m)
     {
+        // 0.6.8-#16: drop only the caption strip (the page draws the bar); left / right / bottom frame, shadow and Snap stay Windows'
+        if (_chrome && !_full && m.Msg == WM_NCCALCSIZE && m.WParam != IntPtr.Zero && FormBorderStyle != FormBorderStyle.None)
+        {
+            var before = System.Runtime.InteropServices.Marshal.PtrToStructure<RECT>(m.LParam);
+            base.WndProc(ref m);
+            var after = System.Runtime.InteropServices.Marshal.PtrToStructure<RECT>(m.LParam);
+            // Do not use WindowState: on restore, this message carries the restored rect while WindowState can still
+            // report Maximized, which left a padded accent-colored non-client strip at the top until the next resize.
+            // Maximized / top-snapped windows hang the frame off the work-area edge; that geometry is the real signal.
+            int ww = Math.Max(1, before.Right - before.Left), wh = Math.Max(1, before.Bottom - before.Top);
+            int workTop = Screen.FromRectangle(new Rectangle(before.Left, before.Top, ww, wh)).WorkingArea.Top;
+            after.Top = TitleBar.ClientTop(before.Top, workTop, GetSystemMetrics(SM_CYFRAME), GetSystemMetrics(SM_CXPADDEDBORDER));
+            System.Runtime.InteropServices.Marshal.StructureToPtr(after, m.LParam, false);
+            m.Result = IntPtr.Zero; return;
+        }
         base.WndProc(ref m);
         if (WebViewSync.Needs(m.Msg)) SyncWebView();
     }
+    private const int WM_NCCALCSIZE = 0x0083, SM_CYFRAME = 33, SM_CXPADDEDBORDER = 92;
+    private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_FRAMECHANGED = 0x0020;
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        if (_chrome) { try { SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED); } catch { } }   // re-run WM_NCCALCSIZE now
+    }
+    /// <summary>0.6.8-#16: the page's window buttons.</summary>
+    private void WinAct(TitleBar.Act a)
+    {
+        switch (a)
+        {
+            case TitleBar.Act.Minimize: WindowState = FormWindowState.Minimized; break;
+            case TitleBar.Act.MaximizeRestore: WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; break;
+            case TitleBar.Act.Close: Close(); break;
+            case TitleBar.Act.Ready: PostWinState(); break;
+        }
+    }
+    private void PostWinState() { if (!_chrome) return; try { _web.CoreWebView2?.PostWebMessageAsJson(TitleBar.StateJson(WindowState == FormWindowState.Maximized)); } catch { } }
     /// <summary>0.3.2 F14: bounds = the client area, then tell WebView2 its parent moved (DPI / monitor change) and repaint.</summary>
     internal void SyncWebView()
     {

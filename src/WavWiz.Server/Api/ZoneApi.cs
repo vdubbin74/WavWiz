@@ -144,14 +144,14 @@ public static class ZoneApi
             if (CalPhoneApi.LinkOf(c) is { ByAdmin: false } own)
             {
                 if (own.OwnerZoneId == null) return Ext.Bad("This QR code was made by someone without a speaker of their own, so there is nothing it may calibrate. Ask an administrator to make the QR code.", 409);
-                long house = s.Zones.ReferenceZoneId; if (house != 0) refId = house; only = own.OwnerZoneId;
+                long house = s.Zones.ReferenceFor(own.OwnerZoneId.Value); if (house != 0) refId = house; only = own.OwnerZoneId;   // 0.6.8-#15: its zone's reference
             }
             else if (!IsAdmin(c) && !viaAdminLink)
             {
                 // item 28/30 (Wiz B): a regular user calibrates ONLY their own device, against the house reference; the result saves only to their device
                 var mine = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(z => z.Mine);
                 if (mine == null) return Ext.Bad("This browser is not playing as a speaker yet, so there is no device of yours to calibrate. Only an administrator can calibrate other devices (File > Sign in as admin).", 409);
-                long house = s.Zones.ReferenceZoneId;
+                long house = s.Zones.ReferenceFor(mine.Id);   // 0.6.8-#15: a speaker is measured against its own zone's reference
                 if (house != 0 && refId != 0 && refId != house) return Ext.Bad(AdminOnly("change the reference speaker"), 403);
                 if (house != 0) refId = house;
                 only = mine.Id;
@@ -306,8 +306,17 @@ public static class ZoneApi
         {
             var b = await c.Request.Body(); var id = b.Long("zoneId") ?? 0;
             if (id != 0 && s.Zones.Zone(id) == null) return Ext.Bad("device not found", 404);
+            // 0.6.8-#15: "Set as reference" on a speaker in a zone makes it THAT zone's reference; a speaker in no zone becomes the house reference
+            if (id != 0 && s.Zones.GroupOfSpeaker(id) is long gid) { var e = s.Zones.SetZoneReference(gid, id); return e != null ? Ext.Bad(e, 409) : Results.Json(new { ok = true, zoneId = id, groupId = gid }); }
             s.Zones.ReferenceZoneId = id; s.Events.Publish("zones"); return Results.Json(new { ok = true, zoneId = id });
         }).Req(Role.Admin);
+        // 0.6.8-#15: per-zone reference (any speaker of the zone), and dismissing the quiet "Reference changed, re-check timing" note
+        g.MapPut("/groups/{id:long}/reference", async (long id, HttpContext c) =>
+        {
+            var b = await c.Request.Body(); var sp = b.Long("zoneId") ?? 0; var e = s.Zones.SetZoneReference(id, sp);
+            return e != null ? Ext.Bad(e, e.Contains("not found") ? 404 : 409) : Results.Json(new { ok = true, groupId = id, zoneId = sp });
+        }).Req(Role.Admin);
+        g.MapDelete("/groups/{id:long}/reference-note", (long id) => { s.Zones.SetRefNote(id, false); s.Events.Publish("zones"); return Results.Json(new { ok = true }); }).Req(Role.Control);
 
         g.MapPost("/calibration/ear/play", async (HttpContext c) =>
         {
@@ -316,7 +325,7 @@ public static class ZoneApi
             if (!IsAdmin(c))
             {
                 if (!s.Zones.IsMine(dev, c.Who(), c.Connection.RemoteIpAddress)) return Ext.Bad(AdminOnly("tune the delay of another device"), 403);
-                long house = s.Zones.ReferenceZoneId; if (house != 0) refId = house;
+                long house = s.Zones.ReferenceFor(dev); if (house != 0) refId = house;   // 0.6.8-#15
             }
             var (at, err) = s.Cal.PlayEar(refId, dev, b.Num("candidateMs") ?? 0, -20, sess);
             return err != null ? Ext.Bad(err, 409) : Results.Json(new { atUs = at });

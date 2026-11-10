@@ -1,58 +1,101 @@
+// B6 radio finder (Radio Browser). RADIO-1 (Nov 9 2026): full-width search row - name + Genre + Country pickers (the themed F152
+// wsel, filled from /radio/finder/tags + /countries, which the server already proxies), a friendly empty state before the first
+// search, finder favorites only when there are some, podcast list without the always-open Add form (radiotab hosts a quiet toggle).
+// RADIO-2: search results follow the Radio tiles/list toggle; right-click menu; drag to queue; no star/X buttons on result rows.
 import { h, api, toast } from './util.js';
 import { canControl } from './ui.js';
+import { wsel } from './wwselect.js';
+import { radioGridOn, finderStationTile, finderStationRow } from './radiostation.js';
+import { attachCtx } from './ctxmenu.js';
 
-export function radioFinderView(S, act) {
+/** Pure: pin USA (US) at the top of a Radio Browser country list, after 'Any country' in the picker. */
+export function pinCountries(cs, pinned = ['US', 'USA']) {
+  const list = Array.isArray(cs) ? cs.slice() : [];
+  const want = new Set(pinned.map(x => String(x).toUpperCase()));
+  const pin = [], rest = [];
+  for (const c of list) {
+    const code = String(c?.code || '').toUpperCase(), name = String(c?.name || '').toUpperCase();
+    if (want.has(code) || name === 'UNITED STATES' || name === 'USA' || name === 'UNITED STATES OF AMERICA') pin.push(c);
+    else rest.push(c);
+  }
+  return [...pin, ...rest];
+}
+
+export function radioFinderView(S, act, { onSaved } = {}) {
   const root = h('div');
-  const q = h('input', { type: 'search', placeholder: 'Station name', class: 'grow', onkeydown: ev => { if (ev.key === 'Enter') search(); } });
-  const tag = h('input', { type: 'text', placeholder: 'Genre / tag', style: 'width:140px' });
-  const country = h('input', { type: 'text', placeholder: 'Country code (US)', maxlength: 2, style: 'width:110px' });
-  const results = h('div'); const favs = h('div'); const pods = h('div');
+  const q = h('input', { type: 'search', placeholder: 'Station name', class: 'grow', 'aria-label': 'Station name', onkeydown: ev => { if (ev.key === 'Enter') search(); } });
+  const tag = wsel({ 'aria-label': 'Genre', class: 'radpick', onchange: () => { if (searched) search(); } }, h('option', { value: '' }, 'Any genre'));
+  const country = wsel({ 'aria-label': 'Country', class: 'radpick', onchange: () => { if (searched) search(); } }, h('option', { value: '' }, 'Any country'));
+  const results = h('div', { class: 'radresults', 'aria-live': 'polite' }); const favs = h('div'); const pods = h('div');
+  let searched = false, listsLoaded = false, lastRows = [], savedUrls = new Set();
+
+  function setSavedUrls(set) { savedUrls = set || new Set(); if (searched && lastRows.length) paintStations(results, lastRows); }
+
+  async function loadLists() {
+    if (listsLoaded) return; listsLoaded = true;
+    try {
+      const tags = await api('/radio/finder/tags?limit=80');
+      tag.replaceChildren(h('option', { value: '' }, 'Any genre'), ...(tags || []).map(t => h('option', { value: t.name }, t.name)));
+    } catch { listsLoaded = false; }
+    try {
+      const cs = await api('/radio/finder/countries');
+      country.replaceChildren(h('option', { value: '' }, 'Any country'), ...pinCountries(cs).map(c => h('option', { value: c.code }, c.name || c.code)));
+    } catch { listsLoaded = false; }
+  }
+
+  function emptyState() {
+    return h('div', { class: 'radempty' },
+      h('span', { class: 'radempty-ic', 'aria-hidden': 'true' }, '📻'),
+      h('b', null, 'Find something to listen to'),
+      h('span', { class: 'small' }, 'Search by name, or pick a genre or country and press Search. Leave it all blank for the most popular stations.'));
+  }
 
   async function search() {
+    searched = true;
     results.replaceChildren(h('p', { class: 'dim' }, 'Searching…'));
     try {
       const rows = await api(`/radio/finder/search?name=${encodeURIComponent(q.value)}&tag=${encodeURIComponent(tag.value)}&country=${encodeURIComponent(country.value)}`);
-      paintStations(results, rows);
+      lastRows = rows || [];
+      paintStations(results, lastRows);
     } catch (e) { results.replaceChildren(h('p', { class: 'err' }, e.message)); }
   }
 
   function paintStations(el, rows) {
-    const can = canControl(S);
     if (!rows?.length) { el.replaceChildren(h('p', { class: 'dim' }, 'No stations found.')); return; }
-    el.replaceChildren(...rows.map(r => h('div', { class: 'card row wrap' },
-      h('div', { class: 'grow', style: 'min-width:0' },
-        h('b', { class: 'ell', style: 'display:block' }, r.name || 'Station'),
-        h('div', { class: 'dim small ell' }, [r.country, r.tags, r.codec, r.bitrate ? r.bitrate + ' kbps' : ''].filter(Boolean).join(' • '))),
-      can ? h('button', { class: 'btn primary', onclick: () => play(r) }, '▶') : null,
-      can ? h('button', { class: 'btn', onclick: () => save(r) }, 'Save') : null,
-      can ? h('button', { class: 'btn', onclick: () => fav(r) }, '★') : null)));
-  }
-
-  async function play(r) {
-    try {
-      const { id } = await api('/radio/finder/save', { method: 'POST', body: r });
-      await act('/stream/play', { kind: 'radio', id });
-      toast('Playing ' + (r.name || ''));
-    } catch (e) { toast(e.message, true); }
-  }
-  async function save(r) {
-    try { await api('/radio/finder/save', { method: 'POST', body: r }); toast('Saved to your stations'); }
-    catch (e) { toast(e.message, true); }
-  }
-  async function fav(r) {
-    try { await api('/radio/finder/favorites', { method: 'POST', body: r }); toast('Favorited'); loadFavs(); }
-    catch (e) { toast(e.message, true); }
+    const opts = { S, act, onChange: () => { onSaved?.(); loadFavs(); }, savedIds: savedUrls };
+    const grid = radioGridOn();
+    if (grid) {
+      el.replaceChildren(h('ul', { class: 'tilegrid tg-radio radfind-grid' }, rows.map(r => finderStationTile(r, opts))));
+    } else {
+      el.replaceChildren(h('div', { class: 'radfind-list' }, ...rows.map(r => finderStationRow(r, opts))));
+    }
   }
 
   async function loadFavs() {
     try {
       const rows = await api('/radio/finder/favorites');
-      const kids = [h('div', { class: 'sec' }, 'Finder favorites')];
-      if (!rows.length) kids.push(h('p', { class: 'dim small' }, 'None yet.'));
-      else for (const r of rows) kids.push(h('div', { class: 'row card' },
-        h('div', { class: 'grow ell' }, r.name),
-        h('button', { class: 'btn primary', onclick: () => play(r) }, '▶'),
-        h('button', { class: 'btn danger', onclick: async () => { await api(`/radio/finder/favorites/${encodeURIComponent(r.stationuuid)}`, { method: 'DELETE' }); loadFavs(); } }, '✕')));
+      const kids = rows.length ? [h('div', { class: 'sec' }, 'Finder favorites')] : [];
+      for (const r of rows) {
+        const row = h('div', { class: 'row card' },
+          h('div', { class: 'grow ell' }, r.name),
+          canControl(S) ? h('button', { class: 'btn primary', onclick: async () => {
+            try {
+              const { id } = await api('/radio/finder/save', { method: 'POST', body: r });
+              await act('/stream/play', { kind: 'radio', id });
+              toast('Playing ' + (r.name || ''));
+              onSaved?.();
+            } catch (e) { toast(e.message, true); }
+          } }, '▶') : null);
+        attachCtx(row, () => [
+          { id: 'play', ic: 'play', label: 'Play', disabled: !canControl(S), onclick: async () => {
+            try { const { id } = await api('/radio/finder/save', { method: 'POST', body: r }); await act('/stream/play', { kind: 'radio', id }); onSaved?.(); }
+            catch (e) { toast(e.message, true); }
+          } },
+          { id: 'unfav', ic: 'del', label: 'Remove from finder favorites', danger: true, disabled: !canControl(S),
+            onclick: async () => { await api(`/radio/finder/favorites/${encodeURIComponent(r.stationuuid)}`, { method: 'DELETE' }); loadFavs(); } },
+        ], r.name);
+        kids.push(row);
+      }
       favs.replaceChildren(...kids);
     } catch (e) { favs.replaceChildren(h('p', { class: 'err' }, e.message)); }
   }
@@ -60,23 +103,15 @@ export function radioFinderView(S, act) {
   async function loadPods() {
     try {
       const rows = await api('/podcasts');
-      const url = h('input', { type: 'url', placeholder: 'Podcast RSS URL', class: 'grow' });
-      const kids = [h('div', { class: 'sec' }, 'Podcasts (RSS)')];
+      const kids = rows.length ? [h('div', { class: 'sec' }, 'Podcasts (RSS)')] : [];
       for (const p of rows) {
-        // 0.3.5 J9 #12: Episodes fold out under the podcast row (no popup)
         const eps = h('div', { class: 'podeps', hidden: true });
         const btn = h('button', { class: 'btn', 'aria-expanded': 'false', onclick: () => episodes(p, eps, btn, card) }, 'Episodes');
         const card = h('div', { class: 'card podrow', 'data-pod': String(p.id) }, h('div', { class: 'row' },
           h('b', { class: 'grow' }, p.title),
           btn,
-          h('button', { class: 'btn danger', 'aria-label': 'Remove podcast', onclick: async () => { await api(`/podcasts/${p.id}`, { method: 'DELETE' }); loadPods(); } }, '✕')), eps);
+          h('button', { class: 'btn ww-close', 'aria-label': 'Remove podcast ' + p.title, onclick: async () => { await api(`/podcasts/${p.id}`, { method: 'DELETE' }); loadPods(); } }, '✕')), eps);
         kids.push(card);
-      }
-      if (canControl(S)) {
-        kids.push(h('div', { class: 'row' }, url, h('button', { class: 'btn', onclick: async () => {
-          try { await api('/podcasts', { method: 'POST', body: { url: url.value } }); loadPods(); }
-          catch (e) { toast(e.message, true); }
-        } }, 'Add feed')));
       }
       pods.replaceChildren(...kids);
     } catch (e) { pods.replaceChildren(h('p', { class: 'err' }, e.message)); }
@@ -92,6 +127,7 @@ export function radioFinderView(S, act) {
           const { id } = await api('/radio', { method: 'POST', body: { name: e.title, url: e.url, genre: 'podcast' } });
           await act('/stream/play', { kind: 'radio', id });
           toast('Playing episode');
+          onSaved?.();
         } catch (err) { toast(err.message, true); }
       } }, h('span', { class: 'podplay', 'aria-hidden': 'true' }, '▶'), h('div', { class: 't' }, h('div', { class: 't1 ell' }, e.title)), h('span', { class: 'small dim' }, e.pubDate ? new Date(e.pubDate).toLocaleDateString() : '')))
       : [h('p', { class: 'dim' }, 'No episodes with audio enclosures.')]));
@@ -102,10 +138,12 @@ export function radioFinderView(S, act) {
     root.replaceChildren(
       h('div', { class: 'sec' }, 'Find stations'),
       h('p', { class: 'dim small' }, 'Search community radio stations (Radio Browser). Direct stream URLs and podcast RSS work too.'),
-      h('div', { class: 'row wrap' }, q, tag, country, h('button', { class: 'btn primary', onclick: search }, 'Search')),
+      h('div', { class: 'radsearch' }, q, tag, country, h('button', { class: 'btn primary', onclick: search }, 'Search')),
       results, favs, pods);
-    loadFavs(); loadPods();
+    if (!searched) results.replaceChildren(emptyState());
+    else if (lastRows.length) paintStations(results, lastRows);
+    loadLists(); loadFavs(); loadPods();
   }
   draw();
-  return { el: root, reload: draw };
+  return { el: root, reload: draw, reloadPods: loadPods, setSavedUrls };
 }

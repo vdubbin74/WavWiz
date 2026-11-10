@@ -341,8 +341,9 @@ export function sleepChip(S, st) {
   if ((!st || st.mode === 'off') && !document.querySelector('.npsleep')) { c?.remove(); return; }
   // 0.3.5 J8: the permanent Now Playing Sleep buttons show the countdown too
   document.querySelectorAll('.npsleep').forEach(b => { b.classList.toggle('on', !!st && st.mode !== 'off'); b._st = st; });
-  if (!st || st.mode === 'off') { document.querySelectorAll('.npsleep').forEach(b => { clearInterval(b._iv); b.textContent = 'Sleep'; }); }
-  else document.querySelectorAll('.npsleep').forEach(b => { const end = Date.now() + st.remainingSec * 1000; clearInterval(b._iv); const tick = () => { const s2 = Math.max(0, Math.round((end - Date.now()) / 1000)); b.textContent = st.mode === 'song' && !st.remainingSec ? 'Sleep: song' : s2 > 90 ? `Sleep ${Math.ceil(s2 / 60)} min` : `Sleep ${s2} s`; if (!s2) clearInterval(b._iv); }; tick(); b._iv = setInterval(tick, 1000); });
+  const slTxt = (b, t) => { const s = b.querySelector('.npsl-t'); if (s) s.textContent = t === 'Sleep' ? '' : t.replace(/^Sleep:? /, ''); else b.textContent = t; };   // 0.6.8-#11a: the moon button keeps its icon
+  if (!st || st.mode === 'off') { document.querySelectorAll('.npsleep').forEach(b => { clearInterval(b._iv); slTxt(b, 'Sleep'); }); }
+  else document.querySelectorAll('.npsleep').forEach(b => { const end = Date.now() + st.remainingSec * 1000; clearInterval(b._iv); const tick = () => { const s2 = Math.max(0, Math.round((end - Date.now()) / 1000)); slTxt(b, st.mode === 'song' && !st.remainingSec ? 'Sleep: song' : s2 > 90 ? `Sleep ${Math.ceil(s2 / 60)} min` : `Sleep ${s2} s`); if (!s2) clearInterval(b._iv); }; tick(); b._iv = setInterval(tick, 1000); });
   if (document.querySelector('.npsleep')) { c?.remove(); return; }
   if (!c) { c = h('button', { id: 'sleepchip', class: 'chip sleepchip', type: 'button', onclick: () => openSleep(S) }); (document.querySelector('.np-title,.nowtop,#now') || document.body).append(c); }
   const end = Date.now() + st.remainingSec * 1000; c._end = end; c.textContent = `☾ ${Math.ceil(st.remainingSec / 60)} min`;

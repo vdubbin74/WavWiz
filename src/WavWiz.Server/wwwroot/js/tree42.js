@@ -6,6 +6,8 @@ import { icon, setIcon } from './icons.js';
 import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } from './mixer-core.js';   // F250-P8: phone Devices max-based (desktop average untouched)
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
+import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
+import { airPlaySetupCard } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
 import { loadOrder, saveOrder, zoneOrderAfterDrop } from './devorder.js';
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 
@@ -90,11 +92,12 @@ export function treeEl(S, ctl, kit, st) {
 
   const move = async (z, toId) => {
     // F269: optimistic - the speaker lands in its new zone at once (S.groups updated locally, tree redrawn); the server answer then confirms, a failure re-reads.
+    const q = swapQuestion(S, z, toId);   // 0.6.8-#15: asked from the state before the move
     const plan = movePlan(S.groups, z.id, toId);
     applyMovePlan(S, plan);
     try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ }
     try { for (const op of plan) await api(`/groups/${op.id}`, { method: 'PATCH', body: { name: op.name, deviceIds: op.deviceIds } }); const tg = toId == null ? null : groups.find(g => g.id === toId), live = tg && [...(tg.deviceIds || []).filter(x => x !== z.id).map(x => (S.zones || []).find(d => d.id === x)), z].some(d => d?.connected);   // F160: landing in a zone with no speaker online
-      toast(toId == null ? `${z.name} is now unassigned` : tg && !live ? `Added to ${zname(toId)} — zone is offline until a speaker comes online.` : `${z.name} moved to ${zname(toId)}`); done(); }
+      toast(toId == null ? `${z.name} is now unassigned` : tg && !live ? `Added to ${zname(toId)} — zone is offline until a speaker comes online.` : `${z.name} moved to ${zname(toId)}`); done(); offerSwap(q, toId, z, done); }
     catch (e) { toast(e.message, true); done(); }
   };
   const playPause = async g => {
@@ -150,7 +153,7 @@ export function treeEl(S, ctl, kit, st) {
     // 0.4.3 #9: an empty zone has nothing to link (as in the render)
     const lb = (S.groups || []).length < 2 || (!ms.length && !linked) ? null : ro(linked
       ? h('button', { type: 'button', class: 'btn sm zlinkbtn split', 'data-act': 'split', title: 'Give this zone its own music', onclick: ev => { ev.stopPropagation(); Z.splitOff(g, done); } }, 'Split off')
-      : h('button', { type: 'button', class: 'btn sm zlinkbtn link', 'data-act': 'link', title: 'Play the same music as another zone', onclick: ev => { ev.stopPropagation(); Z.linkMenu(ev.currentTarget, S, g, done); } }, icon('link'), ' Link'), can, 'Your access is view-only.');
+      : h('button', { type: 'button', class: 'btn sm zlinkbtn link zlinkic', 'data-act': 'link', 'aria-label': `Link ${g.name} to another zone`, title: 'Link: play the same music as another zone', onclick: ev => { ev.stopPropagation(); Z.linkMenu(ev.currentTarget, S, g, done); } }, icon('link')), can, 'Your access is view-only.');   // 0.6.8-#12: chain-link icon beside OFF/ON
     // 0.4.3 #9 (render final042l): grip-style gutter (zone actions) | dot, name, inline speaker-count badge ... OFF/ON
     //                              | CONTROLLING / "Queue from X" / other tags ... Link or Split off
     const all3 = zoneTags3(S.zones, g), cnt = all3.find(t => t.k === 'count'), tags = all3.filter(t => t.k !== 'count');
@@ -160,11 +163,13 @@ export function treeEl(S, ctl, kit, st) {
     // 0.4.9 F69: the zone NAME ROW (name, count, OFF/ON, tags) opens the zone settings; its own controls keep their behavior
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': g.id, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.tagact,.dgrip,.dgrip42,.pill42,.tog')) return; st.onZone(g.id); } }, gut,
       h('div', { class: 'zc42-body' },
-        h('div', { class: 'zc42-1' }, h('span', { class: 'dot ' + (connected ? 'ok' : 'off'), title: `${connected} of ${ms.length} online` }), name, badge, h('span', { class: 'zacts' }, pill)),
-        h('div', { class: 'dtagrow ztagrow zc42-2' }, sel ? Z.controllingTag() : null, S.cast?.active && (S.cast.zones || []).includes(g.id) ? h('span', { class: 'dtag zcast', title: `Playing what a phone sends to ${S.cast.name}` }, S.cast.kind === 'spotify' ? 'SPOTIFY' : 'AIRPLAY') : null, leaderOf ? h('span', { class: 'small dim zc42-q' }, `Queue from ${leaderOf.name}`) : null, tagEls3(tags), lb ? h('span', { class: 'zacts zc42-lb' }, lb) : null)));
+        h('div', { class: 'zc42-1' }, h('span', { class: 'dot ' + (connected ? 'ok' : 'off'), title: `${connected} of ${ms.length} online` }), name, badge, h('span', { class: 'zacts' }, linked ? null : lb, pill)),
+        h('div', { class: 'dtagrow ztagrow zc42-2' }, sel ? Z.controllingTag() : null, S.cast?.active && (S.cast.zones || []).includes(g.id) ? h('span', { class: 'dtag zcast', title: `Playing what a phone sends to ${S.cast.name}` }, S.cast.kind === 'spotify' ? 'SPOTIFY' : 'AIRPLAY') : null, leaderOf ? h('span', { class: 'small dim zc42-q' }, `Queue from ${leaderOf.name}`) : null, tagEls3(tags), lb && linked ? h('span', { class: 'zacts zc42-lb' }, lb) : null)));
     const list = h('div', { class: 'zsp42', role: 'list', 'aria-label': `Speakers in ${g.name}` }, ms.length ? ms.map(z => spRow(z, g.id)) : h('div', { class: 'drop42' }, 'Drop speakers here'));
     if (box && box._collapsed) { list.hidden = true; list.classList.add('zsp42-collapsed'); }
-    const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-playback-id': g.playbackId || 'default', 'data-zone': g.name }, card, list);
+    // 0.6.8-#15: quiet note after the zone's reference speaker left (the server picked a new one and re-based the delays)
+    const note = g.refNote ? h('div', { class: 'zrefnote42', role: 'status' }, h('span', { class: 'grow' }, g.refNote), h('button', { type: 'button', class: 'zrefnote-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { ev.stopPropagation(); dismissNote(g, done); } }, '✕')) : null;
+    const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-playback-id': g.playbackId || 'default', 'data-zone': g.name }, card, note, list);
     zoneCtx(g, wrap);
     return wrap;
   };
@@ -231,11 +236,12 @@ export function treeEl(S, ctl, kit, st) {
     const active = ms.filter(z => z.enabled !== false && z.connected), playing = now?.state === 'playing';
     const dot = h('span', { class: 'dot zfold42-dot ' + (active.length ? 'ok' : 'off'), title: active.length ? `${active.length} of ${ms.length} speaker${ms.length === 1 ? '' : 's'} active` : 'No active speaker', 'aria-label': active.length ? 'Active' : 'Not active', role: 'img' });
     const name = linked ? box.zones.map(g => g.name).join(' + ') : lead.name;
-    const note = playing ? `▶ ${now.title || 'Playing'}` : now?.state === 'paused' ? 'Paused' : `${ms.length} speaker${ms.length === 1 ? '' : 's'}`;
+    // 0.6.8 t1651: the now-playing line sits under the zone name (same .zl-now chrome as an expanded card). Idle / no title = one row, matching the AirPlay card.
+    const line = now?.title ? Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }) : null;
     return h('section', { class: 'qb42 empty42 zfold42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === lead.id ? ' picked' : ''), 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
-        h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name),
-          h('span', { class: 'small dim ze42-note ell' }, note), h('span', { class: 'grow' })),
+        h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name)),
+        line,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here')));
   };
   // 0.4.9 F69: a zone with no speakers is one compact row (name, "No speakers" / "Offline") - still a drop target (its hint opens while dragging)
@@ -355,6 +361,8 @@ export function treeEl(S, ctl, kit, st) {
       speakerCtx(z, row, false); return row;
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));
   root.append(unBox);
+  // 0.6.8: AirPlay speakers card sits under Unassigned (the card itself expands / collapses; no header button)
+  if (admin) { const apc = airPlaySetupCard(S, ctl); if (apc) root.append(apc); }
   attachDrag(root, S, move);
   // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
   attachZoneDrag(root, model.boxes, () => window.dispatchEvent(new CustomEvent('wavwiz:devredraw')), { active: b => rank(b) === 0, reorder: (fromBox, toBox, after) => {

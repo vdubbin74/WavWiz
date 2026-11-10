@@ -108,14 +108,20 @@ export function listTable(S, ctl) {
   window.addEventListener('wavwiz:editzone', () => setView(null));
   const paintQz = () => { const many = Z.choicesNow().length > 1, c = view ? viewChoice() : Z.current(); qzone.textContent = c && many ? (view ? Z.queueSuffixFor(c) : Z.queueSuffixNow()) : ''; if (!title.classList.contains('haspick')) title.title = ('Queue' + qzone.textContent).trim(); /* 0.4.8 F50: full label as a tooltip when a long zone name ellipsizes */ try { root.setAttribute('data-editing', editingKey() || ''); } catch { /* before the panel exists */ } };
   window.addEventListener('wavwiz:zonesync', paintQz); paintQz(); paintPick();
-  const head = h('div', { class: 'pane-h' }, title, meta, sortChip, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
+  const head = h('div', { class: 'pane-h' }, title, sortChip, meta, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Queue' }, head, wrap);
   /** 0.2.3 U2: hosts the "Up next" line (shown while the Playlist is minimized) in the title bar. */
   const setNextBlock = el => { head.insertBefore(el, meta); };
-  /** Left edge of the right-hand header controls (count, icons, arrow), for keeping the Up next line clear of them. */
-  const rightEdge = () => Math.min(...[head.querySelector('.tpin'), meta, sortChip, iconRow, upBtn, colBtn].filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
-  const leftEdge = () => { const pk = title.querySelector('select,.qzpick'); if (pk && pk.getBoundingClientRect().width) return Math.max(pk.getBoundingClientRect().right, title.getBoundingClientRect().right);   // F137b: a zone picker in the title ends at its own box (a text range over a <select> under-measures and let Up next sit on it)
-    const r = document.createRange(); r.selectNodeContents(title); return Math.min(r.getBoundingClientRect().right, title.getBoundingClientRect().right); };   // F50: clipped text ends at the box
+  /** Left edge of the right-hand header cluster (track count, tools, pin, chevrons). The sort chip stays left after the zone picker. */
+  const rightEdge = () => Math.min(...[meta, head.querySelector('.tpin'), iconRow, upBtn, colBtn].filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.left));
+  const leftEdge = () => {
+    const pk = title.querySelector('select,.qzpick');
+    let L;
+    if (pk && pk.getBoundingClientRect().width) L = Math.max(pk.getBoundingClientRect().right, title.getBoundingClientRect().right);   // F137b: a zone picker in the title ends at its own box (a text range over a <select> under-measures and let Up next sit on it)
+    else { const r = document.createRange(); r.selectNodeContents(title); L = Math.min(r.getBoundingClientRect().right, title.getBoundingClientRect().right); }   // F50: clipped text ends at the box
+    const sr = sortChip?.getBoundingClientRect(); if (sr?.width) L = Math.max(L, sr.right);   // 0.6.8: sort chip stays left; the count sits in the right cluster
+    return L;
+  };
   const save = () => saveLayout(L, narrow);
   const isNarrow = () => !!root.closest('.desk')?.classList.contains('libexpanded');   // the side (right-hand) playlist while the Library is expanded
 

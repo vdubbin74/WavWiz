@@ -71,6 +71,21 @@ public class KeepPlayingTests
         Assert.Equal(before, S.Conductor.Queue().Count);
     }
 
+    [Fact]
+    public async Task Skip_on_the_last_song_adds_the_next_auto_pick_first()   // 0.6.8-#3
+    {
+        await using var f = await ServerFixture.StartAsync(); var S = f.Server.S; var db = S.Db;
+        long a1 = Track(db, "A1", "Ann", "Jazz"), a2 = Track(db, "A2", "Ann", "Jazz");
+        S.Conductor.Add(S.Conductor.TracksToItems(new[] { a1 }), false);
+        Assert.False(S.Keep.FillForSkip(S.Conductor));                       // Keep playing off: Next behaves as before
+        Assert.Null(S.Keep.Set(Conductor.DefaultGroupId, "similar", null));
+        Assert.True(S.Keep.FillForSkip(S.Conductor));
+        var q = S.Conductor.Queue(); Assert.Equal(2, q.Count); Assert.Equal(a2, q[1].RefId); Assert.Equal(KeepPlayingService.Origin, q[1].Origin);
+        Assert.False(S.Keep.FillForSkip(S.Conductor));                       // something is up next now: no second fill
+        S.Keep.JukeboxOwns = () => S.Conductor; S.Conductor.Clear(); S.Conductor.Add(S.Conductor.TracksToItems(new[] { a1 }), false);
+        Assert.False(S.Keep.FillForSkip(S.Conductor));                       // the Jukebox's zone keeps its own autofill
+    }
+
     static QueueItem Remote(string artist, string? genre = null, int? year = null) => new(0, "remote", "subsonic:nd:" + Guid.NewGuid(), "R", artist, "Al", 200_000, null, genre, year);
 
     [Fact]
@@ -98,5 +113,22 @@ public class KeepPlayingTests
         S.Db.SetSetting(Conductor.LastQueueKey, json);
         var c2 = new Conductor(S.Db, new EventHub(), TestMedia.Ffmpeg); Assert.Equal(1, c2.RestoreLast());
         var back = c2.Queue().Single(); Assert.Equal("Jazz", back.Genre); Assert.Equal(1991, back.Year);
+    }
+
+    [Fact]
+    public async Task Similar_pick_widens_to_the_genre_and_avoids_repeating_artists()   // 0.6.8-#13
+    {
+        await using var f = await ServerFixture.StartAsync(); var S = f.Server.S; var db = S.Db;
+        long a1 = Track(db, "A1", "Ann", "Jazz"), a2 = Track(db, "A2", "Ann", "Jazz"), a3 = Track(db, "A3", "Ann", "Jazz");
+        long b1 = Track(db, "B1", "Bob", "Jazz"), c1 = Track(db, "C1", "Cy", "Jazz"), r1 = Track(db, "R1", "Rex", "Rock");
+        var none = new List<QueueItem>(); var last = S.Conductor.TracksToItems(new[] { a1 }).Single();
+        S.Keep.Roll = () => 0.99;   // roam the wider pool
+        var p1 = S.Keep.SimilarPick("g", last, none)!.Value; var p2 = S.Keep.SimilarPick("g", last, none)!.Value;
+        Assert.Equal(new[] { b1, c1 }.OrderBy(x => x), new[] { p1, p2 }.OrderBy(x => x));   // other Jazz artists first, never Ann right after Ann
+        var p3 = S.Keep.SimilarPick("g", last, none)!.Value;
+        Assert.Contains(p3, new[] { a2, a3 });                    // only Ann left fresh: still plays (no silence), never off-genre Rock
+        S.Keep.Roll = () => 0.0;    // stay close: the classic same-artist match
+        Assert.Contains(S.Keep.SimilarPick("h", last, none)!.Value, new[] { a2, a3 });
+        Assert.DoesNotContain(r1, new[] { p1, p2, p3 });
     }
 }

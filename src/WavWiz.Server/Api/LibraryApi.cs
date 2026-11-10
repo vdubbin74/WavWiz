@@ -62,6 +62,23 @@ public static class LibraryApi
             return Results.Json(new { ok = true, removed, artCv = Library.ArtService.UrlVersion });
         }).Req(Role.Admin);
         g.MapGet("/library/art/rebuild", () => Results.Json(new { rebuilding = s.Art.Rebuilding, artCv = Library.ArtService.UrlVersion })).Req(Role.View);
+        // Unsaved Radio Browser hits have no radio_station id. Proxy their favicon through GetRemoteAsync so the tile can load it under img-src 'self'.
+        // The client sends only an opaque hash the server issued when it returned the finder result — never a URL from the request (same rule as /art/radio/{id}/live).
+        g.MapGet("/art/remote/{hash}", async (string hash, int? size, HttpContext c) =>
+        {
+            if (!s.RadioFinder.TryFavicon(hash, out var url)) return Results.StatusCode(404);
+            byte[]? jpg = await s.Art.GetRemoteAsync(url, size ?? 192, c.RequestAborted);
+            return Send(c, jpg, 300);
+        }).Req(Role.View);
+        // 0.6.8-#8: the current song's picture from the station's metadata (amgArtworkURL), fetched by the server (CSP keeps the page on 'self');
+        // only a URL a playing conductor got from that station is ever fetched - never one from the request. Falls back to the station logo.
+        g.MapGet("/art/radio/{id:long}/live", async (long id, int? size, HttpContext c) =>
+        {
+            var u = s.Registry.Live().Select(cd => cd.LiveArtUrl(id)).FirstOrDefault(x => x != null);
+            byte[]? jpg = u == null ? null : await s.Art.GetRemoteAsync(u, size ?? 192, c.RequestAborted);
+            jpg ??= await s.Art.GetRemoteAsync(s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string, size ?? 192, c.RequestAborted);
+            return Send(c, jpg, 60);
+        }).Req(Role.View);
         g.MapGet("/art/radio/{id:long}", async (long id, int? size, HttpContext c) =>
         {
             var logo = s.Db.Scalar("SELECT logo_url FROM radio_station WHERE id=$i", ("$i", id)) as string;

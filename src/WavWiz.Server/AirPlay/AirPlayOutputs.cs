@@ -2,6 +2,7 @@ using System.Net;
 using WavWiz.Core.AirPlay;
 using WavWiz.Core.Stream;
 using WavWiz.Server.Playback;
+using WavWiz.Server.Media;
 
 namespace WavWiz.Server.AirPlay;
 
@@ -20,12 +21,24 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         public required Func<int, Task> Volumer; public required Func<Task> Teardown; public required Action<int> Delayer; public required Func<object> Stats;
         public int Volume = 50; public int DelayMs; public string State = "connected"; public string? Error;
         public DateTimeOffset Since = DateTimeOffset.UtcNow;
+        // 0.6.8-#14e: outgoing metadata (title/artist/album, artwork, progress). Each kind switches itself off for this session after the
+        // speaker rejects it once, so a picky speaker never gets a second try and the audio path is never touched.
+        public Func<byte[], string, Dictionary<string, string>?, Task<RtspResponse>>? SetParam; public Func<uint>? RtpNow;
+        public bool MetaText = true, MetaArt = true, MetaProgress = true; public AirPlaySetup.MetaState? Meta; public int MetaBusy;
+        public long MetaSent, MetaRejected; public bool Subscribed;
     }
     readonly ConductorRegistry _reg; readonly Func<AirPlayBrowser?> _browser; readonly Action<string>? _log;
     readonly Dictionary<string, Out> _outs = new(); readonly SemaphoreSlim _gate = new(1, 1);
 
     readonly Dictionary<IPAddress, PtpMaster> _ptp = new();
     public AirPlayOutputs(ConductorRegistry reg, Func<AirPlayBrowser?> browser, Action<string>? log = null) { _reg = reg; _browser = browser; _log = log; }
+    /// <summary>0.6.8-#14e: cover art for the speaker's screen (JPEG/PNG bytes) or null; set by the server.</summary>
+    public Func<QueueItem, CancellationToken, Task<byte[]?>>? ArtFor { get; set; }
+    /// <summary>0.6.8-#14f: this PC's addresses, for refusing WavWiz's own receiver.</summary>
+    public Func<IReadOnlyCollection<string>> Local { get; set; } = AirPlaySetup.LocalAddresses;
+    /// <summary>What the speaker's group is playing (tests replace it).</summary>
+    public Func<string, NowPlaying>? NowFor { get; set; }
+    Timer? _metaTimer;
     /// <summary>Stage 10: AirPlay 2 speakers only when the experimental setting is on. Buffered (AAC via ffmpeg) unless off or no ffmpeg.</summary>
     public bool AirPlay2Enabled { get; set; }
     public bool PreferBuffered { get; set; } = true;
@@ -42,17 +55,19 @@ public sealed class AirPlayOutputs : IAsyncDisposable
     public static string PlayerId(string key) => "airplay:" + key;
 
     /// <summary>Connects to a discovered speaker (by device id) or an explicit host:port, and subscribes it to its group.</summary>
-    public async Task<Out> ConnectAsync(string key, string? endpoint, int delayMs, int volume, CancellationToken ct = default)
+    public async Task<Out> ConnectAsync(string key, string? endpoint, int delayMs, int volume, CancellationToken ct = default, bool subscribe = true)
     {
         await _gate.WaitAsync(ct);
         try
         {
             if (_outs.TryGetValue(key, out var existing)) return existing;
-            IPEndPoint ep; string name = key; int et = 0; bool ap2 = false; string? model = null;
+            IPEndPoint ep; string name = key; int et = 0; bool ap2 = false; string? model = null; (bool T, bool A, bool P) caps = (true, true, true);
             if (endpoint != null) { if (endpoint.StartsWith("ap2:")) { ap2 = true; endpoint = endpoint[4..]; } ep = IPEndPoint.Parse(endpoint); }
             else
             {
                 var d = _browser()?.State.Devices(DateTimeOffset.UtcNow).FirstOrDefault(x => x.Id == key) ?? throw new InvalidOperationException("speaker not found; search again");
+                if (AirPlaySetup.IsSelf(d.Name, d.Addresses, d.Host, Local())) throw new InvalidOperationException("this is WavWiz's own AirPlay receiver (audio loop)");   // 0.6.8-#14f
+                caps = MetaCaps(d);
                 var route = d.Route; model = d.Model; int port;
                 if (route == "airplay2-ptp" && AirPlay2Enabled) { ap2 = true; port = d.AirPlayPort; }
                 else if (d.Raop && route is "raop" or "raop-rsa" || (d.Raop && route.StartsWith("airplay2") && d.Encryption.Contains(0)))
@@ -79,10 +94,13 @@ public sealed class AirPlayOutputs : IAsyncDisposable
                     Volumer = v => s.SetVolumeAsync(RaopControls.ToAirPlayDb(v, percent: true)), Delayer = v => sink.DelayMs = v,
                     Teardown = async () => { try { await s.TeardownAsync(); } catch { } await s.DisposeAsync(); },
                     Stats = () => new { packets = sink.Packets, syncs = sink.Syncs, flushes = sink.Flushes, resends = sink.Resends, framesIn = sink.FramesIn, timingRequests = s.TimingRequests },
+                    SetParam = (b, t, h) => s.SetParameterAsync(b, t, h), RtpNow = () => sink.RtpAt(_reg.Clock.NowUs),
                 };
             }
+            (o.MetaText, o.MetaArt, o.MetaProgress) = caps;
             _outs[key] = o;
-            _reg.Subscribe(o.Sink);
+            if (subscribe) { _reg.Subscribe(o.Sink); o.Subscribed = true; }   // 0.6.8-#14b: the setup's test connects without joining a group
+            _metaTimer ??= new Timer(_ => MetaTick(), null, 1000, 1000);
             _log?.Invoke($"airplay {key}: connected {ep} {o.Kind}");
             return o;
         }
@@ -116,6 +134,71 @@ public sealed class AirPlayOutputs : IAsyncDisposable
     {
         var o = Get(key); if (o == null) return;
         if (on) _reg.Subscribe(o.Sink); else _reg.Unsubscribe(o.Sink.Id);
+        o.Subscribed = on;
+    }
+
+    /// <summary>0.6.8-#14b: plays the setup chime on one connected speaker. A speaker that is in a group leaves it for ~4 s (its music
+    /// pauses there) and rejoins; one that is not in a group just plays the chime.</summary>
+    public async Task<bool> TestToneAsync(string key)
+    {
+        var o = Get(key); if (o == null) return false;
+        bool was = o.Subscribed; if (was) _reg.Unsubscribe(o.Sink.Id);
+        foreach (var m in AirPlaySetup.Chime(_reg.Clock.NowUs + 2_000_000, 0xC0DE0000u | (uint)Random.Shared.Next(0xFFFF))) o.Sink.Send(m);
+        if (was) { await Task.Delay(4000); if (Get(key) == o && o.Subscribed) _reg.Subscribe(o.Sink); }
+        return true;
+    }
+
+    /// <summary>0.6.8-#14e: what the speaker said it shows. AirPlay 1 "md" TXT lists 0 = text, 1 = artwork, 2 = progress; else the feature bits
+    /// (15 artwork, 16 progress, 17 text); nothing advertised -> try all three once (a rejection switches that kind off).</summary>
+    static (bool, bool, bool) MetaCaps(WavWiz.Core.AirPlay.AirPlayDevice d)
+    {
+        if (d.RaopTxt.TryGetValue("md", out var md) && md.Length > 0) { var p = md.Split(',').Select(x => x.Trim()).ToHashSet(); return (p.Contains("0"), p.Contains("1"), p.Contains("2")); }
+        bool t = AirPlayFeatures.Has(d.Features, AirPlayFeatures.MetaText), a = AirPlayFeatures.Has(d.Features, AirPlayFeatures.MetaArtwork), g = AirPlayFeatures.Has(d.Features, AirPlayFeatures.MetaProgress);
+        return t || a || g ? (t, a, g) : (true, true, true);
+    }
+
+    void MetaTick()
+    {
+        List<Out> all; lock (_outs) all = _outs.Values.ToList();
+        foreach (var o in all)
+        {
+            if (o.SetParam == null || o.RtpNow == null || !o.Subscribed || !(o.MetaText || o.MetaArt || o.MetaProgress)) continue;
+            if (Interlocked.CompareExchange(ref o.MetaBusy, 1, 0) != 0) continue;   // one request at a time per speaker
+            _ = Task.Run(async () => { try { await MetaOnce(o); } catch (Exception e) { _log?.Invoke($"airplay {o.Key}: metadata skipped ({e.Message})"); } finally { o.MetaBusy = 0; } });
+        }
+    }
+
+    async Task MetaOnce(Out o)
+    {
+        var n = NowFor?.Invoke(o.Sink.Id) ?? _reg.ForPlayer(o.Sink.Id).Now();
+        var cur = new AirPlaySetup.MetaState(AirPlaySetup.ItemKey(n), n.State, n.PositionMs, n.DurationMs, Environment.TickCount64);
+        var plan = AirPlaySetup.Plan(o.Meta, cur); o.Meta = cur;
+        if (plan == AirPlaySetup.MetaSend.None) return;
+        var at = RaopControls.At(o.RtpNow!());
+        async Task<bool> Send(byte[] body, string type, Dictionary<string, string>? h)
+        {
+            var r = await o.SetParam!(body, type, h); o.MetaSent++;
+            if (!r.Ok) { o.MetaRejected++; _log?.Invoke($"airplay {o.Key}: speaker rejected {type} ({r.Status}); not sent again this session"); }
+            return r.Ok;
+        }
+        if (plan.HasFlag(AirPlaySetup.MetaSend.Text) && o.MetaText)
+        {
+            var (t, a, al) = AirPlaySetup.Text(n);
+            if (!await Send(RaopControls.Dmap(t, a, al), "application/x-dmap-tagged", at)) o.MetaText = false;
+        }
+        if (plan.HasFlag(AirPlaySetup.MetaSend.Art) && o.MetaArt)
+        {
+            byte[]? img = null;
+            if (n.Item != null && ArtFor != null) { using var cts = new CancellationTokenSource(4000); try { img = await ArtFor(n.Item, cts.Token); } catch { img = null; } }
+            if (img != null && img.Length > 512 * 1024) img = null;   // keep the control channel quick
+            // no picture: clear the old one ("image/none", empty body) so the previous song's cover does not linger
+            if (!await Send(img ?? Array.Empty<byte>(), img != null ? RaopControls.ImageType(img) : "image/none", at)) o.MetaArt = false;
+        }
+        if (plan.HasFlag(AirPlaySetup.MetaSend.Progress) && o.MetaProgress && n.DurationMs > 0)
+        {
+            var (st, c, e) = AirPlaySetup.Progress(o.RtpNow!(), n.PositionMs, n.DurationMs);
+            if (!await Send(RaopControls.Progress(st, c, e), "text/parameters", null)) o.MetaProgress = false;
+        }
     }
 
     public bool SetDelay(string key, int delayMs)
@@ -128,6 +211,7 @@ public sealed class AirPlayOutputs : IAsyncDisposable
     {
         key = o.Key, id = o.Sink.Id, name = o.Name, address = o.Address, kind = o.Kind, volume = o.Volume, delayMs = o.DelayMs, state = o.State, error = o.Error,
         group = _reg.GroupOf(o.Sink.Id), stats = o.Stats(), since = o.Since,
+        meta = new { text = o.MetaText, art = o.MetaArt, progress = o.MetaProgress, sent = o.MetaSent, rejected = o.MetaRejected }, inGroup = o.Subscribed,
     }).ToList();
 
     async Task<Out> ConnectAp2Async(string key, string name, IPEndPoint ep, string? model, int delayMs, int volume, CancellationToken ct)
@@ -151,11 +235,13 @@ public sealed class AirPlayOutputs : IAsyncDisposable
             Volumer = v => s.SetVolumeAsync(RaopControls.ToAirPlayDb(v, percent: true)), Delayer = v => sk.DelayMs = v + q.DefaultDelayMs,
             Teardown = async () => { try { await s.TeardownAsync(); } catch { } await s.DisposeAsync(); ptp.RemovePeer(ep.Address); },
             Stats = () => new { packets = sk.Packets, announces = sk.Announces, flushes = sk.Flushes, segments = sk.Segments, framesIn = sk.FramesIn, feedbacks = s.Feedbacks, quirk = q.Label },
+            SetParam = (b, t, h) => s.SetParameterAsync(b, t, h), RtpNow = () => sk.RtpAt(_reg.Clock.NowUs),   // 0.6.8-#14e: best effort on AirPlay 2
         };
     }
 
     public async ValueTask DisposeAsync()
     {
+        _metaTimer?.Dispose(); _metaTimer = null;
         foreach (var k in _outs.Keys.ToList()) await DisconnectAsync(k);
         foreach (var m in _ptp.Values) m.Dispose(); _ptp.Clear();
     }

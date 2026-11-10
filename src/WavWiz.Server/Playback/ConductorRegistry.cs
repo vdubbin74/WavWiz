@@ -99,6 +99,13 @@ public sealed class ConductorRegistry : IDisposable
         Unsubscribe(playerId); bool had; lock (_l) { _sessions.Remove(playerId); had = _groupOf.Remove(playerId); }
         if (had) SaveLayout();
     }
+    /// <summary>0.6.8-#11e: the same phone came back under a new id - its group membership moves to the new id.</summary>
+    public void Rekey(string oldId, string newId)
+    {
+        Unsubscribe(oldId); bool had;
+        lock (_l) { _sessions.Remove(oldId); had = _groupOf.Remove(oldId, out var g); if (had) _groupOf[newId] = g!; }
+        if (had) SaveLayout();
+    }
     /// <summary>The player's group is playing (what the room health check needs).</summary>
     public bool Playing(string playerId) { var c = ForPlayer(playerId); return c.State == PlayState.Playing && c.Engine.Playing; }
     public long StreamAgeMs(string playerId) { var c = ForPlayer(playerId); return c.Engine.Playing ? (c.Clock.NowUs - c.Engine.EpochStartUs) / 1000 : 0; }

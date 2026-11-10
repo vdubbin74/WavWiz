@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using WavWiz.Core.Discovery;
+using WavWiz.Server.AirPlay;
 using WavWiz.Server.Api;
 using WavWiz.Server.Media;
 using WavWiz.Server.Playback;
@@ -100,9 +101,17 @@ public sealed class AirPlayReceiver : IDisposable
         return new()
         {
             DnsWire.Ptr(svc, inst), DnsWire.Srv(inst, host, Port),
-            DnsWire.Txt(inst, new[] { "txtvers=1", "ch=2", "cn=0,1", "et=0,1", "sv=false", "da=true", "sr=44100", "ss=16", "pw=false", "vn=3", "tp=TCP,UDP", "md=0,1,2", "vs=130.14", "sm=false", "ek=1", "am=WavWiz" }),
+            DnsWire.Txt(inst, TxtKeys(_s.ServerId)),
             DnsWire.A(host, ip),
         };
+    }
+
+    /// <summary>RAOP TXT keys (shairplay shape) plus wwid, a harmless unique marker so this server can recognise its own advertisement.</summary>
+    public static string[] TxtKeys(string? serverId)
+    {
+        var t = new List<string> { "txtvers=1", "ch=2", "cn=0,1", "et=0,1", "sv=false", "da=true", "sr=44100", "ss=16", "pw=false", "vn=3", "tp=TCP,UDP", "md=0,1,2", "vs=130.14", "sm=false", "ek=1", "am=WavWiz" };
+        if (!string.IsNullOrWhiteSpace(serverId)) t.Add(AirPlaySetup.SelfTxtKey + "=" + serverId);
+        return t.ToArray();
     }
 
     public void OnLine(string line)

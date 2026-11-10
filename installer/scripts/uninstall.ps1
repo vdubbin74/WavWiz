@@ -12,6 +12,7 @@ Say ("== WavWiz uninstall ({0}) root={1} purge={2} ==" -f (Get-Date -Format s), 
 if (-not $DataDir) { $DataDir = Get-WavWizDataRoot }
 $svc = $script:ServiceName; $problems = 0
 function Step([string]$Name, [scriptblock]$Do) { Set-Step $Name; try { & $Do } catch { $script:problems++; Say ("uninstall: '{0}' did not complete: {1}" -f $Name, ($_.Exception.Message -split "`n")[0]) } }
+Step 'uninstall: remove the CD-ROM read grant' { Revoke-WavWizCdromAccess }
 Step 'uninstall: stop and remove the service' {
     if (Test-ServiceExists $svc) {
         if ((Get-ServiceState $svc) -ne 'STOPPED') { [void](Invoke-Sc 'stop' @('stop', $svc) -AllowFail); [void](Wait-ServiceState $svc 'STOPPED' 30) }

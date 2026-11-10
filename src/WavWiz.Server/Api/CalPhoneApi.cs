@@ -121,7 +121,7 @@ public static class CalPhoneApi
         {
             var l = Valid(token, DateTimeOffset.UtcNow); if (l == null || l.Stopped) return Ext.Bad("This phone link has expired. Scan the new QR code on the PC.", 404);
             var zs = s.Zones.Zones(null, null).Where(z => z.Connected && z.Outputs.Any(o => o.Active)).ToList();
-            var refId = s.Zones.ReferenceZoneId; var rz = refId == 0 ? null : s.Zones.Zone(refId);
+            var refId = l.OwnerZoneId is long oz && !l.ByAdmin ? s.Zones.ReferenceFor(oz) : s.Zones.ReferenceZoneId; var rz = refId == 0 ? null : s.Zones.Zone(refId);   // 0.6.8-#15
             if (rz == null) { var w = zs.FirstOrDefault(z => z.Outputs.First(o => o.Active).Kind == "wired") ?? zs.FirstOrDefault(); if (w != null) { refId = w.Id; rz = s.Zones.Zone(w.Id); } }
             var speakers = zs.Where(z => z.Id != refId && (l.ByAdmin || z.Id == l.OwnerZoneId)).Select(z => new { id = z.Id, name = z.Name }).ToList();
             var host = PhoneApi.PhoneHost(c, s);

@@ -57,6 +57,25 @@ internal static class CertificateEndpoints
         if (!selected.Any(ip => !IPAddress.IsLoopback(ip))) throw new InvalidOperationException("No active LAN/Tailscale certificate endpoints found for wildcard bind; use an explicit reachable bind address or restore the interface. Existing certificates are unchanged.");
         return selected;
     }
+    /// <summary>0.6.8-#11g: the order a phone should try the certificate's addresses in: the address the request came in on (when it is a private
+    /// LAN one), then home-network addresses (192.168 / 10 / 172.16-31, IPv4 first), then Tailscale 100.x / fd7a:115c:a1e0, never loopback.
+    /// The certificate's own address list (<see cref="Select"/>) is not changed by this.</summary>
+    internal static IReadOnlyList<IPAddress> PreferForPhone(IEnumerable<IPAddress> ips, IPAddress? local = null)
+    {
+        int Rank(IPAddress ip)
+        {
+            if (local != null && ip.Equals(Normalize(local)) && Private(ip) && !Tailnet(ip)) return 0;
+            var b = ip.GetAddressBytes();
+            if (b.Length == 4 && b[0] == 192 && b[1] == 168) return 1;
+            if (b.Length == 4 && b[0] == 10) return 2;
+            if (b.Length == 4 && Private(ip)) return 3;
+            if (Private(ip)) return 4;
+            if (Tailnet(ip)) return 6;
+            return 5;
+        }
+        return ips.Select(Normalize).Where(ip => !IPAddress.IsLoopback(ip) && !Wildcard(ip)).Distinct()
+            .OrderBy(Rank).ThenBy(ip => ip.AddressFamily).ThenBy(ip => ip.ToString(), StringComparer.Ordinal).ToArray();
+    }
     internal static string[] DnsNames() => new[] { "localhost", "wavwiz.local", Environment.MachineName.ToLowerInvariant(), Environment.MachineName.ToLowerInvariant() + ".local" }.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     internal static bool Covers(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, IEnumerable<IPAddress> ips)
     {

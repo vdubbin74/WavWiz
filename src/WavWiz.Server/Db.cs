@@ -112,6 +112,15 @@ public sealed class Db
         CREATE INDEX ix_play_history_started ON play_history(started_at);
         CREATE INDEX ix_play_history_track ON play_history(track_id, started_at);
         """,
+        // v10 (0.6.8): CD ripper live progress, MP3 quality, year.
+        """
+        ALTER TABLE rip_job ADD COLUMN quality TEXT;
+        ALTER TABLE rip_job ADD COLUMN detail TEXT;
+        ALTER TABLE rip_job ADD COLUMN track_no INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rip_job ADD COLUMN track_total INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rip_job ADD COLUMN speed REAL;
+        ALTER TABLE rip_job ADD COLUMN year TEXT;
+        """,
     };
 
     public SqliteConnection Open()

@@ -76,15 +76,65 @@ export function unassignedMenu42(a) {
 
 let open = null;
 export function closeCtx() { if (!open) return; open.el.remove(); open.subs?.forEach(e => e.remove()); document.removeEventListener('pointerdown', open.off, true); document.removeEventListener('keydown', open.key, true); window.removeEventListener('blur', closeCtx); const f = open.from; open = null; f?.focus?.({ preventScroll: true }); }
-/** Place a menu next to (x, y) inside the window. Submenus pass the parent item's rect and flip to the left when the right side has no room. */
+/** Viewport box in client px. topMin clears the in-page title bar / topbar so the menu does not sit under it. */
+export function ctxViewBox(win = globalThis, doc = typeof document !== 'undefined' ? document : null, pad = 4) {
+  const vw = win.innerWidth ?? 0, vh = win.innerHeight ?? 0;
+  let topMin = pad;
+  try {
+    const bar = doc?.querySelector?.('.topbar');
+    if (bar) {
+      const b = bar.getBoundingClientRect();
+      if (b.bottom > 0 && b.top < 80) topMin = Math.max(topMin, Math.round(b.bottom) + pad);
+    }
+  } catch { /* no DOM / no bar */ }
+  return { vw, vh, pad, topMin };
+}
+
+/** Pure: menu top-left in client pixels.
+ *  Default: top-left at (x, y). If it would overflow the right, flip so the right edge is at x;
+ *  if it would overflow the bottom, flip so the bottom edge is at y. Then clamp into the viewport
+ *  (below topMin). Submenus pass the parent item's rect as `anchor` and flip to its left when the right side has no room. */
+export function ctxPlaceBox(x, y, w, h, view, anchor) {
+  const pad = view.pad ?? 4, topMin = view.topMin ?? pad, vw = view.vw, vh = view.vh;
+  const maxHeight = Math.max(44, vh - topMin - pad);
+  const useH = Math.min(h, maxHeight);
+  let left = x;
+  if (anchor) {
+    if (left + w > vw - pad) left = Math.max(pad, (anchor.left ?? x) - w + 2);
+  } else if (x + w > vw - pad) left = x - w;
+  left = Math.max(pad, Math.min(vw - w - pad, left));
+  if (!Number.isFinite(left)) left = pad;
+  let top = y;
+  if (!anchor && y + useH > vh - pad) top = y - useH;
+  top = Math.max(topMin, Math.min(vh - useH - pad, top));
+  if (!Number.isFinite(top)) top = topMin;
+  return { left, top, maxHeight };
+}
+
+const cssZoom = () => Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
+
+/** Write a client-pixel position. Measures a 0→100px probe so html zoom (`--z`) and a transformed
+ *  containing block (dialog, sheet, filter/transform ancestor that breaks position:fixed) do not offset the menu. */
+function writeClientPos(el, clientX, clientY, z) {
+  el.style.left = '0px'; el.style.top = '0px';
+  const a = el.getBoundingClientRect();
+  el.style.left = '100px';
+  const b = el.getBoundingClientRect();
+  const sx = (b.left - a.left) / 100;
+  const scale = (Number.isFinite(sx) && Math.abs(sx) > 1e-6) ? sx : z;
+  el.style.left = (clientX - a.left) / scale + 'px';
+  el.style.top = (clientY - a.top) / scale + 'px';
+}
+
+/** Place a menu at (x, y) in client pixels (top-left), flipping or clamping to stay in the window. Submenus pass the parent item's rect. */
 function place(el, x, y, r) {
-  const w = el.offsetWidth, hh = el.offsetHeight, pad = 4;
-  let left = x; if (r && x + w > innerWidth - pad) left = Math.max(pad, r.left - w + 2);
-  left = Math.max(pad, Math.min(innerWidth - w - pad, left));
-  let top = Math.max(pad, Math.min(innerHeight - hh - pad, y));
-  el.style.left = left + 'px'; el.style.top = top + 'px';
-  // taller than the window: scroll inside instead of overflowing
-  el.style.maxHeight = (innerHeight - 2 * pad) + 'px';
+  // 0.6.8-#6a: Display size is html{zoom:var(--z)}. Client rects are zoomed; style.left/top are in pre-zoom CSS px.
+  // writeClientPos measures the actual scale so the menu still opens under the pointer (and inside a transformed host).
+  const z = cssZoom(), box = el.getBoundingClientRect();
+  const w = box.width || el.offsetWidth * z, hh = box.height || el.offsetHeight * z;
+  const pos = ctxPlaceBox(x, y, w, hh, ctxViewBox(), r || null);
+  writeClientPos(el, pos.left, pos.top, z);
+  el.style.maxHeight = pos.maxHeight / z + 'px';
 }
 /** Show a menu at (x, y) (clamped into the window). Items: { id, label, ic?, onclick | sub:[{label,onclick}], danger, disabled, hint, sep }. A disabled item is dim, with its hint as a tooltip. Esc closes (submenu first); Up/Down move, Right opens a submenu, Left closes it. */
 export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
@@ -127,7 +177,7 @@ export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
 export function attachCtx(card, build, label) {
   const show = (x, y) => openCtx(x, y, build(), { label, from: card });
   card.addEventListener('contextmenu', ev => { if (ev.target.closest('input,textarea')) return; ev.preventDefault(); ev.stopPropagation(); show(ev.clientX, ev.clientY); });
-  card.addEventListener('keydown', ev => { if ((ev.key === 'F10' && ev.shiftKey) || ev.key === 'ContextMenu') { ev.preventDefault(); const r = card.getBoundingClientRect(); show(r.left + 24, r.top + 24); } });
+  card.addEventListener('keydown', ev => { if ((ev.key === 'F10' && ev.shiftKey) || ev.key === 'ContextMenu') { ev.preventDefault(); const t = (document.activeElement && card.contains(document.activeElement)) ? document.activeElement : card; const r = t.getBoundingClientRect(); show(r.left, r.top); } });
   let t = 0, sx = 0, sy = 0;
   card.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'touch' || ev.target.closest('button,input,.dgrip,.dgrip42,.vbar')) return; if (ev._ctxDone) return; ev._ctxDone = true; sx = ev.clientX; sy = ev.clientY; t = setTimeout(() => { t = 0; show(sx, sy); }, 550); });
   const stop = () => { if (t) { clearTimeout(t); t = 0; } };

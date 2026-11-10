@@ -1,5 +1,6 @@
 // Keep playing (queue header control), server-side queue Undo toast and Recent queues.
 import { h, api, toast, undoToast, dialog } from './util.js';
+import { icon } from './icons.js';
 const zp = (p, zid) => zid ? p + (p.includes('?') ? '&' : '?') + 'zoneId=' + encodeURIComponent(zid) : p;
 
 /** Pure: the <select> value for a Keep playing setting. */
@@ -7,20 +8,35 @@ export const keepValue = k => !k || !k.mode || k.mode === 'off' ? 'off' : k.mode
 /** Pure: the PUT body for a <select> value. */
 export const keepBody = v => { if (!v || v === 'off') return { mode: 'off' }; if (v === 'similar') return { mode: 'similar' }; const [mode, id] = v.split(':'); return { mode, id: Number(id) }; };
 
-/** Compact Keep playing control: quiet "Keep playing ▾" when off, "Keep playing: [mode ▾]" when on. zid() = the zone being shown (null = this player's zone); can() = Control role.
- *  Opens a small popover: the modes first (Off / Similar / Smart… / Playlist… / Radio…), then a type-to-filter list of at most KEEP_MAX items for that kind. */
+/** Keep playing as a toolbar icon (infinity). Same .plus.pllock button chrome as the queue lock:
+ *  dim outline when Off, lock's .on glow when a mode is on. Style B ('badge'): tiny mode letters on the icon.
+ *  Click opens a small menu of modes with the current one checked. Tooltip is "Keep playing: <mode>". */
+export const KEEP_ICON_STYLE = 'glow'; // set to 'badge' for the small text badge variant
 export const KEEP_MAX = 12;
+export const keepModeLabel = (val, name) => !val || val === 'off' ? 'Off' : val === 'similar' ? 'Similar music' : (name || 'On');
+export const keepTip = (val, name) => 'Keep playing: ' + keepModeLabel(val, name);
+export const keepBadge = (val, name) => { const lab = keepModeLabel(val, name); if (lab === 'Off') return ''; if (lab === 'Similar music') return 'SIM'; return String(lab).slice(0, 3).toUpperCase(); };
 /** Pure: the items of one kind matching a filter, at most `max` (name order kept). */
 export const keepFilter = (xs, q, max = KEEP_MAX) => { const t = String(q || '').trim().toLocaleLowerCase(); const m = t ? xs.filter(x => String(x.name || '').toLocaleLowerCase().includes(t)) : xs; return { shown: m.slice(0, max), more: Math.max(0, m.length - max) }; };
 const KINDS = [['smart', 'Smart playlist', 'sm'], ['playlist', 'Playlist', 'pl'], ['radio', 'Radio', 'rd']];
 export function keepControl({ zid = () => null, can = () => true } = {}) {
   let val = 'off', name = '';
-  const sel = h('button', { type: 'button', class: 'qkeep-sel', 'aria-label': 'Keep playing when the queue runs out', title: 'When the queue runs out, keep adding music', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-    onclick: ev => { ev.preventDefault(); ev.stopPropagation(); if (document.querySelector('.qkeeppop')) close(); else open(); } }, 'Keep playing ▾');
-  const lbl = h('span', { class: 'qkeep-lbl dim' }, 'Keep playing:');
-  const el = h('span', { class: 'qkeep row small qkeep-off', 'data-act': 'keepplaying' }, lbl, sel);
-  // Off = one quiet "Keep playing ▾" control; on = "Keep playing: <mode>" so autofill is easy to spot.
-  const mark = () => { const on = val !== 'off'; el.classList.toggle('qkeep-on', on); el.classList.toggle('qkeep-off', !on); lbl.hidden = !on; sel.textContent = (on ? (val === 'similar' ? 'Similar music' : name || 'On') : 'Keep playing') + ' ▾'; sel.dataset.value = val; };
+  if (typeof document !== 'undefined' && document.documentElement && !document.documentElement.dataset.qkeepStyle)
+    document.documentElement.dataset.qkeepStyle = KEEP_ICON_STYLE;
+  const badge = h('span', { class: 'qkeep-badge', 'aria-hidden': 'true' });
+  // Same button classes as the queue lock (.plus.pllock); .on reuses the lock's active glow exactly.
+  const sel = h('button', { type: 'button', class: 'qkeep-sel plus pllock', 'aria-label': keepTip('off'), title: keepTip('off'), 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-pressed': 'false',
+    onclick: ev => { ev.preventDefault(); ev.stopPropagation(); if (document.querySelector('.qkeeppop')) close(); else open(); } }, icon('keep'), badge);
+  const lbl = h('span', { class: 'qkeep-lbl' }, 'Keep playing: Off');
+  const el = h('span', { class: 'qkeep qkeep-ic row small qkeep-off', 'data-act': 'keepplaying' }, sel, lbl);
+  const mark = () => {
+    const on = val !== 'off', tip = keepTip(val, name);
+    el.classList.toggle('qkeep-on', on); el.classList.toggle('qkeep-off', !on);
+    sel.classList.toggle('on', on); sel.setAttribute('aria-pressed', String(on));
+    sel.dataset.value = val; sel.title = tip; sel.setAttribute('aria-label', tip);
+    lbl.textContent = tip;
+    const b = keepBadge(val, name); badge.textContent = b; badge.hidden = !on || !b;
+  };
   let lists = null, at = 0;
   async function loadLists() {
     if (lists && performance.now() - at < 30000) return lists;
@@ -33,10 +49,10 @@ export function keepControl({ zid = () => null, can = () => true } = {}) {
     catch (e) { [val, name] = was; mark(); toast(e.message, true); refresh(); }
   }
   let box = null;
-  const out = ev => { if (!ev.target.closest?.('.qkeeppop') && ev.target !== sel) close(); };
+  const out = ev => { if (!ev.target.closest?.('.qkeeppop') && !ev.target.closest?.('.qkeep-sel') && !ev.target.closest?.('.qkeep-ic')) close(); };
   const esc = ev => { if (ev.key === 'Escape') { close(); sel.focus(); } };
   function close() { box?.remove(); box = null; sel.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); }
-  const item = (text, on, onclick, extra = {}) => h('button', { type: 'button', class: 'plp-sort qkeepi' + (on ? ' on' : ''), role: 'menuitem', onclick, ...extra }, text);
+  const item = (text, on, onclick, extra = {}) => h('button', { type: 'button', class: 'plp-sort qkeepi' + (on ? ' on' : ''), role: 'menuitem', 'aria-checked': String(!!on), onclick, ...extra }, on ? '✓ ' + text : text);
   const place = () => { const a = sel.getBoundingClientRect(), r = box.getBoundingClientRect(); box.style.left = Math.max(4, Math.min(a.left, innerWidth - r.width - 6)) + 'px'; box.style.top = Math.max(4, a.bottom + r.height + 4 > innerHeight ? a.top - r.height - 4 : a.bottom + 4) + 'px'; };
   const paint = kids => { box.replaceChildren(...kids); place(); box.querySelector('input, .qkeepi')?.focus(); };
   async function open() {

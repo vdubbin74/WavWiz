@@ -423,7 +423,7 @@ export class WarpScene extends Scene {
     const [sx, sy, zoom] = this.cam(f); g.begin(sx, sy, zoom);
     const trail = this.fxv('trail', 0.5) * this.q.trails, warp = this.fxv('warp', 1);
     g.fade(Math.min(0.95, (f.idle ? 0.4 : 0.47 + 0.18 * Math.min(1, f.surge + f.bass)) + trail * 0.3));
-    const speed = (f.idle ? 0.07 : 0.18 + f.bass * 1.1 * I + f.surge * 2.0 * I + f.energy * 0.3) * s.speed * warp;
+    const speed = (f.idle ? 0.07 : 0.18 + f.bass * 1.1 * I + f.surge * 2.0 * I + f.energy * 0.3 + (f.punch || 0) * 0.8 * I) * s.speed * warp;
     const focal = h * 0.5, streak = Math.min(0.45, (0.01 + speed * 0.12 * (1 + f.surge)) * (0.4 + trail * 1.2));
     const pxs = Math.max(1, h / 260), bright = f.idle ? 0.5 : 0.6 + 0.6 * f.energy * I;
     this.dist += speed * ds;
@@ -446,6 +446,7 @@ export class WarpScene extends Scene {
       if (near > 0.55) g.sprite(hx, hy, size * 1.8, col, a * 0.35);
     }
     // shockwave burst on kicks: an expanding ring + radial sparks
+    if (f.groove) this.rings.push({ r: Math.min(w, h) * 0.04, life: 0.55 });   // 0.6.8-#17: a softer ring on a predicted beat
     if (f.kick && !f.idle && this.gpu) { this.rings.push({ r: Math.min(w, h) * 0.04, life: 1 }); this.bursts.emit(cx, cy, 0.7 + f.bass * 0.6); }
     else if (f.kick && !f.idle) {
       this.rings.push({ r: Math.min(w, h) * 0.04, life: 1 });
@@ -480,6 +481,7 @@ export class RiverScene extends Scene {
     this.phase += ds * (f.idle ? 0.35 : 0.6 + f.bass * 2.2 * I + f.surge * 2) * s.speed;
     const mx = (this.progress == null ? 0.5 : Math.min(0.98, Math.max(0.02, this.progress))) * w;
     if (f.kick && !f.idle) this.pulses.push({ d: 0, life: 1, amp: 0.6 + f.bass });
+    else if (f.groove) this.pulses.push({ d: 0, life: 0.6, amp: 0.35 });   // 0.6.8-#17
     this.pulses = this.pulses.filter(q => (q.life -= ds * 0.9) > 0); for (const q of this.pulses) q.d += w * 0.7 * ds;
     const layers = Math.max(3, Math.round((this.preview ? 6 : 9) * s.density * this.fxv('layers', 1))), N = this.preview ? 70 : this.light ? 110 : 170;
     // 0.0.8 color-shift sweep: a soft primary/secondary blend that sweeps left and right across the ribbons (speed slider; 0 = still split at the marker)
@@ -524,9 +526,10 @@ export class ConeScene extends Scene {
     const g = this.g, s = this.settings, P = this.pal, I = s.intensity, ds = dt / 1000; this.t += ds;
     const [sx, sy] = this.cam(f); g.begin(sx, sy, 1);
     const flex = this.fxv('flex', 1), ripple = this.fxv('ripple', 1);
-    const target = f.idle ? 0.15 * Math.sin(this.t * 2.2) : Math.min(2.4, (f.bass * 1.6 + f.surge * 1.0 + f.beat * 0.4) * I * flex) * (0.75 + 0.25 * Math.sin(this.t * 40 * s.speed));
+    const target = f.idle ? 0.15 * Math.sin(this.t * 2.2) : Math.min(2.4, (f.bass * 1.6 + f.surge * 1.0 + f.beat * 0.4 + (f.punch || 0) * 0.8) * I * flex) * (0.75 + 0.25 * Math.sin(this.t * 40 * s.speed));
     this.vel += (target - this.exc) * 0.5; this.vel *= 0.55; this.exc += this.vel;                     // a springy cone, not a jumpy one
     if (f.kick && !f.idle) this.rips.push({ r: 0.37, life: 1 });
+    else if (f.groove) this.rips.push({ r: 0.37, life: 0.6 });   // 0.6.8-#17: the groove keeps rippling between detected kicks
     if (this.rips.length > 6) this.rips.shift();
     this.rips = this.rips.filter(q => (q.life -= ds * 0.7 / Math.max(0.5, s.speed) / ripple) > 0);
     this.rip.fill(0); this.rips.forEach((q, i) => { q.r += ds * (0.45 + 0.3 * q.life) * s.speed * ripple; this.rip[i * 4] = q.r; this.rip[i * 4 + 1] = q.life * I; });
@@ -546,7 +549,7 @@ export class RingScene extends Scene {
     const g = this.g, s = this.settings, P = this.pal, w = g.w, h = g.h, cx = w / 2, cy = h / 2, I = s.intensity, ds = dt / 1000; this.t += ds;
     const [sx, sy, zoom] = this.cam(f); g.begin(sx, sy, zoom); g.fade(0.6 + 0.15 * f.energy);
     const spin = this.fxv('spin', 1), thick = this.fxv('thick', 1);
-    this.rot += ds * (0.15 + f.bass * 0.8 * I + f.surge) * s.speed * spin;
+    this.rot += ds * (0.15 + f.bass * 0.8 * I + f.surge + (f.punch || 0) * 0.5 * I) * s.speed * spin;
     const tiltX = 0.45 + 0.12 * Math.sin(this.t * 0.4), tiltY = 0.25 * Math.sin(this.t * 0.27), R = h * 0.3 * (1 + 0.08 * f.flash), pxs = Math.max(1, h / 300);
     const cX = Math.cos(tiltX), sX = Math.sin(tiltX), cY = Math.cos(tiltY), sY = Math.sin(tiltY), F = 2.2;
     const proj = (x, y, z) => { let y1 = y * cX - z * sX, z1 = y * sX + z * cX; const x2 = x * cY + z1 * sY, z2 = -x * sY + z1 * cY; const k = persp(z2, F); return [cx + x2 * k * R, cy + y1 * k * R, k]; };
@@ -565,6 +568,7 @@ export class RingScene extends Scene {
     const seg = this.preview ? 64 : 128; let pp = null;
     for (let i = 0; i <= seg; i++) { const a = i / seg * Math.PI * 2 + this.rot * 0.5, wv = f.wave[(i % seg) * 2] || 0, rr = 0.62 + wv * 0.35 * I; const q = proj(Math.cos(a) * rr, Math.sin(a) * rr, 0.05); if (pp) g.line(pp[0], pp[1], q[0], q[1], 2 * pxs, mixc(P.a, P.p, 0.4), 0.7, 1); pp = q; }
     if (f.kick && !f.idle) this.rings.push({ r: 1, z: 0, life: 1 });
+    else if (f.groove) this.rings.push({ r: 1, z: 0, life: 0.55 });   // 0.6.8-#17
     this.rings = this.rings.filter(q => (q.life -= ds * 1.2) > 0);
     for (const q of this.rings) { q.r += ds * 1.6; q.z -= ds * 1.3; let p0 = null; for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, p = proj(Math.cos(a) * q.r, Math.sin(a) * q.r, q.z); if (p0) g.line(p0[0], p0[1], p[0], p[1], (2 + 6 * q.life) * pxs * p[2], i < 32 ? P.p : P.s, q.life * 0.8 * I, 1); p0 = p; } }
     this.sparks = this.sparks.filter(q => (q.life -= ds * 1.5) > 0); if (this.sparks.length > 800) this.sparks.splice(0, 200);
@@ -585,7 +589,7 @@ export class TunnelScene extends Scene {
     const g = this.g, s = this.settings, P = this.pal, w = g.w, h = g.h, cx = w / 2, cy = h / 2, I = s.intensity, ds = dt / 1000; this.t += ds;
     const [sx, sy, zoom] = this.cam(f); g.begin(sx, sy, zoom); g.fade(f.idle ? 0.25 : 0.28 + 0.12 * f.energy);   // short trails: crisp rings on a dark tunnel
     const fly = this.fxv('fly', 1), twist = this.fxv('twist', 0.25), count = Math.max(6, Math.round((this.preview ? 14 : 24) * this.fxv('rings', 1)));
-    const speed = (f.idle ? 0.35 : 0.7 + f.bass * 2.6 * I + f.surge * 3 * I) * s.speed * fly; this.dist += speed * ds;
+    const speed = (f.idle ? 0.35 : 0.7 + f.bass * 2.6 * I + f.surge * 3 * I + (f.punch || 0) * 1.6 * I) * s.speed * fly; this.dist += speed * ds;   // 0.6.8-#17: the kick's thump pushes the flight
     const R = Math.min(w * 0.42, h * 0.62), pxs = Math.max(1, h / 300), seg = this.preview ? 40 : this.light ? 64 : 96;
     const off = z => { const k = Math.min(1, z / count) * twist; return [Math.sin(this.t * 0.6 + z * 0.22) * w * 0.16 * k, Math.cos(this.t * 0.45 + z * 0.19) * h * 0.14 * k]; };
     const rad = z => R * 0.95 / (z * 0.45 + 0.12);
@@ -612,6 +616,7 @@ export class TunnelScene extends Scene {
       ring(z, n % 2 ? P.p : P.s, Math.min(1.3, a), (1.2 + 3.5 / (z + 0.4)) * pxs * (0.7 + b * 0.8));
     }
     if (f.kick && !f.idle) { this.boosts.push({ z: count, life: 1 }); if (this.gpu) this.bursts.emit(cx, cy, 0.45 + f.bass * 0.4); }
+    else if (f.groove) this.boosts.push({ z: count, life: 0.6 });   // 0.6.8-#17: a dimmer ring on each predicted beat keeps the tunnel on the groove
     this.boosts = this.boosts.filter(q => (q.z -= ds * speed * 3) > 0.15 && (q.life -= ds * 0.35) > 0);
     for (const q of this.boosts) ring(q.z, mixc(P.p, P.a, 0.5), Math.min(1.4, 1.1 * q.life * I), (2.5 + 6 / (q.z + 0.4)) * pxs);
     g.flush();
@@ -633,11 +638,11 @@ export class SpectrumScene extends Scene {
     const N = Math.max(12, Math.min(160, Math.round(this.fxv('bars', 64) * (this.preview ? 0.55 : this.light ? 0.75 : 1))));
     const gainH = this.fxv('height', 1.1), sm = this.fxv('smooth', 0.5), refl = this.fxv('reflect', 0.5), glowK = this.fxv('glow', 0.6), dir = this.fx.direction || 'ltr';
     const left = w * 0.02, right = w * 0.98, top = h * 0.1, floor = h * (refl > 0.02 ? 0.74 : 0.92), H = floor - top, bw = (right - left) / N, gap = Math.max(1, bw * 0.28), pxs = Math.max(1, h / 300);
-    const gain = (0.7 + 0.45 * I) * gainH;
+    const gain = (0.7 + 0.45 * I) * gainH, punch = f.punch || 0;   // 0.6.8-#17
     // target heights from the 64 analyzer bands, then a spatial blur so neighbors flow into one curve
     for (let i = 0; i < N; i++) {
       const u = dir === 'center' ? Math.abs(i / (N - 1) - 0.5) * 2 : i / Math.max(1, N - 1);
-      const bf = u * 63, b0 = Math.floor(bf), b1 = Math.min(63, b0 + 1), t = bf - b0, val = (f.bands[b0] || 0) * (1 - t) + (f.bands[b1] || 0) * t;
+      const bf = u * 63, b0 = Math.floor(bf), b1 = Math.min(63, b0 + 1), t = bf - b0, val = ((f.bands[b0] || 0) * (1 - t) + (f.bands[b1] || 0) * t) * (1 + punch * 0.35 * Math.max(0, 1 - bf / 18));   // bass end lifts on the thump
       this.tmp[i] = f.idle ? 0.05 + 0.04 * (1 + Math.sin(this.t * 1.4 + i * 0.22)) : Math.min(1, val * gain * (0.9 + 0.25 * u));
     }
     const rad = Math.round(sm * 4);
@@ -677,7 +682,7 @@ export class GeqScene extends Scene {
     for (let i = 0; i < N; i++) {
       const b0 = Math.floor(i * 64 / N), b1 = Math.max(b0 + 1, Math.floor((i + 1) * 64 / N)); let val = 0;
       for (let b = b0; b < b1; b++) val = Math.max(val, f.bands[b] || 0);
-      const target = f.idle ? 0.03 + 0.025 * (1 + Math.sin(this.t * 1.8 + i * 0.45)) : Math.min(1, val * gain * (0.92 + 0.22 * i / N));
+      const target = f.idle ? 0.03 + 0.025 * (1 + Math.sin(this.t * 1.8 + i * 0.45)) : Math.min(1, val * gain * (0.92 + 0.22 * i / N) * (1 + (f.punch || 0) * 0.35 * Math.max(0, 1 - i / (N * 0.3))));   // 0.6.8-#17: the bass bars jump on the kick's thump
       const v = this.v[i]; this.v[i] = target > v ? v + (target - v) * Math.min(1, 0.7 * k * Math.max(0.5, s.speed)) : Math.max(target, v - ds * fall * (0.4 + v));
       if (this.v[i] >= this.cap[i]) { this.cap[i] = this.v[i]; this.capV[i] = 0; this.capHold[i] = hold; }
       else if ((this.capHold[i] -= dt) <= 0) { this.capV[i] += ds * 2.2; this.cap[i] = Math.max(this.v[i], this.cap[i] - this.capV[i] * ds); }

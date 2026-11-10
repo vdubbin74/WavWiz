@@ -15,4 +15,12 @@ assert.equal(m.zoneOfPath('/queue/clear?zoneId=g%3A5'), 'g:5'); assert.equal(m.z
 assert.equal(m.undoMsg('/queue/clear'), 'Cleared the queue'); assert.equal(m.undoMsg('/stream/play'), 'Replaced the queue');
 assert.equal(m.UNDO_MS, 10000);
 assert.ok(!/F1\d\d/.test(src.replace(/^\/\/.*$/mg, '')), 'no ticket numbers in user-facing strings');
+assert.equal(m.KEEP_ICON_STYLE, 'glow');
+assert.equal(m.keepTip('off'), 'Keep playing: Off');
+assert.equal(m.keepTip('similar'), 'Keep playing: Similar music');
+assert.equal(m.keepBadge('similar'), 'SIM');
+assert.match(src, /icon\('keep'\)/);
+assert.match(src, /qkeep-ic/);
+assert.match(src, /qkeep-sel plus pllock/);
+assert.match(src, /sel\.classList\.toggle\('on', on\)/);
 console.log('queuetools ok');

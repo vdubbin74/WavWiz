@@ -26,7 +26,7 @@ foreach ($f in 'server/wavwiz-server.exe', 'server/wwwroot/index.html', 'server/
 Write-Ok 'publish output complete (server + wwwroot, player + WebView2 loader)'
 
 Write-Step 'ffmpeg (WavWiz LGPL-only decode build, shared DLLs)'
-# 0.0.3: FFmpeg 8.1.3 is built from the unmodified release tarball by build/build-ffmpeg-lgpl.sh (mingw-w64 cross build, no GPL, no nonfree, no external codec libraries).
+# 0.0.3/0.6.8: FFmpeg 8.1.3 is built from the unmodified release tarball by build/build-ffmpeg-lgpl.sh (mingw-w64, no GPL, no nonfree; LAME 3.100 is bundled as an LGPL shared lib).
 $ffOut = Join-Path $ToolsCache 'ffmpeg-lgpl/out'
 if (-not (Test-Path (Join-Path $ffOut 'bin/ffmpeg.exe'))) {
     $bash = Get-Command bash -ErrorAction SilentlyContinue
@@ -56,6 +56,8 @@ $ffsha = Get-Sha256 (Join-Path $ffDir 'ffmpeg.exe')
 $ffVer = '8.1.3'; $tar = "ffmpeg-$ffVer.tar.xz"; $ztar = 'zlib-1.3.1.tar.gz'
 Copy-Item (Join-Path $ffOut $tar) $srcDir -Force; Copy-Item (Join-Path $ffOut $ztar) $srcDir -Force; Copy-Item (Join-Path $PSScriptRoot 'build-ffmpeg-lgpl.sh') $srcDir -Force
 Copy-Item (Join-Path $PSScriptRoot 'ffmpeg-lgpl.sha256') $srcDir -Force
+$lameTar = 'lame-3.100.tar.gz'; if (Test-Path (Join-Path $ffOut $lameTar)) { Copy-Item (Join-Path $ffOut $lameTar) $srcDir -Force }; if (Test-Path (Join-Path $PSScriptRoot 'lame.sha256')) { Copy-Item (Join-Path $PSScriptRoot 'lame.sha256') $srcDir -Force }
+Get-ChildItem (Join-Path $ffOut 'deps-lic') -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName (Join-Path $licDir $_.Name) -Force }
 
 # 0.1.1: AirPlay + Spotify Connect receivers (separate bundled programs): wavwiz-airplay.exe (shairplay, LGPL-2.1+), librespot.exe (MIT), wavwiz-hook.exe (ours)
 Write-Step 'receivers (AirPlay: shairplay; Spotify Connect: librespot)'

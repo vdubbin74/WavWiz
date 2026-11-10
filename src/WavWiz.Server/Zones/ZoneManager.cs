@@ -12,7 +12,8 @@ public sealed record OutputDto(long EndpointDbId, string DeviceId, string Endpoi
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
     bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null, double? VolCap = null, bool VolLocked = false);
-public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false);
+public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false,
+    long? ReferenceId = null, string? RefNote = null);   // 0.6.8-#15: the zone's reference speaker + a quiet "Reference changed, re-check timing" note
 
 /// <summary>0.3.2 F4: zone volume math (pure). The zone level = the average of its speakers. Moving the zone slider shifts every member by the
 /// same amount from its "virtual" level (which may sit above 100 or below 0), and the real level is that clamped to 0-100 - so clamping at an end
@@ -94,7 +95,10 @@ public sealed class ZoneManager
         var now = DateTimeOffset.UtcNow.ToString("O");
         _db.Exec("INSERT INTO player(id,name,machine_name,app_version,last_seen_at,link_type) VALUES($i,$n,$m,$v,$t,$l) ON CONFLICT(id) DO UPDATE SET name=$n,machine_name=$m,app_version=$v,last_seen_at=$t,link_type=$l",
             ("$i", s.Id), ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$m", s.Hello.MachineName), ("$v", s.Hello.AppVersion), ("$t", now), ("$l", s.Hello.LinkType));
-        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone WHERE player_id=$p", ("$p", s.Id))) == 0)
+        bool isNew = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone WHERE player_id=$p", ("$p", s.Id))) == 0;
+        if (isNew && s.IsWeb) isNew = !MergeWebTwin(s);   // 0.6.8-#11e
+        if (s.IsWeb) lock (_webIp) _webIp[s.Id] = s.Remote.ToString();
+        if (isNew)
         {
             int sort = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(sort),0)+1 FROM zone"));
             _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));
@@ -107,6 +111,43 @@ public sealed class ZoneManager
         if (z.Enabled) _reg.Subscribe(s);      // the device listens to its playback group (the house group unless it was split off)
         _ev.Publish("zones");
         return Task.CompletedTask;
+    }
+
+    // ---- 0.6.8-#11e: one device per phone. iOS gives every Home Screen install (and Safari) its own storage, so a new install can come up with a
+    // new "web-…" id and the phone shows twice. The Home Screen start address carries the id (a2hs.js); when it still arrives as a NEW id, the
+    // server re-keys the phone's existing entry to it instead of adding a twin: same phone name, same address, the old one offline. The zone row
+    // (id, name, volume, groups) and its calibration + outputs move over; nothing is deleted. In-memory addresses only (cheap; after a server
+    // restart the first reconnect simply adds the device as before).
+    private readonly Dictionary<string, string> _webIp = new();
+    private static readonly HashSet<string> PhoneNames = new(StringComparer.Ordinal) { "iPhone", "iPad", "Android phone", "Android tablet" };
+    /// <summary>Pure: which offline web device a newly seen phone id replaces, or null.</summary>
+    public static string? WebTwin(string newId, string name, string ip, IEnumerable<(string Id, string Name, string? Ip, bool Online)> known)
+    {
+        if (!PhoneNames.Contains(name)) return null;
+        var c = known.Where(k => k.Id != newId && k.Id.StartsWith("web-", StringComparison.Ordinal) && !k.Online && k.Name == name && k.Ip == ip).Select(k => k.Id).ToList();
+        return c.Count == 1 ? c[0] : null;   // two candidates = ambiguous, leave both
+    }
+    private bool MergeWebTwin(PlayerSession s)
+    {
+        try
+        {
+            var name = string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name;
+            Dictionary<string, string> ips; lock (_webIp) ips = new(_webIp);
+            var online = _host.Sessions.Select(x => x.Id).ToHashSet();
+            var known = _db.Query("SELECT p.id,p.name FROM player p JOIN zone z ON z.player_id=p.id WHERE p.id LIKE 'web-%'", r => (Id: r.GetString(0), Name: r.GetString(1)))
+                .Select(k => (k.Id, k.Name, ips.TryGetValue(k.Id, out var ip) ? ip : null, online.Contains(k.Id))).ToList();
+            var old = WebTwin(s.Id, name ?? "", s.Remote.ToString(), known);
+            if (old == null) return false;
+            _db.Exec("UPDATE zone SET player_id=$n WHERE player_id=$o", ("$n", s.Id), ("$o", old));
+            _db.Exec("UPDATE output_endpoint SET player_id=$n WHERE player_id=$o", ("$n", s.Id), ("$o", old));
+            _db.Exec("UPDATE calibration SET player_id=$n WHERE player_id=$o", ("$n", s.Id), ("$o", old));
+            _db.Exec("DELETE FROM player WHERE id=$o", ("$o", old));
+            lock (_webIp) _webIp.Remove(old);
+            _reg.Rekey(old, s.Id); Rooms.Forget(old); _lastHealth.Remove(old);
+            _log?.Invoke($"web device {s.Id} ({name}) is the same phone as {old} (new Home Screen install) - kept one entry");
+            return true;
+        }
+        catch (Exception e) { _log?.Invoke("web twin merge: " + e.Message); return false; }
     }
 
     private void OnDisconnected(PlayerSession s)
@@ -254,17 +295,93 @@ public sealed class ZoneManager
         return AuthService.IsThisMachine(a) && AuthService.IsThisMachine(b);
     }
 
+    // ---------------- 0.6.8-#15: one reference speaker per zone ----------------
+    private readonly object _refLock = new();
+    /// <summary>Each zone's reference speaker (zone group id -> speaker id), normalized against the current membership. A zone whose reference left
+    /// gets a new one (wired, then online, then steadiest), the saved offsets are re-based on it and a quiet note is left. First run migrates the
+    /// house reference (<see cref="ReferenceZoneId"/>) to its zone; the other zones auto-pick.</summary>
+    public Dictionary<long, long> ZoneReferenceMap()
+    {
+        lock (_refLock)
+        {
+            var members = _db.Query("SELECT group_id,device_id FROM zone_group_member", r => (G: r.GetInt64(0), D: r.GetInt64(1)))
+                .GroupBy(x => x.G).ToDictionary(x => x.Key, x => x.Select(y => y.D).OrderBy(d => d).ToList());
+            var stored = ZoneRefs.ParseMap(_db.Setting(ZoneRefs.MapKey));
+            var (map, changes) = ZoneRefs.Normalize(stored, members, RefCand, ReferenceZoneId);
+            if (stored == null || stored.Count != map.Count || map.Any(kv => !stored.TryGetValue(kv.Key, out var v) || v != kv.Value)) _db.SetSetting(ZoneRefs.MapKey, ZoneRefs.MapJson(map));
+            foreach (var c in changes) { RebaseZone(c.Group, c.New, members[c.Group]); SetRefNote(c.Group, true); }
+            return map;
+        }
+    }
+    ZoneRefs.Cand RefCand(long id)
+    {
+        var row = _db.Query("SELECT z.player_id, COALESCE(d.kind,'') FROM zone z LEFT JOIN output_device d ON d.id=z.active_output_device_id WHERE z.id=$i", r => (P: r.GetString(0), K: r.GetString(1)), ("$i", id)).FirstOrDefault();
+        if (row.P == null) return new(id, false, false, double.MaxValue);
+        var s = _host.Get(row.P); var st = s?.Status;
+        bool wired = ZoneRefs.IsWiredKind(row.K) && !(s?.IsWeb ?? row.P.StartsWith("web-", StringComparison.Ordinal)) && !row.P.StartsWith("airplay:", StringComparison.Ordinal);
+        return new(id, wired, s != null || ExternalOnline?.Invoke(row.P) == true, st == null ? 1e6 : st.Underruns + st.HardResyncs + Math.Abs(st.SyncErrorMs));
+    }
+    /// <summary>The reference a speaker is calibrated against: its zone's reference, or the house reference for a speaker in no zone (0 = none).</summary>
+    public long ReferenceFor(long speakerId)
+    {
+        var map = ZoneReferenceMap();
+        var g = _db.Query("SELECT group_id FROM zone_group_member WHERE device_id=$d", r => r.GetInt64(0), ("$d", speakerId)).FirstOrDefault();
+        return g != 0 && map.TryGetValue(g, out var r) ? r : ReferenceZoneId;
+    }
+    public long? GroupOfSpeaker(long speakerId) { var g = _db.Query("SELECT group_id FROM zone_group_member WHERE device_id=$d", r => r.GetInt64(0), ("$d", speakerId)).FirstOrDefault(); return g == 0 ? null : g; }
+    /// <summary>Any speaker of a zone can be made its reference by hand. The saved offsets are re-based on it (no recalibration needed).</summary>
+    public string? SetZoneReference(long groupId, long speakerId)
+    {
+        lock (_refLock)
+        {
+            var members = _db.Query("SELECT device_id FROM zone_group_member WHERE group_id=$g", r => r.GetInt64(0), ("$g", groupId)).OrderBy(d => d).ToList();
+            if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group WHERE id=$i", ("$i", groupId))) == 0) return "zone not found";
+            if (!members.Contains(speakerId)) return "that speaker is not in this zone";
+            var map = ZoneReferenceMap();
+            if (!map.TryGetValue(groupId, out var cur) || cur != speakerId)
+            {
+                map[groupId] = speakerId; _db.SetSetting(ZoneRefs.MapKey, ZoneRefs.MapJson(map));
+                RebaseZone(groupId, speakerId, members);
+            }
+            SetRefNote(groupId, false);
+        }
+        _ev.Publish("zones"); return null;
+    }
+    /// <summary>Delays are absolute (house clock), so they stay; the stored offset of each calibrated speaker is rewritten against the new reference.</summary>
+    void RebaseZone(long groupId, long newRef, IReadOnlyList<long> members)
+    {
+        var lat = new Dictionary<long, double>(); var rowOf = new Dictionary<long, long>(); string? refDev = null;
+        foreach (var m in members)
+        {
+            var dev = _db.Scalar("SELECT active_output_device_id FROM zone WHERE id=$i", ("$i", m)) as string; if (dev == null) continue;
+            if (m == newRef) refDev = dev;
+            var row = _db.Query("SELECT id,latency_ms FROM calibration WHERE output_device_id=$d AND is_current=1 ORDER BY measured_at DESC LIMIT 1", r => (Id: r.GetInt64(0), L: r.GetDouble(1)), ("$d", dev)).FirstOrDefault();
+            if (row.Id != 0) { lat[m] = row.L; rowOf[m] = row.Id; }
+        }
+        foreach (var (m, off) in ZoneRefs.Rebase(lat, newRef))
+            _db.Exec("UPDATE calibration SET raw_latency_ms=$o, reference_device_id=$r WHERE id=$i", ("$o", off), ("$r", refDev), ("$i", rowOf[m]));
+    }
+    Dictionary<long, string> RefNotes() { try { return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(_db.Setting(ZoneRefs.NoteKey) ?? "{}")!.Where(kv => long.TryParse(kv.Key, out _)).ToDictionary(kv => long.Parse(kv.Key), kv => kv.Value); } catch { return new(); } }
+    /// <summary>Sets or clears the quiet "Reference changed, re-check timing" note of a zone.</summary>
+    public void SetRefNote(long groupId, bool on)
+    {
+        var n = RefNotes(); if (on) n[groupId] = DateTimeOffset.UtcNow.ToString("O"); else if (!n.Remove(groupId)) return;
+        _db.SetSetting(ZoneRefs.NoteKey, System.Text.Json.JsonSerializer.Serialize(n.ToDictionary(kv => kv.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), kv => kv.Value)));
+    }
+    public const string RefNoteText = "Reference changed, re-check timing";
+
     public bool IsMine(long zoneId, AuthInfo? who, System.Net.IPAddress? remote) => Zones(who, remote).FirstOrDefault(z => z.Id == zoneId)?.Mine ?? false;
 
     public List<ZoneDto> Zones(AuthInfo? who = null, System.Net.IPAddress? remote = null)
     {
         var res = new List<ZoneDto>();
-        long reference = ReferenceZoneId;
+        long house = ReferenceZoneId; var zref = ZoneReferenceMap(); var refSet = zref.Values.ToHashSet();   // 0.6.8-#15
         var owners = _db.Query("SELECT id,owner_token_id FROM player", r => (Id: r.GetString(0), Owner: r.IsDBNull(1) ? (long?)null : r.GetInt64(1))).ToDictionary(x => x.Id, x => x.Owner);
         var seen = _db.Query("SELECT id,last_seen_at FROM player WHERE last_seen_at IS NOT NULL", r => (Id: r.GetString(0), At: r.GetString(1))).ToDictionary(x => x.Id, x => x.At);
         var rows = _db.Query("SELECT id,name,player_id,enabled,volume,muted,active_output_device_id,sort FROM zone ORDER BY sort,id",
             r => new ZRow(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetDouble(4), r.GetInt32(5) != 0, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7)));
         var memberships = _db.Query("SELECT device_id,group_id FROM zone_group_member", r => (Dev: r.GetInt64(0), Grp: r.GetInt64(1))).ToLookup(x => x.Dev, x => x.Grp);
+        bool IsRef(long id) => refSet.Contains(id) || (id == house && !memberships[id].Any());   // a speaker in no zone: the house reference
         foreach (var z in rows)
         {
             var s = _host.Get(z.PlayerId); var st = s?.Status;
@@ -297,7 +414,7 @@ public sealed class ZoneManager
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null || ext, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlayingFor(z.PlayerId), StreamAgeMsFor(z.PlayerId)), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
-                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), z.Id == reference, unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
+                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), IsRef(z.Id), unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
         }
         return res;
     }
@@ -440,7 +557,7 @@ public sealed class ZoneManager
     {
         var devs = _db.Query("SELECT id,player_id,enabled FROM zone", r => (Id: r.GetInt64(0), Player: r.GetString(1), On: r.GetInt32(2) != 0)).ToDictionary(x => x.Id);
         var mem = _db.Query("SELECT group_id,device_id FROM zone_group_member", r => (G: r.GetInt64(0), D: r.GetInt64(1))).ToLookup(x => x.G, x => x.D);
-        var res = new List<ZoneGroupDto>();
+        var res = new List<ZoneGroupDto>(); var zref = ZoneReferenceMap(); var notes = RefNotes();   // 0.6.8-#15
         foreach (var g in _db.Query("SELECT id,name FROM zone_group ORDER BY sort,id", r => (Id: r.GetInt64(0), Name: r.GetString(1))))
         {
             var ids = mem[g.Id].Where(devs.ContainsKey).OrderBy(x => x).ToList();
@@ -448,7 +565,8 @@ public sealed class ZoneManager
             // ACTIVE = exactly this group's devices are switched on (every other device is off)
             bool active = ids.Count > 0 && on == ids.Count && devs.Values.Count(d => d.On) == ids.Count;
             var vols = _db.Query("SELECT id,volume,muted FROM zone", r => (Id: r.GetInt64(0), V: r.GetDouble(1), M: r.GetInt32(2) != 0)).Where(x => ids.Contains(x.Id)).ToList();
-            res.Add(new ZoneGroupDto(g.Id, g.Name, ids, ids.Count, online, on, active, ZoneVolume.Level(vols.Select(x => x.V).ToList()), vols.Count > 0 && vols.All(x => x.M)));
+            res.Add(new ZoneGroupDto(g.Id, g.Name, ids, ids.Count, online, on, active, ZoneVolume.Level(vols.Select(x => x.V).ToList()), vols.Count > 0 && vols.All(x => x.M),
+                zref.TryGetValue(g.Id, out var rf) ? rf : null, notes.ContainsKey(g.Id) ? RefNoteText : null));
         }
         return res;
     }

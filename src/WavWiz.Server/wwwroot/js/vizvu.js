@@ -128,6 +128,7 @@ export function meterStep(sc, dt, f) {
   for (let i = 0; i < 2; i++) {
     const vu = audible ? vals[i][0] - sc.ref + sens : -60, pkv = audible ? vals[i][1] - sc.ref + sens - CREST : -60;
     if (audible && f.kick) sc.n[i].v += (0.6 + f.bass) * 2.4 * bounce * (i ? 0.92 : 1);          // the needle jumps on the kick
+    else if (audible && f.groove) sc.n[i].v += 0.8 * bounce * (i ? 0.92 : 1);                     // 0.6.8-#17: a smaller nudge on a predicted beat
     pos[i] = sc.n[i].step(audible ? vuPos(vu) : -0.03, dt, speed, zeta, rest);
     if (audible && (pkv >= 3 || pos[i] >= 1)) { sc.led[i] = 1; sc.ledHold[i] = hold; } else if ((sc.ledHold[i] -= dt) <= 0) sc.led[i] = Math.max(0, sc.led[i] - dt / 250);
   }

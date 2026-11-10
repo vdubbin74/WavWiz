@@ -17,7 +17,7 @@ assert.match(app, /cur = appSubFor\(cur, phone\)/);
 assert.match(app, /appSubsFor\(phone\)\.map/);
 assert.match(app, /function select\(id\) \{\n\s*id = appSubFor\(id, phone\)/);
 assert.match(app, /cur === 'viz' && !phone\) viz\.reload/);
-assert.match(main, /\(k === 'themes' \|\| isPhone\(\)\) \? 'theme' : 'viz'/);
+assert.match(main, /\(k === 'themes' \|\| (?:isPhone|isRealPhone)\(\)\) \? 'theme' : 'viz'/);
 // not a CSS-only hide
 assert.ok(!/\.appnav \[data-sub=["']?viz/.test(css), 'no CSS hide of viz sub-tab');
 console.log('f125 ok');

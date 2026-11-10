@@ -181,6 +181,58 @@ Test 'Get-ServerConfigPlan: existing bindAddress empty string -> loopback (no gu
     Eq $p.Config['bindAddress'] '127.0.0.1'; Eq $p.BindAction 'set-loopback'; Eq $p.Config['leadMs'] 323; Eq $p.Config['custom'] 'keep'
 }
 
+
+Test 'Get-WavWizServiceSid: SHA-1 per-service SID (TrustedInstaller known value; WavWizServer is stable)' {
+    Eq (Get-WavWizServiceSid 'TrustedInstaller') 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464'
+    Eq (Get-WavWizServiceSid 'WavWizServer') 'S-1-5-80-2509175513-1544765435-2013715574-762528763-723216680'
+}
+Test 'Add-SddlAllowAce / Remove-SddlAllowAce: idempotent grant, removes only our ACE, keeps existing DACL' {
+    $sid = Get-WavWizServiceSid
+    $base = 'D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGWGX;;;IU)'
+    $one = Add-SddlAllowAce $base $sid
+    Has $one $sid
+    Has $one '(A;;GR;;;' + $sid + ')'
+    Has $one '(A;;GA;;;SY)'
+    Eq (Add-SddlAllowAce $one $sid) $one 'not idempotent'
+    $back = Remove-SddlAllowAce $one $sid
+    Eq $back $base 'other ACEs changed'
+    Eq (Remove-SddlAllowAce $base $sid) $base 'removed a missing ACE'
+    $withOwner = Add-SddlAllowAce 'O:BAG:SYD:PAI(A;;GA;;;SY)S:P' $sid
+    Has $withOwner '(A;;GR;;;' + $sid + ')'
+    Has $withOwner 'O:BAG:SYD:PAI(A;;GA;;;SY)'
+    Has $withOwner 'S:P' 'SACL lost'
+    if ($withOwner.IndexOf('(A;;GR;;;' + $sid + ')') -gt $withOwner.IndexOf('S:P')) { throw 'ACE was inserted after the SACL' }
+}
+Test 'Get-CdromClassGrantPlan: unset class uses live SDDL or fallback; backup is UNSET; re-run keeps backup' {
+    $sid = Get-WavWizServiceSid
+    $fb = $script:CdromClassSecurityFallback
+    $p0 = Get-CdromClassGrantPlan -ClassSddl '' -LiveSddl '' -ExistingBackup '' -Sid $sid
+    Eq $p0.Backup 'UNSET'; Eq $p0.WriteBackup $true; Eq $p0.WriteClass $true; Eq $p0.AlreadyGranted $false
+    Eq $p0.Base $fb; Has $p0.NewSddl $sid
+    $live = 'O:BAG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGWGX;;;IU)'
+    $p1 = Get-CdromClassGrantPlan -ClassSddl '' -LiveSddl $live -ExistingBackup '' -Sid $sid
+    Eq $p1.Backup 'UNSET'; Eq $p1.Base $live; Has $p1.NewSddl $sid; Has $p1.NewSddl 'O:BAG:SY'
+    $existing = $fb + '(A;;GA;;;LS)'
+    $p2 = Get-CdromClassGrantPlan -ClassSddl $existing -LiveSddl $live -ExistingBackup '' -Sid $sid
+    Eq $p2.Backup $existing; Has $p2.NewSddl '(A;;GA;;;LS)'; Has $p2.NewSddl $sid
+    $granted = Add-SddlAllowAce $existing $sid
+    $p3 = Get-CdromClassGrantPlan -ClassSddl $granted -LiveSddl '' -ExistingBackup 'UNSET' -Sid $sid
+    Eq $p3.WriteClass $false; Eq $p3.WriteBackup $false; Eq $p3.Backup 'UNSET'; Eq $p3.AlreadyGranted $true
+}
+Test 'Get-CdromClassRevokePlan: UNSET backup + only our ACE -> clear class; later foreign ACE is kept minus ours' {
+    $sid = Get-WavWizServiceSid
+    $base = $script:CdromClassSecurityFallback
+    $granted = Add-SddlAllowAce $base $sid
+    $r0 = Get-CdromClassRevokePlan -ClassSddl $granted -Backup 'UNSET' -Base $base -Sid $sid
+    Eq $r0.ClearClass $true
+    $foreign = Add-SddlAllowAce ($base + '(A;;GA;;;LS)') $sid
+    $r1 = Get-CdromClassRevokePlan -ClassSddl $foreign -Backup 'UNSET' -Base $base -Sid $sid
+    Eq $r1.ClearClass $false; Has $r1.NewSddl '(A;;GA;;;LS)'; HasNot $r1.NewSddl $sid
+    $orig = 'D:P(A;;GA;;;SY)(A;;GA;;;BA)'
+    $r2 = Get-CdromClassRevokePlan -ClassSddl (Add-SddlAllowAce $orig $sid) -Backup $orig -Base $orig -Sid $sid
+    Eq $r2.ClearClass $false; Eq $r2.NewSddl $orig
+}
+
 Write-Host 'non-interactive: prompt functions never throw and never wait'
 foreach ($mode in @(
         @{ Name = 'switch flag only'; Env = @{ }; Args = @('-NoProfile', '-Command'); Pre = '$script:WavWizNoPrompt = $true;' },
@@ -249,6 +301,78 @@ Test 'running setup twice: same final state, service updated not re-created, exa
     Eq (Count (Get-Calls $sb) 'tool sc.exe create') 1 'created twice'; Has (Get-Calls $sb) 'tool sc.exe config WavWizServer'; Has (Get-Calls $sb) 'tool sc.exe stop WavWizServer'
     Eq (Count (Get-Rules $sb) 'name=WavWiz Server') 2 'duplicated firewall rules'
     if (Test-Path (Join-Path $sb.Data 'server.json.bak')) { throw 'backup made for an unchanged file' }
+    Has (Get-Log $sb) 'service account preserved: NT AUTHORITY\LocalService'
+}
+Test 're-run keeps a service account the user set (does not reset to LocalService)' {
+    $sb = New-Sandbox; $r1 = Invoke-Setup $sb; Fail-IfNotOk $r1 $sb
+    Set-Content -LiteralPath (Join-Path $sb.State 'svc.def') 'config WavWizServer binPath= x start= delayed-auto obj= NT AUTHORITY\LocalSystem DisplayName= WavWiz Server (BETA)'
+    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb
+    Has (Get-Log $sb) 'service account preserved: NT AUTHORITY\LocalSystem'
+    Has (Get-Content (Join-Path $sb.State 'svc.def') -Raw) 'obj= NT AUTHORITY\LocalSystem'
+    $calls = Get-Calls $sb
+    if ((Count $calls 'obj= NT AUTHORITY\LocalSystem') -lt 1) { throw 'upgrade did not pass the preserved LocalSystem account to sc.exe' }
+}
+
+Test 'fresh install grants NT SERVICE\WavWizServer GENERIC_READ on the CDROM class, sets sidtype unrestricted, stays LocalService; re-run is idempotent; uninstall restores an unset class' {
+    $sid = Get-WavWizServiceSid
+    $sb = New-Sandbox
+    $live = 'O:BAG:SYD:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGWGX;;;IU)'
+    Set-Content -LiteralPath (Join-Path $sb.State 'cdrom-live.txt') ('\\.\\E:|' + $live)
+    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
+    $calls = Get-Calls $sb
+    Has $calls 'tool sc.exe sidtype WavWizServer unrestricted'
+    Has $calls 'NT AUTHORITY\LocalService'
+    Has (Get-Content (Join-Path $sb.State 'svc.sidtype') -Raw).Trim().ToUpper() 'UNRESTRICTED'
+    $class = Get-Content (Join-Path $sb.State 'cdrom-class-sds.txt') -Raw
+    Has $class $sid; Has $class '(A;;GR;;;' + $sid + ')'; Has $class '(A;;GA;;;SY)'; Has $class 'O:BAG:SY'
+    $reg = Get-Content (Join-Path $sb.State 'registry.txt') -Raw
+    Has $reg 'SOFTWARE\WavWiz|CdromClassSecurityBackup|UNSET'
+    Has $reg 'SOFTWARE\WavWiz|CdromClassSecurityBase|'
+    $liveAfter = Get-Content (Join-Path $sb.State 'cdrom-live.txt') -Raw
+    Has $liveAfter $sid
+    $log = Get-Log $sb
+    Has $log 'service SID type for WavWizServer: UNRESTRICTED'
+    Has $log 'CD-ROM class security written:'
+    Has $log 'CD-ROM class security backup: UNSET'
+    $backupBefore = Get-Content (Join-Path $sb.State 'registry.txt') -Raw
+    $classBefore = Get-Content (Join-Path $sb.State 'cdrom-class-sds.txt') -Raw
+    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb
+    Eq (Get-Content (Join-Path $sb.State 'registry.txt') -Raw) $backupBefore 'backup rewritten on re-run'
+    Eq (Get-Content (Join-Path $sb.State 'cdrom-class-sds.txt') -Raw) $classBefore 'class SDDL rewritten on re-run'
+    Has (Get-Log $sb) 'already includes the WavWiz service SID'
+    $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u.ExitCode 0 $u.Output
+    if (Test-Path (Join-Path $sb.State 'cdrom-class-sds.txt')) { throw 'class Security value left after uninstall (should be restored to unset)' }
+    $reg2 = ''; if (Test-Path (Join-Path $sb.State 'registry.txt')) { $reg2 = Get-Content (Join-Path $sb.State 'registry.txt') -Raw }
+    HasNot $reg2 'CdromClassSecurityBackup' 'backup value left'
+    HasNot $reg2 'CdromClassSecurityBase' 'base value left'
+    $liveUndo = Get-Content (Join-Path $sb.State 'cdrom-live.txt') -Raw
+    HasNot $liveUndo $sid 'live ACE left on uninstall'
+    Has (Get-Log $sb 'uninstall.log') 'Removed the WavWiz service CD-ROM read grant'
+}
+
+Test 'player-only install does not set a service SID type or change CD-ROM class security' {
+    $sb = New-Sandbox
+    Set-Content -LiteralPath (Join-Path $sb.State 'cdrom-live.txt') '\\.\\E:|D:P(A;;GA;;;SY)'
+    $r = Invoke-Setup $sb @{ Role = 'player'; ServerHost = '192.168.1.40' }; Fail-IfNotOk $r $sb
+    HasNot (Get-Calls $sb) 'sidtype'
+    if (Test-Path (Join-Path $sb.State 'cdrom-class-sds.txt')) { throw 'player-only install wrote class security' }
+}
+
+Test '0.6.8-#14g: opt-in AirPlay speakers firewall rules (PTP 319-320 + audio, Private, local subnet, server program); re-run without the option removes them; uninstall removes them' {
+    $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
+    HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'rules added without the opt-in'
+    Set-Content (Join-Path $sb.State 'rules.txt') ((Get-Rules $sb).TrimEnd() + "`nWavWiz AirPlay PTP | netsh hand-made")
+    $r1 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r1 $sb
+    $rules = Get-Rules $sb
+    Eq (Count $rules 'name=WavWiz AirPlay speakers (PTP)') 1 'PTP rule'; Eq (Count $rules 'name=WavWiz AirPlay speakers (audio)') 1 'audio rule'
+    $ptp = ($rules -split "`n" | Where-Object { $_ -like 'WavWiz AirPlay speakers (PTP) |*' }) -join ''
+    Has $ptp 'localport=319-320'; Has $ptp 'protocol=UDP'; Has $ptp 'profile=private'; Has $ptp 'remoteip=localsubnet'; Has $ptp 'wavwiz-server.exe'
+    HasNot $rules 'WavWiz AirPlay PTP |' 'hand-made rule not replaced'
+    $r2 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r2 $sb; Eq (Count (Get-Rules $sb) 'name=WavWiz AirPlay speakers') 2 'duplicated on re-run'
+    $r3 = Invoke-Setup $sb; Fail-IfNotOk $r3 $sb; HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'not removed when the option is off'
+    $r4 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r4 $sb
+    $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u.ExitCode 0 $u.Output
+    HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'left behind by uninstall'
 }
 Test 'Get-ServerUdpPorts: clock + discovery + mDNS by default; custom discovery port honored; discovery:false leaves only the clock port' {
     $sb = New-Sandbox

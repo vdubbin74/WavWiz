@@ -71,7 +71,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
         s.TagFix = new Features.TagFixService(db, lib, s.Art, events, ffmpeg);
-        s.CdRip = new Features.CdRipService(db, cfg, lib, events, ffmpeg);
+        s.CdRip = new Features.CdRipService(db, cfg, lib, events, ffmpeg) { Log = u._log.Write };
         zones.AfterOutputsChanged = () => s.Speakers.OnOutputsChanged();
         s.ServerId = db.Setting("server.id") is string sid0 && sid0.Length > 4 ? System.Text.Json.JsonSerializer.Deserialize<string>(sid0)! : NewServerId(db);
         s.Discovery = new Net.DiscoveryHost(cfg, () => s.Beacon(), u._log.Write);
@@ -160,7 +160,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var addrs = app.Urls; u.HttpUrl = $"http://{cfg.BindAddress}:{PortOf(app, false, cfg)}"; u.HttpsUrl = $"https://{cfg.BindAddress}:{PortOf(app, true, cfg)}";
         if (cfg.HttpPort == 0) cfg.HttpPort = PortOf(app, false, cfg); if (cfg.HttpsPort == 0) cfg.HttpsPort = PortOf(app, true, cfg);      // ephemeral ports (tests): every page and the discovery answer must say the real port
         int nasTick = 0;
-        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } try { s.Jukebox.Tick(); } catch (Exception ex) { u._log.Write("jukebox: " + ex.Message); } try { s.Keep.Tick(); } catch (Exception ex) { u._log.Write("keep playing: " + ex.Message); } try { s.History.Tick(); } catch (Exception ex) { u._log.Write("history: " + ex.Message); } if (nasTick % 2 == 0) try { s.ZoneRecv?.Tick(); } catch (Exception ex) { u._log.Write("receivers: " + ex.Message); } }, null, 1000, 1000);
+        u._tick = new Timer(_ => { if (++nasTick % 300 == 0 && s.Nas != null) _ = Task.Run(() => { try { s.Nas.EnsureAll(); } catch { } }); if (events.Count > 0) events.Publish("tick"); try { s.Schedules.Tick(DateTimeOffset.Now); } catch (Exception ex) { u._log.Write("schedule: " + ex.Message); } try { s.Sleep.Tick(); } catch (Exception ex) { u._log.Write("sleep: " + ex.Message); } try { s.Jukebox.Tick(); } catch (Exception ex) { u._log.Write("jukebox: " + ex.Message); } try { s.Keep.Tick(); } catch (Exception ex) { u._log.Write("keep playing: " + ex.Message); } try { s.History.Tick(); } catch (Exception ex) { u._log.Write("history: " + ex.Message); } try { s.CdRip?.Tick(); } catch (Exception ex) { u._log.Write("rip: " + ex.Message); } if (nasTick % 2 == 0) try { s.ZoneRecv?.Tick(); } catch (Exception ex) { u._log.Write("receivers: " + ex.Message); } }, null, 1000, 1000);
         if ((lib.TrackCount() == 0 || lib.NeedsUpgradeScan()) && Convert.ToInt32(db.Scalar("SELECT COUNT(*) FROM library_root")) > 0) SystemApi.StartScan(s);
         u._rescan = new Timer(_ =>
         {
@@ -198,7 +198,9 @@ public sealed class WavWizServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync();
+        _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel();
+        try { S.CdRip?.Shutdown(); } catch (Exception ex) { try { _log.Write("rip shutdown: " + ex.Message); } catch { } }
+        S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
         await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();

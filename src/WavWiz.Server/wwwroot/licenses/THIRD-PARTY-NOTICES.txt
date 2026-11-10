@@ -87,9 +87,13 @@ release's license.
 ---------------------------------------------------------------------------
 MP3 encoding (LAME)
 ---------------------------------------------------------------------------
-NOT bundled. WavWiz's FFmpeg build is LGPL decode-focused plus native FLAC and
-AAC encoders for the CD ripper. MP3 ripping would need LAME (LGPL), which is
-intentionally not shipped; choose FLAC or AAC instead.
+Bundled. LAME 3.100 (GNU Lesser General Public License, version 2 or later) is built
+as a shared library and linked into WavWiz’s LGPL FFmpeg with --enable-libmp3lame
+(this does not require --enable-gpl or --enable-nonfree). The LAME DLL sits next to
+ffmpeg.exe and can be replaced. Official project: https://lame.sourceforge.io/
+Source tarball: https://sourceforge.net/projects/lame/files/lame/3.100/
+(lame-3.100.tar.gz, SHA-256 ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e).
+The corresponding source ships in licenses/source/ when the Windows tools are built.
 
 
 ============================================================

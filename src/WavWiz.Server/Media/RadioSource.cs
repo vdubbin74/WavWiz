@@ -246,3 +246,36 @@ public static class PlaylistParser
     private static string Resolve(string loc, string? baseDir)
         => loc.Contains("://") || Path.IsPathRooted(loc) || baseDir == null ? loc : Path.GetFullPath(Path.Combine(baseDir, loc));
 }
+
+/// <summary>0.6.8-#8: what a station says is playing. Plain "Artist - Title" and iHeart-style key=value StreamTitles
+/// (<c>Nirvana - text="Something In The Way" song_spot="M" amgArtworkURL="http://…" length="00:03:52"</c>) both become artist + title;
+/// <see cref="ArtUrl"/> is the song picture when the station sends one (amgArtworkURL), else null (the station logo is used).</summary>
+public sealed record RadioLive(string Display, string? Artist, string? Title, string? ArtUrl)
+{
+    private static readonly System.Text.RegularExpressions.Regex Kv = new(@"(\w+)=""([^""]*)""", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    public static RadioLive? Parse(string? raw)
+    {
+        raw = raw?.Trim(); if (string.IsNullOrEmpty(raw)) return null;
+        var kv = Kv.Matches(raw);
+        if (kv.Count > 0)
+        {
+            var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Text.RegularExpressions.Match m in kv) d.TryAdd(m.Groups[1].Value, m.Groups[2].Value.Trim());
+            var lead = raw[..kv[0].Index].Trim();                       // "Nirvana -" / "Nirvana"
+            if (lead.EndsWith('-')) lead = lead[..^1].TrimEnd();
+            string? title = d.GetValueOrDefault("text") is { Length: > 0 } t ? t : d.GetValueOrDefault("title") is { Length: > 0 } t2 ? t2 : null;
+            string? artist = d.GetValueOrDefault("artist") is { Length: > 0 } a ? a : lead.Length > 0 ? lead : null;
+            if (title == null && artist != null) { var (pa, pt) = SplitPlain(artist); if (pt != null) { artist = pa; title = pt; } }
+            var art = d.GetValueOrDefault("amgArtworkURL") is { Length: > 0 } u && Uri.TryCreate(u, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? u : null;
+            if (title == null && artist == null) return null;
+            return new(artist != null && title != null ? artist + " - " + title : (title ?? artist)!, artist, title, art);
+        }
+        var (ar, ti) = SplitPlain(raw);
+        return new(raw, ti == null ? null : ar, ti ?? raw, null);
+    }
+    private static (string artist, string? title) SplitPlain(string s)
+    {
+        int i = s.IndexOf(" - ", StringComparison.Ordinal);
+        return i > 0 && i < s.Length - 3 ? (s[..i].Trim(), s[(i + 3)..].Trim()) : (s, null);
+    }
+}

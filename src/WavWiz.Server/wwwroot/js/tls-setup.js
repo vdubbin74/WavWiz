@@ -1,5 +1,6 @@
 // Phone set-up page (CSP: no inline scripts). Shows the right steps for this phone and runs the "does this phone trust WavWiz?" check.
 const B = document.body, $ = id => document.getElementById(id);
+const alts = (B.dataset.alt || '').split(',').map(x => x.trim()).filter(x => /^[0-9a-fA-F.:[\]]+$/.test(x));   // 0.6.8-#11g: other addresses on the certificate (IPs only)
 const host = B.dataset.host, http = B.dataset.http, https = B.dataset.https, enabled = B.dataset.enabled === '1';
 const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
 const inApp = /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\/|; wv\)|Snapchat|Twitter/.test(ua);
@@ -36,7 +37,12 @@ async function check() {
   const btn = $('check'); btn.disabled = true; btn.textContent = 'Checking...';
   set('', 'Checking...', 'Asking WavWiz over the secure address. This takes a few seconds.');
   try {
-    if (location.protocol === 'https:') { good('You opened this page over HTTPS and your phone accepted the certificate.'); return; }
+    // 0.6.8-#11g: an https page alone proves nothing (Safari's "visit this website anyway" also lands here). A "visit anyway" exception covers only the
+    // host it was granted for, so ask ANOTHER address on the server's certificate: that answers only when the phone really trusts the WavWiz CA.
+    if (location.protocol === 'https:') {
+      for (const a of alts) { const r = await ping(`https://${a}:${https}/api/v1/ping?t=${Date.now()}`, 4000); if (r.ok) { good('Your phone trusts the WavWiz certificate.'); return; } }
+      maybe(); return;
+    }
     // 1. plain network reachability (we are on http, so this one must work)
     const plain = await ping(`http://${host}:${http}/api/v1/ping?t=${Date.now()}`);
     // 2. the secure address; the browser refuses the connection if it does not trust the certificate
@@ -64,6 +70,12 @@ const calQ = (() => { const q = new URLSearchParams(location.search), cal = q.ge
 const pairQ = (() => { const p = new URLSearchParams(location.search).get('pair') || ''; return !calQ && /^[0-9]{6}$/.test(p) ? p : ''; })();   // 0.3.7 L28: Pair a player QR
 const secureHome = () => pairQ ? `https://${host}:${https}/?pair=${pairQ}` : calQ ? `https://${host}:${https}/calmic.html?` + calQ.replace(/&pair=\d+/, '') : `https://${host}:${https}/`;   // 0.2.5: calibration goes to the mic-only page
 if (calQ) { const t = $('statusTitle'); if (t) t.textContent = 'Getting your phone ready to calibrate'; }
+// 0.6.8-#11g: on the secure page but trust could not be proven: keep the install steps visible and say how to tell
+function maybe() {
+  const p = document.createElement('p'); const link = document.createElement('a'); link.className = 'btn'; link.href = secureHome(); link.textContent = calQ ? 'Open the calibration page' : 'Open WavWiz (secure)'; p.append(link);
+  set('warn', 'Already installed? You\'re set', 'This page opened over HTTPS. That also happens if you tapped past a "This Connection Is Not Private" warning, so WavWiz cannot be sure yet. If you installed the certificate and switched it on (iPhone: Settings > General > About > Certificate Trust Settings), you are done. If Safari showed a warning, follow the steps below.', [p]);
+  document.querySelectorAll('.dev:not(#a2hs-ios):not(#a2hs-android)').forEach(d => { if (!d.classList.contains('hide')) d.classList.add('focus'); });
+}
 function good(msg) {
   set('ok', 'All set', msg);
   if (calQ) { $('statusText').textContent = msg + ' Opening the calibration page...'; setTimeout(() => location.replace(secureHome()), 900); }
@@ -82,8 +94,30 @@ if (enabled) {
 {
   const standalone = matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
   if (standalone) document.querySelectorAll('#a2hs-ios,#a2hs-android').forEach(x => { x.hidden = true; });
+  if (standalone && enabled) openInSafariCard();
   let deferred = null; const ib = $('a2hsInstall');
   addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); deferred = ev; if (ib) ib.hidden = false; });
   ib?.addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); try { await deferred.userChoice; } catch { /* dismissed */ } deferred = null; ib.hidden = true; });
   addEventListener('appinstalled', () => { document.querySelectorAll('#a2hs-ios,#a2hs-android').forEach(x => { x.hidden = true; }); });
+}
+
+// 0.6.8-#11g: inside the Home Screen app iPhone will not download a configuration profile (and Android's installed app cannot install a CA):
+// say so up front and give the set-up address to copy into Safari / Chrome.
+function openInSafariCard() {
+  const url = `http://${host}:${http}/tls/setup`;
+  const w = document.createElement('section'); w.className = 'card warn'; w.id = 'openInBrowser';
+  const t = document.createElement('h2'); t.textContent = ios ? 'Open this page in Safari' : 'Open this page in your browser';
+  const p = document.createElement('p'); p.className = 'small';
+  p.textContent = ios ? 'You are in the WavWiz Home Screen app. iPhone only installs the certificate from Safari: copy this address, open Safari and paste it.' : 'You are in the installed WavWiz app. Install the certificate from Chrome: copy this address, open Chrome and paste it.';
+  const row = document.createElement('p'); const inp = document.createElement('input'); inp.type = 'text'; inp.readOnly = true; inp.value = url; inp.className = 'copyurl'; inp.setAttribute('aria-label', 'Set-up address');
+  inp.addEventListener('focus', () => inp.select());
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Copy';
+  b.addEventListener('click', async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch { /* insecure page or no permission */ }
+    if (!ok) { inp.focus(); inp.select(); try { ok = document.execCommand('copy'); } catch { ok = false; } }
+    b.textContent = ok ? 'Copied' : 'Select and copy'; setTimeout(() => { b.textContent = 'Copy'; }, 2000);
+  });
+  row.append(inp, b); w.append(t, p, row);
+  const m = document.querySelector('main'); m.insertBefore(w, m.children[1] || null);
 }

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Reproducible LGPL-only FFmpeg for WavWiz (Windows x64, shared DLLs).
 # NO --enable-gpl / --enable-nonfree. FFmpeg's libcdio demuxer is GPL-gated, so CDDA
-# uses a separate LGPL helper (build/cdda-helper) built from libcdio — not linked into FFmpeg.
+# uses a separate LGPL helper (build/cdda-helper). On Windows the helper uses CD-ROM IOCTLs
+# (GENERIC_READ); libcdio is not linked into FFmpeg or the Windows helper.
 # 0.0.5: also builds Chromaprint fpcalc (after FFmpeg) for AcoustID.
+# 0.6.8: also builds LAME 3.100 (LGPL) and enables --enable-libmp3lame. Still no --enable-gpl / --enable-nonfree.
 set -euo pipefail
 VER=8.1.3
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -50,6 +52,24 @@ if [ ! -f "$WORK/deps/lib/pkgconfig/libcdio_paranoia.pc" ]; then
       >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null )
 fi
 
+
+# ---- LAME 3.100 (LGPL; official source: https://lame.sourceforge.io/ / SourceForge lame/3.100)
+# Linked into FFmpeg with --enable-libmp3lame. This does NOT require --enable-gpl or --enable-nonfree.
+LAME_V=3.100; LAME_TAR=lame-$LAME_V.tar.gz
+LAME_SHA=ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
+[ -f "$LAME_TAR" ] || curl -fL --retry 3 -o "$LAME_TAR" "https://downloads.sourceforge.net/project/lame/lame/$LAME_V/$LAME_TAR"
+echo "$LAME_SHA  $LAME_TAR" | sha256sum -c -
+if [ ! -f "$WORK/deps/lib/pkgconfig/lame.pc" ] && [ ! -f "$WORK/deps/lib/pkgconfig/libmp3lame.pc" ]; then
+  rm -rf lame-src; mkdir lame-src; tar xzf "$LAME_TAR" -C lame-src
+  # LAME 3.100 lists lame_init_old in include/libmp3lame.sym, but the function is static
+  # when DEPRECATED_OR_OBSOLETE_CODE_REMOVED=1, so the mingw shared link fails.
+  # The shipped tarball stays unmodified; this is only the extracted tree.
+  sed -i "/^lame_init_old$/d" "lame-src/lame-$LAME_V/include/libmp3lame.sym"
+  ( cd lame-src/lame-$LAME_V && ./configure --host=$HOST --prefix="$WORK/deps" --enable-shared --disable-static --disable-frontend --disable-gtktest --disable-nasm \
+      CC=$HOST-gcc CXX=$HOST-g++ AR=$HOST-ar RANLIB=$HOST-ranlib \
+      >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null )
+fi
+
 # ---- FFmpeg (LGPL only — deliberately WITHOUT --enable-libcdio) ----
 rm -rf src out; mkdir src out
 python3 - <<PY
@@ -59,13 +79,13 @@ cd src/ffmpeg-$VER
 ./configure --prefix="$WORK/out" --enable-cross-compile --cross-prefix=${HOST}- --arch=x86_64 --target-os=mingw32 \
   --enable-shared --disable-static --disable-debug --disable-doc --disable-autodetect --disable-x86asm \
   --disable-programs --enable-ffmpeg --disable-avdevice --enable-network \
-  --disable-encoders --enable-encoder=mjpeg,pcm_f32le,pcm_s16le,pcm_s24le,flac,aac \
-  --disable-muxers --enable-muxer=image2pipe,mjpeg,pcm_f32le,pcm_s16le,pcm_s24le,wav,null,flac,adts,ipod,mp4 \
+  --disable-encoders --enable-encoder=mjpeg,pcm_f32le,pcm_s16le,pcm_s24le,flac,aac,libmp3lame \
+  --disable-muxers --enable-muxer=image2pipe,mjpeg,pcm_f32le,pcm_s16le,pcm_s24le,wav,null,flac,adts,ipod,mp4,mp3 \
   --disable-filters --enable-filter=scale,format,aresample,aformat,anull,null,buffer,buffersink,abuffer,abuffersink,atrim,trim,asetpts,setpts \
   --disable-protocols --enable-protocol=file,pipe,http,https,tcp,tls,crypto,hls,cache,data,subfile,icecast \
   --disable-hwaccels --disable-bsfs --enable-bsf=aac_adtstoasc,null,extract_extradata,mp3_header_decompress,noise,vp9_superframe \
-  --enable-schannel --enable-zlib \
-  --extra-cflags="-I$WORK/zout/include" --extra-ldflags="-static-libgcc -L$WORK/zout/lib" \
+  --enable-schannel --enable-zlib --enable-libmp3lame \
+  --extra-cflags="-I$WORK/zout/include -I$WORK/deps/include" --extra-ldflags="-static-libgcc -L$WORK/zout/lib -L$WORK/deps/lib" \
   --extra-version=wavwiz-lgpl 2>&1 | tee "$WORK/configure.log"
 grep -q -- '--enable-gpl\|--enable-nonfree\|--enable-libcdio\|--enable-version3' "$WORK/configure.log" && { echo "REFUSING non-LGPL configure"; exit 4; } || true
 make -j"$(nproc)" 2>&1 | tee "$WORK/make.log" | tail -8
@@ -75,8 +95,8 @@ cp src/ffmpeg-$VER/COPYING.LGPLv3 src/ffmpeg-$VER/COPYING.LGPLv2.1 src/ffmpeg-$V
 mkdir -p out/bin
 
 # ---- standalone CDDA helper (LGPL libcdio; separate from FFmpeg) ----
-$HOST-gcc -O2 -Wall -I"$WORK/deps/include" "$HERE/cdda-helper.c" -o out/bin/wavwiz-cdda.exe \
-  -L"$WORK/deps/lib" -lcdio_paranoia -lcdio_cdda -lcdio -static-libgcc
+# Windows helper is self-contained (no libcdio / SPTI). GENERIC_READ CD-ROM IOCTLs only.
+$HOST-gcc -O2 -Wall -Wextra "$HERE/cdda-helper.c" -o out/bin/wavwiz-cdda.exe -static-libgcc
 for d in "$WORK/deps/bin"/*.dll; do [ -f "$d" ] && cp -n "$d" out/bin/ || true; done
 
 # ---- chromaprint fpcalc (after FFmpeg) ----
@@ -109,11 +129,13 @@ mkdir -p out/deps-lic
 cp cdio-src/libcdio-$CDIO_V/COPYING* out/deps-lic/ 2>/dev/null || true
 cp para-src/libcdio-paranoia-*/COPYING* out/deps-lic/ 2>/dev/null || true
 cp ch-src/chromaprint-$CH_V/LICENSE.md out/deps-lic/CHROMAPRINT-LICENSE.md 2>/dev/null || true
+cp lame-src/lame-$LAME_V/COPYING out/deps-lic/LAME-COPYING 2>/dev/null || true
+cp lame-src/lame-$LAME_V/LICENSE out/deps-lic/LAME-LICENSE 2>/dev/null || true
 grep -m1 '^#define FFMPEG_CONFIGURATION' src/ffmpeg-$VER/config.h | sed 's/^#define FFMPEG_CONFIGURATION "//; s/"$//; s/\\"/"/g' > out/CONFIGURE-LINE.txt
 ( cd out/bin && sha256sum *.exe *.dll 2>/dev/null ) > out/FILES.sha256
 grep -q -- '--enable-gpl\|--enable-nonfree\|--enable-libcdio\|--enable-version3' out/CONFIGURE-LINE.txt && { echo "REFUSING: non-LGPL ffmpeg"; cat out/CONFIGURE-LINE.txt; exit 4; } || true
 test -f out/bin/wavwiz-cdda.exe || { echo "REFUSING: wavwiz-cdda.exe missing"; exit 5; }
-cp "$TAR" out/; cp "zlib-$ZV.tar.gz" out/; cp "$CDIO_TAR" out/; cp "$PARA_TAR" out/; cp "$CH_TAR" out/ 2>/dev/null || true
+cp "$TAR" out/; cp "zlib-$ZV.tar.gz" out/; cp "$CDIO_TAR" out/; cp "$PARA_TAR" out/; cp "$CH_TAR" out/ 2>/dev/null || true; cp "$LAME_TAR" out/ 2>/dev/null || true
 cp "$HERE/cdda-helper.c" out/
 echo "done: $WORK/out"
 ls out/bin | head -40

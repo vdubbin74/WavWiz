@@ -67,7 +67,7 @@ public static class HomeAssistantApi
                 case "play": { var cd = Cd(true); if (cd.Now().State == "paused") cd.Resume(); else if (cd.Queue().Count > 0) cd.Jump(Math.Max(0, cd.Now().Index)); PlaybackApi.MarkFirstSound(s); break; }
                 case "pause": Cd(false).Pause(); break;
                 case "stop": Cd(false).Stop(); break;
-                case "next": Cd(false).Next(); break;
+                case "next": { var cd = Cd(false); s.Keep.FillForSkip(cd); cd.Next(); break; }   // 0.6.8-#3
                 case "prev": case "previous": Cd(false).Prev(); break;
                 case "volume":
                     {

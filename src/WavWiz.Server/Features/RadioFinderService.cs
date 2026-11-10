@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using WavWiz.Server.Api;
+using WavWiz.Server.Library;
 namespace WavWiz.Server.Features;
 
 /// <summary>B6: Radio Browser API search/browse + podcast RSS. Direct stream URLs only (no Spotify/Apple/Pandora/iHeart custom).</summary>
@@ -12,6 +13,60 @@ public sealed class RadioFinderService
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(12) };
     private static readonly string[] Hosts = { "de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info" };
     public RadioFinderService(Db db) { _db = db; _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent); }
+
+    // Bounded in-memory allow-set of favicon URLs this process itself returned from Radio Browser (or stored finder favorites).
+    // The /art/remote/{hash} endpoint will only fetch a URL that is still in this set — never one supplied by the client.
+    public const int FaviconCap = 4096;
+    public static readonly TimeSpan FaviconTtl = TimeSpan.FromHours(2);
+    readonly Dictionary<string, (string Url, long At)> _favicons = new(StringComparer.OrdinalIgnoreCase);
+    readonly object _faviconLock = new();
+    /// <summary>Test hook: when this returns true the favicon URL is admitted without the private-IP DNS check (still http(s) only).</summary>
+    public Func<Uri, bool>? AllowRemoteHost { get; set; }
+
+    bool FaviconAllowed(Uri u) => AllowRemoteHost?.Invoke(u) == true || RemoteUrlGuard.IsSafeRemoteUrl(u.AbsoluteUri);
+
+    public static string FaviconHash(string url)
+    {
+        var u = Uri.TryCreate(url.Trim(), UriKind.Absolute, out var x) ? x.AbsoluteUri : url.Trim();
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(u))).ToLowerInvariant();
+    }
+
+    /// <summary>Record a favicon the server is about to return to a client. Returns an opaque hash, or null if the URL is missing or unsafe.</summary>
+    public string? RememberFavicon(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url.Trim(), UriKind.Absolute, out var u) || u.Scheme is not ("http" or "https") || !FaviconAllowed(u)) return null;
+        var hash = FaviconHash(u.AbsoluteUri);
+        lock (_faviconLock)
+        {
+            _favicons[hash] = (u.AbsoluteUri, Environment.TickCount64);
+            if (_favicons.Count > FaviconCap) PruneFavicons();
+        }
+        return hash;
+    }
+
+    public bool TryFavicon(string? hash, out string url)
+    {
+        url = "";
+        if (string.IsNullOrWhiteSpace(hash)) return false;
+        lock (_faviconLock)
+        {
+            if (!_favicons.TryGetValue(hash, out var e)) return false;
+            if (Environment.TickCount64 - e.At > (long)FaviconTtl.TotalMilliseconds) { _favicons.Remove(hash); return false; }
+            url = e.Url;
+            return true;
+        }
+    }
+
+    public int FaviconCount { get { lock (_faviconLock) return _favicons.Count; } }
+
+    void PruneFavicons()
+    {
+        var now = Environment.TickCount64;
+        var ttl = (long)FaviconTtl.TotalMilliseconds;
+        foreach (var k in _favicons.Where(kv => now - kv.Value.At > ttl).Select(kv => kv.Key).ToList()) _favicons.Remove(k);
+        if (_favicons.Count <= FaviconCap) return;
+        foreach (var k in _favicons.OrderBy(kv => kv.Value.At).Take(_favicons.Count - FaviconCap).Select(kv => kv.Key).ToList()) _favicons.Remove(k);
+    }
 
     public async Task<object> SearchAsync(string? name, string? tag, string? country, int limit = 40)
     {
@@ -38,7 +93,11 @@ public sealed class RadioFinderService
     }
 
     public object Favorites() => _db.Query("SELECT stationuuid,name,url,favicon,tags,country,added_at FROM radio_finder_fav ORDER BY name COLLATE NOCASE",
-        r => new { stationuuid = r.GetString(0), name = r.GetString(1), url = r.GetString(2), favicon = r.IsDBNull(3) ? null : r.GetString(3), tags = r.IsDBNull(4) ? null : r.GetString(4), country = r.IsDBNull(5) ? null : r.GetString(5), addedAt = r.GetString(6) });
+        r =>
+        {
+            var favicon = r.IsDBNull(3) ? null : r.GetString(3);
+            return new { stationuuid = r.GetString(0), name = r.GetString(1), url = r.GetString(2), favicon, faviconArt = RememberFavicon(favicon), tags = r.IsDBNull(4) ? null : r.GetString(4), country = r.IsDBNull(5) ? null : r.GetString(5), addedAt = r.GetString(6) };
+        });
 
     public string? AddFavorite(JsonElement b)
     {
@@ -104,11 +163,15 @@ public sealed class RadioFinderService
         return list;
     }
 
-    private static object MapStation(JsonElement r) => new {
-        stationuuid = r.Str("stationuuid"), name = r.Str("name"), url = r.Str("url_resolved") ?? r.Str("url"),
-        favicon = r.Str("favicon"), tags = r.Str("tags"), country = r.Str("country"), countrycode = r.Str("countrycode"),
-        bitrate = r.Long("bitrate"), codec = r.Str("codec"), homepage = r.Str("homepage")
-    };
+    private object MapStation(JsonElement r)
+    {
+        var favicon = r.Str("favicon");
+        return new {
+            stationuuid = r.Str("stationuuid"), name = r.Str("name"), url = r.Str("url_resolved") ?? r.Str("url"),
+            favicon, faviconArt = RememberFavicon(favicon), tags = r.Str("tags"), country = r.Str("country"), countrycode = r.Str("countrycode"),
+            bitrate = r.Long("bitrate"), codec = r.Str("codec"), homepage = r.Str("homepage")
+        };
+    }
 
     private async Task<T?> GetAsync<T>(string path)
     {
