@@ -63,10 +63,13 @@ tar -xzf wavwiz-server-0.7.0-linux-arm64.tar.gz
 sudo ./wavwiz-server/install.sh
 ```
 
-`install.sh` checks the board is 64-bit ARM, installs `ffmpeg` with apt, creates a `wavwiz` system user, copies the program to
+`install.sh` checks the board is 64-bit ARM, installs `ffmpeg` and the libraries .NET needs (ICU, OpenSSL, ca-certificates, tzdata, Kerberos) with apt, creates a `wavwiz` system user, copies the program to
 `/opt/wavwiz-server` (keeping the previous copy as `/opt/wavwiz-server.prev`), installs and starts the `wavwiz-server` systemd service.
 Settings and the library database live in `/var/lib/wavwiz` and are never touched by install, upgrade or `--uninstall`.
-Options: `--no-start`, `--no-ffmpeg`, `--uninstall`.
+Options: `--no-start`, `--no-apt` (you install the packages yourself), `--uninstall`.
+
+Installing by hand instead? You need `ffmpeg ca-certificates tzdata libgssapi-krb5-2` plus `libicu76 libssl3t64` (trixie) or
+`libicu72 libssl3` (bookworm). Without ICU the server stops at start with "Couldn't find a valid ICU package".
 
 ```sh
 systemctl status wavwiz-server

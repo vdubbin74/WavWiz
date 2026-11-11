@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # 0.7.0: install / upgrade the WavWiz server from this unpacked tarball (Raspberry Pi OS 64-bit, Debian/Ubuntu x64 or arm64).
 #   tar -xzf wavwiz-server-<ver>-linux-arm64.tar.gz && sudo ./wavwiz-server/install.sh
-# Options: --no-start (install only)   --no-ffmpeg (skip "apt-get install ffmpeg")   --uninstall (stop + remove program; keeps /var/lib/wavwiz)
-# What it does: checks the CPU matches this build, installs ffmpeg, creates the "wavwiz" system user, copies this folder to /opt/wavwiz-server
+# Options: --no-start (install only)   --no-apt (skip apt-get; alias --no-ffmpeg)   --uninstall (stop + remove program; keeps /var/lib/wavwiz)
+# What it does: checks the CPU matches this build, installs ffmpeg + the .NET runtime libraries (ICU, OpenSSL, ...), creates the "wavwiz" system user, copies this folder to /opt/wavwiz-server
 # (the previous copy is kept as /opt/wavwiz-server.prev), installs the systemd unit and starts it. Your data in /var/lib/wavwiz is never touched.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"; DEST=/opt/wavwiz-server; DATA=/var/lib/wavwiz; UNIT=/etc/systemd/system/wavwiz-server.service
-START=1; FFMPEG=1; UNINSTALL=0
-for a in "$@"; do case "$a" in --no-start) START=0;; --no-ffmpeg) FFMPEG=0;; --uninstall) UNINSTALL=1;; -h|--help) sed -n '2,6p' "$0"; exit 0;; *) echo "unknown option $a" >&2; exit 2;; esac; done
+START=1; APT=1; UNINSTALL=0
+for a in "$@"; do case "$a" in --no-start) START=0;; --no-apt|--no-ffmpeg) APT=0;; --uninstall) UNINSTALL=1;; -h|--help) sed -n '2,6p' "$0"; exit 0;; *) echo "unknown option $a" >&2; exit 2;; esac; done
 [ "$(id -u)" = 0 ] || { echo "Run with sudo: sudo $0 $*" >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "systemd is required." >&2; exit 1; }
 
@@ -27,10 +27,17 @@ if [ -n "$want" ] && [ "$arch" != "$want" ]; then
   exit 1
 fi
 
-# 2. ffmpeg (audio decoding) from the OS packages
-if ! command -v ffmpeg >/dev/null; then
-  if [ "$FFMPEG" = 1 ] && command -v apt-get >/dev/null; then apt-get update -qq && apt-get install -y --no-install-recommends ffmpeg
-  else echo "WARNING: ffmpeg is not installed; WavWiz can't play most files until you install it (sudo apt install ffmpeg)." >&2; fi
+# 2. OS packages: ffmpeg (audio decoding) + what a self-contained .NET 10 app needs (Microsoft's Debian list:
+#    ca-certificates libgcc-s1 libgssapi-krb5-2 libicu<N> libssl3[t64] libstdc++6 tzdata). Debian 13 / Pi OS trixie: libicu76 + libssl3t64;
+#    Debian 12 / Pi OS bookworm: libicu72 + libssl3. Without ICU the server stops at start ("Couldn't find a valid ICU package").
+if [ "$APT" = 1 ] && command -v apt-get >/dev/null; then
+  apt-get update -qq
+  icu="$(apt-cache pkgnames libicu 2>/dev/null | grep -E '^libicu[0-9]+$' | sort -V | tail -1 || true)"
+  ssl="$(apt-cache pkgnames libssl3 2>/dev/null | grep -qx libssl3t64 && echo libssl3t64 || echo libssl3)"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg ca-certificates tzdata libgssapi-krb5-2 libstdc++6 libgcc-s1 "$ssl" ${icu:+"$icu"}
+else
+  command -v ffmpeg >/dev/null || echo "WARNING: ffmpeg is not installed; WavWiz can't play most files until you install it (sudo apt install ffmpeg)." >&2
+  ldconfig -p 2>/dev/null | grep -q libicuuc || echo "WARNING: no ICU library (libicu); the server will not start until you install it (Debian 13: libicu76, Debian 12: libicu72)." >&2
 fi
 
 # 3. user + data folder

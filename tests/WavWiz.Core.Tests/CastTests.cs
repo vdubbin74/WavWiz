@@ -147,6 +147,18 @@ public class CastTests
     }
 
     [Fact]
+    public async Task Client_speaks_TLS_to_a_self_signed_device_like_real_Cast_hardware()
+    {
+        // 0.7.0: real devices are TLS-only with a self-signed cert. The first arm64 smoke test against a TLS fake found ConnectAsync threw
+        // before the handshake ("RemoteCertificateValidationCallback option was already set"); this keeps the TLS path covered.
+        await using var fake = new FakeCastReceiver(tls: true);
+        await using var c = await CastClient.ConnectAsync(fake.Ep);
+        var st = await c.LaunchAsync(); Assert.Equal("CC1AD845", st.AppId);
+        var m = await c.LoadAsync("http://127.0.0.1:1/x.wav", "audio/wav", "WavWiz", "Kitchen"); Assert.Equal("BUFFERING", m.PlayerState);
+        await c.SetVolumeAsync(0.5); Assert.Equal(0.5, fake.Level, 3);
+    }
+
+    [Fact]
     public async Task Launch_refusal_and_drop_are_reported()
     {
         await using var fake = new FakeCastReceiver { RefuseLaunch = true };

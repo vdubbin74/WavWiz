@@ -9,19 +9,30 @@ namespace WavWiz.Core.Tests;
 public sealed class FakeCastReceiver : IAsyncDisposable
 {
     readonly TcpListener _tcp = new(IPAddress.Loopback, 0); readonly CancellationTokenSource _cts = new();
-    NetworkStream? _s; readonly SemaphoreSlim _tx = new(1, 1);
+    System.IO.Stream? _s; readonly SemaphoreSlim _tx = new(1, 1); readonly bool _tls;
     public IPEndPoint Ep => (IPEndPoint)_tcp.LocalEndpoint;
     public readonly List<CastMessage> Got = new();
     public string? AppId, LoadedUrl, LoadedType; public double Level = 0.3; public int Pings, Launches, Loads, Stops;
     public bool RefuseLaunch, FailLoad, FetchStream; public int FetchBytes = 48000 * 4;
     public byte[]? Fetched; public readonly TaskCompletionSource<byte[]> FetchDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public FakeCastReceiver() { _tcp.Start(); _ = Task.Run(Run); }
+    /// <param name="tls">0.7.0: also speak TLS like a real device (self-signed certificate, as Cast devices present).</param>
+    public FakeCastReceiver(bool tls = false) { _tls = tls; _tcp.Start(); _ = Task.Run(Run); }
+
+    static System.Security.Cryptography.X509Certificates.X509Certificate2 SelfSigned()
+    {
+        using var rsa = System.Security.Cryptography.RSA.Create(2048);
+        var req = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=fake-cast-device", rsa, System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        using var c = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(2));
+        return System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12(c.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx), null);
+    }
 
     async Task Run()
     {
         try
         {
-            using var c = await _tcp.AcceptTcpClientAsync(_cts.Token); _s = c.GetStream();
+            using var c = await _tcp.AcceptTcpClientAsync(_cts.Token); System.IO.Stream ns = c.GetStream();
+            if (_tls) { var ssl = new System.Net.Security.SslStream(ns, false); await ssl.AuthenticateAsServerAsync(SelfSigned()); ns = ssl; }
+            _s = ns;
             while (!_cts.IsCancellationRequested)
             {
                 var m = await CastProto.ReadAsync(_s, _cts.Token); if (m == null) return;

@@ -17,10 +17,10 @@ Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz` (+ `.sha256`). The tarb
 
 ## Install (systemd)
 
-Easiest (x64 or arm64): `tar -xzf wavwiz-server-<version>-<rid>.tar.gz && sudo ./wavwiz-server/install.sh` (installs ffmpeg, the `wavwiz` user, `/opt/wavwiz-server` and the service; `--uninstall` removes it and keeps `/var/lib/wavwiz`). By hand, for the `linux-x64` build:
+Easiest (x64 or arm64): `tar -xzf wavwiz-server-<version>-<rid>.tar.gz && sudo ./wavwiz-server/install.sh` (installs ffmpeg and the .NET runtime libraries such as ICU and OpenSSL, the `wavwiz` user, `/opt/wavwiz-server` and the service; `--uninstall` removes it and keeps `/var/lib/wavwiz`). By hand, for the `linux-x64` build:
 
 ```sh
-sudo apt install ffmpeg
+sudo apt install ffmpeg ca-certificates tzdata libgssapi-krb5-2 libicu76 libssl3t64   # Debian 12/Ubuntu 22.04: libicu72 libssl3 (Ubuntu 24.04: libicu74 libssl3t64)
 sudo useradd --system --home /var/lib/wavwiz --shell /usr/sbin/nologin wavwiz
 sudo tar -C /opt -xzf wavwiz-server-<version>-linux-x64.tar.gz
 sudo install -d -o wavwiz -g wavwiz /var/lib/wavwiz

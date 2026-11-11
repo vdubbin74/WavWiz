@@ -41,7 +41,9 @@ public sealed class CastClient : IAsyncDisposable
         System.IO.Stream st = tcp.GetStream();
         if (tls)
         {
-            var ssl = new SslStream(st, false, (_, _, _, _) => true);
+            // 0.7.0 Pi smoke test: the callback goes in the options ONLY. Setting it in the SslStream constructor too makes .NET throw
+            // "The 'RemoteCertificateValidationCallback' option was already set" before any handshake (missed by the plain-TCP fake).
+            var ssl = new SslStream(st, false);
             using var t = CancellationTokenSource.CreateLinkedTokenSource(ct); t.CancelAfter(8000);
             await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = ep.Address.ToString(), RemoteCertificateValidationCallback = (_, _, _, _) => true }, t.Token);
             st = ssl;

@@ -21,6 +21,7 @@ test('0.7.0 Pi: the tarball carries install.sh + the systemd unit; install.sh re
   assert.ok(statSync(new URL('../../build/linux/install.sh', import.meta.url)).mode & 0o100, 'install.sh is executable');
   assert.match(i, /32-bit Raspberry Pi OS is not supported/);
   assert.match(i, /b700\) want=aarch64;; 3e00\) want=x86_64;;/);
+  assert.match(i, /libicu\[0-9\]\+/); assert.match(i, /libssl3t64/); assert.match(i, /tzdata/);   // self-contained .NET needs ICU + OpenSSL (Debian 13 has no ICU by default)
   assert.match(i, /--uninstall/); assert.doesNotMatch(i, /rm -rf "?\$DATA/);
   assert.match(u, /Environment=WAVWIZ_HEADLESS=1/); assert.match(u, /ReadWritePaths=\/var\/lib\/wavwiz/);
   assert.match(u, /#AmbientCapabilities=CAP_NET_BIND_SERVICE/);
