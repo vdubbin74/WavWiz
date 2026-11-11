@@ -5176,6 +5176,13 @@ html:not([data-uiscale=compact]) :is(.libpanel,.nowcol,.devpanel,.listpanel,.np-
 .apsetup-name{width:100%;box-sizing:border-box;background:var(--fld-bg,var(--bg));color:var(--ink);border:1px solid var(--fld-line,var(--line));border-radius:var(--radius,3px);padding:6px 8px;font:inherit}
 .apsetup-foot{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--line)}
 .apsetup-footnote{min-width:0}.apsetup-footnote p{margin:0 0 2px}
+/* 0.7.0 item 5b: Cast card "Add by IP address" */
+.castsetup-byip{display:flex;flex-direction:column;gap:6px;padding:10px 0 8px;border-top:1px solid var(--line)}.castsetup-byip p{margin:0}
+.castsetup-byip input{box-sizing:border-box;background:var(--fld-bg,var(--bg));color:var(--ink);border:1px solid var(--fld-line,var(--line));border-radius:var(--radius,3px);padding:6px 8px;font:inherit}
+.castsetup-byip-row{gap:8px;flex-wrap:wrap;align-items:center}.castsetup-byip-row .btn{flex:none}
+.castsetup-byip .castsetup-ip{width:11em;max-width:100%;font-family:var(--mono)}.castsetup-ipname{flex:1 1 10em;min-width:8em}
+.castsetup-byip-link{margin:-2px 0 2px}
+.castsetup-addr{margin-left:6px;font-family:var(--mono);white-space:nowrap}
 .apsetup-empty{padding:8px}
 .dtag.otype.airplay,.dtag.otype.cast{letter-spacing:.4px}
 

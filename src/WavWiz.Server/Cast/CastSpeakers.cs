@@ -48,7 +48,7 @@ public static class CastSpeakers
                 {
                     var sv = Load(s).FirstOrDefault(x => x.Key == k); if (sv == null) { left.Remove(k); continue; }   // forgotten meanwhile
                     if (CastApi.Outs(s).IsConnected(k)) { left.Remove(k); continue; }
-                    try { var o = await CastApi.Outs(s).ConnectAsync(sv.Key, sv.Endpoint, 0, 50, default, subscribe: false); Register(s, o, sv.Endpoint); await Push(s, o.Sink.Id); left.Remove(k); log?.Invoke($"cast {k}: reconnected"); }
+                    try { var o = await CastApi.Outs(s).ConnectAsync(sv.Key, sv.Endpoint, 0, 50, default, subscribe: false, displayName: sv.Name); Register(s, o, sv.Endpoint); await Push(s, o.Sink.Id); left.Remove(k); log?.Invoke($"cast {k}: reconnected"); }
                     catch (Exception e) { if (round == 0) log?.Invoke($"cast {k}: reconnect failed ({e.Message}), retrying"); }
                 }
             }

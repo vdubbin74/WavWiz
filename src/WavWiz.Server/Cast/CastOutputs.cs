@@ -46,14 +46,14 @@ public sealed class CastOutputs : IAsyncDisposable
     public static string StreamUrl(IPAddress host, int port, string token) => $"http://{(host.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + host + "]" : host.ToString())}:{port}/api/v1/cast/stream/{token}.wav";
 
     /// <summary>Resolves a device (from the browser, or an explicit "ip:port"), connects, launches the Default Media Receiver and loads the live stream.</summary>
-    public async Task<Out> ConnectAsync(string key, string? endpoint, int delayMs, int volume, CancellationToken ct = default, bool subscribe = true)
+    public async Task<Out> ConnectAsync(string key, string? endpoint, int delayMs, int volume, CancellationToken ct = default, bool subscribe = true, string? displayName = null)
     {
         await _gate.WaitAsync(ct);
         try
         {
             if (_outs.TryGetValue(key, out var existing)) return existing;
             IPEndPoint ep; string name = key, kind = "Cast";
-            if (endpoint != null) ep = IPEndPoint.Parse(endpoint);
+            if (endpoint != null) { ep = IPEndPoint.Parse(endpoint); name = string.IsNullOrWhiteSpace(displayName) ? key : displayName; }   // 0.7.0 item 5b: an added-by-IP device keeps the name typed for it
             else
             {
                 var d = _browser()?.State.Devices(DateTimeOffset.UtcNow).FirstOrDefault(x => x.Id == key) ?? throw new InvalidOperationException("Cast device not found; search again");

@@ -77,7 +77,7 @@ export function apMergeRemembered(devs, zones) {
 const OPEN_KEY = 'ww.apsetup.open';
 const stOf = () => ({ heard: null, tested: null, problem: null, busy: '', zonePick: 'new', newName: '', added: false });
 let open = (() => { try { return sessionStorage.getItem(OPEN_KEY) === '1'; } catch { return false; } })();
-let Sref = null, ctlRef = null, devs = [], ap2 = false, selId = null, byId = Object.create(null), timer = 0, closed = true;
+let Sref = null, ctlRef = null, devs = [], ap2 = false, selId = null, byId = Object.create(null), timer = 0, closed = true, lastProblem = null;
 
 function sel() { return (devs || []).find(d => d.id === selId) || null; }
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
@@ -114,14 +114,15 @@ async function load() {
     const r = await api('/airplay/setup/devices');
     const browsed = r.devices || [];
     ap2 = !!r.airPlay2Experimental;
-    devs = apMergeRemembered(browsed, Sref?.zones);
+    devs = apMergeRemembered(browsed, Sref?.zones); lastProblem = null;
   } catch (e) {
-    const s = st(selId); s.problem = apProblem(e, '');
+    // 0.7.0 item 5a: with no speaker selected st(null) is a throw-away object, so the error was lost and the card sat on "Looking…"
+    if (selId) st(selId).problem = apProblem(e, ''); else lastProblem = apProblem(e, '').text;
   }
 }
 async function rescan() {
   const s = st(selId); s.problem = null; s.heard = null; selId = null; devs = []; paintInPlace();
-  try { await api('/dev/airplay/query', { method: 'POST' }); } catch (e) { st(selId).problem = apProblem(e, ''); }
+  try { await api('/dev/airplay/query', { method: 'POST' }); } catch (e) { lastProblem = apProblem(e, '').text; }
   await load(); paintInPlace();
   setTimeout(async () => { if (!closed && open) { await load(); paintInPlace(); } }, 1500);
 }
@@ -236,9 +237,11 @@ function speakerRow(d) {
 
 function buildCard(S, ctl) {
   Sref = S; ctlRef = ctl;
+  // 0.7.0 item 5a: restored open from sessionStorage after a reload: nothing had started a scan or the poll, so it said "Looking…" forever
+  if (open && closed) { closed = false; setTimeout(() => { if (open && !closed) { rescan(); startPoll(); } }, 0); }
   const list = apFindList(devs);
   const n = list.length;
-  const note = !open ? (n ? `${n} found` : 'Find, test and add') : (n ? `${n} on this network` : 'Looking…');
+  const note = !open ? (n ? `${n} found` : 'Find, test and add') : (n ? `${n} on this network` : lastProblem ? 'Couldn’t search' : 'Looking…');
   const step = apStep(st(selId), sel());
   const fold = h('button', { type: 'button', class: 'zfold42-t' + (open ? ' open' : ''), 'data-act': 'apsetup-fold',
     'aria-expanded': String(open), 'aria-label': open ? 'Collapse AirPlay speakers' : 'Expand AirPlay speakers',
@@ -268,7 +271,7 @@ function buildCard(S, ctl) {
 
   const rows = list.map(speakerRow);
   const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'AirPlay speakers' },
-    rows.length ? rows : h('div', { class: 'small dim apsetup-empty' }, 'Looking for speakers… answers usually arrive within a few seconds.'));
+    rows.length ? rows : h('div', { class: 'small dim apsetup-empty' + (lastProblem ? ' apsetup-err' : '') }, lastProblem || 'Looking for speakers… answers usually arrive within a few seconds.'));
 
   const footNote = h('p', { class: 'small dim apsetup-note' },
     'AirPlay 2 support is experimental. Speakers that need a PIN aren’t supported yet.');
@@ -318,6 +321,6 @@ export function openAirPlaySetup(S, ctl) {
 
 /** Test helper: reset module state between unit tests. */
 export function _apReset() {
-  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true;
+  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null;
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }

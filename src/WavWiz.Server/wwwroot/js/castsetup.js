@@ -54,6 +54,12 @@ export function csMergeRemembered(devs, zones) {
   }
   return list;
 }
+/** 0.7.0 item 5b: what the Add by IP form posts; null when the address box is empty (the button stays off). Pure. */
+export function csByIpBody(addr, name) {
+  const a = String(addr || '').trim(); if (!a) return null;
+  const n = String(name || '').trim();
+  return n ? { address: a, name: n.slice(0, 40) } : { address: a };
+}
 /** The honest sync line: Cast devices buffer on their own, so lining them up with other speakers is approximate. */
 export const SYNC_NOTE = 'Cast devices keep their own few-second buffer, so with other speakers in the same zone they line up only roughly. Fine-tune with the speaker’s Delay.';
 
@@ -62,10 +68,14 @@ const OPEN_KEY = 'ww.castsetup.open', SEL = '.castsetup-card';
 const stOf = () => ({ heard: null, tested: null, problem: null, busy: '', zonePick: 'new', newName: '', added: false });
 let open = (() => { try { return sessionStorage.getItem(OPEN_KEY) === '1'; } catch { return false; } })();
 let Sref = null, ctlRef = null, devs = [], selId = null, byId = Object.create(null), timer = 0, closed = true, lastProblem = null;
+// 0.7.0 item 5b: "Add by IP address" form (a device discovery can't see: another subnet / VLAN, or the router blocks mDNS)
+const ipOf = () => ({ open: false, addr: '', name: '', busy: false, err: null });
+let byIp = ipOf();
 
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
 function setOpen(v) {
   const was = open; open = !!v;
+  if (!open) byIp = ipOf();
   try { sessionStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* private mode */ }
   if (!open && was) finish();
   if (open && !was) { closed = false; rescan(); startPoll(); }
@@ -88,7 +98,7 @@ function startPoll() {
     if (!open || closed) { stopPoll(); return; }
     const card = document.querySelector(SEL);
     if (!card || !card.isConnected) return;
-    if (!st(selId).busy) { await load(); paintInPlace(); }
+    if (!st(selId).busy && !byIp.open) { await load(); paintInPlace(); }   // 0.7.0 item 5b: no repaint under the typing (it would drop focus)
   }, 3000);
 }
 async function load() {
@@ -99,7 +109,7 @@ async function rescan() {
   selId = null; devs = []; paintInPlace();
   try { await api('/cast/setup/query', { method: 'POST' }); } catch (e) { lastProblem = csProblem(e, '').text; }
   await load(); paintInPlace();
-  setTimeout(async () => { if (!closed && open) { await load(); paintInPlace(); } }, 1500);
+  setTimeout(async () => { if (!closed && open && !byIp.open) { await load(); paintInPlace(); } }, 1500);   // background refreshes skip while Add by IP is open
 }
 function scrollKeep(fn) {
   const card = document.querySelector(SEL);
@@ -126,6 +136,30 @@ async function test(d) {
     s.tested = { key: d.id, kind: r.kind, added: false }; s.busy = ''; s.heard = 'ask';
   } catch (e) { s.busy = ''; s.problem = csProblem(e, d.name); }
   paintInPlace();
+}
+async function findByIp() {
+  const body = csByIpBody(byIp.addr, byIp.name); if (!body || byIp.busy) return;
+  byIp.busy = true; byIp.err = null; paintInPlace();
+  try {
+    const r = await api('/cast/setup/byip', { method: 'POST', body });
+    byIp = ipOf(); await load();
+    selId = r.id; const s = st(r.id); s.problem = null; s.heard = null;   // open its row at "Play test sound": the test is the real connection check
+    paintInPlace();
+  } catch (e) { byIp.busy = false; byIp.err = (e && e.data && e.data.text) || (e && e.message) || 'Couldn’t add that address.'; paintInPlace(); }
+}
+function byIpForm() {
+  const go = ev => { ev?.preventDefault?.(); findByIp(); };
+  return h('form', { class: 'castsetup-byip', 'data-act': 'castsetup-byip-form', onsubmit: go },
+    h('b', { class: 'castsetup-byip-t' }, 'Add by IP address'),
+    h('p', { class: 'small dim' }, 'For a Cast device that doesn’t show up (another network segment, or the router blocks discovery). Your router’s device list or the Google Home app shows its address.'),
+    h('div', { class: 'row castsetup-byip-row' },
+      h('input', { type: 'text', class: 'castsetup-ip', inputmode: 'decimal', autocomplete: 'off', spellcheck: 'false', placeholder: '192.168.1.40', value: byIp.addr,
+        'aria-label': 'IP address', 'data-act': 'castsetup-ip', disabled: byIp.busy, oninput: ev => { byIp.addr = ev.target.value; const b = ev.target.closest('form')?.querySelector('[data-act="castsetup-ip-go"]'); if (b) b.disabled = !csByIpBody(byIp.addr); } }),
+      h('input', { type: 'text', class: 'castsetup-ipname', autocomplete: 'off', maxlength: 40, placeholder: 'Name (optional)', value: byIp.name,
+        'aria-label': 'Name (optional)', 'data-act': 'castsetup-ipname', disabled: byIp.busy, oninput: ev => { byIp.name = ev.target.value; } }),
+      h('button', { type: 'submit', class: 'btn primary', 'data-act': 'castsetup-ip-go', disabled: byIp.busy || !csByIpBody(byIp.addr) }, byIp.busy ? 'Adding…' : 'Add'),
+      h('button', { type: 'button', class: 'btn', 'data-act': 'castsetup-ip-cancel', disabled: byIp.busy, onclick: () => { byIp = ipOf(); paintInPlace(); } }, 'Cancel')),
+    byIp.err ? h('div', { class: 'apsetup-prob other', role: 'alert' }, h('p', { class: 'small' }, byIp.err)) : null);
 }
 async function add(d) {
   const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
@@ -178,7 +212,8 @@ function speakerRow(d) {
   const head = h('div', { class: 'apsetup-rowhead', role: 'button', tabindex: 0, 'data-id': d.id, 'aria-expanded': String(!!on),
     onclick: ev => { ev.stopPropagation(); expand(); },
     onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); expand(); } } },
-    h('span', { class: 'apsetup-rname grow' }, h('b', { class: 'apsetup-n' }, d.name), h('span', { class: 'dtag apsetup-badge ' + badge.kind, title: row.note || badge.text }, badge.text)),
+    h('span', { class: 'apsetup-rname grow' }, h('b', { class: 'apsetup-n' }, d.name), h('span', { class: 'dtag apsetup-badge ' + badge.kind, title: row.note || badge.text }, badge.text),
+      d.manual && d.address ? h('span', { class: 'small dim castsetup-addr', title: 'Added by IP address' }, d.address) : null),
     status.text ? h('span', { class: 'apsetup-st small ' + status.kind }, status.text) : h('span', { class: 'apsetup-st' }));
   const body = on ? h('div', { class: 'apsetup-rowbody' }, ...cardExpanded(d, s)) : null;
   return h('div', { class: 'apsetup-row sp42' + (on ? ' sel' : '') + (row.pick ? '' : ' blocked') + (d.added || d.remembered ? ' added' : ''), 'data-id': d.id, role: 'listitem' }, head, body);
@@ -211,7 +246,10 @@ function buildCard(S, ctl) {
     h('div', { class: 'apsetup-footnote grow' }, h('p', { class: 'small dim apsetup-note' }, SYNC_NOTE)),
     h('button', { type: 'button', class: 'linkbtn', 'data-act': 'castsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy }, 'Scan again'),
     h('button', { type: 'button', class: 'btn primary', 'data-act': 'castsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
-  card.append(head, h('div', { class: 'zwrap42 apsetup-wrap' }, h('div', { class: 'apsetup-body' }, steps, listEl, foot)));
+  card.append(head, h('div', { class: 'zwrap42 apsetup-wrap' }, h('div', { class: 'apsetup-body' }, steps, listEl,
+    byIp.open ? byIpForm() : h('div', { class: 'castsetup-byip-link small' }, h('span', { class: 'dim' }, 'Not listed? '),
+      h('button', { type: 'button', class: 'linkbtn', 'data-act': 'castsetup-byip', onclick: () => { byIp.open = true; paintInPlace(); setTimeout(() => document.querySelector('.castsetup-ip')?.focus?.(), 0); } }, 'Add by IP address')),
+    foot)));
   return card;
 }
 
@@ -230,6 +268,6 @@ export function openCastSetup(S, ctl) {
 
 /** Test helper. */
 export function _csReset() {
-  open = false; Sref = null; ctlRef = null; devs = []; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null;
+  open = false; Sref = null; ctlRef = null; devs = []; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; byIp = ipOf();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }

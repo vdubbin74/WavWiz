@@ -21,9 +21,14 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 - Windows server, least privilege: new installs keep running the WavWiz Server service as Local Service (CD ripping works through the service's own CD-drive grant). An upgrade never changes the account by itself; if your existing service runs as LocalSystem, Setup now offers an unticked "Switch WavWiz Server to Local Service" option on a "Service account" page (silent installs: `/LIMITEDSERVICE=1`). After switching, re-enter saved network-share logins, remote-library passwords and the remote-access certificate password, because Local Service cannot read secrets LocalSystem saved. A user account or NetworkService is never touched. Help > Diagnostics adds "Service account folder access", naming any music folder the service cannot read (or the CD rip folder it cannot write) with the exact icacls command to fix it. Not yet verified on a Windows PC.
 
+- Cast speakers: **Add by IP address** on the Cast speakers card, for a device the network search can't see (another subnet or VLAN, or a router that blocks discovery). Type its IPv4 or IPv6 address (port 8009 unless you give one, e.g. `192.168.1.40:8009`) and an optional name; it then lists like a found speaker, opened at Play test sound, which is the real connection check, and can be added to a zone. Added devices are remembered by address and reconnect after a restart. Host names and partial or legacy-short addresses are refused with a plain message. Not yet verified on real Cast hardware.
+
 ### Changed
 - Linux systemd unit: sets headless mode explicitly and documents the optional capability for experimental AirPlay 2 (UDP 319/320). The Linux publish script adds `install.sh` and a `.sha256` next to each tarball.
 - Dockerfile: optional `APT_HTTPS=1` build argument for build machines whose proxy blocks plain-http package mirrors (default unchanged).
+
+### Fixed
+- AirPlay speakers card: when it was open before a page reload it no longer sticks on “Looking…”; it searches again by itself, and a failed search says so instead of showing an empty list.
 
 ### Not on Linux / Raspberry Pi
 - No CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.

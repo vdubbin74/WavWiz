@@ -34,6 +34,8 @@ public sealed class Services
     public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
     public Host.LocalAudioHost? LocalAudio;      // 0.7.0 Linux/Pi: this machine's ALSA outputs as a speaker
     public Cast.CastBrowser? CastBrowse; public Cast.CastOutputs? CastOut; public Action<string>? Log;      // 0.7.0 F169 Google Cast speakers (browser started on demand)
+    /// <summary>0.7.0 item 5b: Cast devices typed in by IP address on the Cast card (not seen by mDNS), until added or the server restarts.</summary>
+    public readonly System.Collections.Concurrent.ConcurrentDictionary<string, CastApi.Manual> CastManual = new();
     public Library.NasLogon? Nas;      // 0.1.3
     public Library.SubsonicService? Remote;      // F164 remote libraries (Subsonic / OpenSubsonic client)
     public WavWiz.Core.Discovery.ServerBeacon Beacon()
