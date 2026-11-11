@@ -41,6 +41,20 @@ public class Cast070Tests
     }
 
     [Fact]
+    public async Task Stream_url_already_works_when_the_receiver_fetches_it_before_answering_LOAD()
+    {
+        // 0.7.0 Pi smoke: the token was registered only after LOAD + SET_VOLUME, so a quick receiver got a 404
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));
+        await using var fake = new FakeCastReceiver { FetchStream = true, FetchBeforeReply = true };
+        CastApi.Outs(f.Server.S).Dial = (ep, ct) => CastClient.ConnectAsync(ep, ct, tls: false);
+        var r = await admin.PostAsJsonAsync("/api/v1/cast/setup/add", new { key = "fast1", endpoint = fake.Ep.ToString(), newZone = "Hall" });
+        Assert.True(r.IsSuccessStatusCode, (await r.Json()).ToString());
+        Assert.Equal(200, fake.FetchStatus);
+        var wav = await fake.FetchDone.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("RIFF", Encoding.ASCII.GetString(wav, 0, 4));
+    }
+
+    [Fact]
     public async Task Failed_load_leaves_no_speaker_row_and_explains_why()
     {
         await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));

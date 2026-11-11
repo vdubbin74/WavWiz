@@ -64,7 +64,7 @@ public sealed class CastOutputs : IAsyncDisposable
             }
             var client = await Dial(ep, ct);
             client.Log = m => _log?.Invoke($"cast {key}: {m}");
-            CastSink? sink = null;
+            CastSink? sink = null; Out? o = null;
             try
             {
                 await client.LaunchAsync(CastProto.DefaultMediaReceiver, ct);
@@ -72,17 +72,19 @@ public sealed class CastOutputs : IAsyncDisposable
                 sink.Start();
                 var token = NewToken();
                 var url = StreamUrl(StreamHost(BindAddress(), ep.Address), HttpPort(), token);
-                var o = new Out { Key = key, Name = name, Address = ep.ToString(), Kind = kind, Token = token, Url = url, Sink = sink, Client = client, Volume = volume, DelayMs = delayMs };
+                o = new Out { Key = key, Name = name, Address = ep.ToString(), Kind = kind, Token = token, Url = url, Sink = sink, Client = client, Volume = volume, DelayMs = delayMs };
+                // register before LOAD: a receiver may GET the stream URL before it even answers LOAD (seen under QEMU as a 404 race)
+                lock (_outs) _outs[key] = o;
                 await LoadAsync(o, ct);
                 try { await client.SetVolumeAsync(volume / 100.0, ct); } catch (Exception e) { o.Error = "volume: " + e.Message; }
-                client.MediaStatusChanged += ms => OnMedia(o, ms);
-                client.Closed += why => OnClosed(o, why);
-                lock (_outs) _outs[key] = o;
+                var live = o;
+                client.MediaStatusChanged += ms => OnMedia(live, ms);
+                client.Closed += why => OnClosed(live, why);
                 if (subscribe) { _reg.Subscribe(sink); o.Subscribed = true; }
                 _log?.Invoke($"cast {key}: connected {ep} {kind}, stream {url}");
                 return o;
             }
-            catch { if (sink != null) await sink.DisposeAsync(); await client.DisposeAsync(); throw; }
+            catch { if (o != null) lock (_outs) { if (_outs.TryGetValue(key, out var x) && x == o) _outs.Remove(key); } if (sink != null) await sink.DisposeAsync(); await client.DisposeAsync(); throw; }
         }
         finally { _gate.Release(); }
     }

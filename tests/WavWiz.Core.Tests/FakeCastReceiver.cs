@@ -14,6 +14,8 @@ public sealed class FakeCastReceiver : IAsyncDisposable
     public readonly List<CastMessage> Got = new();
     public string? AppId, LoadedUrl, LoadedType; public double Level = 0.3; public int Pings, Launches, Loads, Stops;
     public bool RefuseLaunch, FailLoad, FetchStream; public int FetchBytes = 48000 * 4;
+    /// <summary>0.7.0: hit the LOADed URL and get its HTTP status before answering LOAD, as real receivers can (the race that 404'd under QEMU).</summary>
+    public bool FetchBeforeReply; public int? FetchStatus; readonly TaskCompletionSource<int> _headers = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public byte[]? Fetched; public readonly TaskCompletionSource<byte[]> FetchDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
     /// <param name="tls">0.7.0: also speak TLS like a real device (self-signed certificate, as Cast devices present).</param>
     public FakeCastReceiver(bool tls = false) { _tls = tls; _tcp.Start(); _ = Task.Run(Run); }
@@ -52,7 +54,7 @@ public sealed class FakeCastReceiver : IAsyncDisposable
                         {
                             Loads++; LoadedUrl = (string?)j["media"]?["contentId"]; LoadedType = (string?)j["media"]?["contentType"];
                             if (FailLoad) { await Reply(m, $$"""{"type":"LOAD_FAILED","requestId":{{rid}}}"""); break; }
-                            if (FetchStream && LoadedUrl != null) _ = Task.Run(Fetch);
+                            if (FetchStream && LoadedUrl != null) { _ = Task.Run(Fetch); if (FetchBeforeReply) await Task.WhenAny(_headers.Task, Task.Delay(5000)); }
                             await Reply(m, $$"""{"type":"MEDIA_STATUS","requestId":{{rid}},"status":[{"mediaSessionId":1,"playerState":"BUFFERING","currentTime":0}]}""");
                         }
                         break;
@@ -67,12 +69,14 @@ public sealed class FakeCastReceiver : IAsyncDisposable
         try
         {
             using var h = new HttpClient(); using var r = await h.GetAsync(LoadedUrl, HttpCompletionOption.ResponseHeadersRead, _cts.Token);
+            FetchStatus = (int)r.StatusCode; _headers.TrySetResult(FetchStatus.Value);
+            if (!r.IsSuccessStatusCode) throw new HttpRequestException($"HTTP {FetchStatus}");
             LoadedType = r.Content.Headers.ContentType?.MediaType ?? LoadedType;
             using var st = await r.Content.ReadAsStreamAsync(_cts.Token); var buf = new byte[FetchBytes]; int got = 0;
             while (got < buf.Length) { int n = await st.ReadAsync(buf.AsMemory(got), _cts.Token); if (n == 0) break; got += n; }
             Fetched = buf[..got]; FetchDone.TrySetResult(Fetched);
         }
-        catch (Exception e) { FetchDone.TrySetException(e); }
+        catch (Exception e) { _headers.TrySetResult(-1); FetchDone.TrySetException(e); }
     }
 
     string Status(int rid)
