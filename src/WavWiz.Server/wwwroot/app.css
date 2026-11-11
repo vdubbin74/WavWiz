@@ -5421,6 +5421,27 @@ html[data-qkeep-style=badge] .qkeep.qkeep-ic.qkeep-on .qkeep-badge{display:block
 .mpanel button.mheading{display:flex;grid-template-columns:unset;grid-column:1/-1;padding-left:14px;padding-right:14px}
 .mpanel button.check::before,.mpanel button.nocheck::before{grid-column:2;justify-self:start;width:14px}
 .mpanel button.check>.mlbl,.mpanel button.nocheck>.mlbl{padding-left:22px}
+/* 0.6.8f (t1728u): narrow-PC accordion (.desk-acc) inside the shared menu grid. The accordion rule above it (display:flex, min-width:0)
+   out-specified the grid's display:grid, so the subgrid rows had no tracks: label, pin, shortcut and arrow each landed on their own line
+   ("Ctrl+" clipped) and the File items were pushed into a far-right column. Here the open accordion panel IS the grid again, sized to the
+   menu (label track shrinks and ellipsizes instead of overflowing it), and an open submenu spans the whole row right under its item. */
+.drawer nav.desk-menus.desk-acc .mgroup.open>.mpanel,
+.drawer nav.desk-menus.desk-acc .msub.open>.mpanel{
+  display:grid;
+  grid-template-columns:6px minmax(0,1fr) var(--col-pin) var(--col-kbd) var(--col-arr) 6px;
+  column-gap:8px;align-content:start;
+  width:auto;min-width:0;max-width:none;box-sizing:border-box;
+}
+/* The submenu is the second row of its .msub (subgrid): full width, directly below its item, never in a 6px edge track. */
+.drawer nav.desk-menus.desk-acc .msub>.mpanel{grid-column:1/-1}
+/* In the narrow accordion a row with no pin and no shortcut lends those empty tracks to its label ("Sign in as administrator…" fits). */
+.drawer nav.desk-menus.desk-acc .mpanel button:not(:has(>.mpin,>.kbd))>.mlbl{grid-column:2/5}
+/* Narrow-PC flyouts (.desk-fly) are position:fixed, so the shared grid's min-width:100% meant 100% of the WINDOW: every flyout covered the
+   whole window (nothing left to click to close it). They keep their own 200px minimum and grow with the longest label up to the screen edge. */
+.drawer nav.desk-menus.desk-fly .mgroup.open>.mpanel,
+.drawer nav.desk-menus.desk-fly .msub.open>.mpanel{min-width:200px}
+/* t1729u: the open menu (scrim + panel) is never part of the Windows title bar's drag region, so a click over the bar closes the menu. */
+html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-region:no-drag}
 
 /* A–Z letter finder: slim themed rail of plain letters (no boxed buttons), sticky to the visible list, reserved gutter clear of the scrollbar and row … menus.
    The rail always fits the visible list height — letters flex-shrink and scale (container query / --az-fs); very short panes show every other letter with dots. No rail scrolling.

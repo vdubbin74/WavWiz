@@ -28,7 +28,7 @@ import { GLIDE, glide, holdFor, holdPage, pulse, pulseSel, reduced } from './mot
 import { brandMark } from './brand.js';
 import { installTitlebar, titlebarLogo } from './titlebar.js';   // 0.6.8-#16
 import { loadNpPrefs, npVars, applyNpColor, applyNpClasses } from './npstyle.js';
-import { createMenuBar, createPhoneDrawerNav } from './menu.js';
+import { createMenuBar, createPhoneDrawerNav, drawerOutsideClick } from './menu.js';
 import { setRipAllowed, ripAllowed } from './library.js';
 import { loadPanels, savePanels, normPanels, shown, chevron, railClick, expand, effective, chevronGlyph, chevronDir, chevronLabel, keyAction, listStep, isTight, devTabText, loadLayout as loadLayoutMode, centerWidthFor, centerPopupWidth, popupWidth } from './panels.js';
 import { installAutoJoin, deviceName, stopPhoneDevice, startPhoneAsDevice, defaultRoomName, unlockAudio } from './room.js';
@@ -509,7 +509,11 @@ function buildDrawer() {
   const nav = createPhoneDrawerNav(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist }, { onClose: () => toggleDrawer(false), versionLabel: VERSION_LABEL() });
   return h('div', { class: 'drawer', id: 'drawer', role: 'dialog', 'aria-label': 'Menu' }, h('div', { class: 'scrim', onclick: () => toggleDrawer(false) }), nav);
 }
-function toggleDrawer(open) { drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
+// 0.6.8f (t1729u): menu.js drawerOutsideClick - any click outside the menu column closes the open menu (capture phase).
+let drawerOutsideWired = false;
+function toggleDrawer(open) {
+  if (!drawerOutsideWired) { drawerOutsideWired = true; document.addEventListener('click', ev => { if (drawerOutsideClick(drawerEl, ev.target)) toggleDrawer(false); }, true); }
+  drawerEl.classList.toggle('open', open); document.querySelector('.hamburger')?.setAttribute('aria-expanded', String(open)); if (open) drawerEl.querySelector('nav button')?.focus(); }
 
 /** 0.3.6 K22: Queue always opens the playlist expanded; when it already is, it pulses (K15). */
 export function openQueue() {
