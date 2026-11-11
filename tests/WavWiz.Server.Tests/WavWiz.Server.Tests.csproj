@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\WavWiz.Core.Tests\FakeCastReceiver.cs" Link="FakeCastReceiver.cs" />   <!-- 0.7.0 F169 -->
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />

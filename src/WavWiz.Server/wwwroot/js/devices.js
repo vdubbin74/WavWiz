@@ -89,6 +89,7 @@ export const isPhoneZone = z => !!z?.isWeb && /iPhone|iPad|Android|phone|tablet/
 const OUT_TAG = { hdmi: 'HDMI', spdif: 'TOSLINK', bluetooth: 'BLUETOOTH', usb: 'USB', analog: 'ANALOG', wired: 'ANALOG' };
 export function outputTag(z) {
   if (z && String(z.playerId || '').startsWith('airplay:')) return { k: 'otype airplay', text: 'AIRPLAY', title: 'AirPlay speaker added from this PC' };   // 0.6.8-#14c: a regular speaker, tagged like HDMI / ANALOG
+  if (z && String(z.playerId || '').startsWith('cast:')) return { k: 'otype cast', text: 'CAST', title: 'Google Cast speaker added from this PC' };   // 0.7.0 F169
   const o = z && chosenOutput(z), text = o && OUT_TAG[o.kind]; if (!text) return null;
   return { k: 'otype' + (o.kind === 'bluetooth' ? ' bt' : ''), text, title: o.kind === 'bluetooth' ? 'Bluetooth output: its delay can change when it reconnects. A wired speaker makes a steadier reference.' : `Output: ${outputLabel(o)}` };
 }

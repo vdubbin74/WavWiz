@@ -56,7 +56,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Profiles = new Features.DeviceProfileService(db, zones, dsp, cal, events);
         s.Scenes.Profiles = s.Profiles;
         s.Backup = new Features.BackupService(db, events, Path.Combine(cfg.DataDir, "backups"));
-        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd(); AirPlay.AirPlaySpeakers.Attach(s, u._log.Write);   // F170: AirPlay outputs as Speakers + reconnect      // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
+        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd(); AirPlay.AirPlaySpeakers.Attach(s, u._log.Write); s.Log = u._log.Write; Cast.CastSpeakers.Attach(s, u._log.Write);   /* 0.7.0 F169: Cast devices as Speakers + reconnect */   // F170: AirPlay outputs as Speakers + reconnect      // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
         s.Schedules.CondFor = s.Links.CondFor; s.Schedules.DevicesOf = s.Links.DevicesOf; s.Schedules.KeyName = s.Links.KeyName; s.Schedules.StopAll = s.Links.StopAll;      // 0.4.0 Stage 3: alarms / sleep timer target a zone
         s.Sleep.CondFor = s.Links.CondFor; s.Sleep.DevicesOf = s.Links.DevicesOf;
         s.Jukebox = new Features.JukeboxService(db, cond, events) { Zone = s.Links.JukeboxConductor };
@@ -153,7 +153,7 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
+        AuthApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); CastApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();
@@ -200,7 +200,7 @@ public sealed class WavWizServer : IAsyncDisposable
     {
         _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel();
         try { S.CdRip?.Shutdown(); } catch (Exception ex) { try { _log.Write("rip shutdown: " + ex.Message); } catch { } }
-        S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync();
+        S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync(); S.CastBrowse?.Dispose(); if (S.CastOut != null) await S.CastOut.DisposeAsync();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
         await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();

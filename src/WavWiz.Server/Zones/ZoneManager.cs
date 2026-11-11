@@ -318,7 +318,7 @@ public sealed class ZoneManager
         var row = _db.Query("SELECT z.player_id, COALESCE(d.kind,'') FROM zone z LEFT JOIN output_device d ON d.id=z.active_output_device_id WHERE z.id=$i", r => (P: r.GetString(0), K: r.GetString(1)), ("$i", id)).FirstOrDefault();
         if (row.P == null) return new(id, false, false, double.MaxValue);
         var s = _host.Get(row.P); var st = s?.Status;
-        bool wired = ZoneRefs.IsWiredKind(row.K) && !(s?.IsWeb ?? row.P.StartsWith("web-", StringComparison.Ordinal)) && !row.P.StartsWith("airplay:", StringComparison.Ordinal);
+        bool wired = ZoneRefs.IsWiredKind(row.K) && !(s?.IsWeb ?? row.P.StartsWith("web-", StringComparison.Ordinal)) && !row.P.StartsWith("airplay:", StringComparison.Ordinal) && !row.P.StartsWith("cast:", StringComparison.Ordinal);
         return new(id, wired, s != null || ExternalOnline?.Invoke(row.P) == true, st == null ? 1e6 : st.Underruns + st.HardResyncs + Math.Abs(st.SyncErrorMs));
     }
     /// <summary>The reference a speaker is calibrated against: its zone's reference, or the house reference for a speaker in no zone (0 = none).</summary>
@@ -402,7 +402,7 @@ public sealed class ZoneManager
             }
             var act = outs.FirstOrDefault(o => o.Active);
             string badge, text;
-            if (ext) { badge = "synced"; text = "AIRPLAY"; }
+            if (ext) { badge = "synced"; text = z.PlayerId.StartsWith("cast:", StringComparison.Ordinal) ? "CAST" : "AIRPLAY"; }   // 0.7.0 F169
             else if (s == null) { badge = "offline"; text = "OFFLINE"; }
             else if (act == null) { badge = "nooutput"; text = "NO OUTPUT"; }
             else if (act.NotCalibrated) { badge = "uncalibrated"; text = "NOT CALIBRATED"; }

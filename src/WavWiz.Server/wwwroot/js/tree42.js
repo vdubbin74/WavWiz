@@ -8,6 +8,7 @@ import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
 import { airPlaySetupCard } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
+import { castSetupCard } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
 import { loadOrder, saveOrder, zoneOrderAfterDrop } from './devorder.js';
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 
@@ -362,7 +363,9 @@ export function treeEl(S, ctl, kit, st) {
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));
   root.append(unBox);
   // 0.6.8: AirPlay speakers card sits under Unassigned (the card itself expands / collapses; no header button)
+  // 0.7.0 F169 (user t1680u): order at the bottom is Unassigned, AirPlay speakers, then Cast speakers
   if (admin) { const apc = airPlaySetupCard(S, ctl); if (apc) root.append(apc); }
+  if (admin) { const csc = castSetupCard(S, ctl); if (csc) root.append(csc); }
   attachDrag(root, S, move);
   // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
   attachZoneDrag(root, model.boxes, () => window.dispatchEvent(new CustomEvent('wavwiz:devredraw')), { active: b => rank(b) === 0, reorder: (fromBox, toBox, after) => {
