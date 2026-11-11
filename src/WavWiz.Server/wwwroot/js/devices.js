@@ -20,6 +20,7 @@ import * as Z from './zones40.js';
 import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
 import { swapQuestion, offerSwap } from './zoneref.js';   // 0.6.8-#15
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
+import { nowLines } from './livemeta.js';   // 0.7.0 radio now-playing
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -1100,7 +1101,7 @@ export function devicesPanel(S, ctl) {
     alignMasterSoon(body);
     // 0.3.8 L46 (option A): with few devices the cards grow and show what is playing in each; many devices stay compact
     const rich = S.zones.length + groups.length <= 8; body.classList.toggle('rich', rich);
-    const it = S.now?.item, np = it?.title ? `▶ ${it.title}${it.artist ? ' · ' + it.artist : ''}` : 'Nothing playing'; body.style.setProperty('--np', JSON.stringify(np));
+    const it = S.now?.item, nl = nowLines(S.now), np = it?.title ? `▶ ${nl.title || it.title}${nl.sub ? ' · ' + nl.sub : ''}` : 'Nothing playing';   // 0.7.0: radio song body.style.setProperty('--np', JSON.stringify(np));
     if (busy.v) later();
   }
   if (HASWIN) {   // F214: a stale standard measure never survives a resize or a roomy toggle
@@ -1123,12 +1124,12 @@ export function zoneNowTiles(S, groups) {
   const own = (g, on) => { // 0.4.0: each zone shows ITS playback group's song (the server sends it as g.now); older data falls back to the one house stream
     const n = g.now; if (!n) return null; const has = !!n.title && n.state !== 'stopped';
     if (!has) return { id: g.id, name: g.name, state: on ? 'idle' : 'off', title: on ? 'Nothing playing' : 'Off - nothing playing', artist: '', progress: 0, item: null, linked: (g.linked || []).length > 0 };
-    const item = { kind: n.kind, refId: n.refId, artUrl: n.artUrl, title: n.title };
-    return { id: g.id, name: g.name, state: n.state, title: n.title, artist: n.artist || '', progress: n.durationMs ? Math.min(100, Math.round((n.positionMs || 0) / n.durationMs * 100)) : 0, item, linked: (g.linked || []).length > 0 };
+    const item = { kind: n.kind, refId: n.refId, artUrl: n.artUrl, title: n.title }, nl = nowLines(n, item);   // 0.7.0: a radio zone shows the song
+    return { id: g.id, name: g.name, state: n.state, title: nl.title || n.title, artist: nl.sub, progress: n.durationMs ? Math.min(100, Math.round((n.positionMs || 0) / n.durationMs * 100)) : 0, item, linked: (g.linked || []).length > 0 };
   };
   return (groups || []).map(g => {
     const on = zoneOn(S.zones || [], g), o = own(g, on); if (o) return on || o.item ? o : { ...o, state: 'off', title: 'Off - nothing playing' };
-    if (playing && on) return { id: g.id, name: g.name, state: st, title: it.title || 'Untitled', artist: it.artist || '', progress: prog, item: it };
+    if (playing && on) { const nl = nowLines(S.now); return { id: g.id, name: g.name, state: st, title: nl.title || it.title || 'Untitled', artist: nl.sub, progress: prog, item: it }; }
     return { id: g.id, name: g.name, state: on ? 'idle' : 'off', title: on ? 'Nothing playing' : 'Off - nothing playing', artist: '', progress: 0, item: null };
   });
 }

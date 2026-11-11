@@ -16,6 +16,7 @@ import { npArtBox } from './npart.js';   // 0.5.0 F98: Album art axis in the min
 import { shortcutsSide, sendToMain, writePending } from './shortcuts.js';
 import { installHotkeys } from './hotkeys.js';
 import { OPACITY_MIN, clampOpacity, loadOpacity, saveOpacity, fitText } from './minifit.js';
+import { nowLines } from './livemeta.js';   // 0.7.0 radio now-playing
 
 const host = window.chrome?.webview;
 export const send = (cmd, extra = {}) => { try { host?.postMessage({ cmd, ...extra }); return !!host; } catch { return false; } };
@@ -200,10 +201,11 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
     try {
       await pollZones();
       const r = await api('/stream'); now = r.now;
-      const it = now?.item; t.textContent = it?.title || 'Nothing playing'; { const f = fitText(root.classList.contains('slim') ? 38 : 58, t.textContent.length); root.style.setProperty('--mp-tfs', f.title + 'px'); root.style.setProperty('--mp-afs', f.artist + 'px'); t.title = t.textContent; } { // 0.5.0 F130: condensed player shows the same labeled Artist · Album line as the flat Now Playing panel (album omitted when missing)
+      const it = now?.item, nl = nowLines(now), lv = nl.live; t.textContent = (it ? nl.title || it.title : '') || 'Nothing playing'; { const f = fitText(root.classList.contains('slim') ? 38 : 58, t.textContent.length); root.style.setProperty('--mp-tfs', f.title + 'px'); root.style.setProperty('--mp-afs', f.artist + 'px'); t.title = t.textContent; } { // 0.5.0 F130: condensed player shows the same labeled Artist · Album line as the flat Now Playing panel (album omitted when missing)
         const lab = (l, v) => [h('span', { class: 'np-aal' }, l), h('span', { class: 'np-aav' }, v)];
-        a.replaceChildren(...(it ? [...(it.artist ? lab('Artist', it.artist) : []), ...(it.artist && it.album ? [h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·')] : []), ...(it.album ? lab('Album', it.album) : [])] : []));
-        a.title = it ? [it.artist, it.album].filter(Boolean).join(' · ') : ''; }
+        a.replaceChildren(...(lv ? [...(nl.artist ? [...lab('Artist', nl.artist), h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·')] : []), ...lab('Station', nl.station)]   // 0.7.0: radio = the song + Artist · Station
+          : it ? [...(it.artist ? lab('Artist', it.artist) : []), ...(it.artist && it.album ? [h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·')] : []), ...(it.album ? lab('Album', it.album) : [])] : []));
+        a.title = lv ? nl.sub : it ? [it.artist, it.album].filter(Boolean).join(' · ') : ''; }
       const u = it ? itemArtUrl(it, 96) : null; if (u !== lastArt) { lastArt = u; artTry = 0; clearTimeout(artT); art.classList.add('noart'); if (u) art.src = u; else art.removeAttribute('src'); railArt.style.backgroundImage = u ? `url("${u}")` : ''; }
       railBar.style.setProperty('--p', (now?.durationMs ? Math.min(1, (now.positionMs || 0) / now.durationMs) : 0) * 100 + '%');
       setIcon(play, now?.state === 'playing' ? 'pause' : 'play');

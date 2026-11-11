@@ -91,8 +91,32 @@ public sealed class RadioDecoder : IPcmDecoder
     {
         using var p = StartFfmpeg(url);
         using var reg = _cts.Token.Register(() => { try { p.Kill(true); } catch { } });
-        DrainOutput(p);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        var meta = Task.Run(() => PollHlsTitles(url, stop.Token));            // 0.7.0: HLS stations name the song in #EXTINF
+        try { DrainOutput(p); } finally { stop.Cancel(); try { meta.Wait(2000); } catch { } }
         if (!_cts.IsCancellationRequested) throw new IOException("stream ended");
+    }
+
+    /// <summary>0.7.0: HLS now-playing. Re-reads the media playlist about once per target duration (5-15 s) and takes the newest segment's
+    /// #EXTINF title (RFC 8216 4.3.2.1: "#EXTINF:&lt;duration&gt;,[&lt;title&gt;]"); a master playlist is followed to its first variant.
+    /// ID3 timed metadata inside the segments is NOT read (ffmpeg decodes the audio only). Failures are silent: the audio is unaffected.</summary>
+    private async Task PollHlsTitles(string url, CancellationToken ct)
+    {
+        string media = url; int waitMs = 10_000;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var text = await _http.GetStringAsync(media, ct);
+                if (HlsMeta.Variant(text, media) is { } v && v != media) { media = v; continue; }
+                waitMs = Math.Clamp((int)(HlsMeta.TargetDuration(text) * 1000), 5_000, 15_000);
+                var title = HlsMeta.LastTitle(text);
+                if (title != null && title != NowPlaying) { NowPlaying = title; Metadata?.Invoke(title); }
+            }
+            catch (OperationCanceledException) { return; }
+            catch { waitMs = 15_000; }
+            try { await Task.Delay(waitMs, ct); } catch (OperationCanceledException) { return; }
+        }
     }
 
     private void RunIcy(string url)
@@ -245,6 +269,37 @@ public static class PlaylistParser
 
     private static string Resolve(string loc, string? baseDir)
         => loc.Contains("://") || Path.IsPathRooted(loc) || baseDir == null ? loc : Path.GetFullPath(Path.Combine(baseDir, loc));
+}
+
+/// <summary>0.7.0: the bits of an HLS playlist the radio needs for now-playing (RFC 8216). Pure, unit-tested.</summary>
+public static class HlsMeta
+{
+    /// <summary>A master playlist's first variant (absolute URL), or null for a media playlist.</summary>
+    public static string? Variant(string text, string baseUrl)
+    {
+        var lines = text.Split('\n').Select(l => l.Trim()).ToList();
+        for (int i = 0; i < lines.Count; i++)
+            if (lines[i].StartsWith("#EXT-X-STREAM-INF", StringComparison.Ordinal))
+                for (int j = i + 1; j < lines.Count; j++) { if (lines[j].Length == 0 || lines[j].StartsWith('#')) continue; return Uri.TryCreate(new Uri(baseUrl), lines[j], out var u) ? u.ToString() : null; }
+        return null;
+    }
+    public static double TargetDuration(string text)
+    {
+        foreach (var l in text.Split('\n')) { var t = l.Trim(); if (t.StartsWith("#EXT-X-TARGETDURATION:", StringComparison.Ordinal) && double.TryParse(t[22..], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d)) return d; }
+        return 10;
+    }
+    /// <summary>The title of the newest segment ("#EXTINF:10.0,Artist - Title" or iHeart-style key="value" pairs), null when the station sends none.</summary>
+    public static string? LastTitle(string text)
+    {
+        string? last = null;
+        foreach (var l in text.Split('\n'))
+        {
+            var t = l.Trim(); if (!t.StartsWith("#EXTINF:", StringComparison.Ordinal)) continue;
+            int c = t.IndexOf(','); var title = c < 0 ? "" : t[(c + 1)..].Trim();
+            last = title.Length == 0 ? null : title;
+        }
+        return last;
+    }
 }
 
 /// <summary>0.6.8-#8: what a station says is playing. Plain "Artist - Title" and iHeart-style key=value StreamTitles

@@ -314,7 +314,8 @@ public sealed class ZoneLinks
     private static object? NowDto(Conductor? c)
     {
         if (c == null) return null; var n = c.Now(); var it = n.Item;
-        return new { state = n.State, title = it?.Title, artist = it?.Artist, album = it?.Album, kind = it?.Kind, refId = it?.RefId, artUrl = it?.ArtUrl, positionMs = n.PositionMs, durationMs = n.DurationMs, live = it != null && Conductor.IsLive(it.Kind) };
+        return new { state = n.State, title = it?.Title, artist = it?.Artist, album = it?.Album, kind = it?.Kind, refId = it?.RefId, artUrl = it?.ArtUrl, positionMs = n.PositionMs, durationMs = n.DurationMs, live = it != null && Conductor.IsLive(it.Kind),
+            liveTitle = n.LiveTitle, liveArtist = n.LiveArtist, liveSong = n.LiveSong, liveArt = n.LiveArt };   // 0.7.0: radio song per zone (Devices tiles, zone menu)
     }
     /// <summary>The zone list plus, per zone: playbackId, linked (names of the other zones playing the same music) and now (its group's song).</summary>
     public JsonArray Decorate(List<ZoneGroupDto> groups)

@@ -1,6 +1,7 @@
 import { h } from './util.js';
 import { genNode } from './gencover.js';
 import { icon } from './icons.js';
+import { mediaSessionMeta } from './livemeta.js';
 
 const base = '/api/v1/art';
 /** 0.3.2 F10: art URL version from the server (auth state artCv). A new build = new URLs, so pictures cached by older builds are never reused. */
@@ -248,10 +249,10 @@ const msLogo = () => [{ src: '/assets/logo-512.png', sizes: '512x512', type: 'im
 const msElapsed = () => msLastPos ? Number(msLastPos.posMs) + (msLastPos.now.state === 'playing' ? performance.now() - msLastPos.at : 0) : 0;
 function msWrite(ms) {
   if (!msCurrent) return;
-  const { title, it } = msCurrent, artwork = msArt?.artwork || msLogo();
-  const key = JSON.stringify([msTrackKey, title, it.artist || '', it.album || 'WavWiz', artwork]);
+  const { title, artist, album } = msCurrent, artwork = msArt?.artwork || msLogo();
+  const key = JSON.stringify([msTrackKey, title, artist, album, artwork]);
   if (key === msMetaKey && ms.metadata) return;
-  ms.metadata = new MediaMetadata({ title, artist: it.artist || '', album: it.album || 'WavWiz', artwork }); msMetaKey = key;
+  ms.metadata = new MediaMetadata({ title, artist, album, artwork }); msMetaKey = key;
   if (msLastPos) updateMediaSessionPosition(msLastPos.now, msElapsed(), true, msClockPrev());
 }
 function msDurationBlip(now) {
@@ -289,7 +290,7 @@ export function setMediaSession(now, handlers, posMs, clock = null) {
     // F243 duration blip OR F248 suspicious valid-duration zero: reconcile decides; never trust raw blindly.
     const candidate = durationBlip || rawPosition == null ? NaN : Number(rawPosition);
     const position = msApplyClock(now, candidate, performance.now(), clock, sample);
-    msCurrent = { title: (it.kind === 'radio' ? (now.liveTitle || it.title) : it.title) || 'WavWiz', it };
+    msCurrent = { ...mediaSessionMeta(now, it), it };   // 0.7.0: radio = song / artist / station on the lock screen
     const art = itemArtUrl(it, 512) || msArt?.url;
     if (art !== msArtWant) { msArtWant = art || ''; msGeneration++; }
     if (art && art !== msArt?.url && typeof Image === 'function') {

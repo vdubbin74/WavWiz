@@ -486,7 +486,7 @@ export function createNow(S, ctl) {
     if (npHeart.dataset.id !== String(favId ?? '')) { npHeart.dataset.id = barHeart.dataset.id = String(favId ?? ''); npHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); xHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); sHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); barHeart.replaceChildren(...(favId ? [heartBtn(S, 'track', favId, it.title)] : [])); }
     if (phoneHeart.dataset.id !== String(favId ?? '')) { phoneHeart.dataset.id = String(favId ?? ''); phoneHeart.replaceChildren(favId ? heartBtn(S, 'track', favId, it.title, { round: true }) : idleHeart()); }
     phoneHeart.querySelector('button').disabled = !favId || !canControl(S);
-    miniT.textContent = t1.textContent; miniS.textContent = it ? it.artist || sourceLabel(it) : '';
+    miniT.textContent = t1.textContent; miniS.textContent = it ? (radio && (n.liveSong || n.liveTitle) ? t2.textContent : it.artist || sourceLabel(it)) : '';   // 0.7.0: radio = Artist · Station
     const playing = n.state === 'playing'; setIcon(play, playing ? 'pause' : 'play'); setIcon(miniPlay, playing ? 'pause' : 'play'); play.classList.toggle('playing', playing);
     miniPlay.disabled = !canControl(S); miniPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play'); miniPlay.title = canControl(S) ? (playing ? 'Pause' : 'Play') : 'Your access is view-only';
     setIcon(phonePlay, playing ? 'pause' : 'play'); phonePlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');

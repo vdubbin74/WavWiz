@@ -63,6 +63,7 @@ import { openMixer } from './mixer.js';   // 0.4.8 F49
 import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
+import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -765,7 +766,9 @@ const qZoneKey = () => JSON.stringify([Z.zoneIdFor(Z.current())]); // linked cho
 const qOccurrence = q => q && JSON.stringify([q.id, q.kind, q.refId, q.location]);
 // F252-amend2: shared complete rendered-input signature for drawQueue skip AND qResume retained return.
 const qRowSig = q => [qOccurrence(q), q?.title, q?.artist, q?.album, q?.durationMs, q?.artUrl, q?.source, q?.sourceLabel, q?.kind, q?.refId];
-const qNowItemSig = it => it == null ? null : [qOccurrence(it), it.title, it.artist, it.album, it.artUrl, it.source, it.sourceLabel, it.kind, it.refId];
+/** 0.7.0: the playing radio row's second line names the song (♪ Artist – Song). */
+const qLiveLine = l => l ? h('div', { class: 't2 ell qlive', title: l.artist ? `${l.artist} – ${l.song}` : l.song }, '♪ ', l.artist ? `${l.artist} – ${l.song}` : l.song) : null;
+const qNowItemSig = it => it == null ? null : [qOccurrence(it), it.title, it.artist, it.album, it.artUrl, it.source, it.sourceLabel, it.kind, it.refId, it.kind === 'radio' ? S.now?.liveTitle || null : null];   // 0.7.0: repaint the radio row when the song changes
 function qPaintSignature() {
   const can = canControl(S);
   const locked0 = !!loadLayout(true).locked, busy0 = qEdit.pending();
@@ -850,7 +853,7 @@ function drawQueue() {
     const more = can ? h('button', { type: 'button', class: 'more qmore', 'aria-label': `Actions for ${q.title}`, 'aria-haspopup': 'menu' }, '⋯') : null;
     const rowEl = h('div', { class: 'item' + (playing ? ' cur' : ''), 'data-i': i, 'data-qtitle': q.title, onclick: () => canControl(S) && !qEdit.pending() && zoneKey() === renderedZone && sameOcc(i, occ) && act('/stream/jump', { index: i }) },
       grip, npCover(q, 96, 'qrow-art'), h('span', { class: 'num', 'aria-label': `Queue position ${i + 1}` }, playing ? (S.now.state === 'playing' ? '▶' : 'Ⅱ') : i + 1),
-      h('div', { class: 't' }, h('div', { class: 't1 ell' }, srcPill(q), q.title), h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))),
+      h('div', { class: 't' }, h('div', { class: 't1 ell' }, srcPill(q), q.title), qLiveLine(playing ? liveSong(S.now, q) : null) || h('div', { class: 't2 ell' }, [q.artist, q.album].filter(Boolean).join(' • '))),
       h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''), more);
     if (can) bindMenus.push(() => attachQueueMenu(rowEl, S, { refreshAll, showInLibrary, queueEdit: qEdit }, i, () => !!loadLayout(true).locked, {
       menuButton: more, suppressed: () => qReorder?.blocked(), valid: () => S.view === 'queue' && !wide() && zoneKey() === renderedZone && sameOcc(i, occ),
@@ -868,7 +871,7 @@ function drawQueue() {
   if (root._qSummaryArt?.key !== artKey || !hasNow) root._qSummaryArt = hasNow ? { key: artKey, el: npCover(item, 192, 'qsummary-art') } : null;
   const summary = h('section', { class: 'qsummary', 'aria-label': 'Now playing summary' },
     h('h2', {}, hasNow ? (state === 'playing' ? 'Now playing' : 'Paused') : 'Nothing playing'),
-    hasNow ? h('div', { class: 'qsummary-card' }, root._qSummaryArt.el, h('div', { class: 't' }, h('b', { class: 'ell' }, item.title), h('div', { class: 'small dim ell' }, item.artist || ''), h('span', { class: 'small dim' }, 'On ' + (zone?.name || 'selected zone'))),
+    hasNow ? h('div', { class: 'qsummary-card' }, root._qSummaryArt.el, h('div', { class: 't' }, ...(l => l ? [h('b', { class: 'ell' }, l.song), h('div', { class: 'small dim ell' }, [l.artist, item.title].filter(Boolean).join(' · '))] : [h('b', { class: 'ell' }, item.title), h('div', { class: 'small dim ell' }, item.artist || '')])(liveSong(S.now, item)), h('span', { class: 'small dim' }, 'On ' + (zone?.name || 'selected zone'))),   // 0.7.0 radio song
       h('button', { type: 'button', class: 'iconbtn qsummary-play', disabled: !can, 'aria-label': state === 'playing' ? 'Pause' : 'Resume', onclick: () => canControl(S) && zoneKey() === renderedZone && act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/resume') }, icon(state === 'playing' ? 'pause' : 'play'))) : h('p', { class: 'small dim' }, 'Choose a song from the queue or Library.'));
   // 0.6.8: compact Queue head — same icon row as the desktop header (∞ / recent / save / clear / lock) beside the track count; Up next on one ellipsis line.
   const nTracks = S.queue.length;

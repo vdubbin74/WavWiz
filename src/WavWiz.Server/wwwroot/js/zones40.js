@@ -3,6 +3,7 @@
 // playback group = the server's per-zone queue/stream. Zones that are LINKED share one playback group (same song, in sync); a zone that is split off has its own.
 import { h, api, toast, setApiZone, fmtTime } from './util.js';
 import { icon } from './icons.js';
+import { liveSong } from './livemeta.js';
 
 export const ZONE_KEY = 'wavwiz.zone';
 export const JUKEBOX_KEY = 'jukebox';
@@ -27,7 +28,8 @@ export const zoneIdFor = ch => (!ch ? null : ch.kind === 'zone' && ch.overlaps ?
 /** Pure: "▶ Song" while playing, the dim title while paused, or a plain sentence. */
 export function nowLabel(now) {
   if (!now || !now.title) return 'Nothing playing';
-  return (now.state === 'playing' ? '▶ ' : '') + now.title;
+  const l = liveSong(now);   // 0.7.0: a radio zone names the song
+  return (now.state === 'playing' ? '▶ ' : '') + (l ? `${l.song} · ${l.station}` : now.title);
 }
 /** Pure: the position of a zone's song right now (the server value + the time since it was read, while playing). */
 export const livePos = (now, atMs, nowMs = Date.now()) => !now ? 0 : Math.max(0, Math.min(now.durationMs || 0, (now.positionMs || 0) + (now.state === 'playing' && !now.live ? nowMs - atMs : 0)));
@@ -123,9 +125,9 @@ function paintLine(b) { const { now, at } = b._zl || {}; if (!now?.title) return
 function startLineTick() { if (lineTick || typeof setInterval !== 'function') return; lineTick = setInterval(() => { for (const b of liveLines) { if (!b.isConnected) { liveLines.delete(b); continue; } if (b._zl?.now?.state === 'playing') paintLine(b); } if (!liveLines.size) { clearInterval(lineTick); lineTick = 0; } }, 500); }
 export function nowLine(now, { at = Date.now(), onSelect = null, selected = false } = {}) {
   const has = !!now?.title, pos = livePos(now, at), dur = now?.durationMs || 0, frac = has && dur ? Math.min(1, pos / dur) : 0;
-  const b = h('div', { class: 'zl-now' + (has ? '' : ' empty') + (onSelect ? ' tap' : ''), role: onSelect ? 'button' : null, tabindex: onSelect ? 0 : null, 'aria-label': has ? `Now playing in this zone: ${now.title}` : 'Nothing playing in this zone', title: onSelect && !selected ? 'Control this zone' : null },
+  const b = h('div', { class: 'zl-now' + (has ? '' : ' empty') + (onSelect ? ' tap' : ''), role: onSelect ? 'button' : null, tabindex: onSelect ? 0 : null, 'aria-label': has ? `Now playing in this zone: ${liveSong(now) ? liveSong(now).song + ' · ' + now.title : now.title}` : 'Nothing playing in this zone', title: onSelect && !selected ? 'Control this zone' : null },
     h('span', { class: 'zl-ico', 'aria-hidden': 'true' }, now?.state === 'playing' ? '▶' : has ? '❚❚' : '▷'),
-    h('span', { class: 'zl-t ell' }, has ? h('b', null, now.title) : 'Nothing playing', has && now.artist ? h('span', { class: 'dim' }, ' · ' + now.artist) : null),
+    h('span', { class: 'zl-t ell' }, has ? h('b', null, liveSong(now)?.song || now.title) : 'Nothing playing', has && (liveSong(now) ? h('span', { class: 'dim' }, ' · ' + [liveSong(now).artist, now.title].filter(Boolean).join(' · ')) : now.artist ? h('span', { class: 'dim' }, ' · ' + now.artist) : null)),   // 0.7.0: radio song · artist · station
     // F267: idle keeps the same layout as playing - an empty track and placeholder time, so idle and playing lines match
     h('span', { class: 'zl-bar', style: `--p:${(frac * 100).toFixed(1)}%` }, h('i')),
     has && !now.live && dur ? h('span', { class: 'zl-time small dim' }, `${fmtTime(pos)} / ${fmtTime(dur)}`) : !has ? h('span', { class: 'zl-time small dim zl-ph', 'aria-hidden': 'true' }, '--:-- / --:--') : null);
@@ -137,7 +139,7 @@ export function nowLine(now, { at = Date.now(), onSelect = null, selected = fals
 // Callers pair lines only inside the same tree layout; the listener selects a stable zone id.
 export function patchNowLine(b, fresh) {
   if (!b?._zl || !fresh?._zl || b.getAttribute('role') !== fresh.getAttribute('role')) return false;
-  const content = n => JSON.stringify([n?.state, n?.title, n?.artist, n?.durationMs, !!n?.live]);
+  const content = n => JSON.stringify([n?.state, n?.title, n?.artist, n?.durationMs, !!n?.live, n?.liveTitle || null]);
   if (content(b._zl.now) !== content(fresh._zl.now)) b.replaceChildren(...fresh.childNodes);
   for (const a of [...b.attributes]) if (!fresh.hasAttribute(a.name)) b.removeAttribute(a.name);
   for (const a of [...fresh.attributes]) if (b.getAttribute(a.name) !== a.value) b.setAttribute(a.name, a.value);

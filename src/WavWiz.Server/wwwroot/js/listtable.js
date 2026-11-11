@@ -13,6 +13,7 @@ import { pointerDropTarget, dndMode, usesPointer } from './pdrag.js';
 import { canDragRows, APPLY_SORT_Q } from './qreorder.js';
 import { attachQueueMenu } from './queuemenu.js';
 import { PL_COLS, byId, loadLayout, saveLayout, toggleCol, resetLayout, setLocked, moveCol, widthsFor, resizeAt, numMinFor, fracsFromWidths, nextSort, sortedIndexes, applySort, sortAllowed, SORT_LOCK_HINT, CLEAR_LOCK_HINT, sortChipText } from './plcols.js';
+import { liveSong } from './livemeta.js';
 
 /** Bottom panel of the desktop layout: the play queue as a table. 0.3.6 K10: pick / resize / reorder columns, click a header to sort, lock the layout. */
 /** F176: Local / remote server name / Radio pill (from the queue DTO's source + sourceLabel). */
@@ -205,12 +206,12 @@ export function listTable(S, ctl) {
   }
   const clearQueue = async () => { if (!view) return clearQueueFlow(S, ctl); const n = V.queue.length; if (n && await ask(`Clear ${n} track${n === 1 ? '' : 's'}?`, `This empties ${viewChoice()?.name || 'that zone'}'s queue. You can undo it for a few seconds afterwards.`, { ok: 'Clear', danger: true })) await qact('/queue/clear'); };   // Undo: server snapshot + toast (queuetools.js)
   const cellFor = (id, q, i, isCur, can, last) => {
-    const lc = last ? ' lastc' : '';
+    const lc = last ? ' lastc' : '', lv = isCur ? liveSong(V.now, q) : null;   // 0.7.0: the playing radio row shows the song
     switch (id) {
       case 'num': return h('td', { class: 'num' + lc }, can && !L.locked ? h('span', { class: 'qgrip', 'aria-hidden': 'true', title: 'Drag to reorder' }, '⋮⋮') : null, isCur ? '▶' : i + 1);
       case 'source': return h('td', { class: 'ell qsrccell' + lc }, srcPill(q));   // own column (toggle / reorder like the rest)
-      case 'title': return h('td', { class: 'ell' + lc, title: q.title }, i === nextIdx ? h('span', { class: 'qnextpill', title: 'Plays next' }, 'UP NEXT') : null, q.title);   // 0.4.8 F50; F176 source pill first
-      case 'artist': return h('td', { class: 'ell' + lc, title: q.artist || '' }, q.artist || '');
+      case 'title': return h('td', { class: 'ell' + lc, title: lv ? `${q.title} · ${lv.song}` : q.title }, i === nextIdx ? h('span', { class: 'qnextpill', title: 'Plays next' }, 'UP NEXT') : null, q.title, lv ? h('span', { class: 'qlive' }, ' · ♪ ' + lv.song) : null);   // 0.4.8 F50; F176 source pill first
+      case 'artist': { const a = lv?.artist || q.artist || ''; return h('td', { class: 'ell' + lc, title: a }, a); }
       case 'album': return h('td', { class: 'ell' + lc, title: q.album || '' }, q.album || '');
       case 'genre': return h('td', { class: 'ell' + lc }, q.genre || '');
       case 'year': return h('td', { class: 'ell' + lc }, q.year ? String(q.year) : '');
