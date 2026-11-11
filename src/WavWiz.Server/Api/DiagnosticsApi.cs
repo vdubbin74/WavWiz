@@ -122,6 +122,18 @@ public static class DiagnosticsApi
         }
         checks.Add(new("ffmpeg", "Audio decoder (ffmpeg)", ff ? "ok" : "fail", ff ? s.FfmpegPath : "ffmpeg was not found.", ff ? null : OperatingSystem.IsWindows() ? "Re-run the WavWiz installer (it includes ffmpeg), or set ffmpegPath in server.json." : "Install ffmpeg (apt install ffmpeg), or set WAVWIZ_FFMPEG / ffmpegPath in server.json."));
 
+        // --- 0.7.0 item 3: the service account (Local Service on new installs) must read the music folders and write CD rips ---
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                var paths = s.Db.Query("SELECT path FROM library_root WHERE enabled=1 ORDER BY id", r => r.GetString(0));
+                string who = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                checks.Add(Host.ServiceAccess.Check(who, Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService(), Host.ServiceAccess.ProbeAll(paths)));
+            }
+            catch (Exception e) { checks.Add(new("service-access", "Service account folder access", "unknown", "Could not check: " + e.Message, null)); }
+        }
+
         // --- library ---
         int tracks = s.Library.TrackCount(); int roots = Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM library_root WHERE enabled=1"));
         var lastErr = s.Db.Query("SELECT path,last_error FROM library_root WHERE last_error IS NOT NULL AND last_error<>''", r => r.GetString(0) + ": " + r.GetString(1));

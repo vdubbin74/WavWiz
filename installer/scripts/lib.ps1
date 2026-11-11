@@ -276,9 +276,18 @@ function Get-ServiceAccount([string]$Name) {
     if (-not $acct) { return $null }
     return $acct
 }
-function Get-InstallServiceAccount([string]$Name, [bool]$Exists) {
+# 0.7.0 item 3: sc qc prints "LocalSystem"; services.msc / other tools may have written ".\LocalSystem" or "NT AUTHORITY\SYSTEM".
+function Test-LocalSystemAccount([string]$Account) {
+    $a = ([string]$Account).Trim()
+    return ($a -ieq 'LocalSystem' -or $a -ieq '.\LocalSystem' -or $a -ieq 'NT AUTHORITY\SYSTEM' -or $a -ieq 'SYSTEM')
+}
+# New installs: LocalService (least privilege). An upgrade keeps the account the service has (never forced).
+# 0.7.0 item 3: -SwitchToLocalService (Setup checkbox, shown only for an existing LocalSystem service, default off) moves a LocalSystem
+# service to LocalService; any other account (LocalService already, a user account, NetworkService) is still kept.
+function Get-InstallServiceAccount([string]$Name, [bool]$Exists, [bool]$SwitchToLocalService = $false) {
     if ($Exists) {
         $acct = Get-ServiceAccount $Name
+        if ($acct -and $SwitchToLocalService -and (Test-LocalSystemAccount $acct)) { return [pscustomobject]@{ Account = $script:DefaultServiceAccount; Action = 'switched'; From = $acct } }
         if ($acct) { return [pscustomobject]@{ Account = $acct; Action = 'preserved' } }
         Write-InstallLog 'service account was not readable from sc.exe qc; defaulting to LocalService'
     }

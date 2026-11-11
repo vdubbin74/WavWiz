@@ -313,6 +313,55 @@ Test 're-run keeps a service account the user set (does not reset to LocalServic
     if ((Count $calls 'obj= NT AUTHORITY\LocalSystem') -lt 1) { throw 'upgrade did not pass the preserved LocalSystem account to sc.exe' }
 }
 
+# ---- 0.7.0 item 3: least privilege by default; an upgrade never changes the account unless asked; the ask only touches LocalSystem
+Test 'LocalSystem detection matches what sc qc / services.msc write' {
+    foreach ($a in @('LocalSystem', '.\LocalSystem', 'NT AUTHORITY\SYSTEM', 'localsystem', ' LocalSystem ')) { if (-not (Test-LocalSystemAccount $a)) { throw "not detected: '$a'" } }
+    foreach ($a in @('NT AUTHORITY\LocalService', 'NT AUTHORITY\NetworkService', '.\trevo', 'PC\SYSTEMUSER', '')) { if (Test-LocalSystemAccount $a) { throw "wrongly detected: '$a'" } }
+}
+Test 'upgrade of a LocalSystem service keeps LocalSystem by default (real sc qc form "LocalSystem")' {
+    $sb = New-Sandbox; $r1 = Invoke-Setup $sb; Fail-IfNotOk $r1 $sb
+    Set-Content -LiteralPath (Join-Path $sb.State 'svc.def') 'config WavWizServer binPath= x start= delayed-auto obj= LocalSystem DisplayName= WavWiz Server (BETA)'
+    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb
+    Has (Get-Log $sb) 'service account preserved: LocalSystem'
+    Has (Get-Content (Join-Path $sb.State 'svc.def') -Raw) 'obj= LocalSystem'
+    if ((Get-Content (Join-Path $sb.State 'svc.def') -Raw) -match 'password=') { throw 'a preserved account must not get a password argument' }
+}
+Test 'opt-in switch moves a LocalSystem service to LocalService (empty password), keeps sidtype + CD grant, tells the user what to re-enter' {
+    $sb = New-Sandbox; $r1 = Invoke-Setup $sb; Fail-IfNotOk $r1 $sb
+    Set-Content -LiteralPath (Join-Path $sb.State 'svc.def') 'config WavWizServer binPath= x start= delayed-auto obj= LocalSystem DisplayName= WavWiz Server (BETA)'
+    Remove-Item (Join-Path $sb.State 'calls.log') -ErrorAction SilentlyContinue
+    $r2 = Invoke-Setup $sb @{ SwitchToLocalService = '1' }; Fail-IfNotOk $r2 $sb
+    $log = Get-Log $sb
+    Has $log 'service account switched: NT AUTHORITY\LocalService'
+    Has $log 'Service account changed from LocalSystem to NT AUTHORITY\LocalService'
+    Has $log 'Re-enter saved network-share logins'
+    $def = Get-Content (Join-Path $sb.State 'svc.def') -Raw
+    Has $def 'obj= NT AUTHORITY\LocalService password='
+    $calls = Get-Calls $sb
+    Has $calls 'tool sc.exe sidtype WavWizServer unrestricted'
+    if ((Count $calls 'tool sc.exe create') -ne 0) { throw 'switch re-created the service' }
+    # a third run without the switch keeps the new account
+    $r3 = Invoke-Setup $sb; Fail-IfNotOk $r3 $sb
+    Has (Get-Log $sb) 'service account preserved: NT AUTHORITY\LocalService'
+}
+Test 'opt-in switch never touches a user account or NetworkService' {
+    foreach ($acct in @('.\trevo', 'NT AUTHORITY\NetworkService')) {
+        $sb = New-Sandbox; $r1 = Invoke-Setup $sb; Fail-IfNotOk $r1 $sb
+        Set-Content -LiteralPath (Join-Path $sb.State 'svc.def') "config WavWizServer binPath= x start= delayed-auto obj= $acct DisplayName= WavWiz Server (BETA)"
+        $r2 = Invoke-Setup $sb @{ SwitchToLocalService = '1' }; Fail-IfNotOk $r2 $sb
+        Has (Get-Log $sb) "service account preserved: $acct"
+        Has (Get-Content (Join-Path $sb.State 'svc.def') -Raw) "obj= $acct"
+    }
+}
+Test 'Setup wizard: the service-account page is offered only for an existing LocalSystem service, default off, /LIMITEDSERVICE=1 for silent installs' {
+    $iss = Get-Content (Join-Path $PSScriptRoot '../../installer/WavWiz.iss') -Raw
+    Has $iss "RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Services\WavWizServer', 'ObjectName', A)"
+    Has $iss "if PageID = SvcPage.ID then Result := (not WantServer) or (not ServiceRunsAsLocalSystem);"
+    Has $iss "LimitedSvcCheck.Checked := Trim(ExpandConstant('{param:LIMITEDSERVICE|0}')) = '1';"
+    Has $iss "if ServiceRunsAsLocalSystem and LimitedSvcCheck.Checked then Params := Params + ' -SwitchToLocalService 1';"
+    if ($iss -match "SetPreviousData\(PreviousDataKey, 'LimitedService'") { throw 'the switch is a one-time choice, not remembered' }
+}
+
 Test 'fresh install grants NT SERVICE\WavWizServer GENERIC_READ on the CDROM class, sets sidtype unrestricted, stays LocalService; re-run is idempotent; uninstall restores an unset class' {
     $sid = Get-WavWizServiceSid
     $sb = New-Sandbox

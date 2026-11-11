@@ -128,6 +128,7 @@ var
     specific address in LanEdit) is separate from the connection URL (ConnUrlLabel, read-only) }
   AllIfRadio, LanOnlyRadio, SpecRadio: TNewRadioButton;
   AirPlayOutCheck: TNewCheckBox; { 0.6.8-#14g: opt-in firewall rules for sending to AirPlay speakers }
+  SvcPage: TWizardPage; LimitedSvcCheck: TNewCheckBox; { 0.7.0 item 3: offered only when the existing service runs as LocalSystem }
   ConnUrlLabel: TNewStaticText;
   DetectedLanIp: String;
   ExistingBindSeeded: String; { bind already in server.json when DetectLan seeded the box; empty = fresh install }
@@ -461,7 +462,16 @@ begin
   AirPlayOutCheck.Checked := Trim(ExpandConstant('{param:AIRPLAYOUT|' + GetPreviousData('AirPlayOut', '0') + '}')) = '1';
   PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(214), NetPage.SurfaceWidth, NetPage.SurfaceHeight - ScaleY(214)); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
-  HostPage := CreateCustomPage(NetPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
+  { 0.7.0 item 3: an upgrade keeps the service account; a LocalSystem service may switch to Local Service (default off, /LIMITEDSERVICE=1) }
+  SvcPage := CreateCustomPage(NetPage.ID, 'Service account (BETA)', 'WavWiz Server currently runs as LocalSystem (full control of this PC).');
+  L := TNewStaticText.Create(SvcPage); L.Parent := SvcPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, SvcPage.SurfaceWidth, ScaleY(84));
+  L.Caption := 'New installations run WavWiz Server as Local Service, a limited account that can still read CDs and its own data. Your existing service runs as LocalSystem. You can switch it now, or keep it as it is.';
+  LimitedSvcCheck := TNewCheckBox.Create(SvcPage); LimitedSvcCheck.Parent := SvcPage.Surface; LimitedSvcCheck.SetBounds(0, ScaleY(90), SvcPage.SurfaceWidth, ScaleY(17));
+  LimitedSvcCheck.Caption := 'Switch WavWiz Server to Local Service (recommended)';
+  LimitedSvcCheck.Checked := Trim(ExpandConstant('{param:LIMITEDSERVICE|0}')) = '1';
+  L := TNewStaticText.Create(SvcPage); L.Parent := SvcPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, ScaleY(116), SvcPage.SurfaceWidth, SvcPage.SurfaceHeight - ScaleY(116));
+  L.Caption := 'After switching: saved network-share logins, remote-library passwords and the remote-access certificate password have to be entered again (Windows ties them to the service account). Music folders inside your user profile may need access for the service; Help > Diagnostics lists any folder it cannot read and how to allow it.';
+  HostPage := CreateCustomPage(SvcPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
   L := TNewStaticText.Create(HostPage); L.Parent := HostPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, HostPage.SurfaceWidth, ScaleY(70));
   L.Caption := 'Enter the home-network address (for example 192.168.1.20) or the name of the PC that has WavWiz Server installed. You can leave it empty and enter it later in the player (tray icon > Server).';
   HostEdit := TNewEdit.Create(HostPage); HostEdit.Parent := HostPage.Surface; HostEdit.SetBounds(0, ScaleY(80), ScaleX(260), ScaleY(23));
@@ -473,10 +483,23 @@ begin
     WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 + 'The app is now called WavWiz (it was Unison). An earlier Unison installation was found: Setup will upgrade it and keep your music library, settings, administrator password and paired players. PCs that still run the old Unison Player keep working until you update them.';
 end;
 
+{ 0.7.0 item 3: the existing WavWiz Server service's account (services key ObjectName; sc qc prints the same value) }
+function ServiceRunsAsLocalSystem: Boolean;
+var A: String;
+begin
+  Result := False;
+  if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Services\WavWizServer', 'ObjectName', A) then
+  begin
+    A := Trim(A);
+    Result := (CompareText(A, 'LocalSystem') = 0) or (CompareText(A, '.\LocalSystem') = 0) or (CompareText(A, 'NT AUTHORITY\SYSTEM') = 0) or (CompareText(A, 'SYSTEM') = 0);
+  end;
+end;
+
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
   if PageID = NetPage.ID then Result := not WantServer;
+  if PageID = SvcPage.ID then Result := (not WantServer) or (not ServiceRunsAsLocalSystem);   { 0.7.0 item 3 }
   if PageID = HostPage.ID then Result := WantServer or (not WantPlayer);
 end;
 
@@ -554,6 +577,7 @@ begin
   if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
   else if WantServer then Result := Result + 'Network access: ' + IfThenStr(LanOnlyRadio.Checked, 'Home network only (' + ChosenLanAddress + ')', IfThenStr(ChosenLanAddress = '', '127.0.0.1 (this PC only)', ChosenLanAddress)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
   if WantServer and AirPlayOutCheck.Checked then Result := Result + 'Firewall: AirPlay speakers allowed (UDP 319-320 + audio, home network only)' + NewLine + NewLine;   { 0.6.8-#14g }
+  if WantServer and ServiceRunsAsLocalSystem then Result := Result + 'Service account: ' + IfThenStr(LimitedSvcCheck.Checked, 'switch from LocalSystem to Local Service', 'keep LocalSystem') + NewLine + NewLine;   { 0.7.0 item 3 }
   if WantPlayer and (not WantServer) then Result := Result + 'Player will connect to: ' + IfThenStr(Trim(HostEdit.Text) = '', '(ask on first start)', Trim(HostEdit.Text)) + NewLine + NewLine;
   Result := Result + MemoTasksInfo;
 end;
@@ -723,6 +747,7 @@ begin
     else if (ExistingBindSeeded = '') or (CompareText(ChosenLanAddress, ExistingBindSeeded) <> 0) then
       Params := Params + ' -LanIp ' + ChosenLanAddress;
     if AirPlayOutCheck.Checked then Params := Params + ' -AirPlayOut 1';   { 0.6.8-#14g }
+    if ServiceRunsAsLocalSystem and LimitedSvcCheck.Checked then Params := Params + ' -SwitchToLocalService 1';   { 0.7.0 item 3 }
   end
   else if Trim(HostEdit.Text) <> '' then Params := Params + ' -ServerHost ' + Trim(HostEdit.Text);
   if WizardSilent then Params := Params + ' -NoDialog 1';

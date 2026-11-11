@@ -12,7 +12,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = '', [ValidateSet('server', 'player', 'both')][string]$Role = 'both', [string]$LanIp = '', [int]$AllInterfaces = 0, [int]$AirPlayOut = 0, [string]$ServerHost = '',
+    [string]$Root = '', [ValidateSet('server', 'player', 'both')][string]$Role = 'both', [string]$LanIp = '', [int]$AllInterfaces = 0, [int]$AirPlayOut = 0, [int]$SwitchToLocalService = 0, [string]$ServerHost = '',
     [int]$HttpPort = 47800, [int]$HttpsPort = 47443, [int]$AudioPort = 47801, [int]$ClockPort = 47802,
     [int]$NoDialog = 0, [int]$NoStart = 0, [string]$SetupVersion = '', [string]$DoneFile = ''
 )
@@ -70,6 +70,7 @@ try {
         if ($NoStart) { $sp.NoStart = $true }
         if ($AllInterfaces) { $sp.AllInterfaces = $true }
         if ($AirPlayOut) { $sp.AirPlayOut = $true; Say 'AirPlay speakers firewall rules: on (chosen in Setup).' }   # 0.6.8-#14g
+        if ($SwitchToLocalService) { $sp.SwitchToLocalService = $true; Say 'Service account: switch LocalSystem to Local Service (chosen in Setup).' }   # 0.7.0 item 3
         $r = Invoke-SubScript -Script (Join-Path $PSScriptRoot 'install-server.ps1') -Params $sp -TimeoutSec $ServerLimitSec -Label 'server install'
         foreach ($o in $r.Objects) {
             if ($o.Kind -eq 'notice') { $notices.Add([string]$o.Value) }

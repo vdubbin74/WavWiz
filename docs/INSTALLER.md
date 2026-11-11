@@ -118,3 +118,6 @@ After the install the service is started again by the setup step (or directly wh
 ## How the Player starts (0.2.2)
 
 Only the sign-in auto-start (`--autostart` from the installer, `--background` from the Player's own "Start with Windows", or `--tray` / `--minimized`) starts hidden in the tray. A Start menu or desktop launch opens the window. The Player is single-instance per Windows session: a second manual launch brings the running window to the front. `wavwiz-player.exe --exit` asks a running Player to close.
+
+### Service account (0.7.0)
+New installs create `WavWizServer` as `NT AUTHORITY\LocalService`. A re-run or upgrade keeps whatever account the service already has. Only when that account is LocalSystem does Setup show the "Service account" page with an unticked "Switch WavWiz Server to Local Service" checkbox ( `/LIMITEDSERVICE=1` when silent), which passes `-SwitchToLocalService 1` to `install-server.ps1` (`sc config ... obj= "NT AUTHORITY\LocalService" password= ""`). DPAPI-protected secrets saved under LocalSystem (share logins, Subsonic/remote-library passwords, the remote-access PFX password) must be re-entered afterwards; Setup says so. Help > Diagnostics > "Service account folder access" lists folders the service cannot read or write, with an `icacls ... /grant "NT SERVICE\WavWizServer:(OI)(CI)RX"` line.

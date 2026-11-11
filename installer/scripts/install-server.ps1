@@ -7,7 +7,8 @@
 param(
     [string]$Root = '', [string]$DataDir = '', [string]$LanIp = '', [switch]$AllInterfaces,
     [int]$HttpPort = 47800, [int]$HttpsPort = 47443, [int]$AudioPort = 47801, [int]$ClockPort = 47802,
-    [switch]$NoStart, [switch]$NonInteractive, [switch]$AirPlayOut
+    [switch]$NoStart, [switch]$NonInteractive, [switch]$AirPlayOut,
+    [switch]$SwitchToLocalService   # 0.7.0 item 3: opt-in, only acts on an existing LocalSystem service
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib.ps1')
@@ -64,13 +65,20 @@ $bind = [string]$plan.Config['bindAddress']; $hp = [int]$plan.Config['httpPort']
 Set-Step 'server: Windows service'
 $binPath = Get-ServiceBinPath $exe @('--data-dir', $DataDir)
 $exists = Test-ServiceExists $svc
-$svcAcct = Get-InstallServiceAccount $svc $exists
+$svcAcct = Get-InstallServiceAccount $svc $exists ([bool]$SwitchToLocalService)
 Write-InstallLog ("service account {0}: {1}" -f $svcAcct.Action, $svcAcct.Account)
+# 0.7.0 item 3: built-in accounts other than LocalSystem take an empty password (sc.exe: password= "")
+$objArgs = @('obj=', $svcAcct.Account); if ($svcAcct.Action -eq 'switched') { $objArgs += @('password=', '') }
 if ($exists) {
     $st = Get-ServiceState $svc
     if ($st -ne 'STOPPED') { [void](Invoke-Sc 'stop (update)' @('stop', $svc) -AllowFail); if (-not (Wait-ServiceState $svc 'STOPPED' 30)) { throw "The $svc service did not stop within 30 s. Close WavWiz, then run the installer again." } }
-    [void](Invoke-Sc 'update definition' @('config', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $svcAcct.Account, 'DisplayName=', 'WavWiz Server (BETA)'))
-    if ($svcAcct.Action -eq 'preserved') { Say ("Service definition updated in place (account kept: {0})." -f $svcAcct.Account) }
+    [void](Invoke-Sc 'update definition' (@('config', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto') + $objArgs + @('DisplayName=', 'WavWiz Server (BETA)')))
+    if ($svcAcct.Action -eq 'switched') {
+        Say ("Service account changed from {0} to {1} (least privilege)." -f $svcAcct.From, $svcAcct.Account)
+        $msg = 'WavWiz Server now runs as Local Service. Re-enter saved network-share logins and remote-library passwords (Settings), and check Help > Diagnostics > "Service account folder access" for music folders it cannot read.'
+        Say "NOTE: $msg"; [pscustomobject]@{ Kind = 'notice'; Value = $msg }
+    }
+    elseif ($svcAcct.Action -eq 'preserved') { Say ("Service definition updated in place (account kept: {0})." -f $svcAcct.Account) }
     else { Say 'Service definition updated in place.' }
 } else {
     [void](Invoke-Sc 'create' @('create', $svc, 'binPath=', $binPath, 'start=', 'delayed-auto', 'obj=', $svcAcct.Account, 'DisplayName=', 'WavWiz Server (BETA)'))
