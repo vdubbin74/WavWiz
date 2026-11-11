@@ -52,3 +52,23 @@ test('devices.js: --devstdw is only measured on the docked panel and refreshed w
   assert.match(c, /window\.innerWidth <= 900/);
   assert.match(c, /root\.style\.setProperty\('--devstdw', root\._stdw \+ 'px'\)/);
 });
+
+// 0.6.8e: resizing must leave the Library list / Devices cards in place (the Library blanked mid-drag)
+test('a stream of resize events never rebuilds the Library or Devices: same DOM nodes until the drag ends', async () => {
+  const m = src('main.js');
+  assert.match(m, /resizeRaf = requestAnimationFrame\(\(\) => \{ resizeRaf = 0; applyMode\(\); applyPanels\(\); \}\)/, 'one layout pass per frame');
+  assert.match(m, /if \(ls !== 'rail' && !first && !libWasShown\) libC\.reload\(\); libWasShown = ls !== 'rail';/, 'Library redrawn only when it is opened');
+  assert.match(m, /if \(devSz !== devWasSize \|\| devHl != null \|\| first\) \{ devWasSize = devSz; devp\.setSize\(devSz, devHl\); \}/, 'Devices only on a real size change');
+  assert.match(src('library.js'), /rzT = setTimeout\(\(\) => \{ if \(st\.dirty && visible\(\)\) draw\(\); \}, 150\)/, 'a pending redraw waits for the end of the drag');
+  // simulate the applyPanels gate over a resize stream: the panel state never changes, so nothing is rebuilt
+  let libWasShown = false, devWasSize = null, reloads = 0, sizes = 0; const node = { id: 'row-1' }; let list = [node];
+  const pass = (ls, devSz, first = false) => { if (devSz !== devWasSize || first) { devWasSize = devSz; sizes++; } if (ls !== 'rail' && !first && !libWasShown) { reloads++; list = [{ id: 'row-1' }]; } libWasShown = ls !== 'rail'; };
+  pass('normal', 'standard', true); const before = list[0];
+  for (let i = 0; i < 200; i++) pass('normal', 'standard');
+  assert.equal(reloads, 0, 'no pass during the drag redraws the list (startup draws it once on its own)'); assert.equal(sizes, 1);
+  const kept = list[0]; for (let i = 0; i < 200; i++) pass('normal', 'standard'); assert.equal(list[0], kept, 'list rows are the same objects through the drag');
+  assert.equal(list[0], before);
+  pass('rail', 'standard'); pass('normal', 'standard'); assert.equal(reloads, 1, 'opening the Library from its rail does redraw it');
+  // the Expand button icon is not rewritten when it has not changed
+  assert.match(src('devices.js'), /if \(btn\.dataset\.icon !== name \|\| !\/\^<svg\/\.test\(btn\.innerHTML\)\) \{ btn\.dataset\.icon = name; btn\.innerHTML = iconSvg\(name\); \}/, 'Expand icon only rewritten when it changes');
+});

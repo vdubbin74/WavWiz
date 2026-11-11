@@ -12,7 +12,7 @@ test('L52 viewForMode: wide clears the tab page, narrow never stays blank', asyn
   assert.equal(viewForMode({ wide: false, view: '' }).view, 'now');
 });
 test('L52 main.js applies the mode on resize and on the breakpoint change', () => {
-  const m = src('main.js'); assert.match(m, /applyMode = \(\)/); assert.match(m, /addEventListener\('resize', \(\) => \{ applyMode\(\)/); assert.match(m, /matchMedia\('\(max-width:900px\)'\)\.addEventListener\('change'/);
+  const m = src('main.js'); assert.match(m, /applyMode = \(\)/); assert.match(m, /addEventListener\('resize', \(\) => \{ if \(resizeRaf\) return; resizeRaf = requestAnimationFrame\(\(\) => \{ resizeRaf = 0; applyMode\(\)/);   // 0.6.8e: once per frame assert.match(m, /matchMedia\('\(max-width:900px\)'\)\.addEventListener\('change'/);
 });
 test('L55 the mini player under the Queue uses the standard border in every state', () => {
   for (const line of css.split('\n').filter(l => /\.mp\{[^}]*border:1px solid/.test(l))) assert.doesNotMatch(line, /border:1px solid var\(--accent\)/, line.slice(0, 120));

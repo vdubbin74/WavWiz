@@ -298,7 +298,8 @@ async function startMain() {
     // Now and drawer-only pages have no bottom destination: do not remount on resize.
     else if (!content.firstChild) go(m.view, true);
   };
-  window.addEventListener('resize', () => { applyMode(); applyPanels(); });
+  // 0.6.8e: at most one layout pass per frame while the window is dragged (applyPanels only toggles classes; it no longer redraws the Library / Devices)
+  let resizeRaf = 0; window.addEventListener('resize', () => { if (resizeRaf) return; resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; applyMode(); applyPanels(); }); });
   try { matchMedia('(max-width:900px)').addEventListener('change', () => { applyMode(); applyPanels(); }); } catch { /* old engines */ }
   applyMode();
   window.addEventListener('keydown', ev => {
@@ -392,7 +393,7 @@ function toggleDevExpanded(force) { holdPage(); if (force === true && P6.exp ===
 /** 0.3.5 J11 (option A): with the Library expanded the right column shows the playlist; "Devices ›" swaps the Devices panel in, "‹ Playlist" back. */
 function libSwap(v) { holdPage(); if (!desk) return; desk.classList.toggle('libdev', !!v); devp.setSize(v ? 'standard' : (desk.classList.contains('devcollapsed') ? 'collapsed' : 'standard')); listt.relayout?.(); }
 function setDevSize(sz, highlight = null) { devHl = highlight; setPanels(sz === 'expanded' ? expand(P6, 'dev', true) : sz === 'collapsed' ? { ...P6, dev: 'rail', exp: P6.exp === 'dev' ? null : P6.exp } : { ...P6, dev: 'normal', exp: P6.exp === 'dev' ? null : P6.exp }, 'dev'); }
-let P6 = null, lastOpened = null, devHl = null, libWasExp = false, devTab = null, devScrim = null, tightLib = false, roomyDev = false;
+let P6 = null, lastOpened = null, devHl = null, libWasExp = false, libWasShown = false, devWasSize = null, devTab = null, devScrim = null, tightLib = false, roomyDev = false;
 const pageZoom = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1;
 function paintDevTab() { if (!devTab) return; const n = (S.groups || []).length, t = devTabText(n); devTab.firstChild.textContent = t; devTab.setAttribute('aria-label', `${t}. Open Devices`); }
 function devOpen(v) { holdPage();
@@ -431,9 +432,10 @@ function applyPanels(first = false) {
   const b = libpanel.querySelector('.libcol'); setChev(b, chevronDir(e, 'lib')); b.setAttribute('aria-expanded', String(ls !== 'rail')); b.setAttribute('aria-label', chevronLabel(e, 'lib'));
   paintExpandBtn(libpanel.querySelector('.libexp'), 'Library', ls === 'expanded');   // 0.3.1 B4/B6
   if (ls !== 'expanded') desk.classList.remove('libdev');   // 0.3.5 J11
-  devp.setSize(desk.classList.contains('libdev') ? 'standard' : ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard', devHl); devHl = null;
+  const devSz = desk.classList.contains('libdev') ? 'standard' : ds === 'rail' ? 'collapsed' : ds === 'expanded' ? 'expanded' : 'standard';
+  if (devSz !== devWasSize || devHl != null || first) { devWasSize = devSz; devp.setSize(devSz, devHl); } devHl = null;   // 0.6.8e: only when the size really changes - a resize must not rebuild the Devices cards
   if ((ls === 'expanded') !== libWasExp || first) { libWasExp = ls === 'expanded'; libC.setExpanded(libWasExp); }
-  if (ls !== 'rail' && !first) libC.reload();
+  if (ls !== 'rail' && !first && !libWasShown) libC.reload(); libWasShown = ls !== 'rail';   // 0.6.8e: redraw the Library only when it is opened, never on a resize (it blanked the list mid-drag)
   syncMini();
   if (first) setTimeout(() => nowc.viz?.resize?.(), 0);
   // 0.4.7: panels shown / pinned / Roomy-Full / display size changed: anything that fits itself to a panel (the Library tab row) re-measures after layout

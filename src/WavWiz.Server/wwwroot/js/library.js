@@ -606,7 +606,7 @@ export function libraryView(S, opts = {}) {
   window.addEventListener('wavwiz:library', () => { loadRS().finally(() => draw()); });   // F174: servers added / removed / renamed -> tabs follow
   window.addEventListener('wavwiz:libprefs', () => { const e = P.expanded; P = loadLibPrefs(); P.expanded = e; for (const k of Object.keys(session)) delete session[k]; draw(); });   // Settings > Library view
   window.addEventListener('wavwiz:favs', () => { if (st.tab === 'favorites' && !st.stack.length && !st.q && visible()) { clearTimeout(draw._f); draw._f = setTimeout(draw, 300); } });
-  window.addEventListener('resize', () => { if (st.dirty && visible()) draw(); });
+  let rzT = 0; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (st.dirty && visible()) draw(); }, 150); });   // 0.6.8e: a pending redraw waits until the drag ends (150 ms after the last resize), never mid-drag
   loadFavs(); draw(); loadRS().then(ch => { if (ch) draw(); });
   return { el: root, reload: draw, get dirty() { return st.dirty; }, get expanded() { return expanded; },
     setExpanded(on) { expanded = !!on; P.expanded = expanded; if (!expanded && TOOL_TABS.some(t => t[0] === st.tab)) st.tab = 'artists'; save(); draw(); },

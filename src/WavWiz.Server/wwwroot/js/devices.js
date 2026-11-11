@@ -53,7 +53,7 @@ export const expandLabel = (which, on) => (on ? 'Collapse (Esc)' : 'Expand');
 /** 0.3.1 B4: paint the Expand button for every exit path (Esc, button, chevron, [ ] keys, other rail). Always rewrites the icon:
  *  0.3.0's setIcon() skipped the redraw when the button's remembered icon name had not changed although "⤡ Esc" text had replaced it. */
 export function paintExpandBtn(btn, which, expanded) {
-  const name = expandIcon(null, expanded); btn.dataset.icon = name; btn.innerHTML = iconSvg(name);
+  const name = expandIcon(null, expanded); if (btn.dataset.icon !== name || !/^<svg/.test(btn.innerHTML)) { btn.dataset.icon = name; btn.innerHTML = iconSvg(name); }   // 0.6.8e: unchanged icon is left in place (applyPanels runs on resize)
   btn.setAttribute('aria-pressed', String(!!expanded)); btn.setAttribute('aria-label', expandLabel(which, expanded)); btn.title = expandLabel(which, expanded);
 }
 /** Expand button: Expanded <-> Standard (also opens a collapsed panel straight into Expanded). Pure. */
