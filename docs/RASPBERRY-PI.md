@@ -11,9 +11,11 @@ It is the same headless server as the [Docker](DOCKER.md) and [Linux](LINUX.md) 
 
 ## What you need
 
+**Supported boards: Raspberry Pi 4 and Raspberry Pi 5, 64-bit OS only.** Pi 3B+ and Zero 2 W may work but are not supported.
+
 | | Recommended | Minimum (expected; unverified) |
 |---|---|---|
-| Board | Raspberry Pi 5 or Pi 4 Model B | Pi 4 with 2 GB (Pi 3B+/Zero 2 W boot the 64-bit OS but are untested and probably too tight on memory) |
+| Board | Raspberry Pi 5 (best) or Pi 4 Model B | Pi 4 with 2 GB |
 | RAM | 4 GB or more | 2 GB |
 | OS | **Raspberry Pi OS (64-bit)**, Debian 13 "trixie" (the current release; Lite is fine) | Raspberry Pi OS (Legacy, 64-bit), Debian 12 "bookworm" |
 | Storage | SSD/USB drive or a good A2 microSD card; music on USB or a NAS | 8 GB free for the OS + WavWiz + library database |
