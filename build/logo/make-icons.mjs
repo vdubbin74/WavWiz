@@ -1,13 +1,20 @@
 // 0.7.0 item 4: static Parallel Flow icons (favicon, PWA / home-screen, About fallback, Windows .ico for the Player exe + installer).
-// The static swap point: change COLORS / BG here and re-run. Static files cannot follow the live theme, so they use Midnight Neon
-// (the default theme): TOP wave = Wav orange, BOTTOM wave = Wiz teal, the same rule as the in-app emblem (wwwroot/js/logo.js).
+// Static files cannot follow the live theme, so they use the default theme (Midnight Neon) EXACTLY as the app paints its wordmark:
+// TOP wave = the 'Wav' color (--accent-text), BOTTOM wave = the 'Wiz' color (--accent2-text), tile = --bg, all read from theme.js
+// (PRESETS + derive), never hard-coded. 0.7.0 t1694u: "The colors should align with the theme" -> Midnight Neon top = #F9663A, not raw #FF3C00.
+// Change the theme definition (or THEME_ID) and re-run; the in-app emblem (wwwroot/js/logo.js) uses the same two variables live.
 // Dev tool only (not shipped). Needs Playwright's Chromium:  node build/logo/make-icons.mjs [playwright-module-dir]
 import fs from 'node:fs'; import path from 'node:path'; import { createRequire } from 'node:module';
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const { chromium } = createRequire(path.resolve(process.argv[2] || '/workspace/f262-tools') + '/')('playwright');
 const { emblemSvg } = await import(path.join(repo, 'src/WavWiz.Server/wwwroot/js/logo.js'));
-export const COLORS = { top: '#FF3C00', bottom: '#12D6C2' };   // Midnight Neon: Wav orange (top), Wiz teal (bottom)
-export const BG = '#14171A';                                    // Midnight Neon background (home-screen tiles)
+const theme = await import(path.join(repo, 'src/WavWiz.Server/wwwroot/js/theme.js'));
+export const THEME_ID = theme.DEFAULT_THEME_ID;                 // 'default' = Midnight Neon
+const vars = theme.derive({ ...theme.PRESETS[THEME_ID], preset: THEME_ID });
+/** The wordmark's own colors: .wm-wav = --accent-text, .wm-wiz = --accent2-text (app.css). */
+export const COLORS = { top: vars['--accent-text'], bottom: vars['--accent2-text'] };
+export const BG = vars['--bg'];                                 // home-screen tiles
+console.log(`icons: theme ${THEME_ID} top(Wav) ${COLORS.top} bottom(Wiz) ${COLORS.bottom} tile ${BG}`);
 const web = path.join(repo, 'src/WavWiz.Server/wwwroot'), assets = path.join(web, 'assets'), logoDir = path.join(repo, 'assets/logo');
 const svg = emblemSvg({ cls: 'e', colors: COLORS });
 
@@ -31,6 +38,7 @@ for (const n of [152, 167, 180]) out[`logo-${n}.png`] = await png(n, { tile: tru
 for (const n of [192, 512]) out[`logo-${n}.png`] = await png(n, { tile: true, radius: Math.round(n * 0.18) });   // PWA "any"
 for (const n of [192, 512]) out[`logo-maskable-${n}.png`] = await png(n, { tile: true, scale: 0.8 });   // maskable: inside the 80 % safe zone
 for (const [f, buf] of Object.entries(out)) fs.writeFileSync(path.join(assets, f), buf);
+for (const f of ['apple-touch-icon.png', 'apple-touch-icon-precomposed.png']) fs.writeFileSync(path.join(web, f), out['logo-180.png']);   // iOS asks for these at the site root
 fs.writeFileSync(path.join(web, 'favicon.ico'), ico([[16, out['logo-16.png']], [32, out['logo-32.png']], [48, out['logo-48.png']]]));
 const win = []; for (const n of [16, 24, 32, 48, 64, 128, 256]) win.push([n, n <= 64 ? await png(n) : await png(n, { tile: true, radius: Math.round(n * 0.18) })]);
 fs.writeFileSync(path.join(logoDir, 'wavwiz.ico'), ico(win));

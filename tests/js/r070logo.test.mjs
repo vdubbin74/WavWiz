@@ -36,9 +36,18 @@ test('0.7.0 logo: header and About use the inline emblem; the wordmark keeps the
   assert.match(css(), /\.logo \.brand-emblem\{height:30px/);
 });
 
-test('0.7.0 logo: the static icon generator is the one place for icon colors', () => {
+test('0.7.0 logo: static icons use the app\'s exact Midnight Neon wordmark colors, read from the theme (t1694u), not hard-coded', async () => {
   const g = readFileSync(new URL('../../build/logo/make-icons.mjs', import.meta.url), 'utf8');
-  assert.match(g, /export const COLORS = \{ top: '#FF3C00', bottom: '#12D6C2' \}/);
+  assert.match(g, /export const COLORS = \{ top: vars\['--accent-text'\], bottom: vars\['--accent2-text'\] \}/);
+  assert.match(g, /theme\.derive\(\{ \.\.\.theme\.PRESETS\[THEME_ID\], preset: THEME_ID \}\)/);
+  assert.match(g, /export const BG = vars\['--bg'\]/);
+  assert.doesNotMatch(g.replace(/^\/\/.*$/gm, ''), /#[0-9A-Fa-f]{6}\b/, 'no hex literal in the generator code');
   assert.match(g, /emblemSvg\(\{ cls: 'e', colors: COLORS \}\)/);
-  assert.match(g, /'wavwiz\.ico'/); assert.match(g, /favicon\.ico/); assert.match(g, /logo-maskable-/);
+  assert.match(g, /'wavwiz\.ico'/); assert.match(g, /favicon\.ico/); assert.match(g, /logo-maskable-/); assert.match(g, /apple-touch-icon\.png/);
+  // the generated master matches what the app paints for Wav / Wiz in Midnight Neon (#F9663A over #12D6C2 today)
+  const T = await import(`${js}/theme.js`), v = T.derive({ ...T.PRESETS.default, preset: 'default' });
+  const svg = readFileSync(new URL('../../assets/logo/wavwiz-parallel-flow.svg', import.meta.url), 'utf8');
+  const fills = [...svg.matchAll(/fill:(#[0-9A-Fa-f]{6})/g)].map(m => m[1].toUpperCase());
+  assert.deepEqual(fills, [v['--accent-text'].toUpperCase(), v['--accent2-text'].toUpperCase()]);
+  assert.equal(fills[0], '#F9663A');
 });
