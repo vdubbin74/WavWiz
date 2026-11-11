@@ -1,10 +1,12 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 
-export const WHATS_NEW_VERSION = '0.6.8';
+export const WHATS_NEW_VERSION = '0.7.0';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.7.0
+  ['Google Cast speakers', 'Nest speakers, Chromecast Audio and Cast TVs or soundbars on your network show up in a Cast speakers card under AirPlay speakers. Test with a chime, add one to a zone, then use it like any speaker. Sync with other speakers is close but approximate — fine-tune it with the speaker\'s delay.'],
   // 0.6.8
   ['CD ripper', 'Insert a disc and the artist, album, year and track names fill in from MusicBrainz (or from the disc itself). Pick a format — FLAC, AAC, WAV or MP3 — watch live progress, and Cancel if it stalls. Your own AirPlay outputs are hidden from the Find list.'],
   ['MP3 rips', 'LAME is bundled with WavWiz (LGPL). Choose VBR V0 (default), VBR V2 or CBR 320 kbps; tags and cover art are written into the files.'],
