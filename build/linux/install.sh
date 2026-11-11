@@ -34,7 +34,9 @@ if [ "$APT" = 1 ] && command -v apt-get >/dev/null; then
   apt-get update -qq
   icu="$(apt-cache pkgnames libicu 2>/dev/null | grep -E '^libicu[0-9]+$' | sort -V | tail -1 || true)"
   ssl="$(apt-cache pkgnames libssl3 2>/dev/null | grep -qx libssl3t64 && echo libssl3t64 || echo libssl3)"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg ca-certificates tzdata libgssapi-krb5-2 libstdc++6 libgcc-s1 "$ssl" ${icu:+"$icu"}
+  # 0.7.0: ALSA for local audio output (Debian 13 / Ubuntu 24.04: libasound2t64; Debian 12 / Pi OS bookworm: libasound2)
+  asound="$(apt-cache pkgnames libasound2 2>/dev/null | grep -qx libasound2t64 && echo libasound2t64 || echo libasound2)"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg ca-certificates tzdata libgssapi-krb5-2 libstdc++6 libgcc-s1 "$ssl" "$asound" ${icu:+"$icu"}
 else
   command -v ffmpeg >/dev/null || echo "WARNING: ffmpeg is not installed; WavWiz can't play most files until you install it (sudo apt install ffmpeg)." >&2
   ldconfig -p 2>/dev/null | grep -q libicuuc || echo "WARNING: no ICU library (libicu); the server will not start until you install it (Debian 13: libicu76, Debian 12: libicu72)." >&2
@@ -42,6 +44,8 @@ fi
 
 # 3. user + data folder
 id wavwiz >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin wavwiz
+# 0.7.0: local audio output - the service user may open /dev/snd/* (also SupplementaryGroups=audio in the unit)
+getent group audio >/dev/null && usermod -aG audio wavwiz
 install -d -m 0750 -o wavwiz -g wavwiz "$DATA"
 
 # 4. program files (keep one previous copy for a quick roll-back)

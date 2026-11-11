@@ -1,7 +1,8 @@
 # WavWiz server in Docker (0.6.8; 0.7.0 adds arm64 / Raspberry Pi, F166/F167)
 
 Headless WavWiz **server** (not the Windows Player) for a home server, NAS, or mini PC on **64-bit Intel/AMD (`linux/amd64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
-The container has **no local speakers**: audio plays on WavWiz Players (Windows PCs), phones/browsers, and AirPlay 1 speakers.
+Audio plays on WavWiz Players (Windows PCs), phones/browsers, Cast and AirPlay 1 speakers, and (0.7.0) the host's own sound card when you
+pass `/dev/snd` through, see [Local speakers](#local-speakers-070).
 
 **Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.8`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
 
@@ -11,8 +12,8 @@ The container has **no local speakers**: audio plays on WavWiz Players (Windows 
 
 Docker is a **server only** build. It does not do everything the full Windows app does:
 
-- **Headless:** no local speakers or microphone on the Docker host (use a WavWiz Player PC's mic or a phone for calibration).
-- **No CD ripping**, **no Windows share logins**, **no Linux Player**.
+- **Headless:** no microphone on the Docker host (use a WavWiz Player PC's mic or a phone for calibration). Local speakers need `/dev/snd` (0.7.0).
+- **No CD ripping**, **no Windows share logins**.
 - **No AirPlay 2 / Sonos / HomePod output.**
 - **Windows Docker Desktop:** no real `network_mode: host`, so discovery (mDNS, AirPlay, Players finding the server) is weaker. Use published ports, see [Windows Docker Desktop (step-by-step)](#windows-docker-desktop-step-by-step).
 - **Want PC speakers or richer output?** Pair a Windows Player (or run the full Windows app).
@@ -116,6 +117,22 @@ Restarting the container reopens the 15-minute window. The file is deleted once 
 Settings, library DB (`wavwiz.db`), backups, HTTPS CA, logs, `claim.txt`, and `secret.key`.
 `secret.key` (0600) encrypts saved passwords (remote Subsonic/Navidrome logins) with AES-256-GCM. This is weaker than Windows DPAPI: anyone who can read `/data` can decrypt them. Protect the volume.
 
+## Local speakers (0.7.0)
+
+The 0.7.0 image can play through the host's own headphone jack, HDMI or USB DAC (ALSA). Pass the sound devices and the host's `audio` group:
+
+```yaml
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - "29"          # getent group audio | cut -d: -f3  (29 on Debian, Ubuntu, Raspberry Pi OS)
+```
+
+`docker run ... --device /dev/snd --group-add 29 ...` does the same. The host then appears in Devices as a speaker named after the
+container's hostname (set `hostname:` in compose for a nicer name), with ANALOG / HDMI / USB outputs. Without `/dev/snd` nothing changes
+(Diagnostics > "This machine's speakers (ALSA)" says why). `WAVWIZ_LOCAL_AUDIO=off` turns it off. Docker Desktop on Windows/macOS has no `/dev/snd`.
+Not yet verified on real hardware.
+
 ## Host vs bridge networking
 
 **Host** (recommended): players find the server automatically.
@@ -170,7 +187,7 @@ Auto-update is off. `docker compose pull && docker compose up -d`. (Watchtower w
 
 ## Not on Linux
 
-Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's own speakers and microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins, Linux Player. These are hidden or labelled in the UI.
+Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins; local speakers need `/dev/snd` (0.7.0). These are hidden or labelled in the UI.
 
 ## Building the image (local / experimental)
 

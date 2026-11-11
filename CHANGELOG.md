@@ -16,12 +16,14 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 - Google Cast speakers: Nest speakers, Chromecast Audio and Cast TVs or soundbars on your network appear in a new Cast speakers card directly below AirPlay speakers in Devices. Find, play a test chime, and add one to a zone; it then works like any speaker (volume, mute, on/off, delay, Forget, move between zones), is remembered, and reconnects after a restart or a drop. The device plays a live stream from the WavWiz server over your home network; sync with other speakers is close but approximate, fine-tuned with the speaker's delay. Not yet verified on real Cast hardware.
 - Raspberry Pi (64-bit ARM): the server builds for `linux/arm64` — a multi-arch Docker image (amd64 + arm64) and a self-contained `linux-arm64` tarball with an `install.sh` that sets up ffmpeg, a `wavwiz` user and the systemd service. For Raspberry Pi 4 and 5 on 64-bit Raspberry Pi OS (trixie; bookworm legacy). Cast and AirPlay speaker output are included (the same code as on x86-64). Smoke-tested under QEMU emulation only; not yet verified on real Pi hardware and not published. See docs/RASPBERRY-PI.md.
 
+- Linux and Raspberry Pi local audio output: the server plays through the machine's own headphone jack, HDMI or USB DAC (ALSA). The machine appears in Devices as a speaker with ANALOG / HDMI / USB outputs, a USB DAC plugged in later appears within seconds, and volume, mute, per-output delay, EQ, calibration and sync work like any speaker. On by default when the machine has a sound card (`WAVWIZ_LOCAL_AUDIO=off` turns it off). Docker needs `--device /dev/snd --group-add <audio gid>`; `install.sh` installs libasound and adds the `wavwiz` user to the audio group, and the systemd unit sets `SupplementaryGroups=audio`. Tested with ALSA's null and file devices on x86-64 and under QEMU arm64; not yet verified on a real Pi jack, HDMI or USB DAC.
+
 ### Changed
 - Linux systemd unit: sets headless mode explicitly and documents the optional capability for experimental AirPlay 2 (UDP 319/320). The Linux publish script adds `install.sh` and a `.sha256` next to each tarball.
 - Dockerfile: optional `APT_HTTPS=1` build argument for build machines whose proxy blocks plain-http package mirrors (default unchanged).
 
 ### Not on Linux / Raspberry Pi
-- No local speaker output on the Pi itself (no Linux Player / ALSA output yet), no CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.
+- No CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.
 
 ## [0.6.8] - 2026-11-10 (beta)
 

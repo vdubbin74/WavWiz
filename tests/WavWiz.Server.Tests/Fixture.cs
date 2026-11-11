@@ -15,7 +15,7 @@ public sealed class ServerFixture : IAsyncDisposable
     public static async Task<ServerFixture> StartAsync(Action<ServerConfig>? tweak = null)
     {
         var f = new ServerFixture();
-        f.Cfg = new ServerConfig { DataDir = f.Dir.Path, BindAddress = "127.0.0.1", HttpPort = 0, HttpsPort = 0, AudioPort = 0, ClockPort = 0, FfmpegPath = TestMedia.Ffmpeg, LeadMs = 300, WebRoot = Path.Combine(f.Dir.Path, "web") };
+        f.Cfg = new ServerConfig { DataDir = f.Dir.Path, BindAddress = "127.0.0.1", HttpPort = 0, HttpsPort = 0, AudioPort = 0, ClockPort = 0, FfmpegPath = TestMedia.Ffmpeg, LeadMs = 300, WebRoot = Path.Combine(f.Dir.Path, "web"), LocalAudio = "off" /* 0.7.0: a Linux test host with a sound card must not grow an extra zone; LocalAudio070Tests turns it on */ };
         Directory.CreateDirectory(f.Cfg.WebRoot); File.WriteAllText(Path.Combine(f.Cfg.WebRoot, "index.html"), "<html>ok</html>");
         f.Cfg.OnlineArt = false;      // 0.2.1: tests never reach MusicBrainz / Cover Art Archive
         f.Cfg.Discovery = false;      // tests that need discovery switch it on with a free port

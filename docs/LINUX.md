@@ -1,6 +1,7 @@
 # WavWiz server on Linux without Docker (0.6.8, F166)
 
-Headless **server only** (no Linux Player; pair a Windows Player, phone/browser, or AirPlay 1 for speakers).
+Headless server. 0.7.0: the machine's own sound card (ALSA: analog, HDMI, USB DAC) is a WavWiz speaker; also pair a Windows Player,
+phone/browser, Cast or AirPlay speakers.
 
 **Supported today:** **64-bit Intel/AMD** (`linux-x64` / `amd64`) on a Linux host such as a NAS or mini PC. That matches the published Docker Hub image (`linux/amd64` only).
 
@@ -20,8 +21,9 @@ Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz` (+ `.sha256`). The tarb
 Easiest (x64 or arm64): `tar -xzf wavwiz-server-<version>-<rid>.tar.gz && sudo ./wavwiz-server/install.sh` (installs ffmpeg and the .NET runtime libraries such as ICU and OpenSSL, the `wavwiz` user, `/opt/wavwiz-server` and the service; `--uninstall` removes it and keeps `/var/lib/wavwiz`). By hand, for the `linux-x64` build:
 
 ```sh
-sudo apt install ffmpeg ca-certificates tzdata libgssapi-krb5-2 libicu76 libssl3t64   # Debian 12/Ubuntu 22.04: libicu72 libssl3 (Ubuntu 24.04: libicu74 libssl3t64)
+sudo apt install ffmpeg ca-certificates tzdata libgssapi-krb5-2 libicu76 libssl3t64 libasound2t64   # Debian 12/Ubuntu 22.04: libicu72 libssl3 libasound2 (Ubuntu 24.04: libicu74 libssl3t64 libasound2t64)
 sudo useradd --system --home /var/lib/wavwiz --shell /usr/sbin/nologin wavwiz
+sudo usermod -aG audio wavwiz      # 0.7.0 local audio output (the unit also sets SupplementaryGroups=audio)
 sudo tar -C /opt -xzf wavwiz-server-<version>-linux-x64.tar.gz
 sudo install -d -o wavwiz -g wavwiz /var/lib/wavwiz
 sudo cp /opt/wavwiz-server/wavwiz-server.service /etc/systemd/system/
@@ -38,6 +40,15 @@ Same as Docker, see [DOCKER.md](DOCKER.md): 15-minute LAN claim window or the co
 
 Saved passwords (remote libraries) use AES with `<data>/secret.key` (0600), weaker than Windows DPAPI.
 
+## Local audio output (0.7.0)
+
+With a sound card the server adds itself as a speaker named after the machine, with one Output per ALSA playback device
+(`plughw:CARD=<id>,DEV=<n>`, tagged ANALOG / HDMI / USB / TOSLINK) plus "System default output". Volume, mute, delay, EQ and sync are the
+normal speaker controls. `WAVWIZ_LOCAL_AUDIO=auto|on|off` (or `"localAudio"` in `server.json`), `WAVWIZ_ALSA_DEVICES="softvol;dmixed"` (or
+`"alsaDevices": [...]`) for PCMs from `/etc/asound.conf`. On a desktop with PipeWire/PulseAudio the user session may hold the card:
+choose "System default output" or run headless. Help > Diagnostics > "This machine's speakers (ALSA)" shows what was found. Not yet verified on real
+hardware (tested with ALSA's null and file devices).
+
 ## Limitations
 
-No local Player audio, CD ripping hidden, AirPlay 2 / Sonos output Windows-only, no server PC mic (use a Player PC or phone), no Windows share logins.
+CD ripping hidden, AirPlay 2 / Sonos output Windows-only, no server PC mic (use a Player PC or phone), no Windows share logins.

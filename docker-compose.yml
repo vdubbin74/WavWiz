@@ -14,3 +14,9 @@ services:
     volumes:
       - ./wavwiz-data:/data            # settings, library DB, backups, HTTPS CA, claim.txt (must be writable by uid 10001)
       - /path/to/your/music:/music:ro  # your music; add /music under Settings > Library. SMB/NFS: mount on the host first.
+    # 0.7.0 image and later: play through this machine's own headphone jack / HDMI / USB DAC (a Raspberry Pi as a speaker).
+    # Uncomment both blocks on a host with a sound card (compose refuses to start if /dev/snd does not exist). docs/DOCKER.md "Local speakers".
+    # devices:
+    #   - /dev/snd:/dev/snd
+    # group_add:
+    #   - "29"                         # the HOST's audio group id: getent group audio | cut -d: -f3 (29 on Debian, Ubuntu and Raspberry Pi OS)

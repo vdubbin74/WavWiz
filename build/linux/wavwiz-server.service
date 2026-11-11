@@ -13,12 +13,16 @@ Wants=network-online.target
 Type=simple
 User=wavwiz
 Group=wavwiz
+# 0.7.0: local audio output (headphone jack, HDMI, USB DAC) through ALSA: /dev/snd/* belong to the audio group.
+SupplementaryGroups=audio
 Environment=WAVWIZ_DATA=/var/lib/wavwiz
 # Listen on the home network. Set a specific LAN address instead of 0.0.0.0 if you prefer.
 Environment=WAVWIZ_BIND=0.0.0.0
 Environment=WAVWIZ_ALLOW_ALL_INTERFACES=1
 Environment=WAVWIZ_HEADLESS=1
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+# 0.7.0: auto = play through this machine's sound cards when it has any; off = server only.
+#Environment=WAVWIZ_LOCAL_AUDIO=off
 # Alarms and schedules use the system time zone (sudo timedatectl set-timezone America/Chicago).
 ExecStart=/opt/wavwiz-server/wavwiz-server
 Restart=on-failure

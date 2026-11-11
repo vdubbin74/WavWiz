@@ -167,6 +167,7 @@ public sealed class WavWizServer : IAsyncDisposable
             var h = db.Setting("library.rescanHours"); if (h != null && double.TryParse(h, System.Globalization.CultureInfo.InvariantCulture, out var hrs) && hrs > 0 && !s.Scanning) SystemApi.StartScan(s);
         }, null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
         u._log.Write($"listening on {u.HttpUrl} and {u.HttpsUrl}; audio {audio.Port}; clock {clockHost.Port}");
+        try { s.LocalAudio = LocalAudioHost.TryStart(s, u._log.Write); } catch (Exception ex) { u._log.Write("local audio: could not start: " + ex.Message); }   // 0.7.0 Linux/Pi ALSA output
         return u;
     }
 
@@ -200,6 +201,7 @@ public sealed class WavWizServer : IAsyncDisposable
     {
         _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel();
         try { S.CdRip?.Shutdown(); } catch (Exception ex) { try { _log.Write("rip shutdown: " + ex.Message); } catch { } }
+        if (S.LocalAudio != null) { try { await S.LocalAudio.DisposeAsync(); } catch { } }
         S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync(); S.CastBrowse?.Dispose(); if (S.CastOut != null) await S.CastOut.DisposeAsync();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
         await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();

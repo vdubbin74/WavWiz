@@ -111,7 +111,14 @@ public static class DiagnosticsApi
                 bool musicOk; try { musicOk = Directory.EnumerateFileSystemEntries("/music").Take(1).Any() || true; } catch { musicOk = false; }
                 checks.Add(new("music-mount", "Music folder (/music)", musicOk ? "ok" : "fail", musicOk ? "/music is readable. Add it under Settings > Library if it is not listed yet." : "/music exists but cannot be read.", musicOk ? null : "Check the bind mount and its permissions (read access for uid 10001)."));
             }
-            checks.Add(new("platform", "Linux server", "ok", "Headless Linux server. CD ripping, AirPlay 2 / Sonos output and this PC's speakers/mic are Windows-only; use a WavWiz Player or phone for local audio.", null));
+            checks.Add(new("platform", "Linux server", "ok", "Headless Linux server. CD ripping, the AirPlay receiver and Spotify Connect are Windows-only.", null));
+            // 0.7.0: this machine's own speakers (ALSA)
+            var la = s.LocalAudio; var laOuts = la?.Outputs.List() ?? Array.Empty<WavWiz.Core.Protocol.OutputInfo>();
+            bool laOff = la == null && (Host.LocalAudioHost.LastDecision ?? "").Contains("switched off");
+            checks.Add(new("local-audio", "This machine's speakers (ALSA)", laOff ? "ok" : la == null ? "warn" : laOuts.Count == 0 ? "warn" : la.Client.State.Connected ? "ok" : "warn",
+                la == null ? (Host.LocalAudioHost.LastDecision ?? "Local audio output is not running.")
+                           : laOuts.Count == 0 ? "No ALSA playback devices were found." : $"{(la.Client.State.Connected ? "Connected" : "Connecting")}; outputs: {string.Join(", ", laOuts.Select(o => $"{o.Name} ({o.Kind})"))}.",
+                laOff ? null : la == null ? "Docker: run with --device /dev/snd and --group-add audio (or the host's audio group id). Linux service: the wavwiz user must be in the 'audio' group (install.sh does this)." : laOuts.Count == 0 ? "Check `aplay -l` on this machine and that the wavwiz user is in the 'audio' group." : null));
         }
         checks.Add(new("ffmpeg", "Audio decoder (ffmpeg)", ff ? "ok" : "fail", ff ? s.FfmpegPath : "ffmpeg was not found.", ff ? null : OperatingSystem.IsWindows() ? "Re-run the WavWiz installer (it includes ffmpeg), or set ffmpegPath in server.json." : "Install ffmpeg (apt install ffmpeg), or set WAVWIZ_FFMPEG / ffmpegPath in server.json."));
 

@@ -46,6 +46,14 @@ public sealed class ServerConfig
     /// <summary>F166: no "this PC" browser (Linux/Docker). First-run uses the claim code / 15-min LAN window. WAVWIZ_HEADLESS=0/1 overrides; default = not Windows.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool Headless => Environment.GetEnvironmentVariable("WAVWIZ_HEADLESS")?.Trim() switch { "1" or "true" => true, "0" or "false" => false, _ => !OperatingSystem.IsWindows() };
 
+    /// <summary>0.7.0 Linux/Pi local audio output (ALSA: headphone jack, HDMI, USB DAC). "auto" (default) = on when the server is not on Windows,
+    /// libasound.so.2 loads and /dev/snd exists (Docker: --device /dev/snd); "on" / "off" force it. WAVWIZ_LOCAL_AUDIO overrides. Windows uses the WavWiz Player app.</summary>
+    public string LocalAudio { get; set; } = "auto";
+    /// <summary>0.7.0: extra ALSA PCM names offered as outputs (from ~/.asoundrc or /etc/asound.conf, e.g. a softvol or loopback PCM). WAVWIZ_ALSA_DEVICES (comma separated) overrides.</summary>
+    public string[]? AlsaDevices { get; set; }
+    /// <summary>Tests only: read the sound-card list from this folder instead of /proc/asound.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string? TestProcAsound { get; set; }
+
     public static string DefaultDataDir() =>
         OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WavWiz")
                                      : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WavWiz-server");
@@ -94,6 +102,8 @@ public sealed class ServerConfig
         if (dir != null) cfg.DataDir = dir;
         if (Environment.GetEnvironmentVariable("WAVWIZ_BIND") is { Length: > 0 } b) cfg.BindAddress = b;
         if (Environment.GetEnvironmentVariable("WAVWIZ_FFMPEG") is { Length: > 0 } f) cfg.FfmpegPath = f;
+        if (Environment.GetEnvironmentVariable("WAVWIZ_LOCAL_AUDIO") is { Length: > 0 } la) cfg.LocalAudio = la.Trim();     // 0.7.0 auto|on|off
+        if (Environment.GetEnvironmentVariable("WAVWIZ_ALSA_DEVICES") is { Length: > 0 } ad) cfg.AlsaDevices = ad.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         // F166: Linux/Docker overrides (side-by-side tests, bridge mode). Unset = server.json / defaults, so Windows is unchanged.
         static int? Int(string n) => int.TryParse(Environment.GetEnvironmentVariable(n), out var v) && v is >= 0 and <= 65535 ? v : null;
         static bool? Flag(string n) => Environment.GetEnvironmentVariable(n)?.Trim().ToLowerInvariant() switch { "1" or "true" or "yes" => true, "0" or "false" or "no" => false, _ => null };

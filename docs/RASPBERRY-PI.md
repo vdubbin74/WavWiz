@@ -6,7 +6,8 @@
 > to Docker Hub or GitHub Releases yet. Please treat this page as the plan for 0.7.0 and report what you find.
 
 A Raspberry Pi makes a quiet, low-power, always-on **WavWiz server**: the web UI, library, zones, scenes, schedules, alarms, Jukebox and
-Remote, with playback to **Google Cast** speakers (new in 0.7.0), **AirPlay** speakers, Windows WavWiz Players, and phones or browsers.
+Remote, with playback to the Pi's **own headphone jack, HDMI or USB DAC** (new in 0.7.0), **Google Cast** speakers (new in 0.7.0),
+**AirPlay** speakers, Windows WavWiz Players, and phones or browsers.
 It is the same headless server as the [Docker](DOCKER.md) and [Linux](LINUX.md) builds, compiled for 64-bit ARM (`linux/arm64`).
 
 ## What you need
@@ -48,6 +49,10 @@ services:
     volumes:
       - ./wavwiz-data:/data
       - /mnt/music:/music:ro    # your music (USB drive or NAS mounted on the Pi)
+    devices:                    # 0.7.0: the Pi's jack / HDMI / USB DAC as a speaker (remove both blocks for server-only)
+      - /dev/snd:/dev/snd
+    group_add:
+      - "29"                    # the Pi's audio group id (getent group audio | cut -d: -f3)
 ```
 
 ```sh
@@ -97,8 +102,30 @@ Music on a NAS: mount the share on the Pi first (`/etc/fstab` with `cifs` or `nf
   service uncomment the two `CAP_NET_BIND_SERVICE` lines in `/etc/systemd/system/wavwiz-server.service`; in Docker with host networking
   run `sudo sysctl -w net.ipv4.ip_unprivileged_port_start=319` (or keep AirPlay 2 off).
 - **Windows WavWiz Players**, **phones and browsers** (including a browser on another Pi with a speaker).
-- **Not on a Pi:** the Pi's own headphone jack/HDMI/USB DAC as a WavWiz speaker. The Linux server has no local audio output yet; see
-  "Not available on Linux" below.
+- **The Pi itself** (0.7.0): its headphone jack, HDMI or a USB DAC, see below.
+
+## Local speakers: the Pi's own headphone jack, HDMI or USB DAC (0.7.0)
+
+The server plays through the machine's own sound outputs (ALSA). With a sound card present it appears in **Devices** as one more speaker
+named after the machine (for example `raspberrypi`), tagged **ANALOG** (headphone jack), **HDMI** or **USB** (a USB DAC). It is an ordinary
+speaker: put it in a zone, set its volume, mute, per-output delay, EQ and calibration, and it stays in sync with your other speakers.
+Pick the output (jack / HDMI 1 / HDMI 2 / USB DAC / "System default output") in the speaker's **Output** list; a USB DAC plugged in later
+shows up within a few seconds.
+
+- **Docker:** add `devices: ["/dev/snd:/dev/snd"]` and `group_add: ["29"]` (the host's `audio` group id: `getent group audio | cut -d: -f3`)
+  to the compose service, or `--device /dev/snd --group-add 29` with `docker run`. Without them the container is server-only, as before.
+- **systemd (install.sh):** installs `libasound2t64` (trixie) or `libasound2` (bookworm), adds the `wavwiz` user to the `audio` group, and
+  the unit sets `SupplementaryGroups=audio`. Nothing else to do.
+- **Turn it off:** `WAVWIZ_LOCAL_AUDIO=off` (systemd: uncomment the line in the unit; Docker: an `environment:` entry), or `"localAudio": "off"`
+  in `server.json`. `on` forces it on; `auto` (default) = on when the machine has a sound card.
+- **Custom ALSA devices:** `"alsaDevices": ["softvol"]` in `server.json` (or `WAVWIZ_ALSA_DEVICES`, separated by `;`) adds PCM names from your
+  `/etc/asound.conf` to the Output list.
+- **Desktop Pi OS (PipeWire):** a logged-in desktop session may hold the card. A headless Pi (Lite) has no such conflict. If the jack/HDMI
+  output reports "busy", choose "System default output" or run Pi OS Lite.
+- **Pi 4/5 HDMI audio** needs a display or HDMI receiver connected at boot; the Pi 5 has no headphone jack (use HDMI or a USB DAC).
+- Help > Diagnostics > **This machine's speakers (ALSA)** shows what was found, or why it is off.
+
+> Built and tested with ALSA's null and file devices on x86-64 and under QEMU arm64; **not yet verified on a real Pi jack, HDMI or USB DAC**.
 
 ## mDNS and Avahi
 
@@ -111,7 +138,6 @@ Avahi-style socket held by a different user; not yet tested with a real `avahi-d
 
 | Feature | Why | Instead |
 |---|---|---|
-| Local speaker output (Pi jack/HDMI/USB DAC) | The Windows Player uses WASAPI; there is no Linux Player or ALSA output yet | Cast, AirPlay, a Windows Player, or a browser as a speaker. An ALSA output is an open question for after 0.7.0 |
 | CD ripper | Needs the Windows `wavwiz-cdda.exe` helper and Windows drive access; the Linux server shows an empty drive list | Rip on a Windows WavWiz PC |
 | AirPlay **receiver** ("WavWiz – Everywhere") and Spotify Connect | The bundled receiver helpers are Windows builds only | Play from the WavWiz web app; AirPlay *output* to speakers works |
 | Saved Windows-share logins | Windows-only API | Mount the share in Linux |
@@ -123,4 +149,6 @@ Avahi-style socket held by a different user; not yet tested with a real `avahi-d
 - Speakers not found: check `network_mode: host` (Docker), that the Pi and the speakers are on the same network/VLAN, and that no firewall
   blocks UDP 5353. Diagnostics (Help > Diagnostics) shows the network checks.
 - Cast speaker added but silent: the speaker must reach `http://<pi-ip>:47800/` (firewall); and see the Cast notes in the Devices card.
+- Local speaker missing from Devices: Help > Diagnostics > "This machine's speakers (ALSA)" says why (no `/dev/snd` in the container, no libasound,
+  `WAVWIZ_LOCAL_AUDIO=off`). Silent jack: `aplay -l` on the Pi should list the card; check `raspi-config` > Audio and the speaker's Output.
 - Slow first start: .NET compiles on first run; a Pi 4 should be ready in well under a minute (to be measured on hardware).
