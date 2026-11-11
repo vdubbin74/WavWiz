@@ -1,11 +1,11 @@
-# WavWiz server in Docker (0.6.8, F166/F167)
+# WavWiz server in Docker (0.6.8; 0.7.0 adds arm64 / Raspberry Pi, F166/F167)
 
 Headless WavWiz **server** (not the Windows Player) for a home server, NAS, or mini PC on **64-bit Intel/AMD (`linux/amd64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 The container has **no local speakers**: audio plays on WavWiz Players (Windows PCs), phones/browsers, and AirPlay 1 speakers.
 
 **Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.8`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
 
-**ARM64 / Raspberry Pi:** planned for **0.7.0**, subject to hardware verification. Not available on Docker Hub yet.
+**ARM64 / Raspberry Pi (0.7.0, in development):** the same Dockerfile builds a `linux/arm64` image for Raspberry Pi 4/5 on 64-bit Raspberry Pi OS. It has been built and smoke-tested under QEMU emulation only, is **not verified on real Pi hardware**, and is **not on Docker Hub yet**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
 
 ## Limits vs the Windows app
 
@@ -174,10 +174,14 @@ Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, 
 
 ## Building the image (local / experimental)
 
-The Dockerfile can cross-build `linux/amd64` and `linux/arm64`, but **Hub does not publish an arm64 tag today**, and arm64/Pi is **not** a supported or hardware-verified configuration yet (planned for 0.7.0). Use these only for local experiments:
+The Dockerfile cross-builds `linux/amd64` and `linux/arm64` (the .NET build runs on the build machine's own CPU; only the runtime layer's `apt-get` runs under QEMU for arm64). The runtime base is `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04 "noble"; Microsoft publishes amd64, arm64 and arm/v7 manifests, WavWiz uses amd64 + arm64). **Hub does not publish an arm64 tag yet**, and arm64/Pi is **not hardware-verified** (0.7.0 in development, see [RASPBERRY-PI.md](RASPBERRY-PI.md)):
 
 ```sh
-docker build -t docker.io/vdubbin74/wavwiz-server:0.6.8 .
-# Experimental multi-arch local build only (needs QEMU/binfmt for arm64). Not published on Hub; not a supported configuration yet.
-docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.8 .
+docker build -t wavwiz-server:dev .
+# 0.7.0 multi-arch build into the local image store (no push). On an x86-64 machine register QEMU for arm64 once:
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+docker buildx build --platform linux/amd64,linux/arm64 -t wavwiz-server:0.7.0-dev --load .
+# needs Docker's containerd image store for a multi-platform --load; add --network host if the build can't reach the internet,
+# and --build-arg APT_HTTPS=1 if your proxy blocks plain-http apt mirrors.
+docker run --rm --platform linux/arm64 --network host wavwiz-server:0.7.0-dev    # try the arm64 image under QEMU (slow)
 ```

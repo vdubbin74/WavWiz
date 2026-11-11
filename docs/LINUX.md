@@ -4,20 +4,20 @@ Headless **server only** (no Linux Player; pair a Windows Player, phone/browser,
 
 **Supported today:** **64-bit Intel/AMD** (`linux-x64` / `amd64`) on a Linux host such as a NAS or mini PC. That matches the published Docker Hub image (`linux/amd64` only).
 
-**Not available yet:** **ARM64 / Raspberry Pi**. The publish script can produce a `linux-arm64` tarball for local experiments, but there is no published ARM64 release asset, and Pi/ARM64 is **not** supported or hardware-verified today. Planned for **0.7.0**, subject to hardware verification.
+**ARM64 / Raspberry Pi (0.7.0, in development):** `build/publish-linux.sh linux-arm64` produces a self-contained tarball for 64-bit Raspberry Pi OS (Pi 4/5) with `install.sh` and the systemd unit. Smoke-tested under QEMU only, **not verified on real Pi hardware**, and not published yet. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
 
 ## Build
 
 ```sh
 build/publish-linux.sh linux-x64   # supported target (self-contained; no .NET needed on the host)
-build/publish-linux.sh             # also builds linux-arm64 — experimental / unpublished; not supported yet
-build/publish-linux.sh linux-arm64 # experimental arm64 tarball only
+build/publish-linux.sh             # both linux-x64 and linux-arm64
+build/publish-linux.sh linux-arm64 # Raspberry Pi 4/5 (64-bit OS) tarball only — 0.7.0, not hardware-verified yet
 ```
-Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz`. Official GitHub releases currently ship the Windows installer; Linux tarballs are produced from source with this script.
+Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz` (+ `.sha256`). The tarball contains `install.sh` and `wavwiz-server.service`. Official GitHub releases currently ship the Windows installer; Linux tarballs are produced from source with this script.
 
 ## Install (systemd)
 
-Example for the **supported** `linux-x64` build:
+Easiest (x64 or arm64): `tar -xzf wavwiz-server-<version>-<rid>.tar.gz && sudo ./wavwiz-server/install.sh` (installs ffmpeg, the `wavwiz` user, `/opt/wavwiz-server` and the service; `--uninstall` removes it and keeps `/var/lib/wavwiz`). By hand, for the `linux-x64` build:
 
 ```sh
 sudo apt install ffmpeg

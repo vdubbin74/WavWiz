@@ -1,7 +1,7 @@
 # F166/F167: WavWiz server (headless) for Linux. Multi-arch: linux/amd64, linux/arm64.
 #   docker build -t docker.io/vdubbin74/wavwiz-server:0.7.0 .
 #   docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.7.0 .
-# See docs/DOCKER.md. Server only (no Player audio in the container).
+# See docs/DOCKER.md and docs/RASPBERRY-PI.md (0.7.0: arm64 = Raspberry Pi 4/5 on 64-bit Pi OS). Server only (no Player audio in the container).
 
 # ---- build (runs on the build machine's own arch; cross-publishes for the target) ----
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
@@ -17,8 +17,12 @@ RUN case "$TARGETARCH" in amd64) RID=linux-x64;; arm64) RID=linux-arm64;; *) ech
       -p:DebugType=none -o /app
 
 # ---- runtime ----
+# aspnet:10.0 = Ubuntu 24.04 "noble" (linux/amd64, linux/arm64, linux/arm/v7 manifests; WavWiz builds amd64 + arm64 only).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
-RUN apt-get update \
+# APT_HTTPS=1: fetch Ubuntu packages over https (for build hosts whose proxy blocks plain-http apt). Default off = unchanged.
+ARG APT_HTTPS=0
+RUN if [ "$APT_HTTPS" = 1 ]; then sed -i 's#http://#https://#g' /etc/apt/sources.list.d/*.sources; fi \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 wavwiz \

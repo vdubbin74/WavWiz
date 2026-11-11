@@ -10,6 +10,19 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.7.0] - in development (beta, not released)
+
+### Added
+- Google Cast speakers: Nest speakers, Chromecast Audio and Cast TVs or soundbars on your network appear in a new Cast speakers card directly below AirPlay speakers in Devices. Find, play a test chime, and add one to a zone; it then works like any speaker (volume, mute, on/off, delay, Forget, move between zones), is remembered, and reconnects after a restart or a drop. The device plays a live stream from the WavWiz server over your home network; sync with other speakers is close but approximate, fine-tuned with the speaker's delay. Not yet verified on real Cast hardware.
+- Raspberry Pi (64-bit ARM): the server builds for `linux/arm64` — a multi-arch Docker image (amd64 + arm64) and a self-contained `linux-arm64` tarball with an `install.sh` that sets up ffmpeg, a `wavwiz` user and the systemd service. For Raspberry Pi 4 and 5 on 64-bit Raspberry Pi OS (trixie; bookworm legacy). Cast and AirPlay speaker output are included (the same code as on x86-64). Smoke-tested under QEMU emulation only; not yet verified on real Pi hardware and not published. See docs/RASPBERRY-PI.md.
+
+### Changed
+- Linux systemd unit: sets headless mode explicitly and documents the optional capability for experimental AirPlay 2 (UDP 319/320). The Linux publish script adds `install.sh` and a `.sha256` next to each tarball.
+- Dockerfile: optional `APT_HTTPS=1` build argument for build machines whose proxy blocks plain-http package mirrors (default unchanged).
+
+### Not on Linux / Raspberry Pi
+- No local speaker output on the Pi itself (no Linux Player / ALSA output yet), no CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.
+
 ## [0.6.8] - 2026-11-10 (beta)
 
 - CD ripper follow-up: a rip left “Ripping” after a crash or reinstall is marked Interrupted at startup, and Cancel always clears it even if the helper is already gone, so the drive controls unlock. Disabled controls explain why (for example “A rip is in progress on E:”). Reading the disc retries with a short backoff, tries alternate drive-letter forms, and falls back to the tracks Windows can already see; a failed first read is not cached. Retry is on the page. The ripper uses the full Library width (disc + tracks side by side on a wide screen, jobs below). The A–Z letter rail is hidden on CD ripper, Tag & cover fix, Tidy up library, Radio and Playlists. The info control is a small circular icon immediately after the “CD ripper” heading.
