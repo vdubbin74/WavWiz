@@ -51,9 +51,9 @@ test('#2 #9 boxTitle: PAUSED when paused; sentence-case title split into name + 
 });
 test('#3 #6 #7 #1 CSS: EQ labels thin by width, header one line, no dotted outline, no CONTROLLING chip in the normal panel', () => {
   const c = css();
-  assert.match(c, /\.eqarea\{container:eqa\/inline-size\}/); assert.match(c, /@container eqa \(max-width:560px\)\{ \.eqb-hzu\{display:none\} \}/);
+  assert.match(c, /\.eqarea\{container:eqa\/inline-size\}/); assert.match(c, /@container eqa \(max-width:560px\)\{ \.eqb-hzu\{display:none\}\s/);   /* 0.7.0 item 5c: F181 added more narrow-EQ rules to the same block */
   assert.match(c, /@container spkset \(max-width:820px\)\{ \.spkset \.spk-body\{grid-template-columns:1fr\} \}/);
   assert.doesNotMatch(c, /\.zwrap42\.picked \.zcard42\{outline/);
-  assert.match(c, /\.devpanel:not\(\.expanded\) \.dmaster>\.dvol-master>\.zs-master\{display:none!important\}/); assert.doesNotMatch(c, /\.dmaster \.zs-master \.zs-lbl\{display:inline!important\}/);
+  assert.match(c, /:is\(\.devbody,\.tcol42\)>\.dmaster \.zs-master \.zs-lbl,:is\(\.devbody,\.tcol42\)>\.dmaster \.zs-master \.zs-name\{display:none\}/);   /* 0.7.0 item 5c: later the normal panel shows the zone picker as an icon only - still no CONTROLLING text chip */ assert.doesNotMatch(c, /\.dmaster \.zs-master \.zs-lbl\{display:inline!important\}/);
   assert.match(src('scenesched'), /Server PC clock: /); assert.match(src('eqview'), /class: 'eqb-hzu'/);
 });

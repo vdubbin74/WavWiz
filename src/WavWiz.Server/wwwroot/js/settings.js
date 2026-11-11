@@ -116,7 +116,7 @@ export async function openSettings(S, refresh, nav, section) {
         st.tls.remote.caveat ? h('p', { class: 'small dim' }, st.tls.remote.caveat) : null,
         admin ? h('div', { class: 'row wrap' }, st.tls.remote.mode === 'off'
           ? h('button', { class: 'btn', onclick: async () => {
-              const r = st.tls.remote; if (!r.ctAcknowledged && !confirm(r.ctDisclosure + '\n\nTurn on remote HTTPS with Tailscale?')) return;
+              const r = st.tls.remote; if (!r.ctAcknowledged && !(await ask('Turn on remote HTTPS with Tailscale?', r.ctDisclosure, { ok: 'Turn on' }))) return;   // 0.7.0 item 5c: the app's own dialog (0.3.0 §7.10 - no native confirm())
               try { await api('/tls/remote', { method: 'POST', body: { mode: 'tailscale', acknowledgeCt: !r.ctAcknowledged } }); toast('Remote HTTPS turned on.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Use Tailscale HTTPS for remote access…')
           : h('button', { class: 'btn ghost', onclick: async () => { try { await api('/tls/remote', { method: 'POST', body: { mode: 'off' } }); toast('Remote HTTPS turned off.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Turn off remote HTTPS')) : null) : null,
       // 0.3.0 §7.2: the redirect option lives under Advanced, with a warning. Default stays off.

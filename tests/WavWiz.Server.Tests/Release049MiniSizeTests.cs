@@ -17,9 +17,10 @@ public class Release049MiniSizeTests
     public void Device_pixels_at_100_150_200_percent(double scale, int ew, int eh)
     { var (cw, ch) = MiniPlayer.ContentSize(210, 145, false); Assert.Equal((ew, eh), MiniPlayer.SizeFor(cw, ch, scale)); }
 
-    // 0.4.9 F86: the two-row Player (89 CSS px) is 89 / 178 device px tall at 100 / 200 %, and the window opens at about that height
+    // 0.4.9 F86: the two-row Player (89 CSS px) is 89 / 178 device px tall at 100 / 200 %.
+    // 0.7.0 item 5c: F110 gave the standalone window two bands (transport + pins, then a full-width volume row), so it now OPENS at 128 CSS px (c0bf002: MiniPlayer.Height 90 -> 128).
     [Theory] [InlineData(1.0, 420, 89)] [InlineData(2.0, 840, 178)]
-    public void Two_row_player_height(double scale, int ew, int eh) { var (cw, ch) = MiniPlayer.ContentSize(420, 89, false); Assert.Equal((ew, eh), MiniPlayer.SizeFor(cw, ch, scale)); Assert.InRange(MiniPlayer.Height, 89, 100); }
+    public void Two_row_player_height(double scale, int ew, int eh) { var (cw, ch) = MiniPlayer.ContentSize(420, 89, false); Assert.Equal((ew, eh), MiniPlayer.SizeFor(cw, ch, scale)); Assert.Equal(128, MiniPlayer.Height); }
 
     [Fact] public void Nan_report_falls_back_to_design_width() => Assert.Equal(420, MiniPlayer.ContentSize(double.NaN, 145, false).W);
     // 0.5.0: size with the page's devicePixelRatio (what WebView2 renders at); DeviceDpi only as fallback

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
@@ -128,7 +129,7 @@ test('0.2.2 T6: the Pepecoin logo in the Themes menu is about 20% smaller; still
 
 test('0.2.2: What\'s new lists the 0.2.2 changes in US English; CHANGELOG has the 0.2.2 entry; TheAudioDB credited', () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.[2-9]|[34]\.\d)'/);
+  assert.ok(vge(whatsNewVersion(a), '0.2.2'));   // 0.7.0 item 5c: any later release
   // 0.2.3: What's new moved on to the 0.2.3 list (0.2.2 was never published on its own; its changes stay in the CHANGELOG)
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');

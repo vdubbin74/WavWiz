@@ -62,9 +62,9 @@ test('F232 patchLive42 play↔pause updates title, idle, aria without rebuild', 
   assert.match(cur.querySelector('.qb42-st').textContent, /PLAYING/);
   assert.equal(cur.querySelector('.zl-ico').textContent, '▶');
   assert.equal(cur.querySelector('section.qb42').getAttribute('aria-label'), 'Queue: Basement · PLAYING');
-  // leftover paused@0 → idle title
+  // leftover paused@0 → idle title.
+  // 0.7.0 item 5c: DIG-R1 made idle part of the fold structure (foldSig42), so going idle REBUILDS the box (fresh listeners) instead of patching it
   const r3 = patchLive42(cur, mk('idle', true));
-  assert.equal(r3, 1);
-  assert.equal(cur.querySelector('section.qb42').classList.contains('idle'), true);
-  assert.match(cur.querySelector('.qb42-st').textContent, /IDLE/);
+  assert.equal(r3, 0, 'idle changes the structure: the caller rebuilds');
+  assert.equal(cur.querySelector('section.qb42').classList.contains('idle'), false, 'nothing half-patched before the rebuild');
 });

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
@@ -176,7 +177,7 @@ test('0.2.0 item 8: four panel styles, Classic default, per-browser, effects 50 
 
 test('0.2.0 items 4-7: ten presets with the agreed hexes, four-color custom, old three-color saves migrate, Pepecoin polish', async () => {
   const theme = await imp('theme');
-  const want = { default: ['#FF3C00', '#19C3B1', '#14171A', '#E8EDF0'], pepecoin: ['#269B4D', '#208241', '#212121', '#FFFFFF'], ember: ['#FF5A1F', '#FFB347', '#160E0A', '#E8EDF0'], arctic: ['#3BA7FF', '#A8E6FF', '#0B1218', '#E8EDF0'], violet: ['#A855F7', '#C084FC', '#1A1028', '#F5F3FF'], mono: ['#E8EDF0', '#9AA6AE', '#0E1012', '#E8EDF0'],
+  const want = { default: ['#FF3C00', '#12D6C2', '#14171A', '#E8EDF0'] /* 0.7.0 item 5c: teal refreshed (F108) */, pepecoin: ['#269B4D', '#208241', '#212121', '#FFFFFF'], ember: ['#FF5A1F', '#FFB347', '#160E0A', '#E8EDF0'], arctic: ['#3BA7FF', '#A8E6FF', '#0B1218', '#E8EDF0'], violet: ['#A855F7', '#C084FC', '#1A1028', '#F5F3FF'], mono: ['#E8EDF0', '#8FB0C4', '#0E1012', '#E8EDF0'] /* F108 */,
     daylight: ['#D63A12', '#0B7A6E', '#EDE9E3', '#14171C'], nebula: ['#8B5CF6', '#2DD4BF', '#0F0B1A', '#EDE9FE'], crimson: ['#E84A5F', '#D4A574', '#1A0C10', '#F8EDE8'], ocean: ['#2EC4B6', '#3D8BFF', '#07151F', '#E6F1F8'] };
   assert.deepEqual(Object.keys(theme.PRESETS), Object.keys(want));
   for (const [id, [a, a2, bg, ink]] of Object.entries(want)) assert.deepEqual([theme.PRESETS[id].accent, theme.PRESETS[id].accent2, theme.PRESETS[id].bg, theme.PRESETS[id].ink], [a, a2, bg, ink], id);
@@ -237,5 +238,5 @@ test('0.2.0 item 17: Spectrum replaces Terrain - in the picker, saved terrain mi
   const g = src('vizgl.js'); const body = g.slice(g.indexOf('class SpectrumScene'), g.indexOf('class GeqScene'));
   assert.match(g, /spectrum: SpectrumScene/); assert.doesNotMatch(g, /class TerrainScene/);
   assert.doesNotMatch(body, /this\.cap|segN|fxv\('(segments|caps)'/);
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.(2\.[2-9]|[34]\.\d)'/);   // 0.2.2: What's new lists the 0.2.2 changes (the Terrain note was 0.2.0's)
+  assert.ok(vge(whatsNewVersion(src('about.js')), '0.2.2'));   // 0.7.0 item 5c: any later release. 0.2.2: What's new lists the 0.2.2 changes (the Terrain note was 0.2.0's)
 });

@@ -15,7 +15,8 @@ test('0.2.1 F5: the Library filter box is never re-created or re-parented while 
   const l = src('library.js');
   assert.doesNotMatch(l, /head\.replaceChildren\(h\('div', \{ class: 'row libhead' \}/, 'the header row (holding the filter box) is no longer rebuilt per draw');
   assert.match(l, /tabsSlot\.replaceChildren\(tabs\(\)\)/);
-  assert.match(l, /const placeSearch = parent => \{\s*if \(searchField\.parentElement === parent\) return;/);
+  // 0.7.0 item 5c: F239 - the box always sits under the source tabs (one home), still untouched when it is already there
+  assert.match(l, /const placeSearch = \(\) => \{\s*if \(searchField\.parentElement === root && searchField\.previousElementSibling === srcSlot\) return;/);
   assert.match(l, /search\.focus\(\{ preventScroll: true \}\); try \{ search\.setSelectionRange\(a, b\)/);
   assert.match(l, /search\._t = setTimeout\([^]*?, 250\)/);
   assert.match(css, /\.libtabslot\{display:contents\}/);
@@ -106,10 +107,10 @@ test('0.2.1 F8: five menus with one home per item; Settings tabs Appearance/Devi
   const block = k => m.split(`    ${k}: [`)[1].split('\n    ],')[0];
   assert.deepEqual([...block('library').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Browse library', 'Playlists…', 'Radio', 'Queue', 'Rescan folders', 'CD ripper', 'Tag & cover fix', 'Tidy up library']   /* 0.3.5 J16 menus */);
   assert.deepEqual([...block('playback').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Now Playing', 'Play / Pause', 'Next', 'Previous', 'Sound / EQ', 'Sleep timer', 'Start Jukebox…']);   // 0.6.8: Now Playing kept after views half removed from narrow PC
-  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Speakers', 'Zones', 'Scenes', 'Schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16
+  assert.deepEqual([...block('devices').matchAll(/\['([^']+)'/g)].map(x => x[1]), ['Devices & zones', 'Master volume', 'Speakers', 'Zones', 'Scenes', 'Schedules & alarms', 'Calibrate speakers…', 'Phone role…', 'Mini player', 'Fullscreen', 'Pair a player', 'Away-from-home access']);   // 0.3.5 J16; later releases added Master volume + Fullscreen (0.7.0 item 5c)
   assert.deepEqual([...block('help').matchAll(/\[(?:'([^']+)'|"([^"]+)")/g)].map(x => x[1] ?? x[2]), ['Getting started', "What's new", 'Keyboard shortcuts', 'Diagnostics', 'About WavWiz']);   // 0.3.5 J16
   assert.match(m, /function createCompactPcNav/, 'narrow PC keeps the same Devices tree via compact hover menus');
-  assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['devices', 'Devices'\],\n  \['library', 'Library'\],\n  \['network', 'Network'\],\n  \['jukebox', 'Jukebox'\],\n/   /* 0.3.5 J9 adds Access, Diagnostics, About */);   // 0.3.0 §7: General/Playback/Jukebox tabs
+  assert.match(st, /\['general', 'General'\],\n  \['appearance', 'Appearance'\],\n  \['playback', 'Playback'\],\n  \['library', 'Library'\],\n  \['devices', 'Devices'\],\n  \['network', 'Network'\],[^\n]*\n  \['jukebox', 'Jukebox'\],\n/   /* 0.3.5 J9 adds Access, Diagnostics, About; later Library moved before Devices, F117 folded Access into Network (0.7.0 item 5c) */);   // 0.3.0 §7: General/Playback/Jukebox tabs
   assert.doesNotMatch(st, /id: 'sec-status'/);   // 0.3.5 J9 #1: About is a Settings section again (it was a popup)
   assert.match(dg, /id: 'sec-status'/);
   assert.match(ap, /const pages = \{ theme: themePage, viz, eq: eqs, np, display: themePage \}/);   // 0.3.5 J2: Display size is on the Theme page
@@ -134,10 +135,10 @@ test('0.2.1 F10: no three-dot menu and no Stop on the panel; EQ is a regular but
   const n = src('now.js'), f = src('fav.js');
   assert.doesNotMatch(n, /np-volpop|np-volbtn|barMore|'aria-label': 'Stop'|act\('\/stream\/stop'\) \}, icon\('stop'\)/);
   assert.match(n, /const mkEq = \(\) => h\('button', \{ class: 'tbtn eqbtn', 'aria-label': 'Sound \(EQ\)'/);
-  assert.match(n, /muteBtn, h\('div', \{ class: 'np-vol' \}, eqBtn/); assert.match(n, /barMute, barEq\), mkSc\('npb-sc'\)\)/);
+  assert.match(n, /muteBtn, (?:mkMix\(\), )?h\('div', \{ class: 'np-vol' \}, eqBtn/);   /* 0.7.0 item 5c: 0.4.8 F54 put the mixer button between them */ assert.match(n, /barMute, (?:mkMix\(\), )?barEq\), mkSc\('npb-sc'\)\)/);   /* 0.7.0 item 5c: F54 mixer button */
   assert.match(n, /\{ class: 'transport np-tablexport', role: 'group', 'aria-label': 'Transport' \}, xHeart, shuffle/);
   assert.match(f, /round \? 'heart tbtn ico' : 'heart'/);
-  assert.match(css, /\.np-ctlpanel\.pn-classic \.np-xheart\{display:contents\}/);
+  assert.match(css, /\.np-ctlpanel(?:\.pn-classic)? \.np-xheart\{display:contents\}/);   /* 0.7.0 item 5c: F95 made the heart a transport button in every mix, Classic included */
   assert.match(css, /@container npctl \(max-width:900px\)/);
 });
 
@@ -204,7 +205,7 @@ test('0.2.1 F13: generated covers + portraits are deterministic, unique per albu
 test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on the background), Custom has five pickers; new theme order', async () => {
   const theme = await imp('theme');
   assert.deepEqual(Object.values(theme.PRESETS).map(p => p.name), ['Midnight Neon', 'Pepecoin', 'Ember', 'Arctic', 'Violet Pulse', 'Monochrome', 'Daylight', 'Nebula', 'Crimson Lounge', 'Ocean Abyss']);
-  const want = { default: '#F5C542', pepecoin: '#C07A4E', ember: '#4FC3F7', arctic: '#6EF7B2', violet: '#2EE6D6', mono: '#FF5A5F', daylight: '#5B3FD4', nebula: '#F472B6', crimson: '#F5E6C8', ocean: '#FF8A5B' };
+  const want = { default: '#FFCB3D' /* 0.7.0 item 5c: F108 refresh */, pepecoin: '#C07A4E', ember: '#4FC3F7', arctic: '#6EF7B2', violet: '#2EE6D6', mono: '#FF4D57' /* 0.7.0 item 5c: F108 refresh */, daylight: '#5B3FD4', nebula: '#F472B6', crimson: '#F5E6C8', ocean: '#FF8A5B' };
   const ratio = (a, b) => { const x = theme.luminance(a), y = theme.luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   for (const [id, hl] of Object.entries(want)) {
     assert.equal(theme.PRESETS[id].hl, hl, id);
@@ -232,7 +233,7 @@ test('0.2.1 F14 + F15: Highlight is a third theme color (agreed hexes, >= 3:1 on
 
 test('0.2.1 F17: Mute all on the master volume strip (per-device Mute stays separate)', async () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: one round mute in the master row's mute column
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)(?:, mixerButton\('mutebtn dmixbtn'\))?\)/   /* 0.7.0 item 5c: + the mixer button */);   // 0.3.2 F5: one round mute in the master row's mute column
   assert.match(d, /ctl\.act\('\/zones\/mute-all', \{ muted: want \}\)/);
   assert.match(d, /m \? 'Unmute every device' : 'Mute every device'/);
   assert.match(d, /function muteButton\(S, ctl, z\)/, 'each device keeps its own Mute');

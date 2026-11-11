@@ -17,7 +17,7 @@ test('box carries panel markup and follows art / playing / frac', () => {
 });
 test('mini + strips use the art box; standalone has the Track bar row and wears prefs', () => {
   const mini = src('mini.js'), now = src('now.js');
-  assert.ok(mini.includes("npArtBox({ cls: 'mp-artbox'") && mini.includes('root.append(artBox.el'));
+  assert.ok(mini.includes("npArtBox({ cls: 'mp-artbox'") && /root\.append\([^)\n]*\bartBox\.el\b/.test(mini) && mini.includes("h('div', { class: 'mp-body' }, artBox.el"));   // 0.7.0 item 5c: F138 title bar - the box goes after the header (standalone) or in mp-body
   assert.ok(/if \(!embedded\) txt\.append\(npHost\)/.test(mini) && /applyNpClasses\(root, q\); applyNpColor\(q\)/.test(mini));
   for (const k of ['sArtB', 'miniArtB', 'barArtB']) assert.ok(now.includes(k + '.setFrac') || now.includes('[sArtB, miniArtB, barArtB]'), k);
   for (const b of ['round', 'soft', 'square', 'ring']) assert.ok(css.includes(`:is(.mp,.minicol).pn-btn-${b} .mp-tr`), b);

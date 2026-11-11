@@ -8,8 +8,12 @@ namespace WavWiz.Server.Tests;
 public class Release032ArtTests
 {
     static string Fx(string n) => Path.Combine(AppContext.BaseDirectory, "Fixtures", "art", n);
+    // 0.7.0 item 5c: the Wine wrapper is used only when it can really run (Wine on PATH and the packaged ffmpeg.exe present); otherwise the
+    // system ffmpeg, as this always intended when the wrapper is missing. A wrapper left behind without Wine made every test here fail with no output.
+    const string WineWrap = "/workspace/tools-cache/ffmpeg-shipped-wine.sh", WineExe = "/workspace/tools-cache/ffmpeg-lgpl/out/bin/ffmpeg.exe";
+    static bool OnPath(string exe) => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator).Any(d => d.Length > 0 && File.Exists(Path.Combine(d, exe)));
     public static string Shipped => Environment.GetEnvironmentVariable("WAVWIZ_SHIPPED_FFMPEG") is { Length: > 0 } e ? e
-        : File.Exists("/workspace/tools-cache/ffmpeg-shipped-wine.sh") ? "/workspace/tools-cache/ffmpeg-shipped-wine.sh" : "ffmpeg";
+        : File.Exists(WineWrap) && File.Exists(WineExe) && OnPath("wine") ? WineWrap : "ffmpeg";
     static (ArtService Art, LibraryService Lib, string Dir) Make(string? ff = null, Action<string>? before = null)
     {
         var dir = Path.Combine(Path.GetTempPath(), "wavwiz-f10-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);

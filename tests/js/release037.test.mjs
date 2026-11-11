@@ -32,13 +32,13 @@ test('L26 confidence shown only as a real 0-100 %', async () => {
   assert.equal(m.confPct(NaN), null); assert.equal(m.confText(undefined), '—'); assert.equal(m.confText(0.234), '23%');
 });
 
-test('L5/L8/L11/L23 shortcuts: max 5 pins, Home far right, pins stack leftward, order is remembered', async () => {
+test('L5/L8/L11/L23 shortcuts: max 8 pins (F198; was 5), Home far right, pins stack leftward, order is remembered', async () => {
   const m = await imp('shortcuts');
-  assert.equal(m.MAX_PINS, 5);
+  assert.equal(m.MAX_PINS, 8);   // 0.7.0 item 5c: F198 raised the cap from 5 to 8
   assert.deepEqual(m.cleanPins(['eq', 'eq', 'nope', 'queue', 'library', 'devices']), ['eq', 'queue', 'library', 'devices']);
-  let r = m.togglePin([], 'eq'); for (const k of ['queue', 'scenes', 'alarms', 'library']) r = m.togglePin(r.pins, k); assert.deepEqual(r.pins, ['eq', 'queue', 'scenes', 'alarms', 'library']);
-  const full = m.togglePin(r.pins, 'sleep'); assert.equal(full.full, true); assert.deepEqual(full.pins, r.pins, 'a 6th pin changes nothing');
-  assert.deepEqual(m.togglePin(r.pins, 'queue').pins, ['eq', 'scenes', 'alarms', 'library'], 'pin again = unpin');
+  let r = m.togglePin([], 'eq'); for (const k of ['queue', 'scenes', 'alarms', 'library', 'devices', 'sleep', 'mixer']) r = m.togglePin(r.pins, k); assert.deepEqual(r.pins, ['eq', 'queue', 'scenes', 'alarms', 'library', 'devices', 'sleep', 'mixer']);
+  const full = m.togglePin(r.pins, 'settings'); assert.equal(full.full, true); assert.deepEqual(full.pins, r.pins, 'a 9th pin changes nothing');
+  assert.deepEqual(m.togglePin(r.pins, 'queue').pins, ['eq', 'scenes', 'alarms', 'library', 'devices', 'sleep', 'mixer'], 'pin again = unpin');
   // the first pinned is closest to Home: DOM order left->right is last pin ... first pin, separator, Home
   assert.deepEqual(m.rowOrder(['eq', 'queue', 'scenes']).map(x => x.id || x.kind), ['scenes', 'queue', 'eq', 'sep', 'home']);
   assert.deepEqual(m.rowOrder([]).map(x => x.kind), ['home'], 'no pins: just Home, no separator');
@@ -55,7 +55,7 @@ test('L1/L4/L17 every EQ / Queue / shortcut entry point goes through the shared 
   assert.doesNotMatch(main.replace(/\/\*[\s\S]*?\*\//g, ''), /openEq\(S, refreshAll\)\s*[;}]\s*\n\s*if \(S\.view/, 'the phone go(eq) no longer opens the popup');
   assert.match(now, /onclick: \(\) => ctl\.openEq\(\)/); assert.match(now, /scSide\.toggle/);   // F130: NP header = one Shortcuts toggle + side strip assert.match(now, /mkSc\('npb-sc'\)/);
   assert.match(main, /if \(P6\.exp === 'dev'\) setPanels\(\{ \.\.\.P6, exp: null \}/);   // L17 queue from an expanded Devices view
-  assert.match(menu, /pin: 'eq'/); assert.match(menu, /pin: 'queue'/); assert.match(mini, /shortcutsRow/); assert.match(mini, /sendToMain/);
+  assert.match(menu, /pin: 'eq'/); assert.match(menu, /pin: 'queue'/); assert.match(mini, /shortcutsSide\(/); assert.match(mini, /sendToMain/);   /* 0.7.0 item 5c: F138 - the mini player uses the side strip (built on shortcutsRow) */
   assert.match(css, /\.scrow/); assert.match(css, /\.schome/);
 });
 
@@ -106,12 +106,14 @@ test('L30 sorted column + Sorted-by chip use the theme accent only; chip clear a
 });
 
 test('every new 0.3.7 helper a module calls is imported there (a missing import blanks the page)', () => {
-  const need = { 'now.js': ['shortcutsRow'], 'main.js': ['attachReorder', 'canDragRows', 'loadLayout', 'saveLayout', 'setLocked', 'installMiniTargets', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'reduced', 'pulse'], 'mini.js': ['shortcutsRow', 'sendToMain'],
+  const need = { 'now.js': ['shortcutsRow'], 'main.js': ['attachReorder', 'canDragRows', 'loadLayout', 'saveLayout', 'setLocked', 'installMiniTargets', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'reduced', 'pulse'], 'mini.js': ['shortcutsSide', 'sendToMain'] /* F138 */,
     'menu.js': ['icon', 'pinToggle', 'loadPins', 'pinInfo', 'MAX_PINS', 'toast'], 'listtable.js': ['canDragRows', 'APPLY_SORT_Q', 'ask', 'toast', 'applySort', 'sortAllowed', 'SORT_LOCK_HINT', 'CLEAR_LOCK_HINT', 'sortChipText', 'movesFor', 'sortedIndexes'],
     'centerview.js': ['soundSettings', 'icon', 'setIcon', 'saveEqLock', 'loadEqLock', 'flatEq'], 'calibrate.js': ['undoToast', 'api'], 'devices.js': ['centerEq'] };
   for (const [f, names] of Object.entries(need)) {
     const s = src(f), imports = [...s.matchAll(/^import\s*\{([^}]*)\}\s*from/gm)].map(m => m[1]).join(',') + ' ' + [...s.matchAll(/^(?:export )?(?:async )?(?:function|const|let) ([A-Za-z0-9_$]+)/gm)].map(m => m[1]).join(' ');
-    for (const n of names) assert.ok(new RegExp(`\\b${n}\\b`).test(imports), `${f} uses ${n} without importing / defining it`);
+    const body = s.replace(/^import[^\n]*\n/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    for (const n of names) { if (!new RegExp(`\\b${n}\\b`).test(body)) continue;   // 0.7.0 item 5c: the rule is about helpers a module CALLS; one that is no longer used needs no import
+      assert.ok(new RegExp(`\\b${n}\\b`).test(imports), `${f} uses ${n} without importing / defining it`); }
   }
 });
 

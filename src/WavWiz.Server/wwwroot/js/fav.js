@@ -31,4 +31,4 @@ export function heartBtn(S, kind, ref, label = '', { round = false } = {}) {
   paint(b); if (!canControl(S)) b.title = 'Only Control or Admin access can change favorites.';
   return b;
 }
-window.addEventListener('wavwiz:favorites', () => loadFavs(true));   // another browser changed a heart
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('wavwiz:favorites', () => loadFavs(true));   // another browser changed a heart (0.7.0: guarded so node tests can import the module)

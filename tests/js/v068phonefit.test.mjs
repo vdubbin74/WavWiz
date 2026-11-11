@@ -1,7 +1,11 @@
 // 0.6.8: phone Now Playing fits the viewport — art fills leftover height, no page scroll, Queue/Sound stay on screen.
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const raw = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+// 0.7.0 item 5c: viewport units are now divided by the Display size zoom (`88vw / var(--z,1)`, same value at 100%) so phones at Large / Extra small fit;
+// the checks below read the sizes with that factor taken out, and one check makes sure it is there.
+const css = raw.replace(/ \/ var\(--z,1\)/g, '');
+assert.match(raw, /--np-phone-art:min\(100%,88vw \/ var\(--z,1\)\)/);
 const i = css.indexOf('0.6.8 phone-fit');
 assert.ok(i > 0, '0.6.8 phone-fit block present on F250-P5');
 const j = css.indexOf('F250-P6', i);

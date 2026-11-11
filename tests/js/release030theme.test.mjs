@@ -37,8 +37,12 @@ test('§8: no hard-coded hex/rgb colors in the 0.3.0 CSS and UI modules (theme f
   assert.match(readFileSync(join(root, 'jukebox-palette.css'), 'utf8').replace(/\/\*[^]*?\*\//g, '').trim(), /^:root\{(--jr-c\d+:[^;{}]+;?)+\}$/);
   for (const f of NEW_CSS) assert.doesNotMatch(strip(readFileSync(join(root, f), 'utf8')), /#[0-9a-f]{3,8}\b|rgba?\(/i, f);
   // app.css: everything added in 0.3.0 sits after the "0.3.0" markers; those blocks use theme variables only
-  const css = readFileSync(join(root, 'app.css'), 'utf8'); const i = css.indexOf('0.3.0'); assert.ok(i > 0);
-  const tail = strip(css.slice(i)).replace(/rgba\(0,0,0,\.\d+\)/g, '');      // neutral shadows (no hue) are allowed
+  // 0.7.0 item 5c: every block a "0.3.0" comment opens, up to the next comment naming another release (0.3.0 rules also sit further down, after
+  // 0.3.1 ones). Slicing to the end of app.css also caught later releases' fixed-palette art (cassette, vinyl, wood), checked by their own tests.
+  const css = readFileSync(join(root, 'app.css'), 'utf8');
+  const own = [...css.matchAll(/\/\*[^*]*?\b0\.3\.0\b/g)].map(m => { const r = css.slice(m.index + 2), e = r.search(/\/\*[^*]*?\b0\.(?!3\.0\b)\d+\.\d+/); return css.slice(m.index, e < 0 ? undefined : m.index + 2 + e); });
+  assert.ok(own.length >= 3 && own.join('').length > 8000, '0.3.0 blocks found');
+  const tail = strip(own.join('\n')).replace(/rgba\(0,0,0,\.\d+\)/g, '');      // neutral shadows (no hue) are allowed
   const bad = tail.match(/#[0-9a-f]{3,8}\b|rgb\((?!0,0,0)/gi) || [];
   assert.deepEqual(bad, [], 'fixed colors in the 0.3.0 CSS');
   for (const f of ['scenesched.js', 'jukebox-kiosk.js', 'jukebox-guest.js', 'jukebox-view.js', 'jukebox-core.js', 'remotemode.js', 'centerview.js', 'settingsui.js', 'panels.js', 'slider.js', 'flags.js'])

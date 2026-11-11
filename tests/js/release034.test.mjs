@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 globalThis.Element ??= class {};
 const js = process.env.JS_DIR, web = join(js, '..');
 const srcWeb = new URL('../../src/WavWiz.Server/wwwroot/', import.meta.url).pathname;   // non-CSS web files are not copied by run.sh
@@ -14,7 +15,7 @@ test('H1 manifest + iOS meta + service worker rules', async () => {
   assert.equal(m.name, 'WavWiz'); assert.equal(m.id, '/'); assert.equal(m.scope, '/'); assert.ok(m.description);
   assert.ok(m.icons.some(i => i.sizes === '192x192' && i.purpose === 'any')); assert.ok(m.icons.filter(i => i.purpose === 'maskable').length >= 2);
   const html = readFileSync(join(srcWeb, 'index.html'), 'utf8');
-  for (const re of [/apple-touch-icon" href="\/assets\/logo-180\.png"/, /apple-mobile-web-app-capable" content="yes"/, /name="mobile-web-app-capable" content="yes"/, /apple-mobile-web-app-title" content="WavWiz"/, /status-bar-style" content="black-translucent"/]) assert.match(html, re);
+  for (const re of [/rel="apple-touch-icon" sizes="180x180" href="\/assets\/logo-180\.png(\?v=[\w.]+)?"/,   /* 0.7.0 item 5c: F237 added sizes + a cache-buster */ /apple-mobile-web-app-capable" content="yes"/, /name="mobile-web-app-capable" content="yes"/, /apple-mobile-web-app-title" content="WavWiz"/, /status-bar-style" content="black"/ /* 0.7.0 item 5c: F161 made the Home Screen status bar opaque (black-translucent blurred the header) */]) assert.match(html, re);
   const sw = readFileSync(join(srcWeb, 'sw.js'), 'utf8');
   assert.match(sw, /'wavwiz-shell-' \+ VERSION/); assert.match(sw, /startsWith\('\/api\/'\)/); assert.match(sw, /fetch\(req\)\.then/, 'network first');
   assert.match(sw, /k !== CACHE\).map\(k => caches\.delete/, 'old caches dropped on activate');
@@ -41,5 +42,5 @@ test('H4-H7 jukebox helpers', async () => {
   assert.doesNotMatch(css + src('settingsui.js'), /vinyl/i, 'no Vinyl style');
 });
 test('0.3.4 What\'s new and version', async () => {
-  const a = await imp('about'); assert.ok(['0.3.4', '0.3.5', '0.3.6', '0.3.7', '0.3.8', '0.3.9', '0.4.0', '0.4.1', '0.4.2', '0.4.3', '0.4.4', '0.4.5', '0.4.6'].includes(a.WHATS_NEW_VERSION)); /* 0.3.5 moved on */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox styles'));
+  const a = await imp('about'); assert.ok(vge(a.WHATS_NEW_VERSION, '0.3.4'));   /* 0.7.0 item 5c: any later release */ /* 0.3.5 moved on */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox styles'));
 });

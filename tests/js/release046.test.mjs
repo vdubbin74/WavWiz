@@ -19,14 +19,14 @@ test('F30 wiring: pointer engine, saved in the shared device order, tree redraws
   assert.match(t, /attachZoneDrag\(root, model\.boxes/);
   assert.match(t, /startPointerDrag\(ev, grab, \(\) => \(\{ kind: 'zone42'/);
   assert.match(t, /saveOrder\(\{ \.\.\.o, g: zoneOrderAfterDrop/);
-  assert.match(src('devices'), /orderedGroups\(S\.groups \|\| \[\]\)\.map\(g => g\.id\)\]\);/);
+  assert.match(src('devices'), /orderedGroups\(S\.groups \|\| \[\]\)\.map\(g => g\.id\)(?:, openSig42\(\))?\]\);/);   // 0.7.0 item 5c: DIG-R1 appended the open-pref signature
   const c = css();
   assert.match(c, /\.tree42 \.zcard42 \.zc42-body,\.tree42 \.zcard42 \.zname,\.tree42 \.qb42-pick\{cursor:grab/);
   assert.doesNotMatch(c, /\.qb42-pick:hover \.qb42-name\{[^}]*underline/);
 });
 test('F31: Roomy holds in the expanded views (Auto keeps the T1 opt-out); F32 no column mini player in tight; F33 strip label top-aligned', () => {
   const m = src('main'), c = css();
-  assert.match(m, /isTight\(window\.innerWidth, pageZoom\(\), window\.devicePixelRatio \|\| 1, mode\) && \(mode === 'roomy' \|\| \(!P6\.exp && P6\.list !== 'expanded'\)\);\s+desk\.classList\.toggle\('tight', tight\)/);
+  assert.match(m, /wantTight = isTight\(window\.innerWidth, pageZoom\(\), window\.devicePixelRatio \|\| 1, mode\), roomy = wantTight && mode === 'roomy', tight = wantTight && !roomy && !P6\.exp && P6\.list !== 'expanded';\s+desk\.classList\.toggle\('tight', tight\)/);   // 0.7.0 item 5c: F58 split Roomy into its own class; Auto still opts out in the expanded views
   assert.match(m, /const need = wide\(\) && desk\.classList\.contains\('libexpanded'\)/);
   assert.match(c, /\.desk\.tight\.libexpanded \.npbar\{display:none!important\}/); assert.match(c, /\.desk\.tight\.libexpanded:not\(\.libdev\) \.minicol\{display:block!important;grid-area:2\/2\/3\/3!important/); assert.match(c, /\.desk\.tight\.listexpanded:not\(\.libexpanded\):not\(\.devexpanded\) \.npbar\{display:flex!important/);
   assert.match(c, /\.desk\.tight \.devtab\{align-items:flex-start;/);
@@ -61,7 +61,7 @@ test('F40: no native <select> anywhere in the Library; themed dropdowns open the
 });
 test('F41: phone zone / speaker settings are a full-width sheet over the tree; closing clears the zone too', () => {
   const d = src('devices'), c = css(); assert.match(d, /setSpk: id => \{ spk = id; if \(id == null\) zsel = null;/); assert.match(d, /'data-act': 'pd-done'/);
-  assert.match(d, /reconcile\(list, \[T\.treeNode\(false\), sel42 \? pwrap : null\]/); assert.match(c, /#p-zones \.pd42-sheet\{position:fixed;inset:0/); assert.match(c, /#p-zones\{overflow-x:hidden\}/);
+  assert.match(d, /if \(pwrap\.parentNode !== document\.body\) document\.body\.append\(pwrap\)/); assert.match(c, /\.pd42-sheet\{[^}]*position:fixed;[^}]*inset:0/); assert.match(c, /#p-zones\{overflow-x:hidden\}/);   // 0.7.0 item 5c: F246 portals the sheet to <body>
 });
 test('F42/F43: EQ header wraps on narrow screens (44 px on touch); the phone drawer has a Done', () => {
   const c = css(); assert.match(c, /0\.4\.6 F42: EQ card header/); assert.match(c, /\.np-stage \.vbtns \.ib\{min-width:44px;min-height:44px\}/);

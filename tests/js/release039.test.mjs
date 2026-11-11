@@ -1,5 +1,6 @@
 // 0.3.9 pure-logic + source checks (L50-L57). Run through run.sh like the others.
 import test from 'node:test'; import assert from 'node:assert/strict'; import { readFileSync } from 'node:fs'; import path from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 globalThis.Element ??= class {}; const dir = process.env.JS_DIR; const src = f => readFileSync(path.join(dir, f), 'utf8'); const css = readFileSync(path.join(dir, '..', 'app.css'), 'utf8');
 const imp = n => import('file://' + path.join(dir, n + '.js'));
 test('L52 viewForMode: wide clears the tab page, narrow never stays blank', async () => {
@@ -47,4 +48,4 @@ test('L57 mini player: Devices-style volume bar (.dvol .vbar .pct) in its own ro
   const m = src('mini.js'); assert.match(m, /class: 'vbar' \}, vol/); assert.match(m, /class: 'pct'/); assert.match(m, /mp-vol dvol/); assert.match(m, /'\/zones\/master', \{ set: \+vol\.value \}/);
   assert.match(m, /h\('div', \{ class: 'mp-tr' \}, prev, play, next, mute\)/); assert.match(m, /\/zones\/mute-all/);
 });
-test('0.3.9 What\'s new leads with the new items', async () => { const a = await imp('about'); assert.ok(['0.3.9', '0.4.0', '0.4.1', '0.4.2', '0.4.3', '0.4.4', '0.4.5', '0.4.6'].includes(a.WHATS_NEW_VERSION)); assert.ok(a.WHATS_NEW.some(([t]) => /Devices/.test(t))); });
+test('0.3.9 What\'s new leads with the new items', async () => { const a = await imp('about'); assert.ok(vge(a.WHATS_NEW_VERSION, '0.3.9'));   /* 0.7.0 item 5c: any later release */ assert.ok(a.WHATS_NEW.some(([t]) => /Devices/.test(t))); });

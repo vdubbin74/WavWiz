@@ -52,7 +52,8 @@ test('0.0.5: no hard-coded private LAN addresses in shipped JS', () => {
   const dir = process.env.JS_DIR;
   const hits = [];
   for (const f of readdirSync(dir).filter(x => x.endsWith('.js'))) {
-    const t = readFileSync(join(dir, f), 'utf8');
+    // 0.7.0 item 5c: example addresses in comments and input placeholders are not addresses the app connects to (the rule's intent)
+    const t = readFileSync(join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/placeholder: '[^']*'/g, '');
     if (/\b(192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b/.test(t)) hits.push(f);
   }
   assert.deepEqual(hits, []);

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 globalThis.Element ??= class {};
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
@@ -92,5 +93,5 @@ test('G14: glow slider - no save / rebuild while dragging, save on change, Live 
   const a = src('appearance.js').match(/'data-eqglow': '1',\s*oninput: ev => \{[^\n]*/)[0]; assert.doesNotMatch(a, /saveEqPrefs/);
 });
 test('0.3.3 What\'s new and version', async () => {
-  const a = await imp('about'); assert.equal(/^0\.(3\.[3-9]|4\.\d)$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox starts again'));
+  const a = await imp('about'); assert.ok(vge(a.WHATS_NEW_VERSION, '0.3.3'));   /* 0.7.0 item 5c: any later release */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Jukebox starts again'));
 });

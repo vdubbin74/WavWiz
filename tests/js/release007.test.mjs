@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
@@ -100,7 +101,8 @@ test('0.0.7 pages: View > Theme… / Visualizer… open pages (desktop + phone);
   // 0.2.1 F8 supersedes: Theme and Visualizer are folded into Settings > Appearance; old routes open it there
   assert.doesNotMatch(m, /'Theme…'|'Visualizer…'/);
   assert.match(st, /appearancePane\(/); assert.match(src('appearance.js'), /themeCard\(\), viz = vizCard\(\)/);   // 0.2.2 T2: sub-sections
-  assert.match(main, /if \(k === 'themes' \|\| k === 'visualizer'\) return openSettings\(S, refreshAll, go, k === 'themes' \? 'theme' : 'viz'\)/);
+  // 0.7.0 item 5c: F125 / 0.6.8-#5 - a real phone has no Visualizer sub-tab, so Visualizer… opens Appearance > Theme there
+  assert.match(main, /if \(k === 'themes' \|\| k === 'visualizer'\) return openSettings\(S, refreshAll, go, \(k === 'themes' \|\| isRealPhone\(\)\) \? 'theme' : 'viz'\)/);
 });
 
 test('0.0.7 transport: SVG icon set, no emoji transport glyphs; themed zone Add', () => {
@@ -112,6 +114,6 @@ test('0.0.7 transport: SVG icon set, no emoji transport glyphs; themed zone Add'
 });
 
 test('0.0.7 version strings', () => {
-  assert.match(src('about.js'), /WHATS_NEW_VERSION = '0\.(0\.[7-9]|[1234]\.\d)'/);   // 0.0.8 bumps it
+  assert.ok(vge(whatsNewVersion(src('about.js')), '0.0.7'));   // 0.7.0 item 5c: any later release (was a pinned list of versions)
   assert.doesNotMatch(src('about.js'), /butterchurn/);
 });

@@ -28,8 +28,9 @@ test('F10 UI: Editing: picker, no (controlling) on queue options', () => {
   const s = src('listtable');
   assert.match(s, /'Editing:'/);
   assert.match(s, /editLbl.*pickSel.*sendBtn/s);
-  // options are plain zone names (no suffix); the word may still appear in a comment
-  assert.match(s, /cs\.map\(c => h\('option', \{ value: c\.key \}, c\.name\)\)/);
+  // options are zone names with no "(controlling)" suffix; the word may still appear in a comment
+  // 0.7.0 item 5c: 0.4.8 F60 marks the zone that is playing with " (playing)" - that is allowed; "(controlling)" is still not
+  assert.match(s, /cs\.map\(c => h\('option', \{ value: c\.key \}, c\.name(?: \+ \(cur && c\.key === cur\.key \? ' \(playing\)' : ''\))?\)\)/);
   assert.doesNotMatch(s, /c\.name \+ .*controlling/);
 });
 
@@ -103,7 +104,7 @@ test('F7: collapsed Library rail count - thousands separator + tooltip, vertical
   assert.deepEqual(libCountLabel(1), { text: '1', title: '1 song' });
   assert.equal(libCountLabel(null).text, '');
   assert.match(src('main'), /libCountLabel\(tracks\)/);
-  const c = css(); const rule = c.match(/\.libpanel\.israil \.prail-n\{([^}]*)\}/)?.[1] || '';
+  const c = css(); const rule = c.match(/\.libpanel\.israil \.prail-n(?:,[^{,]+)*\{([^}]*)\}/)?.[1] || '';   // 0.7.0 item 5c: the rule now also covers the Devices rail
   assert.match(rule, /writing-mode:vertical-rl/); assert.match(rule, /rotate\(180deg\)/); assert.match(rule, /border:0/); assert.match(rule, /background:none/); assert.match(rule, /align-self:flex-start/);
 });
 
@@ -119,7 +120,7 @@ test('F1-F3/F18 CSS + scene subtitle source', () => {
 test('F23: Devices page keeps one detail wrap (no re-attach per tick), skips redraw under a dragged slider; speaker tags/title patched only on change', () => {
   const d = src('devices'), s = src('spkset');
   assert.match(d, /const pwrap = h\('div', \{ class: 'pd42-wrap pd42-sheet'/);
-  assert.match(d, /reconcile\(list, \[T\.treeNode\(false\), sel42 \? pwrap : null\]/);
+  assert.match(d, /if \(pwrap\.parentNode !== document\.body\) document\.body\.append\(pwrap\)/);   // 0.7.0 item 5c: F246 portals the SAME wrap to <body> (attached once, not per tick)
   assert.doesNotMatch(d, /reconcile\(list, \[sel42 \? h\('div'/);
   assert.match(d, /\.spkset input\[type=range\]:active[^)]*\)\) return later\(\);   \/\/ 0\.4\.4 F23/);
   assert.match(s, /if \(sg === tagSig\) return;/); assert.match(s, /if \(sg === titleSig\) return;/);
@@ -170,8 +171,8 @@ test('F24 Rebuild album art: admin button in Settings > Library, new picture URL
 
 test('F25 per-speaker mute toggle: tree rows (right of the %), speaker page (right of the Volume bar); MUTED tag unmutes', () => {
   const t = src('tree42'), s = src('spkset'), d = src('devices');
-  assert.match(t, /`\$\{Math\.round\(z\.volume\)\}%`\),\s*\/\/ 0\.4\.4 F25[^\n]*\n\s*ro\(h\('button', \{ type: 'button', class: 'mutebtn sp42-mute'/);
-  assert.match(t, /ctl\.act\(`\/zones\/\$\{z\.id\}`, \{ muted: !z\.muted \}, 'PATCH'\)/);
+  assert.match(t, /`\$\{Math\.round\(z\.volume\)\}%`\),\s*\/\/ 0\.4\.4 F25[^\n]*\n\s*ro\(\(\(\) => \{ const mb = h\('button', \{ type: 'button', class: 'mutebtn sp42-mute'/);   // 0.7.0 item 5c: the button now repaints itself in place
+  assert.match(t, /const next = !cur\.muted;[^\n]*ctl\.act\(`\/zones\/\$\{z\.id\}`, \{ muted: next \}, 'PATCH'\)/);
   assert.match(s, /class: 'mutebtn spk-mute'/); assert.match(s, /line\.append\(vol\._input, muteB\)/); assert.match(s, /vol\._set\(Math\.round\(z\.volume\)\); paintMute\(\);/);
   assert.match(d, /muted: 'Unmute' \};/); assert.match(d, /if \(tag\.dataset\.tagAct === 'muted'\) \{[^\n]*\{ muted: false \}/);
   assert.match(css(), /\.spk-volline\{display:flex/);

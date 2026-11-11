@@ -5,13 +5,20 @@ namespace WavWiz.Server.Tests;
 
 public class ApiTests
 {
+    /// <summary>0.7.0 item 5c: the one version every surface reports (Directory.Build.props &lt;WavWizVersion&gt;).</summary>
+    static string BuildVersion()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory); while (d != null && !File.Exists(Path.Combine(d.FullName, "WavWiz.sln"))) d = d.Parent;
+        var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(Path.Combine(d!.FullName, "Directory.Build.props")), @"<WavWizVersion>(\d+\.\d+\.\d+)</WavWizVersion>");
+        Assert.True(m.Success, "WavWizVersion in Directory.Build.props"); return m.Groups[1].Value;
+    }
     [Fact]
     public async Task Fresh_server_reports_BETA_version_requires_login_and_serves_the_static_shell()
     {
         await using var f = await ServerFixture.StartAsync();
         var st = await f.Http.GetJson("/api/v1/auth/state");
         Assert.True(st.GetProperty("setupRequired").GetBoolean()); Assert.True(st.GetProperty("beta").GetBoolean()); Assert.Equal("BETA", st.GetProperty("channel").GetString());
-        Assert.Matches(@"^0\.[0-4]\.\d+$", st.GetProperty("appVersion").GetString());
+        Assert.Equal(BuildVersion(), st.GetProperty("appVersion").GetString());   // 0.7.0 item 5c: THE version (Directory.Build.props), not a pinned 0.0-0.4 range
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.GetAsync("/api/v1/status")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.GetAsync("/api/v1/zones")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await f.Http.GetAsync("/api/v1/does-not-exist")).StatusCode);
@@ -122,7 +129,7 @@ public class ApiTests
         for (int i = 0; i < 100; i++) { var st = await admin.GetJson("/api/v1/library/status"); if (!st.GetProperty("scanning").GetBoolean() && st.GetProperty("tracks").GetInt32() == 2) break; await Task.Delay(100); }
         var hits = await admin.GetJson("/api/v1/library/search?q=beta"); Assert.Equal(1, hits.GetArrayLength()); Assert.Equal("Beta Song", hits[0].GetProperty("title").GetString());
         var tree = await admin.GetJson("/api/v1/library/tree"); Assert.Equal(4, tree.GetProperty("nodes").GetArrayLength());
-        Assert.Matches(@"^0\.[0-4]\.\d+$", (await admin.GetJson("/api/v1/status")).GetProperty("appVersion").GetString());
+        Assert.Equal(BuildVersion(), (await admin.GetJson("/api/v1/status")).GetProperty("appVersion").GetString());
     }
 
     [Fact]

@@ -24,7 +24,7 @@ test('F264 menuPlace: opens below, right-aligned, inside the screen', async () =
 });
 test('F264 More menu: content-sized, nowrap, solid, on top; placed only inside the phone sheet', () => {
   const css = src('../app.css'), d = src('devices.js');
-  assert.match(css, /\.dmore \.dmenu\{min-width:max-content;max-width:calc\(100vw - 16px\);white-space:nowrap;z-index:9600;background:var\(--panel\);opacity:1\}/);
+  assert.match(css, /\.dmore \.dmenu\{min-width:max-content;max-width:calc\(100vw \/ var\(--z,1\) - 16px\);white-space:nowrap;z-index:9600;background:var\(--panel\);opacity:1\}/);
   assert.match(css, /\.dmore \.dmenu button\{max-width:none;white-space:nowrap\}/);
   assert.match(d, /if \(!btn\.closest\('\.pd42-sheet'\)\) return;/); assert.match(d, /function open\(\) \{ menu\.hidden = false; place\(\);/);
 });

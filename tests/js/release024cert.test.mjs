@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const t = readFileSync(`${process.env.JS_DIR}/tls-setup.js`, 'utf8');
 
 test('0.2.4: tls-setup.js accepts both ping names and nothing else', () => {
@@ -20,7 +21,7 @@ test('0.2.4: a phone that trusted an earlier certificate is told to install the 
 
 test('0.2.4: What\'s new and CHANGELOG name the 0.2.4 fixes in words (no internal codes)', () => {
   const a = readFileSync(`${process.env.JS_DIR}/about.js`, 'utf8');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.[4-9]|[34]\.\d)'/);
+  assert.ok(vge(whatsNewVersion(a), '0.2.4'));
   for (const x of ['Phone set-up page fixed', 'QR code goes straight to calibration', 'Install steps when needed', 'Certificate says WavWiz']) assert.ok(a.includes(x), x);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.4\] - 2026-10-11 \(beta/); /* 0.2.5: marked "test build, not published" */ assert.ok(cl.indexOf('## [0.2.4]') < cl.indexOf('## [0.2.3]'));

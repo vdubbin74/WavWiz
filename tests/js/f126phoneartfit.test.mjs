@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+const raw = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+// 0.7.0 item 5c: viewport units are now divided by the Display size zoom (`88vw / var(--z,1)`, same value at 100%) so phones at Large / Extra small fit;
+// the checks below read the sizes with that factor taken out, and one check makes sure it is there.
+const css = raw.replace(/ \/ var\(--z,1\)/g, '');
+assert.match(raw, /--np-art:min\(88vw \/ var\(--z,1\),40dvh \/ var\(--z,1\),calc\(100dvh \/ var\(--z,1\) - 560px/);
 const i = css.indexOf('0.5.0 F126'); assert.ok(i > 0, 'F126 block present');
 const j = css.indexOf('0.5.0 F130', i); const blk = css.slice(i, j > 0 ? css.lastIndexOf('/*', j) : undefined);   // F130 appends its own (desktop) block after F126
 assert.ok(i > css.lastIndexOf('100dvh - 490px'), 'F126 overrides every 490px budget');

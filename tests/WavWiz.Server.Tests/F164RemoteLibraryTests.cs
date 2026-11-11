@@ -138,7 +138,9 @@ public class F164RemoteLibraryTests
         var js = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "wwwroot", "js", "library.js"));
         var i = js.IndexOf("async function remoteAlbumPage", StringComparison.Ordinal);
         Assert.True(i >= 0, "remoteAlbumPage missing");
-        var body = js.Substring(i, Math.Min(2200, js.Length - i));
+        // 0.7.0 item 5c: read the whole function (to the next sibling function), not a fixed 2,200 characters - the Shuffle button pushed the song list past it
+        var end = js.IndexOf("\n  async function ", i + 1, StringComparison.Ordinal);
+        var body = end > i ? js.Substring(i, end - i) : js.Substring(i);
         Assert.Contains("'albcover'", body);
         Assert.Contains("albhead", body);
         Assert.Contains("albmeta", body);

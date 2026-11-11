@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { vge } from './_ver.mjs';   // 0.7.0 item 5c
 globalThis.Element ??= class {};
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
@@ -87,6 +88,6 @@ test('F3: Mini player replaces Remote mode; F10/F11: versioned art URLs; F16: (i
   assert.match(src('menu.js'), /\['Mini player'/); assert.match(src('mini.js'), /send\(/);
   const art = await imp('art'); art.setArtCv('3.0.3.2'); assert.match(art.itemArtUrl({ kind: 'track', trackId: 5, refId: 5, id: 5 }) || '', /cv=3\.0\.3\.2/);
   assert.match(src('settingsui.js'), /class: 'infoi'|infoi/);
-  const a = await imp('about'); assert.equal(/^0\.(3\.[3-9]|4\.\d)$/.test(a.WHATS_NEW_VERSION), true); assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
+  const a = await imp('about'); assert.ok(vge(a.WHATS_NEW_VERSION, '0.3.2'));   /* 0.7.0 item 5c: any later release */ assert.ok(a.WHATS_NEW.some(([t]) => t === 'Album art fixed'));
   assert.ok(!a.WHATS_NEW.some(([t]) => t === 'Remote mode'), 'retired feature not advertised');
 });

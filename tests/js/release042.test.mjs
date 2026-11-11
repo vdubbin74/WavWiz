@@ -39,8 +39,8 @@ test('queueSuffix + leaderOf', async () => {
 test('zone menu: items, Split off only when linked, Link submenu', async () => {
   const { zoneMenu42 } = await imp('ctxmenu'); const lab = l => l.filter(i => !i.sep).map(i => i.label);
   const a = { admin: true, can: true, others: [{ id: 2, name: 'B' }], linked: false };
-  assert.deepEqual(lab(zoneMenu42(a)), ['Play', 'Mute', 'Set as Controlling', 'Open queue', 'Link to…', 'Rename', 'Delete zone']);
-  assert.deepEqual(lab(zoneMenu42({ ...a, linked: true, playing: true, muted: true })), ['Pause', 'Unmute', 'Set as Controlling', 'Open queue', 'Link to…', 'Split off', 'Rename', 'Delete zone']);
+  assert.deepEqual(lab(zoneMenu42(a)), ['Play', 'Mute', 'Set as Controlling', 'Open queue', 'Zone settings', 'Link to…', 'Rename', 'Delete zone']);   // 0.7.0 item 5c: 0.4.9 F69 added Zone settings
+  assert.deepEqual(lab(zoneMenu42({ ...a, linked: true, playing: true, muted: true })), ['Pause', 'Unmute', 'Set as Controlling', 'Open queue', 'Zone settings', 'Link to…', 'Split off', 'Rename', 'Delete zone']);
   assert.equal(zoneMenu42(a).find(i => i.id === 'link').sub[0].label, 'B'); assert.ok(zoneMenu42({ ...a, others: [] }).find(i => i.id === 'link').disabled);
   assert.ok(zoneMenu42({ ...a, controlling: true }).find(i => i.id === 'control').disabled); assert.ok(zoneMenu42({ ...a, admin: false }).find(i => i.id === 'delete').disabled);
   assert.ok(zoneMenu42(a).every(i => i.sep || i.ic));

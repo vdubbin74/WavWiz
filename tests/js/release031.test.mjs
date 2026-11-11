@@ -10,7 +10,8 @@ const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
 const css = readFileSync(join(js, '../app.css'), 'utf8');
 const mem = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), m }; };
-const rule = sel => { const i = css.lastIndexOf(sel + '{'); assert.ok(i >= 0, 'css rule ' + sel); return css.slice(i, css.indexOf('}', i)); };
+// 0.7.0 item 5c: the rule whose selector IS sel (a top-level line), not a longer phone-scoped selector that merely ends with it
+const rule = sel => { const re = new RegExp('(?:^|[}\\n])' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{', 'g'); let m, i = -1; while ((m = re.exec(css))) i = m.index + m[0].length - sel.length - 1; assert.ok(i >= 0, 'css rule ' + sel); return css.slice(i, css.indexOf('}', i)); };
 
 test('B18: EQ mode = Lock, swap, Looks, full screen; viz mode adds power + pop-out; no style button', async () => {
   const L = await imp('looks');
@@ -74,7 +75,7 @@ test('B5: both rails put the chevron at the top and center icon + vertical title
 });
 test('B7/B8: master bar uses the device-row structure (slider, %, Mute slot) and Mute all is on its own line', () => {
   const d = src('devices.js');
-  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)\)/);   // 0.3.2 F5: the slot now holds the round master mute
+  assert.match(d, /h\('div', \{ class: 'dvol dvol-master' \}, (?:Z\.zoneChip\('zs-master'\), )?sl, pct, masterMuteButton\(S, ctl\)(?:, mixerButton\('mutebtn dmixbtn'\))?\)/   /* 0.7.0 item 5c: + the mixer button */);   // 0.3.2 F5: the slot now holds the round master mute
   assert.match(d, /h\('div', \{ class: 'dvol' \}, vol, pct, mute\)/, 'device rows: slider, %, round mute');
 });
 test('B9: compact Scenes & Schedules: next event + countdown + Skip, Run chips, Open, + for admins only', async () => {

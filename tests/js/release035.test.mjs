@@ -58,6 +58,9 @@ test('J7 what\'s new version compare', async () => {
   assert.equal(verCmp('0.3.5', '0.3.5'), 0); assert.equal(verCmp('9.9.9', '0.3.5'), 1); assert.equal(verCmp('0.3.10', '0.3.9'), 1); assert.equal(verCmp('0.3.4', '0.3.5'), -1);
 });
 test('J12 switches are labeled pills with 3px corners; no hex in 0.3.5 css', () => {
-  const css = readFileSync(join(web, 'app.css'), 'utf8'); const i = css.indexOf('0.3.6'); assert.ok(i > 0);
-  assert.doesNotMatch(css.slice(i), /#[0-9a-f]{3,8}\b(?![\w-])/i);
+  // 0.7.0 item 5c: the 0.3.6 blocks only (later releases' fixed-palette art has its own tests)
+  const css = readFileSync(join(web, 'app.css'), 'utf8');
+  const own = [...css.matchAll(/\/\*[^*]*?\b0\.3\.6\b/g)].map(m => { const r = css.slice(m.index + 2), e = r.search(/\/\*[^*]*?\b0\.(?!3\.6\b)\d+\.\d+/); return css.slice(m.index, e < 0 ? undefined : m.index + 2 + e); });
+  assert.ok(own.length >= 1 && own.join('').length > 5000, '0.3.6 blocks found');   // every block a "0.3.6" comment opens, not only the first one
+  assert.doesNotMatch(own.join('\n'), /#[0-9a-f]{3,8}\b(?![\w-])/i);
 });

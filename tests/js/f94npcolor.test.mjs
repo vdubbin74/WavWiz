@@ -29,7 +29,7 @@ test('Appearance has the Color intensity bar and Reset effects keeps color', () 
 // ---- 0.5.0 F95: mixable Now Playing (Track bar x Buttons x Color intensity) ----
 test('F95: old package style migrates to seek + buttons; unknown ids clamp; style is not written back', async () => {
   const m = await import(path.join(J, 'npstyle.js'));
-  const mig = { classic: ['line', 'round'], center: ['wave', 'soft'], stack: ['led', 'square'], horizon: ['line', 'ring'], undefined: ['line', 'round'] };
+  const mig = { classic: ['line', 'round'], center: ['wave', 'soft'], stack: ['led', 'square'], horizon: ['line', 'ring'], undefined: ['line', 'square'] };   // 0.7.0 item 5c: F157b - no saved style = the app default (Square buttons)
   for (const [s, [seek, buttons]] of Object.entries(mig)) { const n = m.normNpPrefs(s === 'undefined' ? {} : { style: s }); assert.equal(n.seek, seek, s); assert.equal(n.buttons, buttons, s); assert.equal(n.color, 'spicy'); assert.ok(!('style' in n)); }
   assert.deepEqual([m.normNpPrefs({ seek: 'eq', buttons: 'ring', color: 'max' })].map(n => [n.seek, n.buttons, n.color])[0], ['eq', 'ring', 'max']);
   assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).seek, 'line'); assert.equal(m.normNpPrefs({ seek: 'disc', buttons: 'blob' }).buttons, 'square');
@@ -65,7 +65,7 @@ test('F96: CSS per art mode, phone keeps art, Appearance Album art row between B
   const iB = a.indexOf("'Buttons'), pick("), iA = a.indexOf("'Album art'), pick("), iC = a.indexOf("'Color intensity'),");
   assert.ok(iB > 0 && iA > iB && iC > iA, 'order'); assert.ok(a.includes('album art and color intensity'));
   const s = fs.readFileSync(path.join(J, 'npstyle.js'), 'utf8');
-  for (const t of ['Outline follows track time.', 'Spins while playing.', 'Vinyl slides out with progress.']) assert.ok(s.includes(t), t);
+  for (const t of ['Outline follows track time.', 'Spins while playing.', 'Vinyl slides out of the jacket with progress.' /* 0.7.0 item 5c: F104 Jacket wording */]) assert.ok(s.includes(t), t);
 });
 
 // ---- 0.5.0 F97: Album art Cassette ----

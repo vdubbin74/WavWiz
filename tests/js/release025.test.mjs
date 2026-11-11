@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
@@ -144,7 +145,7 @@ test('0.2.5 C: Settings - Appearance sections are sub-tabs under the main tabs, 
 
 test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; CHANGELOG has 0.2.5 above 0.2.4 with the iPhone root cause in words', async () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.5|[34]\.\d)'/);
+  assert.ok(vge(whatsNewVersion(a), '0.2.5'));
   const i25 = a.indexOf('Calibrate with your PC’s mic'), i24 = a.indexOf('Phone set-up page fixed');
   assert.ok(i25 > 0 && i24 > i25, '0.2.5 first, 0.2.4 kept');
   for (const x of ['iPhone calibration fixed', 'Phone: speaker or mic', 'Cleaner device cards', 'Wider Settings']) assert.ok(a.includes(x), x);

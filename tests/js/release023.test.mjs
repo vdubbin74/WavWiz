@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { whatsNewVersion, vge, buildVersion } from './_ver.mjs';   // 0.7.0 item 5c
 const js = process.env.JS_DIR;
 const imp = n => import(pathToFileURL(`${js}/${n}.js`).href);
 const src = n => readFileSync(join(js, n), 'utf8');
@@ -14,7 +15,7 @@ test('0.2.3 U1: minimized Now Playing is ONE line - thumbnail, title · artist o
   const n = src('now.js');
   assert.match(n, /h\('div', \{ class: 'ns-song' \}, sArt, h\('div', \{ class: 'ns-main' \}, h\('div', \{ class: 'ns-titles' \}, sT1,[^\n]*h\('div', \{ class: 'ns-seek' \}, sElv, sProg, sDur\)\)\)/);
   assert.match(n, /h\('div', \{ class: 'ns-x', role: 'group', 'aria-label': 'Transport' \}, sHeart, sShuffle, sPrev, sPlay, sNext, sRepeat\)/);
-  assert.match(n, /h\('div', \{ class: 'ns-vol' \}, icon\('volume'\), sVol, sPct, sMute, sEq\)/);
+  assert.match(n, /h\('div', \{ class: 'ns-vol' \}, sMute, mkMix\(\), sEq\)/);   /* 0.7.0 item 5c: 0.4.8 F54 - the mixer button replaces the slider in the play bars */
   assert.match(n, /for \(const r of \[vol, barVol, sVol\]\)/);
   assert.match(n, /for \(const b of \[muteBtn, barMute, sMute\]\)/);
   assert.doesNotMatch(n, /songBlock|plsong|np-strip-c/);          // nothing moves to the Playlist title bar any more, no forced centering
@@ -31,10 +32,10 @@ test('0.2.3 U2: minimized Playlist shows "Up next: Title · Artist" centered on 
   assert.match(n, /drawNext\(nxt\);/);
   assert.match(n, /'Nothing queued after this'/);
   assert.match(l, /const setNextBlock = el => \{ head\.insertBefore\(el, meta\); \}/);
-  assert.match(m, /const on = desk\.classList\.contains\('listcollapsed'\)/);
-  assert.match(m, /const c = col\.left \+ col\.width \/ 2, room = Math\.min\(c - \(listt\.leftEdge\(\) \+ 16\), listt\.rightEdge\(\) - 16 - c\)/);
+  assert.match(m, /const on = !window\.matchMedia\('\(max-width:900px\)'\)\.matches;/);   /* 0.7.0 item 5c: 0.5.0 F88 shows Up next with the Queue collapsed, open or full-screen */
+  assert.match(m, /const L = listt\.leftEdge\(\) \+ 16, Rr = listt\.rightEdge\(\) - 16, gap = Rr - L, c = col\.left \+ col\.width \/ 2;/);   /* 0.4.8 F50: placed in the free gap of the Queue header */
   assert.match(m, /listt\.setCollapsed\?\.\(st\); syncMini\(\); placeNext\(\);/);   // 0.3.2 F13: state = collapsed / open / expanded
-  assert.match(css, /\.desk\.listcollapsed \.plnext:not\(\[hidden\]\)\{display:flex;[^}]*transform:translateX\(-50%\)/);
+  assert.match(css, /\.desk(?:\.listcollapsed)? \.plnext:not\(\[hidden\]\)\{display:flex;[^}]*transform:translateX\(-50%\)/);   /* 0.7.0 item 5c: F88 - in every Queue state now */
   assert.doesNotMatch(css, /\.desk\.listcollapsed \.listpanel \.pane-h \.small,\.desk\.listcollapsed \.listpanel \.pane-h \.row:not\(\.listcolwrap\)\{display:none\}/);
 });
 
@@ -141,7 +142,7 @@ test('0.2.3 U7: DEVICES title at the right edge of the Devices header, mirroring
 
 test('0.2.3: What\'s new lists the 0.2.3 changes in US English; CHANGELOG has the 0.2.3 entry above 0.2.2', () => {
   const a = src('about.js');
-  assert.match(a, /WHATS_NEW_VERSION = '0\.(2\.[3-9]|[34]\.\d)'/);   // 0.2.4: What's new moved on to the 0.2.4 list; the 0.2.3 changes stay in the CHANGELOG
+  assert.ok(vge(whatsNewVersion(a), '0.2.3'));   // 0.7.0 item 5c: any later release.   // 0.2.4: What's new moved on to the 0.2.4 list; the 0.2.3 changes stay in the CHANGELOG
   assert.doesNotMatch(a, /\b(colour|favourite|grey|centre|licence|behaviour)\b/i);
   const cl = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(cl, /## \[0\.2\.3\] - 2026-10-11 \(beta\)/); assert.ok(cl.indexOf('## [0.2.3]') < cl.indexOf('## [0.2.2]'));
@@ -158,7 +159,7 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   const panel = d.slice(d.indexOf('function draw(force)'), d.indexOf('export function devicesView'));
   assert.match(panel, /if \(!force && body\.querySelector\('\.dmenu:not\(\[hidden\]\)'\)\) return later\(\);/);
   assert.match(panel, /if \(busy\.v\) later\(\);/, 'a card / slider / zone editor kept for the user retries');
-  assert.doesNotMatch(panel, /\) return;/);
+  assert.doesNotMatch(panel.replace(/const hookDesk = [^\n]*/, ''), /\) return;/);   // 0.7.0 item 5c: hookDesk's one-time observer guard is not a skipped redraw
   // the phone Devices page follows the same rule
   const page = d.slice(d.indexOf('export function devicesView'));
   assert.match(page, /const gone = \[\.\.\.list\.querySelectorAll\('\[data-zone-id\]'\)\]/);
@@ -166,7 +167,11 @@ test('0.2.3 U11: a revoked or forgotten device leaves the Devices list live - no
   // the "zones" push redraws every view (side panel, page, strip) from fresh /zones + /groups - nothing cached
   const m = src('main.js');
   assert.match(m, /m\.type === 'zones'\) \{ refreshZones\(\);/);
-  assert.match(m, /async function refreshZones\(\) \{ try \{ const \[z, g(?:, jb)?\] = await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)[^\n]*S\.zones = z; S\.groups = g; (?:Z\.sync\(\); if \(isDevDragging\(\)\) \{[^}]*\} else )?(if \(idsChanged\) \{ )?devv\.draw\(\); devp\.draw\(\);/);
+  // 0.7.0 item 5c: later releases added the jukebox / Cast reads (F78), the optimistic-move guard (F269) and an idle redraw; the rule is unchanged:
+  // fresh /zones + /groups, then BOTH views redraw (at once when the ids changed, else when idle, never under a drag)
+  const rz = m.match(/async function refreshZones\(\) \{[^\n]*/)?.[0] || '';
+  assert.match(rz, /await Promise\.all\(\[api\('\/zones'\), api\('\/groups'\)/); assert.match(rz, /S\.zones = z; S\.groups = g;/);
+  assert.match(rz, /if \(isDevDragging\(\)\) \{[^}]*\} else if \(idsChanged\) \{ devv\.draw\(\); devp\.draw\(\); \} else whenIdle\(\(\) => \{ devv\.draw\(\); devp\.draw\(\); \}/);
   // a browser speaker told "unauthorized" (forgotten / revoked) stops instead of reconnecting straight back onto the list
   const r = src('room.js');
   assert.match(r, /if \(\/\^unauthorized\/i\.test\(b\?\.reason \|\| ''\)\) \{ this\.removed = true; this\.stop\(\)/);

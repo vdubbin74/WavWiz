@@ -14,7 +14,7 @@ test('F91: phoneRole/setPhoneRole accept speaker, remote, mic; reject others', (
   const bad = mem(); bad.setItem(ROLE_KEY, 'tv'); assert.equal(phoneRole(bad), null);
 });
 test('F91: dialog has three choices, spec wording and footer; Escape cannot dismiss', () => {
-  for (const t of ['How do you want to use this phone?', "'Play music here'", "'Use as remote'", "'Use as a calibration mic'", 'This phone plays in sync with your other speakers.', 'Control the music. This phone stays silent.', 'Listens only, to line up your speakers.', 'You can change this later in the menu → Phone role.']) assert.ok(room.includes(t), t);
+  for (const t of ['How do you want to use this phone?', "'Play music here'", "'Use as remote'", "'Use as a calibration mic'", 'This phone plays in sync with your other speakers.', 'Control the music. This phone stays silent.', 'Listens only, to line up your speakers.', 'You can change this later in Settings → Phone role.' /* 0.7.0 item 5c: F100 moved Phone role into Settings */]) assert.ok(room.includes(t), t);
   assert.match(room, /oncancel: ev => ev\.preventDefault\(\)/);
 });
 test('F91: auto-join branches: ?role=remote accepted, remote shows banner and returns before joining, mic unchanged', () => {

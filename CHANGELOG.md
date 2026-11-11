@@ -29,6 +29,8 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ### Fixed
 - AirPlay speakers card: when it was open before a page reload it no longer sticks on “Looking…”; it searches again by itself, and a failed search says so instead of showing an empty list.
+- Phones at the Large or Extra small display size: screen-height and screen-width sizes (Now Playing art, sheets, menus) now follow the display size, so nothing is cut off or oversized. No change at the default size.
+- Turning on remote HTTPS with Tailscale asks in the app’s own themed dialog instead of the browser’s plain confirm box.
 
 ### Not on Linux / Raspberry Pi
 - No CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.

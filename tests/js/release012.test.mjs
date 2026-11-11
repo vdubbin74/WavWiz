@@ -67,11 +67,11 @@ test('0.1.2 Now Playing viz panel + solid control panel, playlist collapse-down,
   assert.match(n, /shuffle, prev, play, next, repeat/);
   // arrow reuses the Playlist toggle class (plus listcol), persisted per device; collapse grows the viz panel
   assert.match(n, /class: 'plus listcol np-ctlcol'/);
-  assert.match(n, /loadPanels\(\)\.ctl === 'collapsed'/);   // 0.3.0 §6: one key (wavwiz.panels)
+  assert.match(n, /const P0 = loadPanels\(\)[^\n]*\n[^\n]*\n\s*let ctlCollapsed = P0\.ctl === 'collapsed' && !phoneNp;/);   // 0.3.0 §6: one key (wavwiz.panels); 0.4.9 F68: never folded on a phone (0.7.0 item 5c)
   assert.doesNotMatch(css, /\.np-ctlcol\{|\.np-ctlcol\.plus|\.np-statuscol/, 'no bespoke arrow styling');
   // both NP panels share the exact Library/Devices/Playlist chrome rule; solid, no glass
   assert.match(css, /\.libpanel,\.nowcol,\.devpanel,\.listpanel,\.np-vizpanel,\.np-ctlpanel\{/);
-  assert.doesNotMatch(css, /backdrop-filter:blur/);
+  assert.doesNotMatch(css, /(?:^|[},])[^{}]*\.(?:np-vizpanel|np-ctlpanel|nowcol|libpanel|devpanel|listpanel)\b[^{}]*\{[^}]*backdrop-filter:blur/m);   // 0.7.0 item 5c: the panels; later tile badges blur only their own chip
   assert.doesNotMatch(css, /\.np-table\{/);
   assert.match(css, /\.np-vizpanel\{flex:1 1 0/);
   assert.match(css, /\.np-ctlpanel\.collapsed \.np-ctlbody\{max-height:0/);

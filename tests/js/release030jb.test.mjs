@@ -26,7 +26,8 @@ test('0.3.0 §1: the kiosk swallows Esc, Alt+Tab, F11, Alt+F4 and the context-me
   assert.equal(c.isExitChord({ key: 'J', ctrlKey: true, shiftKey: true }), true); assert.equal(c.blockedKey({ key: 'J', ctrlKey: true, shiftKey: true }), false);
   const k = src('jukebox-kiosk.js');
   assert.match(k, /addEventListener\('keydown', block, true\)/); assert.match(k, /addEventListener\('contextmenu', noMenu, true\)/);
-  assert.match(k, /api\('\/jukebox\/unlock', \{ method: 'POST', body: \{ pin \} \}\); closeKiosk\(\)/, 'leaving needs the PIN checked by the server');
+  // 0.7.0 item 5c: 0.4.9 F76 asks "back to the app / stop" between the server's PIN check and closing; a wrong PIN still returns before closeKiosk
+  assert.match(k, /api\('\/jukebox\/unlock', \{ method: 'POST', body: \{ pin \} \}\); \} catch \{ toast\([^;]*\); return; \}[\s\S]{0,400}?closeKiosk\(\)/, 'leaving needs the PIN checked by the server');
   assert.match(k, /setTimeout\(askExit, 1200\)/, 'long-press the corner logo');
   assert.match(k, /new Viz\(bg/, 'visualizer behind'); assert.match(k, /viz\?\.destroy/);
 });

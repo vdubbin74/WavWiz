@@ -24,8 +24,12 @@ assert.match(now, /mkSleep\(\)\),[^\n]*\n\s*zoneLink\('zl-ov'\)/);
 assert.ok(!/np-tabletitles' \}, [^\n]*zoneLink\('zl-ov'\)/.test(now));
 // CSS: F130 block is token-only and desktop-gated; phone hides the new bits
 const blk = css.slice(css.indexOf('0.5.0 F130'));
-assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(blk), 'no hard-coded hex in F130 CSS');
-assert.ok(!/rgba?\(/.test(blk), 'no literal rgb colors in F130 CSS');
+// 0.7.0 item 5c: the token-only rule covers F130's own rules - every block whose comment names F130, up to the next feature's comment.
+// Slicing to the end of app.css also caught later features (e.g. a var(--accent-ink,#fff) fallback on the panel pins).
+const own = [...css.matchAll(/\/\* [^*]*?F130/g)].map(m => { const r = css.slice(m.index + 6), e = r.search(/\/\* (?:[\d.]+ )?F(?!130\b)\d+/); return css.slice(m.index, e < 0 ? undefined : m.index + 6 + e); }).join('\n');
+assert.ok(own.length > 2000, 'F130 blocks found');
+assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(own), 'no hard-coded hex in F130 CSS');
+assert.ok(!/rgba?\(/.test(own), 'no literal rgb colors in F130 CSS');
 assert.match(blk, /@media \(min-width:761px\)\{/);
 assert.match(blk, /@media \(max-width:760px\)\{ \.np-ctlpanel \.np-aaline,\.np-ctlpanel \.np-scside,\.np-ctlpanel \.sctoggle\{display:none!important\} \}/);
 for (const v of ['--accent', '--line', '--panel2', '--ink', '--dim', '--radius']) assert.ok(blk.includes('var(' + v), v);
@@ -34,7 +38,7 @@ assert.match(css, /\.nowcol \.np-ctlpanel \.zl-ov\{grid-area:zone/);
 console.log('f130 ok');
 // Amendments 1+2: narrow widths, art styles, collapsed strip, condensed player
 assert.match(blk, /@container npctl \(max-width:560px\)\{ \.np-ctlpanel\.np-flat/);
-assert.match(blk, /np-flat\.pn-art-cassette \.pn-art/);
+assert.match(blk, /np-flat\.pn-art-cassette(?::not\(\.collapsed\))? \.pn-art/);   // 0.7.0 item 5c: F171 scoped it to the expanded player
 assert.match(blk, /np-flat\.collapsed \.np-scside/);
 assert.ok(!/:has\(\.scrow \.scbtn/.test(css), 'old header-pin squeeze rules retargeted');
 assert.match(now, /F130: collapsed line = Artist · Album/);
@@ -43,7 +47,8 @@ assert.match(mini, /lab\('Artist', it\.artist\)/); assert.match(mini, /lab\('Alb
 const mb = mcss.slice(mcss.indexOf('0.5.0 F130')); assert.ok(mb.length > 20 && !/#[0-9a-fA-F]{3,8}\b/.test(mb));
 console.log('f130 amendments ok');
 // Amendment 3: condensed (embedded mini) uses the same Shortcuts toggle -> vertical strip; collapsed reuses the NP header toggle + drop-down strip
-assert.match(mini, /const sc = embedded \? \(\(\) => \{ const sd = shortcutsSide\(\{ run: scRun, home: scHome, cls: 'mp-scside'/);
+// 0.7.0 item 5c: 0.6.8 (e85c62b) gave every mini player (embedded and standalone) the same toggle + strip, laid out as a row
+assert.match(mini, /const sc = \(\(\) => \{ const sd = shortcutsSide\(\{ run: scRun, home: scHome, cls: 'mp-scside', horizontal: true/);
 assert.match(mini, /h\('div', \{ class: 'mp-sc mp-sctog' \}, sd\.toggle, sd\.strip\)/);
 assert.match(mcss, /\.mp \.mp-scside \.scrow\{flex-direction:column/);
 assert.doesNotMatch(blk, /\.np-ctlpanel\.np-flat\.collapsed \.np-scside\{top:100%/); // F135: no drop-down
