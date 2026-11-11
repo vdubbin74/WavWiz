@@ -1,5 +1,6 @@
 import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
+import { LOGO, emblem } from './logo.js';   // 0.7.0 item 4
 
 export const WHATS_NEW_VERSION = '0.7.0';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
@@ -236,7 +237,7 @@ const FILES = [['/licenses/LICENSE.txt', 'WavWiz license'], ['/licenses/THIRD-PA
 export function aboutBody(S) {
   const v = S?.auth?.appVersion ?? '';
   return h('div', { class: 'about' },
-    h('div', { class: 'aboutHead' }, h('img', { src: '/assets/logo-128.png', alt: '', width: 72, height: 72 }), h('div', null, wordmark('wordmark big'), h('div', { class: 'small dim', 'data-wwv': 'BETA {v}' }, `BETA ${v}`))),
+    h('div', { class: 'aboutHead' }, (LOGO.about ? emblem('pf-emblem about-emblem') : h('img', { src: '/assets/logo-128.png', alt: '', width: 72, height: 72 })), h('div', null, wordmark('wordmark big'), h('div', { class: 'small dim', 'data-wwv': 'BETA {v}' }, `BETA ${v}`))),
     h('p', null, 'WavWiz plays your own music in sync on every speaker in the house: PCs with Bluetooth or wired speakers, phones, TVs and any browser. No cloud account, no analytics, no telemetry.'),
     h('div', { class: 'card' }, h('h3', null, 'Privacy'), h('ul', { class: 'small' },
       h('li', null, 'No cloud account, no analytics, no telemetry. WavWiz doesn\'t open ports to the internet; by default it only listens on your home network.'),

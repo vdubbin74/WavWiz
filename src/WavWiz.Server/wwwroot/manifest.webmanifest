@@ -1,9 +1,9 @@
 { "id": "/", "name": "WavWiz", "short_name": "WavWiz", "description": "Play your music in sync on every speaker in the house.",
   "start_url": "/", "scope": "/", "display": "standalone", "orientation": "portrait", "background_color": "#000614", "theme_color": "#FF3C00",
   "icons": [
-    { "src": "/assets/logo-180.png?v=f237", "sizes": "180x180", "type": "image/png", "purpose": "any" },
-    { "src": "/assets/logo-167.png?v=f272", "sizes": "167x167", "type": "image/png", "purpose": "any" },
-    { "src": "/assets/logo-152.png?v=f272", "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-180.png?v=pf070", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-167.png?v=pf070", "sizes": "167x167", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-152.png?v=pf070", "sizes": "152x152", "type": "image/png", "purpose": "any" },
     { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/assets/logo-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
     { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

@@ -20,11 +20,11 @@ test('touch icons are never redirected to https', () => {
 });
 test('the page inlines the icon as a data: URL on iOS', async () => {
   const { inlineTouchIcon } = await import(new URL('wwwroot/js/a2hs.js', root));
-  const links = ['apple-touch-icon', 'apple-touch-icon-precomposed'].map(rel => { const a = { href: '/assets/logo-180.png?v=f237' }; return { rel, dataset: {}, getAttribute: () => a.href, setAttribute: (_, v) => { a.href = v; }, get href() { return a.href; } }; });
+  const links = ['apple-touch-icon', 'apple-touch-icon-precomposed'].map(rel => { const a = { href: '/assets/logo-180.png?v=pf070' }; return { rel, dataset: {}, getAttribute: () => a.href, setAttribute: (_, v) => { a.href = v; }, get href() { return a.href; } }; });
   const doc = { querySelectorAll: sel => links.filter(l => sel.includes(`"${l.rel}"`)) };
   class FR { readAsDataURL() { this.result = 'data:image/png;base64,AAAA'; this.onload(); } }
   const win = { navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' }, FileReader: FR, fetch: async () => ({ ok: true, blob: async () => ({ type: 'image/png' }) }) };
-  assert.equal(await inlineTouchIcon(win, doc, '/assets/logo-180.png?v=f237'), true);
+  assert.equal(await inlineTouchIcon(win, doc, '/assets/logo-180.png?v=pf070'), true);
   for (const l of links) assert.equal(l.href, 'data:image/png;base64,AAAA');
   const failing = { ...win, fetch: async () => { throw new Error('cert'); } }; assert.equal(await inlineTouchIcon(failing, doc, 'x'), false);
 });

@@ -1,3 +1,4 @@
+import { LOGO, emblem } from './logo.js';   // 0.7.0 item 4
 // Header wordmark (0.0.6): plain text "WavWiz" (Wav = --accent, Wiz = --accent2). No logo image in the header (fixes broken "MANMLS" SVG rendering).
 export function wordmark(cls = 'wordmark') {
   const el = document.createElement('span');
@@ -9,10 +10,11 @@ export function wordmark(cls = 'wordmark') {
   el.append(wav, wiz);
   return el;
 }
-/** Text wordmark only (no logo image) for the page header. */
+/** Header brand: 0.7.0 Parallel Flow emblem (inline, theme colors) + the text wordmark in the current app font. LOGO.header = false -> text only. */
 export function brandMark(opts = {}) {
   const wrap = document.createElement('div');
   wrap.className = opts.class || 'logo';
+  if (LOGO.header && opts.emblem !== false) wrap.append(emblem('pf-emblem brand-emblem'));
   wrap.append(wordmark(opts.wordmarkClass || 'wordmark'));
   return wrap;
 }
