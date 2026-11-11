@@ -5513,3 +5513,9 @@ html[data-qkeep-style=badge] .qkeep.qkeep-ic.qkeep-on .qkeep-badge{display:block
 .mp.embedded .mp-txt .zl-line>:first-child{flex:none;max-width:100%}
 .mp.embedded .mp-txt .zl-line .zlink{flex:none;max-width:100%}
 .np-tabletitles .zlink,.np-meta .titles .zlink,.np-phone-zone .zl-fullphone{max-width:100%}
+
+/* 0.6.8c: the docked Devices side panel keeps ONE width (380 px, the old 1920 px size) at every window width; only the middle column
+   (Now Playing / Sound / Queue) grows and shrinks. It used to follow the window width (250-380 px), so a smaller window squeezed it. The narrow layouts
+   (<= 900 px phone page, Roomy / Auto slide-over) keep their own rules. panels.js DEV_PX mirrors this for the auto-rail math. */
+:root{--devw:380px;--spkcol:var(--devw)}
+.desk{grid-template-columns:var(--libw,clamp(230px,calc(21vw / var(--z,1)),360px)) minmax(0,1fr) var(--rightw,var(--devw))}

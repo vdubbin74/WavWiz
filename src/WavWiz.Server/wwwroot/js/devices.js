@@ -1004,9 +1004,11 @@ export function devicesPanel(S, ctl) {
   root.addEventListener('click', ev => { if (size === 'collapsed' && !ev.target.closest('.devcol')) ctl.toggleDev?.(false); });
   // F215/F216: measure the standard body only when settled in standard (not mid-glide, not Roomy).
   // F222 t1155u: --devstdw = standard body OUTER width (offsetWidth, includes classic SB lane) = the Speakers grid track. No gutter math.
-  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold')) return;
+  // 0.6.8c: never measure the Auto-layout slide-over (.tight) or the phone page - neither is the docked panel, and a narrow value measured there
+  // used to stick in --devstdw so the expanded Speakers column stayed narrow after the window grew back. A fresh measure also refreshes the property.
+  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold') || d?.classList.contains('tight') || (HASWIN && window.innerWidth <= 900)) return;
     const w = body.offsetWidth; if (w < 200) return;
-    root._stdw = Math.round(w); root._stdwGood = root._stdw; };   // F221 C: sticky last-good
+    root._stdw = Math.round(w); root._stdwGood = root._stdw; root.style.setProperty('--devstdw', root._stdw + 'px'); };   // F221 C: sticky last-good
   const setSize = (s, highlight = null) => {
     // F215/F216: --devstdw cached while standard (Full only; never measured after applyPanels flips classes, never in Roomy - clamp there)
     const desk = root.closest?.('.desk'), roomy = !!desk?.classList.contains('roomy');

@@ -45,7 +45,7 @@ test('F13/F15: playlist has three heights; ˄ steps up, ˅ steps down; arrows hi
   assert.equal(p.listStep({ list: 'open' }, 'up').list, 'expanded'); assert.equal(p.listStep({ list: 'expanded' }, 'up').list, 'expanded');
   assert.equal(p.listStep({ list: 'expanded' }, 'down').list, 'open'); assert.equal(p.listStep({ list: 'open' }, 'down').list, 'collapsed'); assert.equal(p.listStep({ list: 'collapsed' }, 'down').list, 'collapsed');
   assert.deepEqual(p.listArrows('collapsed'), { up: true, down: false }); assert.deepEqual(p.listArrows('expanded'), { up: false, down: true });
-  assert.equal(p.centerWidthFor(1920), 1140); assert.equal(p.centerWidthFor(1280), 690);
+  assert.equal(p.centerWidthFor(1920), 1140); assert.equal(p.centerWidthFor(1280), 591);   // 0.6.8c: Devices is a fixed 380 px (was 282 at 1280)
   assert.equal(p.normPanels({ list: 'expanded' }).list, 'expanded');
 });
 
