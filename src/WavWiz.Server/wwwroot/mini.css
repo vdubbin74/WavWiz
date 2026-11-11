@@ -310,3 +310,14 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-dock .mp-vol{
 body.minibody .mp:not(.slim):not(.embedded) .mp-dock .mp-ctl{
   flex:0 0 auto;width:auto;order:1;align-self:center;margin-left:0;
 }
+
+/* 0.6.8: standalone mini keeps art and the song block on one row (title / seek / artist+zone).
+   F86's flex:1 1 100% + width:100% on .mp-txt wrapped the text under the art, leaving a hole
+   beside the cover and growing the window to ~169 CSS px, which clipped in the 128 px default
+   window and in the site's 840x240 frame. */
+body.minibody .mp:not(.slim):not(.embedded) .mp-artbox{flex:0 0 auto;align-self:center}
+body.minibody .mp:not(.slim):not(.embedded) .mp-txt{flex:1 1 0;width:auto;max-width:none;min-width:0;height:auto;min-height:44px;align-content:center}
+body.minibody .mp:not(.slim):not(.embedded) .mp-t{padding-right:0}
+body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:6px;min-width:0;width:100%}
+body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .mp-a{flex:1 1 0;min-width:0}
+body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .zlink{flex:0 0 auto;width:max-content;max-width:50%}
