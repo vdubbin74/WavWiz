@@ -137,7 +137,13 @@ export class Viz {
     const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return null;
     return [Math.max(64, Math.round(w * dpr)), Math.max(64, Math.round(h * dpr))];
   }
-  sizeCanvas(force) { const s = this.boxSize(); if (!s) return false; const [w, h] = s; if (force || w !== this.canvas.width || h !== this.canvas.height) { this.canvas.width = w; this.canvas.height = h; this.paintDark(); return true; } return false; }
+  /** 0.6.8d: setting canvas.width/height wipes the picture; a window drag used to do that on every resize tick and paint it dark, so the
+   *  visualizer strobed. With keep, the last frame is copied, the backing store resized, and that frame drawn back scaled in the same task. */
+  sizeCanvas(force, keep = false) { const s = this.boxSize(); if (!s) return false; const [w, h] = s; if (force || w !== this.canvas.width || h !== this.canvas.height) {
+    let snap = null; if (keep && this.canvas.width && this.canvas.height) { try { snap = document.createElement('canvas'); snap.width = this.canvas.width; snap.height = this.canvas.height; snap.getContext('2d').drawImage(this.canvas, 0, 0); } catch { snap = null; } }
+    this.canvas.width = w; this.canvas.height = h;
+    if (snap) { try { this.ctx.drawImage(snap, 0, 0, w, h); } catch { this.paintDark(); } } else this.paintDark();
+    return true; } return false; }
 
   async start() {
     if (this.started) return; this.started = true;
@@ -180,7 +186,7 @@ export class Viz {
     this._t = setInterval(() => this.kick(), 500);
     this._th = () => this.configure(); window.addEventListener('wavwiz:theme', this._th); window.addEventListener('wavwiz:vizsettings', this._th);
   }
-  resize() { if (this.canvas) this.sizeCanvas(false); }
+  resize() { if (!this.canvas || this.rzRaf) return; this.rzRaf = requestAnimationFrame(() => { this.rzRaf = 0; if (this.canvas && this.sizeCanvas(false, true)) this.last = 0; }); }   // 0.6.8d: like the EQ meters - resize only on a real change, at most once per frame, and repaint at once (last picture scaled now, a fresh frame on the very next tick, no fps-cap skip)
   kick() {
     const should = this.ok || this.mode === 'waiting';
     const run = should && !this.destroyed && this.visible !== false && !document.hidden;
