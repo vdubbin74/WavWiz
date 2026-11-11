@@ -186,6 +186,7 @@ function speakerRow(d) {
 
 function buildCard(S, ctl) {
   Sref = S; ctlRef = ctl;
+  if (open && closed) { closed = false; setTimeout(() => { if (open && !closed) { rescan(); startPoll(); } }, 0); }   // reopened from this tab's saved state after a reload: scan, don't sit on "Looking…"
   const n = devs.length;
   const note = !open ? (n ? `${n} found` : 'Find, test and add') : (n ? `${n} on this network` : 'Looking…');
   const step = csStep(st(selId), devs.find(d => d.id === selId));

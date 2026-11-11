@@ -62,3 +62,11 @@ test('a Cast speaker gets a CAST tag like AIRPLAY / HDMI', () => {
   assert.match(d, /startsWith\('cast:'\)\) return \{ k: 'otype cast', text: 'CAST'/);
   assert.match(d, /startsWith\('airplay:'\)\) return \{ k: 'otype airplay', text: 'AIRPLAY'/);
 });
+
+test('0.7.0 F169 preview fixes: Cast card restored open after a reload scans by itself; setup cards keep the normal 10 px tree gap', () => {
+  const src = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/castsetup.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(open && closed\) \{ closed = false; setTimeout\(\(\) => \{ if \(open && !closed\) \{ rescan\(\); startPoll\(\); \} \}, 0\); \}/);
+  const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
+  assert.match(css, /\.apsetup-card,\.castsetup-card\{margin:0;min-width:0\}/);
+  assert.match(css, /\.tree42>\.apsetup-card:last-child,\.tree42>\.castsetup-card:last-child\{margin-bottom:8px\}/);
+});
