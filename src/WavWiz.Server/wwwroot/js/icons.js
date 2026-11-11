@@ -49,7 +49,8 @@ const P = {
   moon: '<path d="M19.5 14.6A8 8 0 0 1 9.4 4.5a8 8 0 1 0 10.1 10.1z"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4M6 6l1.7 1.7M16.3 16.3 18 18M18 6l-1.7 1.7M7.7 16.3 6 18"/>',
   alarm: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4l2.5 1.5M4.5 5.5 7 3.5M19.5 5.5 17 3.5"/>',
-  pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',   // 0.3.2 F3 mini player: always on top
+  pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',   // 0.3.7 L8: shortcuts pin (menu rows, Shortcuts toggle); mini Keep on top is 'ontop' since 0.6.8
+  ontop: '<path d="M9 8V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3" stroke-width="1.6"/><rect x="4" y="9" width="12" height="11" rx="1"/><path d="M4 12.5h12"/>',   // 0.6.8 mini player Keep on top: stacked windows, front one emphasized
   folder: '<path d="M3.5 7.2A1.2 1.2 0 0 1 4.7 6h4.1l1.5 1.8H19a1.2 1.2 0 0 1 1.2 1.2V18a1.2 1.2 0 0 1-1.2 1.2H4.7A1.2 1.2 0 0 1 3.5 18z"/>',
   note: '<path d="M9 18.4a2.4 2.4 0 1 1-1.9-2.35V6.2L20 4.4v11.6a2.4 2.4 0 1 1-1.9-2.35V8.2l-9.1 1.2z" fill="currentColor" stroke="none"/>',
   radio: '<rect x="3.5" y="8" width="17" height="12" rx="2"/><circle cx="9.5" cy="14" r="2.4"/><path d="M8 8 15.5 4M14.5 12.2h3.2M14.5 15.8h3.2"/>',

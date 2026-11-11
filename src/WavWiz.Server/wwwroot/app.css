@@ -3821,8 +3821,7 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
 .mp .mp-artbox{--npa:56px;cursor:grab}
 body.minibody .mp:not(.slim) .mp-artbox{--npa:44px}
 .mp.slim .mp-artbox{--npa:38px}
-body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-cassette) .mp-txt{flex-basis:calc(100% - 74px)}
-body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:calc(100% - 64px)}
+/* 0.6.8: the standalone mini's song block is flex:1 1 0 beside the art for every Album art style (mini.css); the old Tape/Sleeve flex-basis:calc(100% - N) rules out-specified it and wrapped title/seek/artist under the art. */
 .ns-art{width:auto!important;height:auto!important;border-radius:0} .ns-art .npa-box{--npa:40px}
 .npbar .npb-art .npa-box{--npa:46px}
 .mini-art{flex:none;display:flex} .mini .npa-box{--npa:40px}
