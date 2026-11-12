@@ -64,6 +64,7 @@ import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
+import { startPairRequests, playerApprovalScreen } from './pairreq.js';   // 0.6.9 #15
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -139,8 +140,10 @@ function renderSetup() {
   app.replaceChildren(topbar(), form);
 }
 
-function renderLogin() {
-  const mode = { v: 'pair' };
+function renderLogin(start) {
+  // 0.6.9 #15: the WavWiz Player window never opens on the sign-in tabs - it asks the administrator for approval and waits
+  if (!start && isPlayerUa()) { const w = playerApprovalScreen({ name: deviceName(), other: m => renderLogin(m) }); app.replaceChildren(topbar(), w.el); return; }
+  const mode = { v: start === 'admin' ? 'admin' : 'pair' };
   const root = h('div', { class: 'card auth' });
   const draw = () => {
     const msg = h('p', { class: 'err', role: 'alert' });
@@ -168,6 +171,7 @@ const NAV = [
 // NAV kept for page titles; phone hamburger uses createPhoneDrawerNav. 0.2.0 item 2: the "This phone as a device" page is gone.
 const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes & Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
+let pairReqs = null;   // 0.6.9 #15
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
 /** 0.3.6 K14 / K22: the real mini player lives in the right-hand column while the Library or the Playlist is expanded (and is not running otherwise). */
 function syncMini() { holdPage();
@@ -362,6 +366,7 @@ async function startMain() {
   });
   installAppFull();   // 0.5.0 F120: Esc leaves app fullscreen
   installMedia({ S, api, act, masterLevel, allMuted });   // 0.3.8 L45
+  pairReqs = startPairRequests(() => isAdmin(S));   // 0.6.9 #15: approval cards for administrators
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
@@ -707,6 +712,7 @@ function connectWs() {
       else if (m.type === 'favorites') window.dispatchEvent(new CustomEvent('wavwiz:favorites'));   // 0.2.0 item 14
       else if (m.type === 'library') { refreshStatus(); window.dispatchEvent(new CustomEvent('wavwiz:library')); nowc.drawChecklist(); }
       else if (m.type === 'tick') { if (S.now?.state === 'playing') refreshNow(); if (S.view === 'devices' || wide() || S.view === 'now') refreshZones(); }
+      else if (m.type === 'pairing') pairReqs?.refresh();   // 0.6.9 #15
       else if (m.type === 'notice') toast(m.data.message, true);
       else if (m.type === 'hello' && m.data?.appVersion && S.auth && m.data.appVersion !== S.auth.appVersion) { S.auth.appVersion = m.data.appVersion; paintVersion(); toast(`WavWiz was updated to ${m.data.appVersion}. Reload the page to use it.`); }   // 0.4.6
       else if (m.type === 'schedules' || m.type === 'scenes') window.dispatchEvent(new CustomEvent('wavwiz:schedules'));
