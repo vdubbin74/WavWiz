@@ -5588,3 +5588,13 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
 .tree42.zdrag>[data-card].droppable.dropping{background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
 .tree42.zdrag>[data-card].zins-before{box-shadow:0 -3px 0 0 var(--accent),0 -3px 8px var(--accent)}
 .tree42.zdrag>[data-card].zins-after{box-shadow:0 3px 0 0 var(--accent),0 3px 8px var(--accent)}
+/* ---- 0.6.9 #11: the Flat / Gradient slider style is every slider in the app, not only the volume bars. Each range input (but the Now Playing
+   color picker, whose track is the swatch row) fills up to its value (--v, kept by sliderstyle.js) with --voltrack; the rest is the plain line.
+   The div seek bars and the Studio EQ fader fills use the same --voltrack. */
+input[type=range]:not(.npcolor-range)::-webkit-slider-runnable-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2));opacity:1}
+input[type=range]:not(.npcolor-range)::-moz-range-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2))}
+input[type=range]:not(.npcolor-range)::-moz-range-progress{background:transparent}
+.prog .fill,.ns-prog .fill,.mp-npl .npl-fill{background:var(--voltrack)}
+:root:not([data-slider=flat]) .np-phone-seek>i{background:linear-gradient(90deg,var(--accent),var(--seek-color,var(--accent2)))}
+:root:not([data-slider=flat]) .eqarea[data-eqstyle=faders] .eqb-fill{background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 35% 65%,rgba(0,0,0,.28)),linear-gradient(0deg,var(--accent),var(--accent2))}
+:root:not([data-slider=flat]) .eqb-fill{background:linear-gradient(0deg,var(--accent),var(--accent2))}

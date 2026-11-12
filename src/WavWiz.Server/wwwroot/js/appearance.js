@@ -201,8 +201,8 @@ function displaySizeCard() {
       h('div', { class: 'seg laylayout', role: 'radiogroup', 'aria-label': 'Layout' }, LAYOUTS.map(([id, nm, tip]) => { const on = loadLayout() === id; return h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: 'segbtn' + (on ? ' on' : ''), 'data-layout': id, title: tip, onclick: () => { saveLayout(id); draw(); } }, nm + (id === 'full' ? ' (default)' : '')); })),
       h('p', { class: 'small dim', style: 'margin:6px 0 14px' }, 'Right now: ' + (document.querySelector('.desk')?.classList.contains('tight') || document.querySelector('.desk')?.classList.contains('roomy') ? 'Roomy' : 'Full') + '.'),
       // 0.3.3 G11: volume slider style (this phone or PC only)
-      h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Volume slider style'), h('div', { class: 'small dim' }, 'Gradient blends your theme’s main and second colors. Flat uses the main color. Default: Gradient.')),
-        h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Volume slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },
+      h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Slider style'), h('div', { class: 'small dim' }, 'Every slider in WavWiz: volume, seek bars, EQ faders and settings. Gradient blends your theme’s main and second colors. Flat uses the main color. Default: Gradient.')),
+        h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },
           h('span', { class: 'slsw ' + id, 'aria-hidden': 'true' }), nm)))));
   }
   draw();
