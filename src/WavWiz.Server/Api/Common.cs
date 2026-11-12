@@ -16,6 +16,7 @@ public sealed class Services
     public Playback.VizHubs Vizs = new();      // 0.4.3 #10: one feed per playback group
     public Playback.VizHub Viz => Vizs.Default;
     public string ServerId = ""; public Net.DiscoveryHost? Discovery;
+    public PairRequests PairReqs = new();      // 0.6.9 #15: speakers / Player windows waiting for an administrator's approval
     public Zones.ZoneLinks Links = null!;      // 0.4.0 Stage 2: zones <-> playback groups, Jukebox zone
     public Features.SceneService Scenes = null!;
     public Features.ScheduleService Schedules = null!;
