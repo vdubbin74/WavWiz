@@ -26,6 +26,15 @@ function pinSpan(id) {
   s.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); const r = pinToggle(id); if (r.full) toast(`All ${MAX_PINS} shortcut slots are taken - unpin one first.`, true); else toast(r.pins.includes(id) ? `Pinned: ${pinInfo(id).label}` : `Unpinned: ${pinInfo(id).label}`); paint(); });
   window.addEventListener('wavwiz:pins', paint); paint(); return s;
 }
+/** 0.6.8f (t1729u): any click outside the menu column closes the open menu, even on something drawn above the scrim (the scrim's own
+ *  onclick stays). Capture phase, so a control that stops propagation cannot keep the menu open. Sheets / dialogs / toasts opened on top
+ *  of the menu and the hamburger itself are left alone. */
+export function drawerOutsideClick(drawer, target) {
+  if (!drawer?.classList.contains('open') || !target) return false;
+  if (drawer.querySelector(':scope > nav')?.contains(target)) return false;
+  if (target.closest?.('.hamburger, .toasts, #toasts, .sheet, dialog')) return false;
+  return true;
+}
 const mlbl = t => h('span', { class: 'mlbl' }, t);
 function adorn(btn, o, pins = true) {
   if (o?.pin && pins) btn.append(pinSpan(o.pin));
@@ -466,6 +475,9 @@ function createCompactPcNav(S, ctl, { onClose } = {}) {
   try { new ResizeObserver(applyMode).observe(nav); } catch { /* older engines: resize listener is enough */ }
 
   // Click outside a panel (on the scrim) closes; Escape is handled by main.js toggleDrawer.
+  // 0.6.8f (t1729u): the menu column's own empty space (below Help, around the rows) is "outside" too - a click there closes the menu
+  // instead of doing nothing. Rows and their pins stop propagation, so only bare background reaches this.
+  nav.addEventListener('click', ev => { if (!ev.target.closest?.('button, [role=button], .mpanel')) closeDrawer(); });
   nav.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (openGroup || nav.querySelector('.msub.open')) { closeAll(); ev.stopPropagation(); } } });
   return nav;
 }

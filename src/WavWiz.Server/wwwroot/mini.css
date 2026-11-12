@@ -321,3 +321,38 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-t{padding-right:0}
 body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:6px;min-width:0;width:100%}
 body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .mp-a{flex:1 1 0;min-width:0}
 body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .zlink{flex:0 0 auto;width:max-content;max-width:50%}
+
+/* 0.6.8b: the standalone mini really keeps art + song on one row, the dismiss x sits in the title bar, and every title-bar icon is the app's
+   icon button (.scbtn: transparent, --dim, 3px, accent on hover / when on).
+   - Root cause of the wrap: app.css's Album-art rules (Tape / Sleeve: flex-basis:calc(100% - N)) out-specified the 0.6.8 flex:1 1 0, so with
+     Sleeve the song block was too wide to share the row (art alone, text under it, window 169 px tall). Those rules are gone; this rule is
+     also specific enough to win over any :has() art variant.
+   - The x went 44x44 because app.css's F254 phone target (@media max-width:900px) matches the ~420 px Player window; the standalone window is
+     a desktop title bar, so it keeps the header icon size. */
+body.minibody .mp:not(.slim):not(.embedded):has(.mp-artbox) .mp-txt{flex:1 1 0;width:auto;min-width:0}
+body.minibody .mp.mp-sttitle:not(.embedded){--mp-hib:22px;--mp-hii:14px;--mp-hdp:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
+body.minibody .mp.mp-sttitle:not(.embedded) > .mp-sthd{padding-right:calc(var(--mp-hdp) - 13px)} /* room for keep-on-top, full, x + gaps (the bar ends 13 px short of the window edge; the .mp-side buttons sit over that) */
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-side{top:calc((var(--mp-hdh) - var(--mp-hib)) / 2 - 1px);right:4px;gap:2px;align-items:center}
+body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b,.mp-side .mp-b.mp-x){
+  box-sizing:border-box;width:var(--mp-hib);height:var(--mp-hib);min-width:0;min-height:0;padding:0;margin:0;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:3px;background:transparent;color:var(--dim);font-size:13px;line-height:1;cursor:pointer;flex:none}
+body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b) :is(.ic,.ic svg,.ico-svg){width:var(--mp-hii);height:var(--mp-hii)}
+body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b):is(:hover,:focus-visible){color:var(--accent-text,var(--accent));border-color:var(--accent);background:transparent}
+body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b).on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{color:var(--ink)} /* F254: dismiss is ink, not dim/red */
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x:is(:hover,:focus-visible){color:var(--ink);border-color:var(--accent)}
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-sthd .sctoggle{margin-left:2px}
+/* Shortcuts open: the strip gets the whole title bar left of its toggle (title + transparency step aside) so no pin is ever clipped;
+   pinned icons stay right-aligned next to the toggle, and if a future count still overflows it scrolls sideways instead of hiding icons. */
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside{left:6px;right:calc(var(--mp-hdp) - 13px + var(--mp-hib) + 4px);width:auto;max-width:none;display:flex;justify-content:flex-end;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside::-webkit-scrollbar{display:none}
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside[hidden]{display:none}
+body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside .scrow{flex:none;margin-left:auto}
+body.minibody .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd .mp-hdt{visibility:hidden}
+body.minibody .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{display:none}
+/* slim (no title bar): the same three buttons, centered on the right */
+body.minibody .mp.mp-sttitle.slim:not(.embedded){padding-right:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
+body.minibody .mp.mp-sttitle.slim:not(.embedded) .mp-side{top:50%;translate:0 -50%}
+@media (max-width:900px),(pointer:coarse){
+  body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{width:var(--mp-hib);height:var(--mp-hib);min-width:0;min-height:0}
+}

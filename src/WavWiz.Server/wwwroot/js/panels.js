@@ -2,7 +2,9 @@
 // one restore rule, auto-rail when Now Playing would drop under 420 px (not saved). Pure: no DOM here.
 export const PANELS_KEY = 'wavwiz.panels';
 export const RAIL_PX = 30, NP_MIN = 420, GAP = 10;
-const LIBW = vw => Math.min(360, Math.max(230, vw * 0.21)), DEVW = vw => Math.min(380, Math.max(250, vw * 0.22));
+// 0.6.8c: the docked Devices panel has ONE width (app.css --devw); resizing the window only resizes the middle column.
+export const DEV_PX = 380;
+const LIBW = vw => Math.min(360, Math.max(230, vw * 0.21)), DEVW = () => DEV_PX;
 const base = v => (v === 'rail' ? 'rail' : 'normal');
 /** { lib: 'rail'|'normal', dev: 'rail'|'normal', exp: null|'lib'|'dev', list: 'open'|'collapsed', ctl: 'open'|'collapsed' } */
 export function normPanels(p) {
@@ -64,12 +66,10 @@ export const devTabText = n => `DEVICES · ${n} ZONE${n === 1 ? '' : 'S'}`;
 export function effective(p, width, { opened = null } = {}) {
   const e = { ...p };
   if (width <= 900) return { ...e, exp: null, auto: false };
-  if (e.exp) return { ...e, auto: false };
-  const lw = e.lib === 'rail' ? RAIL_PX : LIBW(width), dw = e.dev === 'rail' ? RAIL_PX : DEVW(width);
-  const np = width - lw - dw - GAP * 4;
-  if (np >= NP_MIN) return { ...e, auto: false };
-  const fold = opened === 'lib' ? 'dev' : opened === 'dev' ? 'lib' : (e.dev === 'normal' ? 'dev' : 'lib');
-  return { ...e, [fold]: 'rail', auto: fold };
+  // 0.6.8d: no auto-fold. Resizing never folds or opens a side panel (it made the Library vanish mid-drag); Library and Devices stay as the
+  // user set them and only the middle column (minmax(0,1fr)) shrinks, down to the phone layout at 900 px. `opened` is kept for callers.
+  void opened;
+  return { ...e, auto: false };
 }
 export const npWidth = (e, width) => (e.exp ? 0 : width - (e.lib === 'rail' ? RAIL_PX : LIBW(width)) - (e.dev === 'rail' ? RAIL_PX : DEVW(width)) - GAP * 4);
 /** Keyboard: [ / ] fold or open, Shift+[ / Shift+] expand, Esc leaves expanded. Returns the new state or null. */

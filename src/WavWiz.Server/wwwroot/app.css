@@ -3817,8 +3817,7 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
 .mp .mp-artbox{--npa:56px;cursor:grab}
 body.minibody .mp:not(.slim) .mp-artbox{--npa:44px}
 .mp.slim .mp-artbox{--npa:38px}
-body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-cassette) .mp-txt{flex-basis:calc(100% - 74px)}
-body.minibody .mp:not(.slim):has(.mp-artbox.pn-art-sleeve) .mp-txt{flex-basis:calc(100% - 64px)}
+/* 0.6.8: the standalone mini's song block is flex:1 1 0 beside the art for every Album art style (mini.css); the old Tape/Sleeve flex-basis:calc(100% - N) rules out-specified it and wrapped title/seek/artist under the art. */
 .ns-art{width:auto!important;height:auto!important;border-radius:0} .ns-art .npa-box{--npa:40px}
 .npbar .npb-art .npa-box{--npa:46px}
 .mini-art{flex:none;display:flex} .mini .npa-box{--npa:40px}
@@ -5410,6 +5409,27 @@ html[data-qkeep-style=badge] .qkeep.qkeep-ic.qkeep-on .qkeep-badge{display:block
 .mpanel button.mheading{display:flex;grid-template-columns:unset;grid-column:1/-1;padding-left:14px;padding-right:14px}
 .mpanel button.check::before,.mpanel button.nocheck::before{grid-column:2;justify-self:start;width:14px}
 .mpanel button.check>.mlbl,.mpanel button.nocheck>.mlbl{padding-left:22px}
+/* 0.6.8f (t1728u): narrow-PC accordion (.desk-acc) inside the shared menu grid. The accordion rule above it (display:flex, min-width:0)
+   out-specified the grid's display:grid, so the subgrid rows had no tracks: label, pin, shortcut and arrow each landed on their own line
+   ("Ctrl+" clipped) and the File items were pushed into a far-right column. Here the open accordion panel IS the grid again, sized to the
+   menu (label track shrinks and ellipsizes instead of overflowing it), and an open submenu spans the whole row right under its item. */
+.drawer nav.desk-menus.desk-acc .mgroup.open>.mpanel,
+.drawer nav.desk-menus.desk-acc .msub.open>.mpanel{
+  display:grid;
+  grid-template-columns:6px minmax(0,1fr) var(--col-pin) var(--col-kbd) var(--col-arr) 6px;
+  column-gap:8px;align-content:start;
+  width:auto;min-width:0;max-width:none;box-sizing:border-box;
+}
+/* The submenu is the second row of its .msub (subgrid): full width, directly below its item, never in a 6px edge track. */
+.drawer nav.desk-menus.desk-acc .msub>.mpanel{grid-column:1/-1}
+/* In the narrow accordion a row with no pin and no shortcut lends those empty tracks to its label ("Sign in as administrator…" fits). */
+.drawer nav.desk-menus.desk-acc .mpanel button:not(:has(>.mpin,>.kbd))>.mlbl{grid-column:2/5}
+/* Narrow-PC flyouts (.desk-fly) are position:fixed, so the shared grid's min-width:100% meant 100% of the WINDOW: every flyout covered the
+   whole window (nothing left to click to close it). They keep their own 200px minimum and grow with the longest label up to the screen edge. */
+.drawer nav.desk-menus.desk-fly .mgroup.open>.mpanel,
+.drawer nav.desk-menus.desk-fly .msub.open>.mpanel{min-width:200px}
+/* t1729u: the open menu (scrim + panel) is never part of the Windows title bar's drag region, so a click over the bar closes the menu. */
+html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-region:no-drag}
 
 /* A–Z letter finder: slim themed rail of plain letters (no boxed buttons), sticky to the visible list, reserved gutter clear of the scrollbar and row … menus.
    The rail always fits the visible list height — letters flex-shrink and scale (container query / --az-fs); very short panes show every other letter with dots. No rail scrolling.
@@ -5502,3 +5522,9 @@ html[data-qkeep-style=badge] .qkeep.qkeep-ic.qkeep-on .qkeep-badge{display:block
 .mp.embedded .mp-txt .zl-line>:first-child{flex:none;max-width:100%}
 .mp.embedded .mp-txt .zl-line .zlink{flex:none;max-width:100%}
 .np-tabletitles .zlink,.np-meta .titles .zlink,.np-phone-zone .zl-fullphone{max-width:100%}
+
+/* 0.6.8c: the docked Devices side panel keeps ONE width (380 px, the old 1920 px size) at every window width; only the middle column
+   (Now Playing / Sound / Queue) grows and shrinks. It used to follow the window width (250-380 px), so a smaller window squeezed it. The narrow layouts
+   (<= 900 px phone page, Roomy / Auto slide-over) keep their own rules. panels.js DEV_PX mirrors this for the auto-rail math. */
+:root{--devw:380px;--spkcol:var(--devw)}
+.desk{grid-template-columns:var(--libw,clamp(230px,calc(21vw / var(--z,1)),360px)) minmax(0,1fr) var(--rightw,var(--devw))}

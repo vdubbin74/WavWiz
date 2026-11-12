@@ -69,7 +69,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const volWrap = h('div', { class: 'vbar' }, vol);
   const paintVol = v => { volWrap.style.setProperty('--v', v + '%'); volPct.textContent = Math.round(v) + '%'; };
   paintVol(0);
-  const pin = b('mp-pin', 'pin', 'Keep on top', () => { pinned = !pinned; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } send('pin', { on: pinned }); paintPin(); });
+  const pin = b('mp-pin', 'ontop', 'Keep on top', () => { pinned = !pinned; try { localStorage.setItem('wavwiz.mini.pin', pinned ? '1' : '0'); } catch { /* ignore */ } send('pin', { on: pinned }); paintPin(); });
   const full = b('mp-full', 'expandOut', 'Open the full app', () => { if (!send('full')) { try { window.opener?.focus(); } catch { /* ignore */ } if (!window.opener) window.open('/', 'wavwiz-main'); } });
   const close = h('button', { type: 'button', class: 'mp-b mp-x ww-close', 'aria-label': 'Close', title: 'Close', onclick: () => { if (!send('close')) window.close(); } }, '✕');
   if (!host && !embedded) { pin.disabled = true; pin.title = 'Keep on top works in the WavWiz Player window'; }
@@ -133,6 +133,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   // 0.5.0 F130 (Amendment 3): the condensed (embedded) player uses the same ONE Shortcuts toggle -> vertical pin strip + Home as Now Playing; the standalone window keeps its row
   // 0.5.0 F138: the standalone window uses the same toggle + leftward horizontal strip, in its own NOW PLAYING title bar
   const sc = (() => { const sd = shortcutsSide({ run: scRun, home: scHome, cls: 'mp-scside', horizontal: true, onChange: o => root?.classList.toggle('scopen', o) });
+    if (!embedded) { sd.toggle.setAttribute('aria-label', 'Pin to shortcuts'); sd.toggle.title = 'Pin to shortcuts - pins + Home'; }   // 0.6.8: the pin is the shortcuts pin; Keep on top is the stacked-windows button
     return { el: h('div', { class: 'mp-sc mp-sctog' }, sd.toggle, sd.strip), destroy: sd.destroy }; })();
   // 0.3.8 L44: the same shortcuts inside the standalone window (Alt+M closes it, Alt+H opens the main window on Home)
   if (!embedded) installHotkeys(id => {

@@ -42,8 +42,8 @@ test('§6: one key wavwiz.panels; the 0.2.x keys migrate once; state survives re
 test('§6: 1000 px window keeps Now Playing ≥ 420 px (auto-rail, not saved); phone width drops expanded for this load only', async () => {
   const P = await imp('panels');
   const p = P.normPanels({ lib: 'normal', dev: 'normal' });
-  for (const w of [901, 920, 1000, 1100, 1280, 1920]) { const e = P.effective(p, w, { opened: 'lib' }); assert.ok(P.npWidth(e, w) >= 420, `${w}px: ${P.npWidth(e, w)}`); }
-  const e = P.effective(p, 920, { opened: 'lib' }); assert.equal(e.dev, 'rail'); assert.equal(e.auto, 'dev'); assert.equal(p.dev, 'normal', 'not saved');
+  // 0.6.8d (user decision): no auto-rail any more - resizing never folds a panel; the middle column shrinks instead (see v068devwidth)
+  for (const w of [901, 920, 1000, 1100, 1280, 1920]) { const e = P.effective(p, w, { opened: 'lib' }); assert.equal(e.lib, 'normal'); assert.equal(e.dev, 'normal'); assert.equal(e.auto, false); }
   assert.equal(P.effective({ ...p, exp: 'lib' }, 800).exp, null);
 });
 test('§6: keyboard [ ] Shift variants Esc; ignored while typing', async () => {

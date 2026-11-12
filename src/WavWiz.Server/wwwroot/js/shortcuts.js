@@ -52,7 +52,8 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
     if (header) {
       const side = header.parentElement?.querySelector(':scope > .mp-side');
       const tog = header.querySelector('.sctoggle');
-      const reserved = (side?.offsetWidth || 0) + (tog?.offsetWidth || 22) + 88 + 12;
+      const title = header.classList.contains('mp-sthd') ? 0 : 88;   // 0.6.8: the standalone mini hides NOW PLAYING while the strip is open, so its pins get that room
+      const reserved = (side?.offsetWidth || 0) + (tog?.offsetWidth || 22) + title + 12;
       const inner = Math.max(0, (header.clientWidth || 0) - reserved);
       const c = Math.max(1, Math.floor((inner - 36) / 26));
       return c >= pins.length ? 99 : c;
