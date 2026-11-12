@@ -38,7 +38,13 @@ export function keyAction(ev) {
 }
 
 /** 0.3.6 K14 / K22: the mini player as a component. The page (mini.html, popup or Player window) mounts it full size; the main app mounts it with { embedded: true } in the right-hand column. */
-export function mountMini(root, { embedded = false, run = null, home = null } = {}) {
+/** 0.6.9 #9: `replica` (embedded only) = the expanded-Library player is the standalone mini player, same layout and controls: NOW PLAYING title bar
+ *  with the Shortcuts pin, art, title / artist / album + "on <zone>", the Track bar pick, the volume bar with its %, and the docked transport
+ *  (shuffle / prev / play / next / repeat / mute). The window-only buttons map to what they mean inside the app window: Keep on top -> pop out
+ *  the real mini player (`popout`), Open the full app -> leave the expanded Library (`collapse`); no Close, no window transparency (that would
+ *  change the whole app window). */
+export function mountMini(root, { embedded = false, run = null, home = null, replica = false, popout = null, collapse = null } = {}) {
+  const solo = !embedded || replica;   // 0.6.9 #9: the standalone layout
   let shufB = null, repB = null;
   let now = null, level = 0, muted = false, pinned = false, dragging = false, timer = 0;
   try { pinned = localStorage.getItem('wavwiz.mini.pin') === '1'; } catch { /* ignore */ }
@@ -57,7 +63,7 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   const t = h('div', { class: 'mp-t' }, '—'), a = h('div', { class: 'mp-a' }, '');
   const pos = h('span', null, '0:00'), dur = h('span', null, '0:00');
   const seek = h('input', { type: 'range', min: 0, max: 1000, value: 0, 'aria-label': 'Position', oninput: () => { dragging = true; }, onchange: async () => { dragging = false; if (now?.durationMs) await act('/stream/seek', { ms: Math.round(seek.value / 1000 * now.durationMs) }); } });
-  const txt = h('div', { class: 'mp-txt' }, t, h('div', { class: 'zl-line' }, a, Z.zoneLink('zl-mini')), ...(embedded ? [h('div', { class: 'mp-seek' }, pos, seek, dur)] : []));   // F98: the standalone shows the Track bar pick (mp-npl) in this slot instead of the plain range
+  const txt = h('div', { class: 'mp-txt' }, t, h('div', { class: 'zl-line' }, a, Z.zoneLink('zl-mini')), ...(!solo ? [h('div', { class: 'mp-seek' }, pos, seek, dur)] : []));   // F98: the standalone shows the Track bar pick (mp-npl) in this slot instead of the plain range
   const b = (cls, ic, label, fn) => { const x = h('button', { type: 'button', class: 'mp-b ' + cls, 'aria-label': label, title: label, onclick: fn }); x.append(icon(ic)); return x; };
   const prev = b('prev', 'prev', 'Previous', () => act('/stream/prev'));
   const play = b('play', 'play', 'Play or pause', () => act(now?.state === 'playing' ? '/stream/pause' : now?.state === 'paused' ? '/stream/resume' : '/stream/resume'));
@@ -89,15 +95,16 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   function setOpac(v, save = true) { opac = clampOpacity(v); opSl.value = String(opac); opVal.textContent = opac + '%'; if (save) saveOpacity(opac); applyOpacity(); }
   function setOpMode(on) { opMode = on; opLbl.textContent = on ? 'Volume' : 'Transparency'; opBtn.title = on ? 'Back to volume' : 'Window transparency: how solid the mini player is'; volWrap.hidden = on; volPct.hidden = on; opRow.hidden = !on; opBtn.classList.toggle('on', on); opBtn.setAttribute('aria-pressed', String(on)); if (on) { opSl.value = String(opac); opVal.textContent = opac + '%'; armOp(); } else clearTimeout(opT); applyOpacity(); }
   let hover = false;
-  function applyOpacity() { const v = shownOpacity(opac, { hover, adjusting: adjusting || opMode }); if (!send('opacity', { value: v / 100, save: opac / 100 })) root.style.opacity = String(v / 100); else root.style.opacity = ''; }
+  function applyOpacity() { if (embedded) { root.style.opacity = ''; return; }   // 0.6.9 #9: window transparency is the mini WINDOW's; never the app window
+    const v = shownOpacity(opac, { hover, adjusting: adjusting || opMode }); if (!send('opacity', { value: v / 100, save: opac / 100 })) root.style.opacity = String(v / 100); else root.style.opacity = ''; }
   const hoverEl = embedded ? root : document.documentElement;
   hoverEl.addEventListener('mouseenter', () => { hover = true; applyOpacity(); }); hoverEl.addEventListener('mouseleave', () => { hover = false; applyOpacity(); });
   window.addEventListener('blur', () => { if (!document.hasFocus()) { hover = false; applyOpacity(); } });
   window.addEventListener('storage', ev => { if (ev.key === 'wavwiz.mini.opacity') setOpac(loadOpacity(), false); });   // Settings > Appearance changed it
-  (embedded ? root : document).addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });
+  if (!embedded) document.addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });   // 0.6.9 #9: the in-app player has no window menu
   const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute));   // F85: the embedded player adds its mixer button here (below)
   // 0.4.8 F54: the condensed (embedded) player has no volume slider - the Master volume mixer button sits in its place; the standalone mini keeps it
-  const mixB = embedded ? h('button', { type: 'button', class: 'mutebtn mixbtn mp-mix', 'data-act': 'mixer', 'aria-label': 'Master volume', title: 'Master volume (Alt+V)', onclick: ev => { ev.stopPropagation(); window.dispatchEvent(new CustomEvent('wavwiz:mixer')); } }, icon('mixer')) : null;
+  const mixB = !solo ? h('button', { type: 'button', class: 'mutebtn mixbtn mp-mix', 'data-act': 'mixer', 'aria-label': 'Master volume', title: 'Master volume (Alt+V)', onclick: ev => { ev.stopPropagation(); window.dispatchEvent(new CustomEvent('wavwiz:mixer')); } }, icon('mixer')) : null;
   // 0.4.9 F85: window transparency only means something in the standalone Player window; the embedded player has no window of its own, so the
   // "Transparency" chip is gone there. The mixer button joins the transport row and the freed row shows the active visualizer (small, preview quality).
   if (mixB) ctl.firstChild.append(mixB);
@@ -105,8 +112,8 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
   // each layout's own seek / time element, in the theme colors - Classic: time pill + round-knob line, Center: waveform, Stack: LCD clock + LED blocks,
   // Horizon: glowing line from the cover edge. Clicking it seeks, like the panel.
   const npHost = h('div', { class: 'mp-npl', role: 'slider', 'aria-label': 'Position', tabindex: 0 });   // F98: both minis
-  if (!embedded) txt.append(npHost);
-  const volRow = embedded ? npHost : h('div', { class: 'mp-vol dvol' }, volWrap, volPct, opRow, opBtn);   // F140: standalone moves opBtn to the title bar (below)   // its own full-width row
+  if (solo) txt.append(npHost);
+  const volRow = !solo ? npHost : h('div', { class: 'mp-vol dvol' }, volWrap, volPct, opRow, opBtn);   // F140: standalone moves opBtn to the title bar (below)   // its own full-width row
   let paintNpl = () => {};
   if (npHost) {
     let style = '', parts = null, seed = null;
@@ -159,7 +166,16 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
     repB = tog('repeat', 'Repeat off', () => setRep(repeatClickNext(now?.repeat)));
     repB.title = 'Repeat off — click for all; long-press for one track';
     wireRepeatOne(repB, () => { setRep('one'); toast('Repeat one track'); }); }
-  if (embedded) {
+  if (embedded && replica) {
+    // 0.6.9 #9: the standalone layout (F138 title bar, F139 docked transport, F140 volume row) inside the app; window buttons -> app actions
+    const popB = b('mp-pin mp-pop', 'popout', 'Pop out the mini player', () => popout?.());
+    const backB = b('mp-full mp-back', 'expandOut', 'Back to the full Now Playing view', () => collapse?.());
+    const hd = h('div', { class: 'mp-hd mp-sthd' }, h('span', { class: 'mp-hdt' }, 'Now playing'), sc.el);
+    ctl.firstChild.replaceChildren(shufB, prev, play, next, repB, mute); ctl.classList.add('mp-ctlr');
+    const dock = h('div', { class: 'mp-dock' }, volRow, ctl);
+    root.classList.add('mp-sttitle', 'mp-replica'); volRow.classList.add('mp-volx'); opBtn.hidden = true;
+    root.append(hd, artBox.el, txt, dock, h('div', { class: 'mp-side' }, popB, backB));
+  } else if (embedded) {
     // 0.5.0 F136: the condensed (under-Queue) player wears the flat Now Playing card chrome: a NOW PLAYING title bar with the Shortcuts pin on the
     // right (F135e: the horizontal pin strip opens leftward ON that bar), then art | titles + labeled Artist / Album + seek, the full transport
     // (shuffle / prev / play / next / repeat) and mute / mixer / EQ / Sleep + "on <zone>". The standalone window keeps its own layout.
@@ -219,7 +235,8 @@ export function mountMini(root, { embedded = false, run = null, home = null } = 
       if (document.activeElement !== vol) { vol.value = String(Math.round(level)); paintVol(level); } paintMute();
     } catch { t.textContent = 'Not connected'; }
   }
-  if (embedded) { root.classList.add('embedded'); paintPin(); poll(); timer = setInterval(poll, 1000); }
+  // 0.6.9 #9: the replica is NOT .embedded (so it wears every standalone rule; mini.css scopes them to body.minibody or .minicol)
+  if (embedded) { root.classList.add(replica ? 'mp-replica' : 'embedded'); paintPin(); poll(); timer = setInterval(poll, 1000); }
   else (async () => { try { const s = await api('/auth/state'); setArtCv(s.artCv); } catch { /* ignore */ } paintPin(); send('ready', { pinned, opacity: opac / 100 }); reportSize(); poll(); timer = setInterval(poll, 1000); })();
   return { root, rail, poll, destroy: () => { clearInterval(timer); sc.destroy(); }, setOpac, applyOpacity };
 

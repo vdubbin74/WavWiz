@@ -60,8 +60,8 @@ html:has(>body.minibody),body.minibody{margin:0;height:100%;overflow:hidden;back
 
 /* 0.4.2: the standalone window is exactly the component: no page margin, no gap. Width is the component's (420 / slim 300), height is its content; the page reports it (mini.js reportSize) and the host sizes the window to it. */
 html:has(>body.minibody),body.minibody{margin:0;padding:0;height:auto;width:max-content;min-width:0;overflow:hidden;background:var(--panel)}
-body.minibody .mp{height:auto;width:420px;margin:0}
-body.minibody .mp.slim{width:300px;height:48px}
+:is(body.minibody,.minicol) .mp{height:auto;width:420px;margin:0}
+:is(body.minibody,.minicol) .mp.slim{width:300px;height:48px}
 /* 0.4.5 F27: artist line + "on <zone> ▾" (the zone picker; the shortcuts row no longer has the chip) */
 .mp .mp-txt .zl-line{order:3;font-size:var(--mp-afs,11px);line-height:1.15;min-width:0}
 .mp .mp-txt .zl-line .mp-a{order:0}
@@ -72,7 +72,7 @@ body.minibody .mp.slim{width:300px;height:48px}
 /* 0.4.8 F55: the standalone window never clips. The component is as wide as the window allows (max 420), the seek bar shrinks first, the
    transport and the % readout stay fully inside with padding, and pin / open full app / close are small icon buttons tucked into the
    top-right corner (no extra height). */
-body.minibody .mp{width:min(420px,100vw);max-width:100vw}
+:is(body.minibody,.minicol) .mp{width:min(420px,100vw);max-width:100vw}
 .mp{position:relative}
 .mp:not(.embedded) .mp-side{position:absolute;top:3px;right:3px;display:flex!important;gap:2px;z-index:3;grid-template-columns:none}
 .mp:not(.embedded) .mp-side .mp-b{width:18px;height:18px;min-width:0;padding:0;border-color:transparent;background:transparent;color:var(--dim);display:inline-flex;align-items:center;justify-content:center;font-size:10px}
@@ -94,8 +94,8 @@ body.minibody .mp{width:min(420px,100vw);max-width:100vw}
 /* 0.4.9 F75: a standalone window narrower than the design width (browser popup, or the Player before it resizes) keeps everything on
    screen: the transport moves under the song line and the title / artist ellipsize (or scroll via the marquee) instead of being overlapped. */
 @media (max-width:405px){
-  body.minibody .mp:not(.slim) .mp-vol{flex-wrap:nowrap;min-width:0}
-  body.minibody .mp:not(.slim) .mp-vol .mp-oplbl{display:none}
+  :is(body.minibody,.minicol) .mp:not(.slim) .mp-vol{flex-wrap:nowrap;min-width:0}
+  :is(body.minibody,.minicol) .mp:not(.slim) .mp-vol .mp-oplbl{display:none}
 }
 /* 0.4.9 F85b: the embedded player's second row is the picked Now Playing layout in compact form (no Transparency chip there) */
 .mp.embedded .mp-npl{flex:1 0 100%;min-width:0;height:28px;display:flex;align-items:center;gap:8px;padding:0 4px;box-sizing:border-box;cursor:pointer;font-size:11px;font-variant-numeric:tabular-nums;color:var(--dim)}
@@ -125,16 +125,16 @@ body.minibody .mp{width:min(420px,100vw);max-width:100vw}
 .mp.embedded .mp-tr .mp-mix{flex:none}
 /* 0.4.9 F86: the Player window is two rows - art + song line, then transport, mute, volume, %, Transparency and the shortcuts on ONE row.
    Less padding and gap; the page reports this height so the window (any DPI) is only as tall as these two rows. */
-body.minibody .mp:not(.slim){padding:5px 6px;gap:5px 6px;align-content:flex-start}
-body.minibody .mp:not(.slim) .mp-art{width:44px;height:44px}
-body.minibody .mp:not(.slim) .mp-txt{flex:1 1 100%;width:100%;height:44px;row-gap:1px;padding-right:0;box-sizing:border-box}
-body.minibody .mp:not(.slim) .mp-ctl{width:auto;flex:none;order:4}
-body.minibody .mp:not(.slim) .mp-tr{gap:3px;justify-content:flex-start}
-body.minibody .mp:not(.slim) .mp-vol{flex:1 1 0;min-width:0;height:24px;order:5;gap:4px;padding-right:0}
-body.minibody .mp:not(.slim) .mp-vol .pct{width:2.6em;font-size:11px}
-body.minibody .mp:not(.slim) .mp-vol .mp-oplbl{display:none}
-body.minibody .mp:not(.slim) .mp-sc{flex:none;order:6;border-top:0;padding:0;margin:0}
-body.minibody .mp:not(.slim) .mp-seek{gap:4px}
+:is(body.minibody,.minicol) .mp:not(.slim){padding:5px 6px;gap:5px 6px;align-content:flex-start}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-art{width:44px;height:44px}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-txt{flex:1 1 100%;width:100%;height:44px;row-gap:1px;padding-right:0;box-sizing:border-box}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-ctl{width:auto;flex:none;order:4}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-tr{gap:3px;justify-content:flex-start}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-vol{flex:1 1 0;min-width:0;height:24px;order:5;gap:4px;padding-right:0}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-vol .pct{width:2.6em;font-size:11px}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-vol .mp-oplbl{display:none}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-sc{flex:none;order:6;border-top:0;padding:0;margin:0}
+:is(body.minibody,.minicol) .mp:not(.slim) .mp-seek{gap:4px}
 /* 0.5.0 F95: EQ-bars track bar in the compact form - even bars standing on the baseline */
 .npl-eqs .npl-wave{align-items:flex-end;gap:2px} .npl-eqs .npl-wave i{border-radius:1px 1px 0 0}
 /* 0.5.0 F98: transport buttons follow Settings > Appearance > Now Playing > Buttons on both minis (standalone .mp carries pn-btn-*; the
@@ -146,8 +146,8 @@ body.minibody .mp:not(.slim) .mp-seek{gap:4px}
 :is(.mp,.minicol).pn-btn-square .mp-tr :is(.mp-b,.mutebtn){border-radius:3px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
 :is(.mp,.minicol).pn-btn-ring .mp-tr :is(.mp-b,.mutebtn:not(.on)){border-radius:50%;background:transparent;border:1.5px solid color-mix(in srgb,var(--ink) 40%,transparent)}
 :is(.mp,.minicol).pn-btn-ring .mp-tr .mp-b.play{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}
-body.minibody .mp .mp-txt .mp-npl{order:2;height:16px;display:flex;align-items:center;gap:5px;font-size:10px;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer;min-width:0}
-body.minibody .mp .mp-npl .npl-pill{padding:0 5px} body.minibody .mp .mp-npl .npl-wbox{height:14px} body.minibody .mp .mp-npl .npl-lcd{font-size:10px} body.minibody .mp .mp-npl .npl-leds{height:7px}
+:is(body.minibody,.minicol) .mp .mp-txt .mp-npl{order:2;height:16px;display:flex;align-items:center;gap:5px;font-size:10px;font-variant-numeric:tabular-nums;color:var(--dim);cursor:pointer;min-width:0}
+:is(body.minibody,.minicol) .mp .mp-npl .npl-pill{padding:0 5px} :is(body.minibody,.minicol) .mp .mp-npl .npl-wbox{height:14px} :is(body.minibody,.minicol) .mp .mp-npl .npl-lcd{font-size:10px} :is(body.minibody,.minicol) .mp .mp-npl .npl-leds{height:7px}
 .mp.slim .mp-npl :is(.npl-pill,.npl-el,.npl-du,.npl-lcd){display:none}
 .mp.slim .mp-txt{grid-template-rows:auto auto}
 /* 0.5.0 F98b: lock transport buttons to squares (5-button condensed row was shrinking them into ovals) */
@@ -173,15 +173,15 @@ body.minibody .mp .mp-npl .npl-pill{padding:0 5px} body.minibody .mp .mp-npl .np
 .mp.embedded .mp-tr .mp-b .ico-svg,.mp.embedded .mp-tr .mutebtn .ico-svg{width:15px;height:15px}
 .mp.embedded .mp-tr .mp-b.play .ico-svg{width:17px;height:17px}
 /* F110: standalone mini two bands - Band A transport + pins/Home, Band B full-width volume/%/Transparency */
-body.minibody .mp:not(.slim):not(.embedded) .mp-ctl{order:4;flex:none;width:auto}
-body.minibody .mp:not(.slim):not(.embedded) .mp-sc{order:4;flex:1 1 0;min-width:0;justify-content:flex-end;border-top:0;padding:0;margin:0}
-body.minibody .mp:not(.slim):not(.embedded) .mp-vol{order:5;flex:1 0 100%;min-width:0;height:auto;min-height:26px;gap:6px;padding-right:4px;flex-wrap:nowrap}
-body.minibody .mp:not(.slim):not(.embedded) .mp-vol .vbar{flex:1 1 auto;min-width:120px}
-body.minibody .mp:not(.slim):not(.embedded) .mp-vol .pct{flex:none;width:2.8em;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
-body.minibody .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-4px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
-body.minibody .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-moz-range-thumb{width:13px;height:13px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
-body.minibody .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn{flex:none;width:22px;height:22px;padding:0;justify-content:center;gap:0}
-body.minibody .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn .mp-oplbl{display:none}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-ctl{order:4;flex:none;width:auto}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-sc{order:4;flex:1 1 0;min-width:0;justify-content:flex-end;border-top:0;padding:0;margin:0}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-vol{order:5;flex:1 0 100%;min-width:0;height:auto;min-height:26px;gap:6px;padding-right:4px;flex-wrap:nowrap}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-vol .vbar{flex:1 1 auto;min-width:120px}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-vol .pct{flex:none;width:2.8em;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-4px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-vol input[type=range]::-moz-range-thumb{width:13px;height:13px;border-width:1px;box-shadow:0 0 6px color-mix(in srgb,var(--accent) 55%,transparent)}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn{flex:none;width:22px;height:22px;padding:0;justify-content:center;gap:0}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn .mp-oplbl{display:none}
 /* 0.5.0 F130: labeled Artist · Album in the condensed / mini player (tokens only) */
 .mp .mp-a .np-aal{font-size:.78em;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--dim);margin-right:4px}
 .mp .mp-a .np-aav{color:var(--ink);opacity:.9}
@@ -235,10 +235,10 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-b.mp-opbtn .mp-oplbl{display:non
 .mp.mp-flat > .mp-npl{display:none}
 /* 0.5.0 F138: standalone mini - NOW PLAYING title bar carries the Shortcuts pin; the horizontal strip opens leftward on that bar (like F136 condensed).
    The window buttons (pin / full / close) stay absolute top-right, so the bar reserves room for them. */
-body.minibody .mp.mp-sttitle:not(.embedded){position:relative;flex-wrap:wrap;align-content:flex-start;--mp-hdh:26px}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded){position:relative;flex-wrap:wrap;align-content:flex-start;--mp-hdh:26px}
 .mp.mp-sttitle > .mp-sthd{order:0;flex:0 0 100%;width:100%;max-width:none;position:relative;display:flex;align-items:center;gap:6px;height:var(--mp-hdh);min-height:var(--mp-hdh);margin:-6px -6px 0 -7px;padding:0 74px 0 10px;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--panel2,var(--panel));overflow:visible}
 .mp.mp-sttitle .mp-sthd .mp-hdt{flex:1 1 auto;min-width:0;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent-text,var(--accent));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-body.minibody .mp.mp-sttitle:not(.slim) .mp-sthd > .mp-sc{order:0;position:static;flex:none;margin:0;padding:0;border:0;display:flex;align-items:center}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim) .mp-sthd > .mp-sc{order:0;position:static;flex:none;margin:0;padding:0;border:0;display:flex;align-items:center}
 .mp.mp-sttitle .mp-sthd .sctoggle{width:20px;height:20px;min-width:0;padding:0;display:grid;place-items:center}
 .mp.mp-sttitle .mp-scside{position:absolute;top:0;bottom:auto;right:98px;height:var(--mp-hdh);max-width:calc(100% - 210px);box-sizing:border-box;padding:0 6px;border-top:0;border-bottom:0;border-radius:0 0 0 var(--radius);overflow-x:hidden;overflow-y:hidden}
 .mp.mp-sttitle .mp-scside .scrow > :not(.scsep){width:20px;height:20px;min-width:0}
@@ -246,7 +246,7 @@ body.minibody .mp.mp-sttitle:not(.slim) .mp-sthd > .mp-sc{order:0;position:stati
 .mp.mp-sttitle.slim > .mp-sthd{display:none}
 /* 0.5.0 F139: standalone transport docked to the right edge with shuffle / repeat pills (condensed language) */
 .mp:not(.embedded) .mp-ctl.mp-ctlr{margin-left:auto;align-self:center;width:auto}
-body.minibody .mp:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:auto;flex:none}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:auto;flex:none}
 .mp:not(.embedded) .mp-ctlr .mp-tr{justify-content:flex-end;gap:4px}
 .mp:not(.embedded) .mp-ctlr .mp-tr .mp-b.tog{width:34px;height:24px;aspect-ratio:auto;border-radius:999px}
 .mp:not(.embedded) .mp-ctlr .mp-tr .mp-b.tog.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
@@ -255,11 +255,11 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:
 @media (max-width:330px){.mp.slim:not(.embedded) .mp-ctlr .mp-tr .tog{display:none}}
 /* 0.5.0 F140: standalone - the slider row (Volume, or Transparency while the title-bar selector is on) sits LEFT of the right-docked transport;
    the selector is a compact icon pill in the NOW PLAYING bar, left of the Shortcuts pin. Condensed untouched (all rules are :not(.embedded) + .mp-sttitle). */
-body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx{order:4;flex:1 1 0;min-width:0;min-height:26px;height:auto;padding-right:2px;gap:5px;flex-wrap:nowrap;align-self:center}
-body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .vbar{min-width:40px;flex:1 1 auto}
-body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow .mp-opl{font-size:9px}
-body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow input{min-width:30px}
-body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:0}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx{order:4;flex:1 1 0;min-width:0;min-height:26px;height:auto;padding-right:2px;gap:5px;flex-wrap:nowrap;align-self:center}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .vbar{min-width:40px;flex:1 1 auto}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow .mp-opl{font-size:9px}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim):not(.embedded) .mp-vol.mp-volx .mp-oprow input{min-width:30px}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;margin-left:0}
 .mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{flex:none;width:20px;height:20px;padding:0;display:grid;place-items:center;gap:0;border-radius:6px}
 .mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn .mp-oplbl{display:none}
 .mp.mp-sttitle:not(.embedded) .mp-sthd > .mp-b.mp-opbtn.on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
@@ -296,18 +296,18 @@ body.minibody .mp.mp-sttitle:not(.slim):not(.embedded) .mp-ctl.mp-ctlr{order:4;m
 
 /* Volume sits immediately left of right-docked transport (shuffle/prev/play/next/repeat/mute), one row, pins open or closed. */
 .mp .mp-dock,
-body.minibody .mp .mp-dock{
+:is(body.minibody,.minicol) .mp .mp-dock{
   display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:8px;
   width:100%;flex:0 0 100%;max-width:100%;box-sizing:border-box;min-width:0;order:5;
 }
 .mp .mp-dock .mp-vol,
 .mp.mp-sttitle .mp-dock .mp-vol,
-body.minibody .mp:not(.slim):not(.embedded) .mp-dock .mp-vol{
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-dock .mp-vol{
   flex:1 1 auto;width:auto;min-width:0;order:0;height:26px;flex-wrap:nowrap;
 }
 .mp .mp-dock .mp-ctl,
 .mp.mp-sttitle .mp-dock .mp-ctl,
-body.minibody .mp:not(.slim):not(.embedded) .mp-dock .mp-ctl{
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-dock .mp-ctl{
   flex:0 0 auto;width:auto;order:1;align-self:center;margin-left:0;
 }
 
@@ -315,12 +315,12 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-dock .mp-ctl{
    F86's flex:1 1 100% + width:100% on .mp-txt wrapped the text under the art, leaving a hole
    beside the cover and growing the window to ~169 CSS px, which clipped in the 128 px default
    window and in the site's 840x240 frame. */
-body.minibody .mp:not(.slim):not(.embedded) .mp-artbox{flex:0 0 auto;align-self:center}
-body.minibody .mp:not(.slim):not(.embedded) .mp-txt{flex:1 1 0;width:auto;max-width:none;min-width:0;height:auto;min-height:44px;align-content:center}
-body.minibody .mp:not(.slim):not(.embedded) .mp-t{padding-right:0}
-body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:6px;min-width:0;width:100%}
-body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .mp-a{flex:1 1 0;min-width:0}
-body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .zlink{flex:0 0 auto;width:max-content;max-width:50%}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-artbox{flex:0 0 auto;align-self:center}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-txt{flex:1 1 0;width:auto;max-width:none;min-width:0;height:auto;min-height:44px;align-content:center}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-t{padding-right:0}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-txt .zl-line{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:6px;min-width:0;width:100%}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-txt .zl-line .mp-a{flex:1 1 0;min-width:0}
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded) .mp-txt .zl-line .zlink{flex:0 0 auto;width:max-content;max-width:50%}
 
 /* 0.6.8b: the standalone mini really keeps art + song on one row, the dismiss x sits in the title bar, and every title-bar icon is the app's
    icon button (.scbtn: transparent, --dim, 3px, accent on hover / when on).
@@ -329,30 +329,34 @@ body.minibody .mp:not(.slim):not(.embedded) .mp-txt .zl-line .zlink{flex:0 0 aut
      also specific enough to win over any :has() art variant.
    - The x went 44x44 because app.css's F254 phone target (@media max-width:900px) matches the ~420 px Player window; the standalone window is
      a desktop title bar, so it keeps the header icon size. */
-body.minibody .mp:not(.slim):not(.embedded):has(.mp-artbox) .mp-txt{flex:1 1 0;width:auto;min-width:0}
-body.minibody .mp.mp-sttitle:not(.embedded){--mp-hib:22px;--mp-hii:14px;--mp-hdp:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
-body.minibody .mp.mp-sttitle:not(.embedded) > .mp-sthd{padding-right:calc(var(--mp-hdp) - 13px)} /* room for keep-on-top, full, x + gaps (the bar ends 13 px short of the window edge; the .mp-side buttons sit over that) */
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-side{top:calc((var(--mp-hdh) - var(--mp-hib)) / 2 - 1px);right:4px;gap:2px;align-items:center}
-body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b,.mp-side .mp-b.mp-x){
+:is(body.minibody,.minicol) .mp:not(.slim):not(.embedded):has(.mp-artbox) .mp-txt{flex:1 1 0;width:auto;min-width:0}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded){--mp-hib:22px;--mp-hii:14px;--mp-hdp:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) > .mp-sthd{padding-right:calc(var(--mp-hdp) - 13px)} /* room for keep-on-top, full, x + gaps (the bar ends 13 px short of the window edge; the .mp-side buttons sit over that) */
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-side{top:calc((var(--mp-hdh) - var(--mp-hib)) / 2 - 1px);right:4px;gap:2px;align-items:center}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b,.mp-side .mp-b.mp-x){
   box-sizing:border-box;width:var(--mp-hib);height:var(--mp-hib);min-width:0;min-height:0;padding:0;margin:0;display:grid;place-items:center;
   border:1px solid transparent;border-radius:3px;background:transparent;color:var(--dim);font-size:13px;line-height:1;cursor:pointer;flex:none}
-body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b) :is(.ic,.ic svg,.ico-svg){width:var(--mp-hii);height:var(--mp-hii)}
-body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b):is(:hover,:focus-visible){color:var(--accent-text,var(--accent));border-color:var(--accent);background:transparent}
-body.minibody .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b).on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{color:var(--ink)} /* F254: dismiss is ink, not dim/red */
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x:is(:hover,:focus-visible){color:var(--ink);border-color:var(--accent)}
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-sthd .sctoggle{margin-left:2px}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b) :is(.ic,.ic svg,.ico-svg){width:var(--mp-hii);height:var(--mp-hii)}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b):is(:hover,:focus-visible){color:var(--accent-text,var(--accent));border-color:var(--accent);background:transparent}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) :is(.mp-sthd > .mp-b.mp-opbtn,.mp-sthd .sctoggle,.mp-side .mp-b).on{color:var(--accent-text,var(--accent));border-color:var(--accent);background:var(--accent-soft,transparent)}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{color:var(--ink)} /* F254: dismiss is ink, not dim/red */
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x:is(:hover,:focus-visible){color:var(--ink);border-color:var(--accent)}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-sthd .sctoggle{margin-left:2px}
 /* Shortcuts open: the strip gets the whole title bar left of its toggle (title + transparency step aside) so no pin is ever clipped;
    pinned icons stay right-aligned next to the toggle, and if a future count still overflows it scrolls sideways instead of hiding icons. */
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside{left:6px;right:calc(var(--mp-hdp) - 13px + var(--mp-hib) + 4px);width:auto;max-width:none;display:flex;justify-content:flex-end;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside::-webkit-scrollbar{display:none}
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside[hidden]{display:none}
-body.minibody .mp.mp-sttitle:not(.embedded) .mp-scside .scrow{flex:none;margin-left:auto}
-body.minibody .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd .mp-hdt{visibility:hidden}
-body.minibody .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{display:none}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-scside{left:6px;right:calc(var(--mp-hdp) - 13px + var(--mp-hib) + 4px);width:auto;max-width:none;display:flex;justify-content:flex-end;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-scside::-webkit-scrollbar{display:none}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-scside[hidden]{display:none}
+:is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-scside .scrow{flex:none;margin-left:auto}
+:is(body.minibody,.minicol) .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd .mp-hdt{visibility:hidden}
+:is(body.minibody,.minicol) .mp.mp-sttitle.scopen:not(.embedded) .mp-sthd > .mp-b.mp-opbtn{display:none}
 /* slim (no title bar): the same three buttons, centered on the right */
-body.minibody .mp.mp-sttitle.slim:not(.embedded){padding-right:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
-body.minibody .mp.mp-sttitle.slim:not(.embedded) .mp-side{top:50%;translate:0 -50%}
+:is(body.minibody,.minicol) .mp.mp-sttitle.slim:not(.embedded){padding-right:calc(3 * var(--mp-hib) + 2 * 2px + 8px)}
+:is(body.minibody,.minicol) .mp.mp-sttitle.slim:not(.embedded) .mp-side{top:50%;translate:0 -50%}
 @media (max-width:900px),(pointer:coarse){
-  body.minibody .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{width:var(--mp-hib);height:var(--mp-hib);min-width:0;min-height:0}
+  :is(body.minibody,.minicol) .mp.mp-sttitle:not(.embedded) .mp-side .mp-b.mp-x{width:var(--mp-hib);height:var(--mp-hib);min-width:0;min-height:0}
 }
+/* ---- 0.6.9 #9: the expanded-Library player IS the standalone mini player (.mp-replica, not .embedded, so every standalone rule above applies,
+   scoped to body.minibody or .minicol). It fills the column instead of the 420 px window; window transparency is the mini WINDOW's only. */
+.minicol .mp.mp-replica{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.mp.mp-replica .mp-opbtn,.mp.mp-replica .mp-oprow{display:none!important}

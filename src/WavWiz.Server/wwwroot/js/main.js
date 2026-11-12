@@ -174,7 +174,8 @@ function syncMini() { holdPage();
   if (!desk || !minicol) return;
   const need = wide() && desk.classList.contains('libexpanded');   // 0.4.6 F36/F37: only the expanded Library (Full and Roomy) shrinks Now Playing to the column mini player
   desk.classList.toggle('devfull', wide() && desk.classList.contains('devexpanded') && !desk.classList.contains('libexpanded'));   // 0.4.8 F53 v2: expanded Devices = no player at all, every column full height
-  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, run: runShortcut, home: goHome }); minicol.append(miniInst.rail); }
+  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, replica: true, run: runShortcut, home: goHome,   // 0.6.9 #9: the standalone mini player's layout and controls
+    popout: () => { try { if (window.chrome?.webview) { window.chrome.webview.postMessage({ cmd: 'mini' }); return; } } catch { /* browser */ } openMini(); }, collapse: () => toggleLibExpanded(false) }); minicol.append(miniInst.rail); }
   else if (!need && miniInst) { miniInst.destroy(); miniInst = null; minicol.replaceChildren(h('div', { class: 'mp embedded-host' })); }
   desk.classList.toggle('minishown', need); paintMiniStyle();
 }
