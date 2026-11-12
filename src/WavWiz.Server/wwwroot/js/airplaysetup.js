@@ -77,6 +77,9 @@ export function apMergeRemembered(devs, zones) {
 const OPEN_KEY = 'ww.apsetup.open';
 const stOf = () => ({ heard: null, tested: null, problem: null, busy: '', zonePick: 'new', newName: '', added: false });
 let open = (() => { try { return sessionStorage.getItem(OPEN_KEY) === '1'; } catch { return false; } })();
+// 0.6.9 #12: the Devices tree tags the card (data-card="airplay") and gives it the reorder handle; kept across in-place repaints
+let cardDecor = null;
+export const setApCardDecor = fn => { cardDecor = typeof fn === 'function' ? fn : null; };
 let Sref = null, ctlRef = null, devs = [], ap2 = false, selId = null, byId = Object.create(null), timer = 0, closed = true, lastProblem = null;
 
 function sel() { return (devs || []).find(d => d.id === selId) || null; }
@@ -286,6 +289,7 @@ function buildCard(S, ctl) {
 
   const body = h('div', { class: 'apsetup-body' }, steps, listEl, foot);
   card.append(head, h('div', { class: 'zwrap42 apsetup-wrap' }, body));
+  try { cardDecor?.(card); } catch { /* decoration is cosmetic */ }
   return card;
 }
 

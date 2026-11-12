@@ -55,7 +55,7 @@ import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
 import * as Z from './zones40.js';
-import { isDevDragging } from './devorder.js';
+import { isDevDragging, setCardOrder, cardOrderChangedAt } from './devorder.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
 import { toggleAppFull, installAppFull } from './fullscreen.js';   // 0.5.0 F120
@@ -682,7 +682,7 @@ async function refreshNow() { try { const responseZone = globalThis.__wavwizZone
     const at = performance.now(), rec = reconcileSmoothPosition(S._smooth, r.now, r.now?.positionMs, at);
     S._smooth = rec; S.localPos = rec.posMs; S.localAt = rec.at;
     whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
-async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast)]); S.jb = jb; S.cast = cast;   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
+async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast, ord] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast), api('/zones/order').catch(() => undefined)]); S.jb = jb; S.cast = cast; if (ord !== undefined && t0 >= cardOrderChangedAt()) setCardOrder(ord?.order);   /* 0.6.9 #12: the shared Devices card order */   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
   nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); } catch (e) { handleErr(e); } }

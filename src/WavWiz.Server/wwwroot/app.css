@@ -5572,3 +5572,19 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
 .lib.compact .tile .gblock.j10 .gcount{font-size:10px;padding:1px 5px}
 .lib.compact .tile .gblock.j10 .galb{display:none}
 .lib.compact .tile.btile .tileplay{left:6px;bottom:6px}
+
+/* ---- 0.6.9 #12: every Devices card reorders by click-and-drag - zones (online, offline or empty), Jukebox, Unassigned and AirPlay.
+   Zone queue boxes keep their ⋮ zone-actions gutter as the handle; the other cards get the same ⋮ strip (.cgrip69) at the left edge. ---- */
+.tree42>[data-card]{position:relative}
+.tree42>[data-card]:has(>.cgrip69){padding-left:22px}
+.tree42>.un42[data-card]:has(>.cgrip69){padding-left:30px}
+.cgrip69{position:absolute;left:0;top:0;bottom:0;width:22px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);border-radius:3px 0 0 3px;
+  background:color-mix(in srgb,var(--text) 10%,var(--panel));color:var(--text);font:700 16px/1 system-ui,sans-serif;cursor:grab;touch-action:none;user-select:none;z-index:1}
+.cgrip69:hover,.cgrip69:focus-visible{background:color-mix(in srgb,var(--accent) 22%,var(--panel));outline:none}
+.tree42[data-reorder="1"] .qb42 .zgut42{cursor:grab}
+.tree42[data-reorder="1"] .qb42 .zgut42:active,.cgrip69:active{cursor:grabbing}
+.tree42.zdrag .un42{opacity:1}
+.tree42.zdrag>[data-card].drag42-src{opacity:.45}
+.tree42.zdrag>[data-card].droppable.dropping{background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.tree42.zdrag>[data-card].zins-before{box-shadow:0 -3px 0 0 var(--accent),0 -3px 8px var(--accent)}
+.tree42.zdrag>[data-card].zins-after{box-shadow:0 3px 0 0 var(--accent),0 3px 8px var(--accent)}

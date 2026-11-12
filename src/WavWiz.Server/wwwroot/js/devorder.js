@@ -19,8 +19,50 @@ export function zoneOrderAfterDrop(boxes, fromIdx, toIdx, after) {
   const moving = b[fromIdx], target = b[toIdx], rest = b.filter((_, i) => i !== fromIdx); let at = rest.indexOf(target) + (after ? 1 : 0);
   rest.splice(at, 0, moving); return rest.flat();
 }
+// ---- 0.6.9 #12: the Devices CARD order is kept on the server (GET / PUT /zones/order), the same for every client and across restarts.
+// Card keys: 'g:<zone id>' (a linked set = all its zone keys), 'jukebox', 'unassigned', 'airplay'. Shown exactly as saved - no rank split,
+// no pinning; a card the saved list does not name yet (a new zone) slots in after the last saved zone card. Without a saved list the old
+// default order applies (active zones, then offline, then empty, the Jukebox by the same rule, then Unassigned and AirPlay).
+let cardOrder = null, cardOrderAt = 0;
+/** When this client last changed the order itself: a zones read that started before that must not put the old order back. */
+export const cardOrderChangedAt = () => cardOrderAt;
+export const setCardOrder = list => { cardOrder = Array.isArray(list) && list.length ? list.map(String) : null; };
+export const getCardOrder = () => cardOrder;
+export const cardKeys = c => (c.keys && c.keys.length ? c.keys : [c.key]).map(String);
+/** Pure: cards ({ key, keys? }) in the default order -> the order to show for the saved key list. */
+export function arrangeCards(cards, saved) {
+  const list = cards || []; if (!saved || !saved.length) return list.slice();
+  const pos = new Map(saved.map((k, i) => [String(k), i])), at = c => { let m = Infinity; for (const k of cardKeys(c)) if (pos.has(k)) m = Math.min(m, pos.get(k)); return m; };
+  const known = list.filter(c => at(c) < Infinity).sort((a, b) => at(a) - at(b)), unknown = list.filter(c => at(c) === Infinity);
+  for (const c of unknown) {
+    if (String(c.key).startsWith('g:')) { let i = -1; known.forEach((k, j) => { if (String(k.key).startsWith('g:')) i = j; }); known.splice(i + 1, 0, c); }
+    else known.push(c);
+  }
+  return known;
+}
+/** Pure: the flat key list after moving card `fromKey` before (after=false) / after (after=true) card `toKey`; `cards` = shown order. */
+export function moveCard(cards, fromKey, toKey, after = false) {
+  const list = (cards || []).slice(), i = list.findIndex(c => c.key === fromKey); if (i < 0 || fromKey === toKey) return list.flatMap(cardKeys);
+  const [m] = list.splice(i, 1), j = list.findIndex(c => c.key === toKey); if (j < 0) return [...list, m].flatMap(cardKeys);
+  list.splice(j + (after ? 1 : 0), 0, m); return list.flatMap(cardKeys);
+}
+/** Pure: move card `key` to 'top' | 'up' | 'down' | 'bottom'. */
+export function stepCard(cards, key, how) {
+  const list = (cards || []).slice(), i = list.findIndex(c => c.key === key); if (i < 0) return list.flatMap(cardKeys);
+  const j = how === 'top' ? 0 : how === 'up' ? i - 1 : how === 'down' ? i + 1 : list.length - 1, [m] = list.splice(i, 1);
+  list.splice(Math.max(0, Math.min(list.length, j)), 0, m); return list.flatMap(cardKeys);
+}
+/** Save a new card order: shown at once on this client (optimistic), then PUT to the server, which tells every other client. */
+export async function saveCardOrder(keys, put) {
+  const prev = cardOrder; setCardOrder(keys); cardOrderAt = Date.now();
+  try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ }
+  try { await put(keys); return true; }
+  catch (e) { setCardOrder(prev); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } throw e; }
+}
+const zoneIdsOf = list => list.filter(k => k.startsWith('g:')).map(k => k.slice(2));
 export const orderedZones = zs => applyOrder(zs, loadOrder().z);
-export const orderedGroups = gs => applyOrder(gs, loadOrder().g);
+/** Zones in the shared server card order when there is one (phone page, menus and the tree agree), else this device's old saved order. */
+export const orderedGroups = gs => applyOrder(gs, cardOrder ? zoneIdsOf(cardOrder) : loadOrder().g);
 
 let dragNow = false, linkHandler = null;
 /** 0.4.1: what dropping a zone card onto the MIDDLE of another zone card does (link the two). Set by the Devices screen. */

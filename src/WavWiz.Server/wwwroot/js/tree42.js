@@ -7,9 +7,9 @@ import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } f
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
-import { airPlaySetupCard } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
+import { airPlaySetupCard, setApCardDecor } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
 import { castSetupCard } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
-import { loadOrder, saveOrder, zoneOrderAfterDrop } from './devorder.js';
+import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
@@ -263,18 +263,14 @@ export function treeEl(S, ctl, kit, st) {
   const spk = box => box.zones.flatMap(g => zoneMembers(S.zones, g));
   const isEmpty = box => box.kind === 'solo' && !spk(box).length;
   const rank = box => { const m = spk(box); return !m.length ? 2 : m.some(z => z.connected) ? 0 : 1; };
-  const full = model.boxes.slice();   // the manual order (orderedGroups), before the rank split
-  const activeBoxes = () => full.filter(b => rank(b) === 0);
-  const orderOf = g => { const a = activeBoxes(), i = a.findIndex(b => b.zones.some(z => z.id === g.id)); return i < 0 ? null : { i, n: a.length }; };
-  // Move to top / up / down / to bottom (active zones only): reorder among the active zones INSIDE the full list - the inactive and empty zones keep their slots
-  const moveZone = (g, how) => {
-    const a = activeBoxes(), i = a.findIndex(b => b.zones.some(z => z.id === g.id)); if (i < 0) return;
-    const j = how === 'top' ? 0 : how === 'up' ? i - 1 : how === 'down' ? i + 1 : a.length - 1, [m] = a.splice(i, 1); a.splice(Math.max(0, Math.min(a.length, j)), 0, m);
-    setActiveOrder(a);
-  };
-  // the active zones in a new sequence, written into their slots of the ONE full order (inactive / empty zones keep theirs)
-  const setActiveOrder = a => { let k = 0; const next = full.map(b => (rank(b) === 0 ? a[k++] : b));
-    saveOrder({ ...loadOrder(), g: next.flatMap(b => b.zones.map(z => String(z.id))) }); window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); };
+  const full = model.boxes.slice();   // orderedGroups order, before the default rank split
+  // 0.6.9 #12: Move to top / up / down / to bottom moves the zone's CARD in the one shown card order (zones, Jukebox, Unassigned, AirPlay alike) and
+  // saves it on the server. Admin only, like the drag. No more "active zones only" - every card stays exactly where it is put.
+  let shownCards = [];
+  const keyOfZone = g => (shownCards.find(c => c.keys.includes('g:' + g.id)) || {}).key;
+  const orderOf = g => { if (!admin) return null; const i = shownCards.findIndex(c => c.keys.includes('g:' + g.id)); return i < 0 ? null : { i, n: shownCards.length }; };
+  const putOrder = keys => saveCardOrder(keys, k => api('/zones/order', { method: 'PUT', body: { order: k } })).catch(e => toast('Order not saved. ' + e.message, true));
+  const moveZone = (g, how) => { const k = keyOfZone(g); if (k) putOrder(stepCard(shownCards, k, how)); };
   model.boxes = full.map((b, i) => [rank(b), i, b]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
   const un = model.unassigned;
   // 0.4.9 F76: the Jukebox zone is in the tree again (it was only drawn once it had speakers, so nobody could pick them). Admins always see it,
@@ -347,9 +343,10 @@ export function treeEl(S, ctl, kit, st) {
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; pick(ev); });
     return el;
   };
-  const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? emptyBox(b.leader, false, b) : queueBox(b)]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
-  if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox()]); }
-  root.append(...boxEls.map(x => x[1]));
+  // 0.6.9 #12: every top-level card has a key; the default order is the old one (ranks), a saved server order replaces it exactly
+  const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? emptyBox(b.leader, false, b) : queueBox(b), { key: 'g:' + b.leader.id, keys: b.zones.map(z => 'g:' + z.id) }]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
+  if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox(), { key: 'jukebox', keys: ['jukebox'] }]); }
+  const cardList = boxEls.map(([, el, c]) => ({ ...c, el }));
   if (!model.boxes.length) root.append(h('p', { class: 'dim small pad' }, 'Zones hold speakers, like “Downstairs”. An administrator can create one with +.'));
   const addMenu = (z, btn) => { const r = btn.getBoundingClientRect(); openCtx(r.left, r.bottom + 2, groups.length ? groups.map(g => ({ id: 'move:' + g.id, label: g.name, onclick: () => move(z, g.id) })) : [{ id: 'none', label: 'Create a zone first', disabled: true }], { label: `Add ${z.name} to a zone`, from: btn }); };
   const unBox = h('section', { class: 'un42' + (un.length ? '' : ' empty'), 'data-drop': 'none', 'aria-label': 'Unassigned speakers' },
@@ -363,15 +360,25 @@ export function treeEl(S, ctl, kit, st) {
         ro(h('button', { type: 'button', class: 'btn sm saddzone', onclick: ev => { ev.stopPropagation(); addMenu(z, ev.currentTarget); } }, 'Add to zone'), admin, 'Only an administrator can change zones.'));
       speakerCtx(z, row, false); return row;
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));
-  root.append(unBox);
-  // 0.6.8: AirPlay speakers card sits under Unassigned (the card itself expands / collapses; no header button)
-  // 0.7.0 F169 (user t1680u): order at the bottom is Unassigned, AirPlay speakers, then Cast speakers
-  if (admin) { const apc = airPlaySetupCard(S, ctl); if (apc) root.append(apc); }
-  if (admin) { const csc = castSetupCard(S, ctl); if (csc) root.append(csc); }
+  const decorateCard = (el, key, label) => {
+    el.dataset.card = key;
+    // zone queue boxes drag by their ⋮ zone-actions gutter (0.4.9 F69); every other card gets the same ⋮ handle at its left edge
+    if (admin && !el.querySelector('.zgut42') && !el.querySelector(':scope > .cgrip69')) el.prepend(h('span', { class: 'cgrip69', role: 'button', tabindex: 0, title: 'Drag to reorder', 'aria-label': `Reorder ${label} (drag, or Alt+Up / Alt+Down)` }, '⋮'));
+    return el;
+  };
+  cardList.push({ key: 'unassigned', keys: ['unassigned'], el: unBox });
+  // 0.6.8: AirPlay speakers card sits under Unassigned by default (the card itself expands / collapses; no header button)
+  if (admin) { setApCardDecor(el => decorateCard(el, 'airplay', 'AirPlay speakers')); const apc = airPlaySetupCard(S, ctl); if (apc) cardList.push({ key: 'airplay', keys: ['airplay'], el: apc }); }
+  shownCards = arrangeCards(cardList, getCardOrder());
+  for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'airplay' ? 'AirPlay speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
+  root.append(...shownCards.map(c => c.el));
+  // 0.7.0 F169 (user t1680u): the Cast speakers card sits directly below the AirPlay card (it follows it when AirPlay is moved; not a reorder card itself)
+  if (admin) { const csc = castSetupCard(S, ctl); if (csc) { const apEl = shownCards.find(c => c.key === 'airplay')?.el; if (apEl) apEl.after(csc); else root.append(csc); } }
   attachDrag(root, S, move);
   // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
-  attachZoneDrag(root, model.boxes, () => window.dispatchEvent(new CustomEvent('wavwiz:devredraw')), { active: b => rank(b) === 0, reorder: (fromBox, toBox, after) => {
-    const a = activeBoxes(), m = a.indexOf(fromBox); if (m < 0 || fromBox === toBox) return; a.splice(m, 1); const t = a.indexOf(toBox); if (t < 0) return; a.splice(t + (after ? 1 : 0), 0, fromBox); setActiveOrder(a); } });
+  // 0.6.9 #12: ANY card (zones online or not, Jukebox, Unassigned, AirPlay) drags by its ⋮ handle; the drop saves the whole order on the server
+  root.dataset.reorder = admin ? '1' : '0';
+  if (admin) attachZoneDrag(root, () => shownCards, (from, to, after) => putOrder(moveCard(shownCards, from, to, after)));
   // 0.4.9 F69: a tap / click on a speaker row (not its handle, name button or controls) opens that speaker's settings
   root.addEventListener('click', ev => { const row = ev.target.closest('.sp42[data-device-id]'); if (!row || !root.contains(row) || ev.defaultPrevented || ev.target.closest('button,input,select,a[href],[role="slider"],.dgrip42,.tagact')) return;
     ev.stopPropagation(); st.onSpk(+row.dataset.deviceId); });
@@ -409,27 +416,35 @@ function attachDrag(root, S, move) {
 // A linked set moves as one box. The order is kept on this device (wavwiz.devorder.v1 .g - the 0.3.8 L40 card order the whole Devices UI uses).
 const BOXSKIP = 'button,input,select,textarea,a[href],[role="slider"],[role="switch"],.qb42-vol,.zcard42,.zsp42,.dgrip,.dgrip42,.ctxmenu';
 const ZSKIP = 'button:not(.zname),input,select,textarea,a[href],[role="slider"],.qb42-vol,.zacts,.zgut42,.zl-now,.tagact,.dgrip42,.zsp42';
-function attachZoneDrag(root, boxes, redraw, opt = {}) {
+// 0.6.9 #12: every top-level card is a drag source and a target - zone boxes (by their ⋮ zone-actions gutter), the Jukebox, Unassigned and the
+// AirPlay card (by their ⋮ .cgrip69 handle). Alt+Up / Alt+Down on a handle moves the card one place. The drop hands (fromKey, toKey, after) to onMove.
+function attachZoneDrag(root, cards, onMove) {
+  if (root._zdrag69) return; root._zdrag69 = true;
+  const top = () => [...root.querySelectorAll(':scope > [data-card]')];
   root.addEventListener('click', ev => { if (ev.target.closest?.('[data-justdragged]')) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);   // a finished drag is not also a click
+  root.addEventListener('keydown', ev => {
+    const grab = ev.target.closest?.('.cgrip69,.zgut42'); if (!grab || !ev.altKey || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+    const box = grab.closest('[data-card]'), all = top(), i = all.indexOf(box), t = all[i + (ev.key === 'ArrowUp' ? -1 : 1)]; if (i < 0 || !t) return;
+    ev.preventDefault(); onMove(box.dataset.card, t.dataset.card, ev.key === 'ArrowDown');
+  });
   root.addEventListener('pointerdown', ev => {
-    const grab = ev.target.closest('.zgut42'); if (!grab || !root.contains(grab) || ev.button > 0 || boxes.length < 2) return;   // 0.4.9 F69: the ⋮ handle only
-    // 0.4.9 F69 fix: the DOM boxes are matched to the model by their leader id. The F76 Jukebox row is a .qb42 too but not a zone box, so the old
-    // index match (DOM i = boxes[i]) shifted every box after it and threw on boxes[i] = undefined in onStart - targets past it were never armed.
-    const byId = new Map(boxes.map((b, i) => [String(b.leader.id), i])), idx = t => byId.get(t.dataset.leaderId) ?? -1;
-    const box = grab.closest('.qb42'), all = [...root.querySelectorAll(':scope > .qb42')].filter(t => idx(t) >= 0), from = idx(box); if (from < 0) return;
-    const g = boxes[from], ids = boxes.map(b => b.zones.map(z => z.id)); let offs = [], where = null; if (opt.active && !opt.active(g)) return;
+    const grab = ev.target.closest('.zgut42,.cgrip69'); if (!grab || !root.contains(grab) || ev.button > 0) return;
+    const box = grab.closest('[data-card]'); if (!box || box.parentElement !== root) return;
+    const all = top(); if (all.length < 2) return;
+    const from = box.dataset.card; let offs = [], where = null;
     const clear = t => t.classList.remove('dropping', 'zins-before', 'zins-after');
     const onStart = () => {
       root.classList.add('dragging', 'zdrag'); box.classList.add('drag42-src');
-      all.forEach(t => { const i = idx(t); if (i === from || (opt.active && !opt.active(boxes[i]))) return; t.classList.add('droppable');
+      all.forEach(t => { if (t === box) return; t.classList.add('droppable');
         offs.push(pointerDropTarget(t, { accept: pl => pl?.kind === 'zone42',
-          over: (_, x, y) => { all.forEach(e => e !== t && clear(e)); const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2; where = { i, after };
+          over: (_, x, y) => { all.forEach(e => e !== t && clear(e)); const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2; where = { key: t.dataset.card, after };
             t.classList.add('dropping'); t.classList.toggle('zins-after', after); t.classList.toggle('zins-before', !after); },
           leave: () => clear(t),   // the engine calls leave() right before drop(), so `where` is kept
-          drop: () => { if (where?.i !== i) return; if (opt.reorder) { opt.reorder(g, boxes[i], where.after); return; } const o = loadOrder(); saveOrder({ ...o, g: zoneOrderAfterDrop(ids, from, where.i, where.after) }); redraw(); } })); });
+          drop: () => { if (!where || where.key !== t.dataset.card) return; onMove(from, where.key, where.after); } })); });
     };
     const onEnd = () => { offs.forEach(f => f()); offs = []; root.classList.remove('dragging', 'zdrag'); box.classList.remove('drag42-src'); all.forEach(t => { clear(t); t.classList.remove('droppable'); }); };
-    startPointerDrag(ev, grab, () => ({ kind: 'zone42', id: g.leader.id, title: g.leader.name }), { mode: 'pointer', pin: grab.closest('.zcard42') || grab, onStart, onEnd, noSkip: true });
+    const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'airplay' ? 'AirPlay speakers' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
+    startPointerDrag(ev, grab, () => ({ kind: 'zone42', id: from, title }), { mode: 'pointer', pin: grab.closest('.zcard42') || box, onStart, onEnd, noSkip: true });
   });
 }
 
