@@ -9,11 +9,14 @@ export const SORTS = {
   folders: [['name', 'Name'], ['count', 'Song count']],
   favorites: [['recent', 'Recently hearted'], ['name', 'Name']],
   remote: [['name', 'Album name'], ['artist', 'Artist'], ['year', 'Year (newest)'], ['server', 'Server order']],
+  // 0.6.9 #4: Remote Artists and Remote Recently added get their own sorts (Artists used the album sorts and said "Album name")
+  rartists: [['name', 'Name'], ['albums', 'Most albums'], ['server', 'Server order']],
+  rrecent: [['recent', 'Recently added'], ['artist', 'Artist'], ['name', 'Album name'], ['year', 'Year (newest)']],
   radio: [['name', 'Name']],
   playlists: [['name', 'Name']],
   songs: [['track', 'Track no.'], ['title', 'Title'], ['length', 'Length'], ['added', 'Date added']],
 };
-export const DEFAULT_SORT = { artists: 'name', albums: 'artist', genres: 'name', years: 'name', recent: 'recent', folders: 'name', favorites: 'recent', remote: 'name', radio: 'name', playlists: 'name', songs: 'track' };
+export const DEFAULT_SORT = { artists: 'name', albums: 'artist', genres: 'name', years: 'name', recent: 'recent', folders: 'name', favorites: 'recent', remote: 'name', rartists: 'name', rrecent: 'recent', radio: 'name', playlists: 'name', songs: 'track' };
 export const LIB_KEY = 'wavwiz.libprefs.v1';
 const coll = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 export const cmpName = (a, b) => coll.compare(String(a ?? ''), String(b ?? ''));

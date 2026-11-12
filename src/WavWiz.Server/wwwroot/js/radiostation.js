@@ -7,7 +7,12 @@ import { dndMode, pointerDragSource } from './pdrag.js';
 import { attachCtx } from './ctxmenu.js';
 import { loadLibPrefs, tabView } from './libsort.js';
 
+// 0.6.9 #5: the Library sets the Tiles / List pick it shows on its toolbar for the Radio source (side panel or Expanded, session picks included);
+// without it (phone Radio page) the Expanded per-tab pref decides as before.
+let viewPick = null;
+export const setRadioView = v => { viewPick = v === 'grid' || v === 'list' ? v : null; };
 export const radioGridOn = () => {
+  if (viewPick) return viewPick === 'grid';
   const P = loadLibPrefs();
   try { return tabView(P, 'radio') === 'grid'; } catch { return P.defView !== 'list'; }
 };

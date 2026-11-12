@@ -15,7 +15,7 @@ export function radioTab(S, act) {
     h('section', { class: 'radcol radsaved', 'aria-label': 'My stations' }, h('div', { class: 'sec' }, 'My stations ', h('span', { class: 'cnt' })), mine, adds),
     h('section', { class: 'radcol radfind' }, finder.el));
 
-  let openKey = null;
+  let openKey = null, filter = '';   // 0.6.9 #4: the Library search box filters My stations by name / genre
   function drawAdds() {
     if (!canControl(S)) { adds.replaceChildren(); return; }
     const forms = {
@@ -42,16 +42,18 @@ export function radioTab(S, act) {
 
   async function drawMine() {
     let rows = S.radio || []; try { rows = S.radio = await api('/radio'); } catch { /* keep */ }
+    const all = rows.length, q = filter.toLowerCase();
+    if (q) rows = rows.filter(r => `${r.name || ''} ${r.genre || ''} ${r.tags || ''}`.toLowerCase().includes(q));
     const playing = S.now?.item?.kind === 'radio' ? S.now.item.refId : null;
-    root.querySelector('.radcol .cnt').textContent = String(rows.length);
+    root.querySelector('.radcol .cnt').textContent = q ? `${rows.length} of ${all}` : String(rows.length);
     const grid = radioGridOn();
     const opts = { S, act, onChange: drawMine };
     const list = rows.length
       ? h('ul', { class: grid ? 'tilegrid tg-radio' : 'list' }, rows.map(r => grid ? savedStationTile(r, playing, opts) : savedStationRow(r, playing, opts)))
-      : h('p', { class: 'dim radnone' }, 'No saved stations yet. Find one below, or add a stream address.');
+      : h('p', { class: 'dim radnone' }, q && all ? `No saved station matches “${filter}”.` : 'No saved stations yet. Find one below, or add a stream address.');
     mine.replaceChildren(list);
     drawAdds();
     finder.setSavedUrls?.(new Set(rows.map(r => r.url).filter(Boolean)));
   }
-  return { el: root, reload: () => { drawMine(); finder.reload(); } };
+  return { el: root, reload: () => { drawMine(); finder.reload(); }, setFilter: q => { filter = String(q || '').trim(); } };
 }

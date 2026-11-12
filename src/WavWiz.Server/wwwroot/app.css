@@ -5545,3 +5545,30 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
    (<= 900 px phone page, Roomy / Auto slide-over) keep their own rules. panels.js DEV_PX mirrors this for the auto-rail math. */
 :root{--devw:380px;--spkcol:var(--devw)}
 .desk{grid-template-columns:var(--libw,clamp(230px,calc(21vw / var(--z,1)),360px)) minmax(0,1fr) var(--rightw,var(--devw))}
+
+/* ---- 0.6.9 Library (#1 three columns next to the A–Z rail, #2 no cut-off names, #3 square Genre / Year tiles) ---- */
+/* #1: the side panel (and the narrow PC page) always lays tiles out in THREE columns - Albums, Artists, Genres, Years, Recently added, Folders,
+   Favorites, Remote and Radio alike. The A–Z rail is a flex sibling of .libcontent, so the grid just takes the width that is left
+   (minmax(0,1fr) never forces a column out). The phone page keeps its own two-column layout. */
+.lib.compact .tilegrid,.libpanel .lib:not(.expanded) .tilegrid,.lib.compact .tilegrid.tg-radio,.lib.compact .radiotab2 .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px}
+@media (max-width:760px){ .view .lib:not(.phone-library) .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 10px} }
+.lib.compact .libscroll>.libcontent{min-width:0}
+.lib.compact .tile .t1{font-size:12px;line-height:1.25;margin-top:6px}
+.lib.compact .tile .t2{font-size:11px;line-height:1.25}
+.lib.compact .tile .t3 .tcount{font-size:10px}
+.lib.compact .tile .tileplay{width:30px;height:30px;font-size:12px}
+/* #2: names wrap onto more lines instead of ending in "…" - album titles, artist names, station names, genre names and years, in tiles and in
+   list rows (the song rows of an album page keep one line, so the # / title / time columns stay aligned). */
+.lib .tile .t1.ell,.lib .tile .t2.ell,.lib .list .item .t .t1.ell,.lib .list .item .t .t2.ell,
+.lib .tile .gblock .gname.ell,.lib .tile .gblock.j10 .gname,.radiotab2 .tile .t1.ell,.radiotab2 .list .item .t1.ell,.radiotab2 .list .item .t2.ell{
+  white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:normal;hyphens:auto}
+.lib .albpage .list .item .t .t1.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* #3: Genres and Years (and decades) are square tiles everywhere, like album covers; the count wraps under the name inside the square. */
+.lib .tile .gblock,.lib .tile .gblock.j10,.lib.compact .tile .gblock.j10,.lib.expanded .tile .gblock.j10{aspect-ratio:1/1;height:auto;justify-content:flex-start}
+.lib .tile .gblock.j10 .gname{max-width:100%;line-height:1.15}
+.lib .tile .gblock.j10 .gcount{white-space:normal;max-width:100%;line-height:1.3}
+.lib.compact .tile .gblock.j10{padding:7px 7px 6px}
+.lib.compact .tile .gblock.j10 .gname{font-size:12px;padding:1px 4px;margin-left:-4px}
+.lib.compact .tile .gblock.j10 .gcount{font-size:10px;padding:1px 5px}
+.lib.compact .tile .gblock.j10 .galb{display:none}
+.lib.compact .tile.btile .tileplay{left:6px;bottom:6px}
