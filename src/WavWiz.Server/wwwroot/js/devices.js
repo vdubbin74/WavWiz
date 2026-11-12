@@ -565,11 +565,24 @@ function keepCard(old, S, z, hl, build, busy) {
   return el;
 }
 /** Keep a section (master row, zones sidebar) while the user is working in it; else take the fresh one. */
+/** 0.6.9 #13: the alignment alignPanelMaster / alignMaster put on the live MASTER strip (class f70p + --f70l / --f70w) is copied onto a fresh strip.
+ *  Without it the fresh markup never equalled the live node, so EVERY status tick (~1 s) swapped the strip for an unaligned one and re-aligned it a
+ *  frame later: the master bar jumped and everything under the pointer (an expanded zone card's rows) lost and regained :hover - the flicker. */
+export function carryAlign(old, fresh) {
+  if (!old || !fresh || !old.classList?.contains('f70p')) return fresh;
+  fresh.classList.add('f70p');
+  for (const p of ['--f70l', '--f70w']) { const v = old.style.getPropertyValue(p); if (v) fresh.style.setProperty(p, v); }
+  return fresh;
+}
+const sansStyle = el => { const c = el.cloneNode(true); for (const n of [c, ...c.querySelectorAll('[style]')]) n.removeAttribute('style'); return c.outerHTML; };
 function keepSection(old, fresh, busy) {
   if (old && userBusyIn(old)) { busy.v = true; return old; }
+  carryAlign(old, fresh);   // 0.6.9 #13
   // F151b: a status tick (~2 s) rebuilt the master row even when nothing changed - hovering the mixer / mute icon lost :hover and its
   // tooltip every tick (flash). Same markup = keep the live node.
   if (old && fresh && old.outerHTML === fresh.outerHTML) return old;
+  // 0.6.9 #13: inline styles painted after insertion (slider fill, the F70 alignment) are not markup - compare without them, keep the live node
+  if (old && fresh && sansStyle(old) === sansStyle(fresh)) return old;
   if (old && fresh && old.isConnected && hov42(old)) return old;   // F151b: pointer on Mute / mixer: keep until it leaves
   return fresh;
 }
@@ -1064,7 +1077,7 @@ export function devicesPanel(S, ctl) {
     // F223: one Speakers scroller both modes — reuse .tcol42 (or migrate .tcol42s); MOVE into .dexp-main on expand; never mint a fresh one
     const speakersHost = () => {
       let t = body.querySelector('.tcol42');
-      if (t) { t.classList.add('ecol'); t.classList.remove('tcol42s'); return t; }
+      if (t) { if (!t.classList.contains('ecol')) t.classList.add('ecol'); if (t.classList.contains('tcol42s')) t.classList.remove('tcol42s'); return t; }   // 0.6.9 #13: no class write (and style recalc) on every tick
       const old = kid(body, 'tcol42s') || body.querySelector('.tcol42s');
       if (old) { old.classList.remove('tcol42s'); old.classList.add('tcol42', 'ecol'); return old; }
       return h('div', { class: 'tcol42 ecol' });
