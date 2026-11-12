@@ -3228,6 +3228,9 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 .libpanel button.on,.lib button.on,.lib [aria-pressed=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 /* 0.4.7: the filled (accent) tabs and chips keep the theme's on-accent text color (F40 above recolored their text to the accent, invisible on the accent fill) */
 .libpanel .tabs button.on,.lib .tabs:not(.xtabs) button.on,.libpanel .chipbtn.on,.lib .chipbtn.on{color:var(--accent-ink)}
+/* 0.6.9 #7: the Z–A (reversed) sort chip keeps its accent-colored lettering on the panel2 face - the chipbtn.on rule above set it to --accent-ink
+   (dark text meant for a solid accent fill), so "Z–A ↑" was nearly invisible on dark themes. Higher specificity, same look as .libtools .libflip.on. */
+.lib .libtools .chipbtn.libflip.on,.libpanel .libtools .chipbtn.libflip.on{background:var(--panel2);color:var(--accent-text,var(--accent));border-color:var(--accent);font-weight:700}
 /* 0.5.0 F116: pane-h Expand/Collapse (+ fold) keep accent — F40's .libpanel button reset was washing them to ink/white */
 .libpanel .pane-h .plus{background:var(--panel2);border:1px solid var(--accent);color:var(--accent-text,var(--accent))}
 .libpanel .pane-h .plus:hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
