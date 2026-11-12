@@ -29,12 +29,18 @@ export function togglePin(pins, id) {
 /** Pure: move a pin to another place in the order (first = closest to Home). */
 export function movePin(pins, from, to) { if (from === to || from < 0 || to < 0 || from >= pins.length || to >= pins.length) return pins; const a = pins.slice(); const [x] = a.splice(from, 1); a.splice(to, 0, x); return a; }
 /** Pure: DOM order left -> right. Home is last (far right corner); pins stack leftward from the separator, so the first pin is the one nearest Home. */
-export const rowOrder = pins => [...pins.slice().reverse().map(id => ({ kind: 'pin', id })), ...(pins.length ? [{ kind: 'sep' }] : []), { kind: 'home' }];
+export const rowOrder = (pins, withHome = true) => withHome ? [...pins.slice().reverse().map(id => ({ kind: 'pin', id })), ...(pins.length ? [{ kind: 'sep' }] : []), { kind: 'home' }]
+  : pins.map(id => ({ kind: 'pin', id }));   // 0.6.9 #8: a row with no Home lists the pins left to right in pin order
+/** 0.6.9 #8: the pins a row shows when it already has its own buttons for some destinations (e.g. Sleep / Master volume): never a duplicate. */
+export const shownPins = (pins, exclude = []) => pins.filter(id => !exclude.includes(id));
 
 /** The row. `run(id)` runs a pinned destination, `home()` goes Home. Redraws when the pins change (here or in another window). Returns { el, destroy }. */
-export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
+/** 0.6.9 #8: `home: false` = no Home button; `exclude` = pin ids this row never shows (the host already has that button); `fit: 'siblings'` = the
+ *  row shares one no-wrap line with sibling buttons, so the cap counts the room the siblings leave, at `btnW` px per button. */
+export function shortcutsRow({ run, home, cls = '', vertical = false, exclude = [], fit = '', btnW = 32 } = {}) {
+  const withHome = home !== false;
   const el = h('div', { class: 'scrow ' + cls, role: 'toolbar', 'aria-label': 'Shortcuts' });
-  let pins = loadPins(), drag = -1;
+  let pins = shownPins(loadPins(), exclude), drag = -1;
   const popover = (btn, i) => {
     document.querySelector('.scpop')?.remove();
     const mk = (t, fn, dis) => h('button', { type: 'button', class: 'btn sm', disabled: dis || undefined, onclick: () => { pop.remove(); fn(); } }, t);
@@ -43,7 +49,7 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
     pop.style.left = Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 6)) + 'px'; pop.style.top = Math.max(4, r.top - pop.offsetHeight - 6) + 'px';
     setTimeout(() => document.addEventListener('pointerdown', function f(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('pointerdown', f, true); } }, true), 0);
   };
-  const set = p => { pins = savePins(p); draw(); try { window.dispatchEvent(new CustomEvent('wavwiz:pins')); } catch { /* ignore */ } };   // F145: title pins + menu pins repaint after a sleeve reorder / unpin
+  const set = p => { const hid = loadPins().filter(id => exclude.includes(id)); pins = shownPins(savePins([...p, ...hid]), exclude); draw(); try { window.dispatchEvent(new CustomEvent('wavwiz:pins')); } catch { /* ignore */ } };   // F145: title pins + menu pins repaint after a sleeve reorder / unpin
   /** 0.3.8 L37: in a very narrow window the pins nearest Home stay and the rest move into a 'more' menu. */
   let cap = 99;
   const calcCap = () => {
@@ -58,6 +64,13 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
       const c = Math.max(1, Math.floor((inner - 36) / 26));
       return c >= pins.length ? 99 : c;
     }
+    if (fit === 'siblings') {
+      const par = el.parentElement; if (!par) return 99;
+      const gap = parseFloat(getComputedStyle(par).columnGap) || 0, kids = [...par.children].filter(k => k !== el);
+      const room = par.clientWidth - kids.reduce((a, k) => a + k.getBoundingClientRect().width + gap, 0);
+      const c = Math.max(1, Math.floor((room + gap) / btnW));
+      return c >= pins.length ? 99 : Math.max(1, c - 1);   // one slot for the … menu
+    }
     const w = el.parentElement?.clientWidth || 0; const c = w ? Math.max(2, Math.floor((w - 56) / 32)) : 99; return c >= pins.length ? 99 : c - 1;
   };
   const more = (btn, ev) => {
@@ -68,7 +81,7 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
   function draw() {
     cap = calcCap();
     const vis = cap >= pins.length ? pins : pins.slice(0, cap);
-    el.replaceChildren(...rowOrder(vis).map(x => {
+    el.replaceChildren(...rowOrder(vis, withHome).map(x => {
       if (x.kind === 'sep' && cap < pins.length) return h('span', { class: 'scsep', 'aria-hidden': 'true' });
       if (x.kind === 'sep') return h('span', { class: 'scsep', 'aria-hidden': 'true' });
       if (x.kind === 'home') return h('button', { type: 'button', class: 'scbtn schome', 'data-sc': 'home', 'aria-label': 'Home', title: 'Home - back to the default screen (Alt+H)', onclick: () => home?.() }, icon('home'));
@@ -83,8 +96,8 @@ export function shortcutsRow({ run, home, cls = '', vertical = false } = {}) {
     if (cap < pins.length) { const mb = h('button', { type: 'button', class: 'scbtn scmore', 'data-sc': 'more', 'aria-label': 'More shortcuts', title: 'More shortcuts', onclick: ev => { ev.stopPropagation(); more(mb, ev); } }, '…'); el.prepend(mb); }
   }
   let ro = null; try { ro = new ResizeObserver(() => { const c = calcCap(); if (c !== cap) draw(); }); if (el.parentElement) ro.observe(el.parentElement); else setTimeout(() => el.parentElement && ro?.observe(el.parentElement), 0); } catch { /* no ResizeObserver */ }
-  const onStore = ev => { if (!ev.key || ev.key === PINS_KEY) { pins = loadPins(); draw(); } };
-  const onPins = () => { pins = loadPins(); draw(); };
+  const onStore = ev => { if (!ev.key || ev.key === PINS_KEY) { pins = shownPins(loadPins(), exclude); draw(); } };
+  const onPins = () => { pins = shownPins(loadPins(), exclude); draw(); };
   window.addEventListener('storage', onStore); window.addEventListener('wavwiz:pins', onPins);
   draw();
   return { el, destroy: () => { ro?.disconnect(); window.removeEventListener('storage', onStore); window.removeEventListener('wavwiz:pins', onPins); } };

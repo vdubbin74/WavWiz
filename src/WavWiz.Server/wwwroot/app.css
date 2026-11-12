@@ -5598,3 +5598,14 @@ input[type=range]:not(.npcolor-range)::-moz-range-progress{background:transparen
 :root:not([data-slider=flat]) .np-phone-seek>i{background:linear-gradient(90deg,var(--accent),var(--seek-color,var(--accent2)))}
 :root:not([data-slider=flat]) .eqarea[data-eqstyle=faders] .eqb-fill{background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 35% 65%,rgba(0,0,0,.28)),linear-gradient(0deg,var(--accent),var(--accent2))}
 :root:not([data-slider=flat]) .eqb-fill{background:linear-gradient(0deg,var(--accent),var(--accent2))}
+/* ---- 0.6.9 #8: narrow PC Now Playing (a PC window at phone width, not a phone): Sleep, Master volume and the pins share ONE row of the same
+   rounded-square buttons, no Home, never wrapping (extra pins go to the … menu). Not inside a phone media query, keyed on .np-xrow-pc only. */
+.np-phone-full .np-xrow-pc{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;overflow:hidden}
+.np-phone-full .np-xrow-pc>.npsleep-ic,.np-phone-full .np-xrow-pc>.tbtn,.np-phone-full .np-xrow-pc .np-xpins>.scbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;min-width:44px;width:auto;height:44px;padding:0 10px;margin:0;border:1px solid var(--line);border-radius:var(--radius,3px);background:var(--panel2);color:var(--ink);box-shadow:none}
+.np-phone-full .np-xrow-pc .ic,.np-phone-full .np-xrow-pc svg{width:20px;height:20px}
+.np-phone-full .np-xrow-pc>.npsleep-ic .npsl-t:empty{display:none}
+.np-phone-full .np-xrow-pc>.npsleep-ic .npsl-t{font-size:13px;font-variant-numeric:tabular-nums}
+.np-phone-full .np-xrow-pc>.npsleep-ic.on,.np-phone-full .np-xrow-pc .scbtn.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.np-phone-full .np-xrow-pc>:is(.npsleep-ic,.tbtn):hover,.np-phone-full .np-xrow-pc .np-xpins>.scbtn:hover{border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
+.np-phone-full .np-xrow-pc .np-xpins{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;margin:0;padding:0;border:0;background:none}
+.np-phone-full .np-xrow-pc .np-xpins>.scsep{display:none}
