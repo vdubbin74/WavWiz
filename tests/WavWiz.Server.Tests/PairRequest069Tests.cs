@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using WavWiz.PlayerCore.Discovery;
 namespace WavWiz.Server.Tests;
 
 /// <summary>0.6.9 #15: smooth first-run pairing by administrator approval. Nothing is granted before an admin approves; a Player token stays a Player token.</summary>
@@ -114,5 +115,46 @@ public class PairRequest069Tests
             var p = await Post(f.Http, "/api/v1/auth/pair-player", new { playerId = "pc-l", name = "Server PC" });
             Assert.Equal(JsonValueKind.Null, p.GetProperty("uiToken").ValueKind);
         }
+    }
+
+    [Fact]
+    public async Task The_Player_client_asks_waits_and_receives_both_tokens_once_the_admin_approves()
+    {
+        await using var f = await ServerFixture.StartAsync(c => c.TestTreatAllClientsAsRemote = true);
+        await f.SetupAdmin();
+        var u = new Uri(f.Base);
+        var req = await PairingClient.RequestApprovalAsync(u.Host, u.Port, "pc-den", "Den PC", "DEN");
+        Assert.NotNull(req.Id); Assert.Matches("^[0-9]{4}$", req.Match!);
+        Assert.Equal("pending", (await PairingClient.PollApprovalAsync(u.Host, u.Port, req.Id!, req.Secret!)).Status);
+        (await f.As(f.Token(Role.Admin)).PostAsync($"/api/v1/pairing/requests/{req.Id}/approve", null)).EnsureSuccessStatusCode();
+        var a = await PairingClient.PollApprovalAsync(u.Host, u.Port, req.Id!, req.Secret!);
+        Assert.Equal("approved", a.Status);
+        Assert.Equal(Role.Player, f.Server.S.Auth.Validate(a.Result!.Token!)!.Role);
+        Assert.Equal(Role.Control, f.Server.S.Auth.Validate(a.Result!.UiToken!)!.Role);
+        Assert.Equal("expired", (await PairingClient.PollApprovalAsync(u.Host, u.Port, req.Id!, req.Secret!)).Status);
+        // nobody listening = "offline" (keep waiting), never an exception
+        Assert.Equal("offline", (await PairingClient.PollApprovalAsync("127.0.0.1", 1, "x", "y")).Status);
+    }
+
+    [Theory]
+    [InlineData(200, "{\"status\":\"pending\"}", "pending")]
+    [InlineData(200, "{\"status\":\"denied\"}", "denied")]
+    [InlineData(404, "{\"status\":\"expired\"}", "expired")]
+    [InlineData(500, "{}", "offline")]
+    [InlineData(200, "{\"status\":\"approved\"}", "pending")]   // approved without a token is not a pairing (window-kind answers never reach the Player)
+    public void Poll_answers_map_to_a_status(int http, string json, string want) => Assert.Equal(want, PairingClient.ParseAnswer(http, JsonDocument.Parse(json).RootElement).Status);
+
+    [Fact]
+    public void The_Player_window_gets_its_session_only_when_it_has_none_and_never_the_player_token()
+    {
+        var root = AppContext.BaseDirectory; while (!File.Exists(Path.Combine(root, "WavWiz.sln"))) root = Path.GetDirectoryName(root)!;
+        var forms = File.ReadAllText(Path.Combine(root, "src", "WavWiz.Player", "Forms.cs"));
+        var app = File.ReadAllText(Path.Combine(root, "src", "WavWiz.Player", "PlayerApp.cs"));
+        Assert.Contains("new DpapiSecretStore().Load(\"uitoken\")", forms);
+        Assert.Contains("if (have.Any(c => c.Name == \"wavwiz_session\")) return;", forms);
+        Assert.DoesNotContain("Load(\"token\")", forms);
+        Assert.Contains("await EnsureWindowSession(cw);", forms);
+        Assert.Contains("if (!here && code == null)", app);   // no code typed -> approval
+        Assert.Contains("_secrets.Delete(\"uitoken\"); Application.Restart();", app);
     }
 }

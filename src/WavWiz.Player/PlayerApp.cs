@@ -80,9 +80,26 @@ internal sealed class PlayerApp : ApplicationContext
                     else if (f.ManualPort is int mp) _s.HttpPort = mp;
                     _s.Save();
                 }
-                Log($"pairing with {_s.ServerHost}:{_s.HttpPort}");
-                var r = await PairingClient.PairAsync(_s.ServerHost, _s.HttpPort, _s.PlayerId, _s.Name, code, _cts.Token);
-                if (r.Token != null) { _secrets.Save("token", r.Token); token = r.Token; if (r.AudioPort > 0) _s.AudioPort = r.AudioPort; }
+                PairResult r;
+                if (!here && code == null)
+                {
+                    // 0.6.9 #15: no code typed - ask the administrator; the request shows up at once on every admin screen
+                    Log($"asking {_s.ServerHost}:{_s.HttpPort} for approval");
+                    using var a = new ApprovalForm(_s);
+                    var dr = a.ShowDialog();
+                    if (dr == DialogResult.OK && a.Result != null) r = a.Result;
+                    else { problem = a.WantsCode ? "Type the 6-digit pairing code (Settings > Players > Pair a PC)." : a.Problem ?? "Not paired yet. Press Connect to ask the administrator again, or type a pairing code."; Log("approval: " + (a.Problem ?? dr.ToString())); continue; }
+                }
+                else
+                {
+                    Log($"pairing with {_s.ServerHost}:{_s.HttpPort}");
+                    r = await PairingClient.PairAsync(_s.ServerHost, _s.HttpPort, _s.PlayerId, _s.Name, code, _cts.Token);
+                }
+                if (r.Token != null)
+                {
+                    _secrets.Save("token", r.Token); token = r.Token; if (r.AudioPort > 0) _s.AudioPort = r.AudioPort;
+                    if (r.UiToken != null) _secrets.Save("uitoken", r.UiToken); else _secrets.Delete("uitoken");   // 0.6.9 #15: the window's own session (WebUiForm.EnsureWindowSession)
+                }
                 else { problem = r.Error; Log("pairing failed: " + r.Error); }
             }
             if (string.IsNullOrEmpty(_s.ServerId))
@@ -162,7 +179,7 @@ internal sealed class PlayerApp : ApplicationContext
         _menu.Items.Add(new ToolStripMenuItem(st == null ? "Starting..." : st.Connected ? $"Connected to {(string.IsNullOrEmpty(_s.ServerName) ? _s.ServerHost : _s.ServerName)} ({_s.ServerHost})" : $"Not connected ({st.Status})") { Enabled = false });
         if (st is { Connected: true }) _menu.Items.Add(new ToolStripMenuItem(st.NotCalibrated ? $"Delay: ~{st.LatencyMs:0} ms - NOT calibrated" : $"Delay: +{st.LatencyMs:0} ms ({st.LatencySource})") { Enabled = false });
         _menu.Items.Add(new ToolStripSeparator());
-        var open = new ToolStripMenuItem("Open player...", null, (_, _) => OpenUi()) { Font = new Font(SystemFonts.MenuFont!, FontStyle.Bold), ToolTipText = "Opens WavWiz (sign in as Player or Administrator)" }; _menu.Items.Add(open);
+        var open = new ToolStripMenuItem("Open player...", null, (_, _) => OpenUi()) { Font = new Font(SystemFonts.MenuFont!, FontStyle.Bold), ToolTipText = "Opens WavWiz on this PC" }; _menu.Items.Add(open);
         // 0.3.5 J15/J16 (next-menus-tray.png): Start Jukebox... (Stop Jukebox... while it runs, with the usual confirm in the page)
         _menu.Items.Add(new ToolStripMenuItem(_jukeboxOn ? "Stop Jukebox..." : "Start Jukebox...", null, (_, _) => OpenUi(_jukeboxOn ? "jukebox-stop" : "jukebox")) { ToolTipText = _jukeboxOn ? "Guests can no longer add songs. The music keeps playing." : "Guests add songs from their phones (administrator)" });
         _menu.Items.Add(new ToolStripMenuItem("Mini player", null, (_, _) => OpenMini()) { ShortcutKeyDisplayString = "Alt+M", ToolTipText = "A small window with play / pause, next, seek and volume. Pin it to keep it on top." });
@@ -190,13 +207,13 @@ internal sealed class PlayerApp : ApplicationContext
     private bool _notPaired;
     private volatile bool _jukeboxOn;   // 0.3.5 J15: reported by the page (WebUiForm.JukeboxState)
     /// <summary>"Pair again": forgets the old token and restarts the player, which then shows the connection dialog (or pairs by itself when the server is on this PC).</summary>
-    private void PairAgain() { _secrets.Delete("token"); Application.Restart(); }
+    private void PairAgain() { _secrets.Delete("token"); _secrets.Delete("uitoken"); Application.Restart(); }
 
     private void Repair()
     {
         using var f = new ConnectForm(_s, null, !string.IsNullOrWhiteSpace(_s.ServerHost) && PairingClient.IsThisMachine(_s.ServerHost)); if (f.ShowDialog() != DialogResult.OK) return;
         _s.ServerHost = f.Host!; if (f.Beacon is { } bc) { _s.ServerId = bc.Id; _s.ServerName = bc.Name; if (bc.HttpPort > 0) _s.HttpPort = bc.HttpPort; if (bc.AudioPort > 0) _s.AudioPort = bc.AudioPort; } else { _s.ServerId = ""; _s.ServerName = ""; if (f.ManualPort is int mp) _s.HttpPort = mp; }
-        _s.Save(); _secrets.Delete("token"); _tray.ShowBalloonTip(4000, WavWizInfo.DisplayName, "Restart WavWiz Player to pair with the new settings.", ToolTipIcon.Info);
+        _s.Save(); _secrets.Delete("token"); _secrets.Delete("uitoken"); _tray.ShowBalloonTip(4000, WavWizInfo.DisplayName, "Restart WavWiz Player to pair with the new settings.", ToolTipIcon.Info);
         Application.Restart();
     }
 
