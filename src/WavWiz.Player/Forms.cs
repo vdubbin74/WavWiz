@@ -300,7 +300,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (FolderPick.Parse(j) is { } fp) { BeginInvoke(() => PickFolder(cw, fp)); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -332,6 +332,20 @@ public sealed class WebUiForm : Form
             cw.CookieManager.AddOrUpdateCookie(c);
         }
         catch { }
+    }
+
+    /// <summary>0.6.9 #6: Settings > Library > Music folders "Browse..." - the Windows folder dialog (the page only offers it on the server PC).</summary>
+    private void PickFolder(CoreWebView2 cw, FolderPick.Request r)
+    {
+        string? path = null;
+        try
+        {
+            using var d = new FolderBrowserDialog { Description = r.Title, UseDescriptionForTitle = true, ShowNewFolderButton = false };
+            if (r.Initial != null && Directory.Exists(r.Initial)) d.InitialDirectory = r.Initial;
+            if (d.ShowDialog(this) == DialogResult.OK) path = d.SelectedPath;
+        }
+        catch { }
+        try { cw.PostWebMessageAsJson(FolderPick.Answer(r.Id, path)); } catch { }
     }
 
     private bool _waiting;   // the next successful NavigationCompleted is our own waiting page, not WavWiz
