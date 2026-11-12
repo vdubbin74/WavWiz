@@ -65,7 +65,7 @@ public class Release011Tests
         var ans = DiscoveryHost.Answer(DnsWire.Query("_raop._tcp.local", DnsWire.TypePtr), beacon, ip, extra);
         Assert.NotNull(ans); Assert.True(DnsWire.TryParse(ans, out var m));
         var srv = m!.Records.Single(r => r.Type == DnsWire.TypeSrv); Assert.Equal(47804, DnsWire.SrvOf(srv.Data).Port); Assert.Contains("Everywhere", srv.Name);
-        Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("_unison._tcp.local", DnsWire.TypePtr), beacon, ip, extra));
+        Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("_wavwiz._tcp.local", DnsWire.TypePtr), beacon, ip, extra));
         Assert.Null(DiscoveryHost.Answer(DnsWire.Query("_googlecast._tcp.local", DnsWire.TypePtr), beacon, ip, extra));
         Assert.NotNull(DiscoveryHost.Answer(DnsWire.Query("AABBCCDDEEFF@WavWiz – Everywhere._raop._tcp.local", DnsWire.TypeSrv), beacon, ip, extra));
     }

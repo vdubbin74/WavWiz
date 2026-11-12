@@ -4,7 +4,7 @@ const types={'.js':'text/javascript','.css':'text/css'}; const b=await chromium.
 const UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
 const theme=process.env.THEME;
 async function open(phone,panels){ const ctx=await b.newContext(phone?{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:UA}:{viewport:{width:1600,height:1000},deviceScaleFactor:1});
-  await ctx.addCookies([{name:'unison_session',value:S,url:B}]);
+  await ctx.addCookies([{name:'wavwiz_session',value:S,url:B}]);
   await ctx.route('**/*', r => { const u=new URL(r.request().url()); const f=path.join(W,u.pathname); const ext=path.extname(f);
     if (u.origin===B && types[ext] && fs.existsSync(f) && fs.statSync(f).isFile()) return r.fulfill({status:200,contentType:types[ext],body:fs.readFileSync(f)}); return r.continue(); });
   await ctx.addInitScript(([pn,th])=>{const s=(k,v)=>localStorage.setItem(k,v);s('wavwiz.whatsnew','9.9.9');s('wavwiz.gettingStarted.shown','1');s('wavwiz.checklist.dismissed','1');s('wavwiz.webRoom.autojoin','0');s('wavwiz.phoneRole','speaker');s('wavwiz.panels',JSON.stringify(pn));if(th)s('wavwiz.theme',th);},[panels,theme]);

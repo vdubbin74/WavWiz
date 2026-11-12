@@ -279,11 +279,11 @@ Test 'nothing found on the network: loopback only, plain notice, install still s
     # detection on this box finds a real address or none; either way the install must not fail and must not bind 0.0.0.0
     Fail-IfNotOk $r $sb; HasNot (Get-Content (Join-Path $sb.Data 'server.json') -Raw) '0.0.0.0'
 }
-Test 'role=server only: no player-defaults.json; role=player only: no service of ours touched (only the read-only check for an old Unison service)' {
+Test 'role=server only: no player-defaults.json; role=player only: no service of ours touched' {
     $sb = New-Sandbox; $r = Invoke-Setup $sb @{ Role = 'server' }; Fail-IfNotOk $r $sb
     if (Test-Path (Join-Path $sb.Data 'player-defaults.json')) { throw 'player defaults written for a server-only install' }
     $sb2 = New-Sandbox; $r2 = Invoke-Setup $sb2 @{ Role = 'player'; ServerHost = '192.168.1.40' }; Fail-IfNotOk $r2 $sb2
-    $c2 = (Get-Calls $sb2) -replace 'tool sc\.exe query UnisonServer', ''; HasNot $c2 'tool sc.exe'; HasNot $c2 'netsh'
+    $c2 = Get-Calls $sb2; HasNot $c2 'tool sc.exe'; HasNot $c2 'netsh'
     Eq ((Get-Content (Join-Path $sb2.Data 'player-defaults.json') -Raw | ConvertFrom-Json).serverHost) '192.168.1.40'
 }
 Test 'silent install (NoDialog=1): no window, notices still land in setup-notices.txt' {
@@ -383,12 +383,12 @@ Test 'UPGRADE over 0.0.1: database, server.json (custom keys), admin data and pa
     $sb = New-Sandbox; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null
     $cfgJson = '{"bindAddress":"' + $lanIp + '","httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"leadMs":900,"ffmpegPath":"' + (Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') + '"}'
     Write-Utf8NoBom (Join-Path $sb.Data 'server.json') $cfgJson
-    [IO.File]::WriteAllBytes((Join-Path $sb.Data 'unison.db'), [byte[]](1..200))                       # stands in for the 0.0.1 database (admin password hash, paired players, library, playlists)
+    [IO.File]::WriteAllBytes((Join-Path $sb.Data 'wavwiz.db'), [byte[]](1..200))                       # stands in for the 0.0.1 database (admin password hash, paired players, library, playlists)
     Write-Utf8NoBom (Join-Path $sb.Data 'player-defaults.json') ('{"serverHost":"' + $lanIp + '","httpPort":47800,"audioPort":47801}')
     # the 0.0.1 install: service exists and is RUNNING, with the old two firewall rules
     Set-Content (Join-Path $sb.State 'svc.state') 'RUNNING'; Set-Content (Join-Path $sb.State 'svc.def') 'old definition'
     Set-Content (Join-Path $sb.State 'rules.txt') @('WavWiz Server (web, audio, clock) | netsh advfirewall firewall add rule localport=47800,47443,47801', 'WavWiz Server (web, audio, clock) (UDP) | netsh advfirewall firewall add rule localport=47802')
-    $dbHash = (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash; $cfgHash = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash; $defHash = (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash
+    $dbHash = (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash; $cfgHash = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash; $defHash = (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database changed by the installer'
     Eq (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash $cfgHash 'server.json rewritten although nothing needed to change'
@@ -909,122 +909,14 @@ Test 'F173: uninstall writes ProgramData\WavWiz\uninstall.log (kept even with -P
     $u2 = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App, '-Purge', '1'); Eq $u2.ExitCode 0 $u2.Output
     if (Test-Path (Join-Path $sb.Data 'server.json')) { throw 'purge left server.json' }; Has (Get-Log $sb 'uninstall.log') 'only uninstall.log is kept'
 }
-Test 'F173: setup scrubs stray WavWiz/Unison Apps & features entries, keeps the stable AppId and foreign apps' {
+Test 'F173: setup scrubs stray WavWiz Apps & features entries, keeps the stable AppId and foreign apps' {
     $sb = New-Sandbox; $ur = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
-    Set-Content (Join-Path $sb.State 'registry.txt') @(($ur + '\{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\{DEADBEEF-0000-0000-0000-000000000001}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\{DEADBEEF-0000-0000-0000-000000000002}_is1|DisplayName|Unison (BETA)'), ($ur + '\OtherApp|DisplayName|WavWizard Pro Not Ours'), ($ur + '\Foo|DisplayName|Foo App'))
+    Set-Content (Join-Path $sb.State 'registry.txt') @(($ur + '\{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\{DEADBEEF-0000-0000-0000-000000000001}_is1|DisplayName|WavWiz (BETA)'), ($ur + '\OtherApp|DisplayName|WavWizard Pro Not Ours'), ($ur + '\Foo|DisplayName|Foo App'))
     $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
     $reg = Get-Content (Join-Path $sb.State 'registry.txt') -Raw
     Has $reg '57415657495A}_is1|DisplayName' 'stable AppId removed'; HasNot $reg 'DEADBEEF' 'stray entry left'; Has $reg 'Foo App' 'foreign app touched'; Has $reg 'WavWizard Pro' 'similar-named app touched'
     Has (Get-Log $sb) 'Removed a stray Apps & features entry'
 }
-
-Write-Host 'upgrade from Unison (0.0.1 / 0.0.2) to WavWiz: the rename migration'
-$legacyUninst = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1'
-function New-LegacyInstall($sb, [switch]$WithDb = $true) {
-    # what a finished 0.0.2 install leaves behind: service (RUNNING), 2 firewall rules, Run value, uninstall entry, program folder, Start-menu group, desktop link, ProgramData\Unison
-    $old = Join-Path $sb.Root 'pf/Unison'; New-Item -ItemType Directory -Force -Path (Join-Path $old 'Server/ffmpeg'), (Join-Path $old 'Player'), (Join-Path $old 'scripts') | Out-Null
-    foreach ($f in 'unins000.exe', 'Server/unison-server.exe', 'Server/ffmpeg/ffmpeg.exe', 'Player/unison-player.exe') { Set-Content (Join-Path $old $f) 'old' }
-    $ld = Join-Path $sb.PD 'Unison'; New-Item -ItemType Directory -Force -Path (Join-Path $ld 'logs'), (Join-Path $ld 'certs'), (Join-Path $ld 'artcache') | Out-Null
-    $cfg = '{"bindAddress":"' + $lanIp + '","httpPort":47800,"httpsPort":47443,"audioPort":47801,"clockPort":47802,"leadMs":900,"customKey":"keep me","ffmpegPath":"' + ((Join-Path $old 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/') + '"}'
-    Write-Utf8NoBom (Join-Path $ld 'server.json') $cfg
-    if ($WithDb) { [IO.File]::WriteAllBytes((Join-Path $ld 'unison.db'), [byte[]](1..250)) }
-    [IO.File]::WriteAllBytes((Join-Path $ld 'unison.db-wal'), [byte[]](9..40)); Set-Content (Join-Path $ld 'certs/unison-root-ca.crt') 'CERT'; Set-Content (Join-Path $ld 'artcache/1.jpg') 'JPG'
-    Set-Content (Join-Path $ld 'logs/unison-server.log') 'old server log'; Set-Content (Join-Path $ld 'install.log') 'old install log'
-    Write-Utf8NoBom (Join-Path $ld 'player-defaults.json') ('{"serverHost":"' + $lanIp + '","httpPort":47800,"audioPort":47801}')
-    Set-Content (Join-Path $sb.State 'legacy-svc.state') 'RUNNING'
-    Set-Content (Join-Path $sb.State 'rules.txt') @('Unison Server (web, audio, clock) | netsh advfirewall firewall add rule localport=47800', 'Unison Server (web, audio, clock) (UDP) | netsh advfirewall firewall add rule localport=47802')
-    Set-Content (Join-Path $sb.State 'registry.txt') @('SOFTWARE\Microsoft\Windows\CurrentVersion\Run|UnisonPlayer|"C:\Program Files\Unison\Player\unison-player.exe" --autostart', 'SOFTWARE\Microsoft\Windows\CurrentVersion\Run|OtherApp|keep', ($legacyUninst + '|InstallLocation|' + $old + '\'), ($legacyUninst + '|DisplayName|Unison (BETA)'))
-    $menu = Join-Path $sb.PD 'Microsoft/Windows/Start Menu/Programs/Unison (BETA)'; New-Item -ItemType Directory -Force -Path $menu | Out-Null; Set-Content (Join-Path $menu 'Unison Player (BETA).lnk') 'x'
-    Set-Content (Join-Path $sb.Root 'pub/Desktop/Unison web page (BETA).url') 'x'
-    return $ld
-}
-Test 'UPGRADE from Unison 0.0.2: data MOVED (db, wal, certs, art cache, config incl. custom keys), old service/rules/Run value/uninstall entry/program folder/shortcuts removed, WavWiz service + 2 rules created' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    $dbHash = (Get-FileHash (Join-Path $ld 'unison.db')).Hash; $walHash = (Get-FileHash (Join-Path $ld 'unison.db-wal')).Hash; $defHash = (Get-FileHash (Join-Path $ld 'player-defaults.json')).Hash
-    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    if (Test-Path $ld) { throw 'the old Unison data folder is still there (it must be moved, not copied)' }
-    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database changed or lost'; Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db-wal')).Hash $walHash 'wal changed or lost'
-    Eq (Get-FileHash (Join-Path $sb.Data 'player-defaults.json')).Hash $defHash 'player defaults changed'
-    Eq (Get-Content (Join-Path $sb.Data 'certs/unison-root-ca.crt') -Raw).Trim() 'CERT' 'certificate lost'; if (-not (Test-Path (Join-Path $sb.Data 'artcache/1.jpg'))) { throw 'art cache lost' }
-    $cfg = Get-Content (Join-Path $sb.Data 'server.json') -Raw | ConvertFrom-Json
-    Eq $cfg.customKey 'keep me' 'custom config key lost'; Eq $cfg.leadMs 900 'leadMs lost'; Eq $cfg.bindAddress $lanIp 'address changed'
-    Eq ($cfg.ffmpegPath -replace '\\', '/') ((Join-Path $sb.App 'Server/ffmpeg/ffmpeg.exe') -replace '\\', '/') 'ffmpegPath still points into the removed Unison folder'
-    Has (Get-Content (Join-Path $sb.Data 'logs/unison-server.log') -Raw) 'old server log'
-    # the old install.log did not collide (WavWiz creates install.log first): it is kept under another name, never lost
-    $keptLogs = @(Get-ChildItem $sb.Data -Filter 'install.log.from-unison*'); Eq $keptLogs.Count 1 'old install.log should be kept as install.log.from-unison'
-    $calls = Get-Calls $sb; Has $calls 'tool sc.exe stop UnisonServer'; Has $calls 'tool sc.exe delete UnisonServer'; Has $calls 'tool taskkill.exe /F /IM unison-server.exe'; Has $calls 'tool taskkill.exe /F /IM unison-player.exe'
-    if (Test-Path (Join-Path $sb.State 'legacy-svc.state')) { throw 'old service still registered' }
-    if (-not (Test-Path (Join-Path $sb.State 'svc.state'))) { throw 'WavWiz service not created' }; Has $calls 'tool sc.exe create WavWizServer'
-    $rules = Get-Rules $sb; HasNot $rules 'Unison Server' 'old firewall rules left'; Eq ((($rules -split "`n") | Where-Object { $_ -like 'WavWiz Server*' }).Count) 2 'WavWiz rules'
-    $reg = Get-Content (Join-Path $sb.State 'registry.txt') -Raw; HasNot $reg 'UnisonPlayer' 'old Run value left'; HasNot $reg 'B5C2D7E1' 'old uninstall entry left'; Has $reg 'OtherApp|keep' 'foreign Run value was touched'
-    if (Test-Path (Join-Path $sb.Root 'pf/Unison')) { throw 'old program folder left' }
-    if (Test-Path (Join-Path $sb.PD 'Microsoft/Windows/Start Menu/Programs/Unison (BETA)')) { throw 'old Start-menu group left' }
-    if (Test-Path (Join-Path $sb.Root 'pub/Desktop/Unison web page (BETA).url')) { throw 'old desktop link left' }
-    if (-not (Test-Path (Join-Path $sb.App 'Server/wavwiz-server.exe'))) { throw 'the NEW install was touched' }
-    $n = Get-Content (Join-Path $sb.Data 'setup-notices.txt') -Raw; Has $n 'Upgraded from Unison'
-    Has (Get-Log $sb) 'Upgrade from Unison finished'
-}
-Test 'upgrade is IDEMPOTENT: running setup again right after changes nothing and does not touch the data or the new service definition twice' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    $h1 = (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash; $c1 = (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash
-    $before = (Get-Calls $sb) -split "`n" | Where-Object { $_ -match 'UnisonServer' } | Measure-Object | ForEach-Object Count
-    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb
-    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $h1 'database changed on re-run'; Eq (Get-FileHash (Join-Path $sb.Data 'server.json')).Hash $c1 'server.json changed on re-run'
-    Has (Get-Log $sb) 'no earlier "Unison" installation found'
-    $after = (Get-Calls $sb) -split "`n" | Where-Object { $_ -match 'UnisonServer' } | Measure-Object | ForEach-Object Count
-    Eq ($after - $before) 1 'only the read-only query for the old service may be repeated'
-    Eq ((((Get-Rules $sb) -split "`n") | Where-Object { $_ -like 'WavWiz Server*' }).Count) 2 'rules duplicated'
-    if (Test-Path (Join-Path $sb.PD 'Unison')) { throw 'Unison data folder reappeared' }
-    Eq @(Get-ChildItem $sb.Data -Filter 'install.log.from-unison*').Count 1 'the kept old log was duplicated'
-}
-Test 'upgrade after an INTERRUPTED first attempt (old service already gone, data folder half moved): finishes without losing anything' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    # simulate: the previous run moved the database but stopped before the rest
-    New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null; Move-Item (Join-Path $ld 'unison.db') (Join-Path $sb.Data 'unison.db')
-    Remove-Item (Join-Path $sb.State 'legacy-svc.state')
-    $dbHash = (Get-FileHash (Join-Path $sb.Data 'unison.db')).Hash
-    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Eq (Get-FileHash (Join-Path $sb.Data 'wavwiz.db')).Hash $dbHash 'database lost'; if (-not (Test-Path (Join-Path $sb.Data 'certs/unison-root-ca.crt'))) { throw 'certs not moved' }; if (Test-Path $ld) { throw 'old data folder left' }
-}
-Test 'BOTH folders hold a database: the WavWiz one wins, the old folder is left untouched, a plain notice says so' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null; [IO.File]::WriteAllBytes((Join-Path $sb.Data 'unison.db'), [byte[]](77, 77, 77))
-    $oldHash = (Get-FileHash (Join-Path $ld 'unison.db')).Hash
-    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Eq (Get-FileHash (Join-Path $ld 'unison.db')).Hash $oldHash 'old database was touched'; Eq ([IO.File]::ReadAllBytes((Join-Path $sb.Data 'wavwiz.db'))).Length 3 'the WavWiz database was replaced'
-    Has (Get-Content (Join-Path $sb.Data 'setup-notices.txt') -Raw) 'contain a library database'
-}
-Test 'an InstallLocation that does not look like an old Unison install (or is the NEW install folder) is never deleted' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    $victim = Join-Path $sb.Root 'important'; New-Item -ItemType Directory -Force $victim | Out-Null; Set-Content (Join-Path $victim 'keep.txt') 'x'
-    Remove-Item -Recurse -Force (Join-Path $sb.Root 'pf/Unison')
-    Set-Content (Join-Path $sb.State 'registry.txt') @(($legacyUninst + '|InstallLocation|' + $victim + '\'))
-    $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    if (-not (Test-Path (Join-Path $victim 'keep.txt'))) { throw 'deleted a folder that is not an old Unison install' }; Has (Get-Log $sb) 'Left alone'
-    $sb2 = New-Sandbox; [void](New-LegacyInstall $sb2); Set-Content (Join-Path $sb2.State 'registry.txt') @(($legacyUninst + '|InstallLocation|' + $sb2.App + '\'))
-    $r2 = Invoke-Setup $sb2; Fail-IfNotOk $r2 $sb2; if (-not (Test-Path (Join-Path $sb2.App 'Server/wavwiz-server.exe'))) { throw 'the new install folder was deleted' }
-}
-Test 'player-only PC with an old Unison Player: old autostart + program folder removed, no service created' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb; Remove-Item (Join-Path $sb.State 'legacy-svc.state')
-    $r = Invoke-Setup $sb @{ Role = 'player'; ServerHost = $lanIp }; Fail-IfNotOk $r $sb
-    HasNot (Get-Content (Join-Path $sb.State 'registry.txt') -Raw) 'UnisonPlayer' 'old autostart left'; if (Test-Path (Join-Path $sb.Root 'pf/Unison')) { throw 'old folder left' }
-    HasNot (Get-Calls $sb) 'tool sc.exe create' 'a service was created on a player-only PC'
-}
-Test 'a clean first install says there is nothing to migrate and touches nothing of an old kind' {
-    $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    Has (Get-Log $sb) 'no earlier "Unison" installation found'; HasNot (Get-Calls $sb) 'sc.exe delete UnisonServer'; HasNot (Get-Calls $sb) 'taskkill'
-}
-Test 'a move that fails stops the install with the folder named, deletes nothing, and the next run (after the lock is gone) succeeds' {
-    $sb = New-Sandbox; $ld = New-LegacyInstall $sb
-    # WavWiz data path occupied by a FILE: the merge cannot create the folder
-    New-Item -ItemType Directory -Force -Path $sb.PD | Out-Null; Set-Content $sb.Data 'blocker'
-    $r = Invoke-Setup $sb; if ($r.ExitCode -eq 0) { throw 'should have failed' }
-    if (-not (Test-Path (Join-Path $ld 'unison.db'))) { throw 'the old database was lost after a failed move' }
-    Remove-Item $sb.Data -Force; Set-Content (Join-Path $sb.State 'legacy-svc.state') 'RUNNING'
-    $r2 = Invoke-Setup $sb; Fail-IfNotOk $r2 $sb; if (-not (Test-Path (Join-Path $sb.Data 'wavwiz.db'))) { throw 'second attempt did not move the database' }
-}
-
 
 Write-Host '0.2.2 T11: closing a running WavWiz before the files are replaced'
 function Invoke-Close($sb, [hashtable]$extraEnv = @{}, [string[]]$more = @()) {

@@ -64,7 +64,7 @@ export function listTable(S, ctl) {
   const paintLock = () => { lockBtn.classList.toggle('on', L.locked); lockBtn.setAttribute('aria-pressed', String(L.locked)); const t = L.locked ? 'Columns locked (click to unlock)' : 'Lock the column layout'; lockBtn.title = t; lockBtn.setAttribute('aria-label', t); setIcon(lockBtn.querySelector('.ic'), L.locked ? 'lock' : 'unlock'); };
   // 0.3.7 L30: "Sorted by Artist ▲ ✕" chip on the title bar; the ✕ gives back the queue's own order (disabled while the queue is locked)
   const sortChip = h('span', { class: 'sortchip', hidden: true, role: 'status' });
-  // 0.4.0: "QUEUE · KITCHEN" names the zone whose queue this is (only once there is more than one zone to choose from)
+  // 0.4.0: "QUEUE · KITCHEN" names the zone whose queue this is (0.6.8 zone fix: also with a single zone)
   // the picker ("Editing: <zone>") and "Copy queue to zone…" (0.4.4 F11: always copy)
   // 0.4.4 F10: one "Editing: <zone>" picker (no "(controlling)" wording; CONTROLLING stays on Now Playing / bottom bar only)
   const editLbl = h('span', { class: 'qediting small', 'aria-hidden': 'true' }, 'Editing:');
@@ -106,7 +106,8 @@ export function listTable(S, ctl) {
   window.addEventListener('wavwiz:zonesync', paintPick);
   // 0.4.5 F27: picking a zone from "on <zone> ▾" in Now Playing also makes it the Editing zone here (like the 0.4.4 F14 box title)
   window.addEventListener('wavwiz:editzone', () => setView(null));
-  const paintQz = () => { const many = Z.choicesNow().length > 1, c = view ? viewChoice() : Z.current(); qzone.textContent = c && many ? (view ? Z.queueSuffixFor(c) : Z.queueSuffixNow()) : ''; if (!title.classList.contains('haspick')) title.title = ('Queue' + qzone.textContent).trim(); /* 0.4.8 F50: full label as a tooltip when a long zone name ellipsizes */ try { root.setAttribute('data-editing', editingKey() || ''); } catch { /* before the panel exists */ } };
+  // 0.6.8 zone fix: "QUEUE · EVERYWHERE" - the zone name shows with one zone too (only the picker needs a second zone)
+  const paintQz = () => { const c = view ? viewChoice() : Z.current(); qzone.textContent = c ? (view ? Z.queueSuffixFor(c) : Z.queueSuffixNow()) : ''; if (!title.classList.contains('haspick')) title.title = ('Queue' + qzone.textContent).trim(); /* 0.4.8 F50: full label as a tooltip when a long zone name ellipsizes */ try { root.setAttribute('data-editing', editingKey() || ''); } catch { /* before the panel exists */ } };
   window.addEventListener('wavwiz:zonesync', paintQz); paintQz(); paintPick();
   const head = h('div', { class: 'pane-h' }, title, sortChip, meta, iconRow, h('span', { class: 'row listcolwrap' }, upBtn, colBtn));
   const root = h('section', { class: 'listpanel', 'aria-label': 'Queue' }, head, wrap);

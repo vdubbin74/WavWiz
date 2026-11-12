@@ -1,7 +1,7 @@
 import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim();
 const br=await chromium.launch(); const ctx=await br.newContext({viewport:{width:960,height:540},deviceScaleFactor:2,userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0 WavWizPlayer/0.4.4'});
-await ctx.addCookies([{name:'unison_session',value:sess,url:B}]); await ctx.addInitScript(()=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');});
+await ctx.addCookies([{name:'wavwiz_session',value:sess,url:B}]); await ctx.addInitScript(()=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');});
 const p=await ctx.newPage(); p.on('pageerror',e=>console.log('ERR',e.message)); await p.goto(B+'/?tv=1'); await p.waitForTimeout(2500);
 console.log(await p.evaluate(()=>({tv:document.documentElement.classList.contains('tv'),lib:getComputedStyle(document.querySelector('.libpanel')).display,list:getComputedStyle(document.querySelector('.listpanel')).display,view:document.getElementById('desk')?.dataset.view, items:document.querySelectorAll('li.item').length, drag:document.querySelectorAll('[draggable=true]').length, tabs:[...document.querySelectorAll('.tabbar button,.menubar button')].map(b=>b.textContent.trim()).slice(0,20)})));
 await p.screenshot({path:'/workspace/screens/wavwiz-045-F8-tv-before-home.png'});

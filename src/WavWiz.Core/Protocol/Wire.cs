@@ -14,13 +14,13 @@ public readonly record struct Header(byte Version, MsgType Type, ushort Flags, u
 public sealed record AudioFrame(long PlayAtUs, uint Epoch, int SampleCount, float[] Samples /* interleaved L,R */);
 
 /// <summary>
-/// Audio channel wire format (spec 6.1). Header = u32 magic 'UNSN' | u8 version=1 | u8 type | u16 flags | u32 seq | u32 payloadLen,
+/// Audio channel wire format (spec 6.1). Header = u32 magic 'WVWZ' | u8 version=1 | u8 type | u16 flags | u32 seq | u32 payloadLen,
 /// little-endian. AUDIO / EPOCH / STOP_AT payloads are binary (hot path); the other control messages carry UTF-8 JSON
 /// (decision: easier to version and test; they are small and infrequent).
 /// </summary>
 public static class Wire
 {
-    public const uint Magic = 0x4E53_4E55; // bytes 'U','N','S','N' little-endian
+    public const uint Magic = 0x5A57_5657; // bytes 'W','V','W','Z' little-endian
     public const byte ProtocolVersion = 1;
     public const int HeaderSize = 16;
     public const uint MaxPayload = 1 << 20; // 1 MiB: refuse absurd lengths from a confused or hostile peer

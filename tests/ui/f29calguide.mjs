@@ -6,7 +6,7 @@ const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'day
 const br = await chromium.launch();
 for (const [vp, d, tag] of [[[1920, 1080], 1, '100'], [[960, 540], 2, '200'], [[390, 844], 3, 'phone']]) for (const th of THEMES) {
   const first = th === 'default';
-  const c = await br.newContext({ viewport: { width: vp[0], height: vp[1] }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vp[0], height: vp[1] }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2200);
   await p.evaluate(async t => { const m = await import('/js/theme.js'); const th = { preset: t, ...(m.PRESETS[t] || {}) }; try { m.saveTheme(th); } catch { } m.applyTheme(th); document.querySelectorAll('dialog[open]').forEach(x => x.close()); }, th); await p.waitForTimeout(300);

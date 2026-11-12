@@ -4,7 +4,7 @@ const S=fs.readFileSync('/workspace/ww-mkt/sess','utf8').trim(), B='http://172.3
 const types={'.js':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml'};
 const b=await chromium.launch();
 for (const [w,h,d,tag] of [[1920,1080,1,'100'],[960,540,2,'200']]) {
-  const ctx=await b.newContext({viewport:{width:w,height:h},deviceScaleFactor:d}); await ctx.addCookies([{name:'unison_session',value:S,url:B}]);
+  const ctx=await b.newContext({viewport:{width:w,height:h},deviceScaleFactor:d}); await ctx.addCookies([{name:'wavwiz_session',value:S,url:B}]);
   await ctx.route('**/*', r => { const u=new URL(r.request().url()); const f=path.join(W,u.pathname); const ext=path.extname(f);
     if (u.origin===B && (ext==='.js'||ext==='.css') && !u.pathname.startsWith('/api') && fs.existsSync(f) && fs.statSync(f).isFile()) return r.fulfill({status:200,contentType:types[ext],body:fs.readFileSync(f)}); return r.continue(); });
   await ctx.addInitScript(()=>{const s=(k,v)=>localStorage.setItem(k,v);s('wavwiz.theme.v1',JSON.stringify({preset:'ember',accent:'#FF5A1F',accent2:'#FFB347',hl:'#4FC3F7',bg:'#160E0A',ink:'#E8EDF0'}));s('wavwiz.whatsnew','9.9.9');s('wavwiz.gettingStarted.shown','1');s('wavwiz.webRoom.autojoin','0');s('wavwiz.checklist.dismissed','1');});

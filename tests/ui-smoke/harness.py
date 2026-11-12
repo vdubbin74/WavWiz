@@ -32,7 +32,7 @@ class Env:
             self.ids = [t['id'] for t in self.api('/library/search?q=Daft', jar=self.jar)]
             self.all_ids = self.ids + [t['id'] for t in self.api('/library/search?q=Lanterns', jar=self.jar)]
             self.api('/queue/add', {'kind': 'tracks', 'ids': self.all_ids}, jar=self.jar)
-        self.cookie = [c for c in self.jar if c.name == 'unison_session'][0]
+        self.cookie = [c for c in self.jar if c.name == 'wavwiz_session'][0]
 
     def api(self, path, body=None, method=None, jar=None):
         req = urllib.request.Request(self.base + '/api/v1' + path, data=json.dumps(body).encode() if body is not None else None, method=method or ('POST' if body is not None else 'GET'), headers={'Content-Type': 'application/json', 'Origin': self.base})
@@ -48,7 +48,7 @@ class Env:
             except Exception: time.sleep(0.3)
         self.ws = websocket.create_connection([t for t in tabs if t['type'] == 'page'][0]['webSocketDebuggerUrl'], timeout=60)
         for d in ('Runtime', 'Log', 'Page', 'Network'): self.call(d + '.enable')
-        self.call('Network.setCookie', name='unison_session', value=self.cookie.value, url=self.base, httpOnly=True)
+        self.call('Network.setCookie', name='wavwiz_session', value=self.cookie.value, url=self.base, httpOnly=True)
 
     def call(self, m, **p):
         self.n += 1; self.ws.send(json.dumps({'id': self.n, 'method': m, 'params': p}))

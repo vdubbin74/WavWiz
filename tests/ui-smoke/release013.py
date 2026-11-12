@@ -60,7 +60,7 @@ try:
     ok = wait("import('/js/viz.js').then(m => { const s = m.vizStats(); return s && s.losses >= 1 && !s.contextLost && s.mode === 'webgl'; })", 10)
     fps, s = frames_after(1.0); check(ok and fps > 3, f"context restored and drawing again ({fps:.0f} fps, losses {s.get('losses')})")
     # saved Lightning falls back to Graphic EQ
-    ev("(() => { const p = JSON.parse(localStorage.getItem('unison.viz.v1') || '{}'); p.engine = 'lightning'; localStorage.setItem('unison.viz.v1', JSON.stringify(p)); return true; })()")
+    ev("(() => { const p = JSON.parse(localStorage.getItem('wavwiz.viz.v1') || '{}'); p.engine = 'lightning'; localStorage.setItem('wavwiz.viz.v1', JSON.stringify(p)); return true; })()")
     load('/', 3.0); close_dialogs(); time.sleep(1.5); s = stats() or {}
     check(s.get('engine') == 'geq', f"a saved Lightning choice opens as Graphic EQ ({s.get('engine')})")
     # Visualizer page
@@ -97,7 +97,7 @@ try:
     for name, w, h, dpr, ua in [('pixel7', 412, 915, 2.625, 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36'),
                                 ('iphone15', 393, 852, 3, 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1')]:
         e.errors.clear()
-        ev("(() => { localStorage.removeItem('unison.viz.v1'); localStorage.removeItem('wavwiz.viz.webgl1'); return true; })()")
+        ev("(() => { localStorage.removeItem('wavwiz.viz.v1'); localStorage.removeItem('wavwiz.viz.webgl1'); return true; })()")
         e.call('Emulation.setUserAgentOverride', userAgent=ua); e.call('Emulation.setTouchEmulationEnabled', enabled=True, maxTouchPoints=5)
         e.call('Emulation.setDeviceMetricsOverride', width=w, height=h, deviceScaleFactor=dpr, mobile=True, screenWidth=w, screenHeight=h)
         e.call('Emulation.setCPUThrottlingRate', rate=4)

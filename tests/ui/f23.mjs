@@ -6,7 +6,7 @@ let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : fail++; console.log(
 const br = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const init = (name, join, panels) => () => {};
 async function ctxFor(dpr, join, panels, vp = [1920, 1080]) {
-  const c = await br.newContext({ viewport: { width: vp[0], height: vp[1] }, deviceScaleFactor: dpr, ...(join ? { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, viewport: { width: 390, height: 844 } } : {}) }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vp[0], height: vp[1] }, deviceScaleFactor: dpr, ...(join ? { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, viewport: { width: 390, height: 844 } } : {}) }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([j, pn]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', j ? '1' : '0'); if (j) localStorage.setItem('wavwiz.webRoom.name', 'F23 iPhone'); localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, [join, panels]);
   return c;
 }
@@ -15,7 +15,7 @@ const phone = await phoneCtx.newPage(); await phone.goto(B + '/'); await phone.w
 await phone.evaluate(async () => { try { (await import('/js/room.js')).unlockAudio(); } catch {} });
 await phone.waitForTimeout(1000);
 // the phone plays in Basement so it sends real ticks (buffer / offset / state)
-const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'wavwiz_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const pid = await phone.evaluate(() => localStorage.getItem('wavwiz.webRoom.id')); const me = (await api('/zones')).find(z => z.playerId === pid);
 const groups = await api('/groups'); const base = groups.find(g => g.name === 'Basement');
 for (const g of groups) if (g.deviceIds.includes(me.id) && g.id !== base.id) await api('/groups/' + g.id, 'PATCH', { deviceIds: g.deviceIds.filter(d => d !== me.id) });

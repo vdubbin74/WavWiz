@@ -6,7 +6,7 @@ const ok=(n,c,x='')=>{c?pass++:fail++; console.log((c?'ok   ':'FAIL ')+n+(c?'':'
 const base={lib:'normal',dev:'normal',exp:null,list:'open',ctl:'collapsed'};
 const br=await chromium.launch();
 for (const [vw,vh,d,z] of [[1920,1080,1,'100'],[960,540,2,'200']]) for (const lay of ['full','roomy']) for (const [sn,pn] of [['queue',base],['queuefull',{...base,list:'expanded'}],['lib-collapsed',{...base,lib:'rail'}],['lib-collapsed-queuefull',{...base,lib:'rail',list:'expanded'}],['lib-expanded',{...base,exp:'lib'}],['dev-expanded',{...base,exp:'dev'}]]) {
- const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+ const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(([pn,lay])=>{ if(sessionStorage.getItem('g'))return; sessionStorage.setItem('g','1'); localStorage.setItem('wavwiz.whatsnew','9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown','1'); localStorage.setItem('wavwiz.webRoom.autojoin','0');
   localStorage.setItem('wavwiz.uiscale','compact'); localStorage.setItem('wavwiz.layout',lay); localStorage.setItem('wavwiz.panels',JSON.stringify(pn));},[pn,lay]);
  const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(3000); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(x=>x.close()));
@@ -24,7 +24,7 @@ for (const [vw,vh,d,z] of [[1920,1080,1,'100'],[960,540,2,'200']]) for (const la
 // collapsed, and no Roomy-only offsets on the Library / Queue / condensed player. Library collapsed / expanded x Queue normal / full screen, 67/100/200 %.
 for (const [vw,vh,d,sc,z] of [[1920,1080,1,'tiny','67'],[1920,1080,1,'compact','100'],[960,540,2,'compact','200']]) for (const lib of ['rail','exp']) for (const list of ['open','expanded']) {
  const get=async lay=>{ const pn={lib:lib==='rail'?'rail':'normal',dev:lay==='full'?'rail':'normal',exp:lib==='exp'?'lib':null,list,ctl:'collapsed'};
-  const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+  const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
   await c.addInitScript(([pn,lay,sc])=>{ if(sessionStorage.getItem('g'))return; sessionStorage.setItem('g','1'); localStorage.setItem('wavwiz.whatsnew','9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown','1'); localStorage.setItem('wavwiz.webRoom.autojoin','0');
    localStorage.setItem('wavwiz.uiscale',sc); localStorage.setItem('wavwiz.layout',lay); localStorage.setItem('wavwiz.panels',JSON.stringify(pn));},[pn,lay,sc]);
   const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(2800); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(x=>x.close()));
@@ -42,7 +42,7 @@ for (const [vw,vh,d,sc,z] of [[1920,1080,1,'tiny','67'],[1920,1080,1,'compact','
 // 0.4.8 F59: the collapsed Devices rail count is vertical and mirrors the Library rail's song count (same writing-mode / font / size / spacing /
 // COLOR - never the yellow highlight - and bottom offset; transform mirrored for the right edge). Full and Roomy, 67/100/200 %.
 for (const [vw,vh,d,sc,z] of [[1920,1080,1,'tiny','67'],[1920,1080,1,'compact','100'],[960,540,2,'compact','200']]) for (const lay of ['full','roomy']) {
- const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+ const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(([lay,sc])=>{ if(sessionStorage.getItem('g'))return; sessionStorage.setItem('g','1'); localStorage.setItem('wavwiz.whatsnew','9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown','1'); localStorage.setItem('wavwiz.webRoom.autojoin','0');
   localStorage.setItem('wavwiz.uiscale',sc); localStorage.setItem('wavwiz.layout',lay); localStorage.setItem('wavwiz.panels',JSON.stringify({lib:'rail',dev:'rail',exp:null,list:'open',ctl:'collapsed'}));},[lay,sc]);
  const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(2800); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(x=>x.close()));

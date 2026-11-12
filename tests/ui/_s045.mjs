@@ -4,7 +4,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const PINS = ['eq', 'queue', 'library', 'devices'];
 const br = await chromium.launch();
 async function pg(w, h, dpr, panels, { url = '/', np = null, touch = false } = {}) {
-  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, hasTouch: touch, isMobile: touch }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, hasTouch: touch, isMobile: touch }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([pn, pins, np]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); localStorage.setItem('wavwiz.pins.v1', JSON.stringify(pins)); if (np) localStorage.setItem('wavwiz.npstyle.v1', JSON.stringify({ style: np })); }, [panels, PINS, np]);
   const p = await c.newPage(); await p.goto(B + url); await p.waitForTimeout(2800); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close())); return { c, p };

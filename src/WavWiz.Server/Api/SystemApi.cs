@@ -22,7 +22,7 @@ public static class SystemApi
         uptimeSec = (long)(DateTime.UtcNow - s.Started).TotalSeconds, bind = s.Cfg.BindAddress, listen = Net.NetworkHelper.Listening(s.Cfg),   // 0.6.8-#9
         ports = new { http = s.Cfg.HttpPort, https = s.Cfg.HttpsPort, audio = s.Audio.Port, clock = s.Clock.Port },
         ffmpeg = new { ok = File.Exists(s.FfmpegPath) || s.FfmpegPath == "ffmpeg", path = s.FfmpegPath },
-        tls = new { enabled = s.Ca.Enabled, rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewedAt = s.Ca.RegeneratedFromLegacyAt, renewalError = s.Ca.LastRenewalError, remote = admin ? s.RemoteTls?.Status() : s.RemoteTls?.PublicStatus() },   // F261-A L4: host name and errors for admins only
+        tls = new { enabled = s.Ca.Enabled, rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewalError = s.Ca.LastRenewalError, remote = admin ? s.RemoteTls?.Status() : s.RemoteTls?.PublicStatus() },   // F261-A L4: host name and errors for admins only
         library = new { tracks = s.Library.TrackCount(), scanning = s.Scanning, progress = s.Library.Progress is { } p ? new { done = p.Done, total = p.Total, root = p.Root } : null },
         playersConnected = s.Audio.Sessions.Count, state = s.Conductor.State.ToString().ToLowerInvariant(),
         warnings = Warnings(s),

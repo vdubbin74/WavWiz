@@ -14,7 +14,6 @@
 #endif
 
 [Setup]
-; New identity for WavWiz (the old Unison one ends ...554E49534F4E). The earlier Unison install is moved over by scripts\setup.ps1 (Invoke-LegacyMigration).
 AppId={{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}
 AppName=WavWiz (BETA)
 AppVersion={#AppVersion}
@@ -142,11 +141,6 @@ var
 
 function GetTickCount: LongWord; external 'GetTickCount@kernel32.dll stdcall';
 
-function UnisonInstalled: Boolean;
-begin
-  Result := RegKeyExists(HKLM64, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1') or DirExists(ExpandConstant('{commonappdata}\Unison'));
-end;
-
 function IfThenStr(Cond: Boolean; const A, B: String): String;
 begin
   if Cond then Result := A else Result := B;
@@ -220,8 +214,7 @@ function ExistingBindAddress: String;
 var A: AnsiString; S: String; P, Q: Integer;
 begin
   Result := '';
-  if not LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\server.json'), A) then
-    if not LoadStringFromFile(ExpandConstant('{commonappdata}\Unison\server.json'), A) then Exit;      { upgrading from Unison 0.0.x: its address is offered again }
+  if not LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\server.json'), A) then Exit;
   S := String(A); P := Pos('"bindAddress"', S); if P = 0 then Exit;
   S := Copy(S, P + 13, 200); P := Pos('"', S); if P = 0 then Exit;
   S := Copy(S, P + 1, 200); Q := Pos('"', S); if Q = 0 then Exit;
@@ -235,8 +228,7 @@ function ExistingHttpsPort: String;
 var A: AnsiString; S: String; P, I, N: Integer;
 begin
   Result := '';
-  if not LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\server.json'), A) then
-    if not LoadStringFromFile(ExpandConstant('{commonappdata}\Unison\server.json'), A) then begin Result := '47443'; Exit; end;
+  if not LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\server.json'), A) then begin Result := '47443'; Exit; end;
   S := String(A); P := Pos('"httpsPort"', S); if P = 0 then Exit;
   S := Copy(S, P + 11, 40); P := Pos(':', S); if P = 0 then Exit;
   S := Trim(Copy(S, P + 1, 40)); I := 1;
@@ -469,8 +461,6 @@ begin
   LanEdit.Text := Trim(ExpandConstant('{param:LANIP|}'));
   HostEdit.Text := Trim(ExpandConstant('{param:SERVERHOST|}'));
   WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 + 'This is a BETA version ({#AppVersion}).';
-  if UnisonInstalled then
-    WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 + 'The app is now called WavWiz (it was Unison). An earlier Unison installation was found: Setup will upgrade it and keep your music library, settings, administrator password and paired players. PCs that still run the old Unison Player keep working until you update them.';
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -567,7 +557,7 @@ begin
     '   Each device has a Test sound button, and a Dropped / Buffering / Reconnecting indicator. Menu > Diagnostics explains problems in plain English.' + #13#10 +
     '4. For a phone: Settings > Phone & HTTPS, scan the QR code with the phone camera and follow the steps (about two minutes; the page checks that it worked). After that the phone can calibrate speakers and can also be a device itself (Menu > This phone as a device; on iPhone the sound stops when the screen locks).' + #13#10#13#10 +
     'New in 0.1.3: Graphic EQ visualizer replaces Lightning (a saved Lightning choice becomes Graphic EQ); every visualizer setting is a 0 to 100 slider (50 is the default) with a Quality setting (Auto/Low/High/Ultra), GPU particles and glow/streak/fringe/depth effects; reworked VU meters and Terrain; ReplayGain volume leveling and iTunes gapless; saved NAS logins (encrypted by Windows); receiver health and a network helper in Diagnostics. Upgrades 0.1.2 in place (library, admin password, paired players and settings are kept).' + #13#10 +
-    'Logs and settings: C:\ProgramData\WavWiz (install.log, server.json, logs\). If this PC had Unison, its data was moved there.' + #13#10 +
+    'Logs and settings: C:\ProgramData\WavWiz (install.log, server.json, logs\).' + #13#10 +
     'This is a BETA. If something fails, install.log says what and where.' + #13#10;
 end;
 

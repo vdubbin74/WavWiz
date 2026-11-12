@@ -7,7 +7,7 @@ const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : '
 if (SH) mkdirSync(OUT, { recursive: true });
 const WANT = ['Now Playing', 'Queue', 'Volume Mixer', 'Library', 'Devices & Zones', 'Scenes & Alarms', 'Settings'];
 const br = await chromium.launch();
-const open = async (vw, vh, dpr, mob) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: mob, hasTouch: mob }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const open = async (vw, vh, dpr, mob) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: mob, hasTouch: mob }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.a2hs.dismissed', '1'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close())); return [c, p]; };
 { const [c, p] = await open(390, 844, 3, true);

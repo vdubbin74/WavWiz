@@ -17,7 +17,7 @@ const geo = () => { const R = e => e.getBoundingClientRect(), m = document.query
     card: (e => e && (r => ({ l: r.left, r: r.right }))(R(e)))(col.querySelector('.spkset')) }; };
 const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
 for (const [vw, vh, dpr, scale, z] of [[1920, 1080, 1, 'compact', '100'], [960, 540, 2, 'tiny', '200-tiny']]) for (const layout of ['full', 'roomy']) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([sc, lay]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f70')) return; sessionStorage.setItem('f70', '1'); localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.layout', lay);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [scale, layout]);
@@ -57,7 +57,7 @@ const pgeo = () => { const R = e => { const r = e.getBoundingClientRect(); retur
   const lbl = dev.querySelector('.dmaster > .dlbl'); const dr = R(dev), bw = parseFloat(getComputedStyle(dev).borderRightWidth) || 0;
   return { m: m && R(m), bars, mx, lbl: lbl && R(lbl), box: { l: dr.l, r: dr.r - bw } }; };
 for (const [vw, vh, dpr, scale, z] of [[1920, 1080, 1, 'compact', '100'], [960, 540, 2, 'tiny', '200-tiny']]) for (const layout of ['classic', 'roomy', 'full']) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([sc, lay]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f70p')) return; sessionStorage.setItem('f70p', '1'); localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.layout', lay);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [scale, layout]);

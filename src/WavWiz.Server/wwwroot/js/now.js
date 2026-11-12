@@ -452,8 +452,8 @@ export function createNow(S, ctl) {
     t3.textContent = n.notice || '';
     phoneTitle.textContent = t1.textContent; phoneArtist.textContent = t2.textContent;
     const choice = currentZone(); phoneZone.textContent = choice?.name || 'No zone selected';
-    // zoneLink intentionally hides its picker for one choice; keep its real name.
-    phoneZone.hidden = !!choice && (S.groups?.length || 0) + (S.jb?.own ? 1 : 0) > 1;
+    // 0.6.8 zone fix: zoneLink names the zone itself now (one zone or many); this plain label only says "No zone selected" when there is none.
+    phoneZone.hidden = !!choice;
     phoneMore.disabled = !currentSongContext(S);
     if (songMenu && !songMenu.valid()) { songMenu.close(); songMenu = null; }
     const ait = liveRadioItem(n);   // 0.6.8-#8: radio song picture when the station sends one

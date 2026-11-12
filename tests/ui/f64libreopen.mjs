@@ -8,7 +8,7 @@ const probe = () => { const row = document.querySelector('.libpanel .ctabs'); if
 if (SH) mkdirSync(OUT, { recursive: true });
 const br = await chromium.launch();
 for (const [vw, vh, d, scale, z] of [[1920, 1080, 1, null, '100'], [960, 540, 2, 'tiny', '200-tiny']]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(sc => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f64')) return; sessionStorage.setItem('f64', '1'); localStorage.setItem('wavwiz.layout', 'full'); if (sc) localStorage.setItem('wavwiz.uiscale', sc); else localStorage.removeItem('wavwiz.uiscale');
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, scale);

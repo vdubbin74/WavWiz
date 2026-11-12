@@ -17,7 +17,7 @@ const api = (p, path, body) => p.evaluate(async ([path, body]) => { const r = aw
 const br = await chromium.launch();
 for (const [vw, vh, d, zt] of [[1920, 1080, 1, '100'], [960, 540, 2, '200']]) {
   try { execSync('bash /workspace/seed042.sh', { env: { ...process.env, WWDIR: '/tmp/ww032' }, stdio: 'ignore' }); } catch { /* seeded by the runner */ }
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.uiscale', 'compact'); localStorage.setItem('wavwiz.layout', 'full');
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); localStorage.removeItem('wavwiz.devorder.v1'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(3000); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close()));

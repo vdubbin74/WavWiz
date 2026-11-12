@@ -11,7 +11,7 @@ public class Release007Tests
     private static async Task<string> Ticket(ServerFixture f, string cookie)
     {
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/ws-ticket") { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
-        req.Headers.Add("Cookie", "unison_session=" + cookie); req.Headers.Add("Origin", f.Base);
+        req.Headers.Add("Cookie", "wavwiz_session=" + cookie); req.Headers.Add("Origin", f.Base);
         var r = await f.Http.SendAsync(req); r.EnsureSuccessStatusCode();
         using var d = JsonDocument.Parse(await r.Content.ReadAsStringAsync()); return d.RootElement.GetProperty("ticket").GetString()!;
     }

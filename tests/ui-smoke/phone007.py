@@ -45,7 +45,7 @@ try:
         if ev(js): time.sleep(1.2); shot(name)
     size(1440, 900); load('/', 3.0); ev("document.querySelector('dialog[open] button')?.click()"); time.sleep(1.5); shot('desk-now.png')
     for k in ('river', 'cone', 'wavwiz', 'particles'):
-        ev(f"(() => {{ localStorage.setItem('unison.viz.v1', JSON.stringify({{ on: true, engine: '{k}' }})); window.dispatchEvent(new CustomEvent('wavwiz:viz')); return true; }})()")
+        ev(f"(() => {{ localStorage.setItem('wavwiz.viz.v1', JSON.stringify({{ on: true, engine: '{k}' }})); window.dispatchEvent(new CustomEvent('wavwiz:viz')); return true; }})()")
         time.sleep(2.0)
         check(wait(f"import('/js/viz.js').then(m => {{ const s = m.vizStats(); return s && s.engine === '{k}' && s.mode === 'webgl' && s.frames > 20; }})", 8), f'{k}: WebGL look draws frames on the desktop banner')
         shot(f'desk-{k}.png')

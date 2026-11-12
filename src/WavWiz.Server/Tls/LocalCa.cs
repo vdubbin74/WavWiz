@@ -19,11 +19,8 @@ public sealed class LocalCa
     private readonly Action<string, string> _replacePfx;
     private DateTime _retryRenewalAfter;
     public string? LastRenewalError { get; private set; }
-    /// <summary>0.2.4: the root is stored (and downloaded) as wavwiz-root-ca.crt; 0.0.1..0.2.3 used unison-root-ca.crt, read once by <see cref="MigrateLegacy"/>.</summary>
     public const string CaFileName = "wavwiz-root-ca.crt", MobileConfigFileName = "wavwiz-root-ca.mobileconfig";
     public string CaCertPath => Path.Combine(_dir, CaFileName);
-    public string LegacyCaCertPath => Path.Combine(_dir, "unison-root-ca.crt");
-    private string RegeneratedMarkerPath => Path.Combine(_dir, "regenerated-from-unison.txt");
     private string CaKeyPath => Path.Combine(_dir, "ca.key.pem");
     private string ServerPfxPath => Path.Combine(_dir, "server.pfx");
     private string StatePath => Path.Combine(_dir, "tls-state.txt");
@@ -36,52 +33,6 @@ public sealed class LocalCa
     public byte[]? RootDer => File.Exists(CaCertPath) ? X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath)).RawData : null;
     public string? RootSha256 => RootDer is { } d ? Convert.ToHexString(SHA256.HashData(d)) : null;
     public DateTimeOffset? ServerCertExpires { get { try { return CurrentServerCert(null)?.NotAfter; } catch { return null; } } }
-
-    /// <summary>When the root was replaced because it still carried the old "Unison" name (0.2.4 migration), else null. Phones must install the new one.</summary>
-    public DateTimeOffset? RegeneratedFromLegacyAt => File.Exists(RegeneratedMarkerPath) && DateTimeOffset.TryParse(File.ReadAllText(RegeneratedMarkerPath).Trim(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var d) ? d : null;
-
-    internal static bool HasLegacyName(X509Certificate2 c) => c.Subject.Contains("unison", StringComparison.OrdinalIgnoreCase) || c.Issuer.Contains("unison", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// 0.2.4: run once at start-up. (1) An existing unison-root-ca.crt is moved to wavwiz-root-ca.crt. (2) If the stored root (or the server certificate) still
-    /// carries the old "Unison" name in its subject/issuer (CAs made by the 0.0.1/0.0.2 betas), a new WavWiz root + server certificate are made for the same
-    /// address; the old files are kept as *.unison-backup-&lt;utc&gt; next to them. Phones that trusted the old root must install the new one (the /tls/check
-    /// page then reports "Not trusted yet" with the install steps). A root that already says WavWiz is only renamed, so existing phone trust keeps working.
-    /// Returns a log line describing what was done, or null when nothing changed. <paramref name="fallbackIp"/> is used when tls-state.txt has no address.
-    /// </summary>
-    public string? MigrateLegacy(IPAddress? fallbackIp)
-    {
-        lock (_l)
-        {
-            var notes = new List<string>();
-            if (File.Exists(LegacyCaCertPath))
-            {
-                if (!File.Exists(CaCertPath)) { File.Move(LegacyCaCertPath, CaCertPath); notes.Add("moved unison-root-ca.crt to " + CaFileName); }
-                else { var bak = LegacyCaCertPath + ".unison-backup-" + Stamp(); File.Move(LegacyCaCertPath, bak); notes.Add("kept stray unison-root-ca.crt as " + Path.GetFileName(bak)); }
-            }
-            if (!File.Exists(CaCertPath)) return notes.Count > 0 ? "TLS: " + string.Join("; ", notes) : null;
-            bool legacyRoot, legacyLeaf = false;
-            using (var root = X509Certificate2.CreateFromPem(File.ReadAllText(CaCertPath))) legacyRoot = HasLegacyName(root);
-            if (!legacyRoot && File.Exists(ServerPfxPath)) { try { using var leaf = LoadPfx(); legacyLeaf = HasLegacyName(leaf); } catch { } }
-            if (legacyRoot || legacyLeaf)
-            {
-                IPAddress? ip = File.Exists(StatePath) && IPAddress.TryParse(File.ReadAllText(StatePath).Trim(), out var sip) ? sip : fallbackIp;
-                if (ip == null) { notes.Add("the certificate still says Unison but no server address is known yet; it will be replaced the next time HTTPS is set up"); return "TLS: " + string.Join("; ", notes); }
-                var stamp = Stamp();
-                if (legacyRoot)
-                {
-                    foreach (var f in new[] { CaCertPath, CaKeyPath, ServerPfxPath }.Where(File.Exists)) { var b = f + ".unison-backup-" + stamp; File.Copy(f, b, true); if (f != CaCertPath) Restrict(b); }
-                    CreateRoot(ip); IssueServer(ip);
-                    File.WriteAllText(RegeneratedMarkerPath, DateTimeOffset.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
-                    notes.Add($"the root certificate still carried the old Unison name; made a new WavWiz root and server certificate for {ip} (old files kept as *.unison-backup-{stamp}). Phones must install and trust the new certificate again (open /tls/check on the phone).");
-                }
-                else { IssueServer(ip); notes.Add($"re-issued the server certificate for {ip} (it still said Unison; the root is unchanged, phones keep their trust)"); }
-            }
-            return notes.Count > 0 ? "TLS: " + string.Join("; ", notes) : null;
-        }
-    }
-
-    private static string Stamp() => DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
 
     private static byte[] NameConstraints(IEnumerable<IPAddress> ips, IEnumerable<string> dns)
     {
@@ -157,7 +108,7 @@ public sealed class LocalCa
                 throw new InvalidOperationException("The existing CA or its key is missing; restore it from backup. Trust will not be reset automatically.");
             if (!recreateCa && !File.Exists(CaCertPath) && File.Exists(ServerPfxPath))
                 throw new InvalidOperationException("An existing leaf has no local CA; it will not be replaced automatically. Use your certificate administrator.");
-            if (recreateCa || !File.Exists(CaCertPath)) { CreateRoot(ip); try { File.Delete(RegeneratedMarkerPath); } catch { } }
+            if (recreateCa || !File.Exists(CaCertPath)) CreateRoot(ip);
             if (!recreateCa && File.Exists(ServerPfxPath))
             {
                 using var current = LoadPfx();

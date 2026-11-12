@@ -7,7 +7,7 @@ const root = new URL('../../', import.meta.url).pathname, V = readFileSync(root 
 ok(`installer fallback AppVersion = ${V}`, readFileSync(root + 'installer/WavWiz.iss', 'utf8').includes(`#define AppVersion "${V}"`));
 const br = await chromium.launch();
 for (const [vw, vh, d, tag] of [[1920, 1080, 1, '100'], [960, 540, 2, '200'], [390, 844, 3, 'phone']]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close()));
   const api = await p.evaluate(async () => (await (await fetch('/api/v1/auth/state')).json()).appVersion); ok(`[${tag}] the server reports ${V}`, api === V, api);

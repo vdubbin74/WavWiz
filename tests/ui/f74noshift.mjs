@@ -14,7 +14,7 @@ const RUNS = [
   ['roomy', 'open', [['Now Playing collapse', '.np-ctlcol', 1], ['Now Playing expand', '.np-ctlcol', 1], ['Roomy Devices slide', '.desk.devcollapsed .devpanel .prail', 0], ['Roomy Devices slide back', 'key:Escape', 0]]]];
 const br = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 for (const [vw, vh, dpr, sc, z] of [[1920, 1080, 1, 'compact', '100'], [960, 540, 2, 'tiny', '200-tiny']]) for (const [lay, ctl, steps] of RUNS) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([sc, lay, ctl]) => { if (sessionStorage.getItem('f74')) return; sessionStorage.setItem('f74', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1');
     localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.layout', lay); localStorage.setItem('wavwiz.uiscale', sc);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl, ctlSet: true })); }, [sc, lay, ctl]);

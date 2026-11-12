@@ -1,4 +1,4 @@
-WavWiz (BETA) - whole-home synchronized music (formerly Unison)
+WavWiz (BETA) - whole-home synchronized music
 
 This is a BETA version. It is meant for you to try on your own home network. Things will change and some things are still missing.
 

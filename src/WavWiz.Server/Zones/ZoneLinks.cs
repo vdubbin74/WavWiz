@@ -10,7 +10,8 @@ namespace WavWiz.Server.Zones;
 ///   zone    = what the user sees as a zone = a zone_group row (a named set of devices).
 ///   playback group = one Conductor (queue, now playing, engine). Zones that are LINKED share one; a split zone has its own.
 /// State: setting zone.links = { "&lt;zone id&gt;": "&lt;playback group id&gt;" }. A zone with no entry is in the house group "default", so every existing install starts with all zones LINKED = exactly 0.3.9 (this is the migration: nothing to convert).
-/// A device plays the group of the FIRST zone (by zone order) it belongs to; a device in no zone plays "default". Devices picked for the Jukebox zone play "jukebox" instead
+/// A device plays the group of the zone it belongs to; a device in no zone is SILENT (0.6.8 zone fix: there is no hidden house fallback for speakers any
+/// more - a fresh setup and an upgrade get a real "Everywhere" zone instead, see ZoneManager.MigrateEverywhere). Devices picked for the Jukebox zone play "jukebox" instead
 /// (setting jukebox.devices = player ids; empty = the Jukebox plays in the house group like in 0.3.9).
 /// </summary>
 public sealed class ZoneLinks
@@ -287,8 +288,9 @@ public sealed class ZoneLinks
             {
                 if (onlyPlayer != null && player != onlyPlayer) continue;
                 if (jb.Contains(player)) { _reg.Assign(player, JukeboxGroup, "Jukebox"); continue; }
-                if (first.TryGetValue(dev, out var zg) && m.TryGetValue(zg, out var gid) && gid != Conductor.DefaultGroupId) _reg.Assign(player, gid, GroupName(gid, m, zs));
-                else _reg.Assign(player, Conductor.DefaultGroupId);
+                if (!first.TryGetValue(dev, out var zg)) { _reg.Silence(player); continue; }   // 0.6.8 zone fix: in no zone = silent, never the house group
+                if (m.TryGetValue(zg, out var gid) && gid != Conductor.DefaultGroupId) _reg.Assign(player, gid, GroupName(gid, m, zs));
+                else _reg.Assign(player, Conductor.DefaultGroupId);   // a zone linked into the house group
             }
         }
         if (onlyPlayer == null)

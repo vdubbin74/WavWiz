@@ -53,29 +53,7 @@ public sealed class ServerConfig
     public string ConfigPath => Path.Combine(DataDir, "server.json");
     /// <summary>F261-A: the server.json this config was read from (an explicit path may differ from DataDir).</summary>
     [System.Text.Json.Serialization.JsonIgnore] public string? LoadedFrom { get; set; }
-    /// <summary>0.1.2: library DB is wavwiz.db. On first start after upgrade, rename unison.db → wavwiz.db (library + password kept).</summary>
-    public string DbPath
-    {
-        get
-        {
-            var neu = Path.Combine(DataDir, "wavwiz.db");
-            var old = Path.Combine(DataDir, "unison.db");
-            try
-            {
-                if (!File.Exists(neu) && File.Exists(old))
-                {
-                    File.Move(old, neu);
-                    foreach (var s in new[] { "-wal", "-shm" })
-                    {
-                        var os = old + s; var ns = neu + s;
-                        if (File.Exists(os) && !File.Exists(ns)) File.Move(os, ns);
-                    }
-                }
-            }
-            catch { /* leave old path if rename fails; Migrate still opens whatever exists */ }
-            return File.Exists(neu) || !File.Exists(old) ? neu : old;
-        }
-    }
+    public string DbPath => Path.Combine(DataDir, "wavwiz.db");
 
     private static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

@@ -5,7 +5,7 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await chromium.launch();
 async function pageFor(panels, scale = 1) {
   const ctx = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scale });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(pn => {
     localStorage.setItem('wavwiz.whatsnew', '9.9.9');
     localStorage.setItem('wavwiz.gettingStarted.shown', '1');

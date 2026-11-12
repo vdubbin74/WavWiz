@@ -62,12 +62,9 @@ The automated tests in this repository run on Linux (pwsh with shims, ISCC under
 * Wizard images, shortcuts, tray icon and favicon use the final logo (`assets/logo/`).
 * Not verified on Windows from this Linux build box: the Inno wizard pages, `netsh` rules, service start, mDNS/broadcast behavior, tray. See the release report.
 
-## 0.0.3 notes (rename + upgrade from Unison)
+## 0.0.3 notes
 * Installer is `WavWiz-Setup-0.0.3.exe` (full, self-contained only), new Inno AppId. ffmpeg is our own decode-only LGPL build (about 20 MB); `build/build.ps1` builds it from the pinned source via `build/build-ffmpeg-lgpl.sh` if `$WAVWIZ_TOOLS_CACHE/ffmpeg-lgpl/out` is missing, and fills `licenses\FFMPEG-BUILD.txt`.
-* **Upgrade migration** (`Invoke-LegacyMigration` in `installer/scripts/lib.ps1`, run by `setup.ps1` right after preflight; idempotent, safe to re-run): stop/delete service `UnisonServer` and kill old processes > delete the old firewall rules > remove the old all-users Run value > merge `ProgramData\Unison` into `ProgramData\WavWiz` (database, library, password, pairings, art cache kept; name collisions become `*.from-unison`; if both hold `unison.db` the new one wins and the old folder is left untouched with a notice; a failed move throws and deletes nothing) > remove the old program folder (marker-checked, never the new root), Start-menu group, desktop link and old uninstall entry.
-* The per-user player folder `%LOCALAPPDATA%\Unison` is copied to `WavWiz` by the player on its first start (the WebView2 cache is skipped); the old HKCU `UnisonPlayer` autostart value is replaced.
-* Tests: `tests/pwsh/install-flow.tests.ps1` (rename migration, re-run, collisions, failure, no-legacy case).
-* Not verified on Windows: the migration on a real 0.0.2 install (real `sc`/`netsh`/registry views/Inno uninstall key), the DPI manifest and 200 %+ layouts, WebView2 zoom, tray Display size, About form, Schannel https in ffmpeg, the visualizer on a real GPU.
+* Not verified on Windows: the DPI manifest and 200 %+ layouts, WebView2 zoom, tray Display size, About form, Schannel https in ffmpeg, the visualizer on a real GPU.
 
 
 ## 0.0.4 notes

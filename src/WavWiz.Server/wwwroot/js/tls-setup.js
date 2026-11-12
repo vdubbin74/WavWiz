@@ -24,8 +24,7 @@ const set = (cls, title, text, extra) => {
 const li = t => { const e = document.createElement('li'); e.textContent = t; return e; };
 const ul = items => { const u = document.createElement('ul'); items.forEach(i => u.append(li(i))); return u; };
 
-// 0.2.4: servers answer app:'wavwiz' (0.2.3 and older said 'unison'); accept both so a cached page and any server version agree
-const isOurApp = app => app === 'wavwiz' || app === 'unison';
+const isOurApp = app => app === 'wavwiz';
 async function ping(url, ms = 7000) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
   try { const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); const j = await r.json(); return j && isOurApp(j.app) ? { ok: true, https: j.https } : { ok: false, why: 'unexpected answer' }; }

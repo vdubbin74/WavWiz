@@ -10,7 +10,7 @@ let pass = 0, fail = 0; const ok = (n, c, d = '') => { c ? pass++ : fail++; cons
 const br = await chromium.launch();
 async function open(dpr, pan, { touch = false, ua = PLAYER, q = '' } = {}) {
   const ctx = await br.newContext({ viewport: { width: 1920 / dpr, height: 1080 / dpr }, deviceScaleFactor: dpr, userAgent: ua, hasTouch: touch });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(P => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.panels', JSON.stringify({ dev: 'normal', ctl: 'collapsed', ...P })); }, pan);
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(B + '/' + q); await p.waitForTimeout(2500);

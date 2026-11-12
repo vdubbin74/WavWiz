@@ -1,4 +1,3 @@
-import { migrateKey } from './phonejoin.js';
 // Theme: ten presets (0.2.0 items 4-7; Midnight Neon default). Custom uses five colors: Background / Main / Second / Highlight / Text.
 // Panel/line/dim are derived. Color math is pure (no DOM) so it is unit-tested with node.
 // 0.2.1 F14: hl = Highlight, the third color for small accents only (hearts, selected tab underline, EQ / visualizer peak caps, the active
@@ -26,8 +25,7 @@ export function ledColors(t, accent, accent2) {
 }
 export const hotFor = t => (t && HOT[t.preset]) || '#C62F22';
 export const DEFAULT_THEME_ID = 'default';
-const KEY = 'wavwiz.theme.v1';         // 0.2.0 item 12: was unison.theme.v1; moved over once
-const migrate = () => { try { migrateKey(localStorage, 'unison.theme.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
+const KEY = 'wavwiz.theme.v1';
 /** Preset ids removed in 0.1.2 theme slim-down — migrate to Midnight Neon. */
 // 0.2.0 restored 'steel' and 'mono'; F114 (0.5.0) drops Blue Steel ('steel') and Lime Circuit ('lime') again -> Midnight Neon. 'mono' stays.
 const REMOVED = new Set(['charcoal', 'midnight', 'forest', 'synthwave', 'teal', 'purple', 'green', 'light', 'amber', 'browns', 'brown', 'steel', 'lime']);
@@ -93,7 +91,7 @@ export function derive(t) {
 }
 
 export function loadTheme() {
-  let saved = null; try { saved = JSON.parse((migrate(), localStorage.getItem(KEY)) || 'null'); } catch { /* private mode / corrupt */ }
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* private mode / corrupt */ }
   const base = { ...PRESETS[DEFAULT_THEME_ID] };
   if (saved && isHex(saved.accent) && isHex(saved.bg)) {
     let preset = saved.preset || 'custom';

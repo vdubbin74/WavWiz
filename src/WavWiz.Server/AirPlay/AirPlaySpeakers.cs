@@ -59,7 +59,7 @@ public static class AirPlaySpeakers
         db.Exec("INSERT INTO player(id,name,machine_name,app_version,last_seen_at,link_type) VALUES($i,$n,$m,$v,$t,'airplay') ON CONFLICT(id) DO UPDATE SET machine_name=$m,app_version=$v,last_seen_at=$t,link_type='airplay'",
             ("$i", pid), ("$n", o.Name), ("$m", "AirPlay " + o.Address), ("$v", o.Kind), ("$t", now));
         bool isNew = Convert.ToInt32(db.Scalar("SELECT COUNT(*) FROM zone WHERE player_id=$p", ("$p", pid))) == 0;
-        if (isNew) db.Insert("INSERT INTO zone(name,player_id,sort,volume,active_output_device_id) VALUES($n,$p,(SELECT COALESCE(MAX(sort),0)+1 FROM zone),$v,$p)", ("$n", o.Name), ("$p", pid), ("$v", (double)o.Volume));
+        if (isNew) s.Zones.AdoptFirstSpeaker(db.Insert("INSERT INTO zone(name,player_id,sort,volume,active_output_device_id) VALUES($n,$p,(SELECT COALESCE(MAX(sort),0)+1 FROM zone),$v,$p)", ("$n", o.Name), ("$p", pid), ("$v", (double)o.Volume)));   // 0.6.8 zone fix: first speaker of a fresh setup -> "Everywhere"
         db.Exec("INSERT INTO output_device(id,kind,friendly_name) VALUES($d,'other',$n) ON CONFLICT(id) DO UPDATE SET friendly_name=$n", ("$d", pid), ("$n", o.Name));
         db.Exec("INSERT INTO output_endpoint(output_device_id,player_id,win_endpoint_id,last_seen_at,connected) VALUES($d,$d,'airplay',$t,1) ON CONFLICT(player_id,win_endpoint_id) DO UPDATE SET last_seen_at=$t,connected=1", ("$d", pid), ("$t", now));
         lock (Gate) { var l = Load(s).Where(x => x.Key != o.Key).ToList(); l.Add(new Saved(o.Key, endpoint, o.Name)); Store(s, l); }

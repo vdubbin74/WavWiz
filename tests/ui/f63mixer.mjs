@@ -6,7 +6,7 @@ const br=await chromium.launch();
 const sizes=[['100',1920,1080,1,'compact'],['200-app67',960,540,2,'tiny'],['200',960,540,2,'compact'],['phone',390,844,3,'compact']];
 const views=[['full','/'],['roomy','/'],['mini','/']];
 for(const [zt,vw,vh,dpr,u] of sizes) for(const [lay,path] of views){ if(zt==='phone'&&lay!=='full') continue;
- const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:dpr,isMobile:zt==='phone'}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+ const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:dpr,isMobile:zt==='phone'}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(([l,u])=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');localStorage.setItem('wavwiz.webRoom.autojoin','0');localStorage.setItem('wavwiz.uiscale',u);localStorage.setItem('wavwiz.layout',l);},[lay==='mini'?'full':lay,u]);
  const p=await c.newPage(); await p.goto(B+path); await p.waitForTimeout(2500); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(e=>e.close()));
  if(lay==='mini') await p.evaluate(()=>window.dispatchEvent(new CustomEvent('wavwiz:mini')));

@@ -101,14 +101,15 @@ public sealed class ZoneManager
         if (isNew)
         {
             int sort = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(sort),0)+1 FROM zone"));
-            _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));
+            var dev = _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));
+            AdoptFirstSpeaker(dev);   // 0.6.8 zone fix: a fresh setup puts its first speaker into "Everywhere"
         }
         if (s.OwnerTokenId != null) _db.Exec("UPDATE player SET owner_token_id=$o WHERE id=$i", ("$o", s.OwnerTokenId), ("$i", s.Id));
         Rooms.Connected(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.Hello.LinkType, s.Remote.ToString());
         var z = ZoneRow(s.Id)!;
         PushZone(s); PushDsp(s);
         Links?.Apply(s.Id);
-        if (z.Enabled) _reg.Subscribe(s);      // the device listens to its playback group (the house group unless it was split off)
+        if (z.Enabled) _reg.Subscribe(s);      // the device listens to its zone's playback group (a device in no zone stays silent)
         _ev.Publish("zones");
         return Task.CompletedTask;
     }
@@ -299,7 +300,7 @@ public sealed class ZoneManager
     private readonly object _refLock = new();
     /// <summary>Each zone's reference speaker (zone group id -> speaker id), normalized against the current membership. A zone whose reference left
     /// gets a new one (wired, then online, then steadiest), the saved offsets are re-based on it and a quiet note is left. First run migrates the
-    /// house reference (<see cref="ReferenceZoneId"/>) to its zone; the other zones auto-pick.</summary>
+    /// house reference (<see cref="ReferenceZoneId"/>) to its zone. 0.6.8 zone fix: a zone that never had a reference gets none (no auto-REF).</summary>
     public Dictionary<long, long> ZoneReferenceMap()
     {
         lock (_refLock)
@@ -611,7 +612,7 @@ public sealed class ZoneManager
         var err = CheckName(ref name); if (err != null) return (0, err);
         if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group WHERE name=$n COLLATE NOCASE", ("$n", name))) > 0) return (0, "there is already a zone with that name");
         var id = _db.Insert("INSERT INTO zone_group(name,sort,created_at) VALUES($n,(SELECT COALESCE(MAX(sort),0)+1 FROM zone_group),$t)", ("$n", name), ("$t", DateTimeOffset.UtcNow.ToString("O")));
-        SetMembers(id, devices); _ev.Publish("zones"); return (id, null);
+        SetMembers(id, devices); Links?.Apply(); _ev.Publish("zones"); return (id, null);   // 0.6.8 zone fix: its speakers leave Unassigned (silent) and play in it
     }
 
     private void SetMembers(long group, IEnumerable<long>? devices)
@@ -643,6 +644,53 @@ public sealed class ZoneManager
         _db.SetSetting(ModelKey, "2"); return moved;
     }
 
+    // ---------------- 0.6.8 zone fix: a real "Everywhere" zone instead of the hidden house fallback ----------------
+    public const string EverywhereKey = "zones.everywhere", EverywhereName = "Everywhere";
+    /// <summary>
+    /// 0.6.8 zone fix. A speaker in no zone is silent now (ZoneLinks.Apply), so the house needs a real zone to play in. Runs once per database
+    /// (setting <see cref="EverywhereKey"/>):
+    /// <list type="bullet">
+    /// <item>fresh setup (no speakers, no zones): nothing yet - the FIRST speaker that shows up goes into a new "Everywhere" zone (<see cref="AdoptFirstSpeaker"/>);</item>
+    /// <item>upgrade of a house without any named zone (every speaker played in the hidden house group): "Everywhere" is created with all of those
+    ///   speakers. It plays in the house group, so the music and queue carry on exactly as before;</item>
+    /// <item>upgrade of a house that already has named zones: nothing changes. Speakers outside every zone go silent (the UI already said so).</item>
+    /// </list>
+    /// It also clears a reference speaker that 0.6.8-#15 picked by itself for a one-speaker zone (no speaker is REF until the user picks one).
+    /// Returns what it did ("pending", "created", "kept") for the log and the tests.
+    /// </summary>
+    public string MigrateEverywhere()
+    {
+        var done = _db.Setting(EverywhereKey); if (done is "done" or "pending") return "skipped";
+        DropAutoReferences();
+        bool hasZones = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0;
+        if (hasZones) { _db.SetSetting(EverywhereKey, "done"); return "kept"; }
+        var devs = _db.Query("SELECT id FROM zone ORDER BY sort,id", r => r.GetInt64(0));
+        if (devs.Count == 0) { _db.SetSetting(EverywhereKey, "pending"); return "pending"; }
+        var (_, err) = CreateGroup(EverywhereName, devs); if (err != null) { _log?.Invoke("everywhere zone: " + err); return "failed"; }
+        _db.SetSetting(EverywhereKey, "done"); _log?.Invoke($"zones: created \"{EverywhereName}\" with {devs.Count} speaker(s) that played in the house group"); return "created";
+    }
+    /// <summary>0.6.8 zone fix: the first speaker of a fresh setup goes into a new "Everywhere" zone. Only while the setup is still waiting for it
+    /// (<see cref="MigrateEverywhere"/> left "pending"); later speakers wait in Unassigned, silent, until the user adds them to a zone.</summary>
+    public void AdoptFirstSpeaker(long deviceId)
+    {
+        if (_db.Setting(EverywhereKey) != "pending") return;
+        _db.SetSetting(EverywhereKey, "done");
+        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0) return;   // the user made a zone before any speaker came
+        var (_, err) = CreateGroup(EverywhereName, new[] { deviceId }); if (err != null) _log?.Invoke("everywhere zone: " + err);
+    }
+    /// <summary>0.6.8 zone fix: 0.6.8-#15 auto-picked the only speaker of a zone as its reference. Forget those picks once (a reference that is also the
+    /// house reference the user chose is kept), so a lone speaker shows NO DELAY instead of REF until the user picks a reference.</summary>
+    void DropAutoReferences()
+    {
+        lock (_refLock)
+        {
+            var stored = ZoneRefs.ParseMap(_db.Setting(ZoneRefs.MapKey)); if (stored == null || stored.Count == 0) return;
+            var members = _db.Query("SELECT group_id,device_id FROM zone_group_member", r => (G: r.GetInt64(0), D: r.GetInt64(1))).ToLookup(x => x.G, x => x.D);
+            long house = ReferenceZoneId; var keep = stored.Where(kv => !(members[kv.Key].Count() == 1 && members[kv.Key].First() == kv.Value && kv.Value != house)).ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (keep.Count != stored.Count) _db.SetSetting(ZoneRefs.MapKey, ZoneRefs.MapJson(keep));
+        }
+    }
+
     public string? UpdateGroup(long id, string? name, IEnumerable<long>? devices)
     {
         if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group WHERE id=$i", ("$i", id))) == 0) return "zone not found";
@@ -655,12 +703,18 @@ public sealed class ZoneManager
         SetMembers(id, devices); Links?.Apply(); _ev.Publish("zones"); return null;
     }
 
-    /// <summary>Removes a zone (the group and its membership list). The devices stay; they just fall back to Unassigned. Playback is stopped first if this zone is the one playing.</summary>
+    /// <summary>Removes a zone (the group and its membership list). The devices stay; they move to Unassigned and go silent.
+    /// 0.6.8 zone fix: the zone's music goes with it. Its own playback group is dropped (stopped, queue forgotten) by ZoneLinks.Apply; when it played in
+    /// the house group and no other zone does any more, the house group is stopped and emptied too - nothing keeps playing for a zone that is gone, and
+    /// no queue is left behind under its old name.</summary>
     public string? DeleteGroup(long id)
     {
         var g = Groups().FirstOrDefault(x => x.Id == id); if (g == null) return "zone not found";
-        if (g.Active && _reg.Default.State != PlayState.Stopped) _reg.Default.Stop();
+        var pid = Links?.PlaybackId(id) ?? Conductor.DefaultGroupId;
         _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g", ("$g", id)); _db.Exec("DELETE FROM zone_group WHERE id=$g", ("$g", id)); Links?.Forget(id);
+        bool houseUsed = Links?.ZoneList().Any(z => Links.PlaybackId(z.Id) == Conductor.DefaultGroupId) ?? false;
+        if (pid == Conductor.DefaultGroupId && !houseUsed) _reg.Default.Clear();
+        else if (Links?.ZoneList().Any(z => Links.PlaybackId(z.Id) == pid) == false) _reg.Get(pid)?.Stop();   // a group only this zone used (Prune normally drops it already)
         _ev.Publish("zones"); return null;
     }
 

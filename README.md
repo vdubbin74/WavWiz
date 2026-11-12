@@ -176,5 +176,3 @@ Project layout and deeper notes: see `docs/` in this repository (architecture, i
 Third-party components keep their own licenses; see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and [NOTICE](NOTICE).
 
 ---
-
-*(WavWiz was called “Unison” in very early betas; the installer upgrades in place and keeps library, settings, and pairings.)*

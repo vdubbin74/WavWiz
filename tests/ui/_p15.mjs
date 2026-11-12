@@ -1,6 +1,6 @@
 import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim(); const br=await chromium.launch(); const TAG=process.env.TAG||'before';
-for (const [w] of [[420],[360],[330]]) for (const [z,d] of [['100',1],['200',2]]) { const c=await br.newContext({viewport:{width:w,height:260},deviceScaleFactor:d}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+for (const [w] of [[420],[360],[330]]) for (const [z,d] of [['100',1],['200',2]]) { const c=await br.newContext({viewport:{width:w,height:260},deviceScaleFactor:d}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(()=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');});
  const p=await c.newPage(); await p.goto(B+'/mini.html'); await p.waitForTimeout(2500);
  const r=await p.evaluate(()=>{const ch=document.querySelector('.zs-mini'),sc=document.querySelector('.mp-sc'),mp=document.querySelector('.mp');const R=e=>e?.getBoundingClientRect();const icons=[...sc.children].filter(e=>e!==ch).map(e=>R(e));const cr=R(ch);

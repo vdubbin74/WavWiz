@@ -5,11 +5,11 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || 
 let pass = 0, fail = 0; const ok = (n, c, i = '') => { c ? pass++ : fail++; console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + i)); };
 execSync('WWDIR=/tmp/ww032 bash /workspace/seed042.sh', { stdio: 'ignore' });
 const br = await chromium.launch();
-const ctx0 = await br.newContext({ viewport: { width: 1400, height: 900 } }); await ctx0.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const ctx0 = await br.newContext({ viewport: { width: 1400, height: 900 } }); await ctx0.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 const p0 = await ctx0.newPage(); await p0.goto(B + '/'); await p0.waitForTimeout(1500); const THEMES = await p0.evaluate(async () => Object.keys((await import('/js/theme.js')).PRESETS)); await ctx0.close();
 console.log('themes', THEMES.join());
 for (const th of THEMES) for (const mode of ['std', 'exp']) {
-  const ctx = await br.newContext({ viewport: { width: 1400, height: 900 } }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: 1400, height: 900 } }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(([m]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', 'compact'); if (m === 'exp') { localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' })); sessionStorage.setItem('wavwiz.spk', '5'); } }, [mode]);
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2200); await p.evaluate(() => document.querySelector('.phone-unlock')?.click());
   await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, th); await p.waitForTimeout(700);

@@ -102,6 +102,7 @@ public class E2ETests
         await using var a = await FakePc.StartAsync(f, "pc-a", "Living room"); await using var b = await FakePc.StartAsync(f, "pc-b", "Kitchen");
         await a.WaitConnected(); await b.WaitConnected();
         await WaitUntil(() => f.Server.S.Zones.Zones().Count == 2 && f.Server.S.Zones.Zones().All(z => z.Outputs.Count == 1), what: "zones + outputs");
+        f.JoinEverywhere();   // 0.6.8 zone fix: the second speaker plays once it is in a zone (a speaker in no zone is silent)
         var zones = await admin.GetJson("/api/v1/zones"); Assert.Equal(2, zones.GetArrayLength());
         Assert.All(zones.EnumerateArray(), z => { Assert.Equal("uncalibrated", z.GetProperty("badge").GetString()); Assert.True(z.GetProperty("connected").GetBoolean()); });
         var o = zones[0].GetProperty("outputs")[0]; Assert.True(o.GetProperty("notCalibrated").GetBoolean()); Assert.Contains("not calibrated", o.GetProperty("label").GetString());   // honest label: never silently zero
@@ -149,6 +150,7 @@ public class E2ETests
         await using var a = await FakePc.StartAsync(f, "pc-ref", "Reference", hiddenMs: 0); await using var b = await FakePc.StartAsync(f, "pc-bt", "BT speaker", hiddenMs: 80, kind: "bluetooth", bt: "AA:BB:CC:00:11:22");
         await a.WaitConnected(); await b.WaitConnected();
         await WaitUntil(() => f.Server.S.Zones.Zones().Count == 2 && f.Server.S.Zones.Zones().All(z => z.Outputs.Count == 1), what: "zones");
+        f.JoinEverywhere();   // 0.6.8 zone fix: both rooms play the music at the end (a speaker in no zone is silent)
         var zones = f.Server.S.Zones.Zones(); long refId = zones.First(z => z.PlayerId == "pc-ref").Id, btId = zones.First(z => z.PlayerId == "pc-bt").Id;
         var bt = zones.First(z => z.Id == btId).Outputs[0]; Assert.Equal("bt:aabbcc001122", bt.DeviceId); Assert.True(bt.NotCalibrated); Assert.Equal(200, bt.LatencyMs);       // BT default guess, flagged
 

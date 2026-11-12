@@ -41,7 +41,7 @@ test('0.1.2 removed themes migrate to Midnight Neon; Pepecoin viz gone; terrain 
   assert.ok(!vc.FX.terrain && vc.FX.spectrum.some(d => d[0] === 'reflect'));   // 0.2.0 item 17: Terrain retired
   assert.equal(vc.loadSettings('spectrum', { getItem: () => null, setItem() {}, removeItem() {} }).fx.height, 50);
   const store = {}; globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } };
-  store['unison.theme.v1'] = JSON.stringify({ accent: '#2ECC71', accent2: '#A8E6CF', bg: '#0C1410', preset: 'forest' });
+  store['wavwiz.theme.v1'] = JSON.stringify({ accent: '#2ECC71', accent2: '#A8E6CF', bg: '#0C1410', preset: 'forest' });
   assert.equal(theme.loadTheme().preset, 'default');
   assert.equal(theme.loadTheme().name, 'Midnight Neon');
   delete globalThis.localStorage;

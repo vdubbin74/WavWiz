@@ -5,11 +5,10 @@ namespace WavWiz.Core.Discovery;
 /// <summary>What a WavWiz server tells a player that asks "who is a WavWiz server?". No secrets: only what a LAN neighbor could see anyway.</summary>
 public sealed record ServerBeacon(string Id, string Name, string Host, int HttpPort, int HttpsPort, int AudioPort, string Version)
 {
-    public const string Probe = "UNISON?1";
+    public const string Probe = "WAVWIZ?1";
     private static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
-    /// <summary>0.2.4: servers answer "wavwiz" on /ping and /discover; the UDP beacon still says "unison" so 0.0.2..0.2.3 players keep finding new servers. Accept both.</summary>
-    public static bool IsOurApp(string? app) => app is "wavwiz" or "unison";
-    public byte[] ToUdp() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { app = "unison", v = 1, id = Id, name = Name, host = Host, httpPort = HttpPort, httpsPort = HttpsPort, audioPort = AudioPort, version = Version }, J));
+    public static bool IsOurApp(string? app) => app is "wavwiz";
+    public byte[] ToUdp() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { app = "wavwiz", v = 1, id = Id, name = Name, host = Host, httpPort = HttpPort, httpsPort = HttpsPort, audioPort = AudioPort, version = Version }, J));
 
     public static ServerBeacon? FromUdp(ReadOnlySpan<byte> data, IPAddress? sender = null)
     {
@@ -26,7 +25,7 @@ public sealed record ServerBeacon(string Id, string Name, string Host, int HttpP
         catch { return null; }
     }
 
-    /// <summary>mDNS answer for "_unison._tcp.local": PTR + SRV + TXT + A (RFC 6763).</summary>
+    /// <summary>mDNS answer for "_wavwiz._tcp.local": PTR + SRV + TXT + A (RFC 6763).</summary>
     public List<DnsWire.Record> ToMdns(IPAddress ip)
     {
         var svc = WavWizInfo.MdnsService + ".local"; var safe = new string(Name.Where(c => c is not ('.' or '\0')).ToArray()); if (safe.Length == 0) safe = "WavWiz"; if (safe.Length > 40) safe = safe[..40];
@@ -44,7 +43,7 @@ public sealed record ServerBeacon(string Id, string Name, string Host, int HttpP
         var raw = host ?? "";
         if (IPAddress.TryParse(raw, out var ip) && (ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any) || IPAddress.IsLoopback(ip))) raw = "";
         var hh = new string(raw.Where(char.IsLetterOrDigit).ToArray());
-        return (hh.Length > 0 ? hh : "unison") + ".local";
+        return (hh.Length > 0 ? hh : "wavwiz") + ".local";
     }
 
     public static ServerBeacon? FromMdns(DnsWire.Message m)

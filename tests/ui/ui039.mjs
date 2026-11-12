@@ -9,7 +9,7 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await (ENG === 'webkit' ? webkit : chromium).launch();
 const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime'];
 async function page(w, h, panels, { dsf = 1, scale = 'normal', pins = null, theme = null, url = '/' } = {}) {
-  const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dsf }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dsf }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(([pn, sc, pi]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', sc); if (pi) localStorage.setItem('wavwiz.pins.v1', JSON.stringify(pi)); if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, [panels, scale, pins]);
   const p = await ctx.newPage(); await p.goto(B + url); await p.waitForTimeout(2000); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {});
   if (theme) await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme);

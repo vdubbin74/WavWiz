@@ -63,7 +63,8 @@ export function sync() {
   // Keep it through linked visual selections; rotate on every routing change.
   if (!S._streamRoute || S._streamRoute.target !== pid) S._streamRoute = { target: pid };
   // 0.4.1: a selected zone that no longer exists is forgotten (back to the first zone), not kept in storage
-  if ((S.groups || []).length && loadSel() && c && loadSel() !== c.key) saveSel(null);
+  // 0.6.8 zone fix: also when the last zone was deleted (no zones left), so a deleted zone's id never lingers in storage as a ghost choice
+  if (Array.isArray(S.groups) && loadSel() && (!c || loadSel() !== c.key)) saveSel(null);
   if (pid !== lastPid) { const first = lastPid === undefined; lastPid = pid; if (!first) ctl.refreshNow?.(); }
   drawChips(); window.dispatchEvent(new CustomEvent('wavwiz:zonesync'));
 }
@@ -71,10 +72,17 @@ export function select(key) { saveSel(key); closeMenu(); sync(); window.dispatch
 globalThis.addEventListener?.('storage', ev => { if (ev.key === ZONE_KEY && S) sync(); });   // the mini player / another tab on this browser
 
 function drawChip(b) {
-  const c = current(), has = !!c && choicesNow().length > 1;   // a one-zone home has nothing to choose, so no chip
+  const c = current(), many = !!c && choicesNow().length > 1;
+  // 0.6.8 zone fix: "on <zone>" always names the zone (Now Playing, the mini player, the phone), also in a one-zone home; only the picker part
+  // (caret + menu) needs a second zone. The CONTROLLING chip (Devices) is only a picker, so a one-zone home still hides it.
+  const has = b._link ? !!c : many;
   b.hidden = !has; if (!has) return;
   b.querySelector('.zs-name').textContent = c.name; b.querySelector('.zs-name').title = c.name;
-  if (b._link) { b.setAttribute('aria-label', `Playing on ${c.name}. Choose the zone this player controls`); b.title = `On ${c.name} - choose the zone this player controls`; return; }
+  if (b._link) {
+    b.classList.toggle('solo', !many); b.querySelector('.zs-car').hidden = !many;
+    if (many) { b.setAttribute('aria-haspopup', 'menu'); b.removeAttribute('aria-disabled'); } else { b.removeAttribute('aria-haspopup'); b.setAttribute('aria-disabled', 'true'); }
+    b.setAttribute('aria-label', many ? `Playing on ${c.name}. Choose the zone this player controls` : `Playing on ${c.name}`); b.title = many ? `On ${c.name} - choose the zone this player controls` : `On ${c.name}`; return;
+  }
   b.classList.toggle('linked', c.linked); b.setAttribute('aria-label', `Controlling ${c.name}. Tap to switch zone`); b.title = `Queue: ${c.name} - choose the zone this player controls`;
 }
 function drawChips() { for (const b of [...chips]) { if (!b.isConnected && b._seen) { chips.delete(b); continue; } b._seen = b._seen || b.isConnected; drawChip(b); } }
@@ -89,7 +97,7 @@ export function zoneChip(extra = '') {
  *  it the Editing zone of the Queue (0.4.4 F14 behavior), via the 'wavwiz:editzone' event. No row or button of its own: it sits on the song line. */
 export function zoneLink(extra = '') {
   const b = h('button', { type: 'button', class: 'zlink ' + extra, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-    onclick: ev => { ev.stopPropagation(); menu && menu._for === b ? closeMenu() : openMenu(b); } },
+    onclick: ev => { ev.stopPropagation(); if (choicesNow().length < 2) return; menu && menu._for === b ? closeMenu() : openMenu(b); } },   // one zone: a name, not a picker
     h('span', { class: 'zl-on' }, 'on '), h('b', { class: 'zs-name zl-name ell' }, ''), h('span', { class: 'zs-car', 'aria-hidden': 'true' }, '▾'));
   b._link = true; chips.add(b); drawChip(b); return b;
 }

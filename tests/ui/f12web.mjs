@@ -3,12 +3,12 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim(), TAG = process.env.TAG || 'after';
-const api = async (p, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (p, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { cookie: 'wavwiz_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const br = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 let fail = 0;
 for (const [tag, dpr] of [['100', 1], ['200', 2]]) {
   const ctx = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: dpr });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '1'); localStorage.setItem('wavwiz.webRoom.name', 'F12 Browser'); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'rail', dev: 'expanded', exp: 'dev', list: 'normal', ctl: 'collapsed' })); });
   const p = await ctx.newPage();
   await p.addInitScript(() => { window.__st = null; window.addEventListener('wavwiz:phone', e => { window.__st = e.detail; }); });

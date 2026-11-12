@@ -8,7 +8,7 @@ namespace WavWiz.Server.Net;
 
 /// <summary>
 /// Lets players find this server without typing an address (0.0.2): (1) a UDP probe/answer on the discovery port - answered on the server's own LAN address and on the
-/// subnet's directed-broadcast address, and also to unicast probes (a player that sweeps the subnet); (2) multicast DNS (Bonjour) "_unison._tcp" for phones and Macs.
+/// subnet's directed-broadcast address, and also to unicast probes (a player that sweeps the subnet); (2) multicast DNS (Bonjour) "_wavwiz._tcp" for phones and Macs.
 /// Never binds 0.0.0.0. Only private-network sources are answered. The answer carries no secret (name, address, ports, version).
 /// </summary>
 public sealed class DiscoveryHost : IDisposable

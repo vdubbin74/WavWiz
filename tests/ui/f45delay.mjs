@@ -5,7 +5,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
 const runs = [['pc-100', chromium, { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }], ['pc-200', chromium, { viewport: { width: 960, height: 540 }, deviceScaleFactor: 2 }],
   ['iphone-390', webkit, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }]];
-for (const [tg, eng, o] of runs) { const br = await eng.launch(), c = await br.newContext(o); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+for (const [tg, eng, o] of runs) { const br = await eng.launch(), c = await br.newContext(o); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   const phone = tg.startsWith('iphone');
   await c.addInitScript(([phone]) => { if (phone) Object.defineProperty(navigator, 'standalone', { get: () => true }); if (sessionStorage.getItem('f45')) return; sessionStorage.setItem('f45', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (!phone) localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'rail', dev: 'expanded', exp: 'dev', list: 'normal', ctl: 'collapsed' })); }, [phone]);

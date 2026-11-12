@@ -11,23 +11,22 @@ import { WavWizRing } from './wzviz.js';
 import { ParticleBurst } from './particles.js';
 import { liveSocket } from './wsconn.js';
 import { Features, VIZ_LIST, normEngine, vizName, effectiveSettings, loadReact, reactRaw, loadPost, postRaw, DEFAULT_ENGINE, QUALITY, normQuality, qualityFromLight, autoTier, FrameGovernor, isLight, safeStart, startsLow, StallWatchdog, TIERS } from './vizcore.js';
-import { isTvUa, migrateKey } from './phonejoin.js';
+import { isTvUa } from './phonejoin.js';
 const toast = (...a) => { import('./util.js').then(m => m.toast(...a)).catch(() => {}); };   // lazy: util.js needs the DOM (viz.js is also loaded by node tests)
 import { SCENES, webglOk, sharedGL, sharedGen, sharedInfo } from './vizgl.js';
 import { VuScene, VuGLScene } from './vizvu.js';
-const KEY = 'wavwiz.viz.v1';           // 0.2.0 item 12: was unison.viz.v1 (0.0.2..0.1.3); moved over once so a device keeps its choices
-const migrate = () => { try { migrateKey(localStorage, 'unison.viz.v1', KEY); } catch { /* no storage */ } };   // read lazily: the old value moves over the first time it is read
+const KEY = 'wavwiz.viz.v1';
 /** 0.6.8-#5: a real phone / tablet by device (UA + touch), never by window width - phone-only restrictions key off this, so a narrow PC
  *  window keeps desktop features (Visualizer settings, pop-out, full-quality viz). */
 export const isRealPhone = () => { try { const ua = navigator?.userAgent || ''; return /iPhone|iPad|iPod|Android/.test(ua) || (/Macintosh/.test(ua) && (navigator?.maxTouchPoints || 0) > 1); } catch { return false; } };
 export const isPhone = () => { try { return matchMedia('(max-width:900px)').matches || /iPhone|iPad|Android/.test(navigator?.userAgent || ''); } catch { return false; } };
-export const inDesktopPlayer = () => /(WavWiz|Unison)Player\//.test(navigator.userAgent);
+export const inDesktopPlayer = () => /WavWizPlayer\//.test(navigator.userAgent);
 export const ENGINES = VIZ_LIST.map(([k, t]) => [k, k === DEFAULT_ENGINE ? t + ' (default)' : t]);
 export { VIZ_LIST, vizName };
 
 /** quality: 'auto' | 'low' | 'high' | 'ultra' (0.1.3; a 0.1.2 "Detail" choice carries over: Automatic -> Auto, Light -> Low, Full -> High). */
 export function vizPrefs() {
-  let p = {}; try { migrate(); p = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* ignore */ }
+  let p = {}; try { p = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* ignore */ }
   const quality = p.quality ? normQuality(p.quality) : qualityFromLight(p.light);
   const ss = startInfo(p.on);                                  // 0.2.0 item 3: ?lite / ?viz=off / TV default off
   return { on: !ss.forceOff && ss.defaultOn, forced: ss.forceOff, engine: normEngine(p.engine), quality, light: quality === 'low' || (quality === 'auto' && isRealPhone()), lightSetting: p.light || 'auto', names: p.names !== false };

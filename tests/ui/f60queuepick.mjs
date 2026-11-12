@@ -5,7 +5,7 @@ import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim(), SH=!!process.env.SHOTS; let pass=0, fail=0;
 const ok=(n,c,x='')=>{c?pass++:fail++; console.log((c?'ok   ':'FAIL ')+n+(c?'':'  '+x));};
 const br=await chromium.launch();
-const open=async (vw,vh,d,sc,list,phone=false)=>{ const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d,...(phone?{isMobile:true,hasTouch:true}:{})}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+const open=async (vw,vh,d,sc,list,phone=false)=>{ const c=await br.newContext({viewport:{width:vw,height:vh},deviceScaleFactor:d,...(phone?{isMobile:true,hasTouch:true}:{})}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(([l,sc])=>{ if(sessionStorage.getItem('g'))return; sessionStorage.setItem('g','1'); localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');localStorage.setItem('wavwiz.webRoom.autojoin','0');localStorage.setItem('wavwiz.uiscale',sc);localStorage.setItem('wavwiz.layout','full');localStorage.setItem('wavwiz.panels',JSON.stringify({lib:'rail',dev:'rail',exp:null,list:l,ctl:'collapsed'}));},[list,sc]);
  const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(2800); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(x=>x.close())); return [c,p]; };
 const probe=p=>p.evaluate(()=>{ const q=s=>document.querySelector(s), R=e=>e.getBoundingClientRect(), vis=e=>!!e&&!!e.offsetParent&&R(e).width>0&&getComputedStyle(e).visibility!=='hidden';

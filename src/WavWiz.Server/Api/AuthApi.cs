@@ -72,8 +72,8 @@ public static class AuthApi
 
         g.MapPost("/auth/logout", (HttpContext c) =>
         {
-            var w = c.Who(); if (w != null && c.Request.Cookies.ContainsKey("unison_session")) s.Auth.Revoke(w.TokenId);
-            c.Response.Cookies.Delete("unison_session", new CookieOptions { Path = "/" }); return Results.Json(new { ok = true });
+            var w = c.Who(); if (w != null && c.Request.Cookies.ContainsKey("wavwiz_session")) s.Auth.Revoke(w.TokenId);
+            c.Response.Cookies.Delete("wavwiz_session", new CookieOptions { Path = "/" }); return Results.Json(new { ok = true });
         }).Req(Role.View);
 
         g.MapPost("/pairing/code", () => { var (code, exp) = s.Auth.NewPairingCode(); return Results.Json(new { code, expires = exp }); }).Req(Role.Admin);
@@ -141,7 +141,7 @@ public static class AuthApi
             if (neu.Length == 0)
             {
                 s.Auth.ClearPassword();
-                c.Response.Cookies.Delete("unison_session", new CookieOptions { Path = "/" });
+                c.Response.Cookies.Delete("wavwiz_session", new CookieOptions { Path = "/" });
                 return Results.Json(new { ok = true, setupRequired = true });
             }
             var err = s.Auth.SetPassword(neu); if (err != null) return Ext.Bad(err);

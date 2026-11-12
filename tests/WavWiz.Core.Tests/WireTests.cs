@@ -4,10 +4,10 @@ namespace WavWiz.Core.Tests;
 public class WireTests
 {
     [Fact]
-    public void Header_magic_is_UNSN_and_is_16_bytes()
+    public void Header_magic_is_WVWZ_and_is_16_bytes()
     {
         var b = new byte[16]; Wire.WriteHeader(b, MsgType.Audio, 7, 100);
-        Assert.Equal((byte)'U', b[0]); Assert.Equal((byte)'N', b[1]); Assert.Equal((byte)'S', b[2]); Assert.Equal((byte)'N', b[3]);
+        Assert.Equal((byte)'W', b[0]); Assert.Equal((byte)'V', b[1]); Assert.Equal((byte)'W', b[2]); Assert.Equal((byte)'Z', b[3]);
         Assert.True(Wire.TryReadHeader(b, out var h, out _));
         Assert.Equal(MsgType.Audio, h.Type); Assert.Equal(7u, h.Seq); Assert.Equal(100u, h.PayloadLen);
     }

@@ -138,7 +138,7 @@ public class Release040Stage1Tests
         long tid = await E2ETests.AddClickTrack(f, admin, 20);
         // old clients: no zoneId anywhere
         var def = await admin.GetJson("/api/v1/stream"); Assert.Equal("default", def.GetProperty("zoneId").GetString());
-        var zs = await admin.GetJson("/api/v1/stream/zones"); Assert.Equal(1, zs.GetProperty("zones").GetArrayLength());
+        var zs = await admin.GetJson("/api/v1/stream/zones"); Assert.Single(zs.GetProperty("zones").EnumerateArray(), z => z.GetProperty("isDefault").GetBoolean());   // one house group (0.6.8: plus the fresh setup's "Everywhere" zone group)
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/stream/play", new { kind = "tracks", ids = new[] { tid } })).StatusCode);
         Assert.Equal("playing", (await admin.GetJson("/api/v1/stream")).GetProperty("now").GetProperty("state").GetString());
         // unknown zone

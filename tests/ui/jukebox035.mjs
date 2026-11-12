@@ -3,12 +3,12 @@
 import { chromium, webkit, devices } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim();
-const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const R = []; const ok = (n, c, i = '') => { R.push(!!c); console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + String(i).slice(0, 500) : '')); };
 const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 500)); } };
 const GE = process.argv[2] === 'webkit' ? await webkit.launch() : null;
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-const ctxOf = async (b, opt, init) => { const c = await b.newContext(opt); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]); await c.addInitScript(i => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); if (i) for (const [k, v] of Object.entries(i)) localStorage.setItem(k, v); }, init || null); return c; };
+const ctxOf = async (b, opt, init) => { const c = await b.newContext(opt); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); await c.addInitScript(i => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); if (i) for (const [k, v] of Object.entries(i)) localStorage.setItem(k, v); }, init || null); return c; };
 const lib = await api('/library/tracks?limit=50');
 for (const style of ['modern', 'retro']) {
   await api('/jukebox/stop', 'POST', { pin: '2468' }).catch(() => {});

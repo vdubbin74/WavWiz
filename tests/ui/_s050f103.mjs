@@ -7,7 +7,7 @@ const scenes=[{id:1,name:'Alarm',icon:'🎛',members:[{deviceId:1,enabled:true,v
 const rows=[{id:9,name:'Alarm',enabled:true,days:'0',time:'06:00',action:'play',alarm:true,payload:{source:'track',name:'Lose Yourself · Eminem',sceneId:1,zoneKey:'g:77',fadeMin:5},nextRunAt:'2026-10-27T06:00:00'}];
 const fx={'/api/v1/scenes':scenes,'/api/v1/schedules':rows,'/api/v1/schedules/clock':{now,server:now},'/api/v1/sleep':{mode:'off'}};
 async function open(phone){ const ctx=await b.newContext(phone?{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,userAgent:UA}:{viewport:{width:1600,height:1000},deviceScaleFactor:1});
-  await ctx.addCookies([{name:'unison_session',value:S,url:B}]);
+  await ctx.addCookies([{name:'wavwiz_session',value:S,url:B}]);
   await ctx.route('**/*', r => { const u=new URL(r.request().url()); if (u.origin===B && fx[u.pathname]) return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(fx[u.pathname])});
     const f=path.join(W,u.pathname); const ext=path.extname(f);
     if (u.origin===B && types[ext] && fs.existsSync(f) && fs.statSync(f).isFile()) return r.fulfill({status:200,contentType:types[ext],body:fs.readFileSync(f)});

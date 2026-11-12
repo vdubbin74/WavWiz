@@ -1,11 +1,11 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim();
-const api=async(p,m='GET',b)=>{const r=await fetch(B+'/api/v1'+p,{method:m,headers:{Cookie:'unison_session='+sess,Origin:B,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const t=await r.text();try{return JSON.parse(t)}catch{return t}};
+const api=async(p,m='GET',b)=>{const r=await fetch(B+'/api/v1'+p,{method:m,headers:{Cookie:'wavwiz_session='+sess,Origin:B,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const t=await r.text();try{return JSON.parse(t)}catch{return t}};
 const R=[];const ok=(n,c,i='')=>{R.push(c);console.log((c?'PASS ':'FAIL ')+n+(i?' :: '+i:''))};
 await api('/jukebox/stop','POST',{pin:'2468'}).catch(()=>{});
 const cb=await chromium.launch(); const ctx=await cb.newContext({viewport:{width:1920,height:1080}});
-await ctx.addCookies([{name:'unison_session',value:sess,url:B}]);
+await ctx.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
 await ctx.addInitScript(()=>localStorage.setItem('wavwiz.whatsnew','9.9.9'));
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto(B+'/'); await p.waitForTimeout(3000); await p.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()));
@@ -22,7 +22,7 @@ await dlg.locator('input[type=password]').fill('2468'); await dlg.locator('foote
 let st=await api('/jukebox'); ok('G13 Start: jukebox running, dialog closed', st.running===true && await dlg.count()===0, JSON.stringify(st).slice(0,200));
 const code=st.code||st.j||st.guestCode||(st.url||'').split('j=')[1];
 // big screen in a plain browser (separate, non-Player context)
-const ctx2=await cb.newContext({viewport:{width:1600,height:900}}); await ctx2.addCookies([{name:'unison_session',value:sess,url:B}]); await ctx2.addInitScript(()=>localStorage.setItem('wavwiz.whatsnew','9.9.9'));
+const ctx2=await cb.newContext({viewport:{width:1600,height:900}}); await ctx2.addCookies([{name:'wavwiz_session',value:sess,url:B}]); await ctx2.addInitScript(()=>localStorage.setItem('wavwiz.whatsnew','9.9.9'));
 const big=await ctx2.newPage(); await big.goto(B+'/'); await big.waitForTimeout(4000); await big.mouse.click(960,450); await big.waitForTimeout(500); await big.evaluate(()=>{document.querySelectorAll('dialog[open]').forEach(d=>d.close());document.querySelectorAll('.phone-unlock').forEach(e=>e.remove())});
 await big.locator('#jbchip').click(); await big.waitForTimeout(1200); await big.locator('dialog[open] button',{hasText:'Open big screen'}).click(); await big.waitForTimeout(2500);
 const kio=await big.evaluate(async()=>(await import('/js/jukebox-kiosk.js')).kioskOpen()); ok('G13 big screen opens in a plain browser', kio); await big.screenshot({path:'/workspace/screens/wavwiz-033-g13-bigscreen.png'});

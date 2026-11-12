@@ -3,10 +3,12 @@ namespace WavWiz.Server.Zones;
 /// <summary>
 /// 0.6.8-#15: one reference speaker per zone (the zone's timing clock for calibration). Pure rules, unit-tested:
 /// <list type="bullet">
-/// <item>every zone with speakers has exactly one reference, one of its own speakers; a one-speaker zone uses that speaker;</item>
+/// <item>a zone has at most one reference, one of its own speakers. 0.6.8 zone fix: no speaker is the reference until the user picks one - a new zone,
+/// or a one-speaker zone, has none (its speakers show NO DELAY until they are measured);</item>
 /// <item>a speaker that moves into a zone joins as a regular speaker (the zone keeps its reference; the UI may offer a swap);</item>
-/// <item>the zone it left picks a new reference: wired first, then online, then the steadiest (fewest underruns / resyncs, smallest sync error), then the lowest id;</item>
-/// <item>first run (no per-zone setting yet): the old house reference becomes the reference of its zone, the other zones auto-pick.</item>
+/// <item>the zone it left picks a new reference among the 2+ speakers left: wired first, then online, then the steadiest (fewest underruns / resyncs,
+/// smallest sync error), then the lowest id. A single speaker left is not made the reference by itself;</item>
+/// <item>first run (no per-zone setting yet): the old house reference becomes the reference of its zone; the other zones get none.</item>
 /// </list>
 /// Delays are absolute against the house clock, so re-basing on a new reference keeps every applied delay and only rewrites the stored
 /// offsets (<see cref="Rebase"/>): nothing has to be recalibrated.
@@ -31,9 +33,11 @@ public static class ZoneRefs
         {
             if (ms.Count == 0) continue;
             if (stored != null && stored.TryGetValue(g, out var r) && ms.Contains(r)) { map[g] = r; continue; }
-            long pick = stored == null && houseRef != 0 && ms.Contains(houseRef) ? houseRef : ms.Count == 1 ? ms[0] : Pick(ms.Select(cand));
+            bool hadRef = stored != null && stored.ContainsKey(g);   // the user's reference left this zone
+            long pick = stored == null && houseRef != 0 && ms.Contains(houseRef) ? houseRef : hadRef && ms.Count > 1 ? Pick(ms.Select(cand)) : 0;
+            if (pick == 0) continue;   // 0.6.8 zone fix: never auto-REF a new zone or a lone speaker
             map[g] = pick;
-            if (stored != null && stored.TryGetValue(g, out var old)) ch.Add(new Change(g, old, pick));
+            if (hadRef) ch.Add(new Change(g, stored![g], pick));
         }
         return (map, ch);
     }

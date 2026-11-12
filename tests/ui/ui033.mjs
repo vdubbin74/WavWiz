@@ -5,7 +5,7 @@ const IP = '172.30.0.2', B = `http://${IP}:47800`;
 const sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim();
 const R = []; const ok = (name, pass, info = '') => { R.push({ name, pass, info }); console.log((pass ? 'PASS ' : 'FAIL ') + name + (info ? ' :: ' + info : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-033-${n}.png` });
-const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 900)); } };
 const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
 const ONLY = process.argv[2] || ''; const want = n => !ONLY || ONLY.split(',').includes(n);
@@ -15,8 +15,8 @@ const setPanels = (p, v) => p.evaluate(v => localStorage.setItem('wavwiz.panels'
 const NORMAL = { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'open' };
 
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-const spc = await cb.newContext({ viewport: { width: 1000, height: 700 } }); await spc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
-for (let i = 0; i < 4; i++) { const spx = await cb.newContext({ viewport: { width: 1000, height: 700 } }); await spx.addCookies([{ name: 'unison_session', value: sess, url: B }]); const sp = await spx.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(2500); await sp.mouse.click(500, 350); await sp.waitForTimeout(800); }
+const spc = await cb.newContext({ viewport: { width: 1000, height: 700 } }); await spc.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
+for (let i = 0; i < 4; i++) { const spx = await cb.newContext({ viewport: { width: 1000, height: 700 } }); await spx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); const sp = await spx.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(2500); await sp.mouse.click(500, 350); await sp.waitForTimeout(800); }
 await new Promise(r => setTimeout(r, 2000));
 const zs = await api('/zones?all=1'); const ids = (Array.isArray(zs) ? zs : zs.zones || []).map(z => z.id).filter(Boolean);
 const groups = await api('/groups');
@@ -26,7 +26,7 @@ const gl = await api('/groups'); if (Array.isArray(gl) && gl[1]) await api(`/gro
 console.log('setup', JSON.stringify({ ids, groups: gl }).slice(0, 400));
 
 const ctx = await cb.newContext({ viewport: { width: 1920, height: 1080 } });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.addInitScript(() => { if (!localStorage.getItem('seeded33')) { localStorage.setItem('seeded33', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'open' })); } });
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
 const home = async () => { await p.goto(B + '/'); await p.waitForSelector('.desk', { timeout: 15000 }); await p.waitForTimeout(2000); await closeDlg(p); await p.waitForTimeout(300); };
@@ -152,7 +152,7 @@ if (want('g14')) await step('g14', async () => {
 
 if (want('mini')) await step('mini', async () => {
   for (const [w, hh, n] of [[420, 145, 'main'], [300, 48, 'slim']]) for (const t of ['default', 'pepecoin']) {
-    const mc = await cb.newContext({ viewport: { width: w, height: hh } }); await mc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+    const mc = await cb.newContext({ viewport: { width: w, height: hh } }); await mc.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
     await mc.addInitScript(id => { localStorage.setItem('wavwiz.theme', JSON.stringify({ preset: id })); }, t);
     const mp = await mc.newPage(); const me = []; mp.on('pageerror', e => me.push(e.message)); await mp.goto(B + '/mini.html'); await mp.waitForTimeout(2500);
     if (t === 'pepecoin') await mp.evaluate(async () => { const m = await import('/js/theme.js'); m.applyTheme({ ...m.PRESETS.pepecoin, preset: 'pepecoin' }); });

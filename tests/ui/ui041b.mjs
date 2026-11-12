@@ -9,14 +9,14 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await chromium.launch();
 const DEVEXP = { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' };
 async function page(scale, theme, { panels = null, zone = null, touch = false, w = 1400, h = 900 } = {}) {
-  const ctx = await br.newContext({ viewport: { width: w, height: h }, hasTouch: touch }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: w, height: h }, hasTouch: touch }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(([sc, pn, z]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', sc); if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify(pn));
     if (z) localStorage.setItem('wavwiz.zone', z); if (!sessionStorage.getItem('i41')) { sessionStorage.setItem('i41', '1'); localStorage.removeItem('wavwiz.devorder.v1'); } }, [scale, panels, zone]);
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2000); await p.locator('.phone-unlock').click({ timeout: 800 }).catch(() => {});
   if (theme) await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme);
   await p.waitForTimeout(400); return { ctx, p };
 }
-const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: body ? JSON.stringify(body) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
+const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: body ? JSON.stringify(body) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
 async function reset(zones) {   // zones: [[name, [deviceIds]]]
   for (const g of (await api('/groups')).j || []) await api('/groups/' + g.id, 'DELETE');
   await api('/jukebox/zone', 'PUT', { deviceIds: [] }); const ids = {};

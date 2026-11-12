@@ -136,7 +136,7 @@ public static class ServerFinder
             {
                 using var resp = await http.GetAsync($"http://{h}:{o.HttpPort}/api/v1/auth/state", ct); if (!resp.IsSuccessStatusCode) return;
                 using var d = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct)); var r = d.RootElement;
-                if (!r.TryGetProperty("display", out var disp) || disp.GetString() is not { } dsp || !(dsp.StartsWith("WavWiz", StringComparison.Ordinal) || dsp.StartsWith("Unison", StringComparison.Ordinal))) return;
+                if (!r.TryGetProperty("display", out var disp) || disp.GetString() is not { } dsp || !dsp.StartsWith("WavWiz", StringComparison.Ordinal)) return;
                 add(new ServerBeacon(r.TryGetProperty("serverId", out var sid) ? sid.GetString() ?? "" : "", r.TryGetProperty("serverName", out var sn) ? sn.GetString() ?? h.ToString() : h.ToString(), h.ToString(), o.HttpPort, WavWizInfo.DefaultHttpsPort, WavWizInfo.DefaultAudioPort, r.TryGetProperty("appVersion", out var v) ? v.GetString() ?? "" : ""));
             }
             catch { }

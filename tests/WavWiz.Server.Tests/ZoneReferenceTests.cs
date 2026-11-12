@@ -3,7 +3,8 @@ using System.Text.Json;
 using WavWiz.Server.Zones;
 namespace WavWiz.Server.Tests;
 
-/// <summary>0.6.8-#15: one reference speaker per zone - pick rules, move, swap, removal, delay re-base and migration from the house reference.</summary>
+/// <summary>0.6.8-#15: one reference speaker per zone - pick rules, move, swap, removal, delay re-base and migration from the house reference.
+/// 0.6.8 zone fix: no speaker is the reference until the user picks one (no auto-REF for a new zone or a lone speaker).</summary>
 public class ZoneReferenceTests
 {
     static ZoneRefs.Cand C(long id, bool wired = false, bool on = true, double inst = 0) => new(id, wired, on, inst);
@@ -18,12 +19,24 @@ public class ZoneReferenceTests
     }
 
     [Fact]
-    public void Normalize_migrates_the_house_reference_to_its_zone_and_other_zones_auto_pick()
+    public void Normalize_migrates_the_house_reference_to_its_zone_and_other_zones_get_none()
     {
         var members = new Dictionary<long, List<long>> { [10] = new() { 1, 2 }, [20] = new() { 3, 4 }, [30] = new() { 5 }, [40] = new() };
         var cand = new Dictionary<long, ZoneRefs.Cand> { [1] = C(1), [2] = C(2), [3] = C(3), [4] = C(4, wired: true), [5] = C(5) };
         var (map, ch) = ZoneRefs.Normalize(null, members, id => cand[id], houseRef: 2);
-        Assert.Equal(2, map[10]); Assert.Equal(4, map[20]); Assert.Equal(5, map[30]); Assert.False(map.ContainsKey(40)); Assert.Empty(ch);
+        Assert.Equal(2, map[10]); Assert.Equal(new[] { 10L }, map.Keys.ToArray()); Assert.Empty(ch);   // 20 and the lone speaker of 30 wait for the user
+    }
+
+    [Fact]
+    public void Normalize_never_auto_picks_a_new_zone_or_a_lone_speaker()
+    {
+        // 0.6.8 zone fix: a fresh "Everywhere" with its first speaker, and a new two-speaker zone: no REF until the user picks one
+        var (map, ch) = ZoneRefs.Normalize(new Dictionary<long, long>(), new Dictionary<long, List<long>> { [1] = new() { 7 }, [2] = new() { 8, 9 } }, id => C(id), houseRef: 0);
+        Assert.Empty(map); Assert.Empty(ch);
+        Assert.Empty(ZoneRefs.Normalize(null, new Dictionary<long, List<long>> { [1] = new() { 7 } }, id => C(id), houseRef: 0).Map);   // first run, no house reference
+        // the reference left and only one speaker is left: that speaker is not made the reference by itself
+        (map, ch) = ZoneRefs.Normalize(new Dictionary<long, long> { [1] = 7 }, new Dictionary<long, List<long>> { [1] = new() { 8 } }, id => C(id), houseRef: 0);
+        Assert.Empty(map); Assert.Empty(ch);
     }
 
     [Fact]
@@ -69,14 +82,16 @@ public class ZoneReferenceTests
         var dev = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
         long dA = dev["pc-a"], dB = dev["pc-b"], dC = dev["pc-c"];
 
-        // migration: the old house reference (B) becomes its zone's reference; the other zone auto-picks its only speaker
+        // migration: the old house reference (B) becomes its zone's reference; the other zone gets none (0.6.8 zone fix: no auto-REF of its only speaker)
         S.Zones.ReferenceZoneId = dB; S.Db.DeleteSetting(ZoneRefs.MapKey);
         long living = await MakeZone(admin, "Living", dA, dB), patio = await MakeZone(admin, "Patio", dC);
         S.Db.DeleteSetting(ZoneRefs.MapKey);
-        var g = await Groups(admin); Assert.Equal(dB, RefOf(g["Living"])); Assert.Equal(dC, RefOf(g["Patio"]));
+        var g = await Groups(admin); Assert.Equal(dB, RefOf(g["Living"])); Assert.Null(RefOf(g["Patio"]));
         var zs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("id").GetInt64(), z => z.GetProperty("reference").GetBoolean());
-        Assert.True(zs[dB]); Assert.True(zs[dC]); Assert.False(zs[dA]);   // exactly one reference per zone
-        Assert.Equal(dB, S.Zones.ReferenceFor(dA)); Assert.Equal(dC, S.Zones.ReferenceFor(dC));
+        Assert.True(zs[dB]); Assert.False(zs[dC]); Assert.False(zs[dA]);   // at most one reference per zone, and only one somebody chose
+        Assert.Equal(dB, S.Zones.ReferenceFor(dA));
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{patio}/reference", new { zoneId = dC })).StatusCode);   // the user picks Patio's
+        Assert.Equal(dC, RefOf((await Groups(admin))["Patio"])); Assert.Equal(dC, S.Zones.ReferenceFor(dC));
 
         // saved delays: A 120 ms, B 100 ms (offset of A = +20 against B)
         string Dev(long z) => (string)S.Db.Scalar("SELECT active_output_device_id FROM zone WHERE id=$i", ("$i", z))!;
@@ -90,12 +105,11 @@ public class ZoneReferenceTests
         g = await Groups(admin); Assert.Equal(dA, RefOf(g["Living"])); Assert.Null(Note(g["Living"]));
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PutAsJsonAsync($"/api/v1/groups/{living}/reference", new { zoneId = dC })).StatusCode);   // not its speaker
 
-        // move the reference A into Patio: Patio keeps C, A joins as a regular speaker; Living auto-picks B, re-bases, and shows the quiet note
+        // move the reference A into Patio: Patio keeps C, A joins as a regular speaker; Living has only B left, which is not made the reference by itself
         Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{patio}", new { deviceIds = new[] { dC, dA } })).StatusCode);
         g = await Groups(admin);
-        Assert.Equal(dC, RefOf(g["Patio"])); Assert.Equal(dB, RefOf(g["Living"]));
-        Assert.Equal(ZoneManager.RefNoteText, Note(g["Living"]));   // leftover zone, even with one speaker: offsets were against a different clock
-        Assert.Equal((100.0, 0.0, Dev(dB)), Cal(dB));
+        Assert.Equal(dC, RefOf(g["Patio"])); Assert.Null(RefOf(g["Living"])); Assert.Null(Note(g["Living"]));
+        Assert.Equal((100.0, -20.0, Dev(dA)), Cal(dB));   // nothing re-based: applied delays and offsets as they were
 
         // swap on "yes": A becomes Patio's reference (the legacy "Set as reference" endpoint now targets the speaker's zone)
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/v1/calibration/reference", new { zoneId = dA })).StatusCode);

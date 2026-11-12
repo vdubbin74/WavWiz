@@ -5,7 +5,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
 const br = await chromium.launch();
 for (const [vw, dpr] of [[420, 1], [420, 2], [210, 1], [210, 2], [300, 2]]) { const tg = `[${vw} css @${dpr * 100}%]`;
-  const c = await br.newContext({ viewport: { width: vw, height: 220 }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: 220 }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { window.chrome = { webview: { postMessage: m => (window.__msgs ||= []).push(m), addEventListener() {} } }; });
   const p = await c.newPage(); await p.goto(B + '/mini.html'); await p.waitForTimeout(2500);
   const r = await p.evaluate(() => { const root = document.getElementById('mini'), R = root.getBoundingClientRect(), vw = document.documentElement.clientWidth;

@@ -26,7 +26,7 @@ public class ApiTests
         Assert.Equal(HttpStatusCode.BadRequest, (await f.Http.PostAsJsonAsync("/api/v1/auth/setup", new { password = "short" })).StatusCode);
         var cookie = await f.SetupAdmin("a long enough password");
         Assert.Equal(HttpStatusCode.Conflict, (await f.Http.PostAsJsonAsync("/api/v1/auth/setup", new { password = "another long password" })).StatusCode);   // cannot be re-run by a stranger
-        var req = new HttpRequestMessage(HttpMethod.Get, "/api/v1/status"); req.Headers.Add("Cookie", "unison_session=" + cookie);
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/v1/status"); req.Headers.Add("Cookie", "wavwiz_session=" + cookie);
         var ok = await f.Http.SendAsync(req); Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
         var s = await ok.Json(); Assert.Equal("BETA", s.GetProperty("channel").GetString()); Assert.True(s.GetProperty("beta").GetBoolean());
         for (int i = 0; i < 5; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.PostAsJsonAsync("/api/v1/auth/login", new { password = "wrong" + i })).StatusCode);

@@ -11,7 +11,7 @@ const seed = () => execSync('WWDIR=/tmp/ww032 bash /workspace/seed042.sh', { std
 const br = await chromium.launch();
 const EXP = { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' };
 async function page(o, { theme = null, panels = null, spk = null, zone = null, phone = false } = {}) {
-  const ctx = await br.newContext({ viewport: { width: o.w, height: o.h }, deviceScaleFactor: o.dpr || 1, hasTouch: phone, isMobile: phone }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: o.w, height: o.h }, deviceScaleFactor: o.dpr || 1, hasTouch: phone, isMobile: phone }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(([sc, pn, sp, z]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', sc); if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); if (sp) sessionStorage.setItem('wavwiz.spk', String(sp)); if (z) localStorage.setItem('wavwiz.zone', z); }, [o.scale, panels, spk, zone]);
   const p = await ctx.newPage(); p.on('pageerror', e => ok('no page error: ' + e.message.slice(0, 80), false));
   await p.goto(B + '/'); await p.waitForTimeout(2200); await p.evaluate(() => document.querySelector('.phone-unlock')?.click());

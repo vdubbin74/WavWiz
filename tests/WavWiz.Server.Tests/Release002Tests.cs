@@ -37,7 +37,7 @@ public class RedirectPolicyTests
         Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", true, true, true, false, "x"));
         Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", false, true, false, false, "x"));
         Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", false, true, true, true, "x"));
-        Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", false, true, true, false, "Mozilla/5.0 Edg/120 UnisonPlayer/0.0.2"));
+        Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", false, true, true, false, "Mozilla/5.0 Edg/120 WavWizPlayer/0.6.8"));
         Assert.False(RedirectPolicy.ShouldRedirect("GET", "/", false, true, true, false, "wavwizplayer/1"));
     }
 }
@@ -59,7 +59,7 @@ public class PairingWithRedirectOnTests
         Assert.True((int)page.StatusCode is >= 300 and < 400, "the redirect should be on for a normal browser page: " + page.StatusCode);
         Assert.StartsWith("https://", page.Headers.Location!.ToString());
         // ...but never for the player app's own window, the phone set-up pages or any API
-        var rq = new HttpRequestMessage(HttpMethod.Get, "/"); rq.Headers.UserAgent.ParseAdd("Mozilla/5.0 UnisonPlayer/0.0.2");
+        var rq = new HttpRequestMessage(HttpMethod.Get, "/"); rq.Headers.UserAgent.ParseAdd("Mozilla/5.0 WavWizPlayer/0.6.8");
         Assert.Equal(HttpStatusCode.OK, (await noFollow.SendAsync(rq)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await noFollow.GetAsync("/api/v1/ping")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await noFollow.GetAsync("/api/v1/auth/state")).StatusCode);
@@ -111,8 +111,8 @@ public class DiscoveryTests
     [Fact]
     public void Mdns_host_label_does_not_come_from_a_wildcard_bind()
     {
-        Assert.Equal("unison.local", ServerBeacon.MdnsHostName("0.0.0.0"));
-        Assert.Equal("unison.local", ServerBeacon.MdnsHostName("127.0.0.1"));
+        Assert.Equal("wavwiz.local", ServerBeacon.MdnsHostName("0.0.0.0"));
+        Assert.Equal("wavwiz.local", ServerBeacon.MdnsHostName("127.0.0.1"));
         Assert.Equal("192168120.local", ServerBeacon.MdnsHostName("192.168.1.20"));
         Assert.Equal("mypc.local", ServerBeacon.MdnsHostName("mypc"));
     }

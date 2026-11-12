@@ -52,43 +52,25 @@ public class UiScaleTests
     }
 }
 
-public class LegacyFolderTests
-{
-    [Fact]
-    public void The_0_0_2_player_folder_is_copied_once_and_left_in_place()
-    {
-        using var t = new TempDir(); var oldDir = Path.Combine(t.Path, "Unison"); Directory.CreateDirectory(Path.Combine(oldDir, "logs")); Directory.CreateDirectory(Path.Combine(oldDir, "webview"));
-        File.WriteAllText(Path.Combine(oldDir, "player.json"), "{\"serverHost\":\"192.168.1.5\"}"); File.WriteAllText(Path.Combine(oldDir, "token.dpapi"), "x"); File.WriteAllText(Path.Combine(oldDir, "logs", "player.log"), "hi"); File.WriteAllText(Path.Combine(oldDir, "webview", "junk"), "x");
-        Assert.True(LegacyFolder.Migrate(t.Path));
-        var nd = Path.Combine(t.Path, "WavWiz");
-        Assert.Contains("192.168.1.5", File.ReadAllText(Path.Combine(nd, "player.json"))); Assert.True(File.Exists(Path.Combine(nd, "token.dpapi"))); Assert.True(File.Exists(Path.Combine(nd, "logs", "player.log")));
-        Assert.False(Directory.Exists(Path.Combine(nd, "webview"))); Assert.True(File.Exists(Path.Combine(oldDir, "player.json")));
-        File.WriteAllText(Path.Combine(nd, "player.json"), "{\"serverHost\":\"NEW\"}");
-        Assert.False(LegacyFolder.Migrate(t.Path));      // idempotent: never overwrites the new settings
-        Assert.Contains("NEW", File.ReadAllText(Path.Combine(nd, "player.json")));
-    }
-    [Fact] public void Nothing_to_migrate_is_fine() { using var t = new TempDir(); Assert.False(LegacyFolder.Migrate(t.Path)); }
-}
-
 public class WireCompatibilityTests
 {
     [Fact]
-    public void Identifiers_that_0_0_2_players_look_for_are_unchanged()
+    public void Discovery_identifiers_say_wavwiz()
     {
-        Assert.Equal("UNISON?1", ServerBeacon.Probe);
+        Assert.Equal("WAVWIZ?1", ServerBeacon.Probe);
         var b = new ServerBeacon("id", "n", "10.0.0.2", 8180, 8443, 8181, "0.0.3");
         var json = System.Text.Encoding.UTF8.GetString(b.ToUdp());
-        Assert.Contains("\"app\":\"unison\"", json); Assert.NotNull(ServerBeacon.FromUdp(System.Text.Encoding.UTF8.GetBytes("{\"app\":\"unison\",\"v\":1,\"id\":\"a\",\"name\":\"b\",\"host\":\"1.2.3.4\",\"httpPort\":8180,\"audioPort\":8181}"), IPAddress.Parse("1.2.3.4")));
-        Assert.Equal("_unison._tcp", WavWizInfo.MdnsService);
+        Assert.Contains("\"app\":\"wavwiz\"", json); Assert.NotNull(ServerBeacon.FromUdp(System.Text.Encoding.UTF8.GetBytes("{\"app\":\"wavwiz\",\"v\":1,\"id\":\"a\",\"name\":\"b\",\"host\":\"1.2.3.4\",\"httpPort\":8180,\"audioPort\":8181}"), IPAddress.Parse("1.2.3.4")));
+        Assert.Equal("_wavwiz._tcp", WavWizInfo.MdnsService);
     }
 
     [Fact]
-    public async Task Ping_and_discover_still_say_app_unison_and_a_0_0_2_style_pairing_still_works()
+    public async Task Ping_says_app_wavwiz_and_a_player_can_pair()
     {
         await using var f = await ServerFixture.StartAsync();
-        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("wavwiz", ping.GetProperty("app").GetString());   // 0.2.4: was "unison"; pages and players accept both
+        var ping = await f.Http.GetJson("/api/v1/ping"); Assert.Equal("wavwiz", ping.GetProperty("app").GetString());
         await f.SetupAdmin();
-        var r = await f.Http.PostAsJsonAsync("/api/v1/auth/pair-player", new { playerId = "old-player", name = "Old PC" }); r.EnsureSuccessStatusCode();     // same body a 0.0.2 PairingClient sends
+        var r = await f.Http.PostAsJsonAsync("/api/v1/auth/pair-player", new { playerId = "old-player", name = "Old PC" }); r.EnsureSuccessStatusCode();
         Assert.False(string.IsNullOrEmpty((await r.Json()).GetProperty("token").GetString()));
     }
 }
@@ -115,11 +97,11 @@ public class ZonesAndForgetTests
         var upd = await admin.PatchAsJsonAsync($"/api/v1/groups/{gid}", new { name = "Ground floor", deviceIds = new[] { ida, idb } }); upd.EnsureSuccessStatusCode();
         Assert.Equal(2, (await upd.Json()).GetProperty("members").GetInt32());
         (await admin.PostAsync($"/api/v1/groups/{gid}/activate", null)).EnsureSuccessStatusCode();
-        var gs = await admin.GetJson("/api/v1/groups"); Assert.True(gs.EnumerateArray().First().GetProperty("active").GetBoolean());
+        var gs = await admin.GetJson("/api/v1/groups"); Assert.True(gs.EnumerateArray().First(x => x.GetProperty("id").GetInt64() == gid).GetProperty("active").GetBoolean());
         // a device that is in no zone is "unassigned"
         var zs = await admin.GetJson("/api/v1/zones"); Assert.All(zs.EnumerateArray(), z => Assert.Contains(gid, z.GetProperty("groupIds").EnumerateArray().Select(x => x.GetInt64())));
         Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
-        Assert.Empty((await admin.GetJson("/api/v1/groups")).EnumerateArray());
+        Assert.DoesNotContain((await admin.GetJson("/api/v1/groups")).EnumerateArray(), x => x.GetProperty("id").GetInt64() == gid);   // (the fresh setup's "Everywhere" zone stays)
         zs = await admin.GetJson("/api/v1/zones"); Assert.Equal(2, zs.GetArrayLength()); Assert.All(zs.EnumerateArray(), z => Assert.Equal(0, z.GetProperty("groupIds").GetArrayLength()));       // devices are untouched
         Assert.Equal(HttpStatusCode.NotFound, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
     }
@@ -151,7 +133,7 @@ public class ZonesAndForgetTests
         var sw = System.Diagnostics.Stopwatch.StartNew(); while (!a.Client.State.NotPaired && sw.ElapsedMilliseconds < 8000) await Task.Delay(50);
         Assert.True(a.Client.State.NotPaired, "the running player must learn that it was removed"); Assert.Equal("notpaired", a.Client.State.Health);
         var zs = await admin.GetJson("/api/v1/zones"); Assert.Equal(new[] { "pc-b" }, zs.EnumerateArray().Select(z => z.GetProperty("playerId").GetString()!).ToArray());
-        var gs = await admin.GetJson("/api/v1/groups"); Assert.Equal(1, gs.EnumerateArray().First().GetProperty("members").GetInt32());
+        var gs = await admin.GetJson("/api/v1/groups"); Assert.Equal(1, gs.EnumerateArray().First(x => x.GetProperty("name").GetString() == "Both").GetProperty("members").GetInt32());
         await Task.Delay(1500); Assert.True(a.Client.State.NotPaired); Assert.False(a.Client.State.Connected);      // it stopped retrying; it does not come back by itself
         Assert.Equal(1, (await admin.GetJson("/api/v1/zones")).GetArrayLength());
         // its old token is dead

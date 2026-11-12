@@ -1,7 +1,7 @@
 // 0.4.8 F55: standalone mini at 100/150/200% - nothing clipped, small corner title-bar buttons
 import { chromium } from 'playwright'; import { readFileSync, mkdirSync } from 'node:fs';
 const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').trim(), TAG=process.env.TAG||'after', D='/workspace/screens/055/'+TAG; mkdirSync(D,{recursive:true}); const br=await chromium.launch(); const out=[]; let fails=0; const ok=(n,c,x='')=>{ if(!c) fails++; console.log((c?'ok   ':'FAIL ')+n+(c?'':'  '+x)); };
-for (const [z,dpr] of [['100',1],['150',1.5],['200',2]]) { const W=Math.round(330/ (z==='200'?1:1)); const c=await br.newContext({viewport:{width:W,height:150},deviceScaleFactor:dpr}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+for (const [z,dpr] of [['100',1],['150',1.5],['200',2]]) { const W=Math.round(330/ (z==='200'?1:1)); const c=await br.newContext({viewport:{width:W,height:150},deviceScaleFactor:dpr}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(()=>{ window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: m => { (window.__sent ||= []).push(m); }, addEventListener: () => {}, removeEventListener: () => {} }; });
  const p=await c.newPage(); await p.goto(B+'/mini.html?slim=0'); await p.waitForTimeout(2500);
  const r=await p.evaluate(()=>{const vw=innerWidth, R=e=>e?.getBoundingClientRect(); const q=s=>document.querySelector(s); const sel=['.mp-pin','.mp-side button:nth-child(2)','.mp-x','.mp-tr .next','.mp-vol .pct'];

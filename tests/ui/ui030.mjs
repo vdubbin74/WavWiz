@@ -4,20 +4,20 @@ const IP = '172.30.0.2', B = `http://${IP}:47800`, BS = `https://${IP}:47443`;
 const sess = readFileSync('/tmp/ww030/sess', 'utf8').trim();
 const R = []; const ok = (name, pass, info = '') => { R.push({ name, pass, info }); console.log((pass ? 'PASS ' : 'FAIL ') + name + (info ? ' :: ' + info : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-030-${n}.png` });
-const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return r.json().catch(() => ({})); };
+const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return r.json().catch(() => ({})); };
 const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 1500)); } };
 const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
 const ONLY = process.argv[2] || '';
 const want = n => !ONLY || ONLY.split(',').includes(n);
 
 const sp = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-const spc = await sp.newContext({ viewport: { width: 1200, height: 800 } }); await spc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
-const spc2 = await sp.newContext(); await spc2.addCookies([{ name: 'unison_session', value: sess, url: B }]); const sp2 = await spc2.newPage(); await sp2.goto(B + '/'); await sp2.waitForTimeout(3000); await sp2.mouse.click(600, 400);
+const spc = await sp.newContext({ viewport: { width: 1200, height: 800 } }); await spc.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
+const spc2 = await sp.newContext(); await spc2.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); const sp2 = await spc2.newPage(); await sp2.goto(B + '/'); await sp2.waitForTimeout(3000); await sp2.mouse.click(600, 400);
 const speaker = await spc.newPage(); await speaker.goto(B + '/'); await speaker.waitForTimeout(4000); await speaker.mouse.click(600, 400); await speaker.waitForTimeout(2000);
 { const tr = await api('/library/search?q=song'); await api('/stream/play', 'POST', { kind: 'tracks', ids: tr.map(x => x.id) }); await speaker.waitForTimeout(2500); console.log('zones', JSON.stringify((await api('/zones?all=1')).map(z => [z.name, z.connected]))); }
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 const ctx = await cb.newContext({ viewport: { width: 1400, height: 900 } });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.addInitScript(() => { if (!localStorage.getItem('seeded')) { localStorage.setItem('seeded', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.center.v1', 'viz'); localStorage.setItem('wavwiz.devsize', 'standard'); } });
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
 await step('smoke', async () => {
@@ -125,7 +125,7 @@ if (want('remote')) await step('remote', async () => {
   await r.evaluate(() => localStorage.setItem('wavwiz.remoteMode', '0')); await r.close();
 });
 if (want('phone')) await step('phone-sheet', async () => {
-  const pc = await cb.newContext({ ...devices['iPhone 13'] }); await pc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const pc = await cb.newContext({ ...devices['iPhone 13'] }); await pc.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await pc.addInitScript(() => { localStorage.setItem('wavwiz.phoneRole', 'speaker'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
   const ph = await pc.newPage(); await ph.goto(B + '/'); await ph.waitForTimeout(2500); await closeDlg(ph);
   await ph.evaluate(async () => { const m = await import('/js/main.js'); m.go('scenes'); }); await ph.waitForTimeout(1200); await shot(ph, 'scenes-phone');

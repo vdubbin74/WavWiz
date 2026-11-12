@@ -9,7 +9,7 @@ const CASES = [[1280, 820, 1, 'compact', true, 'Player window 1280'], [1280, 820
   [2560, 1440, 1, 'compact', true, 'Roomy on 2560', 'roomy'], [1920, 1080, 2, 'compact', false, 'Full on the 4K TV @200%', 'full'], [1280, 820, 1, 'compact', false, 'Full on 1280', 'full'],
   [1920, 1080, 2, 'compact', false, 'no saved setting = Full (4K TV @200%)', null], [1280, 820, 1, 'compact', false, 'no saved setting = Full (1280)', null]];
 for (const [w, hh, d, sc, want, n, lay = 'auto'] of CASES) {
-  const c = await br.newContext({ viewport: { width: w, height: hh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: w, height: hh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([sc, lay]) => { if (lay) localStorage.setItem('wavwiz.layout', lay); else localStorage.removeItem('wavwiz.layout'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.uiscale', sc);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [sc, lay]);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2600); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close()));
@@ -31,14 +31,14 @@ for (const [w, hh, d, sc, want, n, lay = 'auto'] of CASES) {
   await c.close();
 }
 // T1c: in the default Full layout the right Devices column runs full height (0.4.4): top = Library top, bottom = the player bar's bottom edge; in Roomy the tab does too
-for (const [d, lay] of [[1, null], [2, null], [2, 'roomy'], [1, 'roomy']]) { const c = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+for (const [d, lay] of [[1, null], [2, null], [2, 'roomy'], [1, 'roomy']]) { const c = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(l => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.removeItem('wavwiz.panels'); if (l) localStorage.setItem('wavwiz.layout', l); else localStorage.removeItem('wavwiz.layout'); }, lay);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500);
   const m = await p.evaluate(() => { const b = s => document.querySelector(s)?.getBoundingClientRect(); const col = document.querySelector('.desk').classList.contains('tight') ? b('.devtab') : b('.devpanel'); return { top: col?.top, bot: col?.bottom, libTop: b('.libpanel')?.top, barBot: b('.np-ctlpanel')?.bottom, q: b('.listpanel')?.top }; });
   ok(`[T1c ${lay || 'default'} dpr${d}] right column full height: ${Math.round(m.top)}-${Math.round(m.bot)} vs library top ${Math.round(m.libTop)} / player bar bottom ${Math.round(m.barBot)} (queue top ${Math.round(m.q)})`, Math.abs(m.bot - m.barBot) <= 1 && Math.abs(m.top - m.libTop) <= 1);
   await c.close(); }
 // the setting itself: picking Roomy / Full re-lays out at once, Auto returns to the rule
-{ const c = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+{ const c = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.removeItem('wavwiz.layout'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(async () => (await import('/js/main.js')).go('settings:theme')); await p.waitForTimeout(900);
   const tight = () => p.evaluate(() => document.querySelector('.desk').classList.contains('tight'));
