@@ -5609,3 +5609,8 @@ input[type=range]:not(.npcolor-range)::-moz-range-progress{background:transparen
 .np-phone-full .np-xrow-pc>:is(.npsleep-ic,.tbtn):hover,.np-phone-full .np-xrow-pc .np-xpins>.scbtn:hover{border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
 .np-phone-full .np-xrow-pc .np-xpins{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;margin:0;padding:0;border:0;background:none}
 .np-phone-full .np-xrow-pc .np-xpins>.scsep{display:none}
+/* ---- 0.6.9 #18: caption buttons keep Windows' size at every Display size and DPI (46 px on screen, glyph 10 px), maximized or not;
+   the strip width comes from titlebar.js as calc(n x 46px / var(--z)) - computed, never measured back (that loop scrunched them). */
+html.wtb .wtb-btn{flex:0 0 calc(46px / var(--z,1));width:calc(46px / var(--z,1));min-width:calc(46px / var(--z,1))}
+html.wtb .wtb-g{font-size:calc(10px / var(--z,1))}
+html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}

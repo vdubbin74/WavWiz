@@ -266,7 +266,7 @@ public sealed class WebUiForm : Form
             // Maximized / top-snapped windows hang the frame off the work-area edge; that geometry is the real signal.
             int ww = Math.Max(1, before.Right - before.Left), wh = Math.Max(1, before.Bottom - before.Top);
             int workTop = Screen.FromRectangle(new Rectangle(before.Left, before.Top, ww, wh)).WorkingArea.Top;
-            after.Top = TitleBar.ClientTop(before.Top, workTop, GetSystemMetrics(SM_CYFRAME), GetSystemMetrics(SM_CXPADDEDBORDER));
+            after.Top = TitleBar.ClientTop(before.Top, workTop, MetricForWindow(SM_CYFRAME), MetricForWindow(SM_CXPADDEDBORDER));   // 0.6.9 #18: this window's monitor DPI
             System.Runtime.InteropServices.Marshal.StructureToPtr(after, m.LParam, false);
             m.Result = IntPtr.Zero; return;
         }
@@ -277,6 +277,16 @@ public sealed class WebUiForm : Form
     private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_FRAMECHANGED = 0x0020;
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    // 0.6.9 #18: GetSystemMetrics answers for the SYSTEM DPI; this PerMonitorV2 window on a 200 % monitor (or after moving between monitors) needs
+    // the frame size at its own DPI, else the maximized client top is off and the page's title bar is clipped. Windows 10 1607+; older -> fallback.
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetricsForDpi(int index, uint dpi);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
+    private int MetricForWindow(int index)
+    {
+        try { var dpi = GetDpiForWindow(Handle); if (dpi > 0) return GetSystemMetricsForDpi(index, dpi); }
+        catch (EntryPointNotFoundException) { }
+        return GetSystemMetrics(index);
+    }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     protected override void OnHandleCreated(EventArgs e)
     {
