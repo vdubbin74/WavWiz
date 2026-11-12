@@ -15,7 +15,7 @@ export function radioTab(S, act) {
     h('section', { class: 'radcol radsaved', 'aria-label': 'My stations' }, h('div', { class: 'sec' }, 'My stations ', h('span', { class: 'cnt' })), mine, adds),
     h('section', { class: 'radcol radfind' }, finder.el));
 
-  let openKey = null, filter = '';   // 0.6.9 #4: the Library search box filters My stations by name / genre
+  let openKey = null; let filter = '';   // 0.6.9 #4: the Library search box filters My stations by name / genre
   function drawAdds() {
     if (!canControl(S)) { adds.replaceChildren(); return; }
     const forms = {
