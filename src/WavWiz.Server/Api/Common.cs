@@ -72,5 +72,5 @@ public static class Ext
     }
 
     public static void SetSession(this HttpContext c, string token, int days = 30)
-        => c.Response.Cookies.Append("unison_session", token, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/", Secure = c.Request.IsHttps, MaxAge = TimeSpan.FromDays(days) });
+        => c.Response.Cookies.Append("wavwiz_session", token, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/", Secure = c.Request.IsHttps, MaxAge = TimeSpan.FromDays(days) });
 }

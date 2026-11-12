@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim();
 const br = await chromium.launch();
 const ctx = await br.newContext({ viewport: { width: 1920, height: 1080 } });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.addInitScript(() => {
   localStorage.setItem('wavwiz.whatsnew', '9.9.9');
   localStorage.setItem('wavwiz.gettingStarted.shown', '1');

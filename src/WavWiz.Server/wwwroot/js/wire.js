@@ -1,5 +1,5 @@
 // WavWiz audio-channel wire frames in the browser (same bytes the Windows player speaks). Pure functions: unit-tested with node.
-export const MAGIC = [0x55, 0x4E, 0x53, 0x4E];   // 'UNSN'
+export const MAGIC = [0x57, 0x56, 0x57, 0x5A];   // 'WVWZ'
 export const HEADER = 16;
 export const MSG = { Hello: 1, Welcome: 2, Audio: 3, Epoch: 4, StopAt: 5, ZoneUpdate: 6, PlayerStatus: 7, CalCmd: 8, CalResult: 9, Bye: 10, Outputs: 11, DspConfig: 12 };
 const MAX_PAYLOAD = 1 << 20;

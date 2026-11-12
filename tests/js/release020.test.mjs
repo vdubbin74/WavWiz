@@ -91,15 +91,11 @@ test('0.2.0 items 11 + 24 + 2: Help > Getting started opens the Getting started 
   assert.match(g, /An administrator adds music folders/);                                    // read-only guidance for non-admins
 });
 
-test('0.2.0 item 12: unison.* keys move to wavwiz.* once (checklist, web speaker, theme, visualizer)', async () => {
+test('0.2.0 item 12: local settings use wavwiz.* keys (checklist, web speaker, theme, visualizer)', async () => {
   const st = memStore(); globalThis.localStorage = st;
-  st.setItem('unison.checklist.dismissed', '1');
-  const d = await imp('diag'); assert.equal(d.checklistDismissedLocal(), true); assert.equal(st.getItem('wavwiz.checklist.dismissed'), '1'); assert.equal(st.getItem('unison.checklist.dismissed'), null);
-  const pj = await imp('phonejoin');
-  st.setItem('unison.webRoom.id', 'web-abc'); assert.equal(pj.migrateKey(st, 'unison.webRoom.id', 'wavwiz.webRoom.id'), 'web-abc'); assert.equal(st.getItem('wavwiz.webRoom.id'), 'web-abc');
-  st.setItem('unison.webRoom.id', 'web-old'); assert.equal(pj.migrateKey(st, 'unison.webRoom.id', 'wavwiz.webRoom.id'), 'web-abc');   // new key wins
+  const d = await imp('diag'); assert.equal(d.checklistDismissedLocal(), false);
+  st.setItem('wavwiz.checklist.dismissed', '1'); assert.equal(d.checklistDismissedLocal(), true);
   assert.match(src('theme.js'), /'wavwiz\.theme\.v1'/); assert.match(src('viz.js'), /'wavwiz\.viz\.v1'/); assert.match(src('room.js'), /'wavwiz\.webRoom\.id'/);
-  for (const f of ['main.js', 'now.js', 'devices.js', 'settings.js']) assert.doesNotMatch(src(f), /'unison\./, f);
 });
 
 test('0.2.0 item 31 + 28: File > Sign in as admin… / Leave admin mode, Admin chip, admin-only menu items read-only (never hidden)', () => {

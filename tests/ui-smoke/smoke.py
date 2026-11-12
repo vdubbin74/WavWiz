@@ -40,7 +40,6 @@ try:
     check(ev("!!document.querySelector('link[rel=icon]')"), 'favicon still present for icons')
     check('BETA 0.0.4' in (ev('document.body.innerText') or '') and 'Classic Amber' not in (ev('document.documentElement.outerHTML') or '') and 'Browns' not in (ev('document.documentElement.outerHTML') or ''), 'BETA 0.0.4 shown, Classic Amber gone')
     check(wait("document.title.includes('WavWiz')"), 'window title says WavWiz')
-    check(not ev("/Unison/.test(document.body.innerText)"), 'no "Unison" in the visible UI')
     check(not ev("/\\broom(s)?\\b/i.test(document.body.innerText)"), 'no "Room(s)" wording in the visible UI')
     shot('desktop-idle.png')
 

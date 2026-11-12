@@ -7,7 +7,7 @@ mkdirSync(OUT, { recursive: true });
 const NAMES = { 5: 'PCBOXV2', 1: 'PCBOXV3D', 2: "Vince's iPhone 15 Pro Max (Living Room)" };
 const br = await chromium.launch();
 for (const [z, vw, vh, dpr, u] of [['100', 1920, 1080, 1, 'compact'], ['200-tiny', 960, 540, 2, 'tiny'], ['phone', 390, 844, 3, 'compact']]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: z === 'phone', hasTouch: z === 'phone' }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: z === 'phone', hasTouch: z === 'phone' }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(u => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.uiscale', u); localStorage.setItem('wavwiz.layout', 'full'); }, u);
   await c.route(/\/api\/v1\/zones(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json();
     for (const x of j) { if (NAMES[x.id]) x.name = NAMES[x.id]; x.connected = x.id !== 1;

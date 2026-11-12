@@ -5,7 +5,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
 const br = await chromium.launch();
 for (const [vw, vh, d, scale, tag] of (process.env.OPENDEV ? [[1280, 820, 1, 'compact', '100'], [1280, 820, 2, 'compact', '200']] : [[1920, 1080, 1, 'compact', '100'], [960, 540, 2, 'compact', '200'], [1920, 1080, 1, 'large', 'size125']])) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(sc => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.uiscale', sc);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, scale);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(3000); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close()));

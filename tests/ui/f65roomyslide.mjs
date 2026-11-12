@@ -11,7 +11,7 @@ const st = () => { const q = s => document.querySelector(s), R = e => e.getBound
     center: Math.round(parseFloat(getComputedStyle(d).gridTemplateColumns.split(' ')[1]) || 0), tf: cs.transform, scrim: !!sc && getComputedStyle(sc).display !== 'none', body: !!dp.querySelector('.devbody')?.offsetParent, np, deskBottom: Math.round(R(d).bottom) }; };
 const br = await chromium.launch();
 for (const [vw, vh, dpr, scale, z] of [[1920, 1080, 1, 'compact', '100'], [960, 540, 2, 'tiny', '200-tiny']]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(sc => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f65')) return; sessionStorage.setItem('f65', '1'); localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.layout', 'roomy');
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, scale);

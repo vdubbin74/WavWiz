@@ -4,7 +4,7 @@ const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').t
 let fails=0; const ok=(n,c,x='')=>{ if(!c) fails++; console.log((c?'ok   ':'FAIL ')+n+' '+x); };
 const br=await chromium.launch();
 for (const theme of ['default','arctic']) {
- const c=await br.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true,isMobile:true}); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+ const c=await br.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true,isMobile:true}); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(t=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');localStorage.setItem('wavwiz.webRoom.autojoin','0');if(t!=='default')localStorage.setItem('wavwiz.theme',t);},theme);
  await c.route('**/api/v1/zones', async r => { const res = await r.fetch(); let j = await res.json(); if (Array.isArray(j)) j = j.map(z => z.name === 'Office Desk' ? { ...z, connected: true, outputs: (z.outputs||[]).map(o => ({ ...o, connected: true, active: true })) } : z); await r.fulfill({ response: res, json: j }); });
  const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(3000); await p.evaluate(()=>document.querySelectorAll('dialog[open],.phone-unlock').forEach(e=>e.close?.()||e.remove()));

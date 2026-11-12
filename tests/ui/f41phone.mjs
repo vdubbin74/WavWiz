@@ -6,7 +6,7 @@ const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) con
 const br = await webkit.launch();
 for (const mode of ['safari', 'standalone']) for (const how of ['done', 'back', 'zone']) {
   const c = await br.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([mode]) => { if (mode === 'standalone') { Object.defineProperty(navigator, 'standalone', { get: () => true }); const mm = window.matchMedia.bind(window);
       window.matchMedia = q => /display-mode:\s*standalone/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false } : mm(q); }
     if (sessionStorage.getItem('f41')) return; sessionStorage.setItem('f41', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); }, [mode]);

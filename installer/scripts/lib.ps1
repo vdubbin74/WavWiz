@@ -48,20 +48,6 @@ function Read-TextFile([string]$Path) { return ([IO.File]::ReadAllText($Path)).T
 # ---- install log + steps (C:\ProgramData\WavWiz\install.log). Never write secrets here.
 $script:InstallLog = $null; $script:CurrentStep = ''; $script:CurrentStepStart = $null
 function Get-WavWizDataRoot { $pd = $env:ProgramData; if (-not $pd) { $pd = 'C:\ProgramData' }; return (Join-Path $pd 'WavWiz') }
-# 0.1.2: rename unison.db -> wavwiz.db on upgrade (library + password kept). Idempotent.
-function Rename-WavWizLibraryDb([string]$DataDir) {
-    if (-not $DataDir) { return }
-    $neu = Join-Path $DataDir 'wavwiz.db'; $old = Join-Path $DataDir 'unison.db'
-    if ((Test-Path -LiteralPath $neu) -or -not (Test-Path -LiteralPath $old)) { return }
-    try {
-        Move-Item -LiteralPath $old -Destination $neu -Force
-        foreach ($s in '-wal', '-shm') {
-            $os = $old + $s; $ns = $neu + $s
-            if ((Test-Path -LiteralPath $os) -and -not (Test-Path -LiteralPath $ns)) { Move-Item -LiteralPath $os -Destination $ns -Force }
-        }
-        Say "Renamed library database to wavwiz.db (your music library and password were kept)."
-    } catch { Write-InstallLog ("Rename-WavWizLibraryDb: " + $_.Exception.Message) }
-}
 function Get-StepFile { return (Join-Path (Get-WavWizDataRoot) 'current-step.txt') }
 function Start-InstallLog([string]$Name = 'install.log') {
     $dir = Get-WavWizDataRoot
@@ -961,17 +947,6 @@ function Get-PreflightReport([string]$Root, [string]$Role) {
     return [pscustomobject]@{ Problems = $problems.ToArray(); Notes = $notes.ToArray() }
 }
 
-# ---- 0.0.3: in-place upgrade from "Unison" (0.0.1 / 0.0.2) to WavWiz -------------------------------------------------------------------------------------------
-# Unison 0.0.x used the names: service UnisonServer, folder %ProgramData%\Unison, firewall rules "Unison Server (web, audio, clock)" (+ " (UDP)"), Run value UnisonPlayer,
-# install folder ...\Unison with its own Inno uninstall entry. WavWiz is a NEW installer identity, so Setup cannot upgrade in place by itself: this function moves everything over.
-# Rules: (1) nothing the person owns is ever deleted before it is safely in its new place; (2) every step is best-effort and logged; (3) running it again changes nothing;
-# (4) the database, certificates, tokens, settings, admin password and library stay exactly as they were (certificates keep legacy names such as unison-root-ca.crt; 0.1.2 renames unison.db -> wavwiz.db).
-$script:LegacyServiceName = 'UnisonServer'
-$script:LegacyFirewallNames = @('Unison Server (web, audio, clock)')
-$script:LegacyUninstallSubKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1'
-$script:RunSubKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
-function Get-LegacyDataRoot { $pd = $env:ProgramData; if (-not $pd) { $pd = 'C:\ProgramData' }; return (Join-Path $pd 'Unison') }
-
 # machine registry access: the real registry on Windows; a tiny text file ($WAVWIZ_TEST_STATE\registry.txt, lines "subkey|name|value") under the test shim
 function Get-RegFile { return (Join-Path $env:WAVWIZ_TEST_STATE 'registry.txt') }
 function Read-RegLines { $f = Get-RegFile; if (Test-Path -LiteralPath $f) { return @(Get-Content -LiteralPath $f) } else { return @() } }
@@ -1017,13 +992,12 @@ function Set-MachineRegValue([string]$SubKey, [string]$Name, [string]$Value) {
     try { $k.SetValue($Name, $Value, [Microsoft.Win32.RegistryValueKind]::String) } finally { $k.Close() }
 }
 
-# ---- F173: only ONE Apps & features entry. Stray WavWiz / Unison uninstall keys with another AppId (HKLM 64/32 + HKCU) are removed on install/upgrade. ----
+# ---- F173: only ONE Apps & features entry. Stray WavWiz uninstall keys with another AppId (HKLM 64/32 + HKCU) are removed on install/upgrade. ----
 $script:WavWizAppKey = '{B5C2D7E1-4F3A-4B8E-9C61-57415657495A}_is1'
 $script:UninstallRoot = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
 function Test-StrayWavWizArp([string]$KeyName, [string]$DisplayName) {
     if ($KeyName -ieq $script:WavWizAppKey) { return $false }
-    if ($KeyName -ieq '{B5C2D7E1-4F3A-4B8E-9C61-554E49534F4E}_is1') { return $true }
-    return [bool]($DisplayName -match '^\s*(WavWiz|Unison)(\s|$|\()')
+    return [bool]($DisplayName -match '^\s*WavWiz(\s|$|\()')
 }
 function Remove-StrayWavWizArp {
     $removed = New-Object System.Collections.Generic.List[string]
@@ -1053,113 +1027,3 @@ function Remove-StrayWavWizArp {
     return $removed.ToArray()
 }
 
-# is this folder really an old Unison install (and not, say, the new install or a folder the person happens to have)?
-function Test-LegacyInstallDir([string]$Dir, [string]$NewRoot) {
-    if (-not $Dir -or -not (Test-Path -LiteralPath $Dir -PathType Container)) { return $false }
-    $full = [IO.Path]::GetFullPath($Dir).TrimEnd('\', '/')
-    if ($NewRoot -and ($full -eq [IO.Path]::GetFullPath($NewRoot).TrimEnd('\', '/'))) { return $false }
-    if ($full.Length -le 3) { return $false }
-    foreach ($m in 'unins000.exe', 'Server\unison-server.exe', 'Server/unison-server.exe', 'Player\unison-player.exe', 'Player/unison-player.exe') { if (Test-Path -LiteralPath (Join-Path $Dir $m)) { return $true } }
-    return $false
-}
-
-# Moves everything in $From into $To without overwriting: a name that already exists in $To is kept there and the old one is renamed "<name>.from-unison".
-function Merge-LegacyFolder([string]$From, [string]$To) {
-    $moved = 0; $renamed = 0
-    New-Item -ItemType Directory -Force -Path $To | Out-Null
-    foreach ($item in @(Get-ChildItem -LiteralPath $From -Force)) {
-        $dest = Join-Path $To $item.Name
-        if (Test-Path -LiteralPath $dest) {
-            if ($item.PSIsContainer) {
-                [void](Merge-LegacyFolder -From $item.FullName -To $dest)   # sub-folders (logs\, artcache\) are merged the same way
-                continue
-            }
-            $dest = $dest + '.from-unison'; $i = 1; while (Test-Path -LiteralPath $dest) { $i++; $dest = (Join-Path $To $item.Name) + '.from-unison' + $i }
-            $renamed++
-        }
-        Move-Item -LiteralPath $item.FullName -Destination $dest -Force
-        $moved++
-    }
-    if (@(Get-ChildItem -LiteralPath $From -Force).Count -eq 0) { Remove-Item -LiteralPath $From -Force }
-    return [pscustomobject]@{ Moved = $moved; Renamed = $renamed }
-}
-
-function Test-LegacyPresent([string]$NewRoot) {
-    if (Test-ServiceExists $script:LegacyServiceName) { return $true }
-    if (Test-Path -LiteralPath (Get-LegacyDataRoot) -PathType Container) { return $true }
-    if (Test-MachineRegKey $script:LegacyUninstallSubKey) { return $true }
-    if ($null -ne (Get-MachineRegValue $script:RunSubKey 'UnisonPlayer')) { return $true }
-    return $false
-}
-
-function Invoke-LegacyMigration {
-    [CmdletBinding()]
-    param([string]$NewRoot = '')
-    $notes = New-Object System.Collections.Generic.List[string]
-    if (-not (Test-LegacyPresent $NewRoot)) { Say 'Upgrade check: no earlier "Unison" installation found (nothing to migrate).'; return [pscustomobject]@{ Found = $false; Notes = $notes.ToArray() } }
-    Say 'Upgrade: an earlier "Unison" installation was found. Moving it to WavWiz (your music library, settings, administrator password and paired players are kept).'
-    $oldDir = Get-MachineRegValue $script:LegacyUninstallSubKey 'InstallLocation'
-    if ($oldDir) { $oldDir = $oldDir.TrimEnd('\') }
-
-    # 1. the old service and programs
-    try {
-        Set-Step 'upgrade: stopping the old Unison service'
-        if (Test-ServiceExists $script:LegacyServiceName) {
-            if ((Get-ServiceState $script:LegacyServiceName) -ne 'STOPPED') { [void](Invoke-Sc 'stop legacy' @('stop', $script:LegacyServiceName) -AllowFail); [void](Wait-ServiceState $script:LegacyServiceName 'STOPPED' 40) }
-            [void](Invoke-Sc 'delete legacy' @('delete', $script:LegacyServiceName) -AllowFail); Say 'Old service UnisonServer removed.'
-        }
-        foreach ($exe in 'unison-server.exe', 'unison-player.exe') { [void](Invoke-Native -File (Get-SystemTool 'taskkill.exe') -ArgList @('/F', '/IM', $exe) -Label "taskkill $exe" -AllowFail -TimeoutSec 30) }
-        Start-Sleep -Milliseconds 400
-    } catch { $notes.Add("Could not fully stop the old Unison service: $($_.Exception.Message)"); Say $notes[$notes.Count - 1] }
-
-    # 2. the old firewall rules (the new ones are added by the server install)
-    try {
-        Set-Step 'upgrade: removing the old firewall rules'
-        $net = Get-SystemTool 'netsh.exe'
-        foreach ($n in $script:LegacyFirewallNames) { foreach ($rn in @($n, "$n (UDP)")) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$rn") -Label 'netsh delete legacy rule' -AllowFail -TimeoutSec 30) } }
-        Say 'Old Unison firewall rules removed.'
-    } catch { $notes.Add("Could not remove the old firewall rules: $($_.Exception.Message)"); Say $notes[$notes.Count - 1] }
-
-    # 3. the old autostart entry (the all-users one; each user's own entry is replaced by the new player when it starts)
-    try { Remove-MachineRegValue $script:RunSubKey 'UnisonPlayer' } catch { Say "Could not remove the old autostart entry: $($_.Exception.Message)" }
-
-    # 4. the data folder: %ProgramData%\Unison -> %ProgramData%\WavWiz (moved, not copied; merged if WavWiz already has files)
-    $legacyData = Get-LegacyDataRoot; $newData = Get-WavWizDataRoot
-    if (Test-Path -LiteralPath $legacyData -PathType Container) {
-        Set-Step 'upgrade: moving your data from the Unison folder to the WavWiz folder'
-        if ((Test-Path -LiteralPath (Join-Path $legacyData 'unison.db')) -and (Test-Path -LiteralPath (Join-Path $newData 'unison.db'))) {
-            $m = "Both $legacyData and $newData contain a library database. The one in $newData is used; the old folder was left untouched in case you need it."
-            $notes.Add($m); Say $m
-        } else {
-            try {
-                $r = Merge-LegacyFolder -From $legacyData -To $newData
-                Say ("Data moved: {0} item(s) from {1} to {2}{3}." -f $r.Moved, $legacyData, $newData, $(if ($r.Renamed) { " ($($r.Renamed) file(s) with the same name were kept as *.from-unison" + ')' } else { '' }))
-            } catch {
-                throw ("Could not move your WavWiz data from $legacyData to $newData : $($_.Exception.Message)`r`nNothing was deleted. Close any program that is using files in that folder (for example a text editor or a backup tool) and run the installer again.")
-            }
-        }
-    } else { Say 'No Unison data folder to move (already moved, or none was created).' }
-
-    # 5. the old program folder, its shortcuts and its uninstall entry (the data is already safe in the new folder)
-    try {
-        Set-Step 'upgrade: removing the old Unison program files'
-        $cands = New-Object System.Collections.Generic.List[string]
-        if ($oldDir) { $cands.Add($oldDir) }
-        $pf = $env:ProgramFiles; if ($pf) { $cands.Add((Join-Path $pf 'Unison')) }
-        $seen = @{}
-        foreach ($d in $cands) {
-            if ($seen.ContainsKey($d)) { continue }; $seen[$d] = $true
-            if (Test-LegacyInstallDir $d $NewRoot) { Remove-Item -LiteralPath $d -Recurse -Force; Say "Old program folder removed: $d" }
-            elseif (Test-Path -LiteralPath $d) { Say "Left alone (does not look like an old Unison install, or it is the new install folder): $d" }
-        }
-        $pd = $env:ProgramData; if (-not $pd) { $pd = 'C:\ProgramData' }
-        $menu = Join-Path $pd 'Microsoft\Windows\Start Menu\Programs\Unison (BETA)'
-        if (Test-Path -LiteralPath $menu -PathType Container) { Remove-Item -LiteralPath $menu -Recurse -Force; Say 'Old Start-menu group removed.' }
-        $pub = $env:PUBLIC; if (-not $pub) { $pub = 'C:\Users\Public' }
-        foreach ($lnk in (Join-Path $pub 'Desktop\Unison web page (BETA).url')) { if (Test-Path -LiteralPath $lnk) { Remove-Item -LiteralPath $lnk -Force } }
-        if (Test-MachineRegKey $script:LegacyUninstallSubKey) { Remove-MachineRegKey $script:LegacyUninstallSubKey; Say 'Old "Unison" entry removed from Apps & features.' }
-    } catch { $notes.Add("Could not remove some old Unison files: $($_.Exception.Message)"); Say $notes[$notes.Count - 1] }
-
-    Say 'Upgrade from Unison finished.'
-    return [pscustomobject]@{ Found = $true; Notes = $notes.ToArray() }
-}

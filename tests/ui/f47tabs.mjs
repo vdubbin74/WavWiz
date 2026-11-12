@@ -8,7 +8,7 @@ const base = { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'coll
 const probe = () => { const row = document.querySelector('.libpanel .ctabs'); if (!row || !row.offsetParent) return null; const t = [...row.querySelectorAll('button[role=tab]:not(.tabmore)')];
   const vis = t.filter(b => !b.hidden && b.getBoundingClientRect().width > 0); return { rowW: row.getBoundingClientRect().width, n: t.length, vis: vis.map(b => b.textContent), minW: Math.min(...vis.map(b => b.getBoundingClientRect().width)) }; };
 const br = await chromium.launch();
-const ctx = async (vw, vh, d, pn, css) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const ctx = async (vw, vh, d, pn, css) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([pn, css]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f47')) return; sessionStorage.setItem('f47', '1');
     localStorage.setItem('wavwiz.theme.v1', JSON.stringify({ v: 4, preset: 'daylight', accent: '#E03500', accent2: '#0E8F82', hl: '#6B4EE6', bg: '#F3F1EE', ink: '#1A1D21' }));

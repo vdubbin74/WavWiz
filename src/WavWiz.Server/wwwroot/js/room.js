@@ -5,7 +5,7 @@ import { OffsetEstimator, pairClocks, pairClocksEdge, outputDelaySec, ctxTimeFor
 import { makeChirpPattern, scheduleChirpOnScheduler } from './chirppattern.js';
 import { environment } from './calerrors.js';
 import { openOnce, backoffMs } from './wsconn.js';
-import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName, migrateKey } from './phonejoin.js';
+import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName } from './phonejoin.js';
 import { phoneRole, setPhoneRole } from './calmic-core.js';
 import { isRemote } from './remotemode.js';
 import { EqChain, eqPlan } from './roomeq.js';
@@ -13,8 +13,6 @@ export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const idKey = 'wavwiz.webRoom.id', nameKey = 'wavwiz.webRoom.name', wantKey = 'wavwiz.webRoom.autojoin';
-// 0.2.0 item 12: carry the 0.1.x "unison.webRoom.*" keys over once, so a browser keeps its speaker id, name and on/off choice.
-try { for (const k of ['id', 'name', 'autojoin']) migrateKey(localStorage, 'unison.webRoom.' + k, 'wavwiz.webRoom.' + k); } catch { /* no storage */ }
 export function roomId() { let id = localStorage.getItem(idKey); if (!id) { id = 'web-' + [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem(idKey, id); } return id; }
 /** 0.2.0 item 1: every browser names itself from its user agent ("LG TV browser", "iPhone", "Chrome on Windows"); an admin can rename it in Devices. */
 export function defaultRoomName() { let n = null; try { n = localStorage.getItem(nameKey); } catch { /* ignore */ } return n || deviceName(); }

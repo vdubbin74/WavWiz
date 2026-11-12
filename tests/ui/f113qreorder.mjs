@@ -4,7 +4,7 @@ const B = process.env.WW || 'http://172.30.0.2:47800', sess = readFileSync(proce
 const W = new URL('../../src/WavWiz.Server/wwwroot/', import.meta.url).pathname;
 let fail = 0; const ok = (n, c, d = '') => { if (!c) fail++; console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + d)); };
 const br = await chromium.launch(); const ctx = await br.newContext({ viewport: { width: 1600, height: 1000 } });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.route(/\/(js\/[\w.]+\.js|app\.css)(\?.*)?$/, r => { const m = new URL(r.request().url()).pathname.match(/\/(js\/[\w.]+\.js|app\.css)$/); try { r.fulfill({ body: readFileSync(W + m[1]), contentType: m[1].endsWith('.css') ? 'text/css' : 'text/javascript' }); } catch { r.continue(); } });
 const p = await ctx.newPage(); const moves = [], jumps = [];
 p.on('request', q => { if (q.url().includes('/queue/move')) moves.push(q.postData()); if (q.url().includes('/stream/jump')) jumps.push(q.postData()); });

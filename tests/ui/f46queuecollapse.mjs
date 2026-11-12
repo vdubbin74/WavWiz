@@ -7,7 +7,7 @@ let ZQ = '';
 const order = async p => p.evaluate(async zq => (await (await fetch('/api/v1/queue' + zq)).json()).items.map(x => x.id).join(','), ZQ);
 const br = await chromium.launch();
 for (const [lay, vw, vh, d] of [['full', 1920, 1080, 1], ['full', 960, 540, 2], ['roomy', 1920, 1080, 1]]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([lay]) => { if (sessionStorage.getItem('f46')) return; sessionStorage.setItem('f46', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.layout', lay);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [lay]);
   const p = await c.newPage(); const moves = []; p.on('request', r => { if (r.method() === 'POST' && /\/queue\/move/.test(r.url())) moves.push(r.postData()); });

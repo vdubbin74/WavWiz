@@ -39,9 +39,6 @@ public sealed class WavWizServer : IAsyncDisposable
         cal.Registry = registry;      // 0.4.0 Stage 4: calibration pauses only the groups it measures
         cal.Mics = new Calibration.PcMicBroker(events); audio.OnCalResult = cal.Mics.OnCalResult;      // 0.2.5 PC-mic calibration
         var ca = new Tls.LocalCa(cfg.DataDir);
-        // 0.2.4: unison-root-ca.crt -> wavwiz-root-ca.crt; a root that still says "Unison" (0.0.1/0.0.2 betas) is replaced by a WavWiz one (phones re-trust it)
-        try { var m = ca.MigrateLegacy(IPAddress.TryParse(cfg.BindAddress.Trim('[', ']'), out var cip) && !IPAddress.IsLoopback(cip) ? cip : null); if (m != null) u._log.Write(m); }
-        catch (Exception e) { u._log.Write("TLS: certificate rename/migration failed (" + e.Message + "); the old certificate stays in use"); }
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
         s.RemoteTls = new Tls.RemoteCertStore(cfg, Library.SecretProtectors.For(cfg.DataDir), null, u._log.Write);   // F261: default off
         if (s.RemoteTls.Active) _ = Task.Run(() => s.RemoteTls.RefreshAsync());
@@ -186,7 +183,7 @@ public sealed class WavWizServer : IAsyncDisposable
         string? token = null; bool cookie = false;
         var h = c.Request.Headers.Authorization.ToString();
         if (h.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) token = h[7..].Trim();
-        else if (c.Request.Cookies.TryGetValue("unison_session", out var ck)) { token = ck; cookie = true; }
+        else if (c.Request.Cookies.TryGetValue("wavwiz_session", out var ck)) { token = ck; cookie = true; }
         var info = s.Auth.Validate(token);
         // 0.2.5: the phone's mic-only calibration page has no sign-in; the QR code's one-time link code authorizes calibration calls only
         // (header X-WavWiz-Cal, or ?cal= on the clock WebSocket) - never the rest of the app. It is not a cookie, so no cross-site write can carry it.

@@ -7,7 +7,7 @@ const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) con
 const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime'], STYLES = ['classic', 'center', 'stack', 'horizon'];
 const base = { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' };
 const br = await chromium.launch();
-async function open(vw, vh, d, lay, pn) { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+async function open(vw, vh, d, lay, pn) { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([lay, pn]) => { if (sessionStorage.getItem('f48')) return; sessionStorage.setItem('f48', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     localStorage.setItem('wavwiz.uiscale', 'compact'); localStorage.setItem('wavwiz.layout', lay); localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, [lay, pn]);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2800);

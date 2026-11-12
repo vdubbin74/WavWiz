@@ -9,7 +9,7 @@ let mode = 'pick';
 const br = await chromium.launch();
 for (const [view, vw, vh, dpr, phone] of [['desktop', 1920, 1080, 1, false], ['desktop', 960, 540, 2, false], ['phone', 390, 844, 3, true]]) {
   const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, ...(phone ? { isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } : {}) });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
   await c.route(/\/api\/v1\/stream(\?|$)/, async r => { if (r.request().method() !== 'GET') return r.fallback(); try { const res = await r.fetch(), j = await res.json();
     const base = j.queue.items[0] || { id: 1, kind: 'track', title: 'x', artist: '' };

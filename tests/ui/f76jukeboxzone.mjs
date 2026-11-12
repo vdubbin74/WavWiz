@@ -7,15 +7,15 @@
 import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), OUT = '/workspace/screens/049-jukebox'; let pass = 0, fail = 0;
 const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
-const call = (m, u, b) => fetch(B + '/api/v1' + u, { method: m, headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: b ? JSON.stringify(b) : undefined }).then(r => r.json().catch(() => ({})));
-const put = ids => fetch(B + '/api/v1/jukebox/zone', { method: 'PUT', headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: JSON.stringify({ deviceIds: ids }) });
+const call = (m, u, b) => fetch(B + '/api/v1' + u, { method: m, headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: b ? JSON.stringify(b) : undefined }).then(r => r.json().catch(() => ({})));
+const put = ids => fetch(B + '/api/v1/jukebox/zone', { method: 'PUT', headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: JSON.stringify({ deviceIds: ids }) });
 const saved = await call('GET', '/jukebox/zone'), savedCfg = await call('GET', '/jukebox/config'); await put([]); await call('PUT', '/jukebox/config', { showInDevices: true }); if (saved.running) await call('POST', '/jukebox/stop', {});
 const ON = new Set([1, 2, 3, 6]);
 const br = await chromium.launch();
 try {
 for (const [vw, vh, dpr, lay, nm] of [[1920, 1080, 1, 'full', 'full-100'], [1920, 1080, 1, 'roomy', 'roomy-100'], [960, 540, 2, 'full', 'full-200'], [390, 844, 3, 'full', 'phone']]) { const tg = `[${nm}]`, phone = vw < 700;
   await call('POST', '/jukebox/stop', {}).catch(() => {}); await put([]); await call('PUT', '/jukebox/config', { defaultSpeakers: [] });
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, hasTouch: phone, isMobile: phone }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, hasTouch: phone, isMobile: phone }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([lay, sc]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f76')) return; sessionStorage.setItem('f76', '1'); localStorage.setItem('wavwiz.layout', lay); localStorage.setItem('wavwiz.uiscale', sc);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [lay, dpr === 2 ? 'tiny' : 'compact']);
@@ -55,7 +55,7 @@ for (const [vw, vh, dpr, lay, nm] of [[1920, 1080, 1, 'full', 'full-100'], [1920
   await c.close(); }
   // ---- Part B (Full 100 %): Settings > Jukebox switch + default speakers, Start Jukebox… speakers, the kiosk's two ways out, Return to Jukebox
   { const tg = '[settings/start/kiosk]'; await put([]); await call('PUT', '/jukebox/config', { showInDevices: true, defaultSpeakers: [2], pin: '1234' });
-    const c = await br.newContext({ viewport: { width: 1920, height: 1080 } }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+    const c = await br.newContext({ viewport: { width: 1920, height: 1080 } }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
     await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
       if (sessionStorage.getItem('f76b')) return; sessionStorage.setItem('f76b', '1'); localStorage.setItem('wavwiz.layout', 'full'); localStorage.setItem('wavwiz.uiscale', 'compact');
       localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); });

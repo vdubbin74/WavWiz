@@ -752,7 +752,6 @@ First public release since 0.1.3. Versions 0.2.0, 0.2.1 and 0.2.2 were test buil
 
 ### Fixed
 
-- Scrub remaining Unison leftovers for users (for example `unison.db` → `wavwiz.db` on upgrade; clean user-facing strings; keep migration/compat)
 - Admin password reset on the server PC only (no manual SQLite; library kept)
 
 ## [0.1.1] - 2026-10
@@ -799,8 +798,8 @@ Summaries only; see repository history for detail.
 - **0.0.6** — Menu/theme wiring; Particle burst default; phone auto-join improvements.
 - **0.0.5** — UI chrome; CDDA via helper; AcoustID optional; scrub of personal LAN hints from UI.
 - **0.0.4** — Follow-speaker, scenes, schedules, Radio Browser, Tailscale panel, CD ripper, tag auto-fill.
-- **0.0.3** — Renamed from **Unison** to **WavWiz**; in-place upgrade migration.
-- **0.0.2 / 0.0.1** — Early Unison betas (pairing, library, visualizer experiments, installer).
+- **0.0.3** — In-place upgrade support.
+- **0.0.2 / 0.0.1** — Early betas (pairing, library, visualizer experiments, installer).
 
 ---
 

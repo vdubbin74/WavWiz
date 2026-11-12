@@ -221,7 +221,6 @@ internal sealed class PlayerApp : ApplicationContext
         {
             using var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
             if (k == null) return;
-            k.DeleteValue("UnisonPlayer", false);           // 0.0.2 value, replaced by the WavWiz one
             if (_s.StartWithWindows) k.SetValue("WavWizPlayer", $"\"{Application.ExecutablePath}\" --background"); else k.DeleteValue("WavWizPlayer", false);
         }
         catch { }

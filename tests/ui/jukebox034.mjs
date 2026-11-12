@@ -4,7 +4,7 @@
 import { chromium, webkit, devices } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim();
-const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const R = []; const ok = (n, c, i = '') => { R.push(!!c); console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + i : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-034-${n}.png` });
 const STYLES = (process.argv[2] || 'modern,retro').split(',');
@@ -12,7 +12,7 @@ const STYLES = (process.argv[2] || 'modern,retro').split(',');
 const GB = process.env.WW_GUEST === 'webkit' ? await webkit.launch() : null;
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 // a speaker so the music actually plays
-const spx = await cb.newContext({ viewport: { width: 800, height: 600 } }); await spx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const spx = await cb.newContext({ viewport: { width: 800, height: 600 } }); await spx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 const sp = await spx.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(2500); await sp.mouse.click(400, 300); await sp.waitForTimeout(800);
 for (const style of STYLES) {
   const tag = style === 'retro' ? 'retro' : 'modern';
@@ -20,7 +20,7 @@ for (const style of STYLES) {
   await api('/queue/clear', 'POST', {});
   const lib = await api('/library/tracks?limit=50'); await api('/queue/add', 'POST', { kind: 'tracks', ids: lib.slice(0, 2).map(t => t.id) }); await api('/stream/jump', 'POST', { index: 0 });
   ok(`[${tag}] style saved`, (await api('/jukebox/config', 'PUT', { style, perGuest: 3 })).style === style);
-  const ctx = await cb.newContext({ viewport: { width: 1920, height: 1080 } }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await cb.newContext({ viewport: { width: 1920, height: 1080 } }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(B + '/'); await p.waitForTimeout(3000); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
@@ -31,7 +31,7 @@ for (const style of STYLES) {
   await dlg.locator('footer button', { hasText: 'Start Jukebox' }).click(); await p.waitForTimeout(1500);
   let st = await api('/jukebox'); ok(`[${tag}] Jukebox running with style ${style}`, st.running === true && st.style === style, JSON.stringify(st));
   // big screen in a plain browser
-  const ctx2 = await cb.newContext({ viewport: { width: 1920, height: 1080 } }); await ctx2.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx2 = await cb.newContext({ viewport: { width: 1920, height: 1080 } }); await ctx2.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx2.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const big = await ctx2.newPage(); const berrs = []; big.on('pageerror', e => berrs.push(e.message));
   await big.goto(B + '/'); await big.waitForTimeout(3500); await big.evaluate(() => { document.querySelectorAll('dialog[open]').forEach(d => d.close()); document.querySelectorAll('.phone-unlock').forEach(e => e.remove()); });

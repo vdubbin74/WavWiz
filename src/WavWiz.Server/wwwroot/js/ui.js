@@ -8,8 +8,8 @@ export const canControl = S => S.auth && S.auth.role !== 'view';
 /** 0.2.0 item 28: admin-only controls are shown READ-ONLY (disabled, with this hint) to everyone else - never hidden. */
 export const isAdmin = S => S?.auth?.role === 'admin';
 export const ADMIN_HINT = 'Only an administrator can change this. Use File > Sign in as admin.';
-/** The browser speaker id of this page (0.2.0 key, or the 0.1.x one before it is migrated). */
-export function webRoomId() { try { return localStorage.getItem('wavwiz.webRoom.id') || localStorage.getItem('unison.webRoom.id'); } catch { return null; } }
+/** The browser speaker id of this page. */
+export function webRoomId() { try { return localStorage.getItem('wavwiz.webRoom.id'); } catch { return null; } }
 /** 0.2.0 item 9: "this device" = the speaker this page plays on: this browser's own web speaker, else a Player on the same PC that the
  * server marked as mine (the WavWiz Player window, or a browser on a PC that runs a Player). */
 export function thisDevice(S, rid = webRoomId()) {

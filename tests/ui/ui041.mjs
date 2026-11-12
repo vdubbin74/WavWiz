@@ -10,7 +10,7 @@ const br = await (ENG === 'webkit' ? webkit : chromium).launch();
 const IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const DEVEXP = { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' };
 async function page(scale, theme, o = {}, panels = null) {
-  const ctx = await br.newContext({ viewport: { width: 1400, height: 900 }, ...o }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: 1400, height: 900 }, ...o }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(sc => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', sc); }, scale);
   if (panels) await ctx.addInitScript(pn => localStorage.setItem('wavwiz.panels', JSON.stringify(pn)), panels);
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2000); await p.locator('.phone-unlock').click({ timeout: 1000 }).catch(() => {});
@@ -56,7 +56,7 @@ for (const [scale, sn] of [['compact', '100'], ['small', '75']]) for (const them
 }
 // E: iPhone Safari shows the Home Screen card on the calibration page; standalone hides it
 for (const sa of [false, true]) { const ctx = await br.newContext({ userAgent: IOS, viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   if (sa) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { get: () => true }); });
   const p = await ctx.newPage(); await p.goto(B + '/calmic.html'); await p.waitForTimeout(2000);
   const n = await p.locator('.a2hs-card').count(); ok(`E Home Screen card ${sa ? 'hidden when installed' : 'shown on iPhone Safari'}`, sa ? n === 0 : n === 1, n);

@@ -3,7 +3,7 @@
 import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B = process.env.WW || 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim(), SH = process.env.SHOTS;
 let pass = 0, fail = 0; const ok = (n, c, d = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + d)); };
-const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (u, m = 'GET', body) => { const r = await fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'wavwiz_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const KL = (await api('/zones')).find(z => z.name === 'Kitchen-Left'); const muted = async () => (await api('/zones')).find(z => z.id === KL.id).muted;
 const setMuted = async v => { await api('/zones/' + KL.id, 'PATCH', { muted: v }); };
 const until = async (f, ms = 4000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await f()) return true; await new Promise(r => setTimeout(r, 150)); } return false; };
@@ -12,7 +12,7 @@ const views = { panel: { vp: [1920, 1080], pan: { lib: 'normal', dev: 'normal', 
 for (const [view, V] of Object.entries(views)) for (const dpr of [1, 2]) {
   const tag = `[${view} ${dpr * 100}%]`, vp = V.phone ? V.vp : [V.vp[0] / dpr, V.vp[1] / dpr];
   const c = await br.newContext({ viewport: { width: vp[0], height: vp[1] }, deviceScaleFactor: dpr, ...(V.phone ? { isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } : {}) });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   // 0.4.9 F69: zones with no speaker online collapse to a one-line row, so report Kitchen-Left as connected to keep its zone (and row) open
   await c.route(/\/api\/v1\/zones(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); for (const z of j) if (z.name === 'Kitchen-Left') z.connected = true; await r.fulfill({ response: res, json: j }); } catch { /* closed */ } });
   await c.addInitScript(P => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.panels', JSON.stringify(P)); }, V.pan);

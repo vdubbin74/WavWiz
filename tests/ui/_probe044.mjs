@@ -5,7 +5,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const br = await chromium.launch();
 async function page(dpr, panels, w = 1920, h = 1080) {
   const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(pn => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, panels);
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2800);
   await p.evaluate(() => document.querySelectorAll('dialog[open],.phone-unlock').forEach(e => e.close?.() || e.remove()));

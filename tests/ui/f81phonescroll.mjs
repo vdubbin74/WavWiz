@@ -3,7 +3,7 @@ import { chromium, devices } from 'playwright'; import { readFileSync } from 'no
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(); let ok = 0, bad = 0;
 const t = (c, m) => { c ? ok++ : bad++; console.log((c ? 'ok   ' : 'FAIL ') + m); };
 const br = await chromium.launch(); const c = await br.newContext({ ...devices['iPhone 13'] });
-await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
 await c.route(/\/api\/v1\/zones(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); for (const z of j) z.connected = true; await r.fulfill({ response: res, json: j }); } catch { } });
 const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(e => e.close()));

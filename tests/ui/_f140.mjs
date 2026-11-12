@@ -3,7 +3,7 @@ const S=fs.readFileSync('/workspace/ww-mkt/sess','utf8').trim(), B='http://172.3
 const COVER=fs.readFileSync('/workspace/previews/hc-cover.png'); const types={'.js':'text/javascript','.css':'text/css','.html':'text/html'};
 const TH={preset:'violet',accent:'#A855F7',accent2:'#C084FC',hl:'#2EE6D6',bg:'#1A1028',ink:'#F5F3FF'};
 const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:420,height:140},deviceScaleFactor:2});
-await ctx.addCookies([{name:'unison_session',value:S,url:B}]);
+await ctx.addCookies([{name:'wavwiz_session',value:S,url:B}]);
 await ctx.route('**/*', async r=>{const u=new URL(r.request().url()); if(u.origin!==B) return r.continue();
  if(/\/art[\/?]/.test(u.pathname)) return r.fulfill({status:200,contentType:'image/png',body:COVER});
  const f=path.join(W,u.pathname==='/'?'/index.html':u.pathname); const ext=path.extname(f);

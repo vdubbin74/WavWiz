@@ -5,7 +5,7 @@ const IP = '172.30.0.2', B = `http://${IP}:47800`;
 const sess = readFileSync('/tmp/ww030/sess', 'utf8').trim();
 const R = []; const ok = (name, pass, info = '') => { R.push({ name, pass, info }); console.log((pass ? 'PASS ' : 'FAIL ') + name + (info ? ' :: ' + info : '')); };
 const shot = (p, n) => p.screenshot({ path: `/workspace/screens/wavwiz-031-${n}.png` });
-const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return r.json().catch(() => ({})); };
+const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); return r.json().catch(() => ({})); };
 const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 900)); } };
 const closeDlg = p => p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
 const ONLY = process.argv[2] || ''; const want = n => !ONLY || ONLY.split(',').includes(n);
@@ -14,10 +14,10 @@ const setTheme = (p, id) => p.evaluate(async id => { const t = await import('/js
 
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 // two browser speakers so the center EQ, device bars and delay slider have something to show (as in ui030)
-const spc = await cb.newContext({ viewport: { width: 1200, height: 800 } }); await spc.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const spc = await cb.newContext({ viewport: { width: 1200, height: 800 } }); await spc.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 for (let i = 0; i < 2; i++) { const sp = await spc.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(3000); await sp.mouse.click(600, 400); await sp.waitForTimeout(1000); }
 const ctx = await cb.newContext({ viewport: { width: 1400, height: 900 } });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.addInitScript(() => { if (!localStorage.getItem('seeded31')) { localStorage.setItem('seeded31', '1'); localStorage.setItem('wavwiz.center.v1', 'eq'); localStorage.setItem('wavwiz.devsize', 'standard'); localStorage.setItem('wavwiz.whatsnew', '0.3.1'); } });
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
 const home = async () => { await p.goto(B + '/'); await p.waitForSelector('.desk', { timeout: 15000 }); await p.waitForTimeout(2000); await closeDlg(p); await p.waitForTimeout(300); };
@@ -162,7 +162,7 @@ if (want('themes')) await step('themes', async () => {
 if (want('iphone')) await step('iphone', async () => {
   const wk = await webkit.launch();
   for (const [o, dev] of [['portrait', devices['iPhone 13']], ['landscape', devices['iPhone 13 landscape']]]) {
-    const c = await wk.newContext({ ...dev }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+    const c = await wk.newContext({ ...dev }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
     await c.addInitScript(() => { localStorage.setItem('wavwiz.center.v1', 'eq'); localStorage.setItem('wavwiz.whatsnew', '0.3.1'); localStorage.setItem('wavwiz.phoneRole', 'speaker'); });
     const q = await c.newPage(); await q.goto(B + '/'); await q.waitForTimeout(3500); await q.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
     await q.mouse.click(dev.viewport.width / 2, dev.viewport.height / 2); await q.waitForTimeout(3500); await q.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));

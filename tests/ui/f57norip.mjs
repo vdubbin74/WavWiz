@@ -4,7 +4,7 @@ const B='http://172.30.0.2:47800', sess=readFileSync('/tmp/ww032/sess','utf8').t
 let fails=0; const ok=(n,c,x='')=>{ if(!c) fails++; console.log((c?'ok   ':'FAIL ')+n+' '+x); };
 const br=await chromium.launch();
 async function run(name, opt, pc) {
- const c=await br.newContext(opt); await c.addCookies([{name:'unison_session',value:sess,url:B}]);
+ const c=await br.newContext(opt); await c.addCookies([{name:'wavwiz_session',value:sess,url:B}]);
  await c.addInitScript(()=>{localStorage.setItem('wavwiz.whatsnew','9.9.9');localStorage.setItem('wavwiz.gettingStarted.shown','1');localStorage.setItem('wavwiz.webRoom.autojoin','0');localStorage.setItem('wavwiz.panels',JSON.stringify({lib:'normal',dev:'normal',exp:'lib',list:'open',ctl:'open'}));});
  if (pc) await c.route('**/api/v1/auth/state', async r => { const res = await r.fetch(); const j = await res.json(); await r.fulfill({ response: res, json: { ...j, thisMachine: true } }); });
  const p=await c.newPage(); await p.goto(B+'/'); await p.waitForTimeout(3000); await p.evaluate(()=>document.querySelectorAll('dialog[open],.phone-unlock').forEach(e=>e.close?.()||e.remove()));

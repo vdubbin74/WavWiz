@@ -5,7 +5,7 @@ namespace WavWiz.Core;
 public static class WavWizInfo
 {
     public const string ProductName = "WavWiz";
-    public const string MdnsService = "_unison._tcp";
+    public const string MdnsService = "_wavwiz._tcp";
     public const string ServiceName = "WavWizServer";
     public const int DefaultHttpPort = 47800;
     public const int DefaultHttpsPort = 47443;

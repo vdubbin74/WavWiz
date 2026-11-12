@@ -7,7 +7,7 @@ const PICK = 'F88 Shuffle Pick', NEIGH = 'F88 List Neighbour';
 const br = await chromium.launch();
 for (const [lib, vw, vh, dpr] of [['normal', 1920, 1080, 1], ['normal', 1920, 1080, 2], ['expanded', 1920, 1080, 1]]) {
   const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(l => { if (sessionStorage.f88) return; sessionStorage.f88 = 1; localStorage.clear(); for (const [k, v] of [['wavwiz.whatsnew', '9.9.9'], ['wavwiz.gettingStarted.shown', '1'], ['wavwiz.webRoom.autojoin', '0'],
     ['wavwiz.panels', JSON.stringify({ lib: l, dev: 'normal', exp: null, list: 'open', ctl: 'normal', ctlSet: true })]]) localStorage.setItem(k, v); }, lib);
   await c.route(/\/api\/v1\/stream(\?|$)/, async r => { if (r.request().method() !== 'GET') return r.fallback(); try { const res = await r.fetch(), j = await res.json();

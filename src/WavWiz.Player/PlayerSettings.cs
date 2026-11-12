@@ -40,7 +40,6 @@ public sealed class PlayerSettings
 
     public static PlayerSettings Load()
     {
-        WavWiz.PlayerCore.LegacyFolder.Migrate(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         Directory.CreateDirectory(Dir);
         PlayerSettings? s = null;
         try { if (File.Exists(FilePath)) s = JsonSerializer.Deserialize<PlayerSettings>(File.ReadAllText(FilePath).TrimStart('\uFEFF'), J); } catch { /* unreadable file: start from defaults, do not crash */ }
@@ -78,8 +77,7 @@ public sealed class PlayerSettings
 public sealed class DpapiSecretStore : ISecretStore
 {
     private static string PathFor(string name) => System.IO.Path.Combine(PlayerSettings.Dir, name + ".dpapi");
-    // NOT renamed on purpose: it is part of the key that unlocks tokens saved by 0.0.2, so players keep their pairing after the upgrade.
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Unison.Player.v1");
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("WavWiz.Player.v1");
     public string? Load(string name)
     {
         try { var p = PathFor(name); return File.Exists(p) ? Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(p), Entropy, DataProtectionScope.CurrentUser)) : null; } catch { return null; }

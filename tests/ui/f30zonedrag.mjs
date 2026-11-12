@@ -8,7 +8,7 @@ const shot = (p, n) => SH && p.screenshot({ path: `/workspace/screens/wavwiz-046
 const views = { standard: { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' }, expanded: { lib: 'rail', dev: 'expanded', exp: 'dev', list: 'normal', ctl: 'normal' } };
 const br = await chromium.launch();
 for (const [vw, vh, d, zt] of [[1920, 1080, 1, '100'], [960, 540, 2, '200']]) for (const [vn, pn] of Object.entries(views)) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(pn => { if (sessionStorage.getItem('f30init')) return; sessionStorage.setItem('f30init', '1');
     localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     localStorage.setItem('wavwiz.uiscale', 'compact'); localStorage.removeItem('wavwiz.devorder.v1'); localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, pn);

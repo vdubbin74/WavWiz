@@ -8,7 +8,7 @@ const br = await chromium.launch();
 const rnd = n => Math.floor(Math.random() * n);
 async function open(lay, phone, flap = true) {
   const c = await br.newContext(phone ? { ...devices['iPhone 13'] } : { viewport: { width: 1400, height: 760 } });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(l => { for (const [k, v] of [['wavwiz.whatsnew', '9.9.9'], ['wavwiz.gettingStarted.shown', '1'], ['wavwiz.webRoom.autojoin', '0'], ['wavwiz.layout', l]]) localStorage.setItem(k, v); }, lay);
   let song = 0, pos = 0, gid = null;
   await c.route(/\/api\/v1\/zones(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); j.forEach((z, i) => { z.connected = i < j.length - 1 || !flap || rnd(2) === 0; }); if (j[0] && rnd(2)) j[0].volume = 20 + rnd(60); await r.fulfill({ response: res, json: j }); } catch { } });

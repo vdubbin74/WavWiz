@@ -8,7 +8,7 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await chromium.launch();
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150 Safari/537.36 Edg/150 WavWizPlayer/0.4.2 WavWizMini';
 async function host(w, h, dsf, { slim = false, theme = null } = {}) {
-  const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dsf, userAgent: UA }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dsf, userAgent: UA }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { window.__msgs = []; window.__ev = []; window.chrome = window.chrome || {}; window.chrome.webview = { postMessage: m => window.__msgs.push(m), addEventListener: (t, f) => window.__ev.push(f) }; localStorage.setItem('wavwiz.whatsnew', '9.9.9'); });
   const reqs = []; const p = await ctx.newPage(); p.on('request', r => { if (r.method() === 'POST') reqs.push(new URL(r.url()).pathname); });
   await p.goto(B + '/mini.html' + (slim ? '?slim=1' : '')); await p.waitForTimeout(2200);

@@ -10,7 +10,7 @@ const cases = [['side panel -> open Queue', { lib: 'normal', exp: null, list: 'o
   ['expanded Library view -> Queue', { lib: 'normal', exp: 'lib', list: 'open' }, '.listpanel .qwrap']];
 for (const dpr of [1, 2]) for (const [name, pan, dst] of cases) {
   const ctx = await br.newContext({ viewport: { width: 1920 / dpr, height: 1080 / dpr }, deviceScaleFactor: dpr });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(P => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.panels', JSON.stringify({ dev: 'normal', ctl: 'collapsed', ...P })); }, pan);
   const p = await ctx.newPage(); const tag = `[${dpr * 100}%]`;
   try {

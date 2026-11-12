@@ -4,7 +4,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
 const br = await chromium.launch();
 for (const d of [1, 2]) {
-  const c = await br.newContext({ viewport: { width: 1920 / d, height: 1080 / d }, deviceScaleFactor: d }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: 1920 / d, height: 1080 / d }, deviceScaleFactor: d }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); localStorage.removeItem('wavwiz.zone.v1'); });
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(3000); const t = `[dpr ${d}]`;

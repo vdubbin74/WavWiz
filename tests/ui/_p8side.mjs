@@ -4,7 +4,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const DPR = +(process.env.DPR || 1), OUT = process.env.OUT || '/tmp/p8';
 const br = await chromium.launch();
 const ctx = await br.newContext({ viewport: { width: 1920 / DPR, height: 1080 / DPR }, deviceScaleFactor: DPR });
-await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
 await ctx.addInitScript(([LIST, LIB]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1');
   localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: LIB, dev: 'normal', exp: null, list: LIST, ctl: 'collapsed' })); }, [process.env.LIST || 'open', process.env.LIB || 'normal']);
 const p = await ctx.newPage();

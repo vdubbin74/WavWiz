@@ -10,7 +10,7 @@ if (SH) mkdirSync(OUT, { recursive: true });
 const ON = new Set([1, 2, 3, 6]);   // Kitchen 1,2 / Basement 3,5 / Patio 6 online; Garage has no speakers
 const br = await chromium.launch();
 async function open(vw, vh, dpr, scale, layout) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, hasTouch: vw < 700, isMobile: vw < 700 }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, hasTouch: vw < 700, isMobile: vw < 700 }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([sc, lay]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (sessionStorage.getItem('f69')) return; sessionStorage.setItem('f69', '1'); localStorage.removeItem('wavwiz.devorder.v1'); localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.layout', lay);
     localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [scale, layout]);

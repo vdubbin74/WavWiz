@@ -3,12 +3,12 @@ import { chromium, devices } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww032/sess', 'utf8').trim();
 const R = []; const ok = (n, c, i = '') => { R.push(!!c); console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + String(i).slice(0, 600) : '')); };
-const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
 const step = async (n, f) => { try { await f(); } catch (e) { ok(n, false, String(e).slice(0, 600)); } };
 const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime'];
 const NORMAL = { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'open' };
 const cb = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-for (let i = 0; i < 4; i++) { const x = await cb.newContext({ viewport: { width: 900, height: 700 } }); await x.addCookies([{ name: 'unison_session', value: sess, url: B }]); const sp = await x.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(2500); await sp.mouse.click(450, 350); await sp.waitForTimeout(500); }
+for (let i = 0; i < 4; i++) { const x = await cb.newContext({ viewport: { width: 900, height: 700 } }); await x.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); const sp = await x.newPage(); await sp.goto(B + '/'); await sp.waitForTimeout(2500); await sp.mouse.click(450, 350); await sp.waitForTimeout(500); }
 await api('/jukebox/stop', 'POST', { pin: '2468' }).catch(() => {});
 await api('/queue/clear', 'POST', {}); const lib = await api('/library/tracks?limit=50');
 await api('/queue/add', 'POST', { kind: 'tracks', ids: lib.map(t => t.id) }); await api('/stream/jump', 'POST', { index: 0 });
@@ -20,7 +20,7 @@ await api('/queue/add', 'POST', { kind: 'tracks', ids: lib.map(t => t.id) }); aw
 const VPS = (process.argv[2]==='h3') ? [['1440', { viewport: { width: 1440, height: 900 } }]] : [['1920', { viewport: { width: 1920, height: 1080 } }], ['1440', { viewport: { width: 1440, height: 900 } }], ['1280', { viewport: { width: 1280, height: 720 } }], ['iphone', devices['iPhone 13']]];
 const inside = (a, b, t = 1) => a.left >= b.left - t && a.right <= b.right + t && a.top >= b.top - t && a.bottom <= b.bottom + t;
 for (const [tag, opt] of VPS) {
-  const ctx = await cb.newContext(opt); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await cb.newContext(opt); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   const shot = n => p.screenshot({ path: `/workspace/screens/wavwiz-034-v-${n}-${tag}.png` });

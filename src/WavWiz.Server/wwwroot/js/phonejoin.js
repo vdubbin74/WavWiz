@@ -23,7 +23,3 @@ export function deviceName(ua = globalThis.navigator?.userAgent || '', touchPoin
   return os ? `${browser} on ${os}` : browser;
 }
 
-/** 0.2.0 item 12: one-time move of the old "unison.*" localStorage keys to "wavwiz.*" (the old value wins only when the new key is unset). */
-export function migrateKey(store, oldKey, newKey) {
-  try { const nv = store.getItem(newKey); if (nv != null) return nv; const ov = store.getItem(oldKey); if (ov != null) { store.setItem(newKey, ov); store.removeItem(oldKey); } return ov; } catch { return null; }
-}

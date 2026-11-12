@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync(process.env.WW_SESS || '/tmp/ww041L/sess', 'utf8').trim();
 const ok = (n, c, i = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (i ? ' :: ' + String(i).slice(0, 300) : ''));
-const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: body ? JSON.stringify(body) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
+const api = async (path, method = 'GET', body) => { const r = await fetch(B + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: body ? JSON.stringify(body) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; };
 async function setup() {
   await api('/stream/stop', 'POST', {}); await api('/jukebox/zone', 'PUT', { deviceIds: [] }); for (const g of (await api('/groups')).j || []) await api('/groups/' + g.id, 'DELETE');
   const ids = {}; for (const [n, d] of [['Alpha', [1]], ['Bravo', [2]], ['Charlie', [3]], ['Delta', [4]]]) { ids[n] = (await api('/groups', 'POST', { name: n, deviceIds: d })).j.id; await api(`/groups/${ids[n]}/split`, 'POST', {}); }
@@ -15,7 +15,7 @@ const rgb = s => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
 const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime'];
 for (const theme of THEMES) {
   await setup();
-  const ctx = await br.newContext({ viewport: { width: 1600, height: 1500 } }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: 1600, height: 1500 } }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' })); if (!sessionStorage.getItem('i')) { sessionStorage.setItem('i', '1'); localStorage.removeItem('wavwiz.devorder.v1'); } });
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2000); await p.locator('.phone-unlock').click({ timeout: 800 }).catch(() => {});
   await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme); await p.waitForTimeout(400);

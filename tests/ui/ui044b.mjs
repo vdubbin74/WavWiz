@@ -5,7 +5,7 @@ const B = process.env.WW_URL || 'http://172.30.0.2:47800', sess = readFileSync(p
 const SHOTS = process.env.SHOTS; const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
 let pass = 0, fail = 0; const ok = (c, m) => { if (c) { pass++; console.log('ok  ', m); } else { fail++; console.log('FAIL', m); } };
 const want = k => !ONLY.length || ONLY.includes(k);
-const api = (u, m = 'GET', body) => fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined });
+const api = (u, m = 'GET', body) => fetch(B + '/api/v1' + u, { method: m, headers: { cookie: 'wavwiz_session=' + sess, 'content-type': 'application/json', origin: B }, body: body ? JSON.stringify(body) : undefined });
 // fixtures: capped speakers (F18/F19) + an alarm and a scene used by a schedule (F1-F3), idempotent
 for (const id of [3, 5]) await api(`/zones/${id}/volcap`, 'PUT', { cap: 64, locked: true });
 { const sc = await (await api('/schedules')).json().catch(() => []); const scenes = await (await api('/scenes')).json().catch(() => []);
@@ -16,7 +16,7 @@ for (const id of [3, 5]) await api(`/zones/${id}/volcap`, 'PUT', { cap: 64, lock
 const br = await chromium.launch();
 export async function open(dpr, panels, w = 1920, h = 1080) {
   const ctx = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(pn => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); }, panels);
   const p = await ctx.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2600); 
   return { ctx, p };

@@ -6,7 +6,7 @@ const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : '
 const br = await chromium.launch();
 for (const [vw, vh, dpr, sc] of [[1920, 1080, 1, 'compact'], [960, 540, 2, 'tiny']]) for (const lay of ['full', 'roomy', 'classic']) for (const exp of [false, true]) {
   const tg = `[${lay} ${sc} exp=${exp}]`;
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([lay, sc]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); if (sessionStorage.getItem('f80')) return; sessionStorage.setItem('f80', '1'); localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.layout', lay); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' })); }, [lay, sc]);
   await c.route(/\/api\/v1\/zones(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); for (const z of j) z.connected = true; await r.fulfill({ response: res, json: j }); } catch { } });   // live speakers: active zones with handles
   await c.route(/\/api\/v1\/(groups\/\d+|zones\/\d+\/group)(\?|$)/, async r => { if (r.request().method() === 'GET') return r.fallback(); await r.fulfill({ status: 200, json: {} }); });   // a drop never changes the server

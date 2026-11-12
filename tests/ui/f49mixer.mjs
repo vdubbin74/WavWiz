@@ -5,7 +5,7 @@ import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 import { scaleTo, groupLevel, changed } from '../../src/WavWiz.Server/wwwroot/js/mixer-core.js';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(); let pass = 0, fail = 0;
 const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
-const API = (p, o = {}) => fetch(B + '/api/v1' + p, { method: o.method || 'GET', headers: { cookie: 'unison_session=' + sess, 'content-type': 'application/json', origin: B }, body: o.body ? JSON.stringify(o.body) : undefined }).then(r => r.json());
+const API = (p, o = {}) => fetch(B + '/api/v1' + p, { method: o.method || 'GET', headers: { cookie: 'wavwiz_session=' + sess, 'content-type': 'application/json', origin: B }, body: o.body ? JSON.stringify(o.body) : undefined }).then(r => r.json());
 // ---- math
 ok('scale: whole-home 60 -> 30 halves every speaker', JSON.stringify(scaleTo([60, 30, 15], 30)) === JSON.stringify([30, 15, 7.5]));
 ok('scale: up keeps ratios', JSON.stringify(scaleTo([50, 25], 100)) === JSON.stringify([100, 50]));
@@ -15,7 +15,7 @@ ok('scale: from the drag snapshot, down to 0 and back keeps ratios', JSON.string
 ok('level is the loudest member', groupLevel([10, 70, 30]) === 70 && groupLevel([]) === 0);
 ok('changed lists only real moves', JSON.stringify(changed([10, 20], [10, 25])) === '[[1,25]]');
 const br = await chromium.launch();
-const open = async (vw, vh, d, sc, extra = {}) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d, ...extra }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+const open = async (vw, vh, d, sc, extra = {}) => { const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: d, ...extra }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(sc => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '1'); localStorage.setItem('wavwiz.webRoom.name', 'Office Desk'); localStorage.setItem('wavwiz.webRoom.id', 'f51-office-desk');
     localStorage.setItem('wavwiz.uiscale', sc); localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'open' })); }, sc);
   // headless browsers never unlock audio, so the test web speaker "Office Desk" never reports connected; the test marks it connected in the

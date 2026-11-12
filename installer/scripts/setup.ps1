@@ -36,13 +36,8 @@ try {
     if ($pf.Problems.Count -gt 0) { throw ("Pre-flight check failed - no service, rule or setting was touched:`r`n" + (($pf.Problems | ForEach-Object { " - $_" }) -join "`r`n")) }
     $notices = New-Object System.Collections.Generic.List[string]; $bind = ''; $port = $HttpPort
 
-    # 0.0.3: an earlier "Unison" install (service, data folder, firewall rules, autostart, program folder) is moved over first, so that everything below sees the WavWiz layout
-    Set-Step 'setup: checking for an earlier Unison installation'
-    $mig = Invoke-LegacyMigration -NewRoot $Root
-    foreach ($n in $mig.Notes) { $notices.Add([string]$n) }
-    if ($mig.Found) { $notices.Add('Upgraded from Unison: your library, settings, administrator password and paired players were kept. This PC and your phones use WavWiz now; PCs running the old Unison Player keep working until you update them.') }
     # F173: only the stable WavWiz AppId may remain in Apps & features
-    Set-Step 'setup: removing stray WavWiz/Unison Apps & features entries'
+    Set-Step 'setup: removing stray WavWiz Apps & features entries'
     try { [void](Remove-StrayWavWizArp) } catch { Say ("ARP scrub skipped: " + $_.Exception.Message) }
 
     if ($Role -in 'server', 'both') {

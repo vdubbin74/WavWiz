@@ -3,7 +3,7 @@ import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), TAG = process.env.TAG, S = '/workspace/screens/wavwiz-045-T1c-';
 const br = await chromium.launch(); const log = [];
 async function pg(d, { panels = null, np = null, url = '/', w = 1920, h = 1080, touch = false, spk = null } = {}) {
-  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: d, hasTouch: touch, isMobile: touch }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: d, hasTouch: touch, isMobile: touch }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([pn, np, sp]) => { localStorage.clear(); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0');
     if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify({ ...pn, ctlSet: true })); if (np) localStorage.setItem('wavwiz.npstyle.v1', JSON.stringify({ style: np })); if (sp) sessionStorage.setItem('wavwiz.spk', String(sp)); }, [panels, np, spk]);
   const p = await c.newPage(); await p.goto(B + url); await p.waitForTimeout(2800); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close())); return { c, p };

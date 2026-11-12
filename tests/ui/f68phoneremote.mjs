@@ -9,7 +9,7 @@ const item = { id: 1, kind: 'track', title: 'Online', artist: 'Northern Lights',
 const br = await chromium.launch();
 async function open(vp, mobile, style = 'classic') {
   const c = await br.newContext({ viewport: vp, deviceScaleFactor: mobile ? 3 : 1, isMobile: mobile, hasTouch: mobile });
-  await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(st => { for (const [k, v] of [['wavwiz.whatsnew', '9.9.9'], ['wavwiz.gettingStarted.shown', '1'], ['wavwiz.webRoom.autojoin', '0'], ['wavwiz.a2hs.dismissed', '1']]) localStorage.setItem(k, v); if (!sessionStorage.getItem('f68')) { sessionStorage.setItem('f68', '1'); localStorage.setItem('wavwiz.npstyle.v1', JSON.stringify({ style: st })); } }, style);
   await c.route(/\/api\/v1\/stream(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); j.now = { ...j.now, state: 'playing', positionMs: 83000, durationMs: 214000, notice: null, item }; await r.fulfill({ response: res, json: j }); } catch { /* context closed */ } });
   await c.route(/\/api\/v1\/groups(\?|$)/, async r => { try { const res = await r.fetch(), j = await res.json(); for (const g of j) g.now = { state: 'playing', title: item.title, artist: item.artist, album: item.album, kind: 'track', refId: 10, artUrl: art, positionMs: 83000, durationMs: 214000, live: false }; await r.fulfill({ response: res, json: j }); } catch { /* context closed */ } });

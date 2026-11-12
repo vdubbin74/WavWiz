@@ -5,7 +5,7 @@ const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf
 const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
 const br = await webkit.launch();
 for (const mode of ['standalone', 'safari']) {
-  const c = await br.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([m]) => { if (m === 'standalone') Object.defineProperty(navigator, 'standalone', { get: () => true }); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); }, [mode]);
   const p = await c.newPage(); const ids = [], delays = [];
   for (let i = 0; i < 3; i++) { await p.goto(B + '/'); await p.waitForTimeout(1500);

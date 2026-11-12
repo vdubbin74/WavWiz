@@ -10,14 +10,14 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await (ENG === 'webkit' ? webkit : chromium).launch();
 const ST = { devexp: { lib: 'normal', dev: 'normal', exp: 'dev', list: 'open', ctl: 'collapsed' }, normal: { lib: 'normal', dev: 'normal', exp: null, list: 'open', ctl: 'collapsed' } };
 async function page(w, h, panels, { scale = 'compact', theme = null, url = '/', sel = null, phone = false } = {}) {
-  const ctx = await br.newContext({ viewport: { width: w, height: h }, hasTouch: phone, isMobile: phone, deviceScaleFactor: 1 }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: w, height: h }, hasTouch: phone, isMobile: phone, deviceScaleFactor: 1 }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(([pn, sc, sl]) => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.uiscale', sc); if (pn) localStorage.setItem('wavwiz.panels', JSON.stringify(pn)); if (sl) localStorage.setItem('wavwiz.zone', sl); if (!sessionStorage.getItem('ww040init')) { sessionStorage.setItem('ww040init', '1'); localStorage.removeItem('wavwiz.devorder.v1'); } }, [panels, scale, sel]);
   const p = await ctx.newPage(); await p.goto(B + url); await p.waitForTimeout(2000); await p.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {});
   if (theme) await p.evaluate(async id => { const t = await import('/js/theme.js'); t.applyTheme({ ...t.PRESETS[id], preset: id }); }, theme);
   await p.waitForTimeout(500); return { ctx, p };
 }
 const api = (p, path, method = 'GET', body) => p.evaluate(async ([path, method, body]) => { const r = await fetch('/api/v1' + path, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); let j = null; try { j = await r.json(); } catch { } return { s: r.status, j }; }, [path, method, body]);
-const boot = await (await br.newContext()).newPage(); await boot.context().addCookies([{ name: 'unison_session', value: sess, url: B }]); await boot.goto(B + '/api/v1/auth/state').catch(() => {});
+const boot = await (await br.newContext()).newPage(); await boot.context().addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); await boot.goto(B + '/api/v1/auth/state').catch(() => {});
 
 // ---- the scenario from the approved mockups: Kitchen and Living Room each have their own music, Basement + Patio are linked, Deck + Garage are the Jukebox
 async function scenario() {

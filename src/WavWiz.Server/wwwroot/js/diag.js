@@ -174,10 +174,9 @@ export function diagnosticsView(S) {
   return { el: root, reload: build, refresh };
 }
 
-/* 0.2.0 item 12: the "checklist dismissed" flag moved from unison.checklist.dismissed to wavwiz.checklist.dismissed (old value read once). */
 export const CHECK_KEY = 'wavwiz.checklist.dismissed';
 export function checklistDismissedLocal() {
-  try { const v = localStorage.getItem(CHECK_KEY); if (v != null) return v === '1'; const old = localStorage.getItem('unison.checklist.dismissed'); if (old != null) { localStorage.setItem(CHECK_KEY, old); localStorage.removeItem('unison.checklist.dismissed'); } return old === '1'; } catch { return false; }
+  try { return localStorage.getItem(CHECK_KEY) === '1'; } catch { return false; }
 }
 async function dismissChecklist(S, on = true) {
   try { localStorage.setItem(CHECK_KEY, on ? '1' : '0'); } catch { /* ignore */ }

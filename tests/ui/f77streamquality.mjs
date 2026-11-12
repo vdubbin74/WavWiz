@@ -3,15 +3,15 @@
 import { chromium } from 'playwright'; import { readFileSync } from 'node:fs';
 const B = 'http://172.30.0.2:47800', sess = readFileSync('/tmp/ww032/sess', 'utf8').trim(), OUT = '/workspace/screens/049-quality'; let pass = 0, fail = 0;
 const ok = (n, c, x = '') => { c ? pass++ : fail++; if (!c || process.env.V) console.log((c ? 'ok   ' : 'FAIL ') + n + (c ? '' : '  ' + x)); };
-const call = (m, u, b) => fetch(B + '/api/v1' + u, { method: m, headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: b ? JSON.stringify(b) : undefined }).then(r => r.json().catch(() => ({})));
+const call = (m, u, b) => fetch(B + '/api/v1' + u, { method: m, headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: b ? JSON.stringify(b) : undefined }).then(r => r.json().catch(() => ({})));
 const rate = async () => String((await call('GET', '/settings'))['playback.streamRate'] ?? '48000');
 await call('PUT', '/settings', { 'playback.streamRate': '48000' });
-const bad = await fetch(B + '/api/v1/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: B, cookie: 'unison_session=' + sess }, body: JSON.stringify({ 'playback.streamRate': '192000' }) });
+const bad = await fetch(B + '/api/v1/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: B, cookie: 'wavwiz_session=' + sess }, body: JSON.stringify({ 'playback.streamRate': '192000' }) });
 ok('the server refuses a rate other than 48000/96000', bad.status === 400, bad.status);
 const br = await chromium.launch();
 try {
   for (const [vw, vh, dpr, nm] of [[1920, 1080, 1, 'desktop-100'], [960, 540, 2, 'desktop-200'], [390, 844, 3, 'phone']]) { const tg = `[${nm}]`;
-    const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: vw < 700, hasTouch: vw < 700 }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+    const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: vw < 700, hasTouch: vw < 700 }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
     await c.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); });
     const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(x => x.close()));
     await p.evaluate(async () => { const m = await import('/js/main.js'); m.go('settings:playback'); }); await p.waitForTimeout(1500);

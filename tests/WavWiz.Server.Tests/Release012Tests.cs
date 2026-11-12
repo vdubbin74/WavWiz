@@ -27,25 +27,6 @@ public class Release012Tests
     }
 
     [Fact]
-    public void Unison_db_renames_to_wavwiz_db_on_first_open()
-    {
-        using var t = new TempDir();
-        var seedPath = Path.Combine(t.Path, "seed.db");
-        var db = new Db(seedPath); db.Migrate();
-        var old = Path.Combine(t.Path, "unison.db");
-        File.Move(seedPath, old);
-        foreach (var s in new[] { "-wal", "-shm" })
-        {
-            var p = seedPath + s; if (File.Exists(p)) File.Move(p, old + s);
-        }
-        var cfg = new ServerConfig { DataDir = t.Path };
-        var path = cfg.DbPath;
-        Assert.EndsWith(Path.DirectorySeparatorChar + "wavwiz.db", path);
-        Assert.True(File.Exists(path));
-        Assert.False(File.Exists(old));
-    }
-
-    [Fact]
     public void ClearPassword_forces_setup_without_wiping_other_settings()
     {
         using var t = new TempDir();

@@ -21,7 +21,7 @@ function fakeS() {
 for (const scale of [1, 2]) {
   const tag = scale === 1 ? '100' : '200';
   const ctx = await br.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scale });
-  await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => {
     localStorage.setItem('wavwiz.whatsnew', '9.9.9');
     localStorage.setItem('wavwiz.gettingStarted.shown', '1');

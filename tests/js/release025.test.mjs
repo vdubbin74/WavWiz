@@ -153,7 +153,7 @@ test('0.2.5 D: What\'s new puts the 0.2.5 items first and keeps the 0.2.4 ones; 
   assert.ok(cl.indexOf('## [0.2.5]') > 0 && cl.indexOf('## [0.2.5]') < cl.indexOf('## [0.2.4]'));
   const sec = cl.slice(cl.indexOf('## [0.2.5]'), cl.indexOf('## [0.2.4]'));
   for (const x of ['AudioSession category is not compatible with audio capture', 'mic-only page', 'play-and-record', 'Bluetooth mics add their own delay, so results may be off. A wired or USB mic is recommended.', 'Phone role', 'about 1200 px']) assert.ok(sec.includes(x), x);
-  assert.doesNotMatch(sec, /\b[UTF]\d+\b|Unison|colour|behaviour/);
+  assert.doesNotMatch(sec, /\b[UTF]\d+\b|colour|behaviour/);
 });
 
 test('device card More menu stays closed until More is tapped (display:flex must not override [hidden])', () => {

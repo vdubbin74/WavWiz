@@ -26,7 +26,6 @@ foreach ($f in $exe, $ffmpeg, (Join-Path $serverDir 'wwwroot\index.html')) { if 
 Set-Step 'server: data folder and permissions'
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 Grant-ServiceDataAccess $DataDir
-Rename-WavWizLibraryDb $DataDir
 
 Set-Step 'server: server.json (merge with any existing file)'
 $cfgPath = Join-Path $DataDir 'server.json'

@@ -9,7 +9,7 @@ mkdirSync('/workspace/screens', { recursive: true });
 const br = await (ENG === 'webkit' ? webkit : chromium).launch(ENG === 'webkit' ? {} : { args: ['--autoplay-policy=no-user-gesture-required'] });
 const THEMES = ['default', 'pepecoin', 'ember', 'arctic', 'violet', 'mono', 'daylight', 'nebula', 'steel', 'lime'];
 async function page(w, h, panels, theme) {
-  const ctx = await br.newContext({ viewport: { width: w, height: h } }); await ctx.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const ctx = await br.newContext({ viewport: { width: w, height: h } }); await ctx.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await ctx.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const p = await ctx.newPage(); p._errs = []; p.on('pageerror', e => { if (!/access control|Load failed/.test(e.message)) p._errs.push(e.message); });
   await p.goto(B + '/'); await p.evaluate(v => { if (v) localStorage.setItem('wavwiz.panels', JSON.stringify(v)); }, panels); await p.goto(B + '/'); await p.waitForTimeout(2500);
@@ -97,7 +97,7 @@ await step('L47 full-screen visualizer hover player', async () => {
   await ctx.close();
 });
 await step('L48 queue item menu: desktop right-click, locked, phone long-press', async () => {
-  const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'unison_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
+  const api = async (p, m = 'GET', b) => { const r = await fetch(B + '/api/v1' + p, { method: m, headers: { Cookie: 'wavwiz_session=' + sess, Origin: B, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); const t = await r.text(); try { return JSON.parse(t); } catch { return t; } };
   await api('/queue/clear', 'POST', {}); const lib = await api('/library/tracks?limit=20'); await api('/queue/add', 'POST', { kind: 'tracks', ids: lib.slice(0, 6).map(t => t.id) });
   const { ctx, p } = await page(1920, 1080, NORMAL); await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (/plcol|queuecols|pl\.layout/i.test(k)) { try { const v = JSON.parse(localStorage.getItem(k)); v.locked = false; localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } } }); await p.reload(); await p.waitForTimeout(2500); await p.locator('.phone-unlock').click({ timeout: 1000 }).catch(() => {});
   const row = p.locator('.qtable tbody tr[data-i]').nth(2); await row.click({ button: 'right' }); await p.waitForTimeout(300);
@@ -112,7 +112,7 @@ await step('L48 queue item menu: desktop right-click, locked, phone long-press',
   ok('L48 locked: Remove / Move to top / Move to bottom disabled, others enabled', dis.filter(([id, d]) => ['remove', 'top', 'bottom'].includes(id)).every(([, d]) => d) && dis.filter(([id]) => !['remove', 'top', 'bottom'].includes(id)).every(([, d]) => !d), JSON.stringify(dis));
   ok('L48 locked: lock hint shown', /locked/.test(hint || '') && /locked/.test(await p.locator('.qmenu .qm-note').textContent()), hint);
   await p.keyboard.press('Escape'); await p.click('.pllock').catch(() => {}); await ctx.close();
-  const ph = await br.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }); await ph.addCookies([{ name: 'unison_session', value: sess, url: B }]); await ph.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
+  const ph = await br.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }); await ph.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]); await ph.addInitScript(() => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); });
   const pp = await ph.newPage(); await pp.goto(B + '/'); await pp.waitForTimeout(2500); await pp.locator('.phone-unlock').click({ timeout: 1500 }).catch(() => {}); await pp.evaluate(async () => (await import('/js/main.js')).go('queue')); await pp.waitForTimeout(900);
   const hasRows = await pp.locator('.qlist .item').count(); ok('L48 phone queue rows present', hasRows >= 3, hasRows);
   await pp.evaluate(() => { const el = document.querySelectorAll('.qlist .item')[1]; const mk = (type) => { const t = new Touch({ identifier: 1, target: el, clientX: 120, clientY: 300 }); el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] })); }; mk('touchstart'); });

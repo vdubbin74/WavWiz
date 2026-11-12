@@ -6,7 +6,7 @@ const ok = (n, c, x = '') => { c ? pass++ : fail++; console.log((c ? 'ok   ' : '
 if (SH) mkdirSync(OUT, { recursive: true });
 const br = await chromium.launch();
 for (const [z, vw, vh, dpr, u] of [['100', 1920, 1080, 1, 'compact'], ['200-tiny', 960, 540, 2, 'tiny'], ['phone', 390, 844, 3, 'compact']]) {
-  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: z === 'phone' }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: z === 'phone' }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(u => { localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.webRoom.autojoin', '0'); localStorage.setItem('wavwiz.uiscale', u); localStorage.setItem('wavwiz.layout', 'full'); }, u);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(2500); await p.evaluate(() => document.querySelectorAll('dialog[open]').forEach(e => e.close()));
   await p.evaluate(() => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))); await p.waitForTimeout(1200);

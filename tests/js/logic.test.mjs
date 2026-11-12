@@ -54,7 +54,7 @@ test('volumeToGain matches the Windows player taper', () => {
 // ---------------- wire
 test('wire: JSON frame round trip, byte-exact header', () => {
   const f = wire.encodeJson(wire.MSG.Hello, 7, { playerId: 'web-1', name: 'Phone' });
-  assert.deepEqual([...f.slice(0, 4)], [0x55, 0x4E, 0x53, 0x4E]); assert.equal(f[4], 1); assert.equal(f[5], 1);
+  assert.deepEqual([...f.slice(0, 4)], [0x57, 0x56, 0x57, 0x5A]); assert.equal(f[4], 1); assert.equal(f[5], 1);
   const [m] = new wire.FrameParser().push(f); assert.equal(m.type, 1); assert.equal(m.seq, 7); assert.deepEqual(wire.decodeJson(m.payload), { playerId: 'web-1', name: 'Phone' });
 });
 test('wire: audio round trip is exact to 24 bits, including negative samples and full scale', () => {
@@ -109,7 +109,7 @@ test('theme: Midnight Neon default (orange #FF3C00 + teal); five presets incl. V
 });
 test('theme: a device that saved the 0.0.2 default preset id loads as Default', () => {
   const store = {}; globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } };
-  store['unison.theme.v1'] = JSON.stringify({ accent: '#FF3C00', accent2: '#19C3B1', bg: '#14171A', preset: 'b' + 'rowns' });
+  store['wavwiz.theme.v1'] = JSON.stringify({ accent: '#FF3C00', accent2: '#19C3B1', bg: '#14171A', preset: 'b' + 'rowns' });
   assert.equal(theme.loadTheme().preset, 'default'); delete globalThis.localStorage;
 });
 test('theme: hex helpers, luminance, derive makes readable text on every preset', () => {

@@ -8,7 +8,7 @@ const THEMES = { ember: { accent: '#FF5A1F', accent2: '#FFB347', hl: '#4FC3F7', 
 const br = await chromium.launch();
 for (const [theme, np, sc, w, h, dpr] of [['ember', 'classic', '100', 1920, 1080, 1], ['ember', 'center', '200', 960, 540, 2], ['arctic', 'stack', '100', 1920, 1080, 1], ['arctic', 'horizon', '200', 960, 540, 2], ['arctic', 'center', '100', 1920, 1080, 1]]) {
   const T = `${theme}/${np}/${sc}`;
-  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'unison_session', value: sess, url: B }]);
+  const c = await br.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr }); await c.addCookies([{ name: 'wavwiz_session', value: sess, url: B }]);
   await c.addInitScript(([s, t, t2, np]) => { if (sessionStorage.f83) return; sessionStorage.f83 = 1; localStorage.clear(); for (const [k, v] of [['wavwiz.whatsnew', '9.9.9'], ['wavwiz.gettingStarted.shown', '1'], ['wavwiz.webRoom.autojoin', '0'], ['wavwiz.layout', 'full'], ['wavwiz.uiscale', s], ['wavwiz.npstyle.v1', JSON.stringify({ style: np })], ['wavwiz.theme.v1', JSON.stringify({ preset: t, ...t2 })],
     ['wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null, list: 'collapsed', ctl: 'collapsed', ctlSet: true })]]) localStorage.setItem(k, v); }, [sc, theme, THEMES[theme], np]);
   const p = await c.newPage(); await p.goto(B + '/'); await p.waitForTimeout(1500);
