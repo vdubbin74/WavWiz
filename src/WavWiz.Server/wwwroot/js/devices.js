@@ -1,5 +1,5 @@
 import { wsel } from './wwselect.js';
-import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler } from './devorder.js';
+import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler, getCardOrder } from './devorder.js';
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
 import { centerEq } from './centerview.js';
@@ -913,7 +913,7 @@ function tree42Kit(S, ctl, X) {
     (S.groups || []).map(g => [g.now?.state, g.now?.title, g.now?.artist, g.now?.durationMs, Math.floor((g.now?.positionMs || 0) / 10000), (g.now?.positionMs || 0) > 0]), S.jb?.own ? [S.jb.now?.title, S.jb.now?.state] : null]);
   const openSig42 = () => { let a = '', b = ''; try { a = sessionStorage.getItem('wavwiz.qb42.open') || ''; } catch { /* */ } try { b = localStorage.getItem('wavwiz.zfold') || ''; } catch { /* */ } return a + '|' + b; };   // F266: zone folds rebuild the tree   // DIG-R1: idle expand preference participates in cache
   const sig42 = () => JSON.stringify([!!S.cast?.active, (S.zones || []).map(z => [z.id, z.name, z.enabled, z.connected, z.muted, z.volLocked, z.volCap, z.room?.state, z.reference, chosenOutput(z)?.notCalibrated, z.outputs?.length]),
-    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), openSig42()]);   // 0.4.6 F30 + DIG-R1 open pref
+    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
   const st42 = { get spk() { return X.spk; }, get zone() { return X.zsel; },
     onZone: id => { X.zsel = id; X.spk = null; try { sessionStorage.removeItem('wavwiz.spk'); } catch { /* private mode */ } if (X.size === 'expanded' || X.size === 'phone') X.draw(true); else { X.f69from = X.size; ctl.setDevSize?.('expanded'); } },
     onSpk: id => { const z = (S.zones || []).find(x => x.id === id); const g = (S.groups || []).find(x => (x.deviceIds || []).includes(id)); X.zsel = g ? g.id : null; if (X.size === 'expanded' || X.size === 'phone') X.setSpk(id); else { X.f69from = X.size; X.spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } void z; } };
@@ -923,7 +923,8 @@ function tree42Kit(S, ctl, X) {
   // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
   const memSig42 = () => JSON.stringify((S.groups || []).map(g => [g.id, g.deviceIds || []]));
   const treeNode = force => {
-    const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42(), memMoved = !!tnode && mem !== tmem;
+    // 0.6.9 #12: a card-order change (this user's drop / Move up, or another client's) is a deliberate move like F269 membership: rebuild at once, never held by hover
+    const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42() + '|' + JSON.stringify(getCardOrder()), memMoved = !!tnode && mem !== tmem;
     // DIG-R1: open preference change always rebuilds (foldSig also guards patch paths)
     if (!force && openSg === topen && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
     // F151: a status flap (online / buffering / muted / cap) changed sig42 but not the tree's layout: swap only the rows that differ instead of

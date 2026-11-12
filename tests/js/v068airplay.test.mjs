@@ -61,8 +61,10 @@ test('AirPlay speakers card sits below Unassigned as a real zone card; no header
   const t = rd('js/tree42.js');
   assert.doesNotMatch(t, /apsetup-btn/);
   assert.doesNotMatch(t, /AirPlay…/);
-  assert.match(t, /root\.append\(unBox\)/);
-  assert.match(t, /if \(admin\) \{ const apc = airPlaySetupCard\(S, ctl\); if \(apc\) root\.append\(apc\); \}/);
+  // 0.6.9 #12: every card (zones, Jukebox, Unassigned, AirPlay) is user-orderable; with no saved order AirPlay is still listed after Unassigned, admins only
+  assert.match(t, /cardList\.push\(\{ key: 'unassigned', keys: \['unassigned'\], el: unBox \}\);/);
+  assert.match(t, /if \(admin\) \{[^\n]*const apc = airPlaySetupCard\(S, ctl\); if \(apc\) cardList\.push\(\{ key: 'airplay'/);
+  assert.ok(t.indexOf("key: 'unassigned'") < t.indexOf("key: 'airplay'"));
   const src = rd('js/airplaysetup.js');
   assert.match(src, /export function openAirPlaySetup/);
   assert.match(src, /apsetup-card/);
