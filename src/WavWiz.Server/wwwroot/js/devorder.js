@@ -60,6 +60,14 @@ export async function saveCardOrder(keys, put) {
   catch (e) { setCardOrder(prev); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } throw e; }
 }
 const zoneIdsOf = list => list.filter(k => k.startsWith('g:')).map(k => k.slice(2));
+/** 0.6.9 #12 fix: what dropping a dragged Devices card at height y over card `toKey` does (pure). A zone card dropped on the MIDDLE band
+ *  (30-70 %) of another zone card links the two zones (the 0.4.1 zone-onto-zone action, POST /groups/{from}/link); near the top or bottom
+ *  edge - or over a Jukebox / Unassigned / AirPlay card, or when a non-zone card is dragged - it only reorders (before / after). */
+export function cardDropMode(rect, y, fromKey, toKey) {
+  const zone = k => String(k || '').startsWith('g:');
+  if (zone(fromKey) && zone(toKey) && fromKey !== toKey && inMiddle(rect, y)) return 'link';
+  return y > rect.top + rect.height / 2 ? 'after' : 'before';
+}
 export const orderedZones = zs => applyOrder(zs, loadOrder().z);
 /** Zones in the shared server card order when there is one (phone page, menus and the tree agree), else this device's old saved order. */
 export const orderedGroups = gs => applyOrder(gs, cardOrder ? zoneIdsOf(cardOrder) : loadOrder().g);

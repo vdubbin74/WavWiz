@@ -9,7 +9,7 @@ import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
 import { airPlaySetupCard, setApCardDecor } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
 import { castSetupCard } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
-import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder } from './devorder.js';   // 0.6.9 #12: one server-side card order
+import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
@@ -378,7 +378,10 @@ export function treeEl(S, ctl, kit, st) {
   // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
   // 0.6.9 #12: ANY card (zones online or not, Jukebox, Unassigned, AirPlay) drags by its ⋮ handle; the drop saves the whole order on the server
   root.dataset.reorder = admin ? '1' : '0';
-  if (admin) attachZoneDrag(root, () => shownCards, (from, to, after) => putOrder(moveCard(shownCards, from, to, after)));
+  // 0.6.9 #12 fix: a zone dropped on the middle of another zone links them (play the same music, in sync) - the 0.4.1 zone-onto-zone action;
+  // dropped near a card's top / bottom edge it reorders (insertion line)
+  const linkZones = async (fromId, toId) => { if (!fromId || !toId || fromId === toId) return; try { await api(`/groups/${fromId}/link`, { method: 'POST', body: { with: toId } }); toast(`${zname(fromId)} now plays the same music as ${zname(toId)}`); done(); } catch (e) { toast(e.message, true); } };
+  if (admin) attachZoneDrag(root, () => shownCards, (from, to, after) => putOrder(moveCard(shownCards, from, to, after)), linkZones);
   // 0.4.9 F69: a tap / click on a speaker row (not its handle, name button or controls) opens that speaker's settings
   root.addEventListener('click', ev => { const row = ev.target.closest('.sp42[data-device-id]'); if (!row || !root.contains(row) || ev.defaultPrevented || ev.target.closest('button,input,select,a[href],[role="slider"],.dgrip42,.tagact')) return;
     ev.stopPropagation(); st.onSpk(+row.dataset.deviceId); });
@@ -418,7 +421,7 @@ const BOXSKIP = 'button,input,select,textarea,a[href],[role="slider"],[role="swi
 const ZSKIP = 'button:not(.zname),input,select,textarea,a[href],[role="slider"],.qb42-vol,.zacts,.zgut42,.zl-now,.tagact,.dgrip42,.zsp42';
 // 0.6.9 #12: every top-level card is a drag source and a target - zone boxes (by their ⋮ zone-actions gutter), the Jukebox, Unassigned and the
 // AirPlay card (by their ⋮ .cgrip69 handle). Alt+Up / Alt+Down on a handle moves the card one place. The drop hands (fromKey, toKey, after) to onMove.
-function attachZoneDrag(root, cards, onMove) {
+function attachZoneDrag(root, cards, onMove, onLink) {
   if (root._zdrag69) return; root._zdrag69 = true;
   const top = () => [...root.querySelectorAll(':scope > [data-card]')];
   root.addEventListener('click', ev => { if (ev.target.closest?.('[data-justdragged]')) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);   // a finished drag is not also a click
@@ -432,15 +435,22 @@ function attachZoneDrag(root, cards, onMove) {
     const box = grab.closest('[data-card]'); if (!box || box.parentElement !== root) return;
     const all = top(); if (all.length < 2) return;
     const from = box.dataset.card; let offs = [], where = null;
-    const clear = t => t.classList.remove('dropping', 'zins-before', 'zins-after');
+    const fromZone = +(grab.closest('[data-group-id]')?.dataset.groupId || box.querySelector('.zwrap42[data-group-id]')?.dataset.groupId || 0);
+    const clear = t => { t.classList.remove('dropping', 'zins-before', 'zins-after', 'droplink42'); t.querySelectorAll('.droplink42').forEach(e => { e.classList.remove('droplink42'); delete e.dataset.linklabel; }); };
     const onStart = () => {
       root.classList.add('dragging', 'zdrag'); box.classList.add('drag42-src');
       all.forEach(t => { if (t === box) return; t.classList.add('droppable');
         offs.push(pointerDropTarget(t, { accept: pl => pl?.kind === 'zone42',
-          over: (_, x, y) => { all.forEach(e => e !== t && clear(e)); const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2; where = { key: t.dataset.card, after };
-            t.classList.add('dropping'); t.classList.toggle('zins-after', after); t.classList.toggle('zins-before', !after); },
+          over: (_, x, y) => {
+            all.forEach(e => e !== t && clear(e)); clear(t);
+            // the zone under the pointer (a linked box holds several); its own middle band decides link vs reorder
+            const zw = document.elementFromPoint?.(x, y)?.closest?.('.zwrap42[data-group-id]'), zr = (zw && t.contains(zw) ? zw : t).getBoundingClientRect();
+            const mode = onLink && fromZone && zw && t.contains(zw) ? cardDropMode(zr, y, from, t.dataset.card) : cardDropMode(t.getBoundingClientRect(), y, from, 'x');
+            if (mode === 'link') { where = { key: t.dataset.card, link: +zw.dataset.groupId }; zw.classList.add('droplink42'); zw.dataset.linklabel = `Drop to link with ${zw.dataset.zone || 'this zone'}`; return; }
+            const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2; where = { key: t.dataset.card, after };
+            t.classList.toggle('zins-after', after); t.classList.toggle('zins-before', !after); },   // reorder = insertion line only (no fill)
           leave: () => clear(t),   // the engine calls leave() right before drop(), so `where` is kept
-          drop: () => { if (!where || where.key !== t.dataset.card) return; onMove(from, where.key, where.after); } })); });
+          drop: () => { if (!where || where.key !== t.dataset.card) return; if (where.link) { onLink(fromZone, where.link); return; } onMove(from, where.key, where.after); } })); });
     };
     const onEnd = () => { offs.forEach(f => f()); offs = []; root.classList.remove('dragging', 'zdrag'); box.classList.remove('drag42-src'); all.forEach(t => { clear(t); t.classList.remove('droppable'); }); };
     const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'airplay' ? 'AirPlay speakers' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
