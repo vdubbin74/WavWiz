@@ -137,7 +137,7 @@ export function treeEl(S, ctl, kit, st) {
       grip, h('span', { class: 'dot ' + dotClass(z), title: z.connected ? 'Online' : 'Offline' }),
       h('span', { class: 'sp42-nt' }, h('button', { type: 'button', class: 'dname sp42-n ell', title: `${z.name} - open its settings`, onclick: () => st.onSpk(z.id) }, z.name),
         h('span', { class: 'dtagrow sp42-tags' }, tagEls3(tags))),
-      // 0.4.3 #9: tags sit inline after the name when they fit, else wrap under it
+      // tags on their own line under the name (sp42-nt stacks them; 0.4.3 #9 had them inline)
       h('span', { class: 'sp42-v small', title: 'Volume' }, `${Math.round(z.volume)}%`),
       // 0.4.4 F25: per-speaker mute / unmute, right of the % (amber while muted)
       ro((() => { const mb = h('button', { type: 'button', class: 'mutebtn sp42-mute' + (z.muted ? ' on' : ''), 'aria-pressed': String(!!z.muted), 'aria-label': (z.muted ? 'Unmute ' : 'Mute ') + z.name, title: z.muted ? 'Unmute' : 'Mute', 'data-icon': z.muted ? 'mute' : 'volume',
@@ -357,7 +357,9 @@ export function treeEl(S, ctl, kit, st) {
     h('div', { role: 'list' }, un.length ? un.map(z => {
       const row = h('div', { class: 'sp42 un' + (st.spk === z.id ? ' sel' : '') + (z.connected ? '' : ' gone'), 'data-device-id': z.id, 'data-device': z.name, 'data-zone-id': z.id, 'data-in-zone': '', role: 'listitem' },
         ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} into a zone`, title: 'Drag into a zone', 'data-drag-device': z.id }, '⋮'), admin, 'Only an administrator can change zones.'),
-        h('span', { class: 'dot ' + dotClass(z) }), h('button', { type: 'button', class: 'dname sp42-n ell', onclick: () => st.onSpk(z.id) }, z.name), h('span', { class: 'grow' }),
+        // 0.6.8 zone fix: the same name + tag line (ANALOG, NO DELAY, REF...) as a speaker in a zone, tags on the second line under the name
+        h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'sp42-nt' }, h('button', { type: 'button', class: 'dname sp42-n ell', title: `${z.name} - open its settings`, onclick: () => st.onSpk(z.id) }, z.name),
+          h('span', { class: 'dtagrow sp42-tags' }, tagEls3(cardTags3(z)))),
         ro(h('button', { type: 'button', class: 'btn sm saddzone', onclick: ev => { ev.stopPropagation(); addMenu(z, ev.currentTarget); } }, 'Add to zone'), admin, 'Only an administrator can change zones.'));
       speakerCtx(z, row, false); return row;
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));

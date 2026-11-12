@@ -53,7 +53,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Profiles = new Features.DeviceProfileService(db, zones, dsp, cal, events);
         s.Scenes.Profiles = s.Profiles;
         s.Backup = new Features.BackupService(db, events, Path.Combine(cfg.DataDir, "backups"));
-        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); s.Links.Apply(); s.Links.EverywhereEnd(); AirPlay.AirPlaySpeakers.Attach(s, u._log.Write); s.Log = u._log.Write; Cast.CastSpeakers.Attach(s, u._log.Write);   /* 0.7.0 F169: Cast devices as Speakers + reconnect */   // F170: AirPlay outputs as Speakers + reconnect      // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
+        s.Links = new Zones.ZoneLinks(db, zones, registry, events); zones.Links = s.Links; s.Scenes.Links = s.Links; zones.MigrateSingleMembership(); zones.MigrateEverywhere(); s.Links.Apply(); s.Links.EverywhereEnd(); AirPlay.AirPlaySpeakers.Attach(s, u._log.Write); s.Log = u._log.Write; Cast.CastSpeakers.Attach(s, u._log.Write);   /* 0.7.0 F169: Cast devices as Speakers + reconnect */   // F170: AirPlay outputs as Speakers + reconnect      // 0.4.9: a phone session cut short by a restart: put the zone layout back      // 0.4.0 Stage 2
         s.Schedules.CondFor = s.Links.CondFor; s.Schedules.DevicesOf = s.Links.DevicesOf; s.Schedules.KeyName = s.Links.KeyName; s.Schedules.StopAll = s.Links.StopAll;      // 0.4.0 Stage 3: alarms / sleep timer target a zone
         s.Sleep.CondFor = s.Links.CondFor; s.Sleep.DevicesOf = s.Links.DevicesOf;
         s.Jukebox = new Features.JukeboxService(db, cond, events) { Zone = s.Links.JukeboxConductor };

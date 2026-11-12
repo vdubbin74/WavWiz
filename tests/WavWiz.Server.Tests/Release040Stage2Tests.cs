@@ -15,7 +15,7 @@ public class Release040Stage2Tests
     [Fact]
     public async Task Existing_installs_start_fully_linked_and_zones_link_split_and_link_all()
     {
-        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); f.SkipEverywhere();   // only the zones made below
         await using var a = await FakePc.StartAsync(f, "pc-a", "Kitchen Speaker"); await using var b = await FakePc.StartAsync(f, "pc-b", "Counter"); await using var c = await FakePc.StartAsync(f, "pc-c", "Patio Speaker");
         await a.WaitConnected(); await b.WaitConnected(); await c.WaitConnected();
         for (int i = 0; i < 100 && f.Server.S.Zones.Zones().Count < 3; i++) await Task.Delay(50);
@@ -48,7 +48,7 @@ public class Release040Stage2Tests
         Assert.Equal(HttpStatusCode.Forbidden, (await f.As(f.Token(Role.View)).PostAsJsonAsync("/api/v1/groups/link-all", new { })).StatusCode);
         // removing a zone drops its link
         await admin.PostAsJsonAsync($"/api/v1/groups/{p}/split", new { }); await admin.DeleteAsync($"/api/v1/groups/{p}"); Assert.DoesNotContain($"\"{p}\"", f.Server.S.Db.Setting(Zones.ZoneLinks.MapKey) ?? "");
-        Assert.Equal("default", reg.GroupOf("pc-c"));
+        Assert.Equal(ConductorRegistry.SilentGroupId, reg.GroupOf("pc-c"));   // 0.6.8 zone fix: its speaker is in no zone now, so it is silent (no house fallback)
     }
 
     [Fact]
@@ -57,6 +57,7 @@ public class Release040Stage2Tests
         await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin));
         await using var a = await FakePc.StartAsync(f, "pc-a", "Deck"); await using var b = await FakePc.StartAsync(f, "pc-b", "Kitchen");
         await a.WaitConnected(); await b.WaitConnected(); for (int i = 0; i < 100 && f.Server.S.Zones.Zones().Count < 2; i++) await Task.Delay(50);
+        f.JoinEverywhere();   // 0.6.8 zone fix: both speakers in the house zone (a speaker in no zone is silent)
         var devs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
         var j0 = await admin.GetJson("/api/v1/jukebox/zone"); Assert.False(j0.GetProperty("own").GetBoolean()); Assert.Equal(0, j0.GetProperty("deviceIds").GetArrayLength());
         Assert.Same(f.Server.S.Conductor, f.Server.S.Links.JukeboxConductor() ?? f.Server.S.Conductor);              // no speakers picked: 0.3.9 behavior

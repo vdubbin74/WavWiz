@@ -39,6 +39,15 @@ public sealed class ServerFixture : IAsyncDisposable
     }
 
     public string Token(Role role, string name = "t") => Server.S.Auth.CreateToken(name, role);
+    /// <summary>0.6.8 zone fix: a fresh server puts its first speaker into an "Everywhere" zone and every later speaker waits, silent, in Unassigned.
+    /// Call before any speaker connects to start like a house without zones (every speaker Unassigned) instead.</summary>
+    public void SkipEverywhere() => Server.S.Db.SetSetting(Zones.ZoneManager.EverywhereKey, "done");
+    /// <summary>0.6.8 zone fix: put every known speaker into the "Everywhere" zone (what a user does after adding speakers), so they all play the house music.</summary>
+    public void JoinEverywhere()
+    {
+        var z = Server.S.Zones; var ids = z.Zones().Select(x => x.Id).ToList(); var g = z.Groups().FirstOrDefault(x => x.Name == Zones.ZoneManager.EverywhereName);
+        if (g == null) z.CreateGroup(Zones.ZoneManager.EverywhereName, ids); else z.UpdateGroup(g.Id, null, ids);
+    }
     public async ValueTask DisposeAsync() { Http.Dispose(); await Server.DisposeAsync(); Dir.Dispose(); }
 }
 

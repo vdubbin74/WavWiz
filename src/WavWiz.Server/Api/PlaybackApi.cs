@@ -98,11 +98,13 @@ public static class PlaybackApi
     public static IResult? Zone(Services s, HttpContext c, JsonElement body, out Conductor cond)
     {
         var zid = c.Request.Query["zoneId"].FirstOrDefault() ?? body.Str("zoneId");
-        // 0.4.1: "g:<zone id>" names a zone (play inside a smaller zone claims its devices automatically); an unknown zone falls back to the house group instead of failing
+        // 0.4.1: "g:<zone id>" names a zone (play inside a smaller zone claims its devices automatically); an unknown zone only falls back to the house group for reads
         bool play = c.Request.Method != "GET" && (c.Request.Path.Value!.EndsWith("/stream/play") || c.Request.Path.Value!.EndsWith("/stream/resume"));
         var gid = s.Links != null && !string.IsNullOrWhiteSpace(zid) ? s.Links.ResolveZone(zid, play) : (s.Registry.Exists(zid) ? zid : null);
-        // 0.4.2: pause / stop / next / previous / clear for a zone that does not exist must NOT touch the house group (a stale client would silence the house); other calls keep the 0.4.1 fallback
-        if (gid == null && !string.IsNullOrWhiteSpace(zid) && !ConductorRegistry.IsDefault(zid) && c.Request.Method != "GET" && System.Text.RegularExpressions.Regex.IsMatch(c.Request.Path.Value ?? "", "/(stream/(pause|stop|next|prev)|queue/clear)$")) { cond = s.Conductor; return Ext.Bad("no such zone", 404); }
+        // 0.4.2: pause / stop / next / previous / clear for a zone that does not exist must NOT touch the house group (a stale client would silence the house).
+        // 0.6.8 zone fix: the same for EVERY change (play, add to queue, ...): a deleted zone is gone - its songs never land in the house group under its old name.
+        // Reads (GET) still answer with the house group and the fallback header, so a stale client can notice and re-pick its zone.
+        if (gid == null && !string.IsNullOrWhiteSpace(zid) && !ConductorRegistry.IsDefault(zid) && c.Request.Method != "GET") { cond = s.Conductor; return Ext.Bad("no such zone", 404); }
         var cd = s.Registry.Get(gid); cond = cd ?? s.Conductor;
         if (gid == null && !string.IsNullOrWhiteSpace(zid) && !ConductorRegistry.IsDefault(zid)) c.Response.Headers["X-WavWiz-Zone-Fallback"] = "1";
         return null;

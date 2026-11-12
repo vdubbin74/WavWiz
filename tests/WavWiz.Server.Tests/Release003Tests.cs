@@ -97,11 +97,11 @@ public class ZonesAndForgetTests
         var upd = await admin.PatchAsJsonAsync($"/api/v1/groups/{gid}", new { name = "Ground floor", deviceIds = new[] { ida, idb } }); upd.EnsureSuccessStatusCode();
         Assert.Equal(2, (await upd.Json()).GetProperty("members").GetInt32());
         (await admin.PostAsync($"/api/v1/groups/{gid}/activate", null)).EnsureSuccessStatusCode();
-        var gs = await admin.GetJson("/api/v1/groups"); Assert.True(gs.EnumerateArray().First().GetProperty("active").GetBoolean());
+        var gs = await admin.GetJson("/api/v1/groups"); Assert.True(gs.EnumerateArray().First(x => x.GetProperty("id").GetInt64() == gid).GetProperty("active").GetBoolean());
         // a device that is in no zone is "unassigned"
         var zs = await admin.GetJson("/api/v1/zones"); Assert.All(zs.EnumerateArray(), z => Assert.Contains(gid, z.GetProperty("groupIds").EnumerateArray().Select(x => x.GetInt64())));
         Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
-        Assert.Empty((await admin.GetJson("/api/v1/groups")).EnumerateArray());
+        Assert.DoesNotContain((await admin.GetJson("/api/v1/groups")).EnumerateArray(), x => x.GetProperty("id").GetInt64() == gid);   // (the fresh setup's "Everywhere" zone stays)
         zs = await admin.GetJson("/api/v1/zones"); Assert.Equal(2, zs.GetArrayLength()); Assert.All(zs.EnumerateArray(), z => Assert.Equal(0, z.GetProperty("groupIds").GetArrayLength()));       // devices are untouched
         Assert.Equal(HttpStatusCode.NotFound, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
     }
@@ -133,7 +133,7 @@ public class ZonesAndForgetTests
         var sw = System.Diagnostics.Stopwatch.StartNew(); while (!a.Client.State.NotPaired && sw.ElapsedMilliseconds < 8000) await Task.Delay(50);
         Assert.True(a.Client.State.NotPaired, "the running player must learn that it was removed"); Assert.Equal("notpaired", a.Client.State.Health);
         var zs = await admin.GetJson("/api/v1/zones"); Assert.Equal(new[] { "pc-b" }, zs.EnumerateArray().Select(z => z.GetProperty("playerId").GetString()!).ToArray());
-        var gs = await admin.GetJson("/api/v1/groups"); Assert.Equal(1, gs.EnumerateArray().First().GetProperty("members").GetInt32());
+        var gs = await admin.GetJson("/api/v1/groups"); Assert.Equal(1, gs.EnumerateArray().First(x => x.GetProperty("name").GetString() == "Both").GetProperty("members").GetInt32());
         await Task.Delay(1500); Assert.True(a.Client.State.NotPaired); Assert.False(a.Client.State.Connected);      // it stopped retrying; it does not come back by itself
         Assert.Equal(1, (await admin.GetJson("/api/v1/zones")).GetArrayLength());
         // its old token is dead

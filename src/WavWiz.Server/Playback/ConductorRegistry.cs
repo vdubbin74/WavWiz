@@ -9,7 +9,8 @@ public sealed record PlaybackGroupInfo(string Id, string Name, bool IsDefault, b
 /// <summary>
 /// 0.4.0 Stage 1. Replaces "the one Conductor" with a set of playback groups (the UI will call them zones in Stage 2).
 /// Rules:
-///  - "default" is the house group: it is today's Conductor, always exists, and every device belongs to it unless it was split off. With only the default group nothing behaves differently from 0.3.9.
+///  - "default" is the house group: it is today's Conductor and always exists. Zones that are linked play in it (ZoneLinks decides which device listens to which group).
+///  - 0.6.8 zone fix: a device in no zone is SILENT (<see cref="Silence"/>): it listens to no group at all. Nothing falls back to the house group any more.
 ///  - A device belongs to exactly ONE group at a time. <see cref="Split"/> (unlink) moves it into its own group ("p:&lt;playerId&gt;") that resumes its own saved queue, STOPPED; <see cref="Link"/> moves it (or a whole group) back into another group. The default group keeps playing through a split.
 ///  - Non-default Conductors are created lazily (first use) and keep their queue while empty so Unlink can bring it back. An idle Conductor has no decoder, no pump timer and no DSP (see Conductor.PumpArmed).
 ///  - Linked devices share one Conductor, so decode and the frame encode happen once per group, not once per device.
@@ -26,6 +27,7 @@ public sealed class ConductorRegistry : IDisposable
     private readonly Dictionary<string, string> _groupOf = new();                       // playerId -> non-default groupId (absent = default)
     private readonly Dictionary<string, IStreamSubscriber> _sessions = new();           // connected sessions we may re-subscribe on moves
     private readonly HashSet<string> _enabled = new();                                  // players that are currently switched on (subscribed somewhere)
+    private readonly HashSet<string> _silent = new();                                   // 0.6.8 zone fix: players in no zone - they listen to nothing (in memory; ZoneLinks.Apply rebuilds it at start)
     private Timer? _saveTimer;
 
     /// <summary>Production: <paramref name="make"/> builds a Conductor for a group id (must reuse the default clock).</summary>
@@ -57,7 +59,11 @@ public sealed class ConductorRegistry : IDisposable
         if (_live.TryGetValue(id, out var c)) return c;
         c = _make(id); _live[id] = c; if (_db != null) c.RestoreLast(); return c;
     }
-    public string GroupOf(string playerId) { lock (_l) return _groupOf.TryGetValue(playerId, out var g) ? g : Conductor.DefaultGroupId; }
+    /// <summary>0.6.8 zone fix: the group id of a device in no zone. It names no Conductor: the device plays nothing.</summary>
+    public const string SilentGroupId = "none";
+    public string GroupOf(string playerId) { lock (_l) return _silent.Contains(playerId) ? SilentGroupId : _groupOf.TryGetValue(playerId, out var g) ? g : Conductor.DefaultGroupId; }
+    public bool IsSilent(string playerId) { lock (_l) return _silent.Contains(playerId); }
+    /// <summary>The Conductor a device listens to. A silent device (in no zone) still gets the house Conductor here so read-only callers keep working; <see cref="Playing"/> and <see cref="Subscribe"/> know it is silent.</summary>
     public Conductor ForPlayer(string playerId) => Get(GroupOf(playerId)) ?? _default;
     /// <summary>Every materialized Conductor (default first).</summary>
     public IReadOnlyList<Conductor> Live() { lock (_l) return _live.Values.OrderBy(c => c.GroupId != Conductor.DefaultGroupId).ToList(); }
@@ -71,7 +77,7 @@ public sealed class ConductorRegistry : IDisposable
             foreach (var id in ids)
             {
                 _live.TryGetValue(id, out var c); var members = _groupOf.Where(kv => kv.Value == id).Select(kv => kv.Key).OrderBy(x => x).ToList();
-                if (id == Conductor.DefaultGroupId) members = _sessions.Keys.Where(k => !_groupOf.ContainsKey(k)).OrderBy(x => x).ToList();
+                if (id == Conductor.DefaultGroupId) members = _sessions.Keys.Where(k => !_groupOf.ContainsKey(k) && !_silent.Contains(k)).OrderBy(x => x).ToList();
                 res.Add(new(id, id == Conductor.DefaultGroupId ? "Everything" : _names[id], id == Conductor.DefaultGroupId, c != null, c?.IsIdle ?? true, members, c?.State.ToString().ToLowerInvariant() ?? "stopped", c?.Queue().Count ?? 0));
             }
             return res;
@@ -82,8 +88,8 @@ public sealed class ConductorRegistry : IDisposable
     /// <summary>A device connected / switched on: it listens to its group's engine.</summary>
     public void Subscribe(IStreamSubscriber s)
     {
-        lock (_l) { _sessions[s.Id] = s; _enabled.Add(s.Id); }
-        ForPlayer(s.Id).Subscribe(s);
+        bool silent; lock (_l) { _sessions[s.Id] = s; _enabled.Add(s.Id); silent = _silent.Contains(s.Id); }
+        if (!silent) ForPlayer(s.Id).Subscribe(s);   // 0.6.8 zone fix: a device in no zone stays connected but hears nothing
     }
     /// <summary>A device disconnected / switched off / was removed: it leaves whatever engine it was on.</summary>
     public void Unsubscribe(string playerId)
@@ -96,19 +102,19 @@ public sealed class ConductorRegistry : IDisposable
     /// <summary>The device was removed for good: it leaves its engine and its group membership.</summary>
     public void Forget(string playerId)
     {
-        Unsubscribe(playerId); bool had; lock (_l) { _sessions.Remove(playerId); had = _groupOf.Remove(playerId); }
+        Unsubscribe(playerId); bool had; lock (_l) { _sessions.Remove(playerId); _silent.Remove(playerId); had = _groupOf.Remove(playerId); }
         if (had) SaveLayout();
     }
     /// <summary>0.6.8-#11e: the same phone came back under a new id - its group membership moves to the new id.</summary>
     public void Rekey(string oldId, string newId)
     {
         Unsubscribe(oldId); bool had;
-        lock (_l) { _sessions.Remove(oldId); had = _groupOf.Remove(oldId, out var g); if (had) _groupOf[newId] = g!; }
+        lock (_l) { _sessions.Remove(oldId); had = _groupOf.Remove(oldId, out var g); if (had) _groupOf[newId] = g!; if (_silent.Remove(oldId)) _silent.Add(newId); }
         if (had) SaveLayout();
     }
     /// <summary>The player's group is playing (what the room health check needs).</summary>
-    public bool Playing(string playerId) { var c = ForPlayer(playerId); return c.State == PlayState.Playing && c.Engine.Playing; }
-    public long StreamAgeMs(string playerId) { var c = ForPlayer(playerId); return c.Engine.Playing ? (c.Clock.NowUs - c.Engine.EpochStartUs) / 1000 : 0; }
+    public bool Playing(string playerId) { if (IsSilent(playerId)) return false; var c = ForPlayer(playerId); return c.State == PlayState.Playing && c.Engine.Playing; }
+    public long StreamAgeMs(string playerId) { if (IsSilent(playerId)) return 0; var c = ForPlayer(playerId); return c.Engine.Playing ? (c.Clock.NowUs - c.Engine.EpochStartUs) / 1000 : 0; }
     /// <summary>Everyone listening to anything (Diagnostics).</summary>
     public List<IStreamSubscriber> Subscribers() { var r = new List<IStreamSubscriber>(); foreach (var c in Live()) r.AddRange(c.Subscribers()); return r; }
 
@@ -128,6 +134,21 @@ public sealed class ConductorRegistry : IDisposable
     {
         if (!IsDefault(groupId)) { bool added; lock (_l) { added = !_names.ContainsKey(groupId) || (!string.IsNullOrWhiteSpace(name) && _names[groupId] != name); if (added) _names[groupId] = string.IsNullOrWhiteSpace(name) ? (_names.TryGetValue(groupId, out var o) ? o : groupId) : name!; } if (added) SaveLayout(); }
         Move(playerId, IsDefault(groupId) ? Conductor.DefaultGroupId : groupId);
+    }
+    /// <summary>0.6.8 zone fix: a device in no zone plays nothing. It leaves whatever group it was in (a group nobody listens to any more stops) and
+    /// is not subscribed again until <see cref="Assign"/> puts it into a zone's group. Replaces the old "no zone = house group" fallback.</summary>
+    public void Silence(string playerId)
+    {
+        Conductor? from; string fromId; bool wasOn;
+        lock (_l)
+        {
+            if (_silent.Contains(playerId)) return;
+            fromId = _groupOf.TryGetValue(playerId, out var g) ? g : Conductor.DefaultGroupId; _live.TryGetValue(fromId, out from);
+            _groupOf.Remove(playerId); _silent.Add(playerId); wasOn = _enabled.Contains(playerId);
+        }
+        if (wasOn) from?.Release(playerId); else from?.Unsubscribe(playerId);
+        if (from != null && fromId != Conductor.DefaultGroupId && !from.Subscribers().Any() && from.State != PlayState.Stopped) from.Stop();
+        SaveLayout(); _events?.Publish("zones");
     }
     /// <summary>0.4.1: a zone's playback group exists even with 0 speakers (so a zoneId for it always resolves).</summary>
     public void Ensure(string groupId, string name)
@@ -176,9 +197,10 @@ public sealed class ConductorRegistry : IDisposable
         Conductor? from; Conductor to; bool wasOn; IStreamSubscriber? sess; string fromId;
         lock (_l)
         {
-            fromId = _groupOf.TryGetValue(playerId, out var g) ? g : Conductor.DefaultGroupId;
+            bool wasSilent = _silent.Remove(playerId);   // 0.6.8 zone fix: a silent device listens to nothing, so there is nothing to leave
+            fromId = wasSilent ? SilentGroupId : _groupOf.TryGetValue(playerId, out var g) ? g : Conductor.DefaultGroupId;
             if (fromId == toGroup) return;
-            _live.TryGetValue(fromId, out from);
+            if (wasSilent) from = null; else _live.TryGetValue(fromId, out from);
             if (toGroup == Conductor.DefaultGroupId) _groupOf.Remove(playerId); else _groupOf[playerId] = toGroup;
             to = toGroup == Conductor.DefaultGroupId ? _default : Materialize(toGroup);
             wasOn = _enabled.Contains(playerId); _sessions.TryGetValue(playerId, out sess);

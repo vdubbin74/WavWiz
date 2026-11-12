@@ -3073,6 +3073,7 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 .zlink:hover .zl-name,.zlink[aria-expanded=true] .zl-name{text-decoration:underline}
 .zlink:hover,.zlink[aria-expanded=true]{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .zlink:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.zlink.solo{cursor:default}.zlink.solo:hover{background:none}.zlink.solo:hover .zl-name{text-decoration:none}.zlink .zs-car[hidden]{display:none}   /* 0.6.8 zone fix: one zone = its name, not a picker */
 .ns-titles .zlink{margin-left:6px;flex:0 1 auto}
 .np-tabletitles .zlink,.np-meta .titles .zlink{max-width:100%;margin-top:2px;align-self:flex-start}
 /* 0.4.5 F29: calibration step strip, By ear lines, '? How calibration works' link and sheet (theme accent only, 3px corners) */
@@ -4266,6 +4267,7 @@ select optgroup{background:var(--panel2);color:var(--dim);font-style:normal}
 /* F152: themed value pickers (wwselect.js) - closed = field chrome, open = the shared ctxmenu (File menu look) */
 .wwdd.wwsel{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--fld-h);padding:var(--fld-pad);background:var(--fld-bg);color:var(--fld-ink);border:1px solid var(--fld-line);border-radius:var(--fld-radius);font:inherit;font-size:var(--fld-fs);text-align:left;cursor:pointer;width:auto;max-width:100%;min-width:9em}
 .wwdd.wwsel:focus-visible{outline:2px solid var(--fld-focus);outline-offset:1px}
+.wwdd[hidden]{display:none!important}   /* 0.6.8 zone fix: a hidden themed dropdown (the Queue zone picker with one zone) no longer shows as an empty box */
 .wwdd.wwsel[disabled]{opacity:.55;cursor:not-allowed}
 .wwdd.wwsel .wwdd-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 :is(.np-eqpick,.qzpick,.spk-presel,.fld-sm,.dsel,.spk-zsel,.spk-prof,.ss-prof).wwdd.wwsel{min-height:var(--fld-h-sm);padding:var(--fld-pad-sm);font-size:var(--fld-fs-sm)}
