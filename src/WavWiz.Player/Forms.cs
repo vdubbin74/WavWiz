@@ -109,6 +109,8 @@ public sealed class WebUiForm : Form
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(11, 13, 18) }; private readonly PlayerSettings _set; private string _url = "";
     private FormBorderStyle _prevBorder; private FormWindowState _prevState; private bool _full; private bool _loadedOnce; private int _retries;
     private readonly System.Windows.Forms.Timer _watch = new() { Interval = 20000 };
+    private readonly System.Windows.Forms.Timer _again = new();   // 0.6.9 #14: next try while the server is not answering yet
+    private int _waitTry;
     private readonly bool _chrome;   // 0.6.8-#16: themed in-page title bar (caption strip removed, frame styles kept for Snap / resize)
 
     public WebUiForm(PlayerSettings s)
@@ -122,8 +124,9 @@ public sealed class WebUiForm : Form
         DpiChanged += (_, _) => { ApplyZoom(); SyncWebView(); };
         // 0.3.2 F14: snapped / maximized / restored / moved across monitors -> re-lay out the WebView2 so it never goes black
         Resize += (_, _) => { SyncWebView(); PostWinState(); }; Move += (_, _) => SyncWebView(); ResizeEnd += (_, _) => SyncWebView();
-        _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) ShowProblem("WavWiz did not answer in time.", "The window waited 20 seconds for " + _url + "."); };
-        FormClosed += (_, _) => { _watch.Dispose(); };
+        _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) WaitForServer(); };   // 0.6.9 #14: wait (with backoff) instead of giving up
+        _again.Tick += (_, _) => { _again.Stop(); if (IsDisposed || _loadedOnce) return; try { _watch.Start(); _web.CoreWebView2?.Navigate(_url); } catch { } };
+        FormClosed += (_, _) => { _watch.Dispose(); _again.Dispose(); };
     }
 
     /// <summary>The address this window loads (server PC: the desktop shortcut's address from first-run-url.txt).</summary>
@@ -215,9 +218,11 @@ public sealed class WebUiForm : Form
             };
             cw.NavigationCompleted += (_, e) =>
             {
-                if (e.IsSuccess) { _loadedOnce = true; _retries = 0; _watch.Stop(); return; }
+                if (e.IsSuccess) { if (!_waiting) { _loadedOnce = true; _retries = 0; _waitTry = 0; _watch.Stop(); } _waiting = false; return; }
                 if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) return;           // our own cancel / a reload
-                _watch.Stop(); ShowProblem("WavWiz could not be reached.", $"{_url} answered: {e.WebErrorStatus}. Is the WavWiz server running on that PC?");
+                _watch.Stop();
+                if (!_loadedOnce && ServerWait.ShouldWait(e.WebErrorStatus.ToString())) { WaitForServer(); return; }   // 0.6.9 #14: not up yet (reboot) - wait and retry
+                ShowProblem("WavWiz could not be reached.", $"{_url} answered: {e.WebErrorStatus}. Is the WavWiz server running on that PC?");
             };
             cw.ProcessFailed += (_, e) =>
             {
@@ -238,6 +243,18 @@ public sealed class WebUiForm : Form
         {
             _watch.Stop(); OpenInBrowser(_url); Close();
         }
+    }
+
+    private bool _waiting;   // the next successful NavigationCompleted is our own waiting page, not WavWiz
+    /// <summary>0.6.9 #14: "Waiting for the WavWiz server…" and the next try after a growing pause (2, 4, 8, 16, then every 30 s; never gives up).</summary>
+    private void WaitForServer()
+    {
+        if (IsDisposed || _loadedOnce) return;
+        var cw = _web.CoreWebView2; if (cw == null) return;
+        _waitTry++; var next = ServerWait.Delay(_waitTry);
+        _waiting = true;
+        try { cw.NavigateToString(ServerWait.Page(_url, _waitTry, next, _set.ServerName)); } catch { }
+        _again.Stop(); _again.Interval = (int)next.TotalMilliseconds; _again.Start();
     }
 
     /// <summary>A plain, readable page inside the window (never a gray void) with Try again / Open in my browser.</summary>
