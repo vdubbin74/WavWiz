@@ -80,8 +80,40 @@ test('0.6.9 #17 (t1843): no Search & add on the big screen (Modern, Retro CD, Se
     assert.doesNotMatch(t, /jb-big|jbpm-big|jbr-select|jbr-sel-l|openSearch|jb-search-pane|Search &(amp;)? add/, f);
   }
   assert.doesNotMatch(k, /kiosk-screen/, 'the big screen no longer adds songs as a guest');
-  assert.match(k, /h\('b', null, 'Scan to add a song'\)/); assert.match(k, /class="jbr-qr"/); assert.match(k, /'Hold for host'/); assert.match(k, /setTimeout\(askExit, 1200\)/);
+  assert.match(k, /h\('b', null, 'Scan to add a song'\)/); assert.match(k, /class="jbr-qr"/); assert.match(k, /'Hold logo to exit'/); assert.match(k, /askExit\(\); \}, HOLD_MS\)/);
   assert.doesNotMatch(css, /\.jb-big|\.jbr-select|\.jbr-sel-l|\.jb-search-pane|\.jbpm-big/, 'dead big-screen search CSS removed');
   assert.match(css, /\.jb-stage \.jb-disc\{position:relative;width:520px/); assert.match(css, /\.jb-stage \.jb-join img\{width:272px/);
   assert.match(g, /tabBtn\('search', 'Search & add'\)/, 'phone guest page keeps Search & add');
+});
+test('0.6.9 #18 (t1845): the big screen shows how the host gets out (hint, tooltip, hold fill bar) in Modern, Retro and the Settings previews', () => {
+  const k = src('jukebox-kiosk.js'), pv = src('jukebox-preview.js'), css = readFileSync(join(js, '../jukebox.css'), 'utf8');
+  assert.match(k, /export const HOLD_MS = 1200;/); assert.match(k, /export const EXIT_TIP = 'Host: press and hold to exit · Ctrl\+Shift\+J'/);
+  assert.match(k, /class: 'jb-logo', type: 'button', title: EXIT_TIP/, 'native tooltip on the logo');
+  assert.match(k, /'Hold logo to exit'/); assert.match(k, /'Hold here to exit'/); assert.match(k, /class: 'jb-kbd' \}, ' · Ctrl\+Shift\+J'/);
+  assert.match(k, /classList\.add\('holding'\)/); assert.match(k, /\['pointerup', 'pointerleave', 'pointercancel'\]\.forEach\(t => logo\.addEventListener\(t, unhold\)\)/, 'letting go early stops the fill and the timer');
+  assert.match(css, /\.jb-logo \.jb-kbd\{display:none\}/); assert.match(css, /@media \(any-pointer:fine\)\{ \.jb-logo \.jb-kbd\{display:inline\} \}/, 'shortcut only with a mouse / keyboard; touch shows just the hold hint');
+  assert.match(css, /\.jb-logo\.holding::after\{opacity:1;transform:scaleX\(1\);transition:transform 1\.2s linear\}/, 'the fill runs as long as HOLD_MS');
+  assert.match(css, /\.jb\.retro \.jb-stage\{z-index:2;pointer-events:none\}/, 'the Retro cabinet no longer covers the logo');
+  assert.match(css, /\.jb\.retro \.jb-logo \.jb-hint-r\{display:inline\}/);
+  assert.match(pv, /h\('small', null, 'Hold logo to exit'\)/); assert.match(pv, /<span class="jbr-hold">Hold here to exit<\/span>/);
+  assert.doesNotMatch(k + pv, /'Hold for host'/);
+});
+test('0.6.9 #18 (t1845): the big screen in another PC\'s browser (?jukebox=tv): sign-in kept, Go fullscreen / Fullscreen button, never a speaker, host panel link', () => {
+  const k = src('jukebox-kiosk.js'), m = src('main.js'), css = readFileSync(join(js, '../jukebox.css'), 'utf8');
+  assert.match(k, /get\('jukebox'\) === 'tv'/);
+  // the display URL is the app's own address (normal sign-in / pairing applies), built from the server's LAN join address
+  const displayUrl = new Function('return ' + k.match(/export const displayUrl = (joinUrl => \{[^\n]+\});/)[1])();
+  assert.equal(displayUrl('http://192.168.1.169:47800/jukebox.html?j=abc123'), 'http://192.168.1.169:47800/?jukebox=tv');
+  assert.equal(displayUrl(''), '');
+  assert.match(k, /if \(DISPLAY && !kiosk && !displayLeft\) openKiosk\(S\)/, 'opens by itself while the Jukebox runs');
+  assert.match(k, /if \(how === 'app'\) displayLeft = true;/, 'Switch to app (after the PIN) is not undone by the next state push');
+  // fullscreen: the button shows whenever the page is not fullscreen (first visit: no gesture yet; after Esc), never in the Player window
+  assert.match(k, /fsBtn\.hidden = full \|\| player \|\| !document\.fullscreenEnabled/); assert.match(k, /document\.addEventListener\('fullscreenchange', paintFs\)/);
+  assert.match(k, /document\.removeEventListener\('fullscreenchange', paintFs\)/, 'cleaned up on close');
+  assert.match(k, /wasFull \? 'Fullscreen' : 'Go fullscreen'/); assert.match(css, /\.jb-fs\.again\{/);
+  // no host controls without host auth: leaving still goes through /jukebox/unlock (PIN, Control session)
+  assert.match(k, /await api\('\/jukebox\/unlock', \{ method: 'POST', body: \{ pin \} \}\)/);
+  assert.match(m, /if \(!JB_DISPLAY\) installAutoJoin\(S, refreshAll\)/, 'a TV display never joins as a speaker');
+  assert.match(m, /if \(!JB_DISPLAY\) maybeWhatsNew\(S\)/);
+  assert.match(k, /'OPEN ON ANOTHER SCREEN'/); assert.match(k, /'data-act': 'jb-copy-display'/);
 });

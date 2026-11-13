@@ -304,3 +304,19 @@ span.jb-art.jb-art0{width:64px;height:64px;border-radius:var(--radius)}
 @media (prefers-reduced-motion:reduce){.jbg-npc.playing .jbg-eq i{animation:none;height:7px}.jbg-prog i{transition:none}}
 body.jbtv .jb-np span.jb-art{width:clamp(96px,14vw,220px);height:auto;aspect-ratio:1}
 body.jbtv .jb-np span.jb-art>img{width:100%;height:100%}
+/* ---- 0.6.9 #18 (t1845): the exit hint under the logo (quiet), the hold fill bar, "Go fullscreen" in a plain browser, Open on another screen ---- */
+.jb-logo .jb-hint{opacity:.72} .jb-logo .jb-hint-r,.jb.retro .jb-logo .jb-hint-m{display:none} .jb.retro .jb-logo .jb-hint-r{display:inline}
+.jb-logo .jb-kbd{display:none}
+@media (any-pointer:fine){ .jb-logo .jb-kbd{display:inline} }   /* the shortcut only where there is a mouse / keyboard; touch shows just "Hold logo to exit" */
+.jb-logo::after{content:"";position:absolute;left:6px;right:6px;bottom:0;height:4px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:0 50%;opacity:0}
+.jb-logo.holding::after{opacity:1;transform:scaleX(1);transition:transform 1.2s linear}   /* HOLD_MS */
+.jb.retro .jb-logo::after{background:var(--jr-c64);height:3px}
+.jb.retro .jb-stage{z-index:2;pointer-events:none} .jb.retro .jb-stage .jb-logo{font-size:20px;pointer-events:auto;color:var(--jr-c24);opacity:.6}   /* the Retro cabinet (.jbr) used to cover the logo: its hint was invisible and could not be held; 10px there was ~5px on a 1024 screen */
+.jb-fs{position:absolute;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);font:700 26px/1 system-ui,"Segoe UI",sans-serif;padding:20px 34px;border-radius:3px;border:0;background:var(--accent);color:var(--on-accent,var(--jr-c24));cursor:pointer;box-shadow:0 10px 40px var(--jr-c30)}
+.jb-fs.again{left:auto;top:auto;right:2vw;bottom:2vh;transform:none;font-size:18px;padding:8px 14px;opacity:.6;box-shadow:none;background:color-mix(in srgb,var(--panel) 80%,transparent);color:var(--ink);border:1px solid var(--line)}
+.jb-fs.again:hover,.jb-fs.again:focus-visible{opacity:1}
+.jb-fs[hidden]{display:none}
+.jbhost .jb-by{font-size:inherit}   /* the big screen's requester size was leaking into the host panel rows */
+.jbother{display:flex;flex-direction:column;gap:4px} .jbother .jbother-u{font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:3px;user-select:all} .jbother p{margin:0}
+.jbpm-logo small{opacity:.72}
+.jbr-preview .jbr-hold{position:absolute;left:10px;top:6px;z-index:2;font:10px "Special Elite",monospace;color:var(--jr-c64);opacity:.72}

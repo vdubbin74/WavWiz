@@ -45,7 +45,7 @@ import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
 import { canControl, thisDevice, isAdmin } from './ui.js';
 import { isPlayerUa, isHandset } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
-import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning } from './jukebox-kiosk.js';
+import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning, DISPLAY as JB_DISPLAY } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
 import { jbTvChip } from './jbtv.js';
@@ -370,7 +370,7 @@ async function startMain() {
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
-  drawStatus(); maybeWhatsNew(S); showPendingUndo();
+  drawStatus(); if (!JB_DISPLAY) maybeWhatsNew(S); showPendingUndo();   /* 0.6.9 #18: no What's new popping over a TV display */
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
   api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
@@ -385,7 +385,7 @@ async function startMain() {
   setInterval(() => nowc.tickPos(), 250);
   // 0.3.0 §2: remote mode (remembered per device) never joins as a speaker
   await retireRemote();      // 0.3.2 F3: Remote mode is gone - a remembered choice is cleared once and the speaker card comes back
-  installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
+  if (!JB_DISPLAY) installAutoJoin(S, refreshAll);           // 0.6.9 #18: a ?jukebox=tv display never joins as a speaker (the Jukebox plays on its own speakers) // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
 /** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */

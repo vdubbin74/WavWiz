@@ -16,6 +16,13 @@ const mss = ms => { const t = Math.max(0, Math.floor((ms || 0) / 1000)); return 
 const JBQ = p => p + (p.includes('?') ? '&' : '?') + 'zoneId=' + (jbOwn ? 'jukebox' : 'default');
 let jbOwn = false; api('/jukebox/zone').then(z => { jbOwn = !!z.own; }).catch(() => {});
 export const kioskOpen = () => !!kiosk;
+/** 0.6.9 #18 (t1845): how long the logo is held to open the host PIN pad (the fill bar runs this long), and its tooltip. */
+export const HOLD_MS = 1200;
+export const EXIT_TIP = 'Host: press and hold to exit · Ctrl+Shift+J';
+/** 0.6.9 #18: the big screen in another PC's browser - the app's address with ?jukebox=tv (sign in or pair once; it then opens the big screen). */
+export const DISPLAY = (() => { try { return new URLSearchParams(location.search).get('jukebox') === 'tv'; } catch { return false; } })();
+export const displayUrl = joinUrl => { try { return new URL(joinUrl).origin + '/?jukebox=tv'; } catch { return ''; } };
+let displayLeft = false;   // the host left the display with the PIN (Switch to app): do not reopen it by itself
 
 /** Playback > Start Jukebox… (admin only). A host PIN is required so the big screen can be left. */
 export async function startJukebox(S) {
@@ -59,6 +66,7 @@ export function jukeboxChip(S, st) {
   if (!st?.running) { c?.remove(); if (kiosk) closeKiosk(); paintReturn(S); return; }
   if (!c) { c = h('button', { id: 'jbchip', class: 'chip jbchip', type: 'button', onclick: () => hostControls(S) }); (document.querySelector('.topbar .grow') || document.body).after(c); }
   c.textContent = st.locked ? '♫ Jukebox on · locked' : '♫ Jukebox on'; paintReturn(S);
+  if (DISPLAY && !kiosk && !displayLeft) openKiosk(S);   // 0.6.9 #18: ?jukebox=tv shows the big screen whenever the Jukebox runs
 }
 /** 0.3.5 J9 #13: Jukebox host controls are a small panel that drops down from the "Jukebox on" chip (no window). Ban guest and Stop Jukebox keep their confirms. */
 async function hostControls(S) {
@@ -68,6 +76,7 @@ async function hostControls(S) {
   const out = ev => { if (!panel.contains(ev.target) && !chip?.contains(ev.target) && !ev.target.closest?.('dialog')) close(); }, esc = ev => { if (ev.key === 'Escape' && !document.querySelector('dialog[open]')) close(); };
   function close() { panel.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); }
   panel._close = close;
+  let dispUrl = ''; try { dispUrl = displayUrl((await api('/jukebox/join')).url); } catch { /* not running */ }
   async function draw() {
     let b; try { b = await api('/jukebox/board'); } catch (e) { toast(e.message, true); close(); return; }
     const act = async (fn) => { try { await fn(); } catch (e) { toast(e.message, true); } draw(); };
@@ -83,6 +92,11 @@ async function hostControls(S) {
         h('button', { class: 'btn sm', disabled: !ctl, 'data-act': 'jb-reset-guests', title: 'Lift bans and give every guest their full song allowance again', onclick: async () => { if (await ask('Reset guests', 'Every guest gets their full song allowance again and bans are lifted. Songs already queued stay.', { ok: 'Reset' })) act(async () => { await api('/jukebox/guests/reset', { method: 'POST' }); toast('Guests reset.'); }); } }, 'Reset guests'),
         h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),
         h('button', { class: 'btn sm danger', onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } }, 'Stop Jukebox')),
+      // 0.6.9 #18 (t1845): the same big screen in another PC's browser (that browser signs in or pairs once; no host controls without them)
+      dispUrl ? h('div', { class: 'jbother' }, h('div', { class: 'dlbl' }, 'OPEN ON ANOTHER SCREEN'),
+        h('div', { class: 'row' }, h('code', { class: 'grow ell jbother-u', title: dispUrl }, dispUrl.replace(/^https?:\/\//, '')),
+          h('button', { class: 'btn sm', type: 'button', 'data-act': 'jb-copy-display', onclick: async () => { try { await navigator.clipboard.writeText(dispUrl); toast('Address copied'); } catch { toast(dispUrl); } } }, 'Copy')),
+        h('p', { class: 'small dim' }, 'Open it in a web browser on another PC or TV. It asks to sign in or pair the first time, then shows this big screen. The host PIN leaves it.')) : null,
       h('div', { class: 'dlbl' }, 'UP NEXT'), rows.length ? h('div', { class: 'jbrows' }, rows) : h('p', { class: 'small dim' }, 'Nothing queued yet.'));
   }
   document.body.append(panel);
@@ -159,10 +173,17 @@ export function openKiosk(S) {
     // 0.4.9 F76: two ways out - back to the app with the Jukebox still running (queue, guest adds, playback go on), or stop it
     const how = await exitChoice(root); if (!how) return;
     if (how === 'stop') { try { await stopWithPin(S, pin); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); return; } }
+    if (how === 'app') displayLeft = true;
     closeKiosk(); if (how === 'app') toast('The Jukebox keeps running. Use Return to Jukebox to go back.');
   }
-  const logo = h('button', { class: 'jb-logo', type: 'button', 'aria-label': 'Host: hold to exit' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'), 'Hold for host');
-  let lp = 0; logo.addEventListener('pointerdown', () => { lp = setTimeout(askExit, 1200); }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, () => clearTimeout(lp)));
+  // 0.6.9 #18 (t1845): the way out is shown, quietly: a line under the logo ("Hold logo to exit", plus "· Ctrl+Shift+J" only where there is a
+  // mouse / keyboard - CSS any-pointer:fine), a native tooltip, and a fill bar that runs along the logo while it is held, so the host sees it working.
+  const logo = h('button', { class: 'jb-logo', type: 'button', title: EXIT_TIP, 'aria-label': 'Host: press and hold to exit, or press Ctrl+Shift+J' },
+    h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'),
+    h('span', { class: 'jb-hint' }, h('span', { class: 'jb-hint-m' }, 'Hold logo to exit'), h('span', { class: 'jb-hint-r' }, 'Hold here to exit'), h('span', { class: 'jb-kbd' }, ' · Ctrl+Shift+J')));
+  let lp = 0; const unhold = () => { clearTimeout(lp); logo.classList.remove('holding'); };
+  logo.addEventListener('pointerdown', () => { unhold(); void logo.offsetWidth; logo.classList.add('holding'); lp = setTimeout(() => { unhold(); askExit(); }, HOLD_MS); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, unhold));
   // 0.6.9 #17 (t1843): no song search button on the big screen - a TV has no mouse and the screen would only get its own 3 picks; guests add from
   // their phones with the QR code ("Scan to add a song"). Host controls (hold the logo, the host panel) are unchanged.
   const qrSrc = () => '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || '');
@@ -248,8 +269,23 @@ export function openKiosk(S) {
   fit(); addEventListener('resize', fit);
   api('/jukebox/join').then(j => { joinUrl = j.url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''); draw(); }).catch(() => {});
   document.addEventListener('keydown', block, true); document.addEventListener('contextmenu', noMenu, true);
-  try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch?.(() => {}); } catch { /* not allowed */ }
-  try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
+  // 0.6.9 #18 (t1845): in a plain browser fullscreen needs a click or key press first (a page opened at ?jukebox=tv has none), and Esc - held,
+  // once the keyboard lock is on - leaves it. Then a "Go fullscreen" button shows (big the first time, a small corner one after) instead of a
+  // half-broken screen; the big screen itself keeps running. Not in the WavWiz Player window, which owns its own fullscreen.
+  const player = !!window.chrome?.webview;
+  let wasFull = false;
+  const fsBtn = h('button', { class: 'jb-fs', type: 'button', hidden: true, 'data-act': 'jb-fullscreen', onclick: () => goFull() }, h('span', { 'aria-hidden': 'true' }, '⛶ '), h('span', { class: 'jb-fs-l' }, 'Go fullscreen'));
+  function goFull() {
+    try { const r = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); r?.then?.(() => { try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ } }, () => paintFs()); } catch { paintFs(); }
+  }
+  function paintFs() {
+    const full = !!document.fullscreenElement; if (full) wasFull = true;
+    fsBtn.hidden = full || player || !document.fullscreenEnabled; fsBtn.classList.toggle('again', wasFull);
+    fsBtn.lastChild.textContent = wasFull ? 'Fullscreen' : 'Go fullscreen';
+  }
+  root.append(fsBtn); document.addEventListener('fullscreenchange', paintFs);
+  goFull(); try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
+  setTimeout(() => { paintFs(); if (!fsBtn.hidden) fsBtn.focus(); }, 700);   // a TV remote's OK key presses it
   // 0.6.9 J5: the background visualizer shows the JUKEBOX's music. It used to follow the zone this PC controls in the app (say Basement), which
   // is quiet while the Jukebox plays in its own zone, so it sat in its idle picture: an empty bar grid with one lit row across the middle.
   // crisp: sized in real screen pixels under Display size (html zoom), so the picture is never a stretched low-resolution copy.
@@ -257,7 +293,7 @@ export function openKiosk(S) {
   try { viz = new Viz(bg, { preview: false, crisp: true }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
   window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: true })); retS = S;
   refresh(); iv = setInterval(refresh, 1000);
-  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); setVizZone(undefined); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
+  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); setVizZone(undefined); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); document.removeEventListener('fullscreenchange', paintFs); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
   paintReturn(S);   // F76: after kiosk is set, so the header's Return to Jukebox goes away
 }
 /** 0.3.5 J14: scale factors for the two stages from the window size in device px and the page zoom (pure). */

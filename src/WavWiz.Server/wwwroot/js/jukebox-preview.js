@@ -11,10 +11,11 @@ export const JB_EXAMPLE = {
 const ART = ['linear-gradient(135deg,#1fb5a8,#245b8f)', 'linear-gradient(135deg,#2e7d32,#9ccc65)', 'linear-gradient(135deg,#f06292,#7e57c2)', 'linear-gradient(135deg,#bdbdbd,#616161)', 'linear-gradient(135deg,#e53935,#3e2723)', 'linear-gradient(135deg,#7e57c2,#ec407a)'];
 const fakeQr = () => h('i', { class: 'jbpv-qr', 'aria-hidden': 'true' });
 
+// 0.6.9 #18 (t1845): both previews show the quiet exit hint the big screen has (top left)
 function modernStage() {
   const d = JB_EXAMPLE;
   return h('div', { class: 'jbpm' },
-    h('div', { class: 'jbpm-logo' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('small', null, 'Hold for host')),
+    h('div', { class: 'jbpm-logo' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('small', null, 'Hold logo to exit')),
     h('div', { class: 'jbpm-chips' }, h('span', null, '3 songs per guest'), h('span', null, 'Vote to skip: on')),
     h('div', { class: 'jbpm-left' }, h('i', { class: 'jbpm-cover', style: `background:${ART[0]}` }), h('span', { class: 'jbpm-kick' }, 'NOW PLAYING'), h('b', { class: 'jbpm-title' }, d.now.title), h('span', { class: 'jbpm-artist' }, d.now.artist),
       h('div', { class: 'jbpm-prog' }, h('i'), h('b')), h('div', { class: 'jbpm-times' }, h('span', null, d.now.pos), h('span', null, d.now.dur)), h('span', { class: 'jbpm-by' }, 'Requested by ' + d.now.by)),
@@ -25,7 +26,7 @@ function modernStage() {
 function retroStage() {
   const d = JB_EXAMPLE, st = h('div', { class: 'jbr jbr-preview' });
   st.innerHTML = RETRO_SVG + `<div class="jbr-disc"><i class="jbr-sheen"></i><i class="jbr-hub"></i><i class="jbr-spindle"></i></div>
-    <span class="jbr-badge l">3 picks per guest</span><span class="jbr-badge r">Vote to skip: on</span>
+    <span class="jbr-hold">Hold here to exit</span><span class="jbr-badge l">3 picks per guest</span><span class="jbr-badge r">Vote to skip: on</span>
     <div class="jbr-plac"><span class="jbr-kick">NOW&nbsp;&nbsp;PLAYING</span><span class="jbr-vfd">SEL ${d.now.sel} ${d.now.pos}/${d.now.dur}</span><div class="jbr-line"><b class="jbr-title">${d.now.title}</b><span class="jbr-artist">${d.now.artist}</span></div><span class="jbr-by">Requested by ${d.now.by}</span></div>
     <div class="jbr-rack"><span class="jbr-h a">UP NEXT</span><span class="jbr-h b">MORE TO PICK</span><div class="jbr-col a"></div><div class="jbr-col b"></div></div>
     <div class="jbr-qr"><span>Scan to pick<br>a song</span><i class="jbpv-qr"></i><small>wavwiz.local/jukebox</small></div>`;
