@@ -134,13 +134,52 @@ async function finish() {
   }
 }
 function stopPoll() { if (timer) { clearInterval(timer); timer = 0; } }
+// t1955u: a background refresh must not replace the card while a select / input inside it is focused
+// (step 3 "Add to:" — opening the zone dropdown was closed by the ~3 s poll's paintInPlace).
+function cardEditing(card) {
+  const el = typeof document !== 'undefined' ? document.activeElement : null;
+  return !!(card && el && card.contains(el) && el.closest?.('select,input,textarea'));
+}
+function syncFields(card) {
+  if (!card || !selId) return;
+  const s = st(selId);
+  const zone = card.querySelector('select.apsetup-zone');
+  const name = card.querySelector('input.apsetup-name');
+  if (zone) s.zonePick = zone.value;
+  if (name) s.newName = name.value;
+}
+let heldPaint = false;
+function armResume(card) {
+  if (heldPaint || !card) return;
+  heldPaint = true;
+  const go = ev => {
+    if (ev.type === 'focusout' && ev.relatedTarget && card.contains(ev.relatedTarget)) return;
+    heldPaint = false;
+    card.removeEventListener('focusout', go);
+    card.removeEventListener('change', go);
+    setTimeout(() => { if (open && !closed) refreshIfIdle(); }, 0);
+  };
+  card.addEventListener('focusout', go);
+  card.addEventListener('change', go);
+}
+async function refreshIfIdle() {
+  const card = document.querySelector('.apsetup-card');
+  if (!card || !card.isConnected) return;
+  if (st(selId).busy) return;
+  if (cardEditing(card)) { armResume(card); return; }
+  await load();
+  if (!open || closed || st(selId).busy) return;
+  const now = document.querySelector('.apsetup-card');
+  if (cardEditing(now)) { armResume(now); return; }
+  paintInPlace();
+}
 function startPoll() {
   stopPoll();
   timer = setInterval(async () => {
     if (!open || closed) { stopPoll(); return; }
     const card = document.querySelector('.apsetup-card');
     if (!card || !card.isConnected) return;
-    if (!st(selId).busy) { await load(); paintInPlace(); }
+    await refreshIfIdle();
   }, 3000);
 }
 
@@ -177,7 +216,7 @@ async function rescan() {
   if (qErr && !lastProblem && !apFindList(devs).length) lastProblem = qErr;
   if (lastProblem) { scanPhase = 'done'; clearTimeout(scanTimer); }   // an error ends the search at once
   paintInPlace();
-  for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open) { await load(); paintInPlace(); } }, ms);
+  for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open) await refreshIfIdle(); }, ms);
 }
 
 function scrollKeep(fn) {
@@ -194,6 +233,7 @@ function scrollKeep(fn) {
 function paintInPlace() {
   const card = document.querySelector('.apsetup-card');
   if (!card || !Sref) return;
+  syncFields(card);   // t1955u: keep the chosen zone / new-zone name across a repaint
   scrollKeep(() => {
     const fresh = buildCard(Sref, ctlRef);
     card.replaceWith(fresh);
@@ -388,8 +428,11 @@ export function openAirPlaySetup(S, ctl) {
   return { el: () => document.querySelector('.apsetup-card'), close: () => { setOpen(false); paintInPlace(); } };
 }
 
+/** t1955u / tests: one background refresh (the 3 s poll and the 1.5 s / 4 s follow-ups). Skips while a select or input is focused. */
+export const _apRefresh = () => refreshIfIdle();
+
 /** Test helper: reset module state between unit tests. */
 export function _apReset() {
-  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; endScan();
+  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; heldPaint = false; endScan();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }
