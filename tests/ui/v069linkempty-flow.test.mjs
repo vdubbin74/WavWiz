@@ -18,7 +18,7 @@ if (rt.playbackId === up.playbackId) await api(`/groups/${rt.id}/split`, 'POST')
 const br = await chromium.launch({ headless: true });
 const ctx = await br.newContext({ viewport: { width: 1600, height: 1800 } });
 await ctx.addCookies([{ name: 'wavwiz_session', value: SESS, url: B }]);
-await ctx.addInitScript(() => { if (sessionStorage.getItem('__s')) return; sessionStorage.setItem('__s', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.checklist.dismissed', '1');
+await ctx.addInitScript(() => { if (sessionStorage.getItem('__s')) return; sessionStorage.setItem('__s', '1'); localStorage.setItem('wavwiz.whatsnew', '9.9.9'); localStorage.setItem('wavwiz.gettingStarted.shown', '1'); localStorage.setItem('wavwiz.checklist.dismissed', '1'); localStorage.setItem('wavwiz.webRoom.id', 'web-v069linkflow'); localStorage.setItem('wavwiz.webRoom.name', 'Link flow test');   // one fixed web speaker: runs reuse it instead of adding a 'Chrome on Linux' speaker each time
   localStorage.setItem('wavwiz.panels', JSON.stringify({ lib: 'normal', dev: 'normal', exp: null })); localStorage.setItem('wavwiz.layout', 'full'); localStorage.setItem('wavwiz.zfold', '[]'); });
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
 await p.goto(B + '/'); await p.waitForSelector(`.tree42 > [data-card="g:${rt.id}"]`); await p.waitForTimeout(1500);
