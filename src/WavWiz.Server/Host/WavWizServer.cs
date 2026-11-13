@@ -39,7 +39,7 @@ public sealed class WavWizServer : IAsyncDisposable
         cal.Registry = registry;      // 0.4.0 Stage 4: calibration pauses only the groups it measures
         cal.Mics = new Calibration.PcMicBroker(events); audio.OnCalResult = cal.Mics.OnCalResult;      // 0.2.5 PC-mic calibration
         var ca = new Tls.LocalCa(cfg.DataDir);
-        var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg };
+        var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg, Log = u._log.Write };
         s.RemoteTls = new Tls.RemoteCertStore(cfg, Library.SecretProtectors.For(cfg.DataDir), null, u._log.Write);   // F261: default off
         if (s.RemoteTls.Active) _ = Task.Run(() => s.RemoteTls.RefreshAsync());
         s.Claim = new HeadlessClaim(cfg.DataDir, cfg.Headless, auth.SetupRequired, u._log.Write);     // F166: claim.txt + 15-min LAN window (Linux/Docker)

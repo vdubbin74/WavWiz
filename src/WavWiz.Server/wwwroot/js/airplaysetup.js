@@ -86,6 +86,12 @@ export function apScanView({ phase = 'idle', n = 0, problem = null } = {}) {
 export function apBrowseProblem(r) {
   if (!r || r.running !== false) return null;
   const p = String(r.problem || '');
+  // 0.6.9 #22b (t1860): the server keeps retrying a browse that failed to start or died, and says why
+  if (r.status === 'retrying') {
+    const why = String(r.lastError || p.replace(/^AirPlay browse unavailable:\s*/i, '') || 'unknown error').replace(/[.\s]+$/, '');
+    const when = Number.isFinite(r.retryInSec) ? (r.retryInSec > 0 ? ` It tries again by itself in ${r.retryInSec} s.` : ' It is trying again now.') : ' It keeps trying by itself.';
+    return `The server’s AirPlay search isn’t working: ${why}.${when}`;
+  }
   if (/loopback/i.test(p)) return 'The server is only listening on this PC (127.0.0.1), so it can’t search the home network. Set its network address in Settings › Network, then search again.';
   return p ? `The server couldn’t start its AirPlay search: ${p.replace(/^AirPlay browse unavailable:\s*/i, '')}` : 'The server’s AirPlay search isn’t running.';
 }
@@ -144,7 +150,10 @@ async function load() {
     const browsed = r.devices || [];
     ap2 = !!r.airPlay2Experimental;
     // 0.6.9 #22: the server says running:false + problem when its browser could not start; that used to be ignored ("Looking…" forever)
+    const had = lastProblem;
     devs = apMergeRemembered(browsed, Sref?.zones); lastProblem = apBrowseProblem(r);
+    // 0.6.9 #22b: the server's search came back (its retry worked): search again instead of jumping straight to "None found"
+    if (had && !lastProblem && scanPhase === 'done' && open && !closed) setTimeout(() => rescan(), 0);
   } catch (e) {
     // 0.7.0 item 5a: with no speaker selected st(null) is a throw-away object, so the error was lost and the card sat on "Looking…"
     if (selId) st(selId).problem = apProblem(e, ''); else lastProblem = apProblem(e, '').text;

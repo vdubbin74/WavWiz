@@ -131,4 +131,36 @@ public class AirPlayDiscoveryTests
         Assert.False(AirPlayBrowseState.UsableAddress("0.0.0.0"));
         Assert.True(AirPlayBrowseState.UsableAddress("192.168.1.20"));
     }
+
+    // 0.6.9 #22b (t1860): an LG webOS TV advertises AirPlay 2 mainly as _airplay._tcp (no _raop), model + maker + features in the TXT.
+    static readonly string[] LgAir = { "acl=0", "deviceid=A8:23:FE:12:34:56", "features=0x7F8AD0,0x38BCB46", "flags=0x244", "gid=0B4A2C1E-1111-2222-3333-444455556666", "igl=0", "gcgl=0",
+        "model=OLED65C1PUB", "manufacturer=LG Electronics", "protovers=1.1", "srcvers=377.17.24.6", "pi=5d0c0d6e-aaaa-bbbb-cccc-0123456789ab", "pk=8a7f6e5d4c3b2a19" };
+
+    [Fact]
+    public void Lg_tv_advertising_only_airplay_tcp_is_listed_with_name_model_maker_and_address()
+    {
+        var st = new AirPlayBrowseState(); var ip = IPAddress.Parse("192.168.1.57");
+        Assert.True(st.Ingest(Msg(Group(AirPlayBrowseState.AirPlay, "[LG] webOS TV OLED65C1PUB", "LG-webOS-TV.local", ip, 7000, LgAir)), T0));
+        var d = Assert.Single(st.Devices(T0.AddSeconds(1)));
+        Assert.Equal("A823FE123456", d.Id);
+        Assert.Equal("[LG] webOS TV OLED65C1PUB", d.Name);
+        Assert.Equal("OLED65C1PUB", d.Model); Assert.Equal("LG Electronics", d.Manufacturer);
+        Assert.Equal(new[] { "192.168.1.57" }, d.Addresses);
+        Assert.Equal(7000, d.AirPlayPort); Assert.False(d.Raop);
+        Assert.NotEqual(0UL, d.Features);
+    }
+
+    [Fact]
+    public void A_ptr_only_answer_asks_for_the_missing_srv_txt_then_a()
+    {
+        var st = new AirPlayBrowseState(); var inst = "[LG] webOS TV." + AirPlayBrowseState.AirPlay;
+        st.Ingest(Msg(DnsWire.Ptr(AirPlayBrowseState.AirPlay, inst)), T0);
+        var q = st.Missing(T0.AddSeconds(1));
+        Assert.Contains((inst, DnsWire.TypeSrv), q); Assert.Contains((inst, DnsWire.TypeTxt), q);
+        Assert.Single(st.Devices(T0.AddSeconds(1)));                       // already listed by name while the rest is asked for
+        st.Ingest(Msg(DnsWire.Srv(inst, "LG-webOS-TV.local", 7000), DnsWire.Txt(inst, LgAir)), T0.AddSeconds(2));
+        Assert.Equal(new[] { ("LG-webOS-TV.local", DnsWire.TypeA) }, st.Missing(T0.AddSeconds(3)));
+        st.Ingest(Msg(DnsWire.A("LG-webOS-TV.local", IPAddress.Parse("192.168.1.57"))), T0.AddSeconds(4));
+        Assert.Empty(st.Missing(T0.AddSeconds(5)));
+    }
 }

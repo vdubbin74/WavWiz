@@ -155,3 +155,23 @@ test('#22: speakers found during the search show at once, and a later rebuild ke
   assert.equal(card().querySelector('.qb42-st').textContent, '1 on this network');
   m._apReset();
 });
+
+// 0.6.9 #22b (t1860): the server retries a browse that failed to start or died, and the card shows why + when it tries again
+test('#22b: status retrying shows the last error and the retry time in "Couldn’t search"', async t => {
+  const m = await import(pathToFileURL(join(js, 'airplaysetup.js')).href + '?retry22b');
+  const msg = m.apBrowseProblem({ running: false, status: 'retrying', lastError: 'couldn\'t start on 192.168.1.169:5353: An attempt was made to access a socket in a way forbidden by its access permissions.', retryInSec: 12 });
+  assert.match(msg, /isn’t working: couldn't start on 192\.168\.1\.169:5353: An attempt was made .* permissions\. It tries again by itself in 12 s\./);
+  assert.match(m.apBrowseProblem({ running: false, status: 'retrying', lastError: 'stopped: socket closed', retryInSec: 0 }), /stopped: socket closed\. It is trying again now\./);
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  let body = { running: false, status: 'retrying', lastError: 'boom', retryInSec: 5, devices: [] };
+  const mm = await openedCard('retry22bcard', url => url.endsWith('/airplay/setup/devices') ? body : { ok: true });
+  await advance(t, 10);
+  assert.equal(card().querySelector('.qb42-st').textContent, 'Couldn’t search');
+  assert.match(card().querySelector('.apsetup-err').textContent, /boom\. It tries again by itself in 5 s/);
+  const q = queries();
+  body = { running: true, status: 'running', devices: [] };                // the server's retry worked
+  await advance(t, 3100);                                                 // next poll sees it -> a fresh search, not straight to "None found"
+  assert.equal(queries(), q + 1);
+  assert.equal(card().querySelector('.qb42-st').textContent, 'Looking…');
+  mm._apReset();
+});

@@ -37,7 +37,7 @@ public static class AirPlaySenderApi
             s.Cfg.Save(); var o = Outs(s); o.AirPlay2Enabled = s.Cfg.AirPlay2Experimental; o.PreferBuffered = s.Cfg.AirPlay2Buffered;
             return Results.Json(Settings(s));
         }).Req(Role.Admin);
-        g.MapPost("/dev/airplay/query", () => { Ensure(s); s.AirPlayBrowse!.QueryNow(); return Results.Json(new { ok = true }); }).Req(Role.Admin);
+        g.MapPost("/dev/airplay/query", () => { Ensure(s); var b = s.AirPlayBrowse!; b.QueryNow(); return Results.Json(new { ok = true, running = b.Running, status = b.Status, problem = b.Problem, lastError = b.LastError }); }).Req(Role.Admin);
     }
 
     // ---------------- 0.6.8-#14: Find / Test / Add to zone ----------------
@@ -62,7 +62,9 @@ public static class AirPlaySenderApi
                     tv = IsTv(d), connected = outs.IsConnected(d.Id), added = saved.Contains(d.Id),
                 };
             }).Where(x => !x.self).OrderBy(x => x.block != null).ThenBy(x => x.name, StringComparer.OrdinalIgnoreCase).ToList();
-            return Results.Json(new { running = b.Running, problem = b.Problem, airPlay2Experimental = s.Cfg.AirPlay2Experimental, devices = list });
+            // 0.6.9 #22b: status 'retrying' + lastError + retryInSec while the browse could not start / died and is being retried
+            return Results.Json(new { running = b.Running, status = b.Status, problem = b.Problem, lastError = b.LastError, retryInSec = b.NextRetry is { } nr ? Math.Max(0, (int)Math.Ceiling((nr - DateTimeOffset.Now).TotalSeconds)) : (int?)null,
+                airPlay2Experimental = s.Cfg.AirPlay2Experimental, devices = list });
         }).Req(Role.Admin);
         // Test: connect WITHOUT joining a group (nothing is saved), play the chime. The person then says whether they heard it.
         g.MapPost("/airplay/setup/test", async (SetupReq r) =>
@@ -166,8 +168,11 @@ public static class AirPlaySenderApi
         lock (Gate)
         {
             if (s.AirPlayBrowse != null) return;
-            var b = new AirPlay.AirPlayBrowser(); s.AirPlayBrowse = b;
-            b.Start(IPAddress.TryParse(s.Cfg.BindAddress.Trim('[', ']'), out var ip) ? ip : IPAddress.Loopback);
+            var b = new AirPlay.AirPlayBrowser(s.Log); s.AirPlayBrowse = b;   // 0.6.9 #22b: logs start / failures / retries / speakers seen
+            var ip = IPAddress.TryParse(s.Cfg.BindAddress.Trim('[', ']'), out var p) ? p : IPAddress.Loopback;
+            // 0.6.9 #22b: a wildcard bind browses on the real LAN address (the one WavWiz advertises), like DiscoveryHost's mDNS responder
+            if (ip.Equals(IPAddress.Any)) ip = Net.NetworkHelper.AdvertiseAddress(ip);
+            b.Start(ip);
         }
     }
 }
