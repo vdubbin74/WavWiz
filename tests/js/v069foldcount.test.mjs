@@ -10,7 +10,7 @@ const css = readFileSync(join(js, '../app.css'), 'utf8');
 
 test('folded zone row: [▸] dot name, then the speaker-count chip; the now-playing line stays below', () => {
   const fold = t.slice(t.indexOf('const foldedBox ='), t.indexOf('const emptyBox ='));
-  assert.match(fold, /h\('div', \{ class: 'ze42-row' \}, foldBtn\(box, true, name\), dot, h\('button', \{[\s\S]*?onclick: \(\) => st\.onZone\(lead\.id\) \}, name\), foldCount\(ms, linked\)\),\s*line,/);
+  assert.match(fold, /h\('div', \{ class: 'ze42-row' \}, foldBtn\(box, true, name\), dot, zoneName\(lead\.id, name\), foldCount\(ms, linked\)\),\s*line,/);
 });
 
 test('foldCount: chip with the volume icon + count, null with no speakers (empty zones keep their note)', () => {
