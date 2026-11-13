@@ -5195,6 +5195,11 @@ html:not([data-uiscale=compact]) :is(.libpanel,.nowcol,.devpanel,.listpanel,.np-
 .castsetup-byip-link{margin:-2px 0 2px}
 .castsetup-addr{margin-left:6px;font-family:var(--mono);white-space:nowrap}
 .apsetup-empty{padding:8px}
+/* 0.6.9 #22 (t1857): a finished search with nothing found, or a search that failed, says so with Search again */
+.apsetup-empty.apsetup-none,.apsetup-empty.apsetup-err{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 8px}
+.apsetup-empty.apsetup-none ul,.apsetup-empty.apsetup-err p{margin:0;padding-left:18px}
+.apsetup-empty.apsetup-err p{padding-left:0}
+.apsetup-empty.apsetup-err b{color:var(--bad,#e5484d)}
 .dtag.otype.airplay,.dtag.otype.cast{letter-spacing:.4px}
 
 

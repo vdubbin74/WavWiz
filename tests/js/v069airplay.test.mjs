@@ -45,3 +45,113 @@ test('5a: a failed search says so on the card instead of "Looking…" (the error
   assert.match(c.querySelector('.apsetup-empty').textContent, /AirPlay browser is not running/);
   m._apReset();
 });
+
+// 0.6.9 #22 (t1857): "The AirPlay section still just says Looking…". An empty answer (no speakers heard, or only WavWiz itself, or the
+// server's browser not running) looked exactly like "still searching", so the card said "Looking…" for ever. A search now ends.
+test('#22 pure: apScanView - searching, list, nothing found, error', async () => {
+  const m = await import(pathToFileURL(join(js, 'airplaysetup.js')).href + '?pure22');
+  assert.equal(m.apScanView({ phase: 'searching', n: 0 }).note, 'Looking…');
+  assert.equal(m.apScanView({ phase: 'searching', n: 2 }).note, '2 on this network');
+  const none = m.apScanView({ phase: 'done', n: 0 });
+  assert.equal(none.note, 'None found'); assert.equal(none.title, 'No AirPlay speakers found');
+  const err = m.apScanView({ phase: 'searching', n: 0, problem: 'boom' });
+  assert.equal(err.note, 'Couldn’t search'); assert.equal(err.text, 'boom');
+  assert.ok(m.SCAN_MS >= 8000 && m.SCAN_MS <= 10000);
+  assert.equal(m.apBrowseProblem({ running: true, devices: [] }), null);
+  assert.match(m.apBrowseProblem({ running: false, problem: 'AirPlay browse needs a home-network address (the server is bound to loopback).' }), /only listening on this PC/);
+  assert.match(m.apBrowseProblem({ running: false, problem: 'AirPlay browse unavailable: Only one usage of each socket address' }), /couldn’t start its AirPlay search: Only one usage/);
+});
+
+// advances mocked timers in small steps and lets the awaited fetches settle between steps (setImmediate stays real)
+const flush = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r)); };
+async function advance(t, ms, step = 50) { await flush(); for (let d = 0; d < ms; d += step) { t.mock.timers.tick(Math.min(step, ms - d)); await flush(); } }
+async function openedCard(tag, rep) {
+  sessionStorage.setItem('ww.apsetup.open', '0');
+  const m = await import(pathToFileURL(join(js, 'airplaysetup.js')).href + '?' + tag);
+  m._apReset(); calls.length = 0; reply = rep;
+  mount(m.airPlaySetupCard(S, {}));
+  doc.querySelector('.apsetup-card .qb42-t').click();                   // first open, by click (not the restored-open path)
+  return m;
+}
+const card = () => doc.querySelector('.apsetup-card');
+const queries = () => calls.filter(c => c.url.endsWith('/dev/airplay/query')).length;
+
+test('#22: first open by click with an EMPTY answer ends as "No AirPlay speakers found" + Search again (not "Looking…" for ever)', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const m = await openedCard('empty22', url => url.endsWith('/airplay/setup/devices') ? { running: true, devices: [] } : { ok: true });
+  await advance(t, 10);
+  assert.equal(queries(), 1, 'one search started');
+  assert.equal(card().querySelector('.qb42-st').textContent, 'Looking…');        // still inside the search window
+  assert.equal(card().querySelector('.apsetup-list').getAttribute('aria-busy'), 'true');
+  // the Devices tree redraws (state push, #12 reorder rebuild, #21 empty-zone rows) while the search runs: no restart, no reset
+  for (let i = 0; i < 3; i++) mount(m.airPlaySetupCard(S, {}));
+  await advance(t, 3000);
+  assert.equal(queries(), 1, 'tree rebuilds never restart an in-flight search');
+  await advance(t, m.SCAN_MS);
+  const c = card();
+  assert.equal(c.querySelector('.qb42-st').textContent, 'None found');
+  assert.match(c.querySelector('.apsetup-empty').textContent, /No AirPlay speakers found/);
+  assert.match(c.querySelector('.apsetup-empty').textContent, /Firewall/);
+  assert.ok(c.querySelector('[data-act="apsetup-again"]'), 'Search again button');
+  // a rebuild after the search keeps the finished result
+  mount(m.airPlaySetupCard(S, {}));
+  assert.equal(card().querySelector('.qb42-st').textContent, 'None found');
+  // Search again starts exactly one new search
+  card().querySelector('[data-act="apsetup-again"]').click(); card().querySelector('[data-act="apsetup-rescan"]')?.click();
+  await advance(t, 10);
+  assert.equal(queries(), 2);
+  assert.equal(card().querySelector('.qb42-st').textContent, 'Looking…');
+  m._apReset();
+});
+
+test('#22: only WavWiz itself on the network counts as nothing found', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const m = await openedCard('self22', url => url.endsWith('/airplay/setup/devices') ? { running: true, devices: [{ id: 'me', name: 'WavWiz - Basement', self: true }] } : { ok: true });
+  await advance(t, m.SCAN_MS + 10);
+  assert.equal(card().querySelector('.qb42-st').textContent, 'None found');
+  m._apReset();
+});
+
+test('#22: the server answers but its AirPlay search is not running -> a clear error at once, not "Looking…"', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const m = await openedCard('down22', url => url.endsWith('/airplay/setup/devices')
+    ? { running: false, problem: 'AirPlay browse needs a home-network address (the server is bound to loopback).', devices: [] } : { ok: true });
+  await advance(t, 10);
+  const c = card();
+  assert.equal(c.querySelector('.qb42-st').textContent, 'Couldn’t search');
+  assert.match(c.querySelector('.apsetup-err').textContent, /Couldn’t search for AirPlay speakers/);
+  assert.match(c.querySelector('.apsetup-err').textContent, /only listening on this PC/);
+  assert.ok(c.querySelector('.apsetup-err [data-act="apsetup-again"]'));
+  m._apReset();
+});
+
+test('#22: a server that never answers still ends the search with an error inside the time limit', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  sessionStorage.setItem('ww.apsetup.open', '0');
+  const m = await import(pathToFileURL(join(js, 'airplaysetup.js')).href + '?hang22');
+  m._apReset(); calls.length = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (url, init = {}) => { calls.push({ url, method: init.method || 'GET' }); return new Promise(() => {}); };   // never resolves
+  try {
+    mount(m.airPlaySetupCard(S, {}));
+    card().querySelector('.qb42-t').click();
+    await advance(t, m.SCAN_MS + 50);
+    await advance(t, m.SCAN_MS + 50);
+    const c = card();
+    assert.notEqual(c.querySelector('.qb42-st').textContent, 'Looking…');
+    assert.equal(c.querySelector('.qb42-st').textContent, 'Couldn’t search');
+    assert.match(c.querySelector('.apsetup-err').textContent, /didn’t answer the AirPlay search in time/);
+  } finally { globalThis.fetch = realFetch; m._apReset(); }
+});
+
+test('#22: speakers found during the search show at once, and a later rebuild keeps them', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const m = await openedCard('found22', url => url.endsWith('/airplay/setup/devices') ? { running: true, devices: [{ id: 'k1', name: 'Kitchen', route: 'raop' }] } : { ok: true });
+  await advance(t, 10);
+  assert.equal(card().querySelector('.qb42-st').textContent, '1 on this network');
+  mount(m.airPlaySetupCard(S, {}));
+  assert.match(card().querySelector('.apsetup-list').textContent, /Kitchen/);
+  await advance(t, m.SCAN_MS + 10);
+  assert.equal(card().querySelector('.qb42-st').textContent, '1 on this network');
+  m._apReset();
+});

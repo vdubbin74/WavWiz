@@ -73,6 +73,29 @@ export function apMergeRemembered(devs, zones) {
   return list;
 }
 
+/** 0.6.9 #22 (t1857): a search always ends. While it runs (at most SCAN_MS) the card says "Looking…"; after that an empty list is
+ *  "No AirPlay speakers found" with Search again, and a server that cannot browse (or does not answer) is a clear error. Pure. */
+export const SCAN_MS = 9000;
+export function apScanView({ phase = 'idle', n = 0, problem = null } = {}) {
+  if (n) return { note: `${n} on this network`, kind: 'list', title: '', text: '' };
+  if (problem) return { note: 'Couldn’t search', kind: 'err', title: 'Couldn’t search for AirPlay speakers', text: problem };
+  if (phase === 'searching') return { note: 'Looking…', kind: 'busy', title: '', text: 'Looking for speakers… answers usually arrive within a few seconds.' };
+  return { note: 'None found', kind: 'none', title: 'No AirPlay speakers found', text: '' };
+}
+/** The server's own browse problem (it answered, but its AirPlay search is not running) in plain words. Pure. */
+export function apBrowseProblem(r) {
+  if (!r || r.running !== false) return null;
+  const p = String(r.problem || '');
+  if (/loopback/i.test(p)) return 'The server is only listening on this PC (127.0.0.1), so it can’t search the home network. Set its network address in Settings › Network, then search again.';
+  return p ? `The server couldn’t start its AirPlay search: ${p.replace(/^AirPlay browse unavailable:\s*/i, '')}` : 'The server’s AirPlay search isn’t running.';
+}
+/** Rejects after ms so a request that never comes back still ends the search. */
+function within(p, ms) {
+  let t = 0;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The server didn’t answer the AirPlay search in time.'), { status: 0 })), ms); })])
+    .finally(() => clearTimeout(t));
+}
+
 // ---------------------------------------------------------------- module state (survives tree rebuilds)
 const OPEN_KEY = 'ww.apsetup.open';
 const stOf = () => ({ heard: null, tested: null, problem: null, busy: '', zonePick: 'new', newName: '', added: false });
@@ -81,6 +104,9 @@ let open = (() => { try { return sessionStorage.getItem(OPEN_KEY) === '1'; } cat
 let cardDecor = null;
 export const setApCardDecor = fn => { cardDecor = typeof fn === 'function' ? fn : null; };
 let Sref = null, ctlRef = null, devs = [], ap2 = false, selId = null, byId = Object.create(null), timer = 0, closed = true, lastProblem = null;
+// 0.6.9 #22: one search at a time; phase 'idle' | 'searching' | 'done'. Kept in the module so tree rebuilds / repaints never reset it.
+let scanPhase = 'idle', scanSeq = 0, scanTimer = 0;
+function endScan() { scanSeq++; scanPhase = 'idle'; clearTimeout(scanTimer); scanTimer = 0; }
 
 function sel() { return (devs || []).find(d => d.id === selId) || null; }
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
@@ -92,7 +118,7 @@ function setOpen(v) {
   if (!open) stopPoll();
 }
 async function finish() {
-  closed = true; stopPoll();
+  closed = true; stopPoll(); endScan();
   for (const id of Object.keys(byId)) {
     const s = byId[id];
     if (s.tested && !s.tested.added && !s.added) {
@@ -114,20 +140,35 @@ function startPoll() {
 
 async function load() {
   try {
-    const r = await api('/airplay/setup/devices');
+    const r = await within(api('/airplay/setup/devices'), SCAN_MS) || {};
     const browsed = r.devices || [];
     ap2 = !!r.airPlay2Experimental;
-    devs = apMergeRemembered(browsed, Sref?.zones); lastProblem = null;
+    // 0.6.9 #22: the server says running:false + problem when its browser could not start; that used to be ignored ("Looking…" forever)
+    devs = apMergeRemembered(browsed, Sref?.zones); lastProblem = apBrowseProblem(r);
   } catch (e) {
     // 0.7.0 item 5a: with no speaker selected st(null) is a throw-away object, so the error was lost and the card sat on "Looking…"
     if (selId) st(selId).problem = apProblem(e, ''); else lastProblem = apProblem(e, '').text;
   }
 }
 async function rescan() {
-  const s = st(selId); s.problem = null; s.heard = null; selId = null; devs = []; paintInPlace();
-  try { await api('/dev/airplay/query', { method: 'POST' }); } catch (e) { lastProblem = apProblem(e, '').text; }
-  await load(); paintInPlace();
-  setTimeout(async () => { if (!closed && open) { await load(); paintInPlace(); } }, 1500);
+  // 0.6.9 #22 (t1857): an empty answer used to look exactly like "still searching", so the card said "Looking…" for ever.
+  // Now a search has a deadline (SCAN_MS) and ends as a list, "No AirPlay speakers found" or an error; a second call while one runs
+  // (a repaint, the restored-open path, Devices menu) does not restart it, and the list already shown is kept until the new answer.
+  if (scanPhase === 'searching') return;
+  const seq = ++scanSeq;
+  const s = st(selId); s.problem = null; s.heard = null; selId = null; lastProblem = null;
+  scanPhase = 'searching'; clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => { if (seq === scanSeq && scanPhase === 'searching') { scanPhase = 'done'; paintInPlace(); } }, SCAN_MS);
+  paintInPlace();
+  let qErr = null;
+  try { await within(api('/dev/airplay/query', { method: 'POST' }), SCAN_MS); } catch (e) { qErr = apProblem(e, '').text; }
+  if (seq !== scanSeq) return;
+  await load();
+  if (seq !== scanSeq) return;
+  if (qErr && !lastProblem && !apFindList(devs).length) lastProblem = qErr;
+  if (lastProblem) { scanPhase = 'done'; clearTimeout(scanTimer); }   // an error ends the search at once
+  paintInPlace();
+  for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open) { await load(); paintInPlace(); } }, ms);
 }
 
 function scrollKeep(fn) {
@@ -244,7 +285,8 @@ function buildCard(S, ctl) {
   if (open && closed) { closed = false; setTimeout(() => { if (open && !closed) { rescan(); startPoll(); } }, 0); }
   const list = apFindList(devs);
   const n = list.length;
-  const note = !open ? (n ? `${n} found` : 'Find, test and add') : (n ? `${n} on this network` : lastProblem ? 'Couldn’t search' : 'Looking…');
+  const view = apScanView({ phase: scanPhase === 'idle' && open ? 'searching' : scanPhase, n, problem: lastProblem });
+  const note = !open ? (n ? `${n} found` : 'Find, test and add') : view.note;
   const step = apStep(st(selId), sel());
   const fold = h('button', { type: 'button', class: 'zfold42-t' + (open ? ' open' : ''), 'data-act': 'apsetup-fold',
     'aria-expanded': String(open), 'aria-label': open ? 'Collapse AirPlay speakers' : 'Expand AirPlay speakers',
@@ -273,8 +315,18 @@ function buildCard(S, ctl) {
       h('span', { class: 'apsetup-sn' }, String(i + 1)), ' ', t)));
 
   const rows = list.map(speakerRow);
-  const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'AirPlay speakers' },
-    rows.length ? rows : h('div', { class: 'small dim apsetup-empty' + (lastProblem ? ' apsetup-err' : '') }, lastProblem || 'Looking for speakers… answers usually arrive within a few seconds.'));
+  const searching = scanPhase === 'searching';
+  const again = () => h('button', { type: 'button', class: 'btn primary apsetup-again', 'data-act': 'apsetup-again', onclick: () => rescan() }, 'Search again');
+  let empty = null;
+  if (view.kind === 'busy') empty = h('div', { class: 'small dim apsetup-empty', role: 'status' }, view.text);
+  else if (view.kind === 'err') empty = h('div', { class: 'small apsetup-empty apsetup-err', role: 'alert' }, h('b', null, view.title), h('p', { class: 'small' }, view.text), again());
+  else if (view.kind === 'none') empty = h('div', { class: 'small apsetup-empty apsetup-none', role: 'status' }, h('b', null, view.title),
+    h('ul', { class: 'small dim' },
+      h('li', null, 'Check the speaker is switched on and on the same network as this PC (VPN off).'),
+      h('li', null, 'Windows Firewall can block the speakers’ answers. Settings › Network › AirPlay speakers has the firewall rules.')),
+    again());
+  const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'AirPlay speakers', 'aria-busy': searching ? 'true' : null },
+    rows.length ? rows : empty);
 
   const footNote = h('p', { class: 'small dim apsetup-note' },
     'AirPlay 2 support is experimental. Speakers that need a PIN aren’t supported yet.');
@@ -284,7 +336,7 @@ function buildCard(S, ctl) {
 
   const foot = h('div', { class: 'apsetup-foot' },
     h('div', { class: 'apsetup-footnote grow' }, footNote, ap2line),
-    h('button', { type: 'button', class: 'linkbtn', 'data-act': 'apsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy }, 'Scan again'),
+    h('button', { type: 'button', class: 'linkbtn', 'data-act': 'apsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy || searching }, searching ? 'Searching…' : 'Scan again'),
     h('button', { type: 'button', class: 'btn primary', 'data-act': 'apsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
 
   const body = h('div', { class: 'apsetup-body' }, steps, listEl, foot);
@@ -325,6 +377,6 @@ export function openAirPlaySetup(S, ctl) {
 
 /** Test helper: reset module state between unit tests. */
 export function _apReset() {
-  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null;
+  open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; endScan();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }
