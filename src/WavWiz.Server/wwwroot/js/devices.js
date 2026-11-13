@@ -905,6 +905,10 @@ export function patchRows42(cur, fresh) {
   la.forEach((x, i) => { if (!cur.contains(x)) return; if (x.matches('.zl-now') && Z.patchNowLine(x, lb[i])) return; if (x.outerHTML === lhtml[i]) return; if (inUse(x)) { all = 2; return; } x.replaceWith(lb[i]); });
   return all;
 }
+/** F269 + 0.6.9 #31 (t1888/t1889): what a deliberate move changes - which speaker is in which zone AND which zones are linked (playbackId = the
+ *  link leader). A change rebuilds the tree at once, never held by hover. Linking or splitting two EMPTY zones changes no speaker, so the drop / Split off
+ *  used to wait under the pointer until something else forced the Devices panel to redraw. Pure (unit tested on the server's /groups shape). */
+export const treeMoveSig42 = gs => JSON.stringify((gs || []).map(g => [g.id, g.deviceIds || [], g.playbackId || '']));
 function tree42Kit(S, ctl, X) {
   // 0.4.2: the tree is rebuilt only when what it shows changed (a position tick alone repaints at most every 10 s), and never while a drag or slider is in use
   let tnode = null, tsig = '', tlive = '';
@@ -922,7 +926,7 @@ function tree42Kit(S, ctl, X) {
   const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock, phoneMaxBars: X.size === 'phone' };
   let topen = '', tmem = '';
   // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
-  const memSig42 = () => JSON.stringify((S.groups || []).map(g => [g.id, g.deviceIds || []]));
+  const memSig42 = () => treeMoveSig42(S.groups);
   const treeNode = force => {
     // 0.6.9 #12: a card-order change (this user's drop / Move up, or another client's) is a deliberate move like F269 membership: rebuild at once, never held by hover
     const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42() + '|' + JSON.stringify(getCardOrder()), memMoved = !!tnode && mem !== tmem;
