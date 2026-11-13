@@ -2,9 +2,9 @@
 import { h, api, toast, dialog, ask } from './util.js';
 import { isAdmin, canControl } from './ui.js';
 import { loadTheme } from './theme.js';
-import { blockedKey, isExitChord, guestApi, plural, albumName, selNo, upNextLine } from './jukebox-core.js';
+import { blockedKey, isExitChord, guestApi, plural, selNo, upNextLine } from './jukebox-core.js';
 import { RETRO_SVG } from './jukebox-retro.js';
-import { renderResults, artBox, setArt, rowsSig, artFailed } from './jukebox-view.js';
+import { artBox, setArt, rowsSig, artFailed } from './jukebox-view.js';
 import { Viz, setVizZone } from './viz.js';
 import { artCv } from './art.js';
 import { speakerPicker, initialPick } from './jbspeakers.js';   // 0.4.9 F76
@@ -163,26 +163,15 @@ export function openKiosk(S) {
   }
   const logo = h('button', { class: 'jb-logo', type: 'button', 'aria-label': 'Host: hold to exit' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'), 'Hold for host');
   let lp = 0; logo.addEventListener('pointerdown', () => { lp = setTimeout(askExit, 1200); }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, () => clearTimeout(lp)));
-  async function openSearch() {
-    if (!code) return;
-    const call = guestApi(code);
-    const inp = h('input', { class: 'jb-in', type: 'search', placeholder: 'Search songs, artists, albums', 'aria-label': 'Search', autocomplete: 'off' });
-    const out = h('div', { class: 'jb-sout' });
-    const songRow = (s, i = 0) => { const b = h('button', { class: 'btn primary jb-add', type: 'button', onclick: async () => { b.disabled = true; try { await call('/add', { guest: 'kiosk-screen', name: 'Big screen', trackId: s.id }); b.textContent = '✓ In'; b.classList.add('in'); refresh(); } catch (e) { b.disabled = false; toast(e.message, true); } } }, 'Add');
-      return h('div', { class: 'jb-row' }, board?.style === 'retro' ? h('span', { class: 'jbr-code' }, 'C' + (i + 1)) : null, h('div', { class: 'jb-t' }, h('b', null, s.title), h('small', null, s.artist)), b); };
-    const list = (title, songs) => out.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: run }, '‹ Back'), h('h2', { class: 'jb-gh' }, title), ...songs.map(songRow));
-    async function run() { const q = inp.value.trim(); if (!q) { out.replaceChildren(); return; } try { const r = await call('/search?q=' + encodeURIComponent(q)); if (q !== inp.value.trim()) return; out.replaceChildren(renderResults(r, { songRow, onArtist: async a => list(a.name, await call('/artist?name=' + encodeURIComponent(a.name))), onAlbum: async a => list(albumName(a), await call(`/album?artist=${encodeURIComponent(a.artist)}&album=${encodeURIComponent(albumName(a))}`)) })); } catch (e) { toast(e.message, true); } }
-    inp.addEventListener('input', () => { clearTimeout(inp._t); inp._t = setTimeout(run, 250); });
-    const wrap = h('div', { class: 'jb-dlg', onclick: e => { if (e.target === wrap) wrap.remove(); } }, h('div', { class: 'jb-search-pane', role: 'dialog', 'aria-label': 'Search & add' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Search & add'), h('button', { class: 'btn', type: 'button', onclick: () => wrap.remove() }, 'Close')), inp, out));
-    root.append(wrap); inp.focus();
-  }
+  // 0.6.9 #17 (t1843): no song search button on the big screen - a TV has no mouse and the screen would only get its own 3 picks; guests add from
+  // their phones with the QR code ("Scan to add a song"). Host controls (hold the logo, the host panel) are unchanged.
   const qrSrc = () => '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || '');
   // 0.6.9 J1: covers come from the Jukebox art endpoint (a song with no picture of its own gets its album's cover); no picture = the tidy
   // placeholder (artBox), never a broken-image icon. The build's art version keeps them in the browser cache.
   const jbArt = (id, size) => (id ? `/api/v1/jukebox/art/${id}?size=${size}${artCv() ? '&cv=' + encodeURIComponent(artCv()) : ''}` : '');
   const thumb = id => artBox(jbArt(id, 128), 'jb-th');
 
-  // ---- Modern (bug fixes only): cover, now playing, progress, requester, Search & add | Up next with art, QR ----
+  // ---- Modern (bug fixes only): cover, now playing, progress, requester | Up next with art, QR ----
   // 0.6.9 J2: the frame is built ONCE and each second only its text / progress changes. The Up next rows are rebuilt only when the songs
   // change (rowsSig), so a row's cover <img> is never re-created and a song with no picture never flashes its placeholder every tick.
   const mod = h('div', { class: 'jbm' });
@@ -191,8 +180,7 @@ export function openKiosk(S) {
   const mTitle = h('h1', { class: 'jb-title' }), mArtist = h('div', { class: 'jb-artist' }), mProg = h('div', { class: 'jb-prog' }, h('i'), h('b'));
   const mPos = h('small', { class: 'jb-dim' }), mDur = h('small', { class: 'jb-dim' }), mBy = h('div', { class: 'jb-by' });
   const left = h('div', { class: 'jb-left' }, disc, h('span', { class: 'jb-kick' }, 'NOW PLAYING'), mTitle, mArtist, mProg,
-    h('div', { class: 'row jb-times' }, mPos, h('span', { class: 'grow' }), mDur), mBy,
-    h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, h('span', { class: 'jb-sico', 'aria-hidden': 'true' }), 'Search & add'));
+    h('div', { class: 'row jb-times' }, mPos, h('span', { class: 'grow' }), mDur), mBy);
   const nextBox = h('div', { class: 'jb-next' }), jUrl = h('code', { class: 'jb-url' }), jQr = h('img', { class: 'jb-qr', alt: 'QR code to join the Jukebox' });
   const right = h('div', { class: 'jb-right' }, nextBox,
     h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), jUrl, h('small', { class: 'jb-dim' }, 'No app, no login')), jQr));
@@ -221,9 +209,7 @@ export function openKiosk(S) {
     <span class="jbr-badge l"></span><span class="jbr-badge r"></span>
     <div class="jbr-plac"><span class="jbr-kick">NOW&nbsp;&nbsp;PLAYING</span><span class="jbr-vfd"></span><div class="jbr-line"><b class="jbr-title"></b><span class="jbr-artist"></span></div><span class="jbr-by"></span></div>
     <div class="jbr-rack"><span class="jbr-h a">UP NEXT</span><span class="jbr-h b">MORE TO PICK</span><div class="jbr-col a"></div><div class="jbr-col b"></div></div>
-    <div class="jbr-qr"><span>Scan to pick<br>a song</span><img alt="QR code to join the Jukebox"><small></small></div>
-    <button type="button" class="jbr-select" aria-label="Search and add a song"><span>SELECT</span></button><span class="jbr-sel-l">Search &amp; add</span>`;
-  ret.querySelector('.jbr-select').addEventListener('click', openSearch);
+    <div class="jbr-qr"><span>Scan to pick<br>a song</span><img alt="QR code to join the Jukebox"><small></small></div>`;
   const q = sel => ret.querySelector(sel);
   const strip = (cls, codeTxt, kids) => h('div', { class: 'jbr-strip ' + cls }, h('span', { class: 'jbr-code' }, codeTxt), h('span', { class: 'jbr-st' }, kids));
   async function loadPicks() { if (!code || Date.now() - picksAt < 45000) return; picksAt = Date.now(); try { picks = await guestApi(code)('/picks?n=5'); } catch { /* keep the old ones */ } }

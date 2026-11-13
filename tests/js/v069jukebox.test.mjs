@@ -73,3 +73,15 @@ test('J1 CSS: placeholder has no fixed colors and the eq animation respects redu
   assert.match(css, /span\.jb-art[^{]*\{[^}]*linear-gradient\(135deg,var\(--accent\)/); assert.match(css, /span\.jb-art\.has>img\{opacity:1\}/);
   assert.match(css, /prefers-reduced-motion:reduce\)\{\.jbg-npc\.playing \.jbg-eq i\{animation:none/);
 });
+test('0.6.9 #17 (t1843): no Search & add on the big screen (Modern, Retro CD, Settings previews); the QR stays; the phone keeps it', () => {
+  const k = src('jukebox-kiosk.js'), pv = src('jukebox-preview.js'), g = src('jukebox-guest.js');
+  const css = readFileSync(join(js, '../jukebox.css'), 'utf8');
+  for (const [f, t] of [['kiosk', k], ['preview', pv]]) {
+    assert.doesNotMatch(t, /jb-big|jbpm-big|jbr-select|jbr-sel-l|openSearch|jb-search-pane|Search &(amp;)? add/, f);
+  }
+  assert.doesNotMatch(k, /kiosk-screen/, 'the big screen no longer adds songs as a guest');
+  assert.match(k, /h\('b', null, 'Scan to add a song'\)/); assert.match(k, /class="jbr-qr"/); assert.match(k, /'Hold for host'/); assert.match(k, /setTimeout\(askExit, 1200\)/);
+  assert.doesNotMatch(css, /\.jb-big|\.jbr-select|\.jbr-sel-l|\.jb-search-pane|\.jbpm-big/, 'dead big-screen search CSS removed');
+  assert.match(css, /\.jb-stage \.jb-disc\{position:relative;width:520px/); assert.match(css, /\.jb-stage \.jb-join img\{width:272px/);
+  assert.match(g, /tabBtn\('search', 'Search & add'\)/, 'phone guest page keeps Search & add');
+});

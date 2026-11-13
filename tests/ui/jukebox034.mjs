@@ -82,13 +82,9 @@ for (const style of STYLES) {
   await shot(big, `jb-${tag}-bigscreen`);
   await big.evaluate(() => document.fullscreenElement && document.exitFullscreen()).catch(() => {}); await big.waitForTimeout(300);
   for (const [w, hgt] of [[1440, 900], [1280, 720]]) { await big.setViewportSize({ width: w, height: hgt }); await big.waitForTimeout(800); await shot(big, `jb-${tag}-bigscreen-${w}`); }
-  // big-screen Search & add (SELECT on Retro)
+  // 0.6.9 #17 (t1843): the big screen has no Search & add (a TV has no mouse); the QR code is the way to add
   await big.setViewportSize({ width: 1920, height: 1080 }); await big.waitForTimeout(600);
-  await big.locator(style === 'retro' ? '.jbr-select' : '.jb-big').click(); await big.waitForTimeout(600);
-  await big.keyboard.type('song 1', { delay: 300 }); await big.waitForTimeout(1200);
-  ok(`[${tag}] big-screen Search & add opens and searches`, await big.locator('.jb-search-pane .jb-row').count() > 0);
-  await shot(big, `jb-${tag}-bigscreen-search`);
-  await big.locator('.jb-search-pane button', { hasText: 'Close' }).click();
+  ok(`[${tag}] big screen has no Search & add, the join QR is shown`, (await big.locator('.jb .jb-big, .jb .jbr-select, .jb .jb-search-pane').count()) === 0 && (await big.locator(style === 'retro' ? '.jbr-qr img' : '.jb-join img').count()) === 1);
   // stop from the host controls
   await p.evaluate(() => { document.querySelectorAll('dialog[open]').forEach(d => d.close()); document.querySelectorAll('.phone-unlock').forEach(e => e.remove()); });
   await p.locator('#jbchip').click(); await p.waitForTimeout(1000); await p.locator('.jbpanel button', { hasText: 'Stop Jukebox' }).click(); await p.waitForTimeout(700);
