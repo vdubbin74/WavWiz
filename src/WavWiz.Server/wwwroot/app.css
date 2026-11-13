@@ -5702,3 +5702,7 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .radiotab2 .list .item.radrow>.t,.radiotab2 .radfind-row>.grow{min-width:0;flex:1 1 auto}
 .radiotab2 .list .item.radrow>.tag,.radiotab2 .list .item.radrow>.btn,.radiotab2 .radfind-row>.btn,.radiotab2 .list .item.radrow>.cover,.radiotab2 .radfind-row>.cover{flex:none}
 .radiotab2 .list .item.radrow .rad-t1 .rad-favmark{vertical-align:-1px}
+/* 0.6.9 #25 (t1875): folded zone with speakers - the speaker-count chip sits right after the name; only on that row the name may shrink (ellipsis)
+   so a long name never pushes the chip out. Rows without the chip (empty zones, open zones) are unchanged. */
+.tree42 .qb42.zfold42 .ze42-row:has(>.zfold42-n)>.zname{flex:0 1 auto;min-width:0}
+.tree42 .qb42.zfold42 .ze42-row>.zfold42-n{flex:none}

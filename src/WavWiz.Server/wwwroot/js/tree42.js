@@ -233,6 +233,9 @@ export function treeEl(S, ctl, kit, st) {
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; controlZone(lead.id); });
     return el;
   };
+  // 0.6.9 #25 (t1875): a folded zone with speakers shows how many, as the same small speaker-icon chip as the open zone's name row (.zcount42); the
+  // name shrinks first, the chip never wraps, and the now-playing line below keeps its own row. Empty zones keep 'No speakers' (no chip).
+  const foldCount = (ms, linked) => !ms.length ? null : h('span', { class: 'zcount42 zfold42-n', title: `${ms.length} speaker${ms.length === 1 ? '' : 's'} in ${linked ? 'the linked zones' : 'this zone'}`, 'aria-label': `${ms.length} speaker${ms.length === 1 ? '' : 's'}` }, icon('volume'), String(ms.length));
   // F266: a folded zone box = the empty-zone look: [▸] name, green dot when a speaker is on and online, what it is doing.
   const foldedBox = (box, { lead, linked, sel, ms, now }) => {
     const active = ms.filter(z => z.enabled !== false && z.connected), playing = now?.state === 'playing';
@@ -242,7 +245,7 @@ export function treeEl(S, ctl, kit, st) {
     const line = now?.title ? Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }) : null;
     return pickRow(h('section', { class: 'qb42 empty42 zfold42' + ' zpick42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === lead.id ? ' picked' : ''), 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
-        h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name)),
+        h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name), foldCount(ms, linked)),
         line,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))), () => controlZone(lead.id));
   };
