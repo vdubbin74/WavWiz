@@ -66,6 +66,7 @@ import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
 import { startPairRequests, playerApprovalScreen } from './pairreq.js';   // 0.6.9 #15
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
+document.documentElement.classList.toggle('handset', isRealPhone());   // 0.7.0 (t1892): phone-only header sizes follow the device, never a narrow PC window
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
 
 export const S = { auth: null, now: null, queue: [], zones: [], groups: [], radio: [], status: null, view: null, ws: null, localPos: 0, localAt: 0 };

@@ -5718,3 +5718,21 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
    so a long name never pushes the chip out. Rows without the chip (empty zones, open zones) are unchanged. */
 .tree42 .qb42.zfold42 .ze42-row:has(>.zfold42-n)>.zname{flex:0 1 auto;min-width:0}
 .tree42 .qb42.zfold42 .ze42-row>.zfold42-n{flex:none}
+
+/* 0.7.0 (t1892): the phone header fits at 360-390 px with the Jukebox on or off. The Parallel Flow emblem + WavWiz wordmark are the same logo
+   (shape, theme colors, font), only scaled down; the gaps around it are tightened a little. Real phones only (html.handset = isRealPhone()):
+   the PC title bar and a narrow PC window keep their sizes. */
+@media (max-width:900px){
+  html.handset .topbar:not(.wtitlebar){gap:var(--hdr-gap,8px)}
+  html.handset .topbar:not(.wtitlebar) .logo{gap:var(--logo-gap,6px)}
+  html.handset .topbar:not(.wtitlebar) .logo .brand-emblem{height:var(--logo-em,24px);margin:0 -1px 0 -3px}
+  html.handset .topbar:not(.wtitlebar) .wordmark{font-size:var(--logo-wm,18px)}
+  html.handset .topbar:not(.wtitlebar) .adminchip{margin:0 2px}
+}
+@media (max-width:400px){
+  html.handset .topbar:not(.wtitlebar){--hdr-gap:6px;--logo-gap:4px;--logo-em:20px;--logo-wm:16px}
+}
+@media (max-width:380px){
+  html.handset .topbar:not(.wtitlebar){--hdr-gap:4px;--logo-gap:3px;--logo-em:18px;--logo-wm:15px}
+}
+/* end 0.7.0 (t1892) */
