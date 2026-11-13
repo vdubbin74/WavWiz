@@ -109,6 +109,9 @@ public static class PlaybackApi
         if (gid == null && !string.IsNullOrWhiteSpace(zid) && !ConductorRegistry.IsDefault(zid)) c.Response.Headers["X-WavWiz-Zone-Fallback"] = "1";
         return null;
     }
+    /// <summary>0.6.9 #27 (t1877): radio / live streams never go into the running Jukebox's queue (any path: add, play next, drop, play now, send).</summary>
+    internal static IResult? NoLiveInJukebox(Services s, Playback.Conductor cd, IEnumerable<QueueItem> items) =>
+        s.Jukebox != null && ReferenceEquals(s.Jukebox.Owns, cd) && items.Any(x => Playback.Conductor.IsLive(x.Kind)) ? Ext.Bad(Playback.Conductor.LiveRefusedText, 409) : null;
     private static object Groups(Services s) => new { zones = s.Registry.Groups().Select(g => new { id = g.Id, name = g.Name, isDefault = g.IsDefault, state = g.State, queueCount = g.QueueCount, idle = g.Idle, deviceIds = g.PlayerIds }) };
 
     public static void Map(RouteGroupBuilder g, Services s)
@@ -135,6 +138,7 @@ public static class PlaybackApi
         {
             var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; var items = ResolveItems(s, b, out var err);
             if (err != null) return Ext.Bad(err); if (items.Count == 0) return Ext.Bad("nothing to play");
+            if (NoLiveInJukebox(s, cd, items) is { } live) return live;   // 0.6.9 #27
             int index = (int)(b.Long("index") ?? 0); long start = b.Long("startMs") ?? 0;
             if (b.Bool("enqueue") == true) { cd.Add(items, b.Bool("next") == true); return Results.Json(new { ok = true, added = items.Count }); }
             var undo = s.QHistory.Snapshot(cd, "Before Play now");   // Play now replaces the queue: keep what was there for Undo / Recent queues
@@ -144,6 +148,7 @@ public static class PlaybackApi
         g.MapPost("/queue/add", async (HttpContext c) =>
         {
             var b = await c.Request.Body(); if (Zone(s, c, b, out var cd) is { } bad) return bad; var items = ResolveItems(s, b, out var err); if (err != null) return Ext.Bad(err);
+            if (NoLiveInJukebox(s, cd, items) is { } live) return live;   // 0.6.9 #27
             if (b.Long("at") is long at) cd.Insert(items, (int)at); else cd.Add(items, b.Bool("next") == true);   // 0.3.3 G12: drop position
             return Results.Json(new { ok = true, added = items.Count });
         }).Req(Role.Control);
@@ -158,6 +163,7 @@ public static class PlaybackApi
             var dst = s.Registry.Get(gid); if (dst == null) return Ext.Bad("no such zone", 404);
             if (ReferenceEquals(dst, src)) return Ext.Bad("That is the same queue: these zones play the same music.", 409);
             var items = src.Queue().ToList(); if (items.Count == 0) return Ext.Bad("This queue is empty.", 409);
+            if (NoLiveInJukebox(s, dst, items) is { } live) return live;   // 0.6.9 #27
             int idx = src.Now().Index;
             if (play) dst.PlayItems(items, Math.Clamp(idx, 0, items.Count - 1), 0); else dst.Add(items, false);
             string? undo = null; if (move) { undo = s.QHistory.Snapshot(src, "Before move to another zone"); src.Clear(); }

@@ -26,11 +26,12 @@ public sealed class WavWizServer : IAsyncDisposable
         var ffmpeg = cfg.ResolveFfmpeg();
         var events = new EventHub(); var auth = new AuthService(db);
         var lib = new Library.LibraryService(db);
-        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs };
+        Func<Playback.Conductor, bool>? liveRefused = null;   // 0.6.9 #27: set once the Jukebox service exists (below)
+        var cond = new Playback.Conductor(db, events, ffmpeg) { LeadMs = cfg.LeadMs, LiveRefused = c => liveRefused?.Invoke(c) == true };
         // 0.4.0: playback groups. "default" is the house group = this Conductor (today's behavior); split-off groups are created lazily and share its clock. Last queues (0.3.7 L15) are saved per group.
         // 0.4.3 #10: every group's engine feeds its own visualizer hub (0.4.1 moved zones into their own groups, which were never tapped)
         var viz = new Playback.VizHubs(); viz.Attach(cond);
-        var registry = new Playback.ConductorRegistry(cond, gid => viz.Attach(new Playback.Conductor(db, events, ffmpeg, cond.Clock, gid) { LeadMs = cfg.LeadMs }), db, events); registry.EnablePersistence();
+        var registry = new Playback.ConductorRegistry(cond, gid => viz.Attach(new Playback.Conductor(db, events, ffmpeg, cond.Clock, gid) { LeadMs = cfg.LeadMs, LiveRefused = c => liveRefused?.Invoke(c) == true }), db, events); registry.EnablePersistence();
         var clockHost = new Net.ClockHost(cfg, cond.Clock); clockHost.Start();
         var audio = new Net.AudioHost(cfg, auth, cond.Clock, clockHost) { Log = u._log.Write, StreamRate = cond.StreamRateSetting }; audio.Start();
         var dsp = new Dsp.DspService(db);
@@ -63,6 +64,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.History = new Features.PlayHistoryService(db, s.Registry, events, cfg.LastFmHandler) { ZoneName = gid => s.Registry.NameOf(gid) };
         s.History.RemoteScrobble = async loc => { if (s.Remote == null || Library.SubsonicService.ServerIdOf(loc) is not { } sid) return; var song = loc[(Library.SubsonicService.Scheme.Length + sid.Length + 1)..]; await s.Remote.Call(sid, "scrobble", "id=" + Uri.EscapeDataString(song) + "&submission=true"); };
         s.Keep = new Features.KeepPlayingService(db, s.Registry, events) { JukeboxOwns = () => s.Jukebox.Owns };
+        liveRefused = cd => ReferenceEquals(s.Jukebox?.Owns, cd);   // 0.6.9 #27 (t1877): no radio in the running Jukebox's queue (backstop for every path)
         s.Keep.Pools["smart"] = id => s.Smart.Resolve(id); s.Keep.PoolNames["smart"] = id => s.Smart.Get(id)?.Name;
         s.Links.JukeboxRunning = () => s.Jukebox.Active; s.Jukebox.Borrow = ids => { s.Links.SetJukeboxDevices(ids); Features.JukeboxPower.Apply(s); }; s.Jukebox.Saved = () => Features.JukeboxPower.Apply(s); s.Jukebox.Release = () => { var jc = s.Links.JukeboxConductor(); s.Links.Apply(); Features.JukeboxPower.Apply(s); try { jc?.Stop(); } catch { } events.Publish("zones"); }; s.Links.Apply(); Features.JukeboxPower.Apply(s);   // 0.6.9 #19: a speaker the Jukebox switched off before a restart gets switched back on
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };

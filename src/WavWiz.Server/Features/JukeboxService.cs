@@ -302,10 +302,21 @@ public sealed class JukeboxService
             next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) && r.Guest.Length > 0 ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) && Same(r2, me, net) }) };
     }
 
+    /// <summary>0.6.9 #27 (t1877): a radio station already in the Jukebox's queue (added before it started, or by an older client) is taken out - a stream
+    /// never ends, so the Jukebox would never get to the guests' songs. If it was playing, the queue moves on to the next song. Returns how many went.</summary>
+    public int DropRadio()
+    {
+        if (!Running) return 0;
+        var q = Cond.Queue(); int n = 0;
+        for (int i = q.Count - 1; i >= 0; i--) if (q[i].Kind == "radio" && Cond.Remove(i)) n++;
+        if (n > 0) _ev.Publish("queue");
+        return n;
+    }
     /// <summary>Auto-fill: when the queue runs dry, add a random allowed song from the chosen playlist (or genre). Called every second.</summary>
     public void Tick()
     {
         if (!Running) return;
+        DropRadio();
         var c = Cfg();
         var now = Cond.Now(); var q = Cond.Queue();
         bool dry = q.Count == 0 || now.Index >= q.Count - 1 && (now.State == "stopped" || now.DurationMs > 0 && now.DurationMs - now.PositionMs < 15_000);

@@ -29,6 +29,12 @@ public sealed class Conductor : IDisposable
     private readonly Dictionary<string, LiveFeed> _feeds = new(); private (List<QueueItem> Queue, int Index)? _beforeLive; private bool _lastLiveActive;
     public static bool IsReceiver(string? kind) => kind is "airplay" or "spotify";
     public static bool IsLive(string? kind) => kind == "radio" || IsReceiver(kind);
+    /// <summary>0.6.9 #27 (t1877): true for the conductor the running Jukebox plays on - live items (radio / receivers: no end) are never queued there
+    /// (a stream that never ends stalls the Jukebox). Set by the server host; evaluated OUTSIDE the queue lock. The API answers with a clear message first;
+    /// this is the backstop for every other path (schedules, Keep playing, send to zone...). Per conductor (no static), so servers never share it.</summary>
+    public Func<Conductor, bool>? LiveRefused { get; set; }
+    public const string LiveRefusedText = "Radio can't go in the Jukebox queue";
+    private List<QueueItem> NoLiveHere(IEnumerable<QueueItem> items) { var l = items.ToList(); return LiveRefused?.Invoke(this) == true ? l.Where(x => !IsLive(x.Kind)).ToList() : l; }
     /// <summary>0.4.0: <paramref name="key"/> names the feed when more than one receiver of a kind can feed this group (one AirPlay/Spotify name per zone). The queue item keeps the key in Location; null = the kind itself (0.3.9).</summary>
     public void RegisterFeed(string kind, LiveFeed feed, string? key = null) { lock (_l) _feeds[key ?? kind] = feed; }
     public void UnregisterFeed(string key, LiveFeed feed) { lock (_l) { if (_feeds.TryGetValue(key, out var f) && ReferenceEquals(f, feed)) _feeds.Remove(key); } }
@@ -231,6 +237,7 @@ public sealed class Conductor : IDisposable
     /// <summary>Replace the queue and start playing at <paramref name="index"/>.</summary>
     public void PlayItems(IEnumerable<QueueItem> items, int index = 0, long startMs = 0)
     {
+        var given = items.ToList(); items = NoLiveHere(given); if (given.Count > 0 && !items.Any()) return;   // 0.6.9 #27: only radio for the Jukebox - leave its queue alone
         lock (_l)
         {
             _queue.Clear(); _queue.AddRange(items.Select(WithId)); ResetShuffleState();   // 0.4.2: shuffle never reorders the list; it only picks what plays next
@@ -403,6 +410,7 @@ public sealed class Conductor : IDisposable
     // ---------------- queue editing ----------------
     public void Add(IEnumerable<QueueItem> items, bool next)
     {
+        items = NoLiveHere(items);   // 0.6.9 #27
         lock (_l)
         {
             var list = items.Select(WithId).ToList(); if (list.Count == 0) return;
@@ -433,6 +441,7 @@ public sealed class Conductor : IDisposable
     /// <summary>0.3.3 G12: insert at a queue position (drag from the Library to the drop line). at &lt; 0 or past the end appends.</summary>
     public void Insert(IEnumerable<QueueItem> items, int at)
     {
+        items = NoLiveHere(items);   // 0.6.9 #27
         lock (_l)
         {
             var list = items.Select(WithId).ToList(); if (list.Count == 0) return;

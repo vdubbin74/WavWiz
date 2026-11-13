@@ -39,6 +39,10 @@ export function ownZoneKey(groups, me, sel) {
 /** Pure: the zoneId the API wants: null for the house group (old behavior, nothing added to the URL). */
 // 0.4.1: a zone that sits inside a larger one is sent as its zone key (g:<id>): pressing play there makes it play on its own devices automatically.
 export const zoneIdFor = ch => (!ch ? null : ch.kind === 'zone' && ch.overlaps ? ch.key : !ch.playbackId || ch.playbackId === 'default' ? null : ch.playbackId);
+/** 0.6.9 #27 (t1877u): pure - Radio can't go in the Jukebox queue (the server refuses it with this text). True while the Jukebox runs and the
+ *  picked zone is the Jukebox's queue: the Jukebox zone itself, or - while it has no speakers of its own - the main (house) zone it plays in. */
+export const RADIO_JB_TIP = "Radio can't go in the Jukebox queue";
+export const radioBlocked = (c, jb) => !!(jb?.running && c && (c.kind === 'jukebox' || (!jb.own && c.kind === 'zone' && zoneIdFor(c) == null)));
 /** 0.6.9 #21 (t1852/t1853): pure - the quiet note for a picked zone with no speakers ('' otherwise). Picking one is allowed: Now Playing and the
  *  Queue switch to it, and play / queue still work there (nothing is heard until a speaker joins). */
 export const emptyNote = c => !c?.empty ? '' : c.kind === 'jukebox' ? 'No speakers in the Jukebox zone - it plays in the main zone until it has some' : 'No speakers in this zone';
@@ -80,6 +84,7 @@ export function init(state, controls = {}) { S = state; ctl = controls; sync(); 
 export const choicesNow = () => S ? choices(S.groups, S.jb) : [];
 // 0.6.9 (t1838u): with no usable last pick the fallback is the first zone in the Devices card order (not the server's list order)
 export const current = () => S ? resolve(orderedGroups(S.groups || []), S.jb, loadSel()) : null;
+export const radioBlockedNow = () => S ? radioBlocked(current(), S.jb) : false;   // 0.6.9 #27
 // 0.6.9 (t1837u-t1839u): every player (Windows Player window, phone browser / home-screen app, any web player) opens Now Playing on the zone that
 // holds its own speaker, and does it again when that speaker (re)connects. A zone the user picks by hand sticks for the rest of the session: no later
 // zones refresh, membership change or reconnect moves it. "Session" = this tab / app window (sessionStorage), so a reload of the same window keeps it.
