@@ -42,15 +42,24 @@ public sealed class DiscoveryHost : IDisposable
         return null;
     }
 
+    /// <summary>UDP sockets for the discovery probe. Linux only hears a subnet broadcast on a socket bound to the broadcast address, so it
+    /// gets a second socket there. 0.6.9 #22b: Windows refuses that bind ("The requested address is not valid in its context", logged at
+    /// every start) and already delivers subnet broadcasts to the socket bound to the interface address, so Windows skips it. Pure.</summary>
+    public static List<IPAddress> BindTargets(IPAddress bind, IPAddress announce, bool windows)
+    {
+        var targets = new List<IPAddress> { bind };
+        if (windows) return targets;
+        var bcastFrom = bind.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any) ? announce : bind;
+        if (!IPAddress.IsLoopback(bcastFrom) && !bcastFrom.Equals(IPAddress.Any) && DirectedBroadcast(bcastFrom) is { } bc && !bc.Equals(bcastFrom)) targets.Add(bc);
+        return targets;
+    }
+
     public void Start()
     {
         if (!_cfg.Discovery) return;
         var bind = IPAddress.Parse(_cfg.BindAddress.Trim('[', ']'));
         var announce = NetworkHelper.AdvertiseAddress(bind);
-        var targets = new List<IPAddress> { bind };
-        var bcastFrom = bind.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any) ? announce : bind;
-        if (!IPAddress.IsLoopback(bcastFrom) && !bcastFrom.Equals(IPAddress.Any) && DirectedBroadcast(bcastFrom) is { } bc && !bc.Equals(bcastFrom)) targets.Add(bc);
-        foreach (var t in targets)
+        foreach (var t in BindTargets(bind, announce, OperatingSystem.IsWindows()))
         {
             try
             {

@@ -45,17 +45,16 @@ import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
 import { canControl, thisDevice, isAdmin } from './ui.js';
 import { isPlayerUa, isHandset } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
-import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning } from './jukebox-kiosk.js';
+import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning, DISPLAY as JB_DISPLAY } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
-import { jbTvChip } from './jbtv.js';
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
 import { whenIdle, installSliderGuard } from './slider.js';
 import { mountMini } from './mini.js';
 import * as Z from './zones40.js';
-import { isDevDragging } from './devorder.js';
+import { isDevDragging, setCardOrder, cardOrderChangedAt } from './devorder.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
 import { toggleAppFull, installAppFull } from './fullscreen.js';   // 0.5.0 F120
@@ -63,6 +62,7 @@ import { openMixer } from './mixer.js';   // 0.4.8 F49
 import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
+import { startPairRequests, playerApprovalScreen } from './pairreq.js';   // 0.6.9 #15
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
@@ -138,8 +138,10 @@ function renderSetup() {
   app.replaceChildren(topbar(), form);
 }
 
-function renderLogin() {
-  const mode = { v: 'pair' };
+function renderLogin(start) {
+  // 0.6.9 #15: the WavWiz Player window never opens on the sign-in tabs - it asks the administrator for approval and waits
+  if (!start && isPlayerUa()) { const w = playerApprovalScreen({ name: deviceName(), other: m => renderLogin(m) }); app.replaceChildren(topbar(), w.el); return; }
+  const mode = { v: start === 'admin' ? 'admin' : 'pair' };
   const root = h('div', { class: 'card auth' });
   const draw = () => {
     const msg = h('p', { class: 'err', role: 'alert' });
@@ -167,13 +169,15 @@ const NAV = [
 // NAV kept for page titles; phone hamburger uses createPhoneDrawerNav. 0.2.0 item 2: the "This phone as a device" page is gone.
 const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes & Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
+let pairReqs = null;   // 0.6.9 #15
 let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
 /** 0.3.6 K14 / K22: the real mini player lives in the right-hand column while the Library or the Playlist is expanded (and is not running otherwise). */
 function syncMini() { holdPage();
   if (!desk || !minicol) return;
   const need = wide() && desk.classList.contains('libexpanded');   // 0.4.6 F36/F37: only the expanded Library (Full and Roomy) shrinks Now Playing to the column mini player
   desk.classList.toggle('devfull', wide() && desk.classList.contains('devexpanded') && !desk.classList.contains('libexpanded'));   // 0.4.8 F53 v2: expanded Devices = no player at all, every column full height
-  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, run: runShortcut, home: goHome }); minicol.append(miniInst.rail); }
+  if (need && !miniInst) { const host = minicol.querySelector('.embedded-host'); miniInst = mountMini(host, { embedded: true, replica: true, run: runShortcut, home: goHome,   // 0.6.9 #9: the standalone mini player's layout and controls
+    popout: () => { try { if (window.chrome?.webview) { window.chrome.webview.postMessage({ cmd: 'mini' }); return; } } catch { /* browser */ } openMini(); }, collapse: () => toggleLibExpanded(false) }); minicol.append(miniInst.rail); }
   else if (!need && miniInst) { miniInst.destroy(); miniInst = null; minicol.replaceChildren(h('div', { class: 'mp embedded-host' })); }
   desk.classList.toggle('minishown', need); paintMiniStyle();
 }
@@ -264,8 +268,9 @@ async function startMain() {
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => showEq() }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
-  const jbtv = jbTvChip(S);   // 0.6.8-#6d
-  const bar = topbar([menubar, jbtv.el, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px', title: 'Connecting…' }, connDot, connTxt), inline], hamburger);
+  // 0.6.9 #26 (t1876): no 'Jukebox TV <address>' pill in the title bar any more (it ate the bar) - the view-only TV address is in the Jukebox host
+  // panel ('Show on a TV…'), next to 'Open on another screen'; the big screen shows its own join QR
+  const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px', title: 'Connecting…' }, connDot, connTxt), inline], hamburger);
   installTitlebar(bar);   // 0.6.8-#16: Windows app only - the top bar becomes the themed window title bar
   // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
   window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });
@@ -360,10 +365,11 @@ async function startMain() {
   });
   installAppFull();   // 0.5.0 F120: Esc leaves app fullscreen
   installMedia({ S, api, act, masterLevel, allMuted });   // 0.3.8 L45
+  pairReqs = startPairRequests(() => isAdmin(S));   // 0.6.9 #15: approval cards for administrators
   installMiniTargets(msg => { if (msg.home) goHome(); else if (msg.run) runShortcut(msg.run); });   // 0.3.7 L23: the standalone mini player's shortcuts
   connectWs(); go(S.view, true); libC.reload();
   await refreshAll();
-  drawStatus(); maybeWhatsNew(S); showPendingUndo();
+  drawStatus(); if (!JB_DISPLAY) maybeWhatsNew(S); showPendingUndo();   /* 0.6.9 #18: no What's new popping over a TV display */
   api('/alarm').then(r => showAlarm(S, r.alarm)).catch(() => {}); api('/sleep').then(st => sleepChip(S, st)).catch(() => {});   // 0.3.0
   api('/jukebox').then(st => jukeboxChip(S, st)).catch(() => {});
   // 0.2.5: the Player tray's "Calibrate speakers..." opens this page with #calibrate
@@ -378,7 +384,7 @@ async function startMain() {
   setInterval(() => nowc.tickPos(), 250);
   // 0.3.0 §2: remote mode (remembered per device) never joins as a speaker
   await retireRemote();      // 0.3.2 F3: Remote mode is gone - a remembered choice is cleared once and the speaker card comes back
-  installAutoJoin(S, refreshAll);           // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
+  if (!JB_DISPLAY) installAutoJoin(S, refreshAll);           // 0.6.9 #18: a ?jukebox=tv display never joins as a speaker (the Jukebox plays on its own speakers) // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
 }
 /** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */
@@ -681,7 +687,7 @@ async function refreshNow() { try { const responseZone = globalThis.__wavwizZone
     const at = performance.now(), rec = reconcileSmoothPosition(S._smooth, r.now, r.now?.positionMs, at);
     S._smooth = rec; S.localPos = rec.posMs; S.localAt = rec.at;
     whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
-async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast)]); S.jb = jb; S.cast = cast;   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
+async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast, ord] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast), api('/zones/order').catch(() => undefined)]); S.jb = jb; S.cast = cast; if (ord !== undefined && t0 >= cardOrderChangedAt()) setCardOrder(ord?.order);   /* 0.6.9 #12: the shared Devices card order */   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
   nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
 async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); } catch (e) { handleErr(e); } }
@@ -705,6 +711,7 @@ function connectWs() {
       else if (m.type === 'favorites') window.dispatchEvent(new CustomEvent('wavwiz:favorites'));   // 0.2.0 item 14
       else if (m.type === 'library') { refreshStatus(); window.dispatchEvent(new CustomEvent('wavwiz:library')); nowc.drawChecklist(); }
       else if (m.type === 'tick') { if (S.now?.state === 'playing') refreshNow(); if (S.view === 'devices' || wide() || S.view === 'now') refreshZones(); }
+      else if (m.type === 'pairing') pairReqs?.refresh();   // 0.6.9 #15
       else if (m.type === 'notice') toast(m.data.message, true);
       else if (m.type === 'hello' && m.data?.appVersion && S.auth && m.data.appVersion !== S.auth.appVersion) { S.auth.appVersion = m.data.appVersion; paintVersion(); toast(`WavWiz was updated to ${m.data.appVersion}. Reload the page to use it.`); }   // 0.4.6
       else if (m.type === 'schedules' || m.type === 'scenes') window.dispatchEvent(new CustomEvent('wavwiz:schedules'));
@@ -932,7 +939,7 @@ window.addEventListener('wavwiz:zonesync', () => { if (qRenderedZone !== JSON.st
 /** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
 function phonePick() {
   const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;
-  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
+  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, Z.choiceLabel(c, cur))));   // 0.6.9 #21
   sel.value = cur?.key || ''; return h('span', { class: 'qzwrap pqwrap' }, sel);
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)

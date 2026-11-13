@@ -130,6 +130,25 @@ public sealed class AirPlayBrowseState
         }
     }
 
+    /// <summary>0.6.9 #22b: records still needed to finish a service. Some TVs (LG, Samsung...) answer the browse with the PTR only and send
+    /// SRV / TXT / A only when asked, so they showed up without a host, model or address. Returns (name, type) questions to ask; pure.</summary>
+    public List<(string Name, ushort Type)> Missing(DateTimeOffset now, int max = 12)
+    {
+        var q = new List<(string, ushort)>();
+        lock (_lock)
+        {
+            foreach (var (inst, p) in _ptr)
+            {
+                if (p.Exp <= now) continue;
+                if (!_srv.TryGetValue(inst, out var srv) || srv.Exp <= now) q.Add((inst, DnsWire.TypeSrv));
+                else if (!_a.TryGetValue(srv.Host, out var set) || !set.Any(kv => kv.Value > now && UsableAddress(kv.Key))) q.Add((srv.Host, DnsWire.TypeA));
+                if (!_txt.TryGetValue(inst, out var t) || t.Exp <= now) q.Add((inst, DnsWire.TypeTxt));
+                if (q.Count >= max) break;
+            }
+        }
+        return q.Distinct().Take(max).ToList();
+    }
+
     public List<string> AddressesOf(string host, DateTimeOffset now)
     { lock (_lock) return _a.TryGetValue(host, out var s) ? s.Where(kv => kv.Value > now && UsableAddress(kv.Key)).Select(kv => kv.Key).OrderBy(x => x).ToList() : new(); }
 

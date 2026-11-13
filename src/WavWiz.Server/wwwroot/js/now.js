@@ -270,7 +270,10 @@ export function createNow(S, ctl) {
     h('div', { class: 'np-phone-progress' }, phoneSeek, h('div', { class: 'np-phone-times' }, phoneElapsed, phoneDuration)),
     h('div', { class: 'np-phone-transport', role: 'group', 'aria-label': 'Transport' }, phoneShuffle, phonePrev, phonePlay, phoneNext, phoneRepeat), phoneZoneVol,
     h('div', { class: 'np-phone-actions' }, h('button', { type: 'button', onclick: () => ctl.go('queue') }, 'Queue'), h('button', { type: 'button', class: 'np-phone-sound', onclick: () => ctl.openEq?.() }, 'Sound')),
-    h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), h('div', { class: 'row wrap np-phone-xrow' }, ...(isHandset() ? [mkSleepIc()] : [mkMix(), mkSleepIc(), mkSc('np-phone-shortcuts')]))));   // 0.6.8-#11a/d: phones drop the extra mixer (Sound + the volume row cover it), Home and pins
+    h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), (isRealPhone() ? h('div', { class: 'row wrap np-phone-xrow' }, ...(isHandset() ? [mkSleepIc()] : [mkMix(), mkSleepIc(), mkSc('np-phone-shortcuts')]))
+      // 0.6.9 #8: a narrow PC window (not a phone or tablet): ONE no-wrap row - Sleep, Master volume, then the pins in the same rounded-square
+      // buttons; no Home, and a Sleep / Master volume pin is not drawn again (the row already has them). Phones keep their 0.6.8 row.
+      : h('div', { class: 'row np-phone-xrow np-xrow-pc' }, mkSleepIc(), mkMix(), shortcutsRow({ run: id => ctl.runShortcut?.(id), home: false, cls: 'np-phone-shortcuts np-xpins', exclude: ['sleep', 'mixer'], fit: 'siblings', btnW: 52 }).el))));   // 0.6.8-#11a/d: phones drop the extra mixer (Sound + the volume row cover it), Home and pins
   el.prepend(phoneFull);
   phoneMedia.addEventListener('change', () => { phoneFull.hidden = !phoneMedia.matches; if (!phoneMedia.matches) closePhone(); });
   // 0.6.8-#4: zonesync fires on every zones refresh (poll / ws); close the song menu only when its song/zone context really changed

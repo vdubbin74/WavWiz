@@ -1,5 +1,5 @@
 import { wsel } from './wwselect.js';
-import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler } from './devorder.js';
+import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler, getCardOrder } from './devorder.js';
 import { h, api, toast, dialog } from './util.js';
 import { roomPill, roomPillClass } from './diag.js';
 import { centerEq } from './centerview.js';
@@ -20,6 +20,7 @@ import * as Z from './zones40.js';
 import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
 import { swapQuestion, offerSwap } from './zoneref.js';   // 0.6.8-#15
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
+import { jbSaved, jbValue, jbDirty, jbStage, jbDiscard, jbBody, jbHint, jbGuard, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -563,11 +564,24 @@ function keepCard(old, S, z, hl, build, busy) {
   return el;
 }
 /** Keep a section (master row, zones sidebar) while the user is working in it; else take the fresh one. */
+/** 0.6.9 #13: the alignment alignPanelMaster / alignMaster put on the live MASTER strip (class f70p + --f70l / --f70w) is copied onto a fresh strip.
+ *  Without it the fresh markup never equalled the live node, so EVERY status tick (~1 s) swapped the strip for an unaligned one and re-aligned it a
+ *  frame later: the master bar jumped and everything under the pointer (an expanded zone card's rows) lost and regained :hover - the flicker. */
+export function carryAlign(old, fresh) {
+  if (!old || !fresh || !old.classList?.contains('f70p')) return fresh;
+  fresh.classList.add('f70p');
+  for (const p of ['--f70l', '--f70w']) { const v = old.style.getPropertyValue(p); if (v) fresh.style.setProperty(p, v); }
+  return fresh;
+}
+const sansStyle = el => { const c = el.cloneNode(true); for (const n of [c, ...c.querySelectorAll('[style]')]) n.removeAttribute('style'); return c.outerHTML; };
 function keepSection(old, fresh, busy) {
   if (old && userBusyIn(old)) { busy.v = true; return old; }
+  carryAlign(old, fresh);   // 0.6.9 #13
   // F151b: a status tick (~2 s) rebuilt the master row even when nothing changed - hovering the mixer / mute icon lost :hover and its
   // tooltip every tick (flash). Same markup = keep the live node.
   if (old && fresh && old.outerHTML === fresh.outerHTML) return old;
+  // 0.6.9 #13: inline styles painted after insertion (slider fill, the F70 alignment) are not markup - compare without them, keep the live node
+  if (old && fresh && sansStyle(old) === sansStyle(fresh)) return old;
   if (old && fresh && old.isConnected && hov42(old)) return old;   // F151b: pointer on Mute / mixer: keep until it leaves
   return fresh;
 }
@@ -889,6 +903,15 @@ export function patchRows42(cur, fresh) {
   la.forEach((x, i) => { if (!cur.contains(x)) return; if (x.matches('.zl-now') && Z.patchNowLine(x, lb[i])) return; if (x.outerHTML === lhtml[i]) return; if (inUse(x)) { all = 2; return; } x.replaceWith(lb[i]); });
   return all;
 }
+/** F269 + 0.6.9 #31 (t1888/t1889): what a deliberate move changes - which speaker is in which zone AND which zones are linked (playbackId = the
+ *  link leader). A change rebuilds the tree at once, never held by hover. Linking or splitting two EMPTY zones changes no speaker, so the drop / Split off
+ *  used to wait under the pointer until something else forced the Devices panel to redraw. Pure (unit tested on the server's /groups shape). */
+export const treeMoveSig42 = gs => JSON.stringify((gs || []).map(g => [g.id, g.deviceIds || [], g.playbackId || '']));
+/** 0.6.9 t1894 + t1897: which speakers are muted and which are switched off. A zone mute / zone on-off (or the master mute, or a speaker's own
+ *  mute / pill) is a deliberate change like a move: the tree rebuilds at once with every speaker's indicator / greyed row. It used to be patched row
+ *  by row, and a row inside the hovered / focused zone card was held (F151b anti-flicker hold) - so after the zone's mute button or ON/OFF pill the
+ *  speakers kept their old look while the pointer (or focus) stayed on the card. Level / status ticks are not in it and stay held. Pure (unit tested). */
+export const treeSwitchSig42 = zs => { const ids = f => (zs || []).filter(f).map(z => z.id).sort((a, b) => a - b); return JSON.stringify([ids(z => z.muted), ids(z => z.enabled === false)]); };
 function tree42Kit(S, ctl, X) {
   // 0.4.2: the tree is rebuilt only when what it shows changed (a position tick alone repaints at most every 10 s), and never while a drag or slider is in use
   let tnode = null, tsig = '', tlive = '';
@@ -898,7 +921,7 @@ function tree42Kit(S, ctl, X) {
     (S.groups || []).map(g => [g.now?.state, g.now?.title, g.now?.artist, g.now?.durationMs, Math.floor((g.now?.positionMs || 0) / 10000), (g.now?.positionMs || 0) > 0]), S.jb?.own ? [S.jb.now?.title, S.jb.now?.state] : null]);
   const openSig42 = () => { let a = '', b = ''; try { a = sessionStorage.getItem('wavwiz.qb42.open') || ''; } catch { /* */ } try { b = localStorage.getItem('wavwiz.zfold') || ''; } catch { /* */ } return a + '|' + b; };   // F266: zone folds rebuild the tree   // DIG-R1: idle expand preference participates in cache
   const sig42 = () => JSON.stringify([!!S.cast?.active, (S.zones || []).map(z => [z.id, z.name, z.enabled, z.connected, z.muted, z.volLocked, z.volCap, z.room?.state, z.reference, chosenOutput(z)?.notCalibrated, z.outputs?.length]),
-    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), openSig42()]);   // 0.4.6 F30 + DIG-R1 open pref
+    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
   const st42 = { get spk() { return X.spk; }, get zone() { return X.zsel; },
     onZone: id => { X.zsel = id; X.spk = null; try { sessionStorage.removeItem('wavwiz.spk'); } catch { /* private mode */ } if (X.size === 'expanded' || X.size === 'phone') X.draw(true); else { X.f69from = X.size; ctl.setDevSize?.('expanded'); } },
     onSpk: id => { const z = (S.zones || []).find(x => x.id === id); const g = (S.groups || []).find(x => (x.deviceIds || []).includes(id)); X.zsel = g ? g.id : null; if (X.size === 'expanded' || X.size === 'phone') X.setSpk(id); else { X.f69from = X.size; X.spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } void z; } };
@@ -906,20 +929,22 @@ function tree42Kit(S, ctl, X) {
   const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock, phoneMaxBars: X.size === 'phone' };
   let topen = '', tmem = '';
   // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
-  const memSig42 = () => JSON.stringify((S.groups || []).map(g => [g.id, g.deviceIds || []]));
+  const memSig42 = () => treeMoveSig42(S.groups) + '|' + treeSwitchSig42(S.zones);   // t1894 + t1897: + who is muted / switched off
   const treeNode = force => {
-    const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42(), memMoved = !!tnode && mem !== tmem;
+    // 0.6.9 #12: a card-order change (this user's drop / Move up, or another client's) is a deliberate move like F269 membership: rebuild at once, never held by hover
+    const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42() + '|' + JSON.stringify(getCardOrder()), memMoved = !!tnode && mem !== tmem;
     // DIG-R1: open preference change always rebuilds (foldSig also guards patch paths)
     if (!force && openSg === topen && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
     // F151: a status flap (online / buffering / muted / cap) changed sig42 but not the tree's layout: swap only the rows that differ instead of
     // rebuilding the whole tree (that rebuild was the occasional "Devices reloads" flash: art re-decoded, scroll + hover reset)
-    if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
+    // 0.6.9 #24: patched in place while off-screen on the rail too (it used to need isConnected, so a closed panel's tree was rebuilt on open)
+    if (!force && !memMoved && openSg === topen && tnode) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
     // DIG-amend2 R1: explicit idle expand (openSg!==topen) must rebuild even while pointer stays on Show speakers; keep hover defer only for background refreshes.
     if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b (F269: never for a membership move)
-    const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : '' } : null;
+    const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: ['zmute', 'sp42-mute'].find(c => ae.classList?.contains(c)) || (typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : ''), box: ae.closest('[data-leader-id]')?.dataset.leaderId } : null;   // t1894: the pressed mute button itself
     tnode = treeEl(S, ctl, kit42, st42); tsig = sg; tlive = lv; topen = openSg; tmem = mem; tnode._top = top;
     if (keep) queueMicrotask(() => { if (document.activeElement?.closest?.('.tree42')) return;   // 0.4.9 F82: the same control (speaker, else zone, by its first class) gets focus back
-      const scope = keep.id ? tnode.querySelector(`[data-device-id="${keep.id}"]`) : keep.gid ? tnode.querySelector(`[data-group-id="${keep.gid}"]`) : tnode;
+      const scope = keep.id ? tnode.querySelector(`[data-device-id="${keep.id}"]`) : keep.gid ? tnode.querySelector(`[data-group-id="${keep.gid}"]`) : keep.box ? tnode.querySelector(`[data-leader-id="${keep.box}"]`) : tnode;
       const t = (keep.cls && scope?.querySelector('.' + CSS.escape(keep.cls))) || (keep.id ? scope?.querySelector('.sp42-n') : null); t?.focus({ preventScroll: true }); });
     return tnode;
   };
@@ -937,6 +962,7 @@ function tree42Kit(S, ctl, X) {
     const hint = h('div', { class: 'small dim dhint42' }, dcol.closest('.e42') ? HINT42 : HINT42.replace(' on the right', ''));
     const key = jbSel ? 'jb' : spZ ? 's' + spZ.id : zg ? 'z' + zg.id : 'none';
     let pnl = dcol.querySelector('.d42-pane');
+    if (pnl?.dataset.key === 'jb' && key !== 'jb' && jbDirty(S.jb)) leaveJb(S, ctl);   // 0.6.9 #19: unsaved Jukebox zone settings - Save / Discard / Keep editing
     if (!pnl || pnl.dataset.key !== key || (!spZ && pnl._sig !== sig42() && !pnl.contains(document.activeElement) && !hov42(pnl))) {
       pnl?.firstChild?._destroy?.();
       pnl = h('div', { class: 'd42-pane', 'data-key': key });
@@ -1004,7 +1030,10 @@ export function devicesPanel(S, ctl) {
   // F222 t1155u: --devstdw = standard body OUTER width (offsetWidth, includes classic SB lane) = the Speakers grid track. No gutter math.
   // 0.6.8c: never measure the Auto-layout slide-over (.tight) or the phone page - neither is the docked panel, and a narrow value measured there
   // used to stick in --devstdw so the expanded Speakers column stayed narrow after the window grew back. A fresh measure also refreshes the property.
-  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold') || d?.classList.contains('tight') || (HASWIN && window.innerWidth <= 900)) return;
+  // 0.6.9 #23 (t1867/t1871): never measure once the desk is already EXPANDED (or the panel is) - Auto layout's slide-over (.tight) never caches a
+  // width, so the first speaker pick from it reached setSize's F220 C sync measure after applyPanels had added .devexpanded, measured the expanded
+  // body (~whole window) and pinned it as the Speakers track (--devstdw): the zones / speakers column took the window and the settings column got 0 px.
+  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold') || d?.classList.contains('tight') || d?.classList.contains('devexpanded') || d?.classList.contains('devfull') || root.classList.contains('expanded') || (HASWIN && window.innerWidth <= 900)) return;
     const w = body.offsetWidth; if (w < 200) return;
     root._stdw = Math.round(w); root._stdwGood = root._stdw; root.style.setProperty('--devstdw', root._stdw + 'px'); };   // F221 C: sticky last-good
   const setSize = (s, highlight = null) => {
@@ -1032,7 +1061,10 @@ export function devicesPanel(S, ctl) {
     paintExpandBtn(expBtn, 'Devices', s === 'expanded');
     root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';
     root.classList.toggle('expanded', s === 'expanded');
-    draw(true);
+    // 0.6.9 #24 (t1873/t1874): a size change (rail -> open, the Roomy / Auto slide-over, expand / collapse) lays the panel out at once ('size' passes
+    // every busy / menu gate like a forced draw) but KEEPS the zone tree - the tree does not depend on the size. The old forced draw rebuilt every zone / Queue
+    // box (art, now-playing bars) right as the panel started to slide, which flashed. The tree still rebuilds / patches when what it shows changed.
+    draw('size');
     if (s === 'standard') requestAnimationFrame(cacheStd);   // F215: cache while settled standard
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };
@@ -1058,11 +1090,13 @@ export function devicesPanel(S, ctl) {
     clearTimeout(pending); pending = 0; keepExpandFocus(body);
     const busy = { v: false };
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
-    if (size === 'collapsed') { body.replaceChildren(); return; }
+    // 0.6.9 #24: on the rail the tree is still kept up to date off-screen, so opening the panel (Full's rail, the Roomy / Auto slide-over) moves the
+    // existing tree in instead of building every zone / Queue box as the slide starts
+    if (size === 'collapsed') { body.replaceChildren(); treeNode(false); return; }
     // F223: one Speakers scroller both modes — reuse .tcol42 (or migrate .tcol42s); MOVE into .dexp-main on expand; never mint a fresh one
     const speakersHost = () => {
       let t = body.querySelector('.tcol42');
-      if (t) { t.classList.add('ecol'); t.classList.remove('tcol42s'); return t; }
+      if (t) { if (!t.classList.contains('ecol')) t.classList.add('ecol'); if (t.classList.contains('tcol42s')) t.classList.remove('tcol42s'); return t; }   // 0.6.9 #13: no class write (and style recalc) on every tick
       const old = kid(body, 'tcol42s') || body.querySelector('.tcol42s');
       if (old) { old.classList.remove('tcol42s'); old.classList.add('tcol42', 'ecol'); return old; }
       return h('div', { class: 'tcol42 ecol' });
@@ -1081,7 +1115,7 @@ export function devicesPanel(S, ctl) {
       paintDetail(dcol, groups);
       const tcol = speakersHost();   // F223: same node as standard — move into Speakers column
       // F211: the Speakers column = [MASTER, tree, AirPlay strip] - the same MASTER strip and tree as the side panel; MASTER is kept while busy
-      const tn = treeNode(force), hadTree = tcol.contains(tn);
+      const tn = treeNode(force === true), hadTree = tcol.contains(tn);
       const ap = airplayDevicesStrip(S, ctl);
       reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn, ap || null].filter(Boolean));
       if (!hadTree) restoreScroll(tcol);
@@ -1094,7 +1128,7 @@ export function devicesPanel(S, ctl) {
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
     // F223: .devbody is not the scroller — persistent .tcol42 holds MASTER+tree (+ bits that used to scroll with body)
     const tcol = speakersHost();
-    const tn = treeNode(force), hadTree = tcol.contains(tn);
+    const tn = treeNode(force === true), hadTree = tcol.contains(tn);
     reconcile(tcol, [castBar(S, ctl, tcol), keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(tcol, 'dmicline'), S), tn, ssCompact(S, ctl)].filter(Boolean));
     if (!hadTree) restoreScroll(tcol);
     reconcile(body, [tcol]);
@@ -1458,11 +1492,14 @@ function onTagAct(ev) {
 }
 if (HASWIN) { document.addEventListener('click', onTagAct, true); document.addEventListener('keydown', onTagAct, true); }
 /** J4: the labeled OFF | ON pill (replaces the unlabeled switch). */
-export function onPill(label, on, can, toggle) {
-  const b = h('button', { type: 'button', class: 'onpill' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(!!on), 'aria-label': `${label} on or off`, title: on ? 'On - press to switch off' : 'Off - press to switch on',
-    onclick: ev => { ev.stopPropagation(); if (can) toggle(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
-  b._set = v => { b.classList.toggle('on', !!v); b.setAttribute('aria-checked', String(!!v)); b.title = v ? 'On - press to switch off' : 'Off - press to switch on'; };
-  return ro(b, can, 'Your access is view-only.');
+/** 0.6.9 #19: `empty` = the zone has no speakers, so OFF / ON would switch nothing: the pill is shown disabled with that tooltip (never a dead press). */
+export function onPill(label, on, can, toggle, { empty = '', viewOnly = 'Your access is view-only.' } = {}) {
+  const tip = v => empty || (v ? 'On - press to switch off' : 'Off - press to switch on');
+  const b = h('button', { type: 'button', class: 'onpill' + (on ? ' on' : '') + (empty ? ' empty' : ''), role: 'switch', 'aria-checked': String(!!on), 'aria-label': `${label} on or off`, title: tip(on),
+    onclick: ev => { ev.stopPropagation(); if (can && !empty) toggle(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
+  b._set = v => { b.classList.toggle('on', !!v); b.setAttribute('aria-checked', String(!!v)); b.title = b.classList.contains('ro') ? b.title : tip(v); };
+  if (can && empty) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
+  return ro(b, can, viewOnly);
 }
 /** J3: a bar with an optional cap: --v paints the fill, --cap places the marker and the hatched part; input stops at the cap. */
 function capBar(label, value, cap, can, send, title) {
@@ -1556,9 +1593,9 @@ function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [
 /** J4 zone card: the same three lines; picking it highlights its speakers (Expanded); ✎ edits it in place (J9 #2). */
 function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null, shared = false } = {}) {
   const can = canControl(S), ms = zoneMembers(S.zones, g), muted = zoneMuted(S.zones, g), on = zoneOn(S.zones, g);
-  const dot = h('span', { class: 'dot ' + (ms.some(z => z.connected) ? 'ok' : 'off'), title: `${ms.filter(z => z.connected).length} of ${ms.length} online` });
+  const dot = h('span', { class: 'dot ' + Z.zoneDot(ms, g.now), title: ms.length ? `${ms.filter(z => z.connected).length} of ${ms.length} online` : g.now?.state === 'playing' ? 'Playing, but no speakers in this zone' : 'No speakers' });   // 0.6.9 #21c: grey without an online speaker
   const name = ro(h('button', { type: 'button', class: 'dname zname ell', title: 'Play in this zone only', onclick: ev => { ev.stopPropagation(); ctl.act(`/groups/${g.id}/activate`); } }, g.name), can, 'Your access is view-only.');
-  const pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+  const pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });
   const bar = capBar(`${g.name} zone volume`, zoneLevel(S.zones, g), zoneCap(S.zones, g), can, v => ctl.act(`/groups/${g.id}/volume`, { set: v }), 'Moves every speaker in this zone together (keeps their balance)');
   const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, title: muted ? 'Unmute this zone' : 'Mute every speaker in this zone',
     onclick: ev => { ev.stopPropagation(); const m = !zoneMuted(S.zones, g); for (const z of ms) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
@@ -1612,7 +1649,31 @@ function jukeboxCard(S, ctl) {
   const ms = (S.zones || []).filter(z => ids.has(z.id)), on = ms.some(z => z.enabled), muted = ms.length > 0 && ms.every(z => z.muted), sel = Z.current()?.kind === 'jukebox';
   const dot = h('span', { class: 'dot ' + (ms.some(z => z.connected) ? 'ok' : 'off'), title: `${ms.filter(z => z.connected).length} of ${ms.length} online` });
   const name = ro(h('button', { type: 'button', class: 'dname zname ell', title: 'Control the Jukebox zone', onclick: ev => { ev.stopPropagation(); Z.select(Z.JUKEBOX_KEY); } }, 'Jukebox'), can, 'Your access is view-only.');
-  const pill = onPill('Jukebox zone', on, can, () => { const want = !ms.some(z => z.enabled); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+  // 0.6.9 #19 (t1846-t1849): OFF / ON is the saved Jukebox-zone setting (it used to flip the zone's speakers, and with none it did nothing).
+  // Here it is staged with the other Jukebox settings and applied with Save; the speaker picks, volume and mute below stay live.
+  const val = jbValue(jb), nSpk = jb.running === false ? (jb.defaultSpeakers || []).length : ms.length;
+  const pill = onPill('Jukebox zone', val.zoneOn, admin, () => { jbStage(jb, 'zoneOn', !jbValue(jb).zoneOn); paintJb(); }, { viewOnly: 'Only an admin can change this.' });
+  const jbHintEl = h('p', { class: 'small jbzhint', role: 'status' });
+  const perGuest = ro(h('input', { type: 'number', min: 1, max: 20, step: 1, value: val.perGuest, class: 'jbz-per', 'aria-label': 'Songs per guest', oninput: ev => { const n = Math.round(+ev.target.value); if (n >= 1 && n <= 20) { jbStage(jb, 'perGuest', n); paintJb(); } } }), admin, 'Only an admin can change this.');
+  const voteSkip = ro(h('input', { type: 'checkbox', checked: val.voteSkip, class: 'jbz-vote', 'aria-label': 'Vote to skip', onchange: ev => { jbStage(jb, 'voteSkip', ev.target.checked); paintJb(); } }), admin, 'Only an admin can change this.');
+  const savedMsg = h('span', { class: 'small jbz-saved', role: 'status', 'aria-live': 'polite' });
+  const saveBtn = h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'jb-zone-save', disabled: true, onclick: () => saveJb(savedMsg) }, 'Save');
+  const discardBtn = h('button', { type: 'button', class: 'btn sm', 'data-act': 'jb-zone-discard', hidden: true, onclick: () => { jbDiscard(); const v = jbValue(jb); perGuest.value = v.perGuest; voteSkip.checked = v.voteSkip; paintJb(); } }, 'Discard');
+  function paintJb() {
+    const v = jbValue(jb), dirty = jbDirty(jb); pill._set(v.zoneOn); jbHintEl.textContent = jbHint(v.zoneOn, nSpk); jbHintEl.classList.toggle('warn', v.zoneOn && nSpk === 0);
+    saveBtn.disabled = !admin || !dirty; discardBtn.hidden = !dirty; if (dirty) savedMsg.textContent = 'Unsaved changes'; else if (savedMsg.textContent === 'Unsaved changes') savedMsg.textContent = '';
+    savedMsg.classList.toggle('dirty', dirty); jbGuard(dirty);
+  }
+  async function saveJb(msg) {
+    const body = jbBody(jb); if (!Object.keys(body).length) return; saveBtn.disabled = true;
+    try { await api('/jukebox/config', { method: 'PUT', body }); Object.assign(jb, body); jbDiscard(); paintJb(); msg.textContent = '✓ Saved'; setTimeout(() => { if (msg.textContent === '✓ Saved') msg.textContent = ''; }, 4000); ctl.refreshAll?.(); }
+    catch (e) { toast(e.message, true); paintJb(); }
+  }
+  const jbSet = h('div', { class: 'jbzset', 'data-jb-settings': '' },
+    h('label', { class: 'row small' }, h('span', { class: 'grow' }, 'Songs per guest'), perGuest),
+    h('label', { class: 'row small' }, h('span', { class: 'grow' }, 'Vote to skip'), voteSkip),
+    admin ? h('div', { class: 'row jbzsave' }, saveBtn, discardBtn, savedMsg) : null);
+  paintJb();
   const lvl = ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0;
   const bar = capBar('Jukebox zone volume', lvl, 100, can && ms.length > 0, v => api('/jukebox/zone/volume', { method: 'POST', body: { set: v } }).catch(e => toast(e.message, true)), 'Moves every speaker of the Jukebox zone together');
   const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', 'data-icon': muted ? 'mute' : 'volume', onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => ids.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can && ms.length > 0, 'Your access is view-only.');
@@ -1620,17 +1681,26 @@ function jukeboxCard(S, ctl) {
   const pick = async (z, checked) => { const next = new Set(picks); checked ? next.add(z.id) : next.delete(z.id); try { await api('/jukebox/zone', { method: 'PUT', body: { deviceIds: [...next] } }); ctl.refreshAll(); } catch (e) { toast(e.message, true); } };
   const rows = (S.zones || []).slice(0, 200).map(z => h('label', { class: 'jbrow' + (picks.has(z.id) ? ' on' : ''), 'data-device-id': z.id }, ro(h('input', { type: 'checkbox', checked: picks.has(z.id), 'aria-label': `${z.name} plays the Jukebox`, onchange: ev => pick(z, ev.target.checked) }), admin, 'Only an admin can pick the Jukebox devices.'),
     h('span', { class: 'jbn ell' }, z.name), inZone(z) ? h('span', { class: 'small dim jbin ell' }, 'in ' + inZone(z)) : null));
-  return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (on ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
+  return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (val.zoneOn ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), pill),
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, { deviceIds: [...ids] })), h('span', { class: 'dtag zjb', title: 'Guests choose the songs; they play only on these devices' }, 'JUKEBOX'), sel ? Z.controllingTag() : null)),
-    Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: jb.own ? () => Z.select(Z.JUKEBOX_KEY) : null, selected: sel }),
-    h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute),
+    Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: sel }),   // 0.6.9 #21: an empty Jukebox can be picked too
+    jbHintEl, h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute), jbSet,
     h('div', { class: 'dc3mem jbpick' }, h('span', { class: 'dlbl' }, 'SPEAKERS FOR JUKEBOX'),
       h('div', { class: 'dc3chips' }, ms.length ? ms.map(z => h('span', { class: 'zchip', title: z.name }, z.name)) : h('span', { class: 'small dim' }, 'None picked: the Jukebox plays in the main zone')),
       jbDisclosure(ms.length, h('div', { class: 'jblist', role: 'group', 'aria-label': 'Devices for the Jukebox zone' }, rows))));
 }
 /** 0.4.1 L62: with 0 speakers in the Jukebox the long picker folds behind "Choose speakers" (the card was cut off by it); once speakers are picked it is open. The user's own open / close is kept across refreshes. */
 let jbUserOpen = null;
+/** 0.6.9 #19: the Jukebox zone panel was left with unsaved changes (they are kept until the host decides). */
+let jbAsking = false;
+function leaveJb(S, ctl) {
+  if (jbAsking) return; jbAsking = true; const jb = S.jb;
+  dialog('Unsaved Jukebox zone settings', h('p', null, 'You changed the Jukebox zone settings but did not save them.'), [
+    { text: 'Keep editing', onclick: () => { Z.select(Z.JUKEBOX_KEY); } },
+    { text: 'Discard', onclick: () => { jbDiscard(); jbGuard(false); } },
+    { text: 'Save', cls: 'primary', onclick: async () => { try { await api('/jukebox/config', { method: 'PUT', body: jbBody(jb) }); jbDiscard(); jbGuard(false); toast('Jukebox zone saved'); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } }], { onClose: () => { jbAsking = false; } });   // ✕ / Esc: nothing is lost - the changes stay staged
+}
 function jbDisclosure(count, list) {
   const d = h('details', { class: 'jbdisc' }, h('summary', null, count ? `Choose speakers (${count} picked)` : 'Choose speakers'), list);
   d.open = jbUserOpen == null ? count > 0 : jbUserOpen; d.addEventListener('toggle', () => { jbUserOpen = d.open; }); return d;

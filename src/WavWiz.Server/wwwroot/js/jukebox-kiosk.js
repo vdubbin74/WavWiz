@@ -2,11 +2,13 @@
 import { h, api, toast, dialog, ask } from './util.js';
 import { isAdmin, canControl } from './ui.js';
 import { loadTheme } from './theme.js';
-import { blockedKey, isExitChord, guestApi, plural, albumName, selNo, upNextLine } from './jukebox-core.js';
+import { blockedKey, isExitChord, guestApi, plural, selNo, upNextLine } from './jukebox-core.js';
 import { RETRO_SVG } from './jukebox-retro.js';
-import { renderResults } from './jukebox-view.js';
-import { Viz } from './viz.js';
+import { artBox, setArt, rowsSig, artFailed } from './jukebox-view.js';
+import { Viz, setVizZone } from './viz.js';
+import { artCv } from './art.js';
 import { speakerPicker, initialPick } from './jbspeakers.js';   // 0.4.9 F76
+import { showTvInfo } from './jbtv.js';   // 0.6.9 #26
 
 let kiosk = null;
 /** m:ss like the approved renders (1:46 / 4:12). */
@@ -15,6 +17,13 @@ const mss = ms => { const t = Math.max(0, Math.floor((ms || 0) / 1000)); return 
 const JBQ = p => p + (p.includes('?') ? '&' : '?') + 'zoneId=' + (jbOwn ? 'jukebox' : 'default');
 let jbOwn = false; api('/jukebox/zone').then(z => { jbOwn = !!z.own; }).catch(() => {});
 export const kioskOpen = () => !!kiosk;
+/** 0.6.9 #18 (t1845): how long the logo is held to open the host PIN pad (the fill bar runs this long), and its tooltip. */
+export const HOLD_MS = 1200;
+export const EXIT_TIP = 'Host: press and hold to exit · Ctrl+Shift+J';
+/** 0.6.9 #18: the big screen in another PC's browser - the app's address with ?jukebox=tv (sign in or pair once; it then opens the big screen). */
+export const DISPLAY = (() => { try { return new URLSearchParams(location.search).get('jukebox') === 'tv'; } catch { return false; } })();
+export const displayUrl = joinUrl => { try { return new URL(joinUrl).origin + '/?jukebox=tv'; } catch { return ''; } };
+let displayLeft = false;   // the host left the display with the PIN (Switch to app): do not reopen it by itself
 
 /** Playback > Start Jukebox… (admin only). A host PIN is required so the big screen can be left. */
 export async function startJukebox(S) {
@@ -22,6 +31,8 @@ export async function startJukebox(S) {
   let cfg; try { cfg = await api('/jukebox/config'); } catch (e) { toast(e.message, true); return; }
   const pin = h('input', { type: 'password', inputmode: 'numeric', maxlength: '8', placeholder: cfg.hasPin ? 'Keep the current PIN' : '4–8 digits', 'aria-label': 'Host PIN' });
   const full = h('input', { type: 'checkbox', checked: true });
+  // 0.6.9 #19: the Jukebox zone's saved OFF / ON (off by default): off = its speakers stay silent while it runs; ticked here = saved on
+  const zoneOn = h('input', { type: 'checkbox', checked: cfg.zoneOn === true, 'data-act': 'jb-zone-on' });
   // 0.4.9 F76: which speakers the Jukebox plays on - prefilled with the default speakers, changeable here, optionally saved as the default
   let zones = S.zones || [], jbz = S.jb; try { [zones, jbz] = await Promise.all([api('/zones'), api('/jukebox/zone')]); } catch { /* keep what we have */ }
   const spk = speakerPicker(zones, initialPick(cfg.defaultSpeakers, jbz?.deviceIds, zones), () => { warn.hidden = true; }, { label: 'Speakers for the Jukebox' });
@@ -31,6 +42,7 @@ export async function startJukebox(S) {
     h('p', null, 'Guests scan a QR code to add songs. The screen locks; only the host PIN gets out.'),
     h('p', { class: 'small' }, `${plural(cfg.perGuest, 'song')} per guest · vote to skip ${cfg.voteSkip ? 'on' : 'off'} · ${cfg.style === 'retro' ? 'Retro CD' : 'Modern'} style. Change these in Settings > Jukebox.`),
     h('div', { class: 'fld jbstart76' }, h('span', null, 'Speakers'), spk, h('label', { class: 'row small' }, saveDef, h('span', null, 'Save as default'))), warn,
+    h('label', { class: 'row' }, zoneOn, h('span', null, 'Jukebox zone on (play guests’ songs on these speakers)')),
     h('label', { class: 'fld' }, h('span', null, 'Host PIN'), pin),
     h('label', { class: 'row' }, full, h('span', null, 'Open the locked big screen on this PC')));
   const d = dialog('Start Jukebox', body, [
@@ -42,6 +54,7 @@ export async function startJukebox(S) {
       const ids = spk.value(); if (!ids.length) { warn.hidden = false; spk.querySelector('input')?.focus(); return; }
       try {
         if (saveDef.checked) await api('/jukebox/config', { method: 'PUT', body: { defaultSpeakers: ids } });
+        if (zoneOn.checked !== (cfg.zoneOn === true)) await api('/jukebox/config', { method: 'PUT', body: { zoneOn: zoneOn.checked } });
         if (p) { if (!/^\d{4,8}$/.test(p)) { toast('The PIN is 4–8 digits.', true); return; } await api('/jukebox/config', { method: 'PUT', body: { pin: p } }); }
         const t = loadTheme(); await api('/jukebox/start', { method: 'POST', body: { deviceIds: ids, theme: { accent: t.accent, accent2: t.accent2, hl: t.hl, bg: t.bg, ink: t.ink } } });
         d.close(); if (full.checked) openKiosk(S);
@@ -57,7 +70,11 @@ export function jukeboxChip(S, st) {
   let c = document.getElementById('jbchip');
   if (!st?.running) { c?.remove(); if (kiosk) closeKiosk(); paintReturn(S); return; }
   if (!c) { c = h('button', { id: 'jbchip', class: 'chip jbchip', type: 'button', onclick: () => hostControls(S) }); (document.querySelector('.topbar .grow') || document.body).after(c); }
-  c.textContent = st.locked ? '♫ Jukebox on · locked' : '♫ Jukebox on'; paintReturn(S);
+  // 0.6.9 #26 (t1876): icon + label spans - on a phone header only the ♫ shows (the label stays for screen readers / the tooltip), so it never wraps
+  const lbl = st.locked ? 'Jukebox on · locked' : 'Jukebox on';
+  if (c.dataset.lbl !== lbl) { c.dataset.lbl = lbl; c.replaceChildren(h('span', { class: 'jbc-ic', 'aria-hidden': 'true' }, '♫'), h('span', { class: 'jbc-t' }, ' ' + lbl)); c.setAttribute('aria-label', lbl + ' - Jukebox controls'); c.title = lbl + ' - Jukebox controls'; }
+  paintReturn(S);
+  if (DISPLAY && !kiosk && !displayLeft) openKiosk(S);   // 0.6.9 #18: ?jukebox=tv shows the big screen whenever the Jukebox runs
 }
 /** 0.3.5 J9 #13: Jukebox host controls are a small panel that drops down from the "Jukebox on" chip (no window). Ban guest and Stop Jukebox keep their confirms. */
 async function hostControls(S) {
@@ -67,6 +84,7 @@ async function hostControls(S) {
   const out = ev => { if (!panel.contains(ev.target) && !chip?.contains(ev.target) && !ev.target.closest?.('dialog')) close(); }, esc = ev => { if (ev.key === 'Escape' && !document.querySelector('dialog[open]')) close(); };
   function close() { panel.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); }
   panel._close = close;
+  let dispUrl = ''; try { dispUrl = displayUrl((await api('/jukebox/join')).url); } catch { /* not running */ }
   async function draw() {
     let b; try { b = await api('/jukebox/board'); } catch (e) { toast(e.message, true); close(); return; }
     const act = async (fn) => { try { await fn(); } catch (e) { toast(e.message, true); } draw(); };
@@ -78,8 +96,16 @@ async function hostControls(S) {
       h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Jukebox'), h('button', { type: 'button', class: 'btn sm ghost ww-close', 'aria-label': 'Close', onclick: close }, '✕')),
       h('div', { class: 'row wrap' },
         h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } })) }, b.locked ? 'Unlock queue' : 'Lock queue'),
-        h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),
+        // 0.6.9 J3: the song limit follows each phone's network address too (clearing the browser no longer resets it); this frees everyone again
+        h('button', { class: 'btn sm', disabled: !ctl, 'data-act': 'jb-reset-guests', title: 'Lift bans and give every guest their full song allowance again', onclick: async () => { if (await ask('Reset guests', 'Every guest gets their full song allowance again and bans are lifted. Songs already queued stay.', { ok: 'Reset' })) act(async () => { await api('/jukebox/guests/reset', { method: 'POST' }); toast('Guests reset.'); }); } }, 'Reset guests'),
+        h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'),
+        h('button', { class: 'btn sm', type: 'button', 'data-act': 'jb-tv-info', title: 'The view-only TV address (it used to sit in the title bar)', onclick: () => { close(); showTvInfo(); } }, 'Show on a TV…'), h('span', { class: 'grow' }),   // 0.6.9 #26
         h('button', { class: 'btn sm danger', onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } }, 'Stop Jukebox')),
+      // 0.6.9 #18 (t1845): the same big screen in another PC's browser (that browser signs in or pairs once; no host controls without them)
+      dispUrl ? h('div', { class: 'jbother' }, h('div', { class: 'dlbl' }, 'OPEN ON ANOTHER SCREEN'),
+        h('div', { class: 'row' }, h('code', { class: 'grow ell jbother-u', title: dispUrl }, dispUrl.replace(/^https?:\/\//, '')),
+          h('button', { class: 'btn sm', type: 'button', 'data-act': 'jb-copy-display', onclick: async () => { try { await navigator.clipboard.writeText(dispUrl); toast('Address copied'); } catch { toast(dispUrl); } } }, 'Copy')),
+        h('p', { class: 'small dim' }, 'Open it in a web browser on another PC or TV. It asks to sign in or pair the first time, then shows this big screen. The host PIN leaves it.')) : null,
       h('div', { class: 'dlbl' }, 'UP NEXT'), rows.length ? h('div', { class: 'jbrows' }, rows) : h('p', { class: 'small dim' }, 'Nothing queued yet.'));
   }
   document.body.append(panel);
@@ -135,7 +161,7 @@ export function paintReturn(S = retS) {
   retS = S || retS; let b = document.getElementById('jbreturn');
   const show = jbRunning && !kiosk && retS && isAdmin(retS);
   if (!show) { b?.remove(); return; }
-  if (!b) { b = h('button', { id: 'jbreturn', class: 'btn primary jbreturn76', type: 'button', title: 'Back to the Jukebox screen (it is still running)', onclick: () => openKiosk(retS) }, '♫ Return to Jukebox'); const chip = document.getElementById('jbchip'); (chip || document.querySelector('.topbar .grow') || document.body).after(b); }
+  if (!b) { b = h('button', { id: 'jbreturn', class: 'btn primary jbreturn76', type: 'button', title: 'Back to the Jukebox screen (it is still running)', onclick: () => openKiosk(retS), 'aria-label': 'Return to Jukebox' }, h('span', { class: 'jbr-ic', 'aria-hidden': 'true' }, '♫'), h('span', { class: 'jbr-t' }, ' Return to Jukebox')); const chip = document.getElementById('jbchip'); (chip || document.querySelector('.topbar .grow') || document.body).after(b); }   // 0.6.9 #26: icon-only on a phone header
 }
 export function openKiosk(S) {
   if (kiosk) return;
@@ -156,45 +182,57 @@ export function openKiosk(S) {
     // 0.4.9 F76: two ways out - back to the app with the Jukebox still running (queue, guest adds, playback go on), or stop it
     const how = await exitChoice(root); if (!how) return;
     if (how === 'stop') { try { await stopWithPin(S, pin); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); return; } }
+    if (how === 'app') displayLeft = true;
     closeKiosk(); if (how === 'app') toast('The Jukebox keeps running. Use Return to Jukebox to go back.');
   }
-  const logo = h('button', { class: 'jb-logo', type: 'button', 'aria-label': 'Host: hold to exit' }, h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'), 'Hold for host');
-  let lp = 0; logo.addEventListener('pointerdown', () => { lp = setTimeout(askExit, 1200); }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, () => clearTimeout(lp)));
-  async function openSearch() {
-    if (!code) return;
-    const call = guestApi(code);
-    const inp = h('input', { class: 'jb-in', type: 'search', placeholder: 'Search songs, artists, albums', 'aria-label': 'Search', autocomplete: 'off' });
-    const out = h('div', { class: 'jb-sout' });
-    const songRow = (s, i = 0) => { const b = h('button', { class: 'btn primary jb-add', type: 'button', onclick: async () => { b.disabled = true; try { await call('/add', { guest: 'kiosk-screen', name: 'Big screen', trackId: s.id }); b.textContent = '✓ In'; b.classList.add('in'); refresh(); } catch (e) { b.disabled = false; toast(e.message, true); } } }, 'Add');
-      return h('div', { class: 'jb-row' }, board?.style === 'retro' ? h('span', { class: 'jbr-code' }, 'C' + (i + 1)) : null, h('div', { class: 'jb-t' }, h('b', null, s.title), h('small', null, s.artist)), b); };
-    const list = (title, songs) => out.replaceChildren(h('button', { class: 'btn', type: 'button', onclick: run }, '‹ Back'), h('h2', { class: 'jb-gh' }, title), ...songs.map(songRow));
-    async function run() { const q = inp.value.trim(); if (!q) { out.replaceChildren(); return; } try { const r = await call('/search?q=' + encodeURIComponent(q)); if (q !== inp.value.trim()) return; out.replaceChildren(renderResults(r, { songRow, onArtist: async a => list(a.name, await call('/artist?name=' + encodeURIComponent(a.name))), onAlbum: async a => list(albumName(a), await call(`/album?artist=${encodeURIComponent(a.artist)}&album=${encodeURIComponent(albumName(a))}`)) })); } catch (e) { toast(e.message, true); } }
-    inp.addEventListener('input', () => { clearTimeout(inp._t); inp._t = setTimeout(run, 250); });
-    const wrap = h('div', { class: 'jb-dlg', onclick: e => { if (e.target === wrap) wrap.remove(); } }, h('div', { class: 'jb-search-pane', role: 'dialog', 'aria-label': 'Search & add' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Search & add'), h('button', { class: 'btn', type: 'button', onclick: () => wrap.remove() }, 'Close')), inp, out));
-    root.append(wrap); inp.focus();
-  }
+  // 0.6.9 #18 (t1845): the way out is shown, quietly: a line under the logo ("Hold logo to exit", plus "· Ctrl+Shift+J" only where there is a
+  // mouse / keyboard - CSS any-pointer:fine), a native tooltip, and a fill bar that runs along the logo while it is held, so the host sees it working.
+  const logo = h('button', { class: 'jb-logo', type: 'button', title: EXIT_TIP, 'aria-label': 'Host: press and hold to exit, or press Ctrl+Shift+J' },
+    h('b', null, h('span', { class: 'wm-wav' }, 'Wav'), h('span', { class: 'wm-wiz' }, 'Wiz')), h('br'),
+    h('span', { class: 'jb-hint' }, h('span', { class: 'jb-hint-m' }, 'Hold logo to exit'), h('span', { class: 'jb-hint-r' }, 'Hold here to exit'), h('span', { class: 'jb-kbd' }, ' · Ctrl+Shift+J')));
+  let lp = 0; const unhold = () => { clearTimeout(lp); logo.classList.remove('holding'); };
+  logo.addEventListener('pointerdown', () => { unhold(); void logo.offsetWidth; logo.classList.add('holding'); lp = setTimeout(() => { unhold(); askExit(); }, HOLD_MS); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => logo.addEventListener(t, unhold));
+  // 0.6.9 #17 (t1843): no song search button on the big screen - a TV has no mouse and the screen would only get its own 3 picks; guests add from
+  // their phones with the QR code ("Scan to add a song"). Host controls (hold the logo, the host panel) are unchanged.
   const qrSrc = () => '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || '');
-  const thumb = id => (id ? h('img', { class: 'jb-th', src: `/api/v1/art/track/${id}?size=128`, alt: '', loading: 'lazy' }) : h('span', { class: 'jb-th' }));
+  // 0.6.9 J1: covers come from the Jukebox art endpoint (a song with no picture of its own gets its album's cover); no picture = the tidy
+  // placeholder (artBox), never a broken-image icon. The build's art version keeps them in the browser cache.
+  const jbArt = (id, size) => (id ? `/api/v1/jukebox/art/${id}?size=${size}${artCv() ? '&cv=' + encodeURIComponent(artCv()) : ''}` : '');
+  // 0.6.9 #28 (t1878): a Remote library song's cover comes through the guest Remote route the board names (`art`), with this session's code
+  const kArt = (x, size) => x?.trackId ? jbArt(x.trackId, size) : x?.art && code ? `${x.art}?size=${size}&j=${encodeURIComponent(code)}` : '';
+  const thumb = x => artBox(kArt(x, 128), 'jb-th');
 
-  // ---- Modern (bug fixes only): cover, now playing, progress, requester, Search & add | Up next with art, QR ----
+  // ---- Modern (bug fixes only): cover, now playing, progress, requester | Up next with art, QR ----
+  // 0.6.9 J2: the frame is built ONCE and each second only its text / progress changes. The Up next rows are rebuilt only when the songs
+  // change (rowsSig), so a row's cover <img> is never re-created and a song with no picture never flashes its placeholder every tick.
   const mod = h('div', { class: 'jbm' });
-  const cover = h('img', { class: 'jb-cover', alt: '' });
-  const left = h('div', { class: 'jb-left' }), right = h('div', { class: 'jb-right' }), chips = h('div', { class: 'jb-chips' });
+  let cover = artBox('', 'jb-cover');
+  const disc = h('div', { class: 'jb-disc' }, cover);
+  const mTitle = h('h1', { class: 'jb-title' }), mArtist = h('div', { class: 'jb-artist' }), mProg = h('div', { class: 'jb-prog' }, h('i'), h('b'));
+  const mPos = h('small', { class: 'jb-dim' }), mDur = h('small', { class: 'jb-dim' }), mBy = h('div', { class: 'jb-by' });
+  const left = h('div', { class: 'jb-left' }, disc, h('span', { class: 'jb-kick' }, 'NOW PLAYING'), mTitle, mArtist, mProg,
+    h('div', { class: 'row jb-times' }, mPos, h('span', { class: 'grow' }), mDur), mBy);
+  const nextBox = h('div', { class: 'jb-next' }), jUrl = h('code', { class: 'jb-url' }), jQr = h('img', { class: 'jb-qr', alt: 'QR code to join the Jukebox' });
+  const right = h('div', { class: 'jb-right' }, nextBox,
+    h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), jUrl, h('small', { class: 'jb-dim' }, 'No app, no login')), jQr));
+  const chips = h('div', { class: 'jb-chips' });
+  let nextSig = null;
   mod.append(left, right);
   function drawModern(b) {
-    if (b.now?.trackId) { const u = `/api/v1/art/track/${b.now.trackId}?size=512`; if (cover.getAttribute('src') !== u) cover.src = u; } else cover.removeAttribute('src');
+    cover = setArt(cover, kArt(b.now, 512));
     const pos = b.now ? b.now.positionMs : 0, dur = b.now?.durationMs || 0, pct = dur ? Math.min(100, pos / dur * 100) : 0;
-    left.replaceChildren(h('div', { class: 'jb-disc' }, cover), h('span', { class: 'jb-kick' }, 'NOW PLAYING'),
-      h('h1', { class: 'jb-title' }, b.now?.title || 'Add the first song'), h('div', { class: 'jb-artist' }, b.now?.artist || ''),
-      h('div', { class: 'jb-prog', style: `--p:${pct}%` }, h('i'), h('b')),
-      h('div', { class: 'row jb-times' }, h('small', { class: 'jb-dim' }, mss(pos)), h('span', { class: 'grow' }), h('small', { class: 'jb-dim' }, mss(dur))),
-      b.now?.by ? h('div', { class: 'jb-by' }, `Requested by ${b.now.by}`) : null,
-      h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, h('span', { class: 'jb-sico', 'aria-hidden': 'true' }), 'Search & add'));
-    right.replaceChildren(
-      h('div', { class: 'jb-next' }, h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
-        ...(b.next.length ? b.next.slice(0, 5).map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x.trackId), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
-          : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')])),
-      h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), h('code', { class: 'jb-url' }, joinUrl), h('small', { class: 'jb-dim' }, 'No app, no login')), h('img', { class: 'jb-qr', src: qrSrc(), alt: 'QR code to join the Jukebox' })));
+    const txt = (e, t) => { if (e.textContent !== t) e.textContent = t; };
+    txt(mTitle, b.now?.title || 'Add the first song'); txt(mArtist, b.now?.artist || ''); mProg.style.setProperty('--p', pct + '%');
+    txt(mPos, mss(pos)); txt(mDur, mss(dur)); txt(mBy, b.now?.by ? `Requested by ${b.now.by}` : ''); mBy.hidden = !b.now?.by;
+    const rows = b.next.slice(0, 5), sig = rowsSig(rows, upNextLine(b.next));
+    if (sig !== nextSig) {
+      nextSig = sig;
+      nextBox.replaceChildren(h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
+        ...(rows.length ? rows.map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
+          : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')]));
+    }
+    txt(jUrl, joinUrl); if (jQr.getAttribute('src') !== qrSrc()) jQr.src = qrSrc();
   }
 
   // ---- 0.3.4 H4 Retro CD: rebuilt to the approved render (980 x 551 design stage, scaled to the screen) ----
@@ -203,15 +241,15 @@ export function openKiosk(S) {
     <span class="jbr-badge l"></span><span class="jbr-badge r"></span>
     <div class="jbr-plac"><span class="jbr-kick">NOW&nbsp;&nbsp;PLAYING</span><span class="jbr-vfd"></span><div class="jbr-line"><b class="jbr-title"></b><span class="jbr-artist"></span></div><span class="jbr-by"></span></div>
     <div class="jbr-rack"><span class="jbr-h a">UP NEXT</span><span class="jbr-h b">MORE TO PICK</span><div class="jbr-col a"></div><div class="jbr-col b"></div></div>
-    <div class="jbr-qr"><span>Scan to pick<br>a song</span><img alt="QR code to join the Jukebox"><small></small></div>
-    <button type="button" class="jbr-select" aria-label="Search and add a song"><span>SELECT</span></button><span class="jbr-sel-l">Search &amp; add</span>`;
-  ret.querySelector('.jbr-select').addEventListener('click', openSearch);
+    <div class="jbr-qr"><span>Scan to pick<br>a song</span><img alt="QR code to join the Jukebox"><small></small></div>`;
   const q = sel => ret.querySelector(sel);
   const strip = (cls, codeTxt, kids) => h('div', { class: 'jbr-strip ' + cls }, h('span', { class: 'jbr-code' }, codeTxt), h('span', { class: 'jbr-st' }, kids));
   async function loadPicks() { if (!code || Date.now() - picksAt < 45000) return; picksAt = Date.now(); try { picks = await guestApi(code)('/picks?n=5'); } catch { /* keep the old ones */ } }
   function drawRetro(b) {
     const n = b.now, img = q('.jbr-disc img');
-    if (n?.trackId) { const u = `/api/v1/art/track/${n.trackId}?size=512`; if (img.getAttribute('src') !== u) img.src = u; img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
+    // 0.6.9 J1: Jukebox art endpoint (album cover fallback); a song with no picture hides the <img> (the disc face shows) and is not asked for again
+    const u = kArt(n, 512);
+    if (u && !artFailed.has(u)) { if (img.getAttribute('src') !== u) { img.hidden = true; img.onload = () => { if (img.naturalWidth) img.hidden = false; else artFailed.add(u); }; img.onerror = () => { artFailed.add(u); img.hidden = true; }; img.src = u; } } else { img.removeAttribute('src'); img.hidden = true; }
     q('.jbr-badge.l').textContent = `${plural(b.perGuest, 'pick')} per guest`;
     q('.jbr-badge.r').textContent = b.locked ? 'Requests paused' : `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`;
     q('.jbr-title').textContent = n?.title || 'Add the first song'; q('.jbr-artist').textContent = n?.artist || '';
@@ -231,7 +269,8 @@ export function openKiosk(S) {
     const isRetro = b.style === 'retro';
     root.classList.toggle('retro', isRetro); root.classList.toggle('modern', !isRetro); root.classList.toggle('paused', b.now?.state !== 'playing');
     root.style.setProperty('--beat', String((b.beat ?? 50) / 100));
-    chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null);
+    const cs = [b.perGuest, b.voteSkip, b.locked].join('|');
+    if (chips.dataset.sig !== cs) { chips.dataset.sig = cs; chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null); }
     if (isRetro) { loadPicks().then(() => board === b && drawRetro(b)); drawRetro(b); } else drawModern(b);
   }
   async function refresh() { try { const [st, b] = await Promise.all([api('/jukebox'), api('/jukebox/board')]); if (!st.running) { closeKiosk(); return; } code = st.code; board = b; draw(); } catch { /* keep the last picture */ } }
@@ -241,12 +280,31 @@ export function openKiosk(S) {
   fit(); addEventListener('resize', fit);
   api('/jukebox/join').then(j => { joinUrl = j.url.replace(/^https?:\/\//, '').replace(/\?.*$/, ''); draw(); }).catch(() => {});
   document.addEventListener('keydown', block, true); document.addEventListener('contextmenu', noMenu, true);
-  try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch?.(() => {}); } catch { /* not allowed */ }
-  try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
-  try { viz = new Viz(bg, { preview: false }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
+  // 0.6.9 #18 (t1845): in a plain browser fullscreen needs a click or key press first (a page opened at ?jukebox=tv has none), and Esc - held,
+  // once the keyboard lock is on - leaves it. Then a "Go fullscreen" button shows (big the first time, a small corner one after) instead of a
+  // half-broken screen; the big screen itself keeps running. Not in the WavWiz Player window, which owns its own fullscreen.
+  const player = !!window.chrome?.webview;
+  let wasFull = false;
+  const fsBtn = h('button', { class: 'jb-fs', type: 'button', hidden: true, 'data-act': 'jb-fullscreen', onclick: () => goFull() }, h('span', { 'aria-hidden': 'true' }, '⛶ '), h('span', { class: 'jb-fs-l' }, 'Go fullscreen'));
+  function goFull() {
+    try { const r = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); r?.then?.(() => { try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ } }, () => paintFs()); } catch { paintFs(); }
+  }
+  function paintFs() {
+    const full = !!document.fullscreenElement; if (full) wasFull = true;
+    fsBtn.hidden = full || player || !document.fullscreenEnabled; fsBtn.classList.toggle('again', wasFull);
+    fsBtn.lastChild.textContent = wasFull ? 'Fullscreen' : 'Go fullscreen';
+  }
+  root.append(fsBtn); document.addEventListener('fullscreenchange', paintFs);
+  goFull(); try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
+  setTimeout(() => { paintFs(); if (!fsBtn.hidden) fsBtn.focus(); }, 700);   // a TV remote's OK key presses it
+  // 0.6.9 J5: the background visualizer shows the JUKEBOX's music. It used to follow the zone this PC controls in the app (say Basement), which
+  // is quiet while the Jukebox plays in its own zone, so it sat in its idle picture: an empty bar grid with one lit row across the middle.
+  // crisp: sized in real screen pixels under Display size (html zoom), so the picture is never a stretched low-resolution copy.
+  setVizZone(jbOwn ? 'jukebox' : 'default'); api('/jukebox/zone').then(z => { jbOwn = !!z.own; if (kiosk) setVizZone(jbOwn ? 'jukebox' : 'default'); }).catch(() => {});
+  try { viz = new Viz(bg, { preview: false, crisp: true }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
   window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: true })); retS = S;
   refresh(); iv = setInterval(refresh, 1000);
-  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
+  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); setVizZone(undefined); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); document.removeEventListener('fullscreenchange', paintFs); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
   paintReturn(S);   // F76: after kiosk is set, so the header's Return to Jukebox goes away
 }
 /** 0.3.5 J14: scale factors for the two stages from the window size in device px and the page zoom (pure). */

@@ -46,10 +46,10 @@ export function zoneMenu42(a) {
     { id: 'settings', ic: 'gear', label: 'Zone settings' },   // 0.4.9 F69
     { id: 'link', ic: 'link', label: 'Link to…', sub: (a.others || []).map(o => ({ id: 'link:' + o.id, label: o.name, zone: o.id })), disabled: !a.admin || !(a.others || []).length, hint: (a.others || []).length ? 'Only an administrator can link zones.' : 'There is no other zone to link to.' },
   ];
-  // 0.4.9 F69: manual order - only for ACTIVE zones (playing / paused); a.order = { i, n } = place among the active zones; ends disabled
+  // 0.4.9 F69 / 0.6.9 #12: manual order (admin) - a.order = { i, n } = the card's place among ALL Devices cards (saved on the server); ends disabled
   if (a.order && a.order.n > 1) { const { i, n } = a.order; l.push({ sep: true },
     { id: 'movetop', ic: 'move', label: 'Move to top', disabled: i === 0, hint: 'Already at the top.' }, { id: 'moveup', ic: 'move', label: 'Move up', disabled: i === 0, hint: 'Already at the top.' },
-    { id: 'movedown', ic: 'move', label: 'Move down', disabled: i === n - 1, hint: 'Already at the bottom of the active zones.' }, { id: 'movebottom', ic: 'move', label: 'Move to bottom', disabled: i === n - 1, hint: 'Already at the bottom of the active zones.' }, { sep: true }); }
+    { id: 'movedown', ic: 'move', label: 'Move down', disabled: i === n - 1, hint: 'Already at the bottom.' }, { id: 'movebottom', ic: 'move', label: 'Move to bottom', disabled: i === n - 1, hint: 'Already at the bottom.' }, { sep: true }); }
   if (a.linked) l.push({ id: 'split', ic: 'split', label: 'Split off', disabled: !a.can });
   l.push({ id: 'rename', ic: 'rename', label: 'Rename', disabled: !a.admin, hint: 'Only an administrator can rename a zone.' },
     { sep: true }, { id: 'delete', ic: 'del', label: 'Delete zone', danger: true, disabled: !a.admin, hint: 'Only an administrator can delete a zone.' });

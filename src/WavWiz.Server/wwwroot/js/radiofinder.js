@@ -5,7 +5,8 @@
 import { h, api, toast } from './util.js';
 import { canControl } from './ui.js';
 import { wsel } from './wwselect.js';
-import { radioGridOn, finderStationTile, finderStationRow } from './radiostation.js';
+import { radioGridOn, finderStationTile, finderStationRow, radioPlayGuard, radioPlayTip } from './radiostation.js';
+import { radioBlockedNow, RADIO_JB_TIP } from './zones40.js';
 import { attachCtx } from './ctxmenu.js';
 
 /** Pure: pin USA (US) at the top of a Radio Browser country list, after 'Any country' in the picker. */
@@ -78,16 +79,16 @@ export function radioFinderView(S, act, { onSaved } = {}) {
       for (const r of rows) {
         const row = h('div', { class: 'row card' },
           h('div', { class: 'grow ell' }, r.name),
-          canControl(S) ? h('button', { class: 'btn primary', onclick: async () => {
+          canControl(S) ? h('button', { class: 'btn primary', title: radioPlayTip(r.name), onclick: radioPlayGuard(async () => {   // 0.6.9 #27
             try {
               const { id } = await api('/radio/finder/save', { method: 'POST', body: r });
               await act('/stream/play', { kind: 'radio', id });
               toast('Playing ' + (r.name || ''));
               onSaved?.();
             } catch (e) { toast(e.message, true); }
-          } }, '▶') : null);
+          }) }, '▶') : null);
         attachCtx(row, () => [
-          { id: 'play', ic: 'play', label: 'Play', disabled: !canControl(S), onclick: async () => {
+          { id: 'play', ic: 'play', label: 'Play', disabled: !canControl(S) || radioBlockedNow(), hint: radioBlockedNow() ? RADIO_JB_TIP : null, onclick: async () => {
             try { const { id } = await api('/radio/finder/save', { method: 'POST', body: r }); await act('/stream/play', { kind: 'radio', id }); onSaved?.(); }
             catch (e) { toast(e.message, true); }
           } },
@@ -123,6 +124,7 @@ export function radioFinderView(S, act, { onSaved } = {}) {
     try { eps = await api(`/podcasts/${p.id}/episodes`); } catch (e) { return toast(e.message, true); }
     host.replaceChildren(...(eps.length ? eps.map(e => h('div', { class: 'item podep', onclick: async () => {
         if (!canControl(S)) return toast('Your access is view-only.');
+        if (radioBlockedNow()) return toast(RADIO_JB_TIP, true);   // 0.6.9 #27: an episode is a stream too
         try {
           const { id } = await api('/radio', { method: 'POST', body: { name: e.title, url: e.url, genre: 'podcast' } });
           await act('/stream/play', { kind: 'radio', id });

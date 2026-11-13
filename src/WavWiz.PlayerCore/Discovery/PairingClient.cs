@@ -3,7 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 namespace WavWiz.PlayerCore.Discovery;
 
-public sealed record PairResult(string? Token, string? Error, int AudioPort = 0, int ClockPort = 0, bool Retryable = false);
+public sealed record PairResult(string? Token, string? Error, int AudioPort = 0, int ClockPort = 0, bool Retryable = false, string? UiToken = null);
+
+/// <summary>0.6.9 #15: an approval request: the id + secret to poll with and the 4-digit code both screens show.</summary>
+public sealed record ApprovalRequest(string? Id, string? Secret, string? Match, string? Error, bool Retryable = false);
+/// <summary>0.6.9 #15: "pending" | "approved" | "denied" | "expired" | "offline" (could not ask; try again later).</summary>
+public sealed record ApprovalAnswer(string Status, PairResult? Result = null, string? Error = null);
 
 /// <summary>
 /// Pairs a player with the server over plain HTTP on the LAN. The person types at most an address and a 6-digit code - never a scheme or a port
@@ -51,12 +56,57 @@ public static class PairingClient
             string? err = null; JsonElement root = default;
             try { root = JsonDocument.Parse(body).RootElement; if (root.TryGetProperty("error", out var e)) err = e.GetString(); } catch { }
             if (r.IsSuccessStatusCode && root.ValueKind == JsonValueKind.Object && root.TryGetProperty("token", out var t))
-                return new PairResult(t.GetString(), null, root.TryGetProperty("audioPort", out var ap) ? ap.GetInt32() : 0, root.TryGetProperty("clockPort", out var cp) ? cp.GetInt32() : 0);
+                return new PairResult(t.GetString(), null, root.TryGetProperty("audioPort", out var ap) ? ap.GetInt32() : 0, root.TryGetProperty("clockPort", out var cp) ? cp.GetInt32() : 0, UiToken: Str(root, "uiToken"));
             if (r.StatusCode == HttpStatusCode.TooManyRequests) return new PairResult(null, err ?? "Too many attempts. Wait a minute and try again.");
             return new PairResult(null, err ?? $"The server answered {(int)r.StatusCode}.");
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new PairResult(null, $"Could not reach the WavWiz server at {host}. Is it switched on, and is this PC on the same home network?", Retryable: true); }
         catch (HttpRequestException e) { return new PairResult(null, $"Could not reach the WavWiz server at {host}: {Plain(e)}", Retryable: true); }
+    }
+
+    private static string? Str(JsonElement r, string n) => r.ValueKind == JsonValueKind.Object && r.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    private static HttpClient Http(string host, int port) => new(new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(6) }) { Timeout = TimeSpan.FromSeconds(12), BaseAddress = new Uri($"http://{host}:{port}") };
+
+    /// <summary>0.6.9 #15: ask the administrator to approve this PC (no code to type). The request shows up at once on every admin screen.</summary>
+    public static async Task<ApprovalRequest> RequestApprovalAsync(string host, int httpPort, string playerId, string name, string machine, CancellationToken ct = default)
+    {
+        try
+        {
+            using var http = Http(host, httpPort);
+            using var r = await http.PostAsJsonAsync("/api/v1/auth/pair-request", new { kind = "player", playerId, name, machine }, ct);
+            JsonElement root = default; try { root = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct)).RootElement; } catch { }
+            if (r.IsSuccessStatusCode && Str(root, "id") is { } id) return new ApprovalRequest(id, Str(root, "secret"), Str(root, "match"), null);
+            if (r.StatusCode == HttpStatusCode.NotFound) return new ApprovalRequest(null, null, null, "This WavWiz server is older and cannot approve PCs. Type the 6-digit pairing code instead (Settings > Players > Pair a PC).");
+            return new ApprovalRequest(null, null, null, Str(root, "error") ?? $"The server answered {(int)r.StatusCode}.");
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}.", true); }
+        catch (HttpRequestException e) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}: {Plain(e)}", true); }
+    }
+
+    /// <summary>0.6.9 #15: how is the request doing? Approved = the Player token + the window session (handed out once).</summary>
+    public static async Task<ApprovalAnswer> PollApprovalAsync(string host, int httpPort, string id, string secret, CancellationToken ct = default)
+    {
+        try
+        {
+            using var http = Http(host, httpPort);
+            using var r = await http.PostAsJsonAsync($"/api/v1/auth/pair-request/{Uri.EscapeDataString(id)}/poll", new { secret }, ct);
+            JsonElement root = default; try { root = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct)).RootElement; } catch { }
+            return ParseAnswer((int)r.StatusCode, root);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new ApprovalAnswer("offline"); }
+        catch (HttpRequestException) { return new ApprovalAnswer("offline"); }
+    }
+
+    /// <summary>Pure (unit-tested): the poll answer -> status (+ tokens on approval).</summary>
+    public static ApprovalAnswer ParseAnswer(int httpStatus, JsonElement root)
+    {
+        var st = Str(root, "status");
+        if (httpStatus == 404 || st == "expired") return new ApprovalAnswer("expired");
+        if (httpStatus is < 200 or >= 300) return new ApprovalAnswer("offline", Error: Str(root, "error"));
+        if (st == "approved" && Str(root, "token") is { } tok)
+            return new ApprovalAnswer("approved", new PairResult(tok, null, root.TryGetProperty("audioPort", out var ap) && ap.ValueKind == JsonValueKind.Number ? ap.GetInt32() : 0,
+                root.TryGetProperty("clockPort", out var cp) && cp.ValueKind == JsonValueKind.Number ? cp.GetInt32() : 0, UiToken: Str(root, "uiToken")));
+        return new ApprovalAnswer(st is "denied" ? "denied" : "pending");
     }
 
     private static string Plain(HttpRequestException e) => e.InnerException is System.Net.Sockets.SocketException se ? se.SocketErrorCode switch

@@ -119,6 +119,6 @@ test('L31/L23 standalone mini player: Home focuses the main window then goes Hom
   const mini = src('mini.js'), main = src('main.js');
   assert.match(mini, /const toMain = target => \{ writePending\(target\); if \(!send\('full', \{ target \}\)\)/); assert.match(mini, /home \|\| \(\(\) => toMain\(\{ home: true \}\)\)/);   // F130: scHome
   assert.match(main, /export function openMini\(\) \{[\s\S]*?cmd: 'mini'[\s\S]*?window\.open\('\/mini\.html'/);
-  assert.match(main, /mountMini\(host, \{ embedded: true, run: runShortcut, home: goHome \}\)/);   // the embedded (in-app) mini runs the shortcuts directly, never through the window channel
+  assert.match(main, /mountMini\(host, \{ embedded: true, (?:replica: true, )?run: runShortcut, home: goHome[ ,]/);   /* 0.6.9 #9: + replica options */   // the embedded (in-app) mini runs the shortcuts directly, never through the window channel
   assert.match(main, /installMiniTargets\(msg => \{ if \(msg\.home\) goHome\(\)/);
 });

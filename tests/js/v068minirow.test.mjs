@@ -15,11 +15,11 @@ test('standalone mini CSS: art and song block share a row; zone keeps its width'
   const s = mini();
   assert.match(s, /0\.6\.8: standalone mini keeps art and the song block on one row/);
   const blk = s.slice(s.indexOf('0.6.8: standalone mini keeps art and the song block on one row'));
-  assert.match(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-artbox\{flex:0 0 auto/);
-  assert.match(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{flex:1 1 0;width:auto/);
-  assert.doesNotMatch(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{[^}]*flex:1 1 100%/);
-  assert.doesNotMatch(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{[^}]*width:100%/);
-  assert.match(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line\{display:flex;flex-direction:row;flex-wrap:nowrap/);
-  assert.match(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line \.mp-a\{flex:1 1 0;min-width:0\}/);
-  assert.match(blk, /body\.minibody \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line \.zlink\{flex:0 0 auto;width:max-content;max-width:50%\}/);
+  assert.match(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-artbox\{flex:0 0 auto/);
+  assert.match(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{flex:1 1 0;width:auto/);
+  assert.doesNotMatch(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{[^}]*flex:1 1 100%/);
+  assert.doesNotMatch(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt\{[^}]*width:100%/);
+  assert.match(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line\{display:flex;flex-direction:row;flex-wrap:nowrap/);
+  assert.match(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line \.mp-a\{flex:1 1 0;min-width:0\}/);
+  assert.match(blk, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\):not\(\.embedded\) \.mp-txt \.zl-line \.zlink\{flex:0 0 auto;width:max-content;max-width:50%\}/);
 });

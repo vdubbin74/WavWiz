@@ -46,7 +46,7 @@
 .eqarea[data-eqstyle=faders] .eqled{left:calc(50% + 20px)!important;right:auto!important;width:5px!important;top:0;bottom:0;height:100%!important;transform:none!important;border-radius:2px;opacity:.55;z-index:1;transition:opacity .3s}
 .eqarea[data-eqstyle=faders]:has(.eqa-live:not([hidden])) .eqled{opacity:.85}
 .eqarea[data-eqstyle=faders] .eqb-knob{left:calc(50% - 17px)!important;width:34px!important;height:22px!important;border-radius:6px!important;z-index:4;
-  background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 calc(1px / var(--z,1)),transparent calc(1px / var(--z,1)) calc(3px / var(--z,1))),linear-gradient(180deg,color-mix(in srgb,var(--ink) 34%,#3c4248) 0%,color-mix(in srgb,var(--ink) 16%,#2b3035) 48%,color-mix(in srgb,var(--ink) 6%,#1c2024) 52%,color-mix(in srgb,var(--ink) 12%,#262a2e) 100%)!important;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),linear-gradient(180deg,color-mix(in srgb,var(--ink) 34%,#3c4248) 0%,color-mix(in srgb,var(--ink) 16%,#2b3035) 48%,color-mix(in srgb,var(--ink) 6%,#1c2024) 52%,color-mix(in srgb,var(--ink) 12%,#262a2e) 100%)!important;
   border:1px solid rgba(0,0,0,.7)!important;box-shadow:0 4px 10px rgba(0,0,0,.5),0 1px 2px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.35)!important}
 .eqarea[data-eqstyle=faders] .eqb-knob::after{left:5px!important;right:5px!important;height:2px!important;margin-top:-1px!important;border-radius:1px;opacity:1;box-shadow:0 0 4px color-mix(in srgb,var(--hl,var(--accent)) 50%,transparent)}
 .eqarea[data-eqstyle=faders] .eqb-knob::before{content:"";position:absolute;left:8px;right:8px;top:4px;bottom:4px;border-top:1px solid rgba(0,0,0,.35);border-bottom:1px solid rgba(0,0,0,.35);pointer-events:none}
@@ -94,3 +94,13 @@
 /* Spectrum nodes */
 .eqarea[data-eqstyle=curve] .eqn{border:1.5px solid var(--accent)!important}
 .eqarea[data-eqstyle=curve] .eqn.sel{background:var(--accent)!important;box-shadow:0 0 0 2px var(--accent),0 0 0 5px color-mix(in srgb,var(--hl) 40%,transparent),0 0 14px color-mix(in srgb,var(--hl) 45%,transparent)}
+/* 0.6.9 #10: Studio faders are solid hardware. Root cause of the see-through caps: the cap background used calc(1px / var(--z)), but eqview.js sets
+   --z on every band to the 0 dB position (a percentage), so the whole declaration was invalid at computed-value time and the cap had NO background.
+   The brushed lines are now plain px. Also: the response curve runs BEHIND the fader caps and slots (it used to paint over them, and the
+   unselected bands were dimmed with opacity, so the caps looked see-through); the fill is opaque accent */
+.eqarea[data-eqstyle=faders] .eqa-curve{z-index:0}
+.eqarea[data-eqstyle=faders] .eqb,.eqarea[data-eqstyle=faders]:has(.eqb.sel) .eqb:not(.sel){opacity:1}
+.eqarea[data-eqstyle=faders] .eqb-fill{opacity:1;background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 75%,#000 25%),var(--accent) 50%,color-mix(in srgb,var(--accent) 75%,#000 25%))}
+.eqarea[data-eqstyle=faders] .eqb-slot{z-index:1}
+.eqarea[data-eqstyle=faders] .eqb-knob{z-index:5;opacity:1}
+.eqarea[data-eqstyle=faders] .eqb:not(.sel) .eqb-knob::after{opacity:.75}

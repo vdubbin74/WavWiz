@@ -448,8 +448,12 @@ public sealed class ZoneManager
             if (enabled == true) _reg.Subscribe(s); else if (enabled == false) _reg.Unsubscribe(s.Id);
         }
         else ExternalPatched?.Invoke(z.PlayerId);
-        _ev.Publish("zones"); return null;
+        if (Volatile.Read(ref _quietZones) == 0) _ev.Publish("zones"); return null;
     }
+    // 0.6.9 t1894: a zone / master mute patches every member; each Patch used to publish its own "zones" event, so a client could
+    // refresh between them and paint a half-muted zone (the zone button flipped back, then on again). A batch publishes ONE event at the end.
+    private int _quietZones;
+    private T ZonesBatch<T>(Func<T> f) { Interlocked.Increment(ref _quietZones); try { return f(); } finally { Interlocked.Decrement(ref _quietZones); _ev.Publish("zones"); } }
 
     /// <summary>
     /// Master volume (0.2.0 item 10). Rules:
@@ -482,7 +486,8 @@ public sealed class ZoneManager
     /// <summary>0.2.1 F17: Mute all (master strip). Mutes every device and remembers which ones it muted; Unmute all un-mutes only those, so a
     /// device you had muted on its own stays muted (per-device mute stays separate). The list is kept in the settings table across restarts.
     /// Returns the number of devices changed.</summary>
-    public int MuteAll(bool on)
+    public int MuteAll(bool on) => ZonesBatch(() => MuteAllCore(on));
+    private int MuteAllCore(bool on)
     {
         var zs = Zones(); int n = 0;
         if (on)
@@ -593,14 +598,43 @@ public sealed class ZoneManager
         for (int i = 0; i < ids.Length; i++) if (Math.Abs(real[i] - actual[i]) > 0.001) Patch(ids[i], null, real[i], null, null);
         return (ZoneVolume.Level(real), null);
     }
-    /// <summary>0.3.2 F4: zone mute = every member muted / un-muted.</summary>
+    /// <summary>0.3.2 F4: zone mute = every member muted / un-muted. 0.6.9 t1894: works like the master mute (MuteAll), scoped to the zone:
+    /// Mute mutes every member that is not muted yet and remembers which ones IT muted; Unmute un-mutes exactly those, so a speaker the user had
+    /// muted on its own before stays muted (its own toggle keeps working). Mixed zone (some members muted): the zone shows NOT muted and Mute
+    /// mutes the rest. Unmute with no zone mute on record (every speaker was muted one by one) un-mutes every member. A zone mute that found
+    /// every member already muted records an EMPTY list: its Unmute changes nothing (a linked set posts each zone; the other zone's record
+    /// un-mutes what the press muted, and a speaker muted on its own stays muted).
+    /// One "zones" event per press (ZonesBatch), not one per speaker.</summary>
     public string? GroupMute(long groupId, bool muted)
     {
         var g = Groups().FirstOrDefault(x => x.Id == groupId); if (g == null) return "zone not found";
-        foreach (var id in g.DeviceIds) Patch(id, null, null, muted, null);
-        return null;
+        var key = $"zones.mutedByZone.{groupId}";
+        HashSet<long>? Mine() { var v = _db.Setting(key); if (string.IsNullOrEmpty(v)) return null; try { return JsonSerializer.Deserialize<List<long>>(v)?.ToHashSet() ?? new(); } catch { return null; } }
+        return ZonesBatch<string?>(() =>
+        {
+            var ms = Zones().Where(z => g.DeviceIds.Contains(z.Id)).ToList();
+            if (muted)
+            {
+                var now = ms.Where(z => !z.Muted).Select(z => z.Id).ToList();
+                _db.SetSetting(key, JsonSerializer.Serialize((Mine() ?? new()).Where(g.DeviceIds.Contains).Union(now).Distinct().ToList()));
+                foreach (var id in now) Patch(id, null, null, true, null);
+            }
+            else
+            {
+                var mine = Mine(); var list = ms.Where(z => z.Muted && (mine == null || mine.Contains(z.Id))).ToList();
+                _db.DeleteSetting(key);
+                foreach (var z in list) Patch(z.Id, null, null, false, null);
+            }
+            return null;
+        });
     }
-    public void DevicesMute(IEnumerable<long> deviceIds, bool muted) { foreach (var id in deviceIds) Patch(id, null, null, muted, null); }
+    /// <summary>0.6.9 t1897: a zone's ON / OFF = every member switched on / off (same as each speaker's own PATCH), ONE "zones" event.</summary>
+    public string? GroupEnable(long groupId, bool on)
+    {
+        var g = Groups().FirstOrDefault(x => x.Id == groupId); if (g == null) return "zone not found";
+        return ZonesBatch<string?>(() => { foreach (var id in g.DeviceIds) Patch(id, null, null, null, on); return null; });
+    }
+    public void DevicesMute(IEnumerable<long> deviceIds, bool muted) => ZonesBatch(() => { foreach (var id in deviceIds) Patch(id, null, null, muted, null); return 0; });
 
     private static string? CheckName(ref string? name)
     {

@@ -13,6 +13,7 @@ import { setArtCv } from './art.js';   // 0.4.4 F24
 import { airplayOutCard } from './airplayout.js';   // 0.5.0 stage 10 (WIP)
 import { changePhoneRole } from './room.js';   // F100
 import { isPhoneUa } from './phonejoin.js';
+import { canPickNative, pickFolder } from './folderpick.js';   // 0.6.9 #6
 import { phoneRole } from './calmic-core.js';
 import { historyCard, lastFmCard } from './history.js';
 
@@ -157,7 +158,9 @@ export async function openSettings(S, refresh, nav, section) {
       h('p', { class: 'dim small' }, 'Folders are read from the server PC (a local drive or a network share the WavWiz service can read). Files are never modified.'),
       roots.map(r => h('div', { class: 'row', style: 'margin:4px 0' }, h('div', { class: 'grow' }, h('span', { class: 'mono' }, r.path), h('div', { class: 'small ' + (r.lastError ? 'err' : 'dim') }, r.lastError ? r.lastError : `${r.tracks} tracks`)),
         adminOnly(S, h('button', { class: 'btn danger', onclick: async () => { if (!(await ask('Remove folder', `Stop using ${r.path}? The files are not touched.`, { ok: 'Remove', danger: true }))) return; try { await api(`/library/roots/${r.id}`, { method: 'DELETE' }); draw(); } catch (e) { toast(e.message, true); } } }, 'Remove')))),
-      admin ? h('div', { class: 'row', style: 'margin-top:8px' }, pathIn, h('button', { class: 'btn primary', onclick: async () => { try { await api('/library/roots', { method: 'POST', body: { path: pathIn.value } }); toast('Folder added. Scanning…'); draw(); } catch (e) { toast(e.message, true); } } }, 'Add')) : null,
+      admin ? h('div', { class: 'row', style: 'margin-top:8px' }, pathIn,
+        canPickNative(S.auth) ? h('button', { class: 'btn', type: 'button', id: 'lib-browse', title: 'Choose the folder in Windows', onclick: async () => { const p = await pickFolder({ title: 'Choose a music folder for WavWiz', initial: pathIn.value }); if (p) { pathIn.value = p; pathIn.focus(); } } }, 'Browse…') : null,   // 0.6.9 #6
+        h('button', { class: 'btn primary', onclick: async () => { try { await api('/library/roots', { method: 'POST', body: { path: pathIn.value } }); toast('Folder added. Scanning…'); draw(); } catch (e) { toast(e.message, true); } } }, 'Add')) : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } } }, 'Rescan now'),
         h('span', { class: 'dim small' }, st.library.scanning ? `Scanning${st.library.progress ? ` ${st.library.progress.done}/${st.library.progress.total}` : ''}…` : ''))));
     panes.library.push(admin ? nasCard() : h('div', { class: 'card', id: 'sec-nas' }, h('h3', null, 'Network share logins (NAS) ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add share logins.')));

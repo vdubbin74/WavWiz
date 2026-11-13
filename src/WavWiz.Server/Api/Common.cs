@@ -16,6 +16,7 @@ public sealed class Services
     public Playback.VizHubs Vizs = new();      // 0.4.3 #10: one feed per playback group
     public Playback.VizHub Viz => Vizs.Default;
     public string ServerId = ""; public Net.DiscoveryHost? Discovery;
+    public PairRequests PairReqs = new();      // 0.6.9 #15: speakers / Player windows waiting for an administrator's approval
     public Zones.ZoneLinks Links = null!;      // 0.4.0 Stage 2: zones <-> playback groups, Jukebox zone
     public Features.SceneService Scenes = null!;
     public Features.ScheduleService Schedules = null!;
@@ -33,6 +34,7 @@ public sealed class Services
     public Features.CdRipService CdRip = null!;
     public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
     public Library.NasLogon? Nas;      // 0.1.3
+    public Action<string>? Log;      // 0.6.9 #22b: the server log, for services started on demand (AirPlay browse)
     public Library.SubsonicService? Remote;      // F164 remote libraries (Subsonic / OpenSubsonic client)
     public WavWiz.Core.Discovery.ServerBeacon Beacon()
     {

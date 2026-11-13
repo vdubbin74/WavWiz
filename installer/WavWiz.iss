@@ -1,7 +1,7 @@
 ; WavWiz (BETA) installer. Compile:  ISCC /DAppVersion=0.0.4 /DDistDir=<dist> /DRepoDir=<repo> /DOutDir=<out> installer\WavWiz.iss   (build\make-installer.ps1 does this; works under Wine)
 ; FULL self-contained installer only: the target PCs have no .NET. There is no slim / framework-dependent variant.
 #ifndef AppVersion
-  #define AppVersion "0.6.8"
+  #define AppVersion "0.6.9"
 #endif
 #ifndef RepoDir
   #define RepoDir ".."
@@ -38,6 +38,8 @@ SetupIconFile={#RepoDir}\assets\logo\wavwiz.ico
 UninstallDisplayIcon={app}\wavwiz.ico
 UninstallDisplayName=WavWiz (BETA)
 WizardStyle=modern
+; 0.6.9 #17: 140 % (docs: 100-150, default 120) so the component / task check-list captions and the Network page fit at 200 % scaling
+WizardSizePercent=140
 WizardImageFile={#RepoDir}\installer\wizard-large-164.bmp,{#RepoDir}\installer\wizard-large-246.bmp,{#RepoDir}\installer\wizard-large-328.bmp
 WizardSmallImageFile={#RepoDir}\installer\wizard-small-55.bmp,{#RepoDir}\installer\wizard-small-83.bmp,{#RepoDir}\installer\wizard-small-110.bmp
 InfoBeforeFile={#RepoDir}\installer\info-before.txt
@@ -432,31 +434,39 @@ begin
 end;
 
 procedure InitializeWizard;
-var L: TNewStaticText;
+var L, ApNote: TNewStaticText; Y, W: Integer;
 begin
   NetPage := CreateCustomPage(wpSelectComponents, 'Network access (BETA)', 'Which devices may reach the WavWiz server?');
-  L := TNewStaticText.Create(NetPage); L.Parent := NetPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, NetPage.SurfaceWidth, ScaleY(56));
+  { 0.6.9 #17: the Network page flows top to bottom from each control's real height (TNewStaticText.AdjustHeight) instead of fixed 100 % offsets,
+    so nothing is clipped or overlapped at 200 % scaling; option rows are ScaleY(20) tall (the check / radio glyph plus text), and the long AirPlay
+    caption is split into a short check box caption and a wrapping note under it (TNewCheckBox has no WordWrap in Inno Setup). }
+  W := NetPage.SurfaceWidth;
+  L := TNewStaticText.Create(NetPage); L.Parent := NetPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, W, ScaleY(56));
   L.Caption := 'Phones and other PCs on your home network always work. Choose the second option if you also want to reach WavWiz from your phone through Tailscale or another VPN when you are away. An upgrade keeps the setting you already have.';
+  L.AdjustHeight; Y := L.Top + L.Height + ScaleY(6);
   { F268: two plain choices (+ an advanced escape); the all-networks choice never shows an address }
-  LanOnlyRadio := TNewRadioButton.Create(NetPage); LanOnlyRadio.Parent := NetPage.Surface; LanOnlyRadio.SetBounds(0, ScaleY(60), NetPage.SurfaceWidth, ScaleY(17));
+  LanOnlyRadio := TNewRadioButton.Create(NetPage); LanOnlyRadio.Parent := NetPage.Surface; LanOnlyRadio.SetBounds(0, Y, W, ScaleY(20)); Y := Y + ScaleY(23);
   LanOnlyRadio.Caption := 'Home network only (recommended)'; LanOnlyRadio.OnClick := @NetChoiceClick;
-  AllIfRadio := TNewRadioButton.Create(NetPage); AllIfRadio.Parent := NetPage.Surface; AllIfRadio.SetBounds(0, ScaleY(82), NetPage.SurfaceWidth, ScaleY(17));
+  AllIfRadio := TNewRadioButton.Create(NetPage); AllIfRadio.Parent := NetPage.Surface; AllIfRadio.SetBounds(0, Y, W, ScaleY(20)); Y := Y + ScaleY(27);
   AllIfRadio.Caption := 'Home network + Tailscale/VPN (all networks)'; AllIfRadio.OnClick := @NetChoiceClick;
-  SpecRadio := TNewRadioButton.Create(NetPage); SpecRadio.Parent := NetPage.Surface; SpecRadio.SetBounds(0, ScaleY(110), NetPage.SurfaceWidth, ScaleY(17));
+  SpecRadio := TNewRadioButton.Create(NetPage); SpecRadio.Parent := NetPage.Surface; SpecRadio.SetBounds(0, Y, W, ScaleY(20)); Y := Y + ScaleY(22);
   SpecRadio.Caption := 'Advanced: a specific address (127.0.0.1 = this PC only):'; SpecRadio.OnClick := @NetChoiceClick;
-  LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(ScaleX(18), ScaleY(130), ScaleX(200), ScaleY(23)); LanEdit.OnChange := @LanEditChange;
-  ConnUrlLabel := TNewStaticText.Create(NetPage); ConnUrlLabel.Parent := NetPage.Surface; ConnUrlLabel.WordWrap := True; ConnUrlLabel.AutoSize := False; ConnUrlLabel.SetBounds(0, ScaleY(162), NetPage.SurfaceWidth, ScaleY(28)); ConnUrlLabel.Caption := '';
+  LanEdit := TNewEdit.Create(NetPage); LanEdit.Parent := NetPage.Surface; LanEdit.SetBounds(ScaleX(18), Y, ScaleX(200), ScaleY(23)); LanEdit.OnChange := @LanEditChange; Y := Y + ScaleY(29);
+  ConnUrlLabel := TNewStaticText.Create(NetPage); ConnUrlLabel.Parent := NetPage.Surface; ConnUrlLabel.WordWrap := True; ConnUrlLabel.AutoSize := False; ConnUrlLabel.SetBounds(0, Y, W, ScaleY(30)); ConnUrlLabel.Caption := ''; Y := Y + ScaleY(32);
   { F122: Private-network tip (static) + amber warning when a Public profile is found }
   { 0.6.8-#14g: opt-in, remembered on reinstall (previous-data), /AIRPLAYOUT=1|0 for silent installs }
-  AirPlayOutCheck := TNewCheckBox.Create(NetPage); AirPlayOutCheck.Parent := NetPage.Surface; AirPlayOutCheck.SetBounds(0, ScaleY(192), NetPage.SurfaceWidth, ScaleY(17));
-  AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall (UDP 319-320 + audio; home network only)';
+  AirPlayOutCheck := TNewCheckBox.Create(NetPage); AirPlayOutCheck.Parent := NetPage.Surface; AirPlayOutCheck.SetBounds(0, Y, W, ScaleY(20)); Y := Y + ScaleY(21);
+  AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall';
   AirPlayOutCheck.Checked := Trim(ExpandConstant('{param:AIRPLAYOUT|' + GetPreviousData('AirPlayOut', '0') + '}')) = '1';
-  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, ScaleY(214), NetPage.SurfaceWidth, NetPage.SurfaceHeight - ScaleY(214)); { F257-A R1: fills the rest of the page at any DPI }
+  ApNote := TNewStaticText.Create(NetPage); ApNote.Parent := NetPage.Surface; ApNote.WordWrap := True; ApNote.AutoSize := False; ApNote.SetBounds(ScaleX(18), Y, W - ScaleX(18), ScaleY(14));
+  ApNote.Caption := 'UDP 319-320 + audio; home network only.'; ApNote.FocusControl := AirPlayOutCheck; ApNote.AdjustHeight; Y := ApNote.Top + ApNote.Height + ScaleY(8);
+  PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, Y, W, NetPage.SurfaceHeight - Y); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
   HostPage := CreateCustomPage(NetPage.ID, 'Where is the WavWiz server? (BETA)', 'WavWiz Player needs the address of the PC that runs WavWiz Server.');
   L := TNewStaticText.Create(HostPage); L.Parent := HostPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, HostPage.SurfaceWidth, ScaleY(70));
   L.Caption := 'Enter the home-network address (for example 192.168.1.20) or the name of the PC that has WavWiz Server installed. You can leave it empty and enter it later in the player (tray icon > Server).';
-  HostEdit := TNewEdit.Create(HostPage); HostEdit.Parent := HostPage.Surface; HostEdit.SetBounds(0, ScaleY(80), ScaleX(260), ScaleY(23));
+  L.AdjustHeight;   { 0.6.9 #17 }
+  HostEdit := TNewEdit.Create(HostPage); HostEdit.Parent := HostPage.Surface; HostEdit.SetBounds(0, L.Top + L.Height + ScaleY(10), ScaleX(260), ScaleY(23));
   { command-line seeds (silent installs): /LANIP=192.168.1.20  /SERVERHOST=192.168.1.20 }
   LanEdit.Text := Trim(ExpandConstant('{param:LANIP|}'));
   HostEdit.Text := Trim(ExpandConstant('{param:SERVERHOST|}'));

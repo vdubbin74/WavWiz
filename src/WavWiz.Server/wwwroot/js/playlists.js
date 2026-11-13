@@ -7,11 +7,12 @@ const PLMIME = 'application/x-wavwiz-plitem';
 
 /** Saved playlists: create, play, rename, delete, add by drag/menu, and reorder / remove songs (drag on desktop, arrows on phone). */
 export function playlistsView(S, opts = {}) {
-  const root = h('div'); let openId = null;
+  const root = h('div'); let openId = null, filter = '';   // 0.6.9 #4: filter = the Library search box text
   const act = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) toast(okMsg); return r; } catch (e) { toast(e.message, true); return null; } };
 
   async function drawList() {
     openId = null; let lists = []; try { lists = await api('/playlists'); } catch (e) { root.replaceChildren(h('p', { class: 'err' }, e.message)); return; }
+    const all = lists.length; if (filter) lists = lists.filter(p => String(p.name || '').toLowerCase().includes(filter.toLowerCase()));   // 0.6.9 #4: Library search box
     const nm = h('input', { type: 'text', placeholder: 'New playlist name', maxlength: 80, 'aria-label': 'New playlist name' });
     const create = async fromQueue => { const name = nm.value.trim(); if (!name) return toast('Type a name first.', true); if (await act(() => api('/playlists', { method: 'POST', body: { name, fromQueue } }), 'Playlist created')) { nm.value = ''; drawList(); } };
     root.replaceChildren(h('h2', null, 'Playlists'), h('p', { class: 'dim small' }, canControl(S) ? 'Drag songs, albums or artists from the Library onto a playlist (or use the ⋯ menu / long-press on a phone).' : 'Your access is view-only.'),
@@ -24,7 +25,7 @@ export function playlistsView(S, opts = {}) {
           h('button', { class: 'btn', 'aria-label': 'Open ' + p.name, onclick: () => drawOne(p.id) }, 'Open'));
         if (canControl(S)) dropTarget(card, ref => isRemoteRef(ref) ? toast(REMOTE_PL_MSG, true) : act(() => api(`/playlists/${p.id}/items`, { method: 'POST', body: ref }), `Added to ${p.name}`).then(drawList));
         return card;
-      })) : h('p', { class: 'dim' }, 'No playlists yet.'));
+      })) : h('p', { class: 'dim' }, filter && all ? `No playlist matches “${filter}”.` : 'No playlists yet.'));
     const sm = await smartSection(canControl(S), drawList); if (sm && openId == null) root.append(sm);   // rule-based lists, marked Smart
   }
 
@@ -66,5 +67,5 @@ export function playlistsView(S, opts = {}) {
   // F250-P2: a lazy phone Library adapter owns its first/serialized reload.
   // Direct routes and desktop retain the original eager initialization.
   if (!opts.deferInitial) drawList();
-  return { el: root, reload: () => (openId ? drawOne(openId) : drawList()) };
+  return { el: root, reload: () => (openId ? drawOne(openId) : drawList()), setFilter: q => { const f = String(q || '').trim(); if (f !== filter) openId = null; filter = f; } };
 }

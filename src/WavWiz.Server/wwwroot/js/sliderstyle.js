@@ -1,6 +1,6 @@
 // 0.3.3 G11 (revised): volume slider style - a per-device choice in Settings > Appearance > Display size.
 // "Gradient" (default) is the v0.3.2 two-color gradient: theme primary -> secondary (0.3.4 H3: no third color; Pepecoin: brand-kit colors only).
-// "Flat" is the theme primary. Used by every volume bar: standard + expanded Devices, zones, master and the mini player.
+// "Flat" is the theme primary. 0.6.9: used by every slider (range inputs, seek bars, Studio EQ fader fills), not only the volume bars.
 export const SLIDER_KEY = 'wavwiz.sliderstyle';
 export const SLIDER_STYLES = [['gradient', 'Gradient'], ['flat', 'Flat']];
 export const normSlider = v => (v === 'flat' ? 'flat' : 'gradient');
@@ -17,7 +17,9 @@ if (typeof document !== 'undefined') { document.documentElement.dataset.slider =
 
 /** 0.3.4 H3: fill fraction for a range input (pure). */
 export const fillPct = el => { const lo = +el.min || 0, hi = el.max === '' || el.max == null ? 100 : +el.max, v = +el.value; return hi > lo ? Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)) : 0; };
-export const VOL_SEL = ':is(.dvol,.mp-vol,.np-volrow,.dmaster) input[type=range]';
+// 0.6.9 #11: Flat / Gradient is EVERY slider in the app (settings, EQ pre-gain, speaker trims, latency, calibration, mini player, glow...), not only volume.
+// The one exception is the Now Playing color picker, whose track IS the color swatch row.
+export const VOL_SEL = 'input[type=range]:not(.npcolor-range)';
 /** Keeps --v on every volume bar in step with its value: on input right away, and a cheap 4 Hz sweep for values set by code (server updates). */
 export function syncFills(root = document) { for (const el of root.querySelectorAll(VOL_SEL)) { const v = fillPct(el).toFixed(1) + '%'; if (el.style.getPropertyValue('--v') !== v) el.style.setProperty('--v', v); } }
 if (typeof document !== 'undefined' && document.addEventListener) {

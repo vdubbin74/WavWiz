@@ -80,7 +80,9 @@ function settle() {
 export const vizUrl = key => '/ws/viz?delayMs=0' + (key ? '&zoneId=' + encodeURIComponent(key) : '');
 // 0.5.1: the RESOLVED zone (zones40 publishes it on every sync). The raw stored key is empty until a zone is picked by hand, and no zoneId made the
 // server show "whichever group is playing" - so a quiet Controlling zone showed another zone's music.
-const selZone = () => { if (globalThis.__wavwizZoneKey !== undefined) return globalThis.__wavwizZoneKey; try { return globalThis.localStorage?.getItem('wavwiz.zone') || null; } catch { return null; } };
+// 0.6.9 J5: a full-screen view that plays a zone of its own (the Jukebox big screen) pins the feed to that zone while it is open.
+let zoneOverride; export function setVizZone(key) { zoneOverride = key === undefined ? undefined : (key || null); retarget(); }
+const selZone = () => { if (zoneOverride !== undefined) return zoneOverride; if (globalThis.__wavwizZoneKey !== undefined) return globalThis.__wavwizZoneKey; try { return globalThis.localStorage?.getItem('wavwiz.zone') || null; } catch { return null; } };
 function openFeed() {
   feed.key = selZone();
   feed.live = liveSocket(vizUrl(feed.key), { binary: true, pingText: null, silentMs: 1e9,
@@ -88,7 +90,7 @@ function openFeed() {
     onClose: () => { feed.audible = false; feed.win = null; feed.bands = null; settle(); } });
 }
 /** The zone picker moved to another zone: follow its music. */
-const retarget = () => { if (!feed.live || selZone() === feed.key) return; feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; feed.bands = null; if (feed.subs.size) { openFeed(); settle(); } };
+function retarget() { if (!feed.live || selZone() === feed.key) return; feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; feed.bands = null; if (feed.subs.size) { openFeed(); settle(); } }
 try { globalThis.addEventListener?.('wavwiz:zone', retarget); globalThis.addEventListener?.('wavwiz:zonesync', retarget); } catch { /* no window */ }
 function feedUnsub(v) { feed.subs.delete(v); if (!feed.subs.size && feed.live) { feed.live.close(); feed.live = null; feed.audible = false; feed.win = null; } }
 /** 0.2.1 F12: the Sound (EQ) spectrum glow reads the same shared feed. onFrame(waveBytes|null, audible); returns an unsubscribe function. */
@@ -101,8 +103,8 @@ const BG = '#05070a';
 /** Controller for one host element. It owns ONE 2D canvas for its whole life (no new canvas or context per switch).
  * opts.engine fixes the look (preview cards); opts.preview = small, 30 fps, no camera shake. */
 export class Viz {
-  constructor(host, { onStatus, engine = null, preview = false } = {}) {
-    this.host = host; this.onStatus = onStatus || (() => {}); this.fixed = engine ? normEngine(engine) : null; this.preview = preview; this.prefs = vizPrefs();
+  constructor(host, { onStatus, engine = null, preview = false, crisp = false } = {}) {
+    this.crisp = crisp; this.host = host; this.onStatus = onStatus || (() => {}); this.fixed = engine ? normEngine(engine) : null; this.preview = preview; this.prefs = vizPrefs();
     this.engine = this.fixed || this.prefs.engine; this.running = false; this.frames = 0; this.lastError = ''; this.failed = null; this.presetName = '';
     this.features = new Features(); this.applyReact(); this.applyQuality(true, true); this.ftInt = 16.7; this.ftWork = 1; this.lastRaf = 0; this.fpsT = performance.now(); this.fpsN = 0; this.fps = 0; this.canvas = null; this.ctx = null; this.mode = null; this.target = null; this.gen = -1; live.add(this);
   }
@@ -133,7 +135,9 @@ export class Viz {
   /** Backing-store size from the host's real on-screen size; never smaller than 64 and never taken from a hidden (0-size) host. */
   boxSize() {
     const dpr = Math.min(window.devicePixelRatio || 1, this.preview ? 1 : this.q.dpr);
-    const w = this.host.clientWidth, h = this.host.clientHeight; if (!w || !h) return null;
+    // 0.6.9 J5 crisp: clientWidth is in pre-zoom CSS px under Display size (html{zoom}); times the page zoom = the real on-screen size
+    const z = this.crisp ? (Number(this.host.currentCSSZoom) || Number(getComputedStyle(document.documentElement).getPropertyValue('--z')) || 1) : 1;
+    const w = this.host.clientWidth * z, h = this.host.clientHeight * z; if (!w || !h) return null;
     return [Math.max(64, Math.round(w * dpr)), Math.max(64, Math.round(h * dpr))];
   }
   /** 0.6.8d: setting canvas.width/height wipes the picture; a window drag used to do that on every resize tick and paint it dark, so the

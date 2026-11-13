@@ -699,26 +699,30 @@ Test 'F268 upgrade over a LAN address (PCBOXV2 today: 192.168.1.169): Home netwo
     Has $log 'listening on the home network + Tailscale/VPN (all networks) instead of only 192.168.1.169'
 }
 
-Test 'F257-A R1 WavWiz.iss layout: intro, radios, edit, URL and tip stack top-to-bottom with no vertical overlap (all ScaleY)' {
+Test 'F257-A R1 / 0.6.9 #17 WavWiz.iss layout: intro, radios, edit, URL, AirPlay check + note and tip flow top-to-bottom from real heights (no overlap at 200 %)' {
     $iss = Get-Content (Join-Path $repo 'installer/WavWiz.iss') -Raw
+    Has $iss 'WizardSizePercent=140'
+    # each control: (regex with the row height and the step to the next row); the step must be >= the height, and the controls appear in this order
     $ctl = [ordered]@{
-        Intro = "L\.SetBounds\(0, 0, NetPage\.SurfaceWidth, ScaleY\((\d+)\)\);\s*L\.Caption := 'Phones and other PCs"
-        LanOnlyRadio = 'LanOnlyRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
-        AllIfRadio = 'AllIfRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
-        SpecRadio = 'SpecRadio\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
-        LanEdit = 'LanEdit\.SetBounds\(ScaleX\(\d+\), ScaleY\((\d+)\), ScaleX\(\d+\), ScaleY\((\d+)\)\)'
-        ConnUrlLabel = 'ConnUrlLabel\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, ScaleY\((\d+)\)\)'
-        PrivTip = 'PrivTip\.SetBounds\(0, ScaleY\((\d+)\), NetPage\.SurfaceWidth, NetPage\.SurfaceHeight - ScaleY\((\d+)\)\)'
+        Intro = "L\.Caption := 'Phones and other PCs[^']*';\s*L\.AdjustHeight; Y := L\.Top \+ L\.Height \+ ScaleY\(\d+\);"
+        LanOnlyRadio = 'LanOnlyRadio\.SetBounds\(0, Y, W, ScaleY\((\d+)\)\); Y := Y \+ ScaleY\((\d+)\);'
+        AllIfRadio = 'AllIfRadio\.SetBounds\(0, Y, W, ScaleY\((\d+)\)\); Y := Y \+ ScaleY\((\d+)\);'
+        SpecRadio = 'SpecRadio\.SetBounds\(0, Y, W, ScaleY\((\d+)\)\); Y := Y \+ ScaleY\((\d+)\);'
+        LanEdit = 'LanEdit\.SetBounds\(ScaleX\(\d+\), Y, ScaleX\(\d+\), ScaleY\((\d+)\)\); LanEdit\.OnChange := @LanEditChange; Y := Y \+ ScaleY\((\d+)\);'
+        ConnUrlLabel = "ConnUrlLabel\.SetBounds\(0, Y, W, ScaleY\((\d+)\)\); ConnUrlLabel\.Caption := ''; Y := Y \+ ScaleY\((\d+)\);"
+        AirPlayOutCheck = 'AirPlayOutCheck\.SetBounds\(0, Y, W, ScaleY\((\d+)\)\); Y := Y \+ ScaleY\((\d+)\);'
+        ApNote = 'ApNote\.AdjustHeight; Y := ApNote\.Top \+ ApNote\.Height \+ ScaleY\(\d+\);'
+        PrivTip = 'PrivTip\.SetBounds\(0, Y, W, NetPage\.SurfaceHeight - Y\);'
     }
-    $prevBottom = 0; $prev = ''
+    $at = -1
     foreach ($k in $ctl.Keys) {
-        $m = [regex]::Match($iss, $ctl[$k]); if (-not $m.Success) { throw "$k bounds not found / not ScaleY-based" }
-        if ($k -eq 'Intro') { $top = 0; $h = [int]$m.Groups[1].Value }
-        elseif ($k -eq 'PrivTip') { $top = [int]$m.Groups[1].Value; $h = 0; Eq ([int]$m.Groups[2].Value) $top 'PrivTip height must be SurfaceHeight - its own Top' }
-        else { $top = [int]$m.Groups[1].Value; $h = [int]$m.Groups[2].Value }
-        if ($top -lt $prevBottom) { throw "$k top $top overlaps $prev (bottom $prevBottom)" }
-        $prevBottom = $top + $h; $prev = $k
+        $m = [regex]::Match($iss, $ctl[$k]); if (-not $m.Success) { throw "$k is not in the top-to-bottom flow" }
+        if ($m.Index -le $at) { throw "$k comes before the control above it" }; $at = $m.Index
+        if ($m.Groups.Count -ge 3 -and $m.Groups[2].Success) { if ([int]$m.Groups[2].Value -lt [int]$m.Groups[1].Value) { throw "$k step $($m.Groups[2].Value) < its height $($m.Groups[1].Value)" } }
     }
+    Has $iss "AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall';"
+    Has $iss "ApNote.Caption := 'UDP 319-320 + audio; home network only.'"
+    if ($iss -match 'ScaleY\(214\)') { throw 'old fixed 100 % offsets still present' }
 }
 # mirror of WavWiz.iss ExistingHttpsPort (R2): '' = unknown -> no full URL
 function Get-IssHttpsPort([string]$json, [switch]$NoFile) {

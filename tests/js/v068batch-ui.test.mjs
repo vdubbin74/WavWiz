@@ -39,7 +39,7 @@ test('mini player: volume dock left of right-aligned transport; horizontal pin s
   // standalone 420px window must not inherit the phone 44px close
   assert.doesNotMatch(mc, /@media \(max-width:900px\),\(pointer:coarse\)\{[\s\S]*?\.mp:not\(\.embedded\) \.mp-side \.mp-x[\s\S]*?min-width:44px/);
   assert.match(mc, /body:not\(\.minibody\) \.mp \.mp-x/);
-  assert.match(mc, /body\.minibody \.mp:not\(\.slim\) \.mp-txt\{[^}]*padding-right:0/);
+  assert.match(mc, /:is\(body\.minibody,\.minicol\) \.mp:not\(\.slim\) \.mp-txt\{[^}]*padding-right:0/);
 });
 
 test('shortcutsSide stays vertical by default (embedded / NP strip cap unchanged)', () => {

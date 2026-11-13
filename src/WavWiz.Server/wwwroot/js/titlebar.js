@@ -31,11 +31,18 @@ export function windowControls(send = post) {
 }
 
 /** Publish the caption-button strip width so the top bar (and any host inset) can reserve it. */
+// 0.6.9 #18: the width is computed, never measured. It used to be the strip's own on-screen width - but the strip's CSS width IS --wtb-ctl-w,
+// and with a Display size other than 100 % (html zoom) the measured box is that width x zoom. Every resize (maximize, restore, DPI change)
+// fed the zoomed value back in, so at 67 % the buttons shrank 138 -> 92 -> 62 ... px ("scrunched" when maximized) and at 125 % they grew.
+export const CTL_BTN_PX = 46;
+// Like Windows' own caption buttons they keep their real size at every Display size: 46 px on screen = 46 / zoom CSS px.
+export const ctlInsetPx = n => Math.max(1, n | 0 || 3) * CTL_BTN_PX;   // on-screen px (pure)
+export const ctlInsetCss = n => `calc(${ctlInsetPx(n)}px / var(--z,1))`;
 export const applyCtlInset = (ctl, root = globalThis.document?.documentElement) => {
   if (!root) return 0;
-  const w = Math.max(0, Math.round(ctl?.getBoundingClientRect?.().width || ctl?.offsetWidth || 3 * 46));
-  root.style.setProperty('--wtb-ctl-w', w + 'px');
-  return w;
+  const n = ctl?.children?.length || 3, v = ctlInsetCss(n);
+  if (root.style.getPropertyValue('--wtb-ctl-w') !== v) root.style.setProperty('--wtb-ctl-w', v);
+  return ctlInsetPx(n);
 };
 
 /** Turns the page's top bar into the window title bar (only inside the Player with the token). Returns true when it did. */

@@ -6,6 +6,7 @@ import { attachItem, refTracks, refNode, albumNode, canControl, playNow, playShu
 import { SORTS, loadLibPrefs, saveLibPrefs, sortRows, isLetterSort, letterIndex, LETTERS, fitAzLetters, visibleCssHeight, tabView, VIEW_TABS, blockColors, tileSpec, tileCount, byDecade } from './libsort.js';
 import { heartBtn, albumRef, loadFavs } from './fav.js';
 import { openCtx } from './ctxmenu.js';
+import { setRadioView } from './radiostation.js';
 
 const TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['genres', 'Genres'], ['years', 'Years'], ['recent', 'Recently added'], ['folders', 'Folders'], ['favorites', '♥ Favorites'], ['playlists', 'Playlists'], ['radio', 'Radio'], ['remote', 'Remote']];
 // 0.3.5 J9: Playlists + Radio were category tabs; F235 made them sources; F239 promotes sources to top xtabs above search.
@@ -30,10 +31,15 @@ export function libTabs(expanded, source = 'local') {
       : { main: ['artists', 'albums', 'recent'], row2: [], more: [], tools: [] };
   }
   // Local (default): Favorites / Folders stay; Radio + Playlists removed from the category strip
+  // 0.6.9 #4: the sections line up with Remote - Artists, Albums, Recently added first on both sources, then Local's own Genres / Years / Folders / Favorites
   return expanded
-    ? { main: ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites'], more: [], tools: TOOL_TABS.map(t => t[0]) }
-    : { main: ['artists', 'albums', 'genres', 'folders'], row2: ['years', 'recent', 'favorites'], more: [], tools: [] };
+    ? { main: ['artists', 'albums', 'recent', 'genres', 'years', 'folders', 'favorites'], more: [], tools: TOOL_TABS.map(t => t[0]) }
+    : { main: ['artists', 'albums', 'recent', 'genres', 'folders'], row2: ['years', 'favorites'], more: [], tools: [] };
 }
+/** 0.6.9 #4: the search box says the same thing on Local and Remote (both search songs, albums and artists); Radio filters My stations, Playlists the playlists. */
+export const searchPlaceholder = source => source === 'radio' ? 'Search my stations…' : source === 'playlists' ? 'Search playlists…' : 'Search songs, albums and artists…';
+/** 0.6.9 #4: Remote Artists sort by artist name / album count (the shared Remote sort said "Album name"); Remote Recently added keeps the server's newest-first order unless picked. */
+export const remoteSortKind = (rmode, stacked = false) => stacked ? 'remote' : rmode === 'artists' ? 'rartists' : rmode === 'newest' ? 'rrecent' : 'remote';
 /** F174 leftover key "rs:{serverId}" — still recognized for saved-tab migration (F235 drops the tabs). */
 export const isRsTab = k => typeof k === 'string' && k.startsWith('rs:');
 const GRID_KINDS = new Set(['albums', 'recent', 'favorites', 'artists', 'genres', 'years', 'remote', 'radio', 'playlists']);
@@ -161,7 +167,7 @@ export function libraryView(S, opts = {}) {
 
   // 0.2.1 F5: the filter box is ONE persistent element. Redraws never re-create or re-parent it while you type (that dropped focus after
   // every keystroke); filtering is debounced, and focus + caret are restored if a layout switch ever has to move it.
-  const search = h('input', { type: 'search', placeholder: 'Search songs, albums and artists…', 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { const q = ev.target.value.trim(); if (q !== st.q) { st.q = q; draw(); } }, 250); } });
+  const search = h('input', { type: 'search', placeholder: searchPlaceholder('local'), 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { const q = ev.target.value.trim(); if (q !== st.q) { st.q = q; draw(); } }, 250); } });
   const searchField = h('div', { class: 'field libsearch' }, search);
   // F239: source tabs (Local|Remote|Radio|Playlists) above search — xtabs underline chrome in compact + expanded
   const srcSlot = h('div', { class: 'libsrcslot' });
@@ -450,12 +456,23 @@ export function libraryView(S, opts = {}) {
   /** F172: remote Albums / Newest / Artists honor the Library view (own P.sort/flip/views.remote; never touches local views.artists / albums). */
   function rlist(sid, mode, rows) {
     st.kind = 'remote'; st.count = rows.length;
-    const key = P.sort.remote, art = mode === 'artists';
+    // 0.6.9 #4: Artists / Recently added / Albums each read their own sort (remoteSortKind) - Artists no longer offer "Album name"
+    const sk = remoteSortKind(mode), key = P.sort[sk], art = mode === 'artists';
     let sorted = rows.slice();
-    if (key !== 'server' && mode !== 'newest') sorted = art ? sortRows('artists', rows, key === 'name' || key === 'artist' ? 'name' : 'albums') : sortRows('albums', rows, key);
-    if (P.flip.remote) sorted.reverse();
+    if (art) { if (key !== 'server') sorted = sortRows('artists', rows, key === 'albums' ? 'albums' : 'name'); }
+    else if (mode === 'newest') { if (key && key !== 'recent') sorted = sortRows('albums', rows, key); }
+    else if (key !== 'server') sorted = sortRows('albums', rows, key);
+    if (P.flip[sk]) sorted.reverse();
     const grid = gridOn('remote');
-    return h('ul', { class: grid ? 'tilegrid ' + (art ? 'tg-artists' : 'tg-albums') : 'list' }, sorted.map(art ? (grid ? rartistTile(sid) : rartistRow(sid)) : (grid ? ralbumTile(sid) : ralbumRow(sid))));
+    const ul = h('ul', { class: grid ? 'tilegrid ' + (art ? 'tg-artists' : 'tg-albums') : 'list' }, sorted.map(art ? (grid ? rartistTile(sid) : rartistRow(sid)) : (grid ? ralbumTile(sid) : ralbumRow(sid))));
+    // 0.6.9 #1: the same A–Z rail as Local on a long name-sorted Remote list (album name / artist / artist name)
+    const lk = art ? (key === 'name' ? 'name' : null) : (key === 'name' || key === 'artist' ? key : null);
+    if (lk && sorted.length >= (expanded ? 20 : 40)) {
+      const idx = letterIndex(art ? 'artists' : 'albums', sorted, lk);
+      jump = l => { const i = idx.get(l); if (i == null) return; ul.children[i]?.scrollIntoView({ block: 'start' }); };
+      stripPlan = idx;
+    }
+    return ul;
   }
   const rsongList = (sid, rows, albumPage = false) => h('ul', { class: 'list' }, rows.map((t, i) => {
     const it = S.now?.item, on = !!it && it.kind === 'remote' && it.title === t.title && it.album === t.album;
@@ -520,7 +537,13 @@ export function libraryView(S, opts = {}) {
     favorites: favoritesPage,
     remote: remotePage,
   };
-  for (const k of EXTRA_TABS) rootPage[k] = async () => { const v = extras[k]; if (!v) return [empty('Not available here.')]; v.reload?.(); st.kind = null; st.count = null; return [h('div', { class: 'libextra', 'data-extra': k }, v.el)]; };
+  for (const k of EXTRA_TABS) rootPage[k] = async () => { const v = extras[k]; if (!v) return [empty('Not available here.')];
+    // 0.6.9 #5: Radio follows the Library's Tiles / List pick for THIS panel (the side panel's own pick, or the Expanded per-tab / session pick) - it
+    // used to read only the Expanded per-tab pref, so the List button in the side panel (or with Remember off) did nothing.
+    if (k === 'radio' && !phone) setRadioView(gridOn('radio') ? 'grid' : 'list');
+    // 0.6.9 #4: the search box above filters My stations / the playlists by name instead of saying "use the finder below"
+    if (k === 'radio' || k === 'playlists') v.setFilter?.(st.source === k ? st.q : '');
+    v.reload?.(); st.kind = null; st.count = null; return [h('div', { class: 'libextra', 'data-extra': k }, v.el)]; };
   const extraPage = k => rootPage[k]();
   const pageKind = () => {
     if (st.q) return null;
@@ -545,9 +568,10 @@ export function libraryView(S, opts = {}) {
         RS.map(sv => [sv.id, sv.label + (sv.lastError ? ' (offline)' : '')]), st.rsid || cur?.id,
         id => { st.rsid = id; saveRsid(); st.stack = []; draw(); }));
     }
-    if (kind && SORTS[kind]) {
-      const sel = ddBtn('libsort', 'Sort', (SORTS[kind].find(([v]) => v === P.sort[kind]) || SORTS[kind][0])[1], SORTS[kind], P.sort[kind], v => { P.sort[kind] = v; save(); draw(); });
-      const flip = h('button', { type: 'button', class: 'chipbtn libflip' + (P.flip[kind] ? ' on' : ''), 'aria-pressed': String(P.flip[kind]), title: P.flip[kind] ? 'Reversed - tap for the normal order' : 'Tap to reverse the order', onclick: () => { P.flip[kind] = !P.flip[kind]; save(); draw(); } }, P.flip[kind] ? 'Z–A ↑' : 'A–Z ↓');
+    const sk = kind === 'remote' && st.source === 'remote' && !st.q ? remoteSortKind(st.rmode, st.stack.length > 0) : kind;   // 0.6.9 #4
+    if (sk && SORTS[sk]) {
+      const sel = ddBtn('libsort', 'Sort', (SORTS[sk].find(([v]) => v === P.sort[sk]) || SORTS[sk][0])[1], SORTS[sk], P.sort[sk], v => { P.sort[sk] = v; save(); draw(); });
+      const flip = h('button', { type: 'button', class: 'chipbtn libflip' + (P.flip[sk] ? ' on' : ''), 'aria-pressed': String(P.flip[sk]), title: P.flip[sk] ? 'Reversed - tap for the normal order' : 'Tap to reverse the order', onclick: () => { P.flip[sk] = !P.flip[sk]; save(); draw(); } }, P.flip[sk] ? 'Z–A ↑' : 'A–Z ↓');
       kids.push(expanded ? h('span', { class: 'small dim' }, 'Sort:') : null, sel, flip);
     }
     const canGrid = kind && ((expanded ? VIEW_TABS.includes(kind) : GRID_KINDS.has(kind) || kind === 'albums'));
@@ -576,19 +600,17 @@ export function libraryView(S, opts = {}) {
     searchField.hidden = phone && hideCats;  // Radio keeps its real finder; Playlists its create/open tools
     tabsSlot.hidden = hideCats; if (!hideCats) tabsSlot.replaceChildren(tabs()); else tabsSlot.replaceChildren();
     placeSearch();
-    search.placeholder = st.source === 'remote' ? (expanded ? 'Filter remote…' : 'Search the remote library…')
-      : st.source === 'radio' || st.source === 'playlists' ? (expanded ? 'Filter…' : 'Search…')
-      : (expanded ? 'Filter…' : 'Search songs, albums and artists…');
+    search.placeholder = searchPlaceholder(st.source);   // 0.6.9 #4: one wording per source, the same in the side panel and the Expanded view
     crumbs.replaceChildren();
     if (st.stack.length) crumbs.append(h('button', { class: 'btn', onclick: back }, '‹ Back'), h('b', { class: 'ell' }, st.stack[st.stack.length - 1].title));
     content.replaceChildren(h('p', { class: 'dim' }, 'Loading…')); drawTools(pageKind());
     try {
       root.dataset.tab = st.tab;
-      const onExtra = (st.source === 'radio' || st.source === 'playlists' || (st.source === 'local' && EXTRA_TABS.has(st.tab))) && !st.q && !st.stack.length;
+      const onExtra = (((st.source === 'radio' || st.source === 'playlists') && !st.stack.length) || (st.source === 'local' && EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length));
       root.classList.toggle('extratab', onExtra);
       let nodes;
       if (st.q) {
-        nodes = (st.source === 'remote' && st.rsid) ? await remoteFind(st.rsid, st.q) : (st.source === 'local' || st.source === 'remote' ? await findPage(st.q) : [empty('Use the finder below to search stations.')]);
+        nodes = (st.source === 'remote' && st.rsid) ? await remoteFind(st.rsid, st.q) : (st.source === 'local' || st.source === 'remote' ? await findPage(st.q) : await extraPage(st.source));
       } else if (st.stack.length) nodes = await st.stack[st.stack.length - 1].load();
       else if (st.source === 'radio') nodes = await extraPage('radio');
       else if (st.source === 'playlists') nodes = await extraPage('playlists');

@@ -101,8 +101,61 @@ public static class AuthApi
             }
             s.Db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", pid));
             var tok = s.Auth.CreateToken("Player " + (b.Str("name") ?? pid), Role.Player, pid);
-            return Results.Json(new { ok = true, token = tok, audioPort = s.Audio.Port, clockPort = s.Clock.Port });
+            // 0.6.9 #15: a code from an administrator also opens the Player WINDOW (a normal paired Control session, like a phone that typed the code),
+            // so the window never lands on the sign-in page. Pairing on the server PC itself (no code, no admin consent) gets no window session.
+            var ui = local ? null : s.Auth.CreateToken(WindowName(b.Str("name") ?? pid), Role.Control);
+            return Results.Json(new { ok = true, token = tok, uiToken = ui, audioPort = s.Audio.Port, clockPort = s.Clock.Port });
         }).Anon();
+
+        // ---- 0.6.9 #15: pairing by approval (no code to type). See PairRequests for the rules. ----
+        g.MapPost("/auth/pair-request", async (HttpContext c) =>
+        {
+            var ip = c.Client(); if (s.Auth.IsLimited(ip)) return Ext.Bad("Too many attempts. Wait a minute and try again.", 429);
+            var b = await c.Request.Body();
+            var kind = (b.Str("kind") ?? "player") == "window" ? PairRequests.Kind.Window : PairRequests.Kind.Player;
+            var pid = b.Str("playerId");
+            if (kind == PairRequests.Kind.Player && (pid == null || pid.Length is 0 or > 64 || !pid.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_'))) return Ext.Bad("bad player id");
+            if (kind == PairRequests.Kind.Window) pid = null;
+            var name = (b.Str("name") ?? "").Trim(); if (name.Length == 0) name = kind == PairRequests.Kind.Player ? "PC speaker" : "Player window";
+            var (e, secretOrErr) = s.PairReqs.Create(kind, pid, name, b.Str("machine") ?? "", ip);
+            if (e == null) return Ext.Bad(secretOrErr!, 429);
+            s.Events.Publish("pairing");
+            return Results.Json(new { ok = true, id = e.Id, secret = secretOrErr, match = e.Match, expiresIn = (int)PairRequests.Ttl.TotalSeconds });
+        }).Anon();
+
+        g.MapPost("/auth/pair-request/{id}/poll", async (string id, HttpContext c) =>
+        {
+            var b = await c.Request.Body();
+            var (st, e) = s.PairReqs.Poll(id, b.Str("secret") ?? "");
+            if (e == null) return Results.Json(new { status = "expired" }, statusCode: 404);
+            if (st == PairRequests.Status.Pending) return Results.Json(new { status = "pending", match = e.Match });
+            if (st == PairRequests.Status.Denied) return Results.Json(new { status = "denied" });
+            if (e.Kind == PairRequests.Kind.Window) { c.SetSession(e.UiToken!, 365); return Results.Json(new { status = "approved" }); }   // the page's own cookie; no token in the body
+            return Results.Json(new { status = "approved", token = e.PlayerToken, uiToken = e.UiToken, audioPort = s.Audio.Port, clockPort = s.Clock.Port });
+        }).Anon();
+
+        g.MapGet("/pairing/requests", () => Results.Json(new
+        {
+            requests = s.PairReqs.Pending().Select(e => new { id = e.Id, kind = e.Kind == PairRequests.Kind.Player ? "player" : "window", name = e.Name, machine = e.Machine, from = e.Client, match = e.Match, createdAt = e.Created, expiresAt = e.Expires }),
+        })).Req(Role.Admin);
+
+        g.MapPost("/pairing/requests/{id}/{decision}", (string id, string decision, HttpContext c) =>
+        {
+            if (decision is not ("approve" or "deny")) return Ext.Bad("decision must be approve or deny");
+            var e = s.PairReqs.Decide(id, decision == "approve", c.Who()?.Name ?? "admin", r =>
+            {
+                string? p = null;
+                if (r.Kind == PairRequests.Kind.Player)
+                {
+                    s.Db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", r.PlayerId!));
+                    p = s.Auth.CreateToken("Player " + r.Name, Role.Player, r.PlayerId);
+                }
+                return (p, s.Auth.CreateToken(WindowName(r.Name), Role.Control));
+            });
+            if (e == null) return Ext.Bad("That request is no longer waiting (it was answered or it expired).", 404);
+            s.Events.Publish("pairing");
+            return Results.Json(new { ok = true, status = decision == "approve" ? "approved" : "denied" });
+        }).Req(Role.Admin);
 
         g.MapGet("/tokens", () => Results.Json(s.Db.Query("SELECT id,name,role,created_at,last_used_at,revoked,player_id FROM api_token ORDER BY id DESC LIMIT 200",
             r => new { id = r.GetInt64(0), name = r.GetString(1), role = r.GetString(2), createdAt = r.GetString(3), lastUsedAt = r.IsDBNull(4) ? null : r.GetString(4), revoked = r.GetInt32(5) != 0, playerId = r.IsDBNull(6) ? null : r.GetString(6) }))).Req(Role.Admin);
@@ -149,4 +202,7 @@ public static class AuthApi
             return Results.Json(new { ok = true, setupRequired = false });
         }).Anon();
     }
+
+    /// <summary>0.6.9 #15: the token name the Players list shows for a Player window session.</summary>
+    internal static string WindowName(string name) { var n = (name ?? "").Trim(); if (n.StartsWith("Player ", StringComparison.Ordinal)) n = n[7..]; if (n.Length > 40) n = n[..40]; return n + " (Player window)"; }
 }

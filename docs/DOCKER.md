@@ -1,9 +1,9 @@
-# WavWiz server in Docker (0.6.8, F166/F167)
+# WavWiz server in Docker (0.6.9, F166/F167)
 
 Headless WavWiz **server** (not the Windows Player) for a home server, NAS, or mini PC on **64-bit Intel/AMD (`linux/amd64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 The container has **no local speakers**: audio plays on WavWiz Players (Windows PCs), phones/browsers, and AirPlay 1 speakers.
 
-**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.8`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
+**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.9`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
 
 **ARM64 / Raspberry Pi:** planned for **0.7.0**, subject to hardware verification. Not available on Docker Hub yet.
 
@@ -25,7 +25,7 @@ Docker is a **server only** build. It does not do everything the full Windows ap
 # docker-compose.yml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.6.9
     container_name: wavwiz
     network_mode: host          # recommended: discovery (UDP) + mDNS need it
     user: "10001:10001"
@@ -59,7 +59,7 @@ Docker Desktop on Windows does **not** give real `network_mode: host` to the bro
 ```yaml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.6.9
     container_name: wavwiz
     user: "10001:10001"
     restart: unless-stopped
@@ -147,7 +147,7 @@ Host networking shares ports with the host, so on a machine already running WavW
 ```yaml
 services:
   wavwiz-sbs:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.6.9
     network_mode: host
     user: "10001:10001"
     environment:
@@ -177,7 +177,7 @@ Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, 
 The Dockerfile can cross-build `linux/amd64` and `linux/arm64`, but **Hub does not publish an arm64 tag today**, and arm64/Pi is **not** a supported or hardware-verified configuration yet (planned for 0.7.0). Use these only for local experiments:
 
 ```sh
-docker build -t docker.io/vdubbin74/wavwiz-server:0.6.8 .
+docker build -t docker.io/vdubbin74/wavwiz-server:0.6.9 .
 # Experimental multi-arch local build only (needs QEMU/binfmt for arm64). Not published on Hub; not a supported configuration yet.
-docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.8 .
+docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.6.9 .
 ```

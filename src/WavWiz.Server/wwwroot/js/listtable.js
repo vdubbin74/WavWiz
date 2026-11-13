@@ -79,7 +79,7 @@ export function listTable(S, ctl) {
   function paintPick() {
     const cs = Z.choicesNow(), cur = Z.current(), many = cs.length > 1; sendBtn.hidden = !many; if (!many) closeSend(); pickSel.hidden = !many; title.classList.toggle('haspick', many); qlbl.textContent = many ? 'Queue:' : 'QUEUE'; if (!many) { view = null; try { root.classList.remove('qviewing'); } catch { /* before the panel exists */ } return; }
     if (view && !cs.some(c => c.key === view)) view = null;
-    pickSel.replaceChildren(...cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
+    pickSel.replaceChildren(...cs.map(c => h('option', { value: c.key }, Z.choiceLabel(c, cur))));   // 0.6.9 #21: empty zones listed too ("· no speakers")
     queueMicrotask(() => { const n = pickSel.selectedOptions[0]?.textContent; title.title = 'Queue: ' + (n || ''); pickSel.title = (n ? n + ' - ' : '') + 'Show and edit any zone\'s queue without changing the zone that is playing'; });
     pickSel.value = view || cur?.key || '';
     root.classList.toggle('qviewing', !!view);

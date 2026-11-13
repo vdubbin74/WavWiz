@@ -43,8 +43,9 @@ public sealed class ConnectForm : Form
         var t = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
         t.Controls.Add(new Label { Text = "WavWiz servers on your network:", AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold) });
         t.Controls.Add(_status); t.Controls.Add(_list); t.Controls.Add(_again); t.Controls.Add(_manual); t.Controls.Add(_hostHint); t.Controls.Add(_host);
-        t.Controls.Add(new Label { Text = "Pairing code (6 digits):", AutoSize = true, Margin = new Padding(3, U(12), 3, 0) }); t.Controls.Add(_code);
-        t.Controls.Add(new Label { Text = serverIsHere ? "The WavWiz server is on this PC, so no code is needed." : "On a PC or phone, open WavWiz > Settings > Players > Pair a PC to see the code.", AutoSize = true, MaximumSize = new Size(U(420), 0), ForeColor = Color.DimGray });
+        t.Controls.Add(new Label { Text = serverIsHere ? "Pairing code (6 digits):" : "Pairing code (optional):", AutoSize = true, Margin = new Padding(3, U(12), 3, 0) }); t.Controls.Add(_code);
+        // 0.6.9 #15: no code needed - Connect asks the administrator, who approves this PC on any phone or PC signed in as administrator
+        t.Controls.Add(new Label { Text = serverIsHere ? "The WavWiz server is on this PC, so no code is needed." : "Leave it empty and press Connect: the administrator approves this PC on any phone or PC signed in to WavWiz. Or type the code from Settings > Players > Pair a PC.", AutoSize = true, MaximumSize = new Size(U(420), 0), ForeColor = Color.DimGray });
         t.Controls.Add(_msg);
         var ok = new Button { Text = "Connect", AutoSize = true }; var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
         var fl = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Width = U(420) }; fl.Controls.Add(cancel); fl.Controls.Add(ok); t.Controls.Add(fl);
@@ -94,7 +95,7 @@ public sealed class ConnectForm : Form
             if (string.IsNullOrEmpty(host)) { _msg.Text = "That server did not tell us its address. Type it below."; _host.Visible = _hostHint.Visible = true; return; }
         }
         else { _msg.Text = "Pick your WavWiz server from the list, or type its address."; return; }
-        if (!_serverIsHere && (Code == null || Code.Length != 6)) { _msg.Text = "Type the 6-digit pairing code."; _code.Focus(); return; }
+        if (!_serverIsHere && Code != null && Code.Length != 6) { _msg.Text = "The pairing code has 6 digits (or leave it empty to ask for approval)."; _code.Focus(); return; }   // 0.6.9 #15: empty = ask for approval
         Host = host; Beacon = beacon; ManualPort = port; DialogResult = DialogResult.OK; Close();
     }
 }
@@ -103,12 +104,80 @@ public sealed class ConnectForm : Form
 /// 0.0.8 ("Open player" showed a blank gray window on the server PC): the window is dark from the first frame, loads the same address as the desktop shortcut,
 /// never silently cancels a navigation, and shows a readable page with "Try again" / "Open in my browser" when the page cannot load, the WebView2 engine
 /// cannot start in time, or its browser/renderer process dies (all of these used to leave only the gray form background).</summary>
+/// <summary>
+/// 0.6.9 #15: "Waiting for approval" - the PC has asked the WavWiz administrator to let it join (the request is on every admin screen at once).
+/// Shows the 4-digit code the admin's card shows, polls every 2 s (network trouble: 2/4/8/16/30 s), and closes with OK once approved.
+/// Nothing is granted on this side: the server only hands out tokens after an administrator pressed Approve.
+/// </summary>
+public sealed class ApprovalForm : Form
+{
+    private readonly Label _code = new() { AutoSize = true, Text = "····" };
+    private readonly Label _status = new() { AutoSize = true, Text = "Asking WavWiz for permission..." };
+    private readonly PlayerSettings _s; private readonly CancellationTokenSource _cts = new();
+    public PairResult? Result { get; private set; }
+    public string? Problem { get; private set; }
+    /// <summary>True when the person chose "Use a pairing code instead".</summary>
+    public bool WantsCode { get; private set; }
+
+    public ApprovalForm(PlayerSettings s)
+    {
+        _s = s; var k = UiScale.ExtraFactor(s.UiScale); int U(int px) => (int)Math.Round(px * k);
+        AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
+        Text = $"Waiting for approval - {WavWizInfo.DisplayName}"; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = MinimizeBox = false; StartPosition = FormStartPosition.CenterScreen;
+        AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(U(16));
+        try { using var st = typeof(ApprovalForm).Assembly.GetManifestResourceStream("wavwiz.ico"); if (st != null) Icon = new Icon(st); } catch { }
+        _code.Font = new Font(SystemFonts.MessageBoxFont!.FontFamily, 28f * (float)k, FontStyle.Bold); _status.MaximumSize = new Size(U(420), 0);
+        var t = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        t.Controls.Add(new Label { Text = $"Asking {(string.IsNullOrEmpty(s.ServerName) ? s.ServerHost : s.ServerName)} to let \"{s.Name}\" join", AutoSize = true, MaximumSize = new Size(U(420), 0), Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold) });
+        t.Controls.Add(new Label { Text = "On any phone or PC signed in to WavWiz as administrator, a card appears. Check that it shows this code, then press Approve:", AutoSize = true, MaximumSize = new Size(U(420), 0), Margin = new Padding(3, U(8), 3, 0) });
+        t.Controls.Add(_code); t.Controls.Add(_status);
+        var code = new Button { Text = "Use a pairing code instead", AutoSize = true }; var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
+        code.Click += (_, _) => { WantsCode = true; DialogResult = DialogResult.Cancel; Close(); };
+        var fl = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Width = U(420) }; fl.Controls.Add(cancel); fl.Controls.Add(code); t.Controls.Add(fl);
+        Controls.Add(t); CancelButton = cancel;
+        Shown += async (_, _) => await RunAsync();
+        FormClosed += (_, _) => { try { _cts.Cancel(); } catch { } };
+    }
+
+    private async Task RunAsync()
+    {
+        var ct = _cts.Token; int offline = 0;
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var req = await PairingClient.RequestApprovalAsync(_s.ServerHost, _s.HttpPort, _s.PlayerId, _s.Name, Environment.MachineName, ct);
+                if (req.Id == null)
+                {
+                    if (!req.Retryable) { Problem = req.Error; DialogResult = DialogResult.Abort; Close(); return; }
+                    _status.Text = "Waiting for the WavWiz server..."; await Task.Delay(ServerWait.Delay(++offline), ct); continue;
+                }
+                offline = 0; _code.Text = req.Match ?? "····"; _status.Text = "Waiting for the administrator to approve...";
+                while (!ct.IsCancellationRequested)
+                {
+                    await Task.Delay(offline == 0 ? TimeSpan.FromSeconds(2) : ServerWait.Delay(offline), ct);
+                    var a = await PairingClient.PollApprovalAsync(_s.ServerHost, _s.HttpPort, req.Id, req.Secret ?? "", ct);
+                    if (a.Status == "offline") { offline++; _status.Text = "Waiting for the WavWiz server..."; continue; }
+                    offline = 0;
+                    if (a.Status == "approved") { Result = a.Result; DialogResult = DialogResult.OK; Close(); return; }
+                    if (a.Status == "denied") { Problem = "The administrator did not approve this PC. Ask them, then press Connect again - or type a pairing code."; DialogResult = DialogResult.Abort; Close(); return; }
+                    if (a.Status == "expired") { _status.Text = "The request timed out. Asking again..."; break; }
+                    _status.Text = "Waiting for the administrator to approve...";
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+}
+
 public sealed class WebUiForm : Form
 {
     private static readonly Color Dark = Color.FromArgb(11, 13, 18);
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(11, 13, 18) }; private readonly PlayerSettings _set; private string _url = "";
     private FormBorderStyle _prevBorder; private FormWindowState _prevState; private bool _full; private bool _loadedOnce; private int _retries;
     private readonly System.Windows.Forms.Timer _watch = new() { Interval = 20000 };
+    private readonly System.Windows.Forms.Timer _again = new();   // 0.6.9 #14: next try while the server is not answering yet
+    private int _waitTry;
     private readonly bool _chrome;   // 0.6.8-#16: themed in-page title bar (caption strip removed, frame styles kept for Snap / resize)
 
     public WebUiForm(PlayerSettings s)
@@ -122,8 +191,9 @@ public sealed class WebUiForm : Form
         DpiChanged += (_, _) => { ApplyZoom(); SyncWebView(); };
         // 0.3.2 F14: snapped / maximized / restored / moved across monitors -> re-lay out the WebView2 so it never goes black
         Resize += (_, _) => { SyncWebView(); PostWinState(); }; Move += (_, _) => SyncWebView(); ResizeEnd += (_, _) => SyncWebView();
-        _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) ShowProblem("WavWiz did not answer in time.", "The window waited 20 seconds for " + _url + "."); };
-        FormClosed += (_, _) => { _watch.Dispose(); };
+        _watch.Tick += (_, _) => { _watch.Stop(); if (!_loadedOnce) WaitForServer(); };   // 0.6.9 #14: wait (with backoff) instead of giving up
+        _again.Tick += (_, _) => { _again.Stop(); if (IsDisposed || _loadedOnce) return; try { _watch.Start(); _web.CoreWebView2?.Navigate(_url); } catch { } };
+        FormClosed += (_, _) => { _watch.Dispose(); _again.Dispose(); };
     }
 
     /// <summary>The address this window loads (server PC: the desktop shortcut's address from first-run-url.txt).</summary>
@@ -215,9 +285,11 @@ public sealed class WebUiForm : Form
             };
             cw.NavigationCompleted += (_, e) =>
             {
-                if (e.IsSuccess) { _loadedOnce = true; _retries = 0; _watch.Stop(); return; }
+                if (e.IsSuccess) { if (!_waiting) { _loadedOnce = true; _retries = 0; _waitTry = 0; _watch.Stop(); } _waiting = false; return; }
                 if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) return;           // our own cancel / a reload
-                _watch.Stop(); ShowProblem("WavWiz could not be reached.", $"{_url} answered: {e.WebErrorStatus}. Is the WavWiz server running on that PC?");
+                _watch.Stop();
+                if (!_loadedOnce && ServerWait.ShouldWait(e.WebErrorStatus.ToString())) { WaitForServer(); return; }   // 0.6.9 #14: not up yet (reboot) - wait and retry
+                ShowProblem("WavWiz could not be reached.", $"{_url} answered: {e.WebErrorStatus}. Is the WavWiz server running on that PC?");
             };
             cw.ProcessFailed += (_, e) =>
             {
@@ -228,16 +300,64 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (FolderPick.Parse(j) is { } fp) { BeginInvoke(() => PickFolder(cw, fp)); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
+            await EnsureWindowSession(cw);
             cw.Navigate(StartScreen != null ? UiUrl.WithScreen(_url, StartScreen) : _url);
         }
         catch (Exception)
         {
             _watch.Stop(); OpenInBrowser(_url); Close();
         }
+    }
+
+    /// <summary>
+    /// 0.6.9 #15: the window's own sign-in. When the administrator approved this PC (or a pairing code was typed) the server also gave a normal
+    /// paired Control session for the window ("&lt;name&gt; (Player window)" in Settings > Players). It is stored with DPAPI next to the Player token and
+    /// put into the window's cookie jar - only when the window has no WavWiz session of its own, so an administrator who signed in here stays signed in.
+    /// The Player (audio) token is never used for the page and can never be elevated.
+    /// </summary>
+    private async Task EnsureWindowSession(CoreWebView2 cw)
+    {
+        try
+        {
+            var ui = new DpapiSecretStore().Load("uitoken"); if (string.IsNullOrEmpty(ui) || _url.Length == 0) return;
+            var u = new Uri(_url);
+            var have = await cw.CookieManager.GetCookiesAsync(u.GetLeftPart(UriPartial.Authority) + "/");
+            if (have.Any(c => c.Name == "wavwiz_session")) return;
+            var c = cw.CookieManager.CreateCookie("wavwiz_session", ui, u.Host, "/");
+            c.IsHttpOnly = true; c.SameSite = CoreWebView2CookieSameSiteKind.Strict; c.IsSecure = u.Scheme == Uri.UriSchemeHttps; c.Expires = DateTime.Now.AddDays(365);
+            cw.CookieManager.AddOrUpdateCookie(c);
+        }
+        catch { }
+    }
+
+    /// <summary>0.6.9 #6: Settings > Library > Music folders "Browse..." - the Windows folder dialog (the page only offers it on the server PC).</summary>
+    private void PickFolder(CoreWebView2 cw, FolderPick.Request r)
+    {
+        string? path = null;
+        try
+        {
+            using var d = new FolderBrowserDialog { Description = r.Title, UseDescriptionForTitle = true, ShowNewFolderButton = false };
+            if (r.Initial != null && Directory.Exists(r.Initial)) d.InitialDirectory = r.Initial;
+            if (d.ShowDialog(this) == DialogResult.OK) path = d.SelectedPath;
+        }
+        catch { }
+        try { cw.PostWebMessageAsJson(FolderPick.Answer(r.Id, path)); } catch { }
+    }
+
+    private bool _waiting;   // the next successful NavigationCompleted is our own waiting page, not WavWiz
+    /// <summary>0.6.9 #14: "Waiting for the WavWiz server…" and the next try after a growing pause (2, 4, 8, 16, then every 30 s; never gives up).</summary>
+    private void WaitForServer()
+    {
+        if (IsDisposed || _loadedOnce) return;
+        var cw = _web.CoreWebView2; if (cw == null) return;
+        _waitTry++; var next = ServerWait.Delay(_waitTry);
+        _waiting = true;
+        try { cw.NavigateToString(ServerWait.Page(_url, _waitTry, next, _set.ServerName)); } catch { }
+        _again.Stop(); _again.Interval = (int)next.TotalMilliseconds; _again.Start();
     }
 
     /// <summary>A plain, readable page inside the window (never a gray void) with Try again / Open in my browser.</summary>
@@ -266,7 +386,7 @@ public sealed class WebUiForm : Form
             // Maximized / top-snapped windows hang the frame off the work-area edge; that geometry is the real signal.
             int ww = Math.Max(1, before.Right - before.Left), wh = Math.Max(1, before.Bottom - before.Top);
             int workTop = Screen.FromRectangle(new Rectangle(before.Left, before.Top, ww, wh)).WorkingArea.Top;
-            after.Top = TitleBar.ClientTop(before.Top, workTop, GetSystemMetrics(SM_CYFRAME), GetSystemMetrics(SM_CXPADDEDBORDER));
+            after.Top = TitleBar.ClientTop(before.Top, workTop, MetricForWindow(SM_CYFRAME), MetricForWindow(SM_CXPADDEDBORDER));   // 0.6.9 #18: this window's monitor DPI
             System.Runtime.InteropServices.Marshal.StructureToPtr(after, m.LParam, false);
             m.Result = IntPtr.Zero; return;
         }
@@ -277,6 +397,16 @@ public sealed class WebUiForm : Form
     private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_FRAMECHANGED = 0x0020;
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    // 0.6.9 #18: GetSystemMetrics answers for the SYSTEM DPI; this PerMonitorV2 window on a 200 % monitor (or after moving between monitors) needs
+    // the frame size at its own DPI, else the maximized client top is off and the page's title bar is clipped. Windows 10 1607+; older -> fallback.
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetricsForDpi(int index, uint dpi);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
+    private int MetricForWindow(int index)
+    {
+        try { var dpi = GetDpiForWindow(Handle); if (dpi > 0) return GetSystemMetricsForDpi(index, dpi); }
+        catch (EntryPointNotFoundException) { }
+        return GetSystemMetrics(index);
+    }
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     protected override void OnHandleCreated(EventArgs e)
     {

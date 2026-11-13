@@ -3,6 +3,8 @@
 // playback group = the server's per-zone queue/stream. Zones that are LINKED share one playback group (same song, in sync); a zone that is split off has its own.
 import { h, api, toast, setApiZone, fmtTime } from './util.js';
 import { icon } from './icons.js';
+import { thisDevice } from './thisdevice.js';
+import { orderedGroups } from './devorder.js';
 
 export const ZONE_KEY = 'wavwiz.zone';
 export const JUKEBOX_KEY = 'jukebox';
@@ -11,19 +13,43 @@ export function saveSel(v, store = globalThis.localStorage) { try { v == null ? 
 
 /** Pure: the zones a user can control, in the Devices order: every zone, then the Jukebox zone once it has its own devices. */
 export function choices(groups, jb) {
-  const list = (groups || []).map(g => ({ key: 'g:' + g.id, kind: 'zone', id: g.id, name: g.name, playbackId: g.playbackId || 'default', linked: (g.linked || []).length > 0, linkedWith: g.linked || [], now: g.now || null, online: (g.online || 0) > 0, overlaps: !!g.overlapsLarger, playingHere: g.playingHere, of: g.of, claims: g.claims || [], claiming: !!g.claiming }));
-  if (jb?.own) list.push({ key: JUKEBOX_KEY, kind: 'jukebox', id: null, name: 'Jukebox', playbackId: jb.zoneId || 'jukebox', linked: false, linkedWith: [], now: jb.now || null, online: true });
+  const list = (groups || []).map(g => ({ key: 'g:' + g.id, kind: 'zone', id: g.id, name: g.name, playbackId: g.playbackId || 'default', linked: (g.linked || []).length > 0, linkedWith: g.linked || [], now: g.now || null, online: (g.online || 0) > 0, overlaps: !!g.overlapsLarger, playingHere: g.playingHere, of: g.of, claims: g.claims || [], claiming: !!g.claiming, empty: !(g.deviceIds || []).length }));
+  // 0.6.9 #21 (t1852/t1853): an EMPTY Jukebox zone (no speakers yet) can be picked too, whenever Devices shows it. With no speakers the server
+  // answers its zoneId with the main (house) queue - that is where the Jukebox plays until it has its own speakers.
+  if (jb && (jb.own || jb.running || jb.showInDevices !== false)) list.push({ key: JUKEBOX_KEY, kind: 'jukebox', id: null, name: 'Jukebox', playbackId: jb.zoneId || 'jukebox', linked: false, linkedWith: [], now: jb.own ? jb.now || null : null, online: !!jb.own, empty: !jb.own });
   return list;
 }
 /** Pure: the zone targets for an alarm / schedule / sleep timer: [key, name] per zone and the Jukebox zone (once it has speakers). No key = everything (today's behavior). */
-export const targetKeys = (groups, jb) => choices(groups, jb).map(c => [c.key, c.name]);
+export const targetKeys = (groups, jb) => choices(groups, jb).filter(c => c.kind !== 'jukebox' || jb?.own).map(c => [c.key, c.name]);   // 0.6.9 #21: alarms keep "once it has speakers"
 /** Pure: the name for a stored zone key (F103: a deleted zone reads "zone unavailable"). */
 export const targetName = (key, groups, jb) => !key ? '' : targetKeys(groups, jb).find(([k]) => k === key)?.[1] || 'zone unavailable';
 /** Pure: the selected zone (a stale or missing choice falls back to the first zone; null when there are no zones at all). */
 export const resolve = (groups, jb, sel) => { const c = choices(groups, jb); return c.find(x => x.key === sel) || c[0] || null; };
+/** 0.6.9 (t1837u/t1838u): Pure: the zone this player opens on - a zone that holds the player's own speaker `me`. The last pick (`sel`) wins when it
+ * also holds the speaker (e.g. an "Everywhere" zone the user chose); otherwise the smallest such zone, ties in card order (`groups` already ordered).
+ * null when the speaker is in no zone (the caller then keeps the last pick / first card). */
+export function ownZoneKey(groups, me, sel) {
+  if (!me || me.id == null) return null;
+  const has = (groups || []).filter(g => (g.deviceIds || []).some(d => String(d) === String(me.id)));
+  if (!has.length) return null;
+  if (sel && has.some(g => 'g:' + g.id === sel)) return sel;
+  return 'g:' + has.reduce((a, g) => ((g.deviceIds || []).length < (a.deviceIds || []).length ? g : a)).id;
+}
 /** Pure: the zoneId the API wants: null for the house group (old behavior, nothing added to the URL). */
 // 0.4.1: a zone that sits inside a larger one is sent as its zone key (g:<id>): pressing play there makes it play on its own devices automatically.
 export const zoneIdFor = ch => (!ch ? null : ch.kind === 'zone' && ch.overlaps ? ch.key : !ch.playbackId || ch.playbackId === 'default' ? null : ch.playbackId);
+/** 0.6.9 #27 (t1877u): pure - Radio can't go in the Jukebox queue (the server refuses it with this text). True while the Jukebox runs and the
+ *  picked zone is the Jukebox's queue: the Jukebox zone itself, or - while it has no speakers of its own - the main (house) zone it plays in. */
+export const RADIO_JB_TIP = "Radio can't go in the Jukebox queue";
+export const radioBlocked = (c, jb) => !!(jb?.running && c && (c.kind === 'jukebox' || (!jb.own && c.kind === 'zone' && zoneIdFor(c) == null)));
+/** 0.6.9 #21 (t1852/t1853): pure - the quiet note for a picked zone with no speakers ('' otherwise). Picking one is allowed: Now Playing and the
+ *  Queue switch to it, and play / queue still work there (nothing is heard until a speaker joins). */
+export const emptyNote = c => !c?.empty ? '' : c.kind === 'jukebox' ? 'No speakers in the Jukebox zone - it plays in the main zone until it has some' : 'No speakers in this zone';
+/** 0.6.9 #21c (t1856): pure - the zone status dot ('ok' green / 'off' grey): green ONLY when an active (online) speaker is in the zone. A zone with
+ *  no speakers stays grey even while its stream plays (the text says "Playing · no speakers" instead). `now` is unused, kept for callers. */
+export const zoneDot = (ms, now) => (ms || []).some(z => z.connected) ? 'ok' : 'off';
+/** Pure: the zone name in a zone list: "Upstairs · no speakers" for an empty zone ("· playing" while its stream plays). */
+export const choiceLabel = (c, cur) => c.name + (c.empty ? ' · no speakers' + (c.now?.state === 'playing' ? ' · playing' : '') : '') + (cur && c.key === cur.key ? ' (playing)' : '');
 /** Pure: "▶ Song" while playing, the dim title while paused, or a plain sentence. */
 export function nowLabel(now) {
   if (!now || !now.title) return 'Nothing playing';
@@ -54,22 +80,48 @@ export const queueSuffixFor = c => S && c ? queueSuffix(S.groups, c) : '';
 let S = null, ctl = {}, lastPid = undefined; const chips = new Set(); let menu = null;
 export function init(state, controls = {}) { S = state; ctl = controls; sync(); }
 export const choicesNow = () => S ? choices(S.groups, S.jb) : [];
-export const current = () => S ? resolve(S.groups, S.jb, loadSel()) : null;
+// 0.6.9 (t1838u): with no usable last pick the fallback is the first zone in the Devices card order (not the server's list order)
+export const current = () => S ? resolve(orderedGroups(S.groups || []), S.jb, loadSel()) : null;
+export const radioBlockedNow = () => S ? radioBlocked(current(), S.jb) : false;   // 0.6.9 #27
+// 0.6.9 (t1837u-t1839u): every player (Windows Player window, phone browser / home-screen app, any web player) opens Now Playing on the zone that
+// holds its own speaker, and does it again when that speaker (re)connects. A zone the user picks by hand sticks for the rest of the session: no later
+// zones refresh, membership change or reconnect moves it. "Session" = this tab / app window (sessionStorage), so a reload of the same window keeps it.
+export const PICKED_KEY = 'wavwiz.zone.picked';
+const ss = () => { try { return globalThis.sessionStorage || null; } catch { return null; } };
+let picked = false, opened = false, wasOn = false;
+export const pickedThisSession = () => picked || ss()?.getItem(PICKED_KEY) === '1';
+export function markPicked() { picked = true; try { ss()?.setItem(PICKED_KEY, '1'); } catch { /* private mode */ } }
+/** Open / connect only: put this player's own zone in the selection unless the user already chose a zone this session. */
+export function autoPick(state = S, me = thisDevice(state)) {
+  if (!state || !Array.isArray(state.groups) || !Array.isArray(state.zones) || pickedThisSession()) return false;
+  if (!me) return false;
+  const on = !!me.connected, fire = !opened || (on && !wasOn);
+  opened = true; wasOn = on;
+  if (!fire) return false;
+  const k = ownZoneKey(orderedGroups(state.groups), me, loadSel());
+  if (!k) return false;
+  if (k !== loadSel()) saveSel(k);
+  return true;
+}
+/** Tests only: forget the open / connect / picked state. */
+export function _resetAutoPick() { picked = false; opened = false; wasOn = false; try { ss()?.removeItem(PICKED_KEY); } catch { /* */ } }
 export const selectedGroupId = () => { const c = current(); return c?.kind === 'zone' ? c.id : null; };
 /** Apply the selection: the API zone, the chips, and (when the stream we show changed) a reload of Now Playing + Queue. Call after zones data changed. */
 export function sync() {
-  if (!S) return; const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
+  if (!S) return; autoPick(); const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
   // F250-P5: a response/action capability is tied to this actual API route.
   // Keep it through linked visual selections; rotate on every routing change.
   if (!S._streamRoute || S._streamRoute.target !== pid) S._streamRoute = { target: pid };
   // 0.4.1: a selected zone that no longer exists is forgotten (back to the first zone), not kept in storage
   // 0.6.8 zone fix: also when the last zone was deleted (no zones left), so a deleted zone's id never lingers in storage as a ghost choice
-  if (Array.isArray(S.groups) && loadSel() && (!c || loadSel() !== c.key)) saveSel(null);
+  // 0.6.9 #21: ...but only once the zones have LOADED - Z.init runs with the empty start-up list (groups: []), which used to wipe every stored pick on
+  // each page load (so a picked zone - e.g. one with no speakers - never survived a refresh)
+  if (Array.isArray(S.groups) && (S._groupsAt || S.groups.length) && loadSel() && (!c || loadSel() !== c.key)) saveSel(null);
   if (pid !== lastPid) { const first = lastPid === undefined; lastPid = pid; if (!first) ctl.refreshNow?.(); }
   drawChips(); window.dispatchEvent(new CustomEvent('wavwiz:zonesync'));
 }
-export function select(key) { saveSel(key); closeMenu(); sync(); window.dispatchEvent(new CustomEvent('wavwiz:zone', { detail: key })); }
-globalThis.addEventListener?.('storage', ev => { if (ev.key === ZONE_KEY && S) sync(); });   // the mini player / another tab on this browser
+export function select(key) { markPicked(); saveSel(key); closeMenu(); sync(); window.dispatchEvent(new CustomEvent('wavwiz:zone', { detail: key })); }
+globalThis.addEventListener?.('storage', ev => { if (ev.key === ZONE_KEY && S) { if (ev.newValue) markPicked(); sync(); } });   // 0.6.9: a pick in another window of this player counts as a manual pick here   // the mini player / another tab on this browser
 
 function drawChip(b) {
   const c = current(), many = !!c && choicesNow().length > 1;
@@ -81,7 +133,9 @@ function drawChip(b) {
   if (b._link) {
     b.classList.toggle('solo', !many); b.querySelector('.zs-car').hidden = !many;
     if (many) { b.setAttribute('aria-haspopup', 'menu'); b.removeAttribute('aria-disabled'); } else { b.removeAttribute('aria-haspopup'); b.setAttribute('aria-disabled', 'true'); }
-    b.setAttribute('aria-label', many ? `Playing on ${c.name}. Choose the zone this player controls` : `Playing on ${c.name}`); b.title = many ? `On ${c.name} - choose the zone this player controls` : `On ${c.name}`; return;
+    b.setAttribute('aria-label', many ? `Playing on ${c.name}. Choose the zone this player controls` : `Playing on ${c.name}`); b.title = many ? `On ${c.name} - choose the zone this player controls` : `On ${c.name}`;
+    // 0.6.9 #21: an empty zone is a normal pick - just a quiet "· no speakers" after its name (full sentence in the tooltip), never an error
+    const note = emptyNote(c), em = b.querySelector('.zl-empty'); b.classList.toggle('zempty', !!note); if (em) { em.hidden = !note; em.textContent = note ? ' · no speakers' : ''; } if (note) b.title += ' · ' + note; return;
   }
   b.classList.toggle('linked', c.linked); b.setAttribute('aria-label', `Controlling ${c.name}. Tap to switch zone`); b.title = `Queue: ${c.name} - choose the zone this player controls`;
 }
@@ -98,7 +152,7 @@ export function zoneChip(extra = '') {
 export function zoneLink(extra = '') {
   const b = h('button', { type: 'button', class: 'zlink ' + extra, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
     onclick: ev => { ev.stopPropagation(); if (choicesNow().length < 2) return; menu && menu._for === b ? closeMenu() : openMenu(b); } },   // one zone: a name, not a picker
-    h('span', { class: 'zl-on' }, 'on '), h('b', { class: 'zs-name zl-name ell' }, ''), h('span', { class: 'zs-car', 'aria-hidden': 'true' }, '▾'));
+    h('span', { class: 'zl-on' }, 'on '), h('b', { class: 'zs-name zl-name ell' }, ''), h('span', { class: 'zl-empty', hidden: true }), h('span', { class: 'zs-car', 'aria-hidden': 'true' }, '▾'));
   b._link = true; chips.add(b); drawChip(b); return b;
 }
 export function closeMenu() { if (!menu) return; menu._for?.setAttribute('aria-expanded', 'false'); menu.remove(); menu = null; document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', keys, true); }
@@ -111,8 +165,8 @@ function openMenu(anchor) {
     const mh = menu.offsetHeight, up = r.top > vh / 2 || r.bottom + mh + 8 > vh; menu.style.top = Math.max(8, up ? r.top - mh - 6 : r.bottom + 6) + 'px'; };
   menu = h('div', { class: 'zmenu40', role: 'menu', 'aria-label': 'Zones' },
     cs.map(c => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(c.key === sel), 'data-zone-key': c.key, class: 'zm-item' + (c.key === sel ? ' on' : ''), onclick: () => { const edit = !!menu?._for?._link; select(c.key); if (edit) window.dispatchEvent(new CustomEvent('wavwiz:editzone', { detail: c.key })); } },
-      h('span', { class: 'dot ' + (c.online ? 'ok' : 'off') }), h('b', { class: 'zm-n ell' }, c.name), c.linked ? h('span', { class: 'zm-link', title: linkText(c.linkedWith) }, icon('link')) : null, h('span', { class: 'grow' }),
-      h('span', { class: 'zm-now ell' }, nowLabel(c.now)))),
+      h('span', { class: 'dot ' + (c.online ? 'ok' : 'off'), title: c.online ? 'Online' : c.empty ? 'No speakers' : 'Offline' }), h('b', { class: 'zm-n ell' }, c.name), c.linked ? h('span', { class: 'zm-link', title: linkText(c.linkedWith) }, icon('link')) : null, h('span', { class: 'grow' }),
+      h('span', { class: 'zm-now ell' }, c.empty && !c.now?.title ? 'No speakers' : nowLabel(c.now)))),
     h('button', { type: 'button', class: 'zm-manage', onclick: () => { closeMenu(); ctl.manage?.(); } }, 'Manage zones in Devices'));
   menu._for = anchor; anchor.setAttribute('aria-expanded', 'true'); document.body.append(menu); pos();
   document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', keys, true);

@@ -157,6 +157,23 @@ public sealed class SubsonicService
         return new { artists = Arr(o, "artist").Select(a => Artist(sid, a)).ToList(), albums = Arr(o, "album").Select(a => Album(sid, a)).ToList(), tracks = Arr(o, "song").Select(x => Song(sid, x)).ToList() };
     }
 
+    /// <summary>0.6.9 #28 (t1878): the saved servers' ids (Jukebox guest search asks each one).</summary>
+    public List<string> Ids() => Load().Select(x => x.Id).Distinct().ToList();
+    /// <summary>0.6.9 #28: songs only (search3 with no artists / albums), as queue items - the Jukebox guest search merges them with Local.</summary>
+    public async Task<List<QueueItem>> SearchSongItems(string sid, string q, int n, CancellationToken ct = default)
+    {
+        var r = await Call(sid, "search3", $"query={Uri.EscapeDataString(q)}&artistCount=0&albumCount=0&songCount={Math.Clamp(n, 1, 50)}", ct);
+        return Arr(Obj(r, "searchResult3"), "song").Select(x => Item(sid, S(x, "id"), S(x, "title"), S(x, "artist"), S(x, "album"), (Int(x, "duration") ?? 0) * 1000L, S(x, "coverArt"), Int(x, "track"), Int(x, "year"), S(x, "genre"))).Where(x => x.Location.Length > Scheme.Length + sid.Length + 1).ToList();
+    }
+    /// <summary>0.6.9 #28: one song looked up on its server (getSong) - a guest's remote pick is checked here, never taken from the phone. Null when it is gone.</summary>
+    public async Task<QueueItem?> SongItem(string sid, string songId, CancellationToken ct = default)
+    {
+        if (Get(sid) == null || string.IsNullOrWhiteSpace(songId)) return null;
+        var x = Obj(await Call(sid, "getSong", "id=" + Uri.EscapeDataString(songId), ct), "song");
+        if (x.ValueKind != JsonValueKind.Object || S(x, "id") != songId) return null;
+        return Item(sid, songId, S(x, "title"), S(x, "artist"), S(x, "album"), (Int(x, "duration") ?? 0) * 1000L, S(x, "coverArt"), Int(x, "track"), Int(x, "year"), S(x, "genre"));
+    }
+
     // ---- play ----
     public static QueueItem Item(string sid, string songId, string title, string artist, string album, long durMs, string? coverArt, int? trackNo = null, int? year = null, string? genre = null)
         => new(0, "remote", $"{Scheme}{sid}:{songId}", string.IsNullOrWhiteSpace(title) ? "Remote song" : title, artist ?? "", album ?? "", durMs, null, string.IsNullOrWhiteSpace(genre) ? null : genre, year, ArtUrl(sid, coverArt), trackNo);

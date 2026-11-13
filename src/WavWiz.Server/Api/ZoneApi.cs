@@ -51,6 +51,18 @@ public static class ZoneApi
 
         // ---- zones = optional groups of devices (0.0.3) ----
         g.MapGet("/groups", () => Results.Json(s.Links.Decorate(s.Zones.Groups()))).Req(Role.View);
+        // 0.6.9 #12: the Devices card order (zones, Jukebox, Unassigned, AirPlay) lives on the server: same for every client, survives a restart.
+        // Reading it is View; changing it is Admin (like renaming or creating zones). "zones" is published so every open Devices list follows.
+        g.MapGet("/zones/order", () => Results.Json(new { order = WavWiz.Server.Zones.ZoneOrder.Load(s.Db) })).Req(Role.View);
+        g.MapPut("/zones/order", async (HttpContext c) =>
+        {
+            var b = await c.Request.Body();
+            if (b.ValueKind != JsonValueKind.Object || !b.TryGetProperty("order", out var o)) return Ext.Bad("expected { order: [card keys] }");
+            var list = WavWiz.Server.Zones.ZoneOrder.Normalize(o);
+            if (list == null) return Ext.Bad($"order must be a list of up to {WavWiz.Server.Zones.ZoneOrder.MaxEntries} card keys (g:<zone id>, jukebox, unassigned, airplay)");
+            WavWiz.Server.Zones.ZoneOrder.Save(s.Db, list); s.Events.Publish("zones");
+            return Results.Json(new { ok = true, order = list });
+        }).Req(Role.Admin);
         // 0.4.0 Stage 2: link zones (they play the same music) / split a zone off (its own music) / link all. Control, like switching zones; the jukebox picker is admin-only.
         g.MapPost("/groups/{id:long}/link", async (long id, HttpContext c) => { var b = await c.Request.Body(); var w = b.Long("with"); if (w == null) return Ext.Bad("with (the zone to link with) is required"); var err = s.Links.Link(id, w.Value); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/split", (long id) => { var note = s.Links.SplitNote(id); if (note != null) return Ext.Bad(note, 409); var err = s.Links.SplitOff(id); return err != null ? Ext.Bad(err, 404) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
@@ -73,6 +85,8 @@ public static class ZoneApi
         // 0.3.2 F4: zone volume (keeps the members' offsets) and zone mute. Control, like device volume / mute.
         g.MapPost("/groups/{id:long}/volume", async (long id, HttpContext c) => { var b = await c.Request.Body(); var (lvl, err) = s.Zones.GroupVolume(id, b.Num("set") ?? double.NaN); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, level = lvl, groups = s.Zones.Groups() }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/mute", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Zones.GroupMute(id, b.Bool("muted") ?? true); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, groups = s.Zones.Groups() }); }).Req(Role.Control);
+        // 0.6.9 t1897: a zone's ON / OFF pill switches every speaker in ONE call and ONE "zones" event (the client used to PATCH each speaker, one event each).
+        g.MapPost("/groups/{id:long}/enabled", async (long id, HttpContext c) => { var b = await c.Request.Body(); if (b.Bool("enabled") is not bool on) return Ext.Bad("enabled must be true or false"); var err = s.Zones.GroupEnable(id, on); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, zones = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress) }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/activate", (long id) => { var err = s.Zones.ActivateGroup(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
 
         // ---- manual / by-ear delay ----
@@ -343,14 +357,14 @@ public static class ZoneApi
     public static string? PutJukeboxSpeakers(Services s, List<long> ids)
     {
         ids = ids.Distinct().ToList(); var err = s.Links.CheckDevices(ids); if (err != null) return err;
-        if (s.Jukebox.Running) return s.Links.SetJukeboxDevices(ids);
+        if (s.Jukebox.Running) { var e = s.Links.SetJukeboxDevices(ids); Features.JukeboxPower.Apply(s); return e; }
         using var d = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new { defaultSpeakers = ids })); return s.Jukebox.Update(d.RootElement.Clone());
     }
     /// <summary>0.4.9 F76: the Jukebox zone + whether Devices shows it (Settings > Jukebox switch; always while the Jukebox runs) and its default speakers.</summary>
     public static System.Text.Json.Nodes.JsonObject JbView(Services s)
     {
         var n = System.Text.Json.JsonSerializer.SerializeToNode(s.Links.JukeboxView(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!.AsObject(); var c = s.Jukebox.Cfg();
-        n["running"] = s.Jukebox.Running; n["showInDevices"] = c.ShowInDevices; n["defaultSpeakers"] = c.DefaultSpeakers == null ? null : new System.Text.Json.Nodes.JsonArray(c.DefaultSpeakers.Select(x => (System.Text.Json.Nodes.JsonNode?)x).ToArray());
+        n["running"] = s.Jukebox.Running; n["showInDevices"] = c.ShowInDevices; n["zoneOn"] = c.ZoneOn; n["perGuest"] = c.PerGuest; n["voteSkip"] = c.VoteSkip;   /* 0.6.9 #19: the Jukebox zone panel's saved settings */ n["defaultSpeakers"] = c.DefaultSpeakers == null ? null : new System.Text.Json.Nodes.JsonArray(c.DefaultSpeakers.Select(x => (System.Text.Json.Nodes.JsonNode?)x).ToArray());
         return n;
     }
 }

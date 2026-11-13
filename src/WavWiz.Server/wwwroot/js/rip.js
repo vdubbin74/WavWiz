@@ -92,7 +92,7 @@ export function ripPage(model, act = {}) {
 
   const trackRows = tracks.length ? h('ul', { class: 'rip-tracks', 'aria-label': 'Tracks to rip' }, tracks.map((tr, i) => {
     const on = tr.selected !== false;
-    const title = h('input', { type: 'text', class: 'rip-tt', value: tr.title || `Track ${tr.n || i + 1}`, disabled: ripping, title: ripping ? lockTitle : '', maxlength: 200, 'aria-label': `Title for track ${tr.n || i + 1}`,
+    const title = h('input', { type: 'text', class: 'rip-tt', value: tr.title || `Track ${tr.n || i + 1}`, disabled: ripping, title: ripping ? lockTitle : `${tr.title || ''} - click to rename`.replace(/^ - /, ''), maxlength: 200, 'aria-label': `Title for track ${tr.n || i + 1}`,
       oninput: ev => act.onTrackTitle && act.onTrackTitle(i, ev.target.value) });
     return h('li', { class: 'rip-tr' + (on ? '' : ' off') },
       h('label', { class: 'rip-check' }, h('input', { type: 'checkbox', checked: on, disabled: ripping, title: ripping ? lockTitle : '', onchange: ev => act.onTrackSel && act.onTrackSel(i, ev.target.checked) })),
@@ -119,17 +119,18 @@ export function ripPage(model, act = {}) {
   const job = m.job;
   const canClear = !!(job && !isLiveJob(job));
   const fmtTag = job ? `${job.drive || ''} → ${(job.format || '').toUpperCase()}${job.quality ? ' ' + String(job.quality).toUpperCase() : ''}`.trim() : '';
+  // 0.6.9 ripper (t1858/t1859): the status card is compact - one header line (status, what it is doing, format, Cancel / Clear), the bar, the folder
+  const jobText = job ? jobLine(job) + (job.speed ? ` · ${Number(job.speed).toFixed(1)}×` : '') : '';
   const jobCard = job ? h('div', { class: 'card rip-job ' + (job.status || ''), 'data-id': String(job.id) },
-    h('div', { class: 'rip-job-h' }, h('b', null, jobStatusLabel(job)),
+    h('div', { class: 'rip-job-h' }, h('b', null, jobStatusLabel(job)), h('span', { class: 'small rip-job-line ell', title: jobText }, jobText),
       h('span', { class: 'rip-job-h-r' },
         h('span', { class: 'dim small' }, fmtTag),
+        isLiveJob(job) ? h('button', { type: 'button', class: 'btn sm', onclick: () => act.onCancel && act.onCancel(job.id) }, 'Cancel') : null,
         canClear ? h('button', { type: 'button', class: 'btn sm rip-job-clear', 'aria-label': 'Clear job status', title: 'Clear this job from the status bar', onclick: () => act.onDismiss && act.onDismiss(job.id) }, 'Clear') : null)),
     h('div', { class: 'rip-prog', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(jobPercent(job)) },
       h('span', { style: `width:${jobPercent(job)}%` })),
-    h('div', { class: 'small' }, jobLine(job) + (job.speed ? ` · ${Number(job.speed).toFixed(1)}×` : '')),
     job.error && job.error !== jobLine(job) ? h('div', { class: 'err small' }, job.error) : null,
-    job.dest ? h('div', { class: 'mono small dim' }, job.dest) : null,
-    isLiveJob(job) ? h('button', { type: 'button', class: 'btn sm', onclick: () => act.onCancel && act.onCancel(job.id) }, 'Cancel') : null)
+    job.dest ? h('div', { class: 'mono small dim ell rip-job-dest', title: job.dest }, job.dest) : null)
     : null;
 
   const looking = !!(m.looking && ready === false && (m.drives || []).some(d => d.ready));
@@ -160,10 +161,23 @@ export function ripPage(model, act = {}) {
     h('div', { class: 'rip-jobs' },
       jobCard,
       (m.jobs || []).filter(j => !job || j.id !== job.id).length
-        ? h('div', { class: 'rip-recent' }, h('h3', null, 'Recent jobs'), (m.jobs || []).filter(j => !job || j.id !== job.id).slice(0, 8).map(j =>
-          h('div', { class: 'card rip-job past ' + (j.status || '') }, h('b', null, `#${j.id} ${jobStatusLabel(j)}`), h('div', { class: 'small dim' }, `${j.drive || ''} → ${(j.format || '').toUpperCase()} · ${jobPercent(j)}%`), j.error ? h('div', { class: 'err small' }, j.error) : null, j.dest ? h('div', { class: 'mono small' }, j.dest) : null,
-            isLiveJob(j) ? h('button', { type: 'button', class: 'btn sm', onclick: () => act.onCancel && act.onCancel(j.id) }, 'Cancel') : null)))
+        ? recentJobs((m.jobs || []).filter(j => !job || j.id !== job.id).slice(0, 8), act)
         : null));
+}
+
+/** 0.6.9 ripper (t1858/t1859): Recent jobs = a compact list (one row per job: status, album folder, format · percent; an error on a second line)
+ *  in its own height-capped scroller BELOW the disc + tracks section, so it can never squeeze or cover that section. */
+export function recentJobs(list, act = {}) {
+  return h('div', { class: 'rip-recent' }, h('h3', { class: 'rip-recent-h' }, 'Recent jobs', h('span', { class: 'dim small' }, ` · ${list.length}`)),
+    h('ul', { class: 'rip-jlist', 'aria-label': 'Recent rip jobs' }, list.map(j => {
+      const meta = `${j.drive || ''} → ${(j.format || '').toUpperCase()} · ${jobPercent(j)}%`.trim();
+      return h('li', { class: 'rip-jrow ' + (j.status || '') + (j.status === 'error' || j.status === 'cancelled' ? ' bad' : ''), 'data-id': String(j.id), title: [j.dest, j.error].filter(Boolean).join('\n') || null },
+        h('span', { class: 'rip-jst' }, h('i', { class: 'rip-jdot', 'aria-hidden': 'true' }), h('b', null, jobStatusLabel(j))),
+        h('span', { class: 'mono small rip-jdest ell' }, j.dest || `Job #${j.id}`),
+        h('span', { class: 'dim small rip-jmeta' }, meta),
+        isLiveJob(j) ? h('button', { type: 'button', class: 'btn sm', onclick: () => act.onCancel && act.onCancel(j.id) }, 'Cancel') : null,
+        j.error ? h('span', { class: 'err small rip-jerr ell' }, j.error) : null);
+    })));
 }
 
 export function ripView(S) {

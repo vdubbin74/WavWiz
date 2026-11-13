@@ -2116,6 +2116,13 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .onpill.on .op-on{background:var(--accent);color:var(--accent-ink)}
 .onpill:not(.on) .op-off{background:var(--panel2);color:var(--ink)}
 .onpill.ro,.onpill:disabled{cursor:default;opacity:.7}
+/* 0.6.9 #19: a zone with no speakers - the pill is shown disabled (tooltip: add a speaker first), never a dead press */
+.onpill.empty{opacity:.45;cursor:not-allowed}
+/* 0.6.9 #19: the Jukebox zone panel's saved settings (OFF / ON, songs per guest, vote to skip) + Save */
+.zjuke .jbzhint{margin:2px 0 4px;color:var(--dim)} .zjuke .jbzhint.warn{color:var(--hl-text,var(--hl));font-weight:600}
+.zjuke .jbzset{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px;padding-top:8px;border-top:1px solid var(--line)}
+.zjuke .jbzset label.row{align-items:center;gap:8px} .zjuke .jbz-per{width:64px}
+.zjuke .jbzsave{align-items:center;gap:8px;margin-top:2px} .zjuke .jbz-saved{color:var(--ok,var(--accent2));font-weight:600} .zjuke .jbz-saved.dirty{color:var(--hl-text,var(--hl))}
 .onpill:focus-visible{outline:2px solid var(--accent2);outline-offset:1px}
 .vbar{position:relative;flex:1;min-width:0;display:flex;align-items:center;--v:0%}
 .vbar input[type=range]{flex:1;width:100%;min-width:0}
@@ -3224,6 +3231,9 @@ body.pdragging,body.pdragging *{user-select:none;cursor:grabbing!important}
 .libpanel button.on,.lib button.on,.lib [aria-pressed=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 /* 0.4.7: the filled (accent) tabs and chips keep the theme's on-accent text color (F40 above recolored their text to the accent, invisible on the accent fill) */
 .libpanel .tabs button.on,.lib .tabs:not(.xtabs) button.on,.libpanel .chipbtn.on,.lib .chipbtn.on{color:var(--accent-ink)}
+/* 0.6.9 #7: the Z–A (reversed) sort chip keeps its accent-colored lettering on the panel2 face - the chipbtn.on rule above set it to --accent-ink
+   (dark text meant for a solid accent fill), so "Z–A ↑" was nearly invisible on dark themes. Higher specificity, same look as .libtools .libflip.on. */
+.lib .libtools .chipbtn.libflip.on,.libpanel .libtools .chipbtn.libflip.on{background:var(--panel2);color:var(--accent-text,var(--accent));border-color:var(--accent);font-weight:700}
 /* 0.5.0 F116: pane-h Expand/Collapse (+ fold) keep accent — F40's .libpanel button reset was washing them to ink/white */
 .libpanel .pane-h .plus{background:var(--panel2);border:1px solid var(--accent);color:var(--accent-text,var(--accent))}
 .libpanel .pane-h .plus:hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
@@ -3656,6 +3666,18 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
 .jb-exit76 p{max-width:360px;margin:8px 0 12px}
 .jb-exit76-b{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .jbreturn76{border-radius:3px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff);font-weight:700;margin:0 6px;white-space:nowrap}
+/* 0.6.9 #26 (t1876): phone header - 'Jukebox on' and Return to Jukebox are icon-only squares (labels stay for screen readers / tooltips), so the
+   header never wraps, skews or runs past the right edge; the logo and BETA badge keep their size. Desktop keeps the labeled chip / button. */
+/* desktop: Return to Jukebox no longer grows the bar (the generic .btn height made it 7 px taller than with the Jukebox off) */
+.topbar #jbreturn.jbreturn76{min-height:0;height:30px;padding-top:0;padding-bottom:0;display:inline-flex;align-items:center;flex:none}
+.topbar #jbchip.jbchip{flex:none;white-space:nowrap}
+@media (max-width:900px){
+  .topbar #jbchip.jbchip,.topbar #jbreturn.jbreturn76{flex:none;width:30px;min-width:30px;height:30px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1}
+  .topbar #jbchip .jbc-t,.topbar #jbreturn .jbr-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .topbar #jbreturn .jbr-ic{font-size:0} .topbar #jbreturn .jbr-ic::after{content:'↩';font-size:17px;font-weight:700}   /* Return reads as 'back to', not a second ♫ */
+  /* while the two Jukebox buttons are in the phone header, 'Connected' shows as its dot only (the word stays in the tooltip) so nothing runs off the edge */
+  .topbar:has(#jbchip) .conn #conntxt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
 
 /* 0.4.9 F77: Settings > Playback > Streaming quality */
 .sq77{display:flex;flex-direction:column;gap:6px;margin:6px 0}
@@ -5173,6 +5195,11 @@ html:not([data-uiscale=compact]) :is(.libpanel,.nowcol,.devpanel,.listpanel,.np-
 .apsetup-foot{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--line)}
 .apsetup-footnote{min-width:0}.apsetup-footnote p{margin:0 0 2px}
 .apsetup-empty{padding:8px}
+/* 0.6.9 #22 (t1857): a finished search with nothing found, or a search that failed, says so with Search again */
+.apsetup-empty.apsetup-none,.apsetup-empty.apsetup-err{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 8px}
+.apsetup-empty.apsetup-none ul,.apsetup-empty.apsetup-err p{margin:0;padding-left:18px}
+.apsetup-empty.apsetup-err p{padding-left:0}
+.apsetup-empty.apsetup-err b{color:var(--bad,#e5484d)}
 .dtag.otype.airplay{letter-spacing:.4px}
 
 
@@ -5218,11 +5245,13 @@ html.wtb.wtb-inactive .wtb-btn:not(:hover) { color: color-mix(in srgb, var(--tex
 .rip-info{width:20px;height:20px;min-width:20px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--dim);cursor:help;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none}
 .rip-info svg{width:14px;height:14px;display:block}
 .rip-info:hover,.rip-info:focus-visible{color:var(--ink);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel));outline:2px solid var(--accent);outline-offset:2px}
-.rip-layout{display:grid;grid-template-columns:minmax(240px,.9fr) minmax(280px,1.2fr);gap:16px;align-items:stretch;min-width:0;flex:1 0 0%;min-height:320px;overflow:hidden}
+/* 0.6.9 ripper (t1858/t1859): the disc + tracks section keeps its full natural height (flex:none, nothing clipped); Ripping + Recent jobs sit below it
+   in normal flow and the page scrolls - before, the 320px floor + overflow:hidden let the job cards squeeze it and cut off the meta fields and tracks. */
+.rip-layout{display:grid;grid-template-columns:minmax(240px,.9fr) minmax(280px,1.2fr);gap:16px;align-items:stretch;min-width:0;flex:none;min-height:0;overflow:visible}
 .rip-disc,.rip-trackcard{min-width:0;margin:0}
 /* overflow:hidden so the layout's min-height:auto is the Drive form, not every track row.
    The list itself is the inner scroller (min-height:8rem). */
-.rip-trackcard{display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden}
+.rip-trackcard{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .rip-disc-main{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:start}
 .rip-cover{width:120px;height:120px;border-radius:6px;border:1px solid var(--line);background:var(--panel);overflow:hidden;display:flex;align-items:center;justify-content:center}
 .rip-cover img{width:100%;height:100%;object-fit:cover;display:block}
@@ -5235,24 +5264,51 @@ html.wtb.wtb-inactive .wtb-btn:not(:hover) { color: color-mix(in srgb, var(--tex
 .rip-meta-row:has(.rip-qual){grid-template-columns:5.5em minmax(0,1fr) minmax(0,1fr)}
 .rip-track-h{margin:0 0 8px;font-size:13px;font-weight:700;flex:none}
 /* One scroller: the track list. Actions stay under it. Same 4-column grid on every row. */
-.rip-tracks{list-style:none;margin:0;padding:0;flex:1 1 0%;min-height:8rem;max-height:none;overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;min-width:0}
-.rip-tr{display:grid;grid-template-columns:auto 2.25em minmax(0,1fr) 4.75em;gap:8px;align-items:center;padding:4px 0;width:100%;box-sizing:border-box;min-width:0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.rip-tracks{list-style:none;margin:0;padding:0;flex:1 1 auto;min-height:8rem;max-height:clamp(16rem,56vh,40rem);overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;min-width:0}
+.rip-tr{display:grid;grid-template-columns:auto 2.25em minmax(0,1fr) 4.75em;gap:8px;align-items:center;padding:2px 6px 2px 2px;border-radius:3px;width:100%;box-sizing:border-box;min-width:0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 .rip-tr.off{opacity:.55}
 .rip-check{display:inline-flex;align-items:center;justify-content:center;margin:0;flex:none}
 .rip-num{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px;text-align:right}
 .rip-tt{width:100%;min-width:0;max-width:100%;box-sizing:border-box;justify-self:stretch;background:transparent;border:1px solid transparent;border-radius:3px;color:inherit;padding:3px 6px}
 .rip-tt:hover,.rip-tt:focus{border-color:var(--line);background:var(--panel)}
+/* list rows: the title is plain text (no box) until hovered / focused - the generic 40px input box was what made each row a tall bordered field */
+.rip-page .rip-tracks .rip-tr .rip-tt{min-height:0;height:auto;line-height:1.35;padding:3px 6px;margin:0;border:1px solid transparent!important;background:transparent!important;box-shadow:none;font:inherit;color:inherit;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.rip-page .rip-tracks .rip-tr .rip-tt:hover:not(:disabled){border-color:color-mix(in srgb,var(--line) 70%,transparent)!important}
+.rip-page .rip-tracks .rip-tr .rip-tt:focus{border-color:var(--accent)!important;background:var(--fld-bg)!important;outline:0;text-overflow:clip}
+.rip-page .rip-tracks .rip-tr .rip-tt:disabled{opacity:1;cursor:default}
+.rip-tr:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.rip-tr:last-child{border-bottom:0}
 .rip-dur{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;justify-self:end}
 .rip-actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;flex:none}
 .rip-jobs{margin-top:12px;width:100%;min-width:0;flex:none}
 .rip-prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:6px 0}
 .rip-prog>span{display:block;height:100%;background:var(--accent);border-radius:3px}
-.rip-job-h{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.rip-job-h{display:flex;gap:8px;align-items:center;justify-content:space-between;min-width:0}
+.rip-job{padding:8px 12px}
+.rip-job-line{flex:1 1 auto;min-width:0}
+.rip-job .rip-prog{margin:5px 0 3px}
+.rip-job-dest{display:block;min-width:0}
 .rip-job-h-r{display:inline-flex;align-items:center;gap:8px;min-width:0}
 .rip-job-clear{flex:none}
 .rip-job.ripping,.rip-job.queued{border-color:var(--accent)}
 .rip-job.interrupted{border-color:color-mix(in srgb,var(--hl,#FFCB3D) 70%,var(--line))}
-.rip-recent{margin-top:16px}
+.rip-recent{margin-top:12px;min-width:0}
+.rip-recent-h{margin:0 0 4px;font-size:13px;font-weight:700}
+/* Recent jobs: compact list rows in their own capped scroller (never on top of / squeezing the disc + tracks section) */
+.rip-jlist{list-style:none;margin:0;padding:0;max-height:13.5rem;overflow-y:auto;scrollbar-gutter:stable;border:1px solid color-mix(in srgb,var(--line) 60%,transparent);border-radius:6px;min-width:0}
+.rip-jrow{display:grid;grid-template-columns:8.5em minmax(0,1fr) auto auto;gap:4px 10px;align-items:center;padding:5px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);min-width:0}
+.rip-jrow:last-child{border-bottom:0}
+.rip-jrow:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.rip-jst{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.rip-jdot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
+.rip-jrow.done .rip-jdot{background:var(--green,var(--accent))}
+.rip-jrow.bad .rip-jdot{background:var(--red,var(--accent))}
+.rip-jrow.ripping .rip-jdot,.rip-jrow.queued .rip-jdot{background:var(--accent)}
+.rip-jrow.interrupted .rip-jdot{background:var(--amber,var(--accent))}
+.rip-jdest{min-width:0}
+.rip-jmeta{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+.rip-jerr{grid-column:2/-1;min-width:0}
+@container rip (max-width:520px){.rip-jrow{grid-template-columns:minmax(0,1fr) auto}.rip-jdest{grid-column:1/-1;grid-row:2}.rip-jerr{grid-column:1/-1}}
 /* Pane fill is scoped to Rip CD so Radio/Playlists keep their page scroll.
    .rip-page is capped to the pane and scrolls if form + Recent jobs don't fit.
    The Drive/Tracks grid has a 320px floor so job cards cannot collapse it and overlay the form. */
@@ -5470,6 +5526,11 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
   pointer-events:none;z-index:6;box-shadow:0 2px 10px color-mix(in srgb,var(--accent) 40%,transparent);
 }
 .azstrip .azbubble[hidden]{display:none}
+/* 0.6.9 #1 follow-up (t1835u): side-panel Library (the narrow PC window's 3-column grid), Local and Remote - the A–Z rail sits flush on the panel's
+   right edge: the scroller takes back the panel body's 10px right padding and the rail drops its 8px right margin, so the grid gets the freed width.
+   Side panel only: the expanded Library, the phone page and the stacked narrow layout keep their own rules. */
+.libpanel .libbody>.lib:not(.expanded)>.libscroll{margin-right:-10px}
+.libpanel .lib:not(.expanded)>.libscroll>.azstrip{margin-right:0}
 @media (pointer:coarse){
   .libscroll>.azstrip,.lib .azstrip{width:22px}
   .azstrip .azbubble{width:44px;height:44px;font-size:20px}
@@ -5530,3 +5591,118 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
    (<= 900 px phone page, Roomy / Auto slide-over) keep their own rules. panels.js DEV_PX mirrors this for the auto-rail math. */
 :root{--devw:380px;--spkcol:var(--devw)}
 .desk{grid-template-columns:var(--libw,clamp(230px,calc(21vw / var(--z,1)),360px)) minmax(0,1fr) var(--rightw,var(--devw))}
+
+/* ---- 0.6.9 Library (#1 three columns next to the A–Z rail, #2 no cut-off names, #3 square Genre / Year tiles) ---- */
+/* #1: the side panel (and the narrow PC page) always lays tiles out in THREE columns - Albums, Artists, Genres, Years, Recently added, Folders,
+   Favorites, Remote and Radio alike. The A–Z rail is a flex sibling of .libcontent, so the grid just takes the width that is left
+   (minmax(0,1fr) never forces a column out). The phone page keeps its own two-column layout. */
+.lib.compact .tilegrid,.libpanel .lib:not(.expanded) .tilegrid,.lib.compact .tilegrid.tg-radio,.lib.compact .radiotab2 .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px}
+@media (max-width:760px){ .view .lib:not(.phone-library) .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 10px} }
+.lib.compact .libscroll>.libcontent{min-width:0}
+.lib.compact .tile .t1{font-size:12px;line-height:1.25;margin-top:6px}
+.lib.compact .tile .t2{font-size:11px;line-height:1.25}
+.lib.compact .tile .t3 .tcount{font-size:10px}
+.lib.compact .tile .tileplay{width:30px;height:30px;font-size:12px}
+/* #2: names wrap onto more lines instead of ending in "…" - album titles, artist names, station names, genre names and years, in tiles and in
+   list rows (the song rows of an album page keep one line, so the # / title / time columns stay aligned). */
+.lib .tile .t1.ell,.lib .tile .t2.ell,.lib .list .item .t .t1.ell,.lib .list .item .t .t2.ell,
+.lib .tile .gblock .gname.ell,.lib .tile .gblock.j10 .gname,.radiotab2 .tile .t1.ell,.radiotab2 .list .item .t1.ell,.radiotab2 .list .item .t2.ell{
+  white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:normal;hyphens:auto}
+.lib .albpage .list .item .t .t1.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* #3: Genres and Years (and decades) are square tiles everywhere, like album covers; the count wraps under the name inside the square. */
+.lib .tile .gblock,.lib .tile .gblock.j10,.lib.compact .tile .gblock.j10,.lib.expanded .tile .gblock.j10{aspect-ratio:1/1;height:auto;justify-content:flex-start}
+.lib .tile .gblock.j10 .gname{max-width:100%;line-height:1.15}
+.lib .tile .gblock.j10 .gcount{white-space:normal;max-width:100%;line-height:1.3}
+.lib.compact .tile .gblock.j10{padding:7px 7px 6px}
+.lib.compact .tile .gblock.j10 .gname{font-size:12px;padding:1px 4px;margin-left:-4px}
+.lib.compact .tile .gblock.j10 .gcount{font-size:10px;padding:1px 5px}
+.lib.compact .tile .gblock.j10 .galb{display:none}
+.lib.compact .tile.btile .tileplay{left:6px;bottom:6px}
+
+/* ---- 0.6.9 #12: every Devices card reorders by click-and-drag - zones (online, offline or empty), Jukebox, Unassigned and AirPlay.
+   Zone queue boxes keep their ⋮ zone-actions gutter as the handle; the other cards get the same ⋮ strip (.cgrip69) at the left edge. ---- */
+.tree42>[data-card]{position:relative}
+.tree42>[data-card]:has(>.cgrip69){padding-left:22px}
+.tree42>.un42[data-card]:has(>.cgrip69){padding-left:30px}
+.cgrip69{position:absolute;left:0;top:0;bottom:0;width:22px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);border-radius:3px 0 0 3px;
+  background:color-mix(in srgb,var(--text) 10%,var(--panel));color:var(--text);font:700 16px/1 system-ui,sans-serif;cursor:grab;touch-action:none;user-select:none;z-index:1}
+.cgrip69:hover,.cgrip69:focus-visible{background:color-mix(in srgb,var(--accent) 22%,var(--panel));outline:none}
+.tree42[data-reorder="1"] .qb42 .zgut42{cursor:grab}
+.tree42[data-reorder="1"] .qb42 .zgut42:active,.cgrip69:active{cursor:grabbing}
+.tree42.zdrag .un42{opacity:1}
+.tree42.zdrag>[data-card].drag42-src{opacity:.45}
+.tree42.zdrag>[data-card].droppable.dropping{background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.tree42.zdrag>[data-card].zins-before{box-shadow:0 -3px 0 0 var(--accent),0 -3px 8px var(--accent)}
+.tree42.zdrag>[data-card].zins-after{box-shadow:0 3px 0 0 var(--accent),0 3px 8px var(--accent)}
+/* ---- 0.6.9 #11: the Flat / Gradient slider style is every slider in the app, not only the volume bars. Each range input (but the Now Playing
+   color picker, whose track is the swatch row) fills up to its value (--v, kept by sliderstyle.js) with --voltrack; the rest is the plain line.
+   The div seek bars and the Studio EQ fader fills use the same --voltrack. */
+input[type=range]:not(.npcolor-range)::-webkit-slider-runnable-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2));opacity:1}
+input[type=range]:not(.npcolor-range)::-moz-range-track{background:var(--voltrack) 0 0/var(--v,50%) 100% no-repeat,color-mix(in srgb,var(--line) 80%,var(--panel2))}
+input[type=range]:not(.npcolor-range)::-moz-range-progress{background:transparent}
+.prog .fill,.ns-prog .fill,.mp-npl .npl-fill{background:var(--voltrack)}
+:root:not([data-slider=flat]) .np-phone-seek>i{background:linear-gradient(90deg,var(--accent),var(--seek-color,var(--accent2)))}
+:root:not([data-slider=flat]) .eqarea[data-eqstyle=faders] .eqb-fill{background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 35% 65%,rgba(0,0,0,.28)),linear-gradient(0deg,var(--accent),var(--accent2))}
+:root:not([data-slider=flat]) .eqb-fill{background:linear-gradient(0deg,var(--accent),var(--accent2))}
+/* ---- 0.6.9 #8: narrow PC Now Playing (a PC window at phone width, not a phone): Sleep, Master volume and the pins share ONE row of the same
+   rounded-square buttons, no Home, never wrapping (extra pins go to the … menu). Not inside a phone media query, keyed on .np-xrow-pc only. */
+.np-phone-full .np-xrow-pc{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;overflow:hidden}
+.np-phone-full .np-xrow-pc>.npsleep-ic,.np-phone-full .np-xrow-pc>.tbtn,.np-phone-full .np-xrow-pc .np-xpins>.scbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;min-width:44px;width:auto;height:44px;padding:0 10px;margin:0;border:1px solid var(--line);border-radius:var(--radius,3px);background:var(--panel2);color:var(--ink);box-shadow:none}
+.np-phone-full .np-xrow-pc .ic,.np-phone-full .np-xrow-pc svg{width:20px;height:20px}
+.np-phone-full .np-xrow-pc>.npsleep-ic .npsl-t:empty{display:none}
+.np-phone-full .np-xrow-pc>.npsleep-ic .npsl-t{font-size:13px;font-variant-numeric:tabular-nums}
+.np-phone-full .np-xrow-pc>.npsleep-ic.on,.np-phone-full .np-xrow-pc .scbtn.on{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.np-phone-full .np-xrow-pc>:is(.npsleep-ic,.tbtn):hover,.np-phone-full .np-xrow-pc .np-xpins>.scbtn:hover{border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
+.np-phone-full .np-xrow-pc .np-xpins{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;margin:0;padding:0;border:0;background:none}
+.np-phone-full .np-xrow-pc .np-xpins>.scsep{display:none}
+/* ---- 0.6.9 #18: caption buttons keep Windows' size at every Display size and DPI (46 px on screen, glyph 10 px), maximized or not;
+   the strip width comes from titlebar.js as calc(n x 46px / var(--z)) - computed, never measured back (that loop scrunched them). */
+html.wtb .wtb-btn{flex:0 0 calc(46px / var(--z,1));width:calc(46px / var(--z,1));min-width:calc(46px / var(--z,1))}
+html.wtb .wtb-g{font-size:calc(10px / var(--z,1))}
+html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
+/* 0.6.9 #15: pairing by approval - admin cards + Player window waiting screen */
+.pairreqs{position:fixed;right:12px;bottom:calc(56px + var(--safe-b,0px));z-index:70;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 24px))}
+.pairreq-card{background:var(--panel,#1d2329);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.pairreq-t{font-weight:600;margin-bottom:4px}.pairreq-n{overflow-wrap:anywhere}.pairreq-m{margin:6px 0 10px}
+.pairreq-code{font-size:1.25em;letter-spacing:.18em;font-variant-numeric:tabular-nums}
+.pairreq-b{display:flex;gap:8px}
+.pairwait .pairwait-code{font-size:2.6em;font-weight:700;letter-spacing:.3em;text-align:center;margin:14px 0 6px;font-variant-numeric:tabular-nums}
+.pairwait .pairwait-st{text-align:center}
+/* 0.6.9 #12 fix: zone-onto-zone = link (dashed accent box + label), clearly different from the reorder insertion line */
+.tree42.zdrag .zwrap42.droplink42{outline:3px dashed var(--accent);outline-offset:-3px;background:color-mix(in srgb,var(--accent) 16%,var(--panel));position:relative}
+.tree42.zdrag .zwrap42.droplink42::after{content:attr(data-linklabel);position:absolute;left:40px;top:0;transform:translateY(-50%);z-index:60;pointer-events:none;background:var(--accent);color:#000;font-weight:700;font-size:12px;padding:4px 10px;border-radius:3px;white-space:nowrap;box-shadow:0 0 0 2px var(--panel)}
+/* 0.6.9 #12 fix: reorder = a solid insertion bar in the gap above / below the card (not the dashed drop-into-zone link highlight) */
+.tree42.zdrag>[data-card].zins-before,.tree42.zdrag>[data-card].zins-after{position:relative;box-shadow:none;overflow:visible}
+.tree42.zdrag>[data-card].zins-before::before,.tree42.zdrag>[data-card].zins-after::before{content:'';position:absolute;left:-4px;right:-4px;height:4px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);pointer-events:none;z-index:5}
+.tree42.zdrag>[data-card].zins-before::before{top:-7px}
+.tree42.zdrag>[data-card].zins-after::before{bottom:-7px}
+
+
+/* 0.6.9 #21 (t1852/t1853): zones with no speakers can be picked - the row is clickable and shows the Controlling edge; the picked zone's name gets a
+   quiet "· no speakers" (the zone name shrinks first so the note never runs into the buttons) */
+.qb42.zpick42{cursor:pointer}
+.qb42.zpick42 .ze42-row .dname{cursor:pointer}
+.tree42 .qb42.empty42.ctl:not(.linked){border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.zlink.zempty{overflow:hidden}
+.zlink.zempty .zl-name{flex:0 1 auto}
+.zlink .zl-empty{flex:none;font-weight:400;opacity:.7;font-size:.92em;white-space:nowrap}
+.zlink .zl-empty[hidden]{display:none}
+/* ---- 0.6.9 #20 (t1850/t1851): Radio station text takes too much space. Station names clamp to 2 lines and the subtitle (genre / tags / URL)
+   to 1 line, with "…", in tiles and list rows of My stations and the station finder; the full name, tags and address are in the tooltip
+   (stationTip). This overrides the 0.6.9 #2 "names wrap, never …" rule for RADIO ONLY - albums, artists, genres and years keep full titles. ---- */
+.radiotab2 .tile .t1.ell.rad-t1,.radiotab2 .list .item .t1.ell.rad-t1,.radiotab2 .radfind-row .ell.rad-t1,.lib .radiotab2 .tile .t1.ell.rad-t1,.lib .radiotab2 .list .item .t .t1.ell.rad-t1{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.25}
+.radiotab2 .tile .t2.ell.rad-t2,.radiotab2 .list .item .t2.ell.rad-t2,.radiotab2 .radfind-row .ell.rad-t2,.lib .radiotab2 .tile .t2.ell.rad-t2,.lib .radiotab2 .list .item .t .t2.ell.rad-t2{
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+/* tiles: the name always takes its 2 lines, so every tile in a row is the same height and the rows line up */
+.radiotab2 .tilegrid .tile.radtile{align-self:start;min-width:0}
+.radiotab2 .tile .t1.ell.rad-t1{min-height:2.5em}
+/* list rows: one compact height for every station, playing or not (the highlight never grows the row) */
+.radiotab2 .list .item.radrow,.radiotab2 .radfind-row{height:62px;min-height:62px;box-sizing:border-box;padding-top:6px;padding-bottom:6px;align-items:center;overflow:hidden;flex-wrap:nowrap}
+.radiotab2 .list .item.radrow>.t,.radiotab2 .radfind-row>.grow{min-width:0;flex:1 1 auto}
+.radiotab2 .list .item.radrow>.tag,.radiotab2 .list .item.radrow>.btn,.radiotab2 .radfind-row>.btn,.radiotab2 .list .item.radrow>.cover,.radiotab2 .radfind-row>.cover{flex:none}
+.radiotab2 .list .item.radrow .rad-t1 .rad-favmark{vertical-align:-1px}
+/* 0.6.9 #25 (t1875): folded zone with speakers - the speaker-count chip sits right after the name; only on that row the name may shrink (ellipsis)
+   so a long name never pushes the chip out. Rows without the chip (empty zones, open zones) are unchanged. */
+.tree42 .qb42.zfold42 .ze42-row:has(>.zfold42-n)>.zname{flex:0 1 auto;min-width:0}
+.tree42 .qb42.zfold42 .ze42-row>.zfold42-n{flex:none}

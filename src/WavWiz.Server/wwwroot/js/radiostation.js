@@ -6,8 +6,14 @@ import { canControl, dragInfo, playNext, addToQueue, MIME } from './ui.js';
 import { dndMode, pointerDragSource } from './pdrag.js';
 import { attachCtx } from './ctxmenu.js';
 import { loadLibPrefs, tabView } from './libsort.js';
+import { radioBlockedNow, RADIO_JB_TIP } from './zones40.js';
 
+// 0.6.9 #5: the Library sets the Tiles / List pick it shows on its toolbar for the Radio source (side panel or Expanded, session picks included);
+// without it (phone Radio page) the Expanded per-tab pref decides as before.
+let viewPick = null;
+export const setRadioView = v => { viewPick = v === 'grid' || v === 'list' ? v : null; };
 export const radioGridOn = () => {
+  if (viewPick) return viewPick === 'grid';
   const P = loadLibPrefs();
   try { return tabView(P, 'radio') === 'grid'; } catch { return P.defView !== 'list'; }
 };
@@ -18,9 +24,20 @@ export const stationSub = r => {
   const mid = [genre, [codec, br].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
   return mid || (r.url || '').replace(/^https?:\/\//, '').slice(0, 40);
 };
+/** 0.6.9 #20 (t1850/t1851): station names and tag strings can be huge ("IBIZA CHILLOUT LOUNGE - Ambient, Deep House, …"): the name is clamped
+ *  to 2 lines and the subtitle to 1 (CSS .rad-t1 / .rad-t2, Radio only - albums and artists keep full titles); this tooltip has it all. */
+export const stationTip = r => {
+  const tags = [r.genre, r.tags].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · ');
+  return [r.name || 'Station', tags, (r.url || r.url_resolved || '').replace(/^https?:\/\//, '')].filter(Boolean).join('\n');
+};
 export const savedRef = r => ({ kind: 'radio', id: r.id });
 /** Unsaved finder hit: queue by URL (ResolveItems kind=url). Play still saves via finder/save. */
 export const finderRef = r => ({ kind: 'url', url: r.url || r.url_resolved, name: r.name || 'Station' });
+
+/** 0.6.9 #27 (t1877u): the ▶ buttons on station tiles / rows. Read at click time (the Jukebox can start after the tile was drawn): while the
+ *  picked zone is the Jukebox's queue they say why instead of playing; drawn in that state they carry the reason as their tooltip. */
+export const radioPlayGuard = fn => ev => { ev?.stopPropagation?.(); if (radioBlockedNow()) { toast(RADIO_JB_TIP, true); return; } fn(); };
+export const radioPlayTip = (name) => radioBlockedNow() ? RADIO_JB_TIP : 'Play ' + (name || '');
 
 export function favMark() {
   return h('span', { class: 'rad-favmark', title: 'Favorite', 'aria-hidden': 'true' }, icon('heartOn'));
@@ -45,11 +62,13 @@ async function ensureSavedId(r) {
 
 export function stationMenuItems(r, { S, act, onChange, saved }) {
   const can = canControl(S);
+  // 0.6.9 #27 (t1877u): Play / Play next / Add to queue are greyed out (with the reason) while the picked zone is the Jukebox's queue
+  const jbNo = radioBlockedNow(), qok = can && !jbNo, qhint = jbNo ? RADIO_JB_TIP : null;
   if (saved) {
     return [
-      { id: 'play', ic: 'play', label: 'Play', disabled: !can, onclick: () => act('/stream/play', { kind: 'radio', id: r.id }) },
-      { id: 'next', ic: 'queue', label: 'Play next', disabled: !can, onclick: () => playNext(savedRef(r)) },
-      { id: 'add', ic: 'plus', label: 'Add to queue', disabled: !can, onclick: () => addToQueue(savedRef(r)) },
+      { id: 'play', ic: 'play', label: 'Play', disabled: !qok, hint: qhint, onclick: () => act('/stream/play', { kind: 'radio', id: r.id }) },
+      { id: 'next', ic: 'queue', label: 'Play next', disabled: !qok, hint: qhint, onclick: () => playNext(savedRef(r)) },
+      { id: 'add', ic: 'plus', label: 'Add to queue', disabled: !qok, hint: qhint, onclick: () => addToQueue(savedRef(r)) },
       { sep: true },
       { id: 'fav', label: r.favorite ? 'Remove from favorites' : 'Add to favorites', disabled: !can,
         onclick: () => act(`/radio/${r.id}`, { favorite: !r.favorite }, 'PUT').then(onChange) },
@@ -62,7 +81,7 @@ export function stationMenuItems(r, { S, act, onChange, saved }) {
     ];
   }
   return [
-    { id: 'play', ic: 'play', label: 'Play', disabled: !can, onclick: async () => {
+    { id: 'play', ic: 'play', label: 'Play', disabled: !qok, hint: qhint, onclick: async () => {
       try {
         const id = await ensureSavedId(r);
         await act('/stream/play', { kind: 'radio', id });
@@ -70,7 +89,7 @@ export function stationMenuItems(r, { S, act, onChange, saved }) {
         onChange?.();
       } catch (e) { toast(e.message, true); }
     } },
-    { id: 'add', ic: 'plus', label: 'Add to queue', disabled: !can, onclick: async () => {
+    { id: 'add', ic: 'plus', label: 'Add to queue', disabled: !qok, hint: qhint, onclick: async () => {
       try {
         // Match play path: save first, then queue by radio id (no invented backend).
         const id = await ensureSavedId(r);
@@ -121,26 +140,26 @@ export function wireStationChrome(el, r, { S, act, onChange, saved }) {
 
 export function savedStationTile(r, playing, { S, act, onChange }) {
   const can = canControl(S), on = playing === r.id;
-  const el = h('li', { class: 'tile' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id) },
+  const el = h('li', { class: 'tile radtile' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id), title: stationTip(r) },
     h('div', { class: 'tileart' }, stationArt(r, 384, 'lg'),
       on ? h('span', { class: 'tilebadge' }, '▮▮▮ Playing') : null,
       r.favorite ? favMark() : null,
-      can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + r.name, onclick: ev => { ev.stopPropagation(); act('/stream/play', { kind: 'radio', id: r.id }); } }, '▶') : null),
-    h('div', { class: 't1 ell', title: r.name }, r.name),
-    h('div', { class: 't2 ell' }, stationSub(r)));
+      can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + r.name, title: radioPlayTip(r.name), onclick: radioPlayGuard(() => act('/stream/play', { kind: 'radio', id: r.id })) }, '▶') : null),
+    h('div', { class: 't1 ell rad-t1' }, r.name),
+    h('div', { class: 't2 ell rad-t2' }, stationSub(r)));
   wireStationChrome(el, r, { S, act, onChange, saved: true });
   return el;
 }
 
 export function savedStationRow(r, playing, { S, act, onChange }) {
   const can = canControl(S), on = playing === r.id;
-  const el = h('li', { class: 'item radrow' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id) },
+  const el = h('li', { class: 'item radrow' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id), title: stationTip(r) },
     stationArt(r, 96, 'sm'),
     h('div', { class: 't', style: 'min-width:0' },
-      h('div', { class: 't1 ell' }, r.name, r.favorite ? favMark() : null),
-      h('div', { class: 't2 ell' }, stationSub(r))),
+      h('div', { class: 't1 ell rad-t1' }, r.name, r.favorite ? favMark() : null),
+      h('div', { class: 't2 ell rad-t2' }, stationSub(r))),
     on ? h('span', { class: 'tag on' }, 'PLAYING') : null,
-    can ? h('button', { class: 'btn primary', 'aria-label': 'Play ' + r.name, onclick: ev => { ev.stopPropagation(); act('/stream/play', { kind: 'radio', id: r.id }); } }, '▶') : null);
+    can ? h('button', { class: 'btn primary', 'aria-label': 'Play ' + r.name, title: radioPlayTip(r.name), onclick: radioPlayGuard(() => act('/stream/play', { kind: 'radio', id: r.id })) }, '▶') : null);
   wireStationChrome(el, r, { S, act, onChange, saved: true });
   return el;
 }
@@ -148,15 +167,14 @@ export function savedStationRow(r, playing, { S, act, onChange }) {
 export function finderStationTile(r, { S, act, onChange, savedIds }) {
   const can = canControl(S);
   const saved = !!(r.url && savedIds?.has(r.url));
-  const el = h('li', { class: 'tile' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '' },
+  const el = h('li', { class: 'tile radtile' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '', title: stationTip(r) },
     h('div', { class: 'tileart' }, stationArt(r, 384, 'lg'),
       saved ? h('span', { class: 'tilebadge' }, 'Saved') : null,
-      can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + (r.name || ''), onclick: ev => {
-        ev.stopPropagation();
+      can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + (r.name || ''), title: radioPlayTip(r.name), onclick: radioPlayGuard(() => {
         stationMenuItems(r, { S, act, onChange, saved: false }).find(i => i.id === 'play')?.onclick?.();
-      } }, '▶') : null),
-    h('div', { class: 't1 ell', title: r.name }, r.name || 'Station'),
-    h('div', { class: 't2 ell' }, stationSub(r)));
+      }) }, '▶') : null),
+    h('div', { class: 't1 ell rad-t1' }, r.name || 'Station'),
+    h('div', { class: 't2 ell rad-t2' }, stationSub(r)));
   wireStationChrome(el, r, { S, act, onChange, saved: false });
   return el;
 }
@@ -164,15 +182,14 @@ export function finderStationTile(r, { S, act, onChange, savedIds }) {
 export function finderStationRow(r, { S, act, onChange, savedIds }) {
   const can = canControl(S);
   const saved = !!(r.url && savedIds?.has(r.url));
-  const el = h('div', { class: 'card row wrap radfind-row' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '' },
+  const el = h('div', { class: 'card row radfind-row' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '', title: stationTip(r) },
     stationArt(r, 96, 'sm'),
     h('div', { class: 'grow', style: 'min-width:0' },
-      h('b', { class: 'ell', style: 'display:block' }, r.name || 'Station', saved ? h('span', { class: 'small dim' }, ' · Saved') : null),
-      h('div', { class: 'dim small ell' }, stationSub(r))),
-    can ? h('button', { class: 'btn primary', onclick: ev => {
-      ev.stopPropagation();
+      h('b', { class: 'ell rad-t1' }, r.name || 'Station', saved ? h('span', { class: 'small dim' }, ' · Saved') : null),
+      h('div', { class: 'dim small ell rad-t2' }, stationSub(r))),
+    can ? h('button', { class: 'btn primary', title: radioPlayTip(r.name), onclick: radioPlayGuard(() => {
       stationMenuItems(r, { S, act, onChange, saved: false }).find(i => i.id === 'play')?.onclick?.();
-    } }, '▶') : null);
+    }) }, '▶') : null);
   wireStationChrome(el, r, { S, act, onChange, saved: false });
   return el;
 }
