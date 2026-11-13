@@ -407,18 +407,23 @@ Test 'player-only install does not set a service SID type or change CD-ROM class
     if (Test-Path (Join-Path $sb.State 'cdrom-class-sds.txt')) { throw 'player-only install wrote class security' }
 }
 
-Test '0.6.8-#14g: opt-in AirPlay speakers firewall rules (PTP 319-320 + audio, Private, local subnet, server program); re-run without the option removes them; uninstall removes them' {
+Test '0.7.0 t1930: AirPlay PTP firewall rule (UDP 319-320) is always added; audio UDP rule stays opt-in; re-run without the option keeps PTP and removes audio; uninstall removes both' {
     $sb = New-Sandbox; $r = Invoke-Setup $sb; Fail-IfNotOk $r $sb
-    HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'rules added without the opt-in'
+    $rules = Get-Rules $sb
+    Eq (Count $rules 'name=WavWiz AirPlay speakers (PTP)') 1 'PTP rule missing on a default install'
+    HasNot $rules 'WavWiz AirPlay speakers (audio)' 'audio rule added without the opt-in'
+    $ptp = ($rules -split "`n" | Where-Object { $_ -like 'WavWiz AirPlay speakers (PTP) |*' }) -join ''
+    Has $ptp 'localport=319-320'; Has $ptp 'protocol=UDP'; Has $ptp 'profile=private'; Has $ptp 'remoteip=localsubnet'; Has $ptp 'wavwiz-server.exe'
     Set-Content (Join-Path $sb.State 'rules.txt') ((Get-Rules $sb).TrimEnd() + "`nWavWiz AirPlay PTP | netsh hand-made")
     $r1 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r1 $sb
     $rules = Get-Rules $sb
     Eq (Count $rules 'name=WavWiz AirPlay speakers (PTP)') 1 'PTP rule'; Eq (Count $rules 'name=WavWiz AirPlay speakers (audio)') 1 'audio rule'
-    $ptp = ($rules -split "`n" | Where-Object { $_ -like 'WavWiz AirPlay speakers (PTP) |*' }) -join ''
-    Has $ptp 'localport=319-320'; Has $ptp 'protocol=UDP'; Has $ptp 'profile=private'; Has $ptp 'remoteip=localsubnet'; Has $ptp 'wavwiz-server.exe'
     HasNot $rules 'WavWiz AirPlay PTP |' 'hand-made rule not replaced'
     $r2 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r2 $sb; Eq (Count (Get-Rules $sb) 'name=WavWiz AirPlay speakers') 2 'duplicated on re-run'
-    $r3 = Invoke-Setup $sb; Fail-IfNotOk $r3 $sb; HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'not removed when the option is off'
+    $r3 = Invoke-Setup $sb; Fail-IfNotOk $r3 $sb
+    $rules = Get-Rules $sb
+    Eq (Count $rules 'name=WavWiz AirPlay speakers (PTP)') 1 'PTP rule removed when the audio option is off'
+    HasNot $rules 'WavWiz AirPlay speakers (audio)' 'audio rule not removed when the option is off'
     $r4 = Invoke-Setup $sb @{ AirPlayOut = 1 }; Fail-IfNotOk $r4 $sb
     $u = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'uninstall.ps1'), '-Root', $sb.App); Eq $u.ExitCode 0 $u.Output
     HasNot (Get-Rules $sb) 'WavWiz AirPlay speakers' 'left behind by uninstall'
@@ -770,7 +775,7 @@ Test 'F257-A R1 / 0.6.9 #17 WavWiz.iss layout: intro, radios, edit, URL, AirPlay
         if ($m.Groups.Count -ge 3 -and $m.Groups[2].Success) { if ([int]$m.Groups[2].Value -lt [int]$m.Groups[1].Value) { throw "$k step $($m.Groups[2].Value) < its height $($m.Groups[1].Value)" } }
     }
     Has $iss "AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall';"
-    Has $iss "ApNote.Caption := 'UDP 319-320 + audio; home network only.'"
+    Has $iss "ApNote.Caption := 'AirPlay 2 timing (UDP 319-320) is always allowed on the home network. Tick this for extra AirPlay audio UDP ports.'"
     if ($iss -match 'ScaleY\(214\)') { throw 'old fixed 100 % offsets still present' }
 }
 # mirror of WavWiz.iss ExistingHttpsPort (R2): '' = unknown -> no full URL

@@ -460,7 +460,7 @@ begin
   AirPlayOutCheck.Caption := 'Allow AirPlay speakers through the firewall';
   AirPlayOutCheck.Checked := Trim(ExpandConstant('{param:AIRPLAYOUT|' + GetPreviousData('AirPlayOut', '0') + '}')) = '1';
   ApNote := TNewStaticText.Create(NetPage); ApNote.Parent := NetPage.Surface; ApNote.WordWrap := True; ApNote.AutoSize := False; ApNote.SetBounds(ScaleX(18), Y, W - ScaleX(18), ScaleY(14));
-  ApNote.Caption := 'UDP 319-320 + audio; home network only.'; ApNote.FocusControl := AirPlayOutCheck; ApNote.AdjustHeight; Y := ApNote.Top + ApNote.Height + ScaleY(8);
+  ApNote.Caption := 'AirPlay 2 timing (UDP 319-320) is always allowed on the home network. Tick this for extra AirPlay audio UDP ports.'; ApNote.FocusControl := AirPlayOutCheck; ApNote.AdjustHeight; Y := ApNote.Top + ApNote.Height + ScaleY(8);
   PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, Y, W, NetPage.SurfaceHeight - Y); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
   { 0.7.0 item 3: an upgrade keeps the service account; a LocalSystem service may switch to Local Service (default off, /LIMITEDSERVICE=1) }
@@ -576,7 +576,7 @@ begin
   Result := 'WavWiz (BETA) {#AppVersion}' + NewLine + NewLine + MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine;
   if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
   else if WantServer then Result := Result + 'Network access: ' + IfThenStr(LanOnlyRadio.Checked, 'Home network only (' + ChosenLanAddress + ')', IfThenStr(ChosenLanAddress = '', '127.0.0.1 (this PC only)', ChosenLanAddress)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
-  if WantServer and AirPlayOutCheck.Checked then Result := Result + 'Firewall: AirPlay speakers allowed (UDP 319-320 + audio, home network only)' + NewLine + NewLine;   { 0.6.8-#14g }
+  if WantServer then Result := Result + 'Firewall: AirPlay 2 timing (UDP 319-320) on the home network' + IfThenStr(AirPlayOutCheck.Checked, ' + extra AirPlay audio UDP ports', '') + NewLine + NewLine;   { 0.6.8-#14g / 0.7.0 t1930 }
   if WantServer and ServiceRunsAsLocalSystem then Result := Result + 'Service account: ' + IfThenStr(LimitedSvcCheck.Checked, 'switch from LocalSystem to Local Service', 'keep LocalSystem') + NewLine + NewLine;   { 0.7.0 item 3 }
   if WantPlayer and (not WantServer) then Result := Result + 'Player will connect to: ' + IfThenStr(Trim(HostEdit.Text) = '', '(ask on first start)', Trim(HostEdit.Text)) + NewLine + NewLine;
   Result := Result + MemoTasksInfo;

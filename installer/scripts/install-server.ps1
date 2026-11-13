@@ -95,7 +95,9 @@ Set-ServerFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['http
 Set-ServerVpnFirewall $exe @([int]$plan.Config['httpPort'], [int]$plan.Config['httpsPort']) (Test-AllNetworksConfig $plan.Config)
 Set-Step 'server: firewall rules for the AirPlay and Spotify Connect receivers (private networks, local subnet only)'
 Set-ReceiverFirewall $exe $plan.Config
-Set-Step ('server: firewall rules for sending to AirPlay speakers (opt-in: ' + $(if ($AirPlayOut) { 'on' } else { 'off - removed if present' }) + ')')
+Set-Step 'server: firewall rule for AirPlay 2 timing (PTP UDP 319-320, private networks, local subnet)'
+Set-AirPlayPtpFirewall $exe
+Set-Step ('server: firewall rule for AirPlay speaker audio UDP (opt-in: ' + $(if ($AirPlayOut) { 'on' } else { 'off - removed if present' }) + ')')
 Set-AirPlayOutFirewall $exe ([bool]$AirPlayOut)
 
 if ($NoStart) { Say 'Not starting the service (-NoStart).' }

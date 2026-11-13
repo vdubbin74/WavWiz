@@ -156,7 +156,7 @@ public static class AirPlaySenderApi
 
     public static AirPlay.AirPlayOutputs Outs(Services s)
     {
-        lock (Gate) return s.AirPlayOut ??= new AirPlay.AirPlayOutputs(s.Registry, () => s.AirPlayBrowse)
+        lock (Gate) return s.AirPlayOut ??= new AirPlay.AirPlayOutputs(s.Registry, () => s.AirPlayBrowse, s.Log)   // 0.7.0 t1930: PTP / SETRATEANCHORTIME / metadata must reach wavwiz-server.log
             { AirPlay2Enabled = s.Cfg.AirPlay2Experimental, PreferBuffered = s.Cfg.AirPlay2Buffered, FfmpegPath = s.FfmpegPath,
               ArtFor = async (it, ct) => it.Kind == "track" && it.RefId is long tid && s.Library.Track(tid) is { } t ? await s.Art.GetAsync(t, 384, ct) : null };   // 0.6.8-#14e
     }

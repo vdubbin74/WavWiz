@@ -328,19 +328,28 @@ function Set-ReceiverFirewall([string]$ServerExe, $Config) {
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[2]), 'protocol=TCP', "program=$librespot") + $common) -Label 'netsh add Spotify Connect rule' -TimeoutSec 30)
     [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:ReceiverFirewallNames[3]), 'protocol=UDP', 'localport=5353', "program=$librespot") + $common) -Label 'netsh add Spotify Connect mDNS rule' -TimeoutSec 30)
 }
-# 0.6.8-#14g: OPT-IN rules for sending to AirPlay speakers (AirPlay 2 needs PTP on the fixed UDP ports 319-320; the AirPlay 1/2 audio,
-# control and timing ports are ephemeral). Same style: Private profile, local subnet only, scoped to the server program. Delete-then-add
-# = idempotent; not chosen -> the rules are removed. The two older hand-made rules from Settings > AirPlay speakers are replaced.
-$script:AirPlayOutFirewallNames = @('WavWiz AirPlay speakers (PTP)', 'WavWiz AirPlay speakers (audio)')
+# 0.6.8-#14g / 0.7.0 t1930: AirPlay speaker firewall rules (Private profile, local subnet only, scoped to the server program).
+# PTP on the fixed UDP ports 319-320 is ALWAYS added: AirPlay 2 metadata uses TCP, so a TV can show the song title while
+# inbound Delay_Req is blocked and audio/progress never start. The catch-all audio UDP rule (ephemeral AirPlay 1/2 audio
+# and control ports) stays OPT-IN. Delete-then-add = idempotent. The two older hand-made rules from Settings > AirPlay
+# speakers are replaced when the audio rule is enabled. Uninstall removes both.
+$script:AirPlayPtpFirewallName = 'WavWiz AirPlay speakers (PTP)'
+$script:AirPlayAudioFirewallName = 'WavWiz AirPlay speakers (audio)'
+$script:AirPlayOutFirewallNames = @($script:AirPlayPtpFirewallName, $script:AirPlayAudioFirewallName)
 $script:AirPlayOutLegacyNames = @('WavWiz AirPlay PTP', 'WavWiz AirPlay audio')
+function Set-AirPlayPtpFirewall([string]$Exe) {
+    $net = Get-SystemTool 'netsh.exe'
+    [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$script:AirPlayPtpFirewallName") -Label 'netsh delete old AirPlay speakers PTP rule' -AllowFail -TimeoutSec 30)
+    $common = @('dir=in', 'action=allow', 'profile=private', 'remoteip=localsubnet', "program=$Exe", 'enable=yes')
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayPtpFirewallName), 'protocol=UDP', 'localport=319-320') + $common) -Label 'netsh add AirPlay speakers PTP rule' -TimeoutSec 30)
+}
 function Set-AirPlayOutFirewall([string]$Exe, [bool]$Enable) {
     $net = Get-SystemTool 'netsh.exe'
-    foreach ($n in $script:AirPlayOutFirewallNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete old AirPlay speakers rule' -AllowFail -TimeoutSec 30) }
+    [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$script:AirPlayAudioFirewallName") -Label 'netsh delete old AirPlay speakers audio rule' -AllowFail -TimeoutSec 30)
     if (-not $Enable) { return }
     foreach ($n in $script:AirPlayOutLegacyNames) { [void](Invoke-Native -File $net -ArgList @('advfirewall', 'firewall', 'delete', 'rule', "name=$n") -Label 'netsh delete hand-made AirPlay rule' -AllowFail -TimeoutSec 30) }
     $common = @('dir=in', 'action=allow', 'profile=private', 'remoteip=localsubnet', "program=$Exe", 'enable=yes')
-    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayOutFirewallNames[0]), 'protocol=UDP', 'localport=319-320') + $common) -Label 'netsh add AirPlay speakers PTP rule' -TimeoutSec 30)
-    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayOutFirewallNames[1]), 'protocol=UDP') + $common) -Label 'netsh add AirPlay speakers audio rule' -TimeoutSec 30)
+    [void](Invoke-Native -File $net -ArgList (@('advfirewall', 'firewall', 'add', 'rule', ('name=' + $script:AirPlayAudioFirewallName), 'protocol=UDP') + $common) -Label 'netsh add AirPlay speakers audio rule' -TimeoutSec 30)
 }
 function Remove-ServerFirewall {
     $net = Get-SystemTool 'netsh.exe'; $name = $script:FirewallNames[0]

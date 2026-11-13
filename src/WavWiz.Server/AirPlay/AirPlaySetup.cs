@@ -36,6 +36,15 @@ public static class AirPlaySetup
     }
     static string Short(string m) { m = m.Trim(); return m.Length <= 80 ? m : m[..80] + "…"; }
 
+    /// <summary>0.7.0 t1930: AirPlay 2 needs a completed PTP handshake. Metadata travels over TCP, so a TV can show the
+    /// song title even when inbound UDP 319/320 (Delay_Req) is blocked and audio/progress never start. Null when the
+    /// clock looks healthy (followers have called back, or we have not sent Syncs yet).</summary>
+    public static string? PtpNoFollowersHint(long syncsSent, long delayReqs)
+    {
+        if (syncsSent <= 0 || delayReqs > 0) return null;
+        return "The speaker has not answered the timing clock (PTP). The song title can still show, but there is no audio and the progress bar stays at 0. On Windows, allow AirPlay speakers through the firewall (Settings > Network > AirPlay speakers): UDP ports 319 and 320, home network only. Then stop and start the song, or remove and add the speaker again.";
+    }
+
     // ---------------- 14f: WavWiz's own receiver ----------------
     /// <summary>TXT key this server puts on its own _raop advertisement so Find can recognise it without relying on the A record.</summary>
     public const string SelfTxtKey = "wwid";

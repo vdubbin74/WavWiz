@@ -97,4 +97,39 @@ public class AirPlaySetupTests
         Assert.StartsWith("transport|", AirPlaySenderApi.Block(ap2, false));   // AirPlay 2 off -> explained, not offered
         Assert.Null(AirPlaySenderApi.Block(ap2, true));
     }
+
+    [Fact]
+    public void Ptp_no_followers_hint_matches_title_without_audio()
+    {
+        Assert.Null(AirPlaySetup.PtpNoFollowersHint(0, 0));          // clock not sending yet
+        Assert.Null(AirPlaySetup.PtpNoFollowersHint(12, 1));         // TV has called back
+        Assert.Null(AirPlaySetup.PtpNoFollowersHint(12, 4));
+        var hint = AirPlaySetup.PtpNoFollowersHint(24, 0);           // Syncs leaving, no Delay_Req (typical blocked UDP 319/320)
+        Assert.NotNull(hint);
+        Assert.Contains("timing clock (PTP)", hint);
+        Assert.Contains("progress bar stays at 0", hint);
+        Assert.Contains("319", hint);
+        Assert.Contains("320", hint);
+        Assert.Contains("firewall", hint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AirPlay_PTP_firewall_diag_warns_when_the_rule_is_missing()
+    {
+        var missing = DiagnosticsApi.AirPlayPtpFirewallFrom(null);
+        Assert.Equal("airplay-firewall", missing.Id);
+        Assert.Equal("warn", missing.Status);
+        Assert.Contains("319-320", missing.Detail);
+        Assert.Contains("title", missing.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(missing.Fix);
+        Assert.Contains("AirPlay speakers", missing.Fix);
+
+        var none = DiagnosticsApi.AirPlayPtpFirewallFrom("No rules match the specified criteria.");
+        Assert.Equal("warn", none.Status);
+
+        var ok = DiagnosticsApi.AirPlayPtpFirewallFrom("Rule Name: WavWiz AirPlay speakers (PTP)\nEnabled: Yes\nLocalPort: 319-320");
+        Assert.Equal("ok", ok.Status);
+        Assert.Null(ok.Fix);
+        Assert.Contains("319-320", ok.Detail);
+    }
 }

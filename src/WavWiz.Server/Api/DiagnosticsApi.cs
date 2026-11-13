@@ -13,6 +13,7 @@ public sealed record DiagCheck(string Id, string Title, string Status, string De
 public static class DiagnosticsApi
 {
     public const string FirewallRule = "WavWiz Server (web, audio, clock)";
+    public const string AirPlayPtpFirewallRule = "WavWiz AirPlay speakers (PTP)";
 
     public static void Map(RouteGroupBuilder g, Services s)
     {
@@ -87,6 +88,8 @@ public static class DiagnosticsApi
 
         // --- firewall (Windows only, best effort) ---
         checks.Add(await Firewall());
+        if (s.Cfg.AirPlay2Experimental && OperatingSystem.IsWindows())
+            checks.Add(await AirPlayPtpFirewall());
 
         // --- certificate ---
         if (!s.Ca.Enabled) checks.Add(new("tls", "HTTPS certificate", "unknown", "HTTPS is not set up. That is fine for music; phones need it for the microphone (calibration) and for the phone-as-a-device page.", "Settings > Phone & HTTPS > Set up HTTPS."));
@@ -221,6 +224,24 @@ public static class DiagnosticsApi
             return new("firewall", "Windows Firewall", "ok", $"Rule present; active profile: {name?.Replace(" Settings:", "") ?? "unknown"}.", null);
         }
         catch (Exception e) { return new("firewall", "Windows Firewall", "unknown", "The firewall check failed: " + e.Message, null); }
+    }
+
+    /// <summary>0.7.0 t1930: AirPlay 2 needs inbound UDP 319-320 (PTP). The main server UDP rule does not cover those ports,
+    /// and the installer only added this rule when "Allow AirPlay speakers through the firewall" was ticked. Pure
+    /// <see cref="AirPlayPtpFirewallFrom"/> is unit-tested; this asks netsh the same way as the main firewall check.</summary>
+    public static DiagCheck AirPlayPtpFirewallFrom(string? ruleOutput) =>
+        ruleOutput != null && ruleOutput.Contains("Enabled", StringComparison.OrdinalIgnoreCase) && !ruleOutput.Contains("No rules match", StringComparison.OrdinalIgnoreCase)
+            ? new("airplay-firewall", "AirPlay speakers firewall", "ok", "The PTP rule (UDP 319-320) is present, so AirPlay 2 speakers can share WavWiz's timing clock.", null)
+            : new("airplay-firewall", "AirPlay speakers firewall", "warn", "The AirPlay 2 timing rule (UDP 319-320) is missing. A TV or speaker can show the song title but play no audio, with the progress bar stuck at 0.", "Settings > Network > AirPlay speakers has the rules to copy, or re-run WavWiz Setup and tick “Allow AirPlay speakers through the firewall”. Then stop and start the song, or remove and add the speaker again.");
+
+    static async Task<DiagCheck> AirPlayPtpFirewall()
+    {
+        try
+        {
+            var rule = await Netsh($"advfirewall firewall show rule name=\"{AirPlayPtpFirewallRule}\"");
+            return AirPlayPtpFirewallFrom(rule);
+        }
+        catch (Exception e) { return new("airplay-firewall", "AirPlay speakers firewall", "unknown", "The AirPlay firewall check failed: " + e.Message, null); }
     }
 
     private static async Task<string?> Netsh(string args)

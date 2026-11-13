@@ -21,6 +21,8 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         public required Func<int, Task> Volumer; public required Func<Task> Teardown; public required Action<int> Delayer; public required Func<object> Stats;
         public int Volume = 50; public int DelayMs; public string State = "connected"; public string? Error;
         public DateTimeOffset Since = DateTimeOffset.UtcNow;
+        /// <summary>0.7.0 t1930: non-fatal notice (for example PTP Delay_Req never arrived). Shown on the card; does not drop the session.</summary>
+        public string? Warning;
         // 0.6.8-#14e: outgoing metadata (title/artist/album, artwork, progress). Each kind switches itself off for this session after the
         // speaker rejects it once, so a picky speaker never gets a second try and the audio path is never touched.
         public Func<byte[], string, Dictionary<string, string>?, Task<RtspResponse>>? SetParam; public Func<uint>? RtpNow;
@@ -209,7 +211,7 @@ public sealed class AirPlayOutputs : IAsyncDisposable
 
     public object Snapshot() => _outs.Values.Select(o => new
     {
-        key = o.Key, id = o.Sink.Id, name = o.Name, address = o.Address, kind = o.Kind, volume = o.Volume, delayMs = o.DelayMs, state = o.State, error = o.Error,
+        key = o.Key, id = o.Sink.Id, name = o.Name, address = o.Address, kind = o.Kind, volume = o.Volume, delayMs = o.DelayMs, state = o.State, error = o.Error, warning = o.Warning,
         group = _reg.GroupOf(o.Sink.Id), stats = o.Stats(), since = o.Since,
         meta = new { text = o.MetaText, art = o.MetaArt, progress = o.MetaProgress, sent = o.MetaSent, rejected = o.MetaRejected }, inGroup = o.Subscribed,
     }).ToList();
@@ -229,14 +231,34 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         }
         catch { if (sink != null) await sink.DisposeAsync(); await s.DisposeAsync(); ptp.RemovePeer(ep.Address); throw; }
         var sk = sink;
-        return new Out
+        var o = new Out
         {
             Key = key, Name = name, Address = ep.ToString(), Kind = buffered ? "AirPlay 2 (buffered AAC)" : "AirPlay 2 (realtime ALAC)", Sink = sk, SinkDisp = sk, Volume = volume, DelayMs = delayMs,
             Volumer = v => s.SetVolumeAsync(RaopControls.ToAirPlayDb(v, percent: true)), Delayer = v => sk.DelayMs = v + q.DefaultDelayMs,
             Teardown = async () => { try { await s.TeardownAsync(); } catch { } await s.DisposeAsync(); ptp.RemovePeer(ep.Address); },
-            Stats = () => new { packets = sk.Packets, announces = sk.Announces, flushes = sk.Flushes, segments = sk.Segments, framesIn = sk.FramesIn, feedbacks = s.Feedbacks, quirk = q.Label },
+            Stats = () => new { packets = sk.Packets, announces = sk.Announces, flushes = sk.Flushes, segments = sk.Segments, framesIn = sk.FramesIn, feedbacks = s.Feedbacks, ptpSyncs = ptp.SyncsSent, ptpDelayReqs = ptp.DelayReqs, quirk = q.Label },
             SetParam = (b, t, h) => s.SetParameterAsync(b, t, h), RtpNow = () => sk.RtpAt(_reg.Clock.NowUs),   // 0.6.8-#14e: best effort on AirPlay 2
         };
+        WatchPtp(o, ptp);
+        return o;
+    }
+
+    /// <summary>0.7.0 t1930: after a few seconds of Syncs with no Delay_Req, tell the log and the card about the PTP firewall.</summary>
+    void WatchPtp(Out o, PtpMaster ptp)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(5000);
+                if (Get(o.Key) != o) return;
+                var hint = AirPlaySetup.PtpNoFollowersHint(ptp.SyncsSent, ptp.DelayReqs);
+                if (hint == null) return;
+                o.Warning = hint;
+                _log?.Invoke($"airplay {o.Key}: {hint}");
+            }
+            catch { }
+        });
     }
 
     public async ValueTask DisposeAsync()
