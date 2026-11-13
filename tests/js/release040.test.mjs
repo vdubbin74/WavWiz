@@ -8,8 +8,8 @@ const groups = [
   { id: 1, name: 'Kitchen', playbackId: 'default', linked: [], now: { title: 'A', state: 'playing' }, online: 2 },
   { id: 3, name: 'Basement', playbackId: 'zg:3', linked: ['Patio'], now: { title: 'C', state: 'paused' }, online: 1 },
   { id: 4, name: 'Patio', playbackId: 'zg:3', linked: ['Basement'], now: { title: 'C', state: 'paused' }, online: 0 }];
-test('choices: every zone in order, the Jukebox only once it has its own speakers', async () => {
-  const Z = await imp('zones40'); assert.equal(Z.choices(groups, null).length, 3); assert.equal(Z.choices(groups, { own: false }).length, 3);
+test('choices: every zone in order, the Jukebox only once it has its own speakers', async () => {   // 0.6.9 #21: an empty Jukebox shown in Devices is a choice too (marked empty)
+  const Z = await imp('zones40'); assert.equal(Z.choices(groups, null).length, 3); assert.equal(Z.choices(groups, { own: false, showInDevices: false }).length, 3); assert.equal(Z.choices(groups, { own: false }).at(-1).empty, true);
   const c = Z.choices(groups, { own: true, zoneId: 'jukebox', now: { title: 'J' } }); assert.equal(c.length, 4); assert.equal(c[3].key, 'jukebox'); assert.equal(c[1].linked, true); assert.equal(c[0].linked, false);
 });
 test('resolve: a stale or missing selection falls back to the first zone; nothing when there are no zones', async () => {

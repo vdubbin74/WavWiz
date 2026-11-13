@@ -240,24 +240,29 @@ export function treeEl(S, ctl, kit, st) {
     const name = linked ? box.zones.map(g => g.name).join(' + ') : lead.name;
     // 0.6.8 t1651: the now-playing line sits under the zone name (same .zl-now chrome as an expanded card). Idle / no title = one row, matching the AirPlay card.
     const line = now?.title ? Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }) : null;
-    return h('section', { class: 'qb42 empty42 zfold42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
+    return pickRow(h('section', { class: 'qb42 empty42 zfold42' + ' zpick42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === lead.id ? ' picked' : ''), 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
         h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name)),
         line,
-        h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here')));
+        h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))), () => controlZone(lead.id));
   };
+  // 0.6.9 #21 (t1852/t1853): clicking an empty / offline / folded zone row (not its buttons) CONTROLS that zone, like a full zone box does -
+  // before, the row had no click and its name opened the settings, so a zone with no speakers could never be picked here.
+  const pickRow = (el, fn) => { el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; fn();
+    // the hovered row is held back from the next patch (F263), so mark it Controlling right away instead of after the pointer leaves
+    el.closest('.tree42')?.querySelectorAll('.qb42.empty42.ctl').forEach(x => x !== el && x.classList.remove('ctl')); el.classList.add('ctl'); }); el.title = el.title || 'Click to control this zone'; return el; };
   // 0.4.9 F69: a zone with no speakers is one compact row (name, "No speakers" / "Offline") - still a drop target (its hint opens while dragging)
   // 0.5.2 F160: an OFFLINE zone (speakers, none online) keeps the compact Offline header but lists its real speakers as dimmed .gone rows (Move / Remove still work)
   const emptyBox = (g, off = false, box = null) => {
     const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).map(z => spRow(z, zg.id))) : [];
-    const wrap = h('section', { class: 'qb42 empty42' + (off ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
+    const wrap = h('section', { class: 'qb42 empty42 zpick42' + (off ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
         h('div', { class: 'ze42-row' }, h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
           h('span', { class: 'small dim ze42-note' }, off ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })),
         gone.length ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': `Speakers in ${g.name} (offline)` }, ...gone) : null,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here')));
     zoneCtx(g, wrap.firstChild);
-    return wrap;
+    return pickRow(wrap, () => controlZone(g.id));
   };
   // 0.4.9 F69: ONE manual order list over all zones (the saved zone order). Shown: ACTIVE zones (a speaker online) in that order, then
   // INACTIVE zones (speakers, none online) in that order, then EMPTY zones (no speakers). A zone that comes back online pops into its remembered slot.
@@ -280,15 +285,15 @@ export function treeEl(S, ctl, kit, st) {
   const jb = S.jb, jbIds = new Set(jb?.deviceIds || []), jbMs = (S.zones || []).filter(z => jbIds.has(z.id));
   const jbRank = !jb || !(jb.own || admin) || (jb.showInDevices === false && !jb.running) ? -1 : !jbMs.length ? 2 : jbMs.some(z => z.connected) ? 0 : 1;
   const jbBox = () => {
-    const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB);
+    const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB), pickJb = () => { Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
     const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); } }, 'Jukebox');
     if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
-          h('div', { class: 'ze42-row', onclick: open }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
+          h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
             ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.')),
           jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : null));   // F160
-      return wrap;
+      wrap.classList.add('zpick42'); return pickRow(wrap, pickJb);   // 0.6.9 #21: the row picks the (empty) Jukebox zone; name / Settings still open its settings
     }
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
     // F250-P8: phone Jukebox volume uses max + member PATCH (backend /jukebox/zone/volume is average Shift — not the phone contract).

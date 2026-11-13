@@ -1668,7 +1668,7 @@ function jukeboxCard(S, ctl) {
   return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (val.zoneOn ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), pill),
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, { deviceIds: [...ids] })), h('span', { class: 'dtag zjb', title: 'Guests choose the songs; they play only on these devices' }, 'JUKEBOX'), sel ? Z.controllingTag() : null)),
-    Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: jb.own ? () => Z.select(Z.JUKEBOX_KEY) : null, selected: sel }),
+    Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: sel }),   // 0.6.9 #21: an empty Jukebox can be picked too
     jbHintEl, h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute), jbSet,
     h('div', { class: 'dc3mem jbpick' }, h('span', { class: 'dlbl' }, 'SPEAKERS FOR JUKEBOX'),
       h('div', { class: 'dc3chips' }, ms.length ? ms.map(z => h('span', { class: 'zchip', title: z.name }, z.name)) : h('span', { class: 'small dim' }, 'None picked: the Jukebox plays in the main zone')),

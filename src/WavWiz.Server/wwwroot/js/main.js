@@ -942,7 +942,7 @@ window.addEventListener('wavwiz:zonesync', () => { if (qRenderedZone !== JSON.st
 /** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
 function phonePick() {
   const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;
-  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, c.name + (cur && c.key === cur.key ? ' (playing)' : ''))));
+  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, Z.choiceLabel(c, cur))));   // 0.6.9 #21
   sel.value = cur?.key || ''; return h('span', { class: 'qzwrap pqwrap' }, sel);
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)

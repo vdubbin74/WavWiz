@@ -5643,6 +5643,16 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .tree42.zdrag>[data-card].zins-before::before{top:-7px}
 .tree42.zdrag>[data-card].zins-after::before{bottom:-7px}
 
+
+/* 0.6.9 #21 (t1852/t1853): zones with no speakers can be picked - the row is clickable and shows the Controlling edge; the picked zone's name gets a
+   quiet "· no speakers" (the zone name shrinks first so the note never runs into the buttons) */
+.qb42.zpick42{cursor:pointer}
+.qb42.zpick42 .ze42-row .dname{cursor:pointer}
+.tree42 .qb42.empty42.ctl:not(.linked){border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.zlink.zempty{overflow:hidden}
+.zlink.zempty .zl-name{flex:0 1 auto}
+.zlink .zl-empty{flex:none;font-weight:400;opacity:.7;font-size:.92em;white-space:nowrap}
+.zlink .zl-empty[hidden]{display:none}
 /* ---- 0.6.9 #20 (t1850/t1851): Radio station text takes too much space. Station names clamp to 2 lines and the subtitle (genre / tags / URL)
    to 1 line, with "…", in tiles and list rows of My stations and the station finder; the full name, tags and address are in the tooltip
    (stationTip). This overrides the 0.6.9 #2 "names wrap, never …" rule for RADIO ONLY - albums, artists, genres and years keep full titles. ---- */

@@ -31,8 +31,8 @@ test('resolve: a deleted zone falls back to a remaining real zone; no zones = no
   assert.equal(resolve([], null, 'g:7'), null);
 });
 
-test('sync forgets a stale zone even when no zone is left', () => {
-  assert.match(src('zones40'), /if \(Array\.isArray\(S\.groups\) && loadSel\(\) && \(!c \|\| loadSel\(\) !== c\.key\)\) saveSel\(null\);/);
+test('sync forgets a stale zone even when no zone is left (0.6.9 #21: once the zones have loaded)', () => {
+  assert.match(src('zones40'), /if \(Array\.isArray\(S\.groups\) && \(S\._groupsAt \|\| S\.groups\.length\) && loadSel\(\) && \(!c \|\| loadSel\(\) !== c\.key\)\) saveSel\(null\);/);
 });
 
 test('"on <zone>" names the zone with one zone (no caret, no menu); the CONTROLLING picker chip still needs two', () => {
