@@ -94,9 +94,10 @@ test('Recent jobs stay in their own area and never overlay Drive or Tracks', asy
   assert.ok(layoutAt >= 0 && jobsAt > layoutAt, 'rip-jobs must be rendered after rip-layout, as a sibling');
   // Desktop fill-pane: the grid may grow but must not shrink below its content
   // (min-height:0 let Recent jobs collapse the grid so the cards painted over the form).
-  assert.match(css, /\.rip-layout\{[^}]*flex:1 0 0%;min-height:320px;overflow:hidden/);
+  // 0.6.9 ripper (t1858/t1859): the grid now keeps its full natural height (flex:none, nothing clipped) and jobs flow below it
+  assert.match(css, /\.rip-layout\{[^}]*flex:none;min-height:0;overflow:visible/);
   assert.match(css, /\.rip-trackcard\{[^}]*overflow:hidden/);
-  assert.match(css, /\.rip-tracks\{[^}]*flex:1 1 0%;min-height:8rem/);
+  assert.match(css, /\.rip-tracks\{[^}]*flex:1 1 auto;min-height:8rem;max-height:clamp\(/);
   assert.match(css, /\.rip-page\{[^}]*flex:1 1 auto;min-height:100%;max-height:100%/);
   assert.match(css, /\.rip-jobs\{[^}]*flex:none/);
   assert.doesNotMatch(css, /\.rip-jobs\{[^}]*(position:\s*(absolute|fixed)|grid-area:)/);
