@@ -13,6 +13,7 @@ COPY src/WavWiz.Dsp/ src/WavWiz.Dsp/
 COPY src/WavWiz.Measure/ src/WavWiz.Measure/
 COPY src/WavWiz.PlayerCore/ src/WavWiz.PlayerCore/
 COPY src/WavWiz.Server/ src/WavWiz.Server/
+COPY assets/ assets/
 RUN case "$TARGETARCH" in amd64) RID=linux-x64;; arm64) RID=linux-arm64;; *) echo "unsupported arch $TARGETARCH"; exit 1;; esac \
  && dotnet publish src/WavWiz.Server/WavWiz.Server.csproj -c Release -r $RID --self-contained false \
       -p:DebugType=none -o /app

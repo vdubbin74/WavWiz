@@ -5,7 +5,10 @@
 !src/WavWiz.Core/
 !src/WavWiz.Dsp/
 !src/WavWiz.Measure/
+!src/WavWiz.PlayerCore/
 !src/WavWiz.Server/
+!assets/
+!assets/**
 **/bin/
 **/obj/
 src/WavWiz.Server/wwwroot/preview-*.html
