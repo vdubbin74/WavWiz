@@ -199,7 +199,9 @@ export function openKiosk(S) {
   // 0.6.9 J1: covers come from the Jukebox art endpoint (a song with no picture of its own gets its album's cover); no picture = the tidy
   // placeholder (artBox), never a broken-image icon. The build's art version keeps them in the browser cache.
   const jbArt = (id, size) => (id ? `/api/v1/jukebox/art/${id}?size=${size}${artCv() ? '&cv=' + encodeURIComponent(artCv()) : ''}` : '');
-  const thumb = id => artBox(jbArt(id, 128), 'jb-th');
+  // 0.6.9 #28 (t1878): a Remote library song's cover comes through the guest Remote route the board names (`art`), with this session's code
+  const kArt = (x, size) => x?.trackId ? jbArt(x.trackId, size) : x?.art && code ? `${x.art}?size=${size}&j=${encodeURIComponent(code)}` : '';
+  const thumb = x => artBox(kArt(x, 128), 'jb-th');
 
   // ---- Modern (bug fixes only): cover, now playing, progress, requester | Up next with art, QR ----
   // 0.6.9 J2: the frame is built ONCE and each second only its text / progress changes. The Up next rows are rebuilt only when the songs
@@ -218,7 +220,7 @@ export function openKiosk(S) {
   let nextSig = null;
   mod.append(left, right);
   function drawModern(b) {
-    cover = setArt(cover, b.now?.trackId ? jbArt(b.now.trackId, 512) : '');
+    cover = setArt(cover, kArt(b.now, 512));
     const pos = b.now ? b.now.positionMs : 0, dur = b.now?.durationMs || 0, pct = dur ? Math.min(100, pos / dur * 100) : 0;
     const txt = (e, t) => { if (e.textContent !== t) e.textContent = t; };
     txt(mTitle, b.now?.title || 'Add the first song'); txt(mArtist, b.now?.artist || ''); mProg.style.setProperty('--p', pct + '%');
@@ -227,7 +229,7 @@ export function openKiosk(S) {
     if (sig !== nextSig) {
       nextSig = sig;
       nextBox.replaceChildren(h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
-        ...(rows.length ? rows.map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x.trackId), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
+        ...(rows.length ? rows.map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
           : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')]));
     }
     txt(jUrl, joinUrl); if (jQr.getAttribute('src') !== qrSrc()) jQr.src = qrSrc();
@@ -246,7 +248,7 @@ export function openKiosk(S) {
   function drawRetro(b) {
     const n = b.now, img = q('.jbr-disc img');
     // 0.6.9 J1: Jukebox art endpoint (album cover fallback); a song with no picture hides the <img> (the disc face shows) and is not asked for again
-    const u = n?.trackId ? jbArt(n.trackId, 512) : '';
+    const u = kArt(n, 512);
     if (u && !artFailed.has(u)) { if (img.getAttribute('src') !== u) { img.hidden = true; img.onload = () => { if (img.naturalWidth) img.hidden = false; else artFailed.add(u); }; img.onerror = () => { artFailed.add(u); img.hidden = true; }; img.src = u; } } else { img.removeAttribute('src'); img.hidden = true; }
     q('.jbr-badge.l').textContent = `${plural(b.perGuest, 'pick')} per guest`;
     q('.jbr-badge.r').textContent = b.locked ? 'Requests paused' : `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`;

@@ -182,8 +182,46 @@ public sealed class JukeboxService
     }
     public bool IsAllowed(long trackId) { var (w, ps) = Allowed(Cfg()); return Convert.ToInt32(_db.Scalar($"SELECT COUNT(*) FROM track WHERE id=$id AND {w}", ps.Append(("$id", (object?)trackId)).ToArray())) > 0; }
 
+    /// <summary>0.6.9 #28 (t1878): Remote library songs join the guest search only when the host allows ALL music (no folder / playlist picks -
+    /// those name local music only). Radio is never in it.</summary>
+    public bool RemoteOk() => RemoteOk(Cfg());
+    private static bool RemoteOk(Config c) => c.Folders.Count == 0 && c.Playlists.Count == 0;
+    private static bool Explicit(string? title, string? album) => (title ?? "").Contains("explicit", StringComparison.OrdinalIgnoreCase) || (album ?? "").Contains("explicit", StringComparison.OrdinalIgnoreCase);
+    /// <summary>0.6.9 #28: one song in the guest search. Local songs keep their old shape (id = track id); a Remote song has no id but `rid`
+    /// ("server:song", what /guest/add takes), `src` (the library's name, shown small) and `art` (the guest cover URL).</summary>
+    public sealed record Song(long? Id, string Title, string Artist, string Album, long DurationMs,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Rid = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Src = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Art = null);
+    static string Key(string? t, string? a) => string.Join(' ', (t ?? "").ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries)) + "\u0001" + string.Join(' ', (a ?? "").ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    /// <summary>0.6.9 #28, pure: Local songs first, then Remote ones that are not already there (same title + artist, case / spacing ignored - the
+    /// same song in both libraries shows once, as Local), also no duplicates between Remote servers. Live items and explicit ones (when filtered) are left out.</summary>
+    public static List<Song> MergeSongs(IEnumerable<Song> local, IEnumerable<(QueueItem It, string Src)> remote, bool explicitFilter, int max = 50)
+    {
+        var outp = local.ToList(); var seen = outp.Select(x => Key(x.Title, x.Artist)).ToHashSet();
+        foreach (var (it, src) in remote)
+        {
+            if (outp.Count >= max) break;
+            if (it.Kind != "remote" || !it.Location.StartsWith(Library.SubsonicService.Scheme) || explicitFilter && Explicit(it.Title, it.Album)) continue;
+            if (!seen.Add(Key(it.Title, it.Artist))) continue;
+            outp.Add(new Song(null, it.Title, it.Artist, it.Album, it.DurationMs, it.Location[Library.SubsonicService.Scheme.Length..], src, GuestArt(it)));
+        }
+        return outp;
+    }
+    /// <summary>0.6.9 #28: the guest-page cover for a Remote item: its /remote/{sid}/art/{cover} picture through the guest route (the session
+    /// code instead of a sign-in). Null for anything else.</summary>
+    public static string? GuestArt(QueueItem x)
+    {
+        const string P = "/api/v1/remote/";
+        if (x.Kind != "remote" || x.ArtUrl is not { } u || !u.StartsWith(P)) return null;
+        var rest = u[P.Length..]; var i = rest.IndexOf("/art/", StringComparison.Ordinal);
+        return i <= 0 ? null : $"/api/v1/jukebox/guest/rart/{rest[..i]}/{rest[(i + 5)..]}";
+    }
+
     /// <summary>Grouped search: Artists (song counts), Albums (track counts), Songs - counting only allowed music.</summary>
-    public object Search(string q)
+    public object Search(string q) => Search(q, null);
+    /// <summary>0.6.9 #28: the same, with Remote library songs (already fetched by the caller) merged into Songs.</summary>
+    public object Search(string q, IEnumerable<(QueueItem It, string Src)>? remote)
     {
         var (w, ps) = Allowed(Cfg()); var terms = (q ?? "").ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(6).ToArray();
         if (terms.Length == 0) return new { artists = Array.Empty<object>(), albums = Array.Empty<object>(), songs = Array.Empty<object>() };
@@ -194,8 +232,8 @@ public sealed class JukeboxService
         var albums = _db.Query($"SELECT a, album, COUNT(*) FROM (SELECT CASE WHEN album_artist<>'' THEN album_artist ELSE artist END a, album FROM track WHERE {w}) t WHERE album<>'' AND EXISTS (SELECT 1 FROM track x WHERE {w.Replace("path", "x.path").Replace("missing", "x.missing").Replace(" id IN", " x.id IN").Replace("lower(title)", "lower(x.title)").Replace("lower(album)", "lower(x.album)")} AND x.album=t.album AND (CASE WHEN x.album_artist<>'' THEN x.album_artist ELSE x.artist END)=t.a AND {tw.Replace("search", "x.search")}) GROUP BY a, album ORDER BY album COLLATE NOCASE LIMIT 20",
             r => new { artist = r.GetString(0), name = r.GetString(1), tracks = r.GetInt32(2) }, all);
         var songs = _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} AND {tw} ORDER BY artist, album, disc_no, track_no LIMIT 50",
-            r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, all);
-        return new { artists, albums, songs };
+            r => new Song(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4)), all);
+        return new { artists, albums, songs = remote == null ? songs : MergeSongs(songs, remote, Cfg().ExplicitFilter) };
     }
     /// <summary>0.3.4 H4 Retro CD: "More to pick" (B1-B5) - a few random allowed songs that are not already queued. Read-only suggestions.</summary>
     public object Picks(int n = 5)
@@ -212,9 +250,12 @@ public sealed class JukeboxService
     /// <summary>A guest adds ONE song. Returns an error sentence for the guest, or null.</summary>
     public string? Add(string guest, string name, long trackId, string? net = null) => AddAt(guest, name, trackId, net).Err;
     /// <summary>0.6.9 J4: adds like Add and also says where the song landed in Up next (1 = plays next; 0 = playing now) for "Added - you're #4".</summary>
-    public (string? Err, int Pos) AddAt(string guest, string name, long trackId, string? net = null)
+    public (string? Err, int Pos) AddAt(string guest, string name, long trackId, string? net = null) => AddAt(guest, name, trackId, null, net);
+    /// <summary>0.6.9 #28 (t1878): a guest's Remote library pick - the item was looked up on its server (SubsonicService.SongItem), same rules as a local song.</summary>
+    public (string? Err, int Pos) AddRemoteAt(string guest, string name, QueueItem? item, string? net = null) => AddAt(guest, name, 0, item ?? new QueueItem(0, "remote", "", "", "", "", 0, null), net);
+    private (string? Err, int Pos) AddAt(string guest, string name, long trackId, QueueItem? remote, string? net)
     {
-        var err = AddCore(guest, name, trackId, net, out var itemId); if (err != null) return (err, -1);
+        var err = AddCore(guest, name, trackId, remote, net, out var itemId); if (err != null) return (err, -1);
         lock (_l)
         {
             var q = Cond.Queue(); var now = Cond.Now(); var i = q.ToList().FindIndex(x => x.Id == itemId);
@@ -235,7 +276,7 @@ public sealed class JukeboxService
         }
         _ev.Publish("queue"); return null;
     }
-    private string? AddCore(string guest, string name, long trackId, string? net, out long itemId)
+    private string? AddCore(string guest, string name, long trackId, QueueItem? remote, string? net, out long itemId)
     {
         itemId = -1;
         lock (_l)
@@ -244,12 +285,12 @@ public sealed class JukeboxService
             if (Locked) return "The host has paused requests for now.";
             if (_banned.Contains(guest) || net != null && _bannedNet.Contains(net)) return "Requests from this phone are turned off by the host.";
             var c = Cfg();
-            if (!IsAllowed(trackId)) return "That song isn't available here.";
+            if (remote != null ? !RemoteOk(c) || remote.Kind != "remote" || remote.Location.Length == 0 || c.ExplicitFilter && Explicit(remote.Title, remote.Album) : !IsAllowed(trackId)) return "That song isn't available here.";
             var q = Cond.Queue(); var now = Cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
             if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
             var mine = Waiting(guest, net);
             if (mine >= c.PerGuest) return $"You already have {mine} song{(mine == 1 ? "" : "s")} waiting. Add more once one has played.";
-            var items = Cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
+            var items = remote != null ? new List<QueueItem> { remote } : Cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
             var it = items[0];
             if (c.ArtistCooldownMin > 0 && _artistAt.TryGetValue(it.Artist, out var at) && Clock() - at < TimeSpan.FromMinutes(c.ArtistCooldownMin)) return $"{it.Artist} played a moment ago. Try another artist for now.";
             // 0.3.5 J13: guest picks always go before random filler
@@ -298,8 +339,8 @@ public sealed class JukeboxService
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
         int? left = null; if (!string.IsNullOrEmpty(me)) lock (_l) left = Math.Max(0, c.PerGuest - Waiting(me, net));
         return new { running = Running, locked = Locked, style = c.Style, playsLeft = left, filler = now.Item != null && _filler.Contains(now.Item.Id), voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, voted = !string.IsNullOrEmpty(me) && _voteItem == now.Item?.Id && (_votes.Contains(me) || net != null && _voteNets.Contains(net)), beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
-            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(now.Item.Id, out var r0) && Same(r0, me, net), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
-            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) && r.Guest.Length > 0 ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) && Same(r2, me, net) }) };
+            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, art = GuestArt(now.Item), by = Who(now.Item.Id), mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(now.Item.Id, out var r0) && Same(r0, me, net), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
+            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, art = GuestArt(x), by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) && r.Guest.Length > 0 ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) && Same(r2, me, net) }) };
     }
 
     /// <summary>0.6.9 #27 (t1877): a radio station already in the Jukebox's queue (added before it started, or by an older client) is taken out - a stream

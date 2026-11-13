@@ -18,6 +18,10 @@ const added = new Set();   // track ids this phone added (button stays "✓ In" 
 const retro = () => board?.style === 'retro';
 const fmt = ms => { const s = Math.max(0, Math.floor((ms || 0) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const art = id => `/api/v1/jukebox/guest/art/${id}?size=128&j=${encodeURIComponent(code)}`;
+// 0.6.9 #28 (t1878): a Remote library song has no track id - its cover comes from the guest Remote route the server names (`art`)
+const artOf = x => x?.trackId ? art(x.trackId) : x?.art ? `${x.art}?size=128&j=${encodeURIComponent(code)}` : '';
+/** 0.6.9 #28: the song's key on this page (added marks): the track id, or "server:song" for a Remote song. */
+const songKey = s => s.id ?? s.rid;
 
 const name = () => { try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; } };
 function ended(text) { endedNow = true; app.replaceChildren(el('section', { class: 'jb-card' }, el('h1', {}, 'WavWiz Jukebox'), el('p', {}, text))); built = false; }
@@ -54,7 +58,7 @@ function paintTv() {
   const sig = rowsSig(next, code); if (sig === tvSig && bodySlot.firstChild) return; tvSig = sig;
   bodySlot.replaceChildren(el('section', { class: 'jbtv-next' }, el('h2', { class: 'jb-gh' }, 'Up next'),
     ...(next.length ? next.map((s, i) => el('div', { class: 'jb-row' }, el('span', { class: 'jbtv-n' }, String(i + 1)),
-      artBox(s.trackId ? art(s.trackId) : '', 'jb-thumb'),
+      artBox(artOf(s), 'jb-thumb'),
       el('div', { class: 'jb-t' }, el('b', {}, s.title || ''), el('small', {}, [s.artist, s.by ? 'requested by ' + s.by : null].filter(Boolean).join(' · ')))))
       : [el('p', { class: 'jb-dim' }, 'Nothing queued yet - scan the code to add a song.')])));
   foot.replaceChildren(el('div', { class: 'jbtv-join' }, el('img', { src: `/api/v1/jukebox/guest/qr.svg?j=${encodeURIComponent(code)}`, alt: 'Scan to add a song' }),
@@ -64,7 +68,7 @@ function paintTv() {
 async function add(t, btn) {
   btn.disabled = true;
   try {
-    const r = await call('/add', { guest: gid, name: nameIn.value.trim(), trackId: t.id }); added.add(t.id); markIn(btn);
+    const r = await call('/add', t.id != null ? { guest: gid, name: nameIn.value.trim(), trackId: t.id } : { guest: gid, name: nameIn.value.trim(), rid: t.rid }); added.add(songKey(t)); markIn(btn);
     flash(addedLine(r?.position), true);   // 0.6.9 J4: instant "Added! You're #4 in line."
     if (board && Number.isFinite(board.playsLeft)) { board.playsLeft = Math.max(0, board.playsLeft - 1); paintFoot(); }
     await refresh();
@@ -98,18 +102,20 @@ async function vote() {
 
 function songRow(s, i = 0) {
   const btn = el('button', { class: 'btn primary jb-add', type: 'button', onclick: () => add(s, btn), 'aria-label': `Add ${s.title}` }, retro() ? 'ADD' : 'Add');
-  if (added.has(s.id)) markIn(btn);
-  if (retro()) return el('div', { class: 'jb-row jbr-strip' }, el('span', { class: 'jbr-code' }, 'C' + (i + 1)), el('div', { class: 'jb-t' }, el('b', {}, s.title), el('small', {}, s.artist)), btn);
-  return el('div', { class: 'jb-row' }, artBox(art(s.id), 'jb-thumb'), el('div', { class: 'jb-t' }, el('b', {}, s.title), el('small', {}, s.artist)), btn);
+  if (added.has(songKey(s))) markIn(btn);
+  // 0.6.9 #28: a Remote library song says where it comes from, in the same small grey line as the artist ("Air · Navidrome")
+  const sub = s.src ? [s.artist, s.src].filter(Boolean).join(' · ') : s.artist;
+  if (retro()) return el('div', { class: 'jb-row jbr-strip' }, el('span', { class: 'jbr-code' }, 'C' + (i + 1)), el('div', { class: 'jb-t' }, el('b', {}, s.title), el('small', {}, sub)), btn);
+  return el('div', { class: 'jb-row' }, artBox(artOf({ trackId: s.id, art: s.art }), 'jb-thumb'), el('div', { class: 'jb-t' }, el('b', {}, s.title), el('small', {}, sub)), btn);
 }
 let npArt = null;
 /** 0.6.9 J2: the Now playing cover node is kept while the song is the same, so the 3-second refresh never re-requests or flashes it. */
-const npCover = (n, cls) => { const u = n?.trackId ? art(n.trackId) : ''; if (!npArt || npArt.dataset.art !== u || !npArt.classList.contains(cls)) npArt = artBox(u, cls); return npArt; };
+const npCover = (n, cls) => { const u = artOf(n); if (!npArt || npArt.dataset.art !== u || !npArt.classList.contains(cls)) npArt = artBox(u, cls); return npArt; };
 function paintNow() {
   const b = board, n = b.now;
   paintTabs();
   if (retro()) {
-    npSig = null; const u = n?.trackId ? art(n.trackId) : '';
+    npSig = null; const u = artOf(n);
     npSlot.replaceChildren(el('div', { class: 'jb-np jbr-np' }, el('div', { class: 'jbr-mini' + (n?.state === 'playing' ? ' spin' : '') }, u && !artFailed.has(u) ? npCover(n, 'jbr-art') : null),
       el('div', { class: 'jb-t' }, el('span', { class: 'jbr-kick' }, 'NOW PLAYING'), el('b', { class: 'jbr-script' }, n ? n.title : 'Add the first song')),
       n ? el('span', { class: 'jbr-vfd' }, fmt(n.positionMs)) : null));
@@ -158,7 +164,7 @@ function queueView(b) {
   const n = b.now, next = b.next || [];
   const who = x => x.mine ? 'you' : x.by || (x === n && b.filler ? 'Jukebox pick' : '');
   const row = (x, i, now) => { const r = el('div', { class: 'jb-row jbg-qrow' + (now ? ' now' : '') + (x.mine ? ' mine' : '') },
-    el('span', { class: 'jbg-qn' }, now ? '▶' : String(i + 1)), artBox(x.trackId ? art(x.trackId) : '', 'jb-thumb'),
+    el('span', { class: 'jbg-qn' }, now ? '▶' : String(i + 1)), artBox(artOf(x), 'jb-thumb'),
     el('div', { class: 'jb-t' }, el('b', {}, x.title || ''), el('small', {}, [x.artist, who(x) ? 'requested by ' + who(x) : null].filter(Boolean).join(' · '))),
     x.mine && !now ? el('span', { class: 'jbg-you' }, 'YOU') : null);
     // 0.6.9 J4: your own pick that has not started can be taken back (the server checks it is yours)

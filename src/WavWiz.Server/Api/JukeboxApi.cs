@@ -1,4 +1,5 @@
 using System.Text.Json;
+using WavWiz.Server.Media;
 namespace WavWiz.Server.Api;
 
 /// <summary>0.3.0 §1 Jukebox (beta) and §2 Remote mode endpoints.</summary>
@@ -42,24 +43,54 @@ public static class JukeboxApi
             if (jpg == null && jb.AlbumArtTrack(id) is long aid && aid != id && s.Library.Track(aid) is { } at) jpg = await s.Art.GetAsync(at, size ?? 192, c.RequestAborted);
             return LibraryApi.Send(c, jpg, 120);
         }
+        // ---- 0.6.9 #28 (t1878): Remote libraries in the Jukebox ----
+        async Task<List<(QueueItem, string)>?> RemoteSongs(string q, CancellationToken ct)
+        {
+            var rs = s.Remote; if (rs == null || string.IsNullOrWhiteSpace(q) || !jb.RemoteOk()) return null;
+            var labels = rs.Labels();
+            var asks = rs.Ids().Select(async sid =>
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct); cts.CancelAfter(TimeSpan.FromSeconds(3));
+                try { return (await rs.SearchSongItems(sid, q.Trim(), 30, cts.Token)).Select(x => (x, labels.GetValueOrDefault(sid, "Remote"))).ToList(); }
+                catch { return new List<(QueueItem, string)>(); }   // offline / slow server: Local results still come back
+            }).ToList();
+            return (await Task.WhenAll(asks)).SelectMany(x => x).ToList();
+        }
+        async Task<QueueItem?> RemoteSong(string rid, CancellationToken ct)
+        {
+            var i = rid.IndexOf(':'); if (s.Remote == null || i <= 0 || i == rid.Length - 1) return null;
+            try { using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct); cts.CancelAfter(TimeSpan.FromSeconds(5)); return await s.Remote.SongItem(rid[..i], rid[(i + 1)..], cts.Token); }
+            catch { return null; }
+        }
+        async Task<byte[]?> RemoteCover(string sid, string id, int size, CancellationToken ct)
+        {
+            try { return await s.Remote!.Cover(sid, id, Math.Clamp(size, 32, 512), ct); } catch { return null; }
+        }
         string JoinUrl(HttpContext c) => $"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/jukebox.html?j={jb.Code}";
 
         // ---- guests: no sign-in, the session code only ----
         IResult Guard(HttpContext c, Func<IResult> f) => jb.Guest(c) ? f() : Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
         g.MapGet("/jukebox/guest/board", (HttpContext c, string? g) => Guard(c, () => Results.Json(jb.Board(false, g, jb.NetKey(c.Connection.RemoteIpAddress))))).Anon();   // 0.3.4: ?g=<guest id> marks this phone's picks
-        g.MapGet("/jukebox/guest/search", (HttpContext c, string? q) => Guard(c, () => Results.Json(jb.Search(q ?? "")))).Anon();
+        // 0.6.9 #28 (t1878): Remote library songs are merged into Songs (Local first, the same song once); a slow or offline server is skipped
+        g.MapGet("/jukebox/guest/search", async (HttpContext c, string? q) => !jb.Guest(c) ? Guard(c, () => Results.Ok()) : Results.Json(jb.Search(q ?? "", await RemoteSongs(q ?? "", c.RequestAborted)))).Anon();
         g.MapGet("/jukebox/guest/picks", (HttpContext c, int? n) => Guard(c, () => Results.Json(jb.Picks(n ?? 5)))).Anon();   // 0.3.4 H4: Retro CD B1-B5
         g.MapGet("/jukebox/guest/artist", (HttpContext c, string name) => Guard(c, () => Results.Json(jb.ArtistSongs(name)))).Anon();
         g.MapGet("/jukebox/guest/album", (HttpContext c, string artist, string album) => Guard(c, () => Results.Json(jb.AlbumSongs(artist, album)))).Anon();
         // cover art for guests: only songs from the allowed music
         // 0.6.9 J1: a song with no picture of its own gets its album's cover (the album's song that has one), like the big screen
+        // 0.6.9 #28: the cover of a Remote library song for guests (search rows, Now playing, Up next) - only while Remote songs are allowed
+        g.MapGet("/jukebox/guest/rart/{sid}/{id}", async (string sid, string id, int? size, HttpContext c) =>
+            jb.Guest(c) && jb.RemoteOk() && s.Remote != null ? LibraryApi.Send(c, await RemoteCover(sid, id, size ?? 128, c.RequestAborted), 120) : Results.NotFound()).Anon();
         g.MapGet("/jukebox/guest/art/{id:long}", async (long id, int? size, HttpContext c) => jb.Guest(c) && jb.IsAllowed(id) ? await JbCover(c, id, size) : Results.NotFound()).Anon();
         g.MapPost("/jukebox/guest/add", async (HttpContext c) =>
         {
             if (!jb.Guest(c)) return Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
-            var b = await c.Request.Body(); var gid = (b.Str("guest") ?? "").Trim(); var id = b.Long("trackId");
-            if (gid.Length is < 8 or > 64 || id == null) return Ext.Bad("Something went wrong. Reload the page.");
-            var (err, pos) = jb.AddAt(gid, b.Str("name") ?? "", id.Value, jb.NetKey(c.Connection.RemoteIpAddress)); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { ok = true, position = pos });
+            var b = await c.Request.Body(); var gid = (b.Str("guest") ?? "").Trim(); var id = b.Long("trackId"); var rid = b.Str("rid");
+            if (gid.Length is < 8 or > 64 || id == null && string.IsNullOrEmpty(rid)) return Ext.Bad("Something went wrong. Reload the page.");
+            // 0.6.9 #28: a Remote library song ("server:song" from the search) is looked up on its server - title, artist and stream never come from the phone
+            var (err, pos) = id != null ? jb.AddAt(gid, b.Str("name") ?? "", id.Value, jb.NetKey(c.Connection.RemoteIpAddress))
+                : jb.AddRemoteAt(gid, b.Str("name") ?? "", jb.RemoteOk() ? await RemoteSong(rid!, c.RequestAborted) : null, jb.NetKey(c.Connection.RemoteIpAddress));
+            return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { ok = true, position = pos });
         }).Anon();
         // 0.6.9 J4: a guest removes one of their own picks that has not started yet
         g.MapPost("/jukebox/guest/remove", async (HttpContext c) =>
