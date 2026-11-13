@@ -69,3 +69,15 @@ test('#21 a stored pick survives a page load: Z.init with the empty start-up zon
   assert.equal(Z.current().key, 'g:3', 'the empty Rooftop zone is still the pick'); assert.equal(Z.current().empty, true);
   S.groups = groups.slice(0, 2); Z.sync(); assert.equal(ls.getItem('wavwiz.zone'), null, 'a zone that is really gone is still forgotten');
 });
+
+test('#21b (t1854): an empty zone that plays gets the same green dot as a zone with speakers; idle stays grey', async () => {
+  const Z = await imp('zones40');
+  assert.equal(Z.zoneDot([], { state: 'playing' }), 'ok'); assert.equal(Z.zoneDot([], { state: 'paused' }), 'off');
+  assert.equal(Z.zoneDot([], { state: 'stopped', title: 'Song 23' }), 'off'); assert.equal(Z.zoneDot([], null), 'off');
+  assert.equal(Z.zoneDot([{ connected: true }], null), 'ok', 'zones with speakers keep their online rule'); assert.equal(Z.zoneDot([{ connected: false }], { state: 'playing' }), 'off');
+  const play = Z.choices([{ id: 4, name: 'Patio', deviceIds: [], playbackId: 'zg:4', now: { state: 'playing' } }], null)[0];
+  assert.equal(Z.choiceLabel(play, null), 'Patio · no speakers · playing');
+  const t = src('tree42.js'); assert.match(t, /off \? null : emptyDot\(g\.now\)/); assert.match(t, /class: 'dot zfold42-dot ze42-dot '/, 'same green as a folded zone with speakers');
+  assert.match(src('devices.js'), /class: 'dot ' \+ Z\.zoneDot\(ms, g\.now\)/, 'zone cards');
+  assert.match(src('zones40.js'), /c\.online \|\| \(c\.empty && c\.now\?\.state === 'playing'\) \? 'ok' : 'off'/, 'zone menu');
+});

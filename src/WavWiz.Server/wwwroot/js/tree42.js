@@ -248,6 +248,8 @@ export function treeEl(S, ctl, kit, st) {
   };
   // 0.6.9 #21 (t1852/t1853): clicking an empty / offline / folded zone row (not its buttons) CONTROLS that zone, like a full zone box does -
   // before, the row had no click and its name opened the settings, so a zone with no speakers could never be picked here.
+  // 0.6.9 #21b (t1854): an empty zone gets the same green dot as a zone with speakers while its stream plays (grey when idle) - Z.zoneDot
+  const emptyDot = now => { const on = Z.zoneDot([], now) === 'ok'; return h('span', { class: 'dot zfold42-dot ze42-dot ' + (on ? 'ok' : 'off'), title: on ? 'Playing (no speakers in this zone)' : 'Idle', 'aria-label': on ? 'Active' : 'Not active', role: 'img' }); };
   const pickRow = (el, fn) => { el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; fn();
     // the hovered row is held back from the next patch (F263), so mark it Controlling right away instead of after the pointer leaves
     el.closest('.tree42')?.querySelectorAll('.qb42.empty42.ctl').forEach(x => x !== el && x.classList.remove('ctl')); el.classList.add('ctl'); }); el.title = el.title || 'Click to control this zone'; return el; };
@@ -257,8 +259,8 @@ export function treeEl(S, ctl, kit, st) {
     const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).map(z => spRow(z, zg.id))) : [];
     const wrap = h('section', { class: 'qb42 empty42 zpick42' + (off ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
-        h('div', { class: 'ze42-row' }, h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
-          h('span', { class: 'small dim ze42-note' }, off ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })),
+        h('div', { class: 'ze42-row' }, off ? null : emptyDot(g.now), h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
+          h('span', { class: 'small dim ze42-note' }, off ? 'Offline' : g.now?.state === 'playing' ? 'Playing · no speakers' : 'No speakers'), h('span', { class: 'grow' })),
         gone.length ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': `Speakers in ${g.name} (offline)` }, ...gone) : null,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here')));
     zoneCtx(g, wrap.firstChild);
