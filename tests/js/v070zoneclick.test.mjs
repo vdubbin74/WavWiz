@@ -1,5 +1,6 @@
-// t1948u: clicking a zone (Devices zone cards / name, and any zone picker) must switch Now Playing and the Queue
-// to that zone. A drag must not also count as a click (the follow-up click can land on the drop-target card, not the grip).
+// t1948u / t1954u: in Devices, clicking the zone NAME opens zone settings (st.onZone) and must not also
+// select the zone. Clicking the rest of the zone BOX / card selects that zone for Now Playing and the Queue.
+// A drag must not also count as a click (the follow-up click can land on the drop-target card, not the grip).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,15 +32,14 @@ const zones = [
   { id: 11, name: 'Hall', enabled: true, connected: true, muted: false, volume: 40 },
 ];
 
-test('t1948u wiring: a Devices zone card / zone name click controls that zone (Z.select); settings stay on the ⋮ menu', () => {
+test('t1954u wiring: the zone name opens settings (stopPropagation); the rest of the box / card selects the zone', () => {
   const t = src('tree42.js'), z = src('zones40.js'), m = src('main.js');
-  assert.match(t, /const zoneName = \(id, label\) => h\('button', \{ type: 'button', class: 'dname zname ell', title: `Control \$\{label\}`, onclick: ev => \{ ev\.stopPropagation\(\); controlZone\(id\); \} \}, label\);/);
+  assert.match(t, /const zoneName = \(id, label\) => h\('button', \{ type: 'button', class: 'dname zname ell', title: `\$\{label\} - open the zone settings`, onclick: ev => \{ ev\.stopPropagation\(\); st\.onZone\(id\); \} \}, label\);/);
   assert.match(t, /const card = h\('div', \{ class: 'zcard42' \+ \(on \? '' : ' off'\), 'data-group-id': g\.id, onclick: ev => \{ ev\.stopPropagation\(\); if \(ev\.target\.closest\([^)]+\)\) return; controlZone\(g\.id\); \}/);
   assert.match(t, /const controlZone = id => \{ Z\.select\('g:' \+ id\);/);
-  assert.doesNotMatch(t, /class: 'zcard42'[^;]*st\.onZone\(g\.id\)/, 'the zone card no longer only opens settings');
-  assert.doesNotMatch(t, /class: 'dname zname ell', title: `\$\{g\.name\} - open the zone settings`, onclick: \(\) => st\.onZone\(g\.id\)/);
+  assert.match(t, /title: 'Jukebox - open the zone settings \(pick its speakers\)', onclick: ev => \{ ev\.stopPropagation\(\); open\(\); \}/);
+  assert.match(t, /data-group-id': JB, onclick: ev => \{ ev\.stopPropagation\(\); if \(ev\.target\.closest\([^)]+\)\) return; pickJb\(\); \}/);
   assert.match(t, /settings: \(\) => st\.onZone\(g\.id\)/, '⋮ Zone settings still opens the pane');
-  // pickers already switch the zone that Now Playing and the Queue follow
   assert.match(z, /onclick: \(\) => \{ const edit = !!menu\?._for\?._link; select\(c\.key\);/);
   assert.match(z, /export function select\(key\) \{ markPicked\(\); saveSel\(key\); closeMenu\(\); sync\(\);/);
   assert.match(m, /Z\.select\(sel\.value\)/, 'the Queue zone list calls Z.select');
@@ -74,7 +74,7 @@ function kit() {
   };
 }
 
-test('t1948u: clicking a zone card / name sets the selected zone for Now Playing and the Queue; a drag does not', async () => {
+test('t1954u: the name opens settings and does not select; the box selects; a drag does neither', async () => {
   const Z = await imp('zones40.js');
   const { getApiZone } = await imp('util.js');
   const { treeEl } = await imp('tree42.js');
@@ -85,27 +85,43 @@ test('t1948u: clicking a zone card / name sets the selected zone for Now Playing
   assert.equal(Z.current()?.key, 'g:1', 'starts on the first zone');
   assert.equal(getApiZone(), 'zg:1', 'Now Playing / Queue API zone follows the pick');
 
+  const opened = [];
   const ctl = { refreshAll() {}, refreshNow() {}, go() {}, act() {}, setDevSize() {}, openQueue() {} };
-  const st = { zone: null, spk: null, onZone() {}, onSpk() {}, busy() { return false; } };
+  const st = { zone: null, spk: null, onZone(id) { opened.push(id); }, onSpk() {}, busy() { return false; } };
   const root = treeEl(S, ctl, kit(), st);
   doc.body.append(root);
 
   const upName = [...root.querySelectorAll('.zname')].find(b => b.textContent === 'Upstairs');
   assert.ok(upName, 'the Upstairs zone name is in the Devices tree');
+  const card = upName.closest('.zcard42') || upName.closest('[data-group-id="2"]');
+  assert.ok(card, 'the Upstairs zone card is in the Devices tree');
+  const body = card.querySelector('.zc42-body') || card.querySelector('.dot') || card;
+
+  // name: settings only — must not bubble into a select
+  opened.length = 0;
   upName.dispatchEvent(ev('click', { target: upName, bubbles: true }));
-  assert.equal(Z.current()?.key, 'g:2', 'a click on the zone name selects it');
+  assert.deepEqual(opened, [2], 'a click on the zone name opens zone settings');
+  assert.equal(Z.current()?.key, 'g:1', 'the name click does not also select the zone');
+  assert.equal(getApiZone(), 'zg:1', 'Now Playing / Queue stay on the previous zone');
+
+  // the rest of the box / card selects the zone and does not open settings
+  opened.length = 0;
+  body.dispatchEvent(ev('click', { target: body, bubbles: true }));
+  assert.equal(Z.current()?.key, 'g:2', 'a click on the rest of the zone box selects it');
   assert.equal(Z.current()?.name, 'Upstairs');
   assert.equal(getApiZone(), 'zg:2', 'Queue / Now Playing requests now go to Upstairs');
+  assert.deepEqual(opened, [], 'a box click does not open settings');
 
-  // a finished drag must not also pick the card under the pointer (the flag lives on the tree)
+  // a finished drag must not also pick or open settings (the flag lives on the tree)
   Z.select('g:1');
+  opened.length = 0;
   assert.equal(Z.current()?.key, 'g:1');
   root.dataset.justdragged = '1';
-  const card = upName.closest('.zcard42') || upName.closest('[data-group-id="2"]') || upName;
-  card.dispatchEvent(ev('click', { target: upName, bubbles: true }));
+  body.dispatchEvent(ev('click', { target: body, bubbles: true }));
   assert.equal(Z.current()?.key, 'g:1', 'a drag is not also a click: the selected zone stays put');
+  assert.deepEqual(opened, [], 'a drag does not open settings either');
   delete root.dataset.justdragged; root.removeAttribute('data-justdragged');
-  upName.dispatchEvent(ev('click', { target: upName, bubbles: true }));
-  assert.equal(Z.current()?.key, 'g:2', 'after the drag flag clears, a real click selects again');
+  body.dispatchEvent(ev('click', { target: body, bubbles: true }));
+  assert.equal(Z.current()?.key, 'g:2', 'after the drag flag clears, a real box click selects again');
   root.remove();
 });

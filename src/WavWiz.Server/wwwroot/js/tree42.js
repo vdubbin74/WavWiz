@@ -67,7 +67,7 @@ export function treeEl(S, ctl, kit, st) {
   const done = () => { ctl.refreshAll?.(); window.dispatchEvent(new CustomEvent('wavwiz:zones-changed')); };
   const root = h('div', { class: 'tree42', 'data-tree': '1' });
   // 0.4.9 F69: a tap / click on a speaker row opens the speaker settings (every Devices panel), with a Back.
-  // t1948u: a tap / click on a zone card / zone name selects that zone for Now Playing and the Queue (settings stay on the ⋮ menu).
+  // t1948u / t1954u: a tap / click on the zone NAME opens zone settings; a tap / click on the rest of the zone box / card selects that zone for Now Playing and the Queue.
   const phone = typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
   // DIG idle collapse: hide .zsp42 on idle boxes; expand control + session preference
   const OPEN_KEY = 'wavwiz.qb42.open';
@@ -88,8 +88,8 @@ export function treeEl(S, ctl, kit, st) {
   const controlZone = id => { Z.select('g:' + id); const np = !phone && document.querySelector('.nowcol');
     if (np && np.offsetParent && np.getBoundingClientRect().width > 0) { np.scrollIntoView?.({ block: 'nearest' }); (np.querySelector('.tbtn.play, button') || np).focus?.({ preventScroll: true }); } else ctl.go?.('now'); };
   const zname = id => groups.find(g => g.id === id)?.name || '';
-  // t1948u: the zone name (and the card around it) controls the zone; ⋮ / Zone settings still open the pane
-  const zoneName = (id, label) => h('button', { type: 'button', class: 'dname zname ell', title: `Control ${label}`, onclick: ev => { ev.stopPropagation(); controlZone(id); } }, label);
+  // t1954u: the zone NAME opens settings (stopPropagation so it does not also select); the rest of the box / card selects the zone
+  const zoneName = (id, label) => h('button', { type: 'button', class: 'dname zname ell', title: `${label} - open the zone settings`, onclick: ev => { ev.stopPropagation(); st.onZone(id); } }, label);
   const create = () => promptName('New zone', '', async v => { await createZone(v, []); done(); });
   // 0.4.3 #9: the counts are plain text inside the accent caps title, as in the render
   root.append(h('div', { class: 'pane-h dsec-h tree42-h' }, h('span', { class: 'tree42-n' }, ...countsText(model).split(/(\d+)/).map(x => /^\d+$/.test(x) ? h('span', { class: 'tree42-num' }, x) : x)), h('span', { class: 'grow' }),
@@ -165,7 +165,7 @@ export function treeEl(S, ctl, kit, st) {
     const badge = h('span', { class: 'zcount42', title: cnt?.title || '', 'aria-label': `${ms.length} speaker${ms.length === 1 ? '' : 's'}` }, icon('volume'), String(ms.length));
     const gut = h('button', { type: 'button', class: 'zgut42', 'aria-label': `${g.name} zone actions`, title: 'Zone actions',
       onclick: ev => { ev.stopPropagation(); const r = ev.currentTarget.getBoundingClientRect(); ev.currentTarget.closest('.zwrap42').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.right, clientY: r.top + 8 })); } }, '⋮');
-    // t1948u: the zone card (name, count, tags, empty area) selects this zone for Now Playing + Queue; its own controls keep their behavior
+    // t1948u / t1954u: the rest of the zone card (not the name or its own controls) selects this zone for Now Playing + Queue
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': g.id, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.tagact,.dgrip,.dgrip42,.cgrip69,.zgut42,.pill42,.tog')) return; controlZone(g.id); } }, gut,
       h('div', { class: 'zc42-body' },
         h('div', { class: 'zc42-1' }, h('span', { class: 'dot ' + (connected ? 'ok' : 'off'), title: `${connected} of ${ms.length} online` }), name, badge, h('span', { class: 'zacts' }, linked ? null : lb, pill)),
@@ -257,7 +257,7 @@ export function treeEl(S, ctl, kit, st) {
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))), () => controlZone(lead.id));
   };
   // 0.6.9 #21 (t1852/t1853): clicking an empty / offline / folded zone row CONTROLS that zone, like a full zone box does -
-  // t1948u: the name does too (it used to only open settings, so a click on the obvious target did not switch Now Playing / Queue).
+  // t1954u: the name opens zone settings (and must not also select); the rest of the row / box selects the zone.
   // 0.6.9 #21c (t1856): an empty zone's dot is always grey - green needs an active (online) speaker; while it plays the note says "Playing · no speakers"
   const emptyDot = now => h('span', { class: 'dot zfold42-dot ze42-dot off', title: now?.state === 'playing' ? 'Playing, but no speakers in this zone' : 'No speakers', 'aria-label': 'Not active', role: 'img' });
   const pickRow = (el, fn) => { el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; fn();
@@ -315,19 +315,19 @@ export function treeEl(S, ctl, kit, st) {
   const un = model.unassigned;
   // 0.4.9 F76: the Jukebox zone is in the tree again (it was only drawn once it had speakers, so nobody could pick them). Admins always see it,
   // others once it has its own speakers. Same F69 ranks / click map: active (a picked speaker online) = a queue box after the active zones,
-  // else a compact row ("No speakers" / "Offline") with the empty zones; the name and the box both select it (Settings stays on the Settings button).
+  // else a compact row ("No speakers" / "Offline") with the empty zones; the name opens settings, the rest of the box selects it.
   const jb = S.jb, jbIds = new Set(jb?.deviceIds || []), jbMs = (S.zones || []).filter(z => jbIds.has(z.id));
   const jbRank = !jb || !(jb.own || admin) || (jb.showInDevices === false && !jb.running) ? -1 : !jbMs.length ? 2 : jbMs.some(z => z.connected) ? 0 : 1;
   const jbBox = () => {
     const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB), pickJb = () => { Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
-    const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Control the Jukebox', onclick: ev => { ev.stopPropagation(); pickJb(); } }, 'Jukebox');
+    const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); } }, 'Jukebox');
     if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
           h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
             ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.')),
           jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : null));   // F160
-      wrap.classList.add('zpick42'); return pickRow(wrap, pickJb);   // 0.6.9 #21 / t1948u: the row and the name pick the (empty) Jukebox zone; Settings still opens its settings
+      wrap.classList.add('zpick42'); return pickRow(wrap, pickJb);   // 0.6.9 #21 / t1954u: the row picks the (empty) Jukebox zone; the name opens its settings
     }
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
     // F250-P8: phone Jukebox volume uses max + member PATCH (backend /jukebox/zone/volume is average Shift — not the phone contract).
