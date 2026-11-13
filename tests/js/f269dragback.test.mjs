@@ -27,7 +27,7 @@ test('F269 wiring: source read at drag start, optimistic redraw, hover hold skip
   assert.doesNotMatch(t, /const from = \(S\.groups \|\| \[\]\)\.find\(g => \(g\.deviceIds \|\| \[\]\)\.includes\(id\)\), fromKey/);
   assert.match(t, /const plan = movePlan\(S\.groups, z\.id, toId\);\s*applyMovePlan\(S, plan\);\s*try \{ window\.dispatchEvent\(new CustomEvent\('wavwiz:devredraw'\)\)/);
   assert.match(d, /if \(!force && !memMoved && openSg === topen && tnode && tnode\.isConnected && hov42\(tnode\)\) return tnode;/);
-  assert.match(d, /if \(!force && !memMoved && openSg === topen && tnode && tnode\.isConnected\) \{ const fresh = treeEl/);
+  assert.match(d, /if \(!force && !memMoved && openSg === topen && tnode\) \{ const fresh = treeEl/);   // 0.6.9 #24: also patched off-screen (rail)
   assert.match(d, /tmem = mem;/);
   assert.match(m, /if \(\(S\._optAt \|\| 0\) >= t0\) g = S\.groups;/);
 });

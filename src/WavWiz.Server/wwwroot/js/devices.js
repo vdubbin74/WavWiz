@@ -930,7 +930,8 @@ function tree42Kit(S, ctl, X) {
     if (!force && openSg === topen && tnode && sg === tsig) { if (lv === tlive) return tnode; const r = patchLive42(tnode, treeEl(S, ctl, kit42, st42)); if (r === 1) tlive = lv; if (r) return tnode; }
     // F151: a status flap (online / buffering / muted / cap) changed sig42 but not the tree's layout: swap only the rows that differ instead of
     // rebuilding the whole tree (that rebuild was the occasional "Devices reloads" flash: art re-decoded, scroll + hover reset)
-    if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
+    // 0.6.9 #24: patched in place while off-screen on the rail too (it used to need isConnected, so a closed panel's tree was rebuilt on open)
+    if (!force && !memMoved && openSg === topen && tnode) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
     // DIG-amend2 R1: explicit idle expand (openSg!==topen) must rebuild even while pointer stays on Show speakers; keep hover defer only for background refreshes.
     if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b (F269: never for a membership move)
     const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : '' } : null;
@@ -1022,7 +1023,10 @@ export function devicesPanel(S, ctl) {
   // F222 t1155u: --devstdw = standard body OUTER width (offsetWidth, includes classic SB lane) = the Speakers grid track. No gutter math.
   // 0.6.8c: never measure the Auto-layout slide-over (.tight) or the phone page - neither is the docked panel, and a narrow value measured there
   // used to stick in --devstdw so the expanded Speakers column stayed narrow after the window grew back. A fresh measure also refreshes the property.
-  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold') || d?.classList.contains('tight') || (HASWIN && window.innerWidth <= 900)) return;
+  // 0.6.9 #23 (t1867/t1871): never measure once the desk is already EXPANDED (or the panel is) - Auto layout's slide-over (.tight) never caches a
+  // width, so the first speaker pick from it reached setSize's F220 C sync measure after applyPanels had added .devexpanded, measured the expanded
+  // body (~whole window) and pinned it as the Speakers track (--devstdw): the zones / speakers column took the window and the settings column got 0 px.
+  const cacheStd = () => { const d = root.closest?.('.desk'); if (size !== 'standard' || !body.isConnected || d?.classList.contains('roomy') || d?.classList.contains('devhold') || d?.classList.contains('tight') || d?.classList.contains('devexpanded') || d?.classList.contains('devfull') || root.classList.contains('expanded') || (HASWIN && window.innerWidth <= 900)) return;
     const w = body.offsetWidth; if (w < 200) return;
     root._stdw = Math.round(w); root._stdwGood = root._stdw; root.style.setProperty('--devstdw', root._stdw + 'px'); };   // F221 C: sticky last-good
   const setSize = (s, highlight = null) => {
@@ -1050,7 +1054,10 @@ export function devicesPanel(S, ctl) {
     paintExpandBtn(expBtn, 'Devices', s === 'expanded');
     root.classList.toggle('israil', s === 'collapsed'); root.title = s === 'collapsed' ? 'Open the Devices panel ( ] )' : '';
     root.classList.toggle('expanded', s === 'expanded');
-    draw(true);
+    // 0.6.9 #24 (t1873/t1874): a size change (rail -> open, the Roomy / Auto slide-over, expand / collapse) lays the panel out at once ('size' passes
+    // every busy / menu gate like a forced draw) but KEEPS the zone tree - the tree does not depend on the size. The old forced draw rebuilt every zone / Queue
+    // box (art, now-playing bars) right as the panel started to slide, which flashed. The tree still rebuilds / patches when what it shows changed.
+    draw('size');
     if (s === 'standard') requestAnimationFrame(cacheStd);   // F215: cache while settled standard
     if (hl != null) setTimeout(() => body.querySelector(`.dcard[data-zone-id="${hl}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
   };
@@ -1076,7 +1083,9 @@ export function devicesPanel(S, ctl) {
     clearTimeout(pending); pending = 0; keepExpandFocus(body);
     const busy = { v: false };
     count.textContent = `${S.zones.length} device${S.zones.length === 1 ? '' : 's'} • ${S.zones.filter(z => z.connected).length} online`;
-    if (size === 'collapsed') { body.replaceChildren(); return; }
+    // 0.6.9 #24: on the rail the tree is still kept up to date off-screen, so opening the panel (Full's rail, the Roomy / Auto slide-over) moves the
+    // existing tree in instead of building every zone / Queue box as the slide starts
+    if (size === 'collapsed') { body.replaceChildren(); treeNode(false); return; }
     // F223: one Speakers scroller both modes — reuse .tcol42 (or migrate .tcol42s); MOVE into .dexp-main on expand; never mint a fresh one
     const speakersHost = () => {
       let t = body.querySelector('.tcol42');
@@ -1099,7 +1108,7 @@ export function devicesPanel(S, ctl) {
       paintDetail(dcol, groups);
       const tcol = speakersHost();   // F223: same node as standard — move into Speakers column
       // F211: the Speakers column = [MASTER, tree, AirPlay strip] - the same MASTER strip and tree as the side panel; MASTER is kept while busy
-      const tn = treeNode(force), hadTree = tcol.contains(tn);
+      const tn = treeNode(force === true), hadTree = tcol.contains(tn);
       const ap = airplayDevicesStrip(S, ctl);
       reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn, ap || null].filter(Boolean));
       if (!hadTree) restoreScroll(tcol);
@@ -1112,7 +1121,7 @@ export function devicesPanel(S, ctl) {
     // 0.3.5 J4: three-line cards for speakers and zones (name + OFF|ON pill, one tag row, full-width bar + mute)
     // F223: .devbody is not the scroller — persistent .tcol42 holds MASTER+tree (+ bits that used to scroll with body)
     const tcol = speakersHost();
-    const tn = treeNode(force), hadTree = tcol.contains(tn);
+    const tn = treeNode(force === true), hadTree = tcol.contains(tn);
     reconcile(tcol, [castBar(S, ctl, tcol), keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(tcol, 'dmicline'), S), tn, ssCompact(S, ctl)].filter(Boolean));
     if (!hadTree) restoreScroll(tcol);
     reconcile(body, [tcol]);
