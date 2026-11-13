@@ -8,7 +8,7 @@ import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
 import { airPlaySetupCard, setApCardDecor } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
-import { castSetupCard } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
+import { castSetupCard, setCastCardDecor } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, jbDraft, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
@@ -408,11 +408,11 @@ export function treeEl(S, ctl, kit, st) {
   cardList.push({ key: 'unassigned', keys: ['unassigned'], el: unBox });
   // 0.6.8: AirPlay speakers card sits under Unassigned by default (the card itself expands / collapses; no header button)
   if (admin) { setApCardDecor(el => decorateCard(el, 'airplay', 'AirPlay speakers')); const apc = airPlaySetupCard(S, ctl); if (apc) cardList.push({ key: 'airplay', keys: ['airplay'], el: apc }); }
+  // 0.7.0 t1901: the Cast speakers card is a reorder card like AirPlay (same ⋮ handle, saved in the shared card order); by default right below AirPlay
+  if (admin) { setCastCardDecor(el => decorateCard(el, 'cast', 'Cast speakers')); const csc = castSetupCard(S, ctl); if (csc) cardList.push({ key: 'cast', keys: ['cast'], el: csc }); }
   shownCards = arrangeCards(cardList, getCardOrder());
-  for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'airplay' ? 'AirPlay speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
+  for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'airplay' ? 'AirPlay speakers' : c.key === 'cast' ? 'Cast speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
   root.append(...shownCards.map(c => c.el));
-  // 0.7.0 F169 (user t1680u): the Cast speakers card sits directly below the AirPlay card (it follows it when AirPlay is moved; not a reorder card itself)
-  if (admin) { const csc = castSetupCard(S, ctl); if (csc) { const apEl = shownCards.find(c => c.key === 'airplay')?.el; if (apEl) apEl.after(csc); else root.append(csc); } }
   attachDrag(root, S, move);
   // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
   // 0.6.9 #12: ANY card (zones online or not, Jukebox, Unassigned, AirPlay) drags by its ⋮ handle; the drop saves the whole order on the server
@@ -492,7 +492,7 @@ function attachZoneDrag(root, cards, onMove, onLink) {
           drop: () => { if (!where || where.key !== t.dataset.card) return; if (where.link) { onLink(fromZone, where.link); return; } onMove(from, where.key, where.after); } })); });
     };
     const onEnd = () => { offs.forEach(f => f()); offs = []; root.classList.remove('dragging', 'zdrag'); box.classList.remove('drag42-src'); all.forEach(t => { clear(t); t.classList.remove('droppable'); }); };
-    const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'airplay' ? 'AirPlay speakers' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
+    const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'airplay' ? 'AirPlay speakers' : box.dataset.card === 'cast' ? 'Cast speakers' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
     startPointerDrag(ev, grab, () => ({ kind: 'zone42', id: from, title }), { mode: 'pointer', pin: grab.closest('.zcard42') || box, onStart, onEnd, noSkip: true });
   });
 }

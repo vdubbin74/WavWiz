@@ -20,7 +20,7 @@ export function zoneOrderAfterDrop(boxes, fromIdx, toIdx, after) {
   rest.splice(at, 0, moving); return rest.flat();
 }
 // ---- 0.6.9 #12: the Devices CARD order is kept on the server (GET / PUT /zones/order), the same for every client and across restarts.
-// Card keys: 'g:<zone id>' (a linked set = all its zone keys), 'jukebox', 'unassigned', 'airplay'. Shown exactly as saved - no rank split,
+// Card keys: 'g:<zone id>' (a linked set = all its zone keys), 'jukebox', 'unassigned', 'airplay', 'cast' (0.7.0 t1901). Shown exactly as saved - no rank split,
 // no pinning; a card the saved list does not name yet (a new zone) slots in after the last saved zone card. Without a saved list the old
 // default order applies (active zones, then offline, then empty, the Jukebox by the same rule, then Unassigned and AirPlay).
 let cardOrder = null, cardOrderAt = 0;
@@ -36,6 +36,7 @@ export function arrangeCards(cards, saved) {
   const known = list.filter(c => at(c) < Infinity).sort((a, b) => at(a) - at(b)), unknown = list.filter(c => at(c) === Infinity);
   for (const c of unknown) {
     if (String(c.key).startsWith('g:')) { let i = -1; known.forEach((k, j) => { if (String(k.key).startsWith('g:')) i = j; }); known.splice(i + 1, 0, c); }
+    else if (c.key === 'cast' && known.some(k => k.key === 'airplay')) known.splice(known.findIndex(k => k.key === 'airplay') + 1, 0, c);   // 0.7.0 t1901: a new Cast card starts right below AirPlay
     else known.push(c);
   }
   return known;

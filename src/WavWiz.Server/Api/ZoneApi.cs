@@ -59,7 +59,7 @@ public static class ZoneApi
             var b = await c.Request.Body();
             if (b.ValueKind != JsonValueKind.Object || !b.TryGetProperty("order", out var o)) return Ext.Bad("expected { order: [card keys] }");
             var list = WavWiz.Server.Zones.ZoneOrder.Normalize(o);
-            if (list == null) return Ext.Bad($"order must be a list of up to {WavWiz.Server.Zones.ZoneOrder.MaxEntries} card keys (g:<zone id>, jukebox, unassigned, airplay)");
+            if (list == null) return Ext.Bad($"order must be a list of up to {WavWiz.Server.Zones.ZoneOrder.MaxEntries} card keys (g:<zone id>, jukebox, unassigned, airplay, cast)");
             WavWiz.Server.Zones.ZoneOrder.Save(s.Db, list); s.Events.Publish("zones");
             return Results.Json(new { ok = true, order = list });
         }).Req(Role.Admin);

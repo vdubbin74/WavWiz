@@ -9,7 +9,7 @@ public static partial class ZoneOrder
 {
     public const string SettingKey = "zones.cardOrder";
     public const int MaxEntries = 1000;
-    [GeneratedRegex(@"^(g:\d{1,18}|jukebox|unassigned|airplay)$")] private static partial Regex KeyRx();
+    [GeneratedRegex(@"^(g:\d{1,18}|jukebox|unassigned|airplay|cast)$")] private static partial Regex KeyRx();
 
     /// <summary>Valid, de-duplicated card keys in the given order, or null when the body is not a list of known card keys.</summary>
     public static List<string>? Normalize(JsonElement order)

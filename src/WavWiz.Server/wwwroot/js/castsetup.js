@@ -63,6 +63,28 @@ export function csByIpBody(addr, name) {
 /** The honest sync line: Cast devices buffer on their own, so lining them up with other speakers is approximate. */
 export const SYNC_NOTE = 'Cast devices keep their own few-second buffer, so with other speakers in the same zone they line up only roughly. Fine-tune with the speaker’s Delay.';
 
+/** 0.7.0 t1901: a search always ends, like the AirPlay card (0.6.9 #22): while it runs (at most CS_SCAN_MS) the card says "Looking…"; after that an
+ *  empty list is "None found" with Search again, and a server that cannot search (or does not answer) is "Couldn’t search" with the reason. Pure. */
+export const CS_SCAN_MS = 9000;
+export function csScanView({ phase = 'idle', n = 0, problem = null } = {}) {
+  if (n) return { note: `${n} on this network`, kind: 'list', title: '', text: '' };
+  if (problem) return { note: 'Couldn’t search', kind: 'err', title: 'Couldn’t search for Cast speakers', text: problem };
+  if (phase === 'searching') return { note: 'Looking…', kind: 'busy', title: '', text: 'Looking for Chromecast, Google Nest and Cast-enabled speakers and TVs… answers usually arrive within a few seconds.' };
+  return { note: 'None found', kind: 'none', title: 'No Cast speakers found', text: '' };
+}
+/** The server's own Cast search problem (it answered, but its search is not running) in plain words, as for AirPlay. Pure. */
+export function csBrowseProblem(r) {
+  if (!r || r.running !== false) return null;
+  const p = String(r.problem || '');
+  if (/loopback/i.test(p)) return 'The server is only listening on this PC (127.0.0.1), so it can’t search the home network. Set its network address in Settings › Network, then search again.';
+  return p ? `The server couldn’t start its Cast search: ${p.replace(/^Cast search unavailable:\s*/i, '')}` : 'The server’s Cast search isn’t running.';
+}
+/** Rejects after ms so a request that never comes back still ends the search. */
+function within(p, ms) {
+  let t = 0;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The server didn’t answer the Cast search in time.'), { status: 0 })), ms); })]).finally(() => clearTimeout(t));
+}
+
 // ---------------------------------------------------------------- module state (survives tree rebuilds)
 const OPEN_KEY = 'ww.castsetup.open', SEL = '.castsetup-card';
 const stOf = () => ({ heard: null, tested: null, problem: null, busy: '', zonePick: 'new', newName: '', added: false });
@@ -71,6 +93,12 @@ let Sref = null, ctlRef = null, devs = [], selId = null, byId = Object.create(nu
 // 0.7.0 item 5b: "Add by IP address" form (a device discovery can't see: another subnet / VLAN, or the router blocks mDNS)
 const ipOf = () => ({ open: false, addr: '', name: '', busy: false, err: null });
 let byIp = ipOf();
+// t1901: the Devices tree tags the card (data-card="cast") and gives it the ⋮ reorder handle, like the AirPlay card; kept across in-place repaints
+let cardDecor = null;
+export const setCastCardDecor = fn => { cardDecor = typeof fn === 'function' ? fn : null; };
+// t1901: one search at a time; phase 'idle' | 'searching' | 'done' (as the AirPlay card). Module state, so repaints / tree rebuilds never reset it.
+let scanPhase = 'idle', scanSeq = 0, scanTimer = 0;
+function endScan() { scanSeq++; scanPhase = 'idle'; clearTimeout(scanTimer); scanTimer = 0; }
 
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
 function setOpen(v) {
@@ -82,7 +110,7 @@ function setOpen(v) {
   if (!open) stopPoll();
 }
 async function finish() {
-  closed = true; stopPoll();
+  closed = true; stopPoll(); endScan();
   for (const id of Object.keys(byId)) {
     const s = byId[id];
     if (s.tested && !s.tested.added && !s.added) {
@@ -102,14 +130,29 @@ function startPoll() {
   }, 3000);
 }
 async function load() {
-  try { const r = await api('/cast/setup/devices'); devs = csMergeRemembered(r.devices || [], Sref?.zones); lastProblem = r.problem || null; }
+  // t1901: the server's running:false + problem used to show only as body text while the header said "Looking…" for ever (and a running
+  // search's leftover problem text was shown as if it had failed); now it is read like the AirPlay card's (csBrowseProblem)
+  try { const r = await within(api('/cast/setup/devices'), CS_SCAN_MS) || {}; devs = csMergeRemembered(r.devices || [], Sref?.zones); lastProblem = csBrowseProblem(r); }
   catch (e) { lastProblem = csProblem(e, '').text; }
 }
 async function rescan() {
-  selId = null; devs = []; paintInPlace();
-  try { await api('/cast/setup/query', { method: 'POST' }); } catch (e) { lastProblem = csProblem(e, '').text; }
-  await load(); paintInPlace();
-  setTimeout(async () => { if (!closed && open && !byIp.open) { await load(); paintInPlace(); } }, 1500);   // background refreshes skip while Add by IP is open
+  // t1901 (as AirPlay 0.6.9 #22): a search has a deadline and ends as a list, "No Cast speakers found" or an error; a second call while one runs
+  // does not restart it, and the list already shown is kept until the new answer
+  if (scanPhase === 'searching') return;
+  const seq = ++scanSeq;
+  const s = st(selId); s.problem = null; s.heard = null; selId = null; lastProblem = null;
+  scanPhase = 'searching'; clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => { if (seq === scanSeq && scanPhase === 'searching') { scanPhase = 'done'; if (!byIp.open) paintInPlace(); } }, CS_SCAN_MS);
+  paintInPlace();
+  let qErr = null;
+  try { await within(api('/cast/setup/query', { method: 'POST' }), CS_SCAN_MS); } catch (e) { qErr = csProblem(e, '').text; }
+  if (seq !== scanSeq) return;
+  await load();
+  if (seq !== scanSeq) return;
+  if (qErr && !lastProblem && !devs.length) lastProblem = qErr;
+  if (lastProblem) { scanPhase = 'done'; clearTimeout(scanTimer); }   // an error ends the search at once
+  if (!byIp.open) paintInPlace();
+  for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open && !byIp.open) { await load(); paintInPlace(); } }, ms);   // background refreshes skip while Add by IP is open
 }
 function scrollKeep(fn) {
   const card = document.querySelector(SEL);
@@ -157,8 +200,8 @@ function byIpForm() {
         'aria-label': 'IP address', 'data-act': 'castsetup-ip', disabled: byIp.busy, oninput: ev => { byIp.addr = ev.target.value; const b = ev.target.closest('form')?.querySelector('[data-act="castsetup-ip-go"]'); if (b) b.disabled = !csByIpBody(byIp.addr); } }),
       h('input', { type: 'text', class: 'castsetup-ipname', autocomplete: 'off', maxlength: 40, placeholder: 'Name (optional)', value: byIp.name,
         'aria-label': 'Name (optional)', 'data-act': 'castsetup-ipname', disabled: byIp.busy, oninput: ev => { byIp.name = ev.target.value; } }),
-      h('button', { type: 'submit', class: 'btn primary', 'data-act': 'castsetup-ip-go', disabled: byIp.busy || !csByIpBody(byIp.addr) }, byIp.busy ? 'Adding…' : 'Add'),
-      h('button', { type: 'button', class: 'btn', 'data-act': 'castsetup-ip-cancel', disabled: byIp.busy, onclick: () => { byIp = ipOf(); paintInPlace(); } }, 'Cancel')),
+      h('button', { type: 'submit', class: 'btn sm primary', 'data-act': 'castsetup-ip-go', disabled: byIp.busy || !csByIpBody(byIp.addr) }, byIp.busy ? 'Adding…' : 'Add'),
+      h('button', { type: 'button', class: 'btn sm', 'data-act': 'castsetup-ip-cancel', disabled: byIp.busy, onclick: () => { byIp = ipOf(); paintInPlace(); } }, 'Cancel')),
     byIp.err ? h('div', { class: 'apsetup-prob other', role: 'alert' }, h('p', { class: 'small' }, byIp.err)) : null);
 }
 async function add(d) {
@@ -223,7 +266,8 @@ function buildCard(S, ctl) {
   Sref = S; ctlRef = ctl;
   if (open && closed) { closed = false; setTimeout(() => { if (open && !closed) { rescan(); startPoll(); } }, 0); }   // reopened from this tab's saved state after a reload: scan, don't sit on "Looking…"
   const n = devs.length;
-  const note = !open ? (n ? `${n} found` : 'Find, test and add') : (n ? `${n} on this network` : 'Looking…');
+  const view = csScanView({ phase: scanPhase === 'idle' && open ? 'searching' : scanPhase, n, problem: lastProblem });
+  const note = !open ? (n ? `${n} found` : 'Find, test and add') : view.note;
   const step = csStep(st(selId), devs.find(d => d.id === selId));
   const expandNow = () => { if (!open) { setOpen(true); paintInPlace(); scrollToCard(); } };
   const fold = h('button', { type: 'button', class: 'zfold42-t' + (open ? ' open' : ''), 'data-act': 'castsetup-fold', 'aria-expanded': String(open),
@@ -236,20 +280,33 @@ function buildCard(S, ctl) {
   const head = h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, fold, title));
   const card = h('section', { class: 'qb42 solo idle castsetup-card' + (open ? ' open' : ' qb42-folded'), 'data-leader-id': '__cast__', 'data-castsetup': '1',
     'aria-label': open ? 'Cast speakers (expanded)' : 'Cast speakers (collapsed)' });
-  if (!open) { card.append(head); return card; }
+  if (!open) { card.append(head); try { cardDecor?.(card); } catch { /* decoration is cosmetic */ } return card; }
 
   const steps = h('ol', { class: 'apsetup-steps', 'aria-label': 'Steps' }, STEPS.map((t, i) =>
     h('li', { class: i === step ? 'on' : i < step ? 'done' : '', 'aria-current': i === step ? 'step' : null }, h('span', { class: 'apsetup-sn' }, String(i + 1)), ' ', t)));
-  const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'Cast speakers' },
-    n ? devs.map(speakerRow) : h('div', { class: 'small dim apsetup-empty' }, lastProblem || 'Looking for Chromecast, Google Nest and Cast-enabled speakers and TVs…'));
+  // t1901: the same empty / error states, compact buttons (btn sm) and single 'Search again' wording as the AirPlay card (0.6.9 #22 / #30)
+  const searching = scanPhase === 'searching';
+  const again = () => h('button', { type: 'button', class: 'btn sm apsetup-again', 'data-act': 'castsetup-again', onclick: () => rescan() }, 'Search again');
+  let empty = null;
+  if (view.kind === 'busy') empty = h('div', { class: 'small dim apsetup-empty', role: 'status' }, view.text);
+  else if (view.kind === 'err') empty = h('div', { class: 'small apsetup-empty apsetup-err', role: 'alert' }, h('b', null, view.title), h('p', { class: 'small' }, view.text), again());
+  else if (view.kind === 'none') empty = h('div', { class: 'small apsetup-empty apsetup-none', role: 'status' }, h('b', null, view.title),
+    h('ul', { class: 'small dim' },
+      h('li', null, 'Check the device is switched on and on the same network as this PC (VPN off). A Cast group needs its speakers on too.'),
+      h('li', null, 'Windows Firewall or the router can block the devices’ answers. Not listed? Add it by its IP address below.')),
+    again());
+  const bodyAgain = !n && (view.kind === 'err' || view.kind === 'none');   // the body has its own Search again
+  const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'Cast speakers', 'aria-busy': searching ? 'true' : null },
+    n ? devs.map(speakerRow) : empty);
   const foot = h('div', { class: 'apsetup-foot' },
     h('div', { class: 'apsetup-footnote grow' }, h('p', { class: 'small dim apsetup-note' }, SYNC_NOTE)),
-    h('button', { type: 'button', class: 'linkbtn', 'data-act': 'castsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy }, 'Scan again'),
-    h('button', { type: 'button', class: 'btn primary', 'data-act': 'castsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
+    bodyAgain ? null : h('button', { type: 'button', class: 'linkbtn', 'data-act': 'castsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy || searching }, searching ? 'Searching…' : 'Search again'),
+    h('button', { type: 'button', class: 'btn sm', 'data-act': 'castsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
   card.append(head, h('div', { class: 'zwrap42 apsetup-wrap' }, h('div', { class: 'apsetup-body' }, steps, listEl,
     byIp.open ? byIpForm() : h('div', { class: 'castsetup-byip-link small' }, h('span', { class: 'dim' }, 'Not listed? '),
       h('button', { type: 'button', class: 'linkbtn', 'data-act': 'castsetup-byip', onclick: () => { byIp.open = true; paintInPlace(); setTimeout(() => document.querySelector('.castsetup-ip')?.focus?.(), 0); } }, 'Add by IP address')),
     foot)));
+  try { cardDecor?.(card); } catch { /* decoration is cosmetic */ }
   return card;
 }
 
@@ -268,6 +325,6 @@ export function openCastSetup(S, ctl) {
 
 /** Test helper. */
 export function _csReset() {
-  open = false; Sref = null; ctlRef = null; devs = []; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; byIp = ipOf();
+  open = false; Sref = null; ctlRef = null; devs = []; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; byIp = ipOf(); endScan();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }
