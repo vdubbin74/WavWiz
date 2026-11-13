@@ -85,6 +85,8 @@ public static class ZoneApi
         // 0.3.2 F4: zone volume (keeps the members' offsets) and zone mute. Control, like device volume / mute.
         g.MapPost("/groups/{id:long}/volume", async (long id, HttpContext c) => { var b = await c.Request.Body(); var (lvl, err) = s.Zones.GroupVolume(id, b.Num("set") ?? double.NaN); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, level = lvl, groups = s.Zones.Groups() }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/mute", async (long id, HttpContext c) => { var b = await c.Request.Body(); var err = s.Zones.GroupMute(id, b.Bool("muted") ?? true); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, groups = s.Zones.Groups() }); }).Req(Role.Control);
+        // 0.6.9 t1897: a zone's ON / OFF pill switches every speaker in ONE call and ONE "zones" event (the client used to PATCH each speaker, one event each).
+        g.MapPost("/groups/{id:long}/enabled", async (long id, HttpContext c) => { var b = await c.Request.Body(); if (b.Bool("enabled") is not bool on) return Ext.Bad("enabled must be true or false"); var err = s.Zones.GroupEnable(id, on); return err != null ? Ext.Bad(err, 404) : Results.Json(new { ok = true, zones = s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress) }); }).Req(Role.Control);
         g.MapPost("/groups/{id:long}/activate", (long id) => { var err = s.Zones.ActivateGroup(id); return err != null ? Ext.Bad(err, err.Contains("not found") ? 404 : 400) : Results.Json(s.Links.Decorate(s.Zones.Groups())); }).Req(Role.Control);
 
         // ---- manual / by-ear delay ----

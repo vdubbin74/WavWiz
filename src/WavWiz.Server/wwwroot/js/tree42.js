@@ -114,7 +114,7 @@ export function treeEl(S, ctl, kit, st) {
   const zoneCtx = (g, el) => attachCtx(el, () => {
     const live = (S.groups || []).find(x => x.id === g.id); if (!live) return []; g = live;   // F263: retained row, fresh inventory
     const ms = zoneMembers(S.zones, g), others = (S.groups || []).filter(o => o.id !== g.id && o.playbackId !== g.playbackId), muted = zoneMuted(S.zones, g);
-    const act = { playpause: () => playPause(g), mute: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); }, control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g), delete: () => confirmRemoveZone(S, g, done) };
+    const act = { playpause: () => playPause(g), mute: () => { const m = !zoneMuted(S.zones, g); if (m) for (const z of zoneMembers(S.zones, g)) z.muted = true; ctl.act(`/groups/${g.id}/mute`, { muted: m }); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } /* t1894: speakers show it at once */ }, control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g), delete: () => confirmRemoveZone(S, g, done) };
     return zoneMenu42({ admin, can, playing: g.now?.state === 'playing', muted, controlling: isControlling(g, cur), order: orderOf(g), linked: (g.linked || []).length > 0, others: others.map(o => ({ id: o.id, name: o.name })) })
       .map(it => it.sep ? it : it.sub ? { ...it, sub: it.sub.map(s => ({ ...s, onclick: () => linkTo(g, s.zone) })) } : { ...it, onclick: act[it.id] });
   }, `${g.name} zone actions`);
@@ -151,7 +151,7 @@ export function treeEl(S, ctl, kit, st) {
   const zoneWrap = (g, box, leaderOf) => {
     const ms = zoneMembers(S.zones, g), sel = isControlling(g, cur), linked = (g.linked || []).length > 0, on = zoneOn(S.zones, g), connected = ms.filter(z => z.connected).length;
     const name = h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone settings`, onclick: () => st.onZone(g.id) }, g.name);
-    const pill = onPill(`Zone ${g.name}`, on, can, () => { const live = (S.groups || []).find(x => x.id === g.id); if (!live || !canControl(S)) return; const want = !zoneOn(S.zones, live); for (const z of zoneMembers(S.zones, live)) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19: no speakers = nothing to switch
+    const pill = onPill(`Zone ${g.name}`, on, can, () => { const live = (S.groups || []).find(x => x.id === g.id); if (!live || !canControl(S)) return; const want = !zoneOn(S.zones, live); for (const z of zoneMembers(S.zones, live)) z.enabled = want; ctl.act(`/groups/${live.id}/enabled`, { enabled: want }); pill._set(want); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ /* t1897: the speakers grey out at once */ } }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19: no speakers = nothing to switch
     // 0.4.3 #9: an empty zone has nothing to link (as in the render)
     const lb = (S.groups || []).length < 2 || (!ms.length && !linked) ? null : ro(linked
       ? h('button', { type: 'button', class: 'btn sm zlinkbtn split', 'data-act': 'split', title: 'Give this zone its own music', onclick: ev => { ev.stopPropagation(); Z.splitOff(g, done); } }, 'Split off')
@@ -195,6 +195,8 @@ export function treeEl(S, ctl, kit, st) {
     const phoneMs = phoneMaxBars ? livePhoneMs() : ms;
     const lvl = phoneMaxBars ? phoneZoneLevel(phoneMs) : (ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0);
     const muted = phoneMs.length > 0 && phoneMs.every(z => z.muted);
+    // t1894: the zone button shows muted only when EVERY speaker is; mixed (some muted) shows not muted and a press mutes the rest
+    const mixed = !muted && phoneMs.some(z => z.muted), muteTitle = muted ? 'Unmute' : mixed ? 'Mute (some speakers are muted)' : 'Mute';
     const phoneKey = () => JSON.stringify([gids, livePhoneMs().map(z => [z.id, z.volCap ?? 100, z.enabled])]);
     const phoneWriter = phoneMaxBars ? phoneZoneVolWriter({
       act: (z, body) => ctl.act(`/zones/${z.id}`, body, 'PATCH'),
@@ -221,8 +223,10 @@ export function treeEl(S, ctl, kit, st) {
       bar.vol.addEventListener('pointercancel', () => cancelPhone());
       bar.vol.addEventListener('change', () => { phoneWriter.resetBase(); gestureKey = null; });
     }
-    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`), title: muted ? 'Unmute' : 'Mute', 'data-icon': muted ? 'mute' : 'volume',
-      onclick: ev => { ev.stopPropagation(); const cur = all.flatMap(g => zoneMembers(S.zones, g)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; for (const g of all) ctl.act(`/groups/${g.id}/mute`, { muted: m }); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`)); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
+    const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`), title: muteTitle, 'data-icon': muted ? 'mute' : 'volume', 'data-mixed': mixed ? '1' : null,
+      // t1894: like the master mute, scoped to this zone: every speaker's indicator changes at once (devredraw rebuilds; treeMuteSig42 is never held by hover).
+      // Optimistic: unmute clears only what the server will clear (GroupMute un-mutes what the zone mute muted), so the next "zones" event agrees.
+      onclick: ev => { ev.stopPropagation(); const live = gids.map(id => (S.groups || []).find(x => x.id === id)).filter(Boolean), cur = phoneMaxBars ? livePhoneMs() : uniqueMembers(live.flatMap(g => zoneMembers(S.zones, g))), m = !(cur.length > 0 && cur.every(z => z.muted)); if (m) for (const z of cur) z.muted = true; for (const g of live) ctl.act(`/groups/${g.id}/mute`, { muted: m }); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute ' : 'Mute ') + (linked ? 'the linked zones' : `zone ${lead.name}`)); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); if (m) try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
     const selectLead = () => controlZone(lead.id);
     const collapsed = false; box._collapsed = false;   // F266: speakers always listed while the box is open (old idle auto-fold removed)
     if (isFolded(box)) return foldedBox(box, { lead, linked, sel, ms, now });
@@ -502,7 +506,7 @@ export function zonePane(S, ctl, kit, g, st) {
   const root = h('section', { class: 'zpane42', 'aria-label': `Zone settings, ${g.name}`, 'data-group-id': g.id });
   const name = h('input', { type: 'text', maxlength: 60, value: g.name, 'aria-label': 'Zone name', class: 'zp42-name' });
   const saveName = ro(h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'zone-rename', onclick: async () => { const v = name.value.trim(); if (!v) { toast('Type a name first', true); return; } try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); toast('Zone renamed'); done(); } catch (e) { toast(e.message, true); } } }, 'Rename'), admin, 'Only an administrator can rename a zone.');
-  const on = zoneOn(S.zones, g), pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19
+  const on = zoneOn(S.zones, g), pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { const lz = (S.zones || []).find(x => x.id === z.id); if (lz) lz.enabled = want; } ctl.act(`/groups/${g.id}/enabled`, { enabled: want }); pill._set(want); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19
   // F250-P8: phone zone settings sheet agrees with tree/NP max contract; desktop zonePane stays average.
   const phoneMax = !!kit.phoneMaxBars;
   const gid = g.id;
@@ -533,7 +537,7 @@ export function zonePane(S, ctl, kit, g, st) {
     bar.vol.addEventListener('pointercancel', () => cancelPane());
     bar.vol.addEventListener('change', () => { paneWriter.resetBase(); paneGesture = null; });
   }
-  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, 'data-icon': muted ? 'mute' : 'volume', onclick: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute zone ' : 'Mute zone ') + g.name); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
+  const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, 'data-icon': muted ? 'mute' : 'volume', onclick: () => { const m = !zoneMuted(S.zones, g); if (m) for (const z of zoneMembers(S.zones, g)) z.muted = true; ctl.act(`/groups/${g.id}/mute`, { muted: m }); if (m) try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute zone ' : 'Mute zone ') + g.name); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
   const others = (S.groups || []).filter(o => o.id !== g.id);
   root.append(
     h('div', { class: 'zp42-row' }, h('span', { class: 'dlbl' }, 'NAME'), name, saveName, h('span', { class: 'grow' }), h('span', { class: 'dlbl' }, 'ENABLED'), pill),

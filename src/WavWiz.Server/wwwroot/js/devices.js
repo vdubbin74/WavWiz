@@ -909,6 +909,11 @@ export function patchRows42(cur, fresh) {
  *  link leader). A change rebuilds the tree at once, never held by hover. Linking or splitting two EMPTY zones changes no speaker, so the drop / Split off
  *  used to wait under the pointer until something else forced the Devices panel to redraw. Pure (unit tested on the server's /groups shape). */
 export const treeMoveSig42 = gs => JSON.stringify((gs || []).map(g => [g.id, g.deviceIds || [], g.playbackId || '']));
+/** 0.6.9 t1894 + t1897: which speakers are muted and which are switched off. A zone mute / zone on-off (or the master mute, or a speaker's own
+ *  mute / pill) is a deliberate change like a move: the tree rebuilds at once with every speaker's indicator / greyed row. It used to be patched row
+ *  by row, and a row inside the hovered / focused zone card was held (F151b anti-flicker hold) - so after the zone's mute button or ON/OFF pill the
+ *  speakers kept their old look while the pointer (or focus) stayed on the card. Level / status ticks are not in it and stay held. Pure (unit tested). */
+export const treeSwitchSig42 = zs => { const ids = f => (zs || []).filter(f).map(z => z.id).sort((a, b) => a - b); return JSON.stringify([ids(z => z.muted), ids(z => z.enabled === false)]); };
 function tree42Kit(S, ctl, X) {
   // 0.4.2: the tree is rebuilt only when what it shows changed (a position tick alone repaints at most every 10 s), and never while a drag or slider is in use
   let tnode = null, tsig = '', tlive = '';
@@ -926,7 +931,7 @@ function tree42Kit(S, ctl, X) {
   const kit42 = { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, jukebox: jukeboxCard, receiverBlock, phoneMaxBars: X.size === 'phone' };
   let topen = '', tmem = '';
   // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
-  const memSig42 = () => treeMoveSig42(S.groups);
+  const memSig42 = () => treeMoveSig42(S.groups) + '|' + treeSwitchSig42(S.zones);   // t1894 + t1897: + who is muted / switched off
   const treeNode = force => {
     // 0.6.9 #12: a card-order change (this user's drop / Move up, or another client's) is a deliberate move like F269 membership: rebuild at once, never held by hover
     const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42() + '|' + JSON.stringify(getCardOrder()), memMoved = !!tnode && mem !== tmem;
@@ -938,10 +943,10 @@ function tree42Kit(S, ctl, X) {
     if (!force && !memMoved && openSg === topen && tnode) { const fresh = treeEl(S, ctl, kit42, st42), r = patchRows42(tnode, fresh); if (r) { if (r === 1) { tsig = sg; tlive = lv; } return tnode; } }   // F263: deferred hovered rows have NOT accepted the new shape signature
     // DIG-amend2 R1: explicit idle expand (openSg!==topen) must rebuild even while pointer stays on Show speakers; keep hover defer only for background refreshes.
     if (!force && !memMoved && openSg === topen && tnode && tnode.isConnected && hov42(tnode)) return tnode;   // F151b (F269: never for a membership move)
-    const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : '' } : null;
+    const par = tnode?.parentElement, top = par?.scrollTop || 0, ae = document.activeElement, keep = tnode && ae && tnode.contains(ae) ? { id: ae.closest('[data-device-id]')?.dataset.deviceId, gid: ae.closest('[data-group-id]')?.dataset.groupId, cls: ['zmute', 'sp42-mute'].find(c => ae.classList?.contains(c)) || (typeof ae.className === 'string' ? ae.className.trim().split(/\s+/)[0] : ''), box: ae.closest('[data-leader-id]')?.dataset.leaderId } : null;   // t1894: the pressed mute button itself
     tnode = treeEl(S, ctl, kit42, st42); tsig = sg; tlive = lv; topen = openSg; tmem = mem; tnode._top = top;
     if (keep) queueMicrotask(() => { if (document.activeElement?.closest?.('.tree42')) return;   // 0.4.9 F82: the same control (speaker, else zone, by its first class) gets focus back
-      const scope = keep.id ? tnode.querySelector(`[data-device-id="${keep.id}"]`) : keep.gid ? tnode.querySelector(`[data-group-id="${keep.gid}"]`) : tnode;
+      const scope = keep.id ? tnode.querySelector(`[data-device-id="${keep.id}"]`) : keep.gid ? tnode.querySelector(`[data-group-id="${keep.gid}"]`) : keep.box ? tnode.querySelector(`[data-leader-id="${keep.box}"]`) : tnode;
       const t = (keep.cls && scope?.querySelector('.' + CSS.escape(keep.cls))) || (keep.id ? scope?.querySelector('.sp42-n') : null); t?.focus({ preventScroll: true }); });
     return tnode;
   };

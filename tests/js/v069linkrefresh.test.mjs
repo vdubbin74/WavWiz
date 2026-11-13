@@ -35,7 +35,7 @@ test('a status / level push is not a move (the hover hold still protects the row
 });
 
 test('wiring: the drop and Split off refresh, and a move skips the hover hold', () => {
-  assert.match(d, /const memSig42 = \(\) => treeMoveSig42\(S\.groups\);/);
+  assert.match(d, /const memSig42 = \(\) => treeMoveSig42\(S\.groups\)( \+ '\|' \+ treeSwitchSig42\(S\.zones\))?;/);   // t1894 + t1897 add who is muted / off
   assert.match(d, /mem = memSig42\(\) \+ '\|' \+ JSON\.stringify\(getCardOrder\(\)\), memMoved = !!tnode && mem !== tmem;/);
   assert.match(d, /if \(!force && !memMoved && openSg === topen && tnode && tnode\.isConnected && hov42\(tnode\)\) return tnode;/, 'the hover hold is unchanged for other refreshes');
   assert.match(d, /if \(!force && !memMoved && openSg === topen && tnode\) \{ const fresh = treeEl/, 'no row patch (which defers hovered rows) for a move');
