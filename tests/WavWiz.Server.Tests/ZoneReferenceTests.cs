@@ -114,6 +114,8 @@ public class ZoneReferenceTests
         // swap on "yes": A becomes Patio's reference (the legacy "Set as reference" endpoint now targets the speaker's zone)
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/v1/calibration/reference", new { zoneId = dA })).StatusCode);
         g = await Groups(admin); Assert.Equal(dA, RefOf(g["Patio"])); Assert.Equal(dB, S.Zones.ReferenceZoneId);   // the house setting is untouched
+        var house = await admin.GetJson("/api/v1/calibration/reference");   // GET reports the house reference, not the zone one just set
+        Assert.Equal(dB, house.GetProperty("zoneId").GetInt64()); Assert.Equal("B", house.GetProperty("name").GetString());
         Assert.Equal((80.0, -40.0, Dev(dA)), Cal(dC));
 
         // removal: take A (the reference) out of a 3-speaker Patio -> new reference + note; dismissing clears it

@@ -316,6 +316,8 @@ public static class ZoneApi
         }).Req(Role.Control);
 
         // 0.2.0 item 30: the house reference speaker (setting calibration.referenceZoneId). Everyone can read it; only an admin can change it.
+        // House reference only. A speaker already in a zone is set as THAT zone's reference (0.6.8-#15) and does not change the house setting;
+        // GET still reports the house reference (0 / unnamed when none is set), so it stays consistent with ReferenceZoneId.
         g.MapGet("/calibration/reference", () => { var id = s.Zones.ReferenceZoneId; var z = id == 0 ? null : s.Zones.Zone(id); return Results.Json(new { zoneId = z?.Id ?? 0, name = z?.Name, connected = z?.Connected ?? false }); }).Req(Role.View);
         g.MapPut("/calibration/reference", async (HttpContext c) =>
         {

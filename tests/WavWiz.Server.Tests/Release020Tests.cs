@@ -11,7 +11,13 @@ public class Release020Tests
     private static async Task<(ServerFixture f, HttpClient admin, FakePc a, FakePc b, long ida, long idb)> TwoPcs()
     {
         var f = await ServerFixture.StartAsync(); await f.SetupAdmin(); var admin = f.As(f.Token(Role.Admin, "admin"));
-        var a = await FakePc.StartAsync(f, "pc-a", "Kitchen"); var b = await FakePc.StartAsync(f, "pc-b", "Garage"); await a.WaitConnected(); await b.WaitConnected();
+        // Kitchen connects first and is adopted into "Everywhere"; Garage stays Unassigned so PUT /calibration/reference
+        // sets the house reference (0.6.8-#15: a speaker already in a zone would only set that zone's reference, and
+        // GET /calibration/reference reports the house reference, not that zone's). Starting both at once made this
+        // test flake: whichever player won AdoptFirstSpeaker landed in Everywhere.
+        var a = await FakePc.StartAsync(f, "pc-a", "Kitchen"); await a.WaitConnected();
+        for (int i = 0; i < 100 && f.Server.S.Db.Setting(ZoneManager.EverywhereKey) != "done"; i++) await Task.Delay(50);
+        var b = await FakePc.StartAsync(f, "pc-b", "Garage"); await b.WaitConnected();
         var zs = await admin.GetJson("/api/v1/zones");
         for (int i = 0; i < 100 && zs.GetArrayLength() < 2; i++) { await Task.Delay(50); zs = await admin.GetJson("/api/v1/zones"); }
         long Id(string pid) => zs.EnumerateArray().First(z => z.GetProperty("playerId").GetString() == pid).GetProperty("id").GetInt64();

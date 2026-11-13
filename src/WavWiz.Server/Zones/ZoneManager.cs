@@ -682,6 +682,7 @@ public sealed class ZoneManager
 
     // ---------------- 0.6.8 zone fix: a real "Everywhere" zone instead of the hidden house fallback ----------------
     public const string EverywhereKey = "zones.everywhere", EverywhereName = "Everywhere";
+    private readonly object _everywhereLock = new();   // AdoptFirstSpeaker can run on two connecting players at once
     /// <summary>
     /// 0.6.8 zone fix. A speaker in no zone is silent now (ZoneLinks.Apply), so the house needs a real zone to play in. Runs once per database
     /// (setting <see cref="EverywhereKey"/>):
@@ -709,10 +710,13 @@ public sealed class ZoneManager
     /// (<see cref="MigrateEverywhere"/> left "pending"); later speakers wait in Unassigned, silent, until the user adds them to a zone.</summary>
     public void AdoptFirstSpeaker(long deviceId)
     {
-        if (_db.Setting(EverywhereKey) != "pending") return;
-        _db.SetSetting(EverywhereKey, "done");
-        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0) return;   // the user made a zone before any speaker came
-        var (_, err) = CreateGroup(EverywhereName, new[] { deviceId }); if (err != null) _log?.Invoke("everywhere zone: " + err);
+        lock (_everywhereLock)
+        {
+            if (_db.Setting(EverywhereKey) != "pending") return;
+            _db.SetSetting(EverywhereKey, "done");
+            if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0) return;   // the user made a zone before any speaker came
+            var (_, err) = CreateGroup(EverywhereName, new[] { deviceId }); if (err != null) _log?.Invoke("everywhere zone: " + err);
+        }
     }
     /// <summary>0.6.8 zone fix: 0.6.8-#15 auto-picked the only speaker of a zone as its reference. Forget those picks once (a reference that is also the
     /// house reference the user chose is kept), so a lone speaker shows NO DELAY instead of REF until the user picks a reference.</summary>
