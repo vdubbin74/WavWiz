@@ -3,8 +3,13 @@
 // TOP wave = the 'Wav' color (--accent-text), BOTTOM wave = the 'Wiz' color (--accent2-text), tile = --bg, all read from theme.js
 // (PRESETS + derive), never hard-coded. 0.7.0 t1694u: "The colors should align with the theme" -> Midnight Neon top = #F9663A, not raw #FF3C00.
 // Change the theme definition (or THEME_ID) and re-run; the in-app emblem (wwwroot/js/logo.js) uses the same two variables live.
+// 0.7.0 t1933: also writes the six Inno Setup wizard bitmaps (installer/wizard-large-*.bmp and wizard-small-*.bmp) from the same
+// SVG master and theme colors: tall banners get a dark --bg field, the emblem centered in the upper area, the WavWiz wordmark
+// in the app font (weight 800, system-ui / Segoe UI / Roboto) when a face is available, and the orange/teal footer stripe;
+// small images are the emblem on a dark --bg tile. 24-bit BMP, no alpha, exact Inno pixel sizes.
 // Dev tool only (not shipped). Needs Playwright's Chromium:  node build/logo/make-icons.mjs [playwright-module-dir]
 import fs from 'node:fs'; import path from 'node:path'; import { createRequire } from 'node:module';
+import zlib from 'node:zlib';
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const { chromium } = createRequire(path.resolve(process.argv[2] || '/workspace/f262-tools') + '/')('playwright');
 const { emblemSvg } = await import(path.join(repo, 'src/WavWiz.Server/wwwroot/js/logo.js'));
@@ -31,6 +36,107 @@ function ico(frames) {   // PNG-backed ICO (Vista+): ICONDIR + ICONDIRENTRY[] + 
   let off = head.length; frames.forEach(([n, buf], i) => { const o = 6 + 16 * i; head.writeUInt8(n % 256, o); head.writeUInt8(n % 256, o + 1); head.writeUInt16LE(1, o + 4); head.writeUInt16LE(32, o + 6); head.writeUInt32LE(buf.length, o + 8); head.writeUInt32LE(off, o + 12); off += buf.length; });
   return Buffer.concat([head, ...frames.map(f => f[1])]);
 }
+
+/** Minimal 8-bit RGB/RGBA PNG decoder (Playwright screenshots) so wizard pages can be written as 24-bit BMPs with no extra package. */
+function decodePng(buf) {
+  if (buf[0] !== 0x89 || buf[1] !== 0x50) throw new Error('not png');
+  let off = 8, w = 0, h = 0, depth, ctype;
+  const ids = [];
+  while (off < buf.length) {
+    const len = buf.readUInt32BE(off); const typ = buf.toString('ascii', off + 4, off + 8);
+    const data = buf.subarray(off + 8, off + 8 + len);
+    if (typ === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); depth = data[8]; ctype = data[9]; }
+    else if (typ === 'IDAT') ids.push(data);
+    else if (typ === 'IEND') break;
+    off += 12 + len;
+  }
+  if (depth !== 8 || (ctype !== 2 && ctype !== 6)) throw new Error(`unsupported png ${depth}/${ctype}`);
+  const bpp = ctype === 6 ? 4 : 3;
+  const raw = zlib.inflateSync(Buffer.concat(ids));
+  const stride = w * bpp, out = Buffer.alloc(w * h * 4);
+  let i = 0;
+  const prev = Buffer.alloc(stride);
+  const paeth = (a, c, d) => { const p = a + c - d, pa = Math.abs(p - a), pb = Math.abs(p - c), pc = Math.abs(p - d); return pa <= pb && pa <= pc ? a : pb <= pc ? c : d; };
+  for (let y = 0; y < h; y++) {
+    const filt = raw[i++], row = raw.subarray(i, i + stride); i += stride;
+    const cur = Buffer.alloc(stride);
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? cur[x - bpp] : 0, c = prev[x], d = x >= bpp ? prev[x - bpp] : 0;
+      const v = row[x];
+      cur[x] = (filt === 0 ? v : filt === 1 ? v + a : filt === 2 ? v + c : filt === 3 ? v + ((a + c) >> 1) : v + paeth(a, c, d)) & 255;
+    }
+    for (let x = 0; x < w; x++) {
+      const s = x * bpp, dest = (y * w + x) * 4;
+      out[dest] = cur[s]; out[dest + 1] = cur[s + 1]; out[dest + 2] = cur[s + 2]; out[dest + 3] = bpp === 4 ? cur[s + 3] : 255;
+    }
+    cur.copy(prev);
+  }
+  return { w, h, rgba: out };
+}
+
+/** 24-bit BI_RGB BMP (54-byte header, bottom-up rows padded to 4 bytes). Opaque: alpha is ignored. */
+function encodeBmp24(w, h, rgba) {
+  const row = (w * 3 + 3) & ~3, size = 54 + row * h, b = Buffer.alloc(size);
+  b.writeUInt16LE(0x4D42, 0); b.writeUInt32LE(size, 2); b.writeUInt32LE(54, 10);
+  b.writeUInt32LE(40, 14); b.writeInt32LE(w, 18); b.writeInt32LE(h, 22);
+  b.writeUInt16LE(1, 26); b.writeUInt16LE(24, 28); b.writeUInt32LE(row * h, 34);
+  for (let y = 0; y < h; y++) {
+    const dest = 54 + (h - 1 - y) * row;
+    for (let x = 0; x < w; x++) {
+      const s = (y * w + x) * 4;
+      b[dest + x * 3] = rgba[s + 2]; b[dest + x * 3 + 1] = rgba[s + 1]; b[dest + x * 3 + 2] = rgba[s];
+    }
+  }
+  return b;
+}
+
+/** The app wordmark font stack (app.css .wordmark). Prefer a local Roboto / Segoe UI file so weight 800 is real. */
+function wordmarkFontFace() {
+  const faces = [
+    '/usr/share/fonts/truetype/sand-box/google/Roboto/Roboto-VariableFont_wdth,wght.ttf',
+    'C:/Windows/Fonts/segoeuib.ttf',
+    'C:/Windows/Fonts/segoeui.ttf',
+  ];
+  const p = faces.find(f => fs.existsSync(f));
+  if (!p) return { css: '', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' };
+  const url = 'file://' + encodeURI(p.replaceAll('\\', '/').replace(/^([A-Za-z]:)/, '/$1'));
+  return {
+    css: `@font-face{font-family:wwWordmark;src:url('${url}') format('truetype');font-weight:100 900;font-style:normal;font-display:block}`,
+    family: 'wwWordmark, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  };
+}
+
+async function wizardBmp(w, h, { large }) {
+  const face = wordmarkFontFace();
+  const scale = w / 164;
+  const stripe = large ? Math.max(1, Math.round(6 * (h / 314))) : 0;
+  const emblemSize = large ? Math.round(w * 0.78) : Math.round(Math.min(w, h) * 0.9);
+  const emblemTop = large ? Math.round(h * 0.12) : Math.round((h - emblemSize) / 2);
+  const fontSize = Math.round(26 * scale);
+  const tracking = (-0.5 * scale).toFixed(2);
+  const gap = Math.round(10 * scale);
+  const wmTop = emblemTop + emblemSize + gap;
+  const wordmark = large
+    ? `<div style="position:absolute;left:50%;top:${wmTop}px;transform:translateX(-50%);font:800 ${fontSize}px/1.05 ${face.family};letter-spacing:${tracking}px;white-space:nowrap">` +
+      `<span style="color:${COLORS.top}">Wav</span><span style="color:${COLORS.bottom}">Wiz</span></div>`
+    : '';
+  const stripes = large
+    ? `<div style="position:absolute;left:0;bottom:0;width:50%;height:${stripe}px;background:${COLORS.top}"></div>` +
+      `<div style="position:absolute;right:0;bottom:0;width:50%;height:${stripe}px;background:${COLORS.bottom}"></div>`
+    : '';
+  await page.setViewportSize({ width: w, height: h });
+  await page.setContent(`<!doctype html><html><head><style>${face.css} html,body{margin:0;background:${BG}}</style></head>` +
+    `<body><div style="position:relative;width:${w}px;height:${h}px;background:${BG};overflow:hidden">` +
+    `<div style="position:absolute;left:50%;top:${emblemTop}px;transform:translateX(-50%);width:${emblemSize}px;height:${emblemSize}px">` +
+    `${svg.replace('class="e"', `class="e" width="${emblemSize}" height="${emblemSize}"`)}</div>` +
+    wordmark + stripes + `</div></body></html>`);
+  await page.evaluate(() => document.fonts.ready);
+  const shot = await page.screenshot({ omitBackground: false, clip: { x: 0, y: 0, width: w, height: h } });
+  const { w: pw, h: ph, rgba } = decodePng(shot);
+  if (pw !== w || ph !== h) throw new Error(`wizard shot size ${pw}x${ph}, expected ${w}x${h}`);
+  return encodeBmp24(w, h, rgba);
+}
+
 const out = {};
 for (const n of [16, 32, 48, 64]) out[`logo-${n}.png`] = await png(n);                                   // transparent: tabs, small UI
 for (const n of [128, 256]) out[`logo-${n}.png`] = await png(n, { tile: true, radius: Math.round(n * 0.18) });   // About fallback, desktop
@@ -46,5 +152,13 @@ for (const n of [16, 32, 48, 64, 128, 180, 256, 512]) fs.writeFileSync(path.join
 for (const n of [256, 512, 1024]) fs.writeFileSync(path.join(logoDir, `wavwiz-${n}-transparent.png`), await png(n));
 fs.writeFileSync(path.join(logoDir, 'wavwiz-1024.png'), await png(1024, { tile: true, radius: 184 }));
 fs.writeFileSync(path.join(logoDir, 'wavwiz-parallel-flow.svg'), emblemSvg({ cls: 'pf', title: 'WavWiz', colors: COLORS }) + '\n');
+
+const inst = path.join(repo, 'installer');
+for (const [w, h] of [[164, 314], [246, 471], [328, 628]]) {
+  fs.writeFileSync(path.join(inst, `wizard-large-${w}.bmp`), await wizardBmp(w, h, { large: true }));
+}
+for (const s of [55, 83, 110]) {
+  fs.writeFileSync(path.join(inst, `wizard-small-${s}.bmp`), await wizardBmp(s, s, { large: false }));
+}
 await b.close();
-console.log('wrote', Object.keys(out).length + 2, 'web icons + favicon.ico, assets/logo/wavwiz.ico (16-256) and PNG masters');
+console.log('wrote', Object.keys(out).length + 2, 'web icons + favicon.ico, assets/logo/wavwiz.ico (16-256) and PNG masters, and 6 Inno wizard BMPs');

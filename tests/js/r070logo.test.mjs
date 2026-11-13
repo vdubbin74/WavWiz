@@ -51,3 +51,18 @@ test('0.7.0 logo: static icons use the app\'s exact Midnight Neon wordmark color
   assert.deepEqual(fills, [v['--accent-text'].toUpperCase(), v['--accent2-text'].toUpperCase()]);
   assert.equal(fills[0], '#F9663A');
 });
+
+test('0.7.0 logo: Setup wizard BMPs are generated from the same theme colors and Parallel Flow emblem (t1933)', () => {
+  const g = readFileSync(new URL('../../build/logo/make-icons.mjs', import.meta.url), 'utf8');
+  assert.match(g, /wizard-large-/);
+  assert.match(g, /wizard-small-/);
+  assert.match(g, /\[164, 314\]/);
+  assert.match(g, /\[246, 471\]/);
+  assert.match(g, /\[328, 628\]/);
+  assert.match(g, /\[55, 83, 110\]/);
+  assert.match(g, /function encodeBmp24/);
+  assert.match(g, /COLORS\.top/);
+  assert.match(g, /COLORS\.bottom/);
+  assert.match(g, /background:\$\{BG\}/);
+  assert.match(g, /<span style="color:\$\{COLORS\.top\}">Wav<\/span><span style="color:\$\{COLORS\.bottom\}">Wiz<\/span>/);
+});
