@@ -228,6 +228,7 @@ public sealed class AirPlayOutputs : IAsyncDisposable
             await s.ConnectAsync(ct);
             sink = new Ap2Sink(PlayerId(key), s, ptp, _reg.Clock, buffered, FfmpegPath) { DelayMs = delayMs + q.DefaultDelayMs, Log = m => _log?.Invoke($"airplay {key}: {m}") };
             await sink.StartAsync();
+            _log?.Invoke($"airplay {key}: SETUP type={(buffered ? 103 : 96)} ct={(buffered ? 4 : 2)} audioFormat=0x{(buffered ? 0x400000 : 0x40000):X} ssrc=0x{sink.Ssrc:X8}");
         }
         catch { if (sink != null) await sink.DisposeAsync(); await s.DisposeAsync(); ptp.RemovePeer(ep.Address); throw; }
         var sk = sink;

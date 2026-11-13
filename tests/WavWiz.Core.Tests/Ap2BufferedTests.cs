@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using WavWiz.Core.AirPlay;
+using WavWiz.Core.Clock;
 namespace WavWiz.Core.Tests;
 
 /// <summary>0.5.0 stage 9: AirPlay 2 buffered (type 103) with live AAC via ffmpeg. Offline tests need ffmpeg
@@ -45,6 +46,25 @@ public class Ap2BufferedTests
         }
         Assert.InRange(best, -2, 2); // priming dropped: decoded audio lines up with the input within 2 frames
         Assert.True(bestErr < 1e5, $"residual {bestErr}");
+    }
+
+    /// <summary>Buffered RTP SSRC is the AAC-LC 44.1 kHz stereo format id (shairport-sync AAC_44100_F24_2),
+    /// not a random stream id; receivers that key the decoder off SSRC drop anything else.</summary>
+    [Fact]
+    public async Task Buffered_packets_carry_aac_44100_format_ssrc()
+    {
+        Assert.Equal(0x16000000u, Ap2Session.BufferedAac44100Ssrc);
+        await using var s = new Ap2Session(new Ap2Options { Endpoint = new IPEndPoint(IPAddress.Loopback, 7000), Timing = Ap2Timing.Ntp, Buffered = true }, null);
+        typeof(Ap2Session).GetField("_aead", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(s, new ChaCha20Poly1305(s.Shk));
+        var b = s.BufferedPacket(1, 0, Ap2Session.BufferedAac44100Ssrc, new byte[16]);
+        Assert.Equal(Ap2Session.BufferedAac44100Ssrc, Rtp.Rd32(b, 10));
+
+        using var ptp = new PtpMaster(1UL);
+        var clock = new StopwatchClock();
+        await using var buffered = new Ap2Sink("t", s, ptp, clock, true, "ffmpeg");
+        Assert.Equal(Ap2Session.BufferedAac44100Ssrc, buffered.Ssrc);
+        await using var realtime = new Ap2Sink("t2", s, ptp, clock, false, null);
+        Assert.NotEqual(Ap2Session.BufferedAac44100Ssrc, realtime.Ssrc);
     }
 
     [Fact]

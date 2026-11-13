@@ -31,6 +31,13 @@ public sealed class Ap2Options
 public sealed class Ap2Session : IAsyncDisposable
 {
     public const int Spf = 352, Rate = 44100;
+    /// <summary>
+    /// SSRC on a buffered (type 103) RTP packet is a codec identifier, not a random
+    /// synchronization source. shairport-sync (player.h, <c>AAC_44100_F24_2</c>) and
+    /// other receivers pick the AAC decoder from this field and drop unrecognised
+    /// values. This is AAC-LC 44.1 kHz stereo, which is what <see cref="AacLiveEncoder"/> emits.
+    /// </summary>
+    public const uint BufferedAac44100Ssrc = 0x16000000;
     readonly Ap2Options _o; readonly PtpMaster? _ptp;
     public RtspClient Rtsp { get; } = new();
     public string Sid { get; } = Random.Shared.NextInt64(1, long.MaxValue).ToString();

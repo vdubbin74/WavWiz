@@ -24,6 +24,7 @@ public sealed class Ap2Sink : IStreamSubscriber, IAsyncDisposable
     uint _epoch; bool _stopFired; long _stopAt = long.MaxValue; long _expectNextRtp = -1; bool _first = true;
     ushort _seq = (ushort)Random.Shared.Next(); uint _bseq = (uint)Random.Shared.Next(0, 1 << 23);
     volatile bool _paused; uint _nextTs; long _nextAnnUs; ushort _annSeq; Task? _pump;
+    bool _anchorLogged;
     // buffered: current encoder segment
     AacLiveEncoder? _enc; ConcurrentQueue<uint>? _encRtps; System.Threading.Channels.Channel<short[]>? _pcmCh; Task? _encReader; readonly SemaphoreSlim _tx = new(1, 1);
 
@@ -32,7 +33,8 @@ public sealed class Ap2Sink : IStreamSubscriber, IAsyncDisposable
     public int BufferDepthMs { get; set; } = 3000;
     public int DelayMs { get; set; }
     public int SendAheadMs { get; set; } = 1500;
-    public uint Ssrc { get; } = (uint)Random.Shared.Next();
+    /// <summary>Buffered mode uses <see cref="Ap2Session.BufferedAac44100Ssrc"/>; realtime ALAC keeps a random SSRC.</summary>
+    public uint Ssrc { get; }
     public long Packets, Announces, Flushes, FramesIn, Segments;
     public Action<string>? Log;
     int Chunk => _buffered ? AacLiveEncoder.FramesPerPacket : Ap2Session.Spf;
@@ -41,6 +43,7 @@ public sealed class Ap2Sink : IStreamSubscriber, IAsyncDisposable
     {
         if (buffered && string.IsNullOrEmpty(ffmpeg)) throw new ArgumentException("buffered AirPlay 2 needs ffmpeg");
         Id = id; _s = s; _ptp = ptp; _clock = clock; _buffered = buffered; _ff = ffmpeg;
+        Ssrc = buffered ? Ap2Session.BufferedAac44100Ssrc : (uint)Random.Shared.Next();
         _t0 = clock.NowUs; _base = (uint)Random.Shared.Next();
         _ptpOffsetNs = (long)ptp.NowNs - clock.NowUs * 1000;
     }
@@ -120,7 +123,27 @@ public sealed class Ap2Sink : IStreamSubscriber, IAsyncDisposable
                     await _tx.WaitAsync(_cts.Token);
                     try
                     {
-                        if (_paused) { _paused = false; var r = await _s.SetRateAnchorAsync(1, rtp, PtpOf(TimeOfRtp(rtp))); if (!r.Ok) Log?.Invoke($"SETRATEANCHORTIME {r.Status}"); }
+                        if (_paused)
+                        {
+                            _paused = false;
+                            var ns = PtpOf(TimeOfRtp(rtp));
+                            var r = await _s.SetRateAnchorAsync(1, rtp, ns);
+                            if (!_anchorLogged)
+                            {
+                                _anchorLogged = true;
+                                Log?.Invoke($"SETRATEANCHORTIME rate=1 rtpTime={rtp} networkTime={ns} timelineId={_ptp.ClockId:X16} status={r.Status}");
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        await Task.Delay(5000, _cts.Token);
+                                        Log?.Invoke($"stats SyncsSent={_ptp.SyncsSent} DelayReqs={_ptp.DelayReqs} framesIn={FramesIn} packets={Packets}");
+                                    }
+                                    catch { }
+                                });
+                            }
+                            else if (!r.Ok) Log?.Invoke($"SETRATEANCHORTIME {r.Status}");
+                        }
                         _nextTs = rtp + (uint)AacLiveEncoder.FramesPerPacket;
                         await _s.SendBufferedAsync(_s.BufferedPacket(_bseq++ & 0xFFFFFF, rtp, Ssrc, au), _cts.Token); Interlocked.Increment(ref Packets);
                     }

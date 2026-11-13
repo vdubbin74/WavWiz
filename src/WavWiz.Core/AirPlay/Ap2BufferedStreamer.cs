@@ -10,7 +10,7 @@ public sealed class Ap2BufferedStreamer : IAsyncDisposable
 {
     readonly Ap2Session _s; readonly PtpMaster _ptp; readonly Func<short[], int> _fill; readonly AacLiveEncoder _enc;
     readonly CancellationTokenSource _cts = new(); Task? _pump, _send; readonly SemaphoreSlim _lk = new(1, 1);
-    public uint Seq = (uint)Random.Shared.Next(0, 1 << 23), Ssrc = (uint)Random.Shared.Next();
+    public uint Seq = (uint)Random.Shared.Next(0, 1 << 23), Ssrc = Ap2Session.BufferedAac44100Ssrc;
     public uint NextRtp; uint _pcmRtp; bool _primed;
     public uint AnchorRtp; public ulong AnchorNs; public bool Playing { get; private set; }
     public int AheadMs { get; set; } = 1500;
