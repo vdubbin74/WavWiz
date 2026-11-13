@@ -1,20 +1,20 @@
-# WavWiz server on Linux without Docker (0.6.8, F166)
+# WavWiz server on Linux without Docker (0.7.0, F166)
 
 Headless server. 0.7.0: the machine's own sound card (ALSA: analog, HDMI, USB DAC) is a WavWiz speaker; also pair a Windows Player,
 phone/browser, Cast or AirPlay speakers.
 
-**Supported today:** **64-bit Intel/AMD** (`linux-x64` / `amd64`) on a Linux host such as a NAS or mini PC. That matches the published Docker Hub image (`linux/amd64` only).
+**Supported:** **64-bit Intel/AMD** (`linux-x64` / `amd64`) on a Linux host such as a NAS or mini PC, and **64-bit ARM** (`linux-arm64`) for Raspberry Pi 4/5. GitHub Releases ship both tarballs, and the Docker Hub image is a multi-arch `linux/amd64` + `linux/arm64` manifest.
 
-**ARM64 / Raspberry Pi (0.7.0, in development):** `build/publish-linux.sh linux-arm64` produces a self-contained tarball for 64-bit Raspberry Pi OS (Pi 4/5) with `install.sh` and the systemd unit. Smoke-tested under QEMU only, **not verified on real Pi hardware**, and not published yet. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
+**ARM64 / Raspberry Pi:** `build/publish-linux.sh linux-arm64` produces a self-contained tarball for 64-bit Raspberry Pi OS (Pi 4/5) with `install.sh` and the systemd unit. Smoke-tested under QEMU only and **not yet verified on real Pi hardware**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
 
 ## Build
 
 ```sh
 build/publish-linux.sh linux-x64   # supported target (self-contained; no .NET needed on the host)
 build/publish-linux.sh             # both linux-x64 and linux-arm64
-build/publish-linux.sh linux-arm64 # Raspberry Pi 4/5 (64-bit OS) tarball only — 0.7.0, not hardware-verified yet
+build/publish-linux.sh linux-arm64 # Raspberry Pi 4/5 (64-bit OS) tarball only — not hardware-verified yet
 ```
-Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz` (+ `.sha256`). The tarball contains `install.sh` and `wavwiz-server.service`. Official GitHub releases currently ship the Windows installer; Linux tarballs are produced from source with this script.
+Output: `out/linux/wavwiz-server-<version>-<rid>.tar.gz` (+ `.sha256`). The tarball contains `install.sh` and `wavwiz-server.service`. Official GitHub releases ship the Windows installer and the `linux-x64` and `linux-arm64` tarballs; this script rebuilds the tarballs from source.
 
 ## Install (systemd)
 

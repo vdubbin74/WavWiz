@@ -10,11 +10,11 @@
 
 **Multi-zone audio for Windows.**
 
-WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an always-on Windows PC (or an optional Linux/Docker server on 64-bit Intel/AMD) and play through Windows WavWiz Players or any modern browser on phones, tablets, Macs and Linux PCs, with no app to install. Zones can play different music or link for sync. Each speaker gets its own delay, volume and EQ. Sources: local folders, NAS shares, internet radio, Subsonic/Navidrome. AirPlay in from iPhone, iPad and Mac; AirPlay 1 speaker output; AirPlay 2 output is experimental and off by default (HomePod and Apple TV unsupported). No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
+WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an always-on Windows PC (or an optional Linux/Docker server on 64-bit Intel/AMD or a Raspberry Pi 4/5) and play through Windows WavWiz Players or any modern browser on phones, tablets, Macs and Linux PCs, with no app to install. Zones can play different music or link for sync. Each speaker gets its own delay, volume and EQ. Sources: local folders, NAS shares, internet radio, Subsonic/Navidrome. AirPlay in from iPhone, iPad and Mac; AirPlay 1 speaker output; AirPlay 2 output is experimental and off by default (HomePod and Apple TV unsupported). No cloud account, no analytics, no telemetry, and WavWiz doesn't open ports to the internet. (Internet radio, tag and cover lookups, online album covers and artist photos (which you can switch off), and the optional Spotify Connect reach the internet.)
 
 > **Public beta.** Expect rough edges and frequent updates. The Windows installer is not code-signed yet (SmartScreen may warn; SHA-256 checksums are on the release). Phone-mic calibration on an iPhone is still in testing; calibrating with the PC's microphone is recommended. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
-**Download:** [latest Windows release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Docker (amd64 server):** [`vdubbin74/wavwiz-server`](https://hub.docker.com/r/vdubbin74/wavwiz-server) · **Website:** [wavwiz.com](https://wavwiz.com) · **Docs:** [First run](docs/FIRST-RUN.md) · [Docker](docs/DOCKER.md) · [Home Assistant](docs/HOME-ASSISTANT.md)
+**Download:** [latest Windows release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Docker (amd64 and arm64 server):** [`vdubbin74/wavwiz-server`](https://hub.docker.com/r/vdubbin74/wavwiz-server) · **Website:** [wavwiz.com](https://wavwiz.com) · **Docs:** [First run](docs/FIRST-RUN.md) · [Docker](docs/DOCKER.md) · [Raspberry Pi](docs/RASPBERRY-PI.md) · [Home Assistant](docs/HOME-ASSISTANT.md)
 
 ---
 
@@ -64,7 +64,7 @@ WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an alw
 
 - Homes, shops, restaurants and offices with a Windows PC that stays on, that want multi-zone music without buying into a speaker ecosystem
 - People who already own PCs, speakers, phones and tablets
-- Linux/NAS owners who only need the headless server (pair Windows Players or browsers for sound). The published Docker image is `linux/amd64` only today; 0.7.0 (in development) adds an arm64 build for Raspberry Pi 4/5, not published or hardware-verified yet. See [docs/DOCKER.md](docs/DOCKER.md) and [docs/RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
+- Linux/NAS owners who only need the headless server (pair Windows Players or browsers for sound), and Raspberry Pi 4/5 owners on 64-bit Pi OS. The published Docker image (`0.7.0`, `latest`) is a multi-arch `linux/amd64` + `linux/arm64` manifest; arm64 has been smoke-tested under QEMU only and is not yet verified on real Pi hardware. See [docs/DOCKER.md](docs/DOCKER.md) and [docs/RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
 
 ## How it compares
 

@@ -1,12 +1,10 @@
-# WavWiz server in Docker (0.6.8; 0.7.0 adds arm64 / Raspberry Pi, F166/F167)
+# WavWiz server in Docker (0.7.0, F166/F167)
 
-Headless WavWiz **server** (not the Windows Player) for a home server, NAS, or mini PC on **64-bit Intel/AMD (`linux/amd64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
+Headless WavWiz **server** (not the Windows Player) for a home server, NAS, mini PC, or Raspberry Pi 4/5, on **64-bit Intel/AMD (`linux/amd64`)** and **64-bit ARM (`linux/arm64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 Audio plays on WavWiz Players (Windows PCs), phones/browsers, Cast and AirPlay 1 speakers, and (0.7.0) the host's own sound card when you
 pass `/dev/snd` through, see [Local speakers](#local-speakers-070).
 
-**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.6.8`, `latest`) is **`linux/amd64` only**. It runs on x86-64 Linux hosts (including many NAS boxes and mini PCs that support Docker). It does **not** run natively on Raspberry Pi / ARM64 today.
-
-**ARM64 / Raspberry Pi (0.7.0, in development):** the same Dockerfile builds a `linux/arm64` image for Raspberry Pi 4/5 on 64-bit Raspberry Pi OS. It has been built and smoke-tested under QEMU emulation only, is **not verified on real Pi hardware**, and is **not on Docker Hub yet**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
+**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.7.0`, `latest`) is a **multi-arch** image (`linux/amd64` and `linux/arm64`). Docker picks the right platform automatically. The amd64 image runs on x86-64 Linux hosts (including many NAS boxes and mini PCs). The arm64 image is for Raspberry Pi 4/5 on 64-bit Raspberry Pi OS; it has been built and smoke-tested under QEMU emulation only and is **not yet verified on real Pi hardware**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
 
 ## Limits vs the Windows app
 
@@ -26,7 +24,7 @@ Docker is a **server only** build. It does not do everything the full Windows ap
 # docker-compose.yml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.7.0
     container_name: wavwiz
     network_mode: host          # recommended: discovery (UDP) + mDNS need it
     user: "10001:10001"
@@ -60,7 +58,7 @@ Docker Desktop on Windows does **not** give real `network_mode: host` to the bro
 ```yaml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.7.0
     container_name: wavwiz
     user: "10001:10001"
     restart: unless-stopped
@@ -164,7 +162,7 @@ Host networking shares ports with the host, so on a machine already running WavW
 ```yaml
 services:
   wavwiz-sbs:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.7.0
     network_mode: host
     user: "10001:10001"
     environment:
@@ -191,7 +189,7 @@ Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, 
 
 ## Building the image (local / experimental)
 
-The Dockerfile cross-builds `linux/amd64` and `linux/arm64` (the .NET build runs on the build machine's own CPU; only the runtime layer's `apt-get` runs under QEMU for arm64). The runtime base is `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04 "noble"; Microsoft publishes amd64, arm64 and arm/v7 manifests, WavWiz uses amd64 + arm64). **Hub does not publish an arm64 tag yet**, and arm64/Pi is **not hardware-verified** (0.7.0 in development, see [RASPBERRY-PI.md](RASPBERRY-PI.md)):
+The Dockerfile cross-builds `linux/amd64` and `linux/arm64` (the .NET build runs on the build machine's own CPU; only the runtime layer's `apt-get` runs under QEMU for arm64). The runtime base is `mcr.microsoft.com/dotnet/aspnet:10.0` (Ubuntu 24.04 "noble"; Microsoft publishes amd64, arm64 and arm/v7 manifests, WavWiz uses amd64 + arm64). Hub publishes both platforms as one multi-arch manifest (`0.7.0` and `latest`). arm64/Pi is **not yet hardware-verified** (see [RASPBERRY-PI.md](RASPBERRY-PI.md)). To build locally:
 
 ```sh
 docker build -t wavwiz-server:dev .

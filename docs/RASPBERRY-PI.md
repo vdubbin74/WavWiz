@@ -1,9 +1,10 @@
-# WavWiz server on Raspberry Pi (0.7.0, in development)
+# WavWiz server on Raspberry Pi (0.7.0)
 
-> **Status: not yet verified on real Raspberry Pi hardware.** The 0.7.0 arm64 build has been built and smoke-tested only under QEMU
-> arm64 emulation on an x86-64 build machine (Docker image, plus the bare tarball in Debian 13 and Debian 12 arm64 containers).
-> Microsoft does not support running .NET under QEMU, so performance and timing on a real Pi are still unknown. Nothing is published
-> to Docker Hub or GitHub Releases yet. Please treat this page as the plan for 0.7.0 and report what you find.
+> **Status: published, not yet verified on real Raspberry Pi hardware.** The 0.7.0 arm64 build is on Docker Hub (`vdubbin74/wavwiz-server:0.7.0`,
+> also tagged `latest`, in a multi-arch manifest with amd64) and GitHub Releases (`wavwiz-server-0.7.0-linux-arm64.tar.gz`).
+> It has been built and smoke-tested only under QEMU arm64 emulation on an x86-64 build machine (Docker image, plus the bare tarball
+> in Debian 13 and Debian 12 arm64 containers). Microsoft does not support running .NET under QEMU, so performance and timing on a
+> real Pi are still unknown. Please report what you find.
 
 A Raspberry Pi makes a quiet, low-power, always-on **WavWiz server**: the web UI, library, zones, scenes, schedules, alarms, Jukebox and
 Remote, with playback to the Pi's **own headphone jack, HDMI or USB DAC** (new in 0.7.0), **Google Cast** speakers (new in 0.7.0),
@@ -33,12 +34,12 @@ sudo usermod -aG docker $USER && newgrp docker
 mkdir -p ~/wavwiz/wavwiz-data && cd ~/wavwiz && sudo chown 10001:10001 wavwiz-data
 ```
 
-`docker-compose.yml` (use the same file as on x86-64; Docker picks the arm64 image automatically once 0.7.0 is published):
+`docker-compose.yml` (use the same file as on x86-64; Docker picks the arm64 image automatically):
 
 ```yaml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.7.0   # not published yet: see "Status" above
+    image: docker.io/vdubbin74/wavwiz-server:0.7.0
     container_name: wavwiz
     network_mode: host          # needed for discovery, mDNS (AirPlay/Cast speakers) and Players finding the server
     user: "10001:10001"

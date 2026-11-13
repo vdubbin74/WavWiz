@@ -2,7 +2,7 @@
 #   docker compose up -d        then open http://<this-host>:47800/
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.6.8
+    image: docker.io/vdubbin74/wavwiz-server:0.7.0
     container_name: wavwiz
     # Host networking is recommended: speakers/players find the server by UDP discovery + mDNS, which bridge mode blocks.
     network_mode: host
