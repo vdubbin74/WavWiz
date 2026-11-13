@@ -35,6 +35,23 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ### Not on Linux / Raspberry Pi
 - No CD ripper, no AirPlay receiver or Spotify Connect (Windows-only helpers), no saved Windows-share logins.
+## [0.6.9] - 2026-11-12 (beta)
+
+### Added
+- 0.6.9 #15: Pairing a PC by approval. Connect with the code left empty asks the administrator; a card with Approve / Deny and a 4-digit match code appears at once on every admin screen. Approval gives the PC its Player (audio) token - which can never be elevated - and a normal paired session for the Player window, so the window opens signed in and never lands on the sign-in page again. Requests use a per-request secret, expire after 10 minutes, are capped per device, and tokens are handed out once. A Player window without a session shows "Use WavWiz on this PC" (asks for approval) instead of the sign-in tabs. Pairing codes still work and now also sign the window in.
+- 0.6.9 #14: The Player window waits for a server that is still starting: "Waiting for the WavWiz server…" with a countdown, retries at 2/4/8/16 s then every 30 s, forever; Try now / Open in my browser stay available.
+- 0.6.9 #6: Settings > Library > Music folders: Browse… opens the Windows folder dialog in the Windows app on the server PC. Browsers and phones keep the path field.
+- 0.6.9 #12: Drag zone cards on Devices to reorder them (including Jukebox, Unassigned and AirPlay); the order is stored on the server for every device (admin).
+- 0.6.9 #16: AirPlay "Looking…" state while the speaker list is searched.
+
+### Changed
+- 0.6.9 #1-#5: Library: three-column grids on PC including Local Albums; A–Z rail on Remote as well as Local; names wrap instead of being cut off; Genres and Years are square tiles; Local / Remote / Radio share one chrome; Radio list view works.
+- 0.6.9 #7: Z–A sort chip is readable when on.
+- 0.6.9 #8: Narrow PC Now Playing: Sleep, Master volume and your pins in one row of matching buttons (no Home, no duplicates).
+- 0.6.9 #9: The player beside the expanded Library is the standalone mini player (Pop out / Back to Now Playing).
+- 0.6.9 #10/#11: Studio EQ faders are solid; Flat / Gradient applies to every slider (volume, seek bars, EQ, settings).
+- 0.6.9 #13: Expanded zone card no longer flickers on hover.
+- 0.6.9 #17/#18: Installer check boxes no longer clipped at 200 %; title bar buttons keep their size when maximized at 200 % / 67 %.
 
 ## [0.6.8] - 2026-11-10 (beta)
 

@@ -8,6 +8,13 @@ export const WHATS_NEW_VERSION = '0.7.0';
 export const WHATS_NEW = [
   // 0.7.0
   ['Google Cast speakers', 'Nest speakers, Chromecast Audio and Cast TVs or soundbars on your network show up in a Cast speakers card under AirPlay speakers. Test with a chime, add one to a zone, then use it like any speaker. Sync with other speakers is close but approximate — fine-tune it with the speaker\'s delay.'],
+  // 0.6.9
+  ['Easier PC pairing', 'A new PC no longer needs a code: press Connect and approve it on any phone or PC signed in as administrator (check the 4-digit code). The Player window then opens signed in, every time.'],
+  ['Waits for the server', 'After a restart the WavWiz window shows "Waiting for the WavWiz server…" and keeps trying by itself until the server is up.'],
+  ['Library grids', 'Three columns on PC (Local Albums too), names wrap instead of being cut off, Genres and Years are square tiles, and Remote gets the A–Z rail.'],
+  ['Arrange zone cards', 'Drag zone cards on Devices (Jukebox, Unassigned and AirPlay too) - the order is saved for every device.'],
+  ['Sliders and EQ', 'Flat or Gradient now applies to every slider; Studio EQ faders are solid.'],
+  ['Expanded Library player', 'The player beside the expanded Library is the real mini player.'],
   // 0.6.8
   ['CD ripper', 'Insert a disc and the artist, album, year and track names fill in from MusicBrainz (or from the disc itself). Pick a format — FLAC, AAC, WAV or MP3 — watch live progress, and Cancel if it stalls. Your own AirPlay outputs are hidden from the Find list.'],
   ['MP3 rips', 'LAME is bundled with WavWiz (LGPL). Choose VBR V0 (default), VBR V2 or CBR 320 kbps; tags and cover art are written into the files.'],
