@@ -65,4 +65,10 @@ test('0.7.0 logo: Setup wizard BMPs are generated from the same theme colors and
   assert.match(g, /COLORS\.bottom/);
   assert.match(g, /background:\$\{BG\}/);
   assert.match(g, /<span style="color:\$\{COLORS\.top\}">Wav<\/span><span style="color:\$\{COLORS\.bottom\}">Wiz<\/span>/);
+  // wordmark scales with the banner (2x at 328, 1.5x at 246) and is drawn with an embedded sans file, not a file:// font or a serif fallback
+  assert.match(g, /const scale = w \/ 164/);
+  assert.match(g, /fontSize = Math\.round\(26 \* scale\)/);
+  assert.match(g, /data:font\/ttf;base64/);
+  assert.match(g, /font:800 \$\{fontSize\}px/);
+  assert.match(g, /document\.fonts\.ready/);
 });

@@ -90,24 +90,28 @@ function encodeBmp24(w, h, rgba) {
   return b;
 }
 
-/** The app wordmark font stack (app.css .wordmark). Prefer a local Roboto / Segoe UI file so weight 800 is real. */
+/** The app wordmark font stack (app.css .wordmark: 800 system-ui / Segoe UI / Roboto). A real sans file is embedded as a data URL
+ *  (about:blank cannot load file:// fonts) so weight 800 renders; no double quotes, they would end the HTML style attribute. */
 function wordmarkFontFace() {
   const faces = [
-    '/usr/share/fonts/truetype/sand-box/google/Roboto/Roboto-VariableFont_wdth,wght.ttf',
     'C:/Windows/Fonts/segoeuib.ttf',
-    'C:/Windows/Fonts/segoeui.ttf',
+    '/usr/share/fonts/truetype/sand-box/google/Roboto/Roboto-VariableFont_wdth,wght.ttf',
+    '/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Black.ttf',
   ];
   const p = faces.find(f => fs.existsSync(f));
-  if (!p) return { css: '', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' };
-  const url = 'file://' + encodeURI(p.replaceAll('\\', '/').replace(/^([A-Za-z]:)/, '/$1'));
+  if (!p) throw new Error('no sans wordmark font file found (Segoe UI Bold or Roboto)');
+  const data = fs.readFileSync(p).toString('base64');
   return {
-    css: `@font-face{font-family:wwWordmark;src:url('${url}') format('truetype');font-weight:100 900;font-style:normal;font-display:block}`,
-    family: 'wwWordmark, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    file: p,
+    css: `@font-face{font-family:wwWordmark;src:url(data:font/ttf;base64,${data}) format('truetype');font-weight:100 900;font-style:normal;font-display:block}`,
+    family: `wwWordmark, system-ui, 'Segoe UI', Roboto, sans-serif`,
   };
 }
+const FACE = wordmarkFontFace();
+console.log(`wizard wordmark font: ${FACE.file}`);
 
 async function wizardBmp(w, h, { large }) {
-  const face = wordmarkFontFace();
+  const face = FACE;
   const scale = w / 164;
   const stripe = large ? Math.max(1, Math.round(6 * (h / 314))) : 0;
   const emblemSize = large ? Math.round(w * 0.78) : Math.round(Math.min(w, h) * 0.9);
