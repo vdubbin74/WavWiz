@@ -4,8 +4,9 @@ import { isAdmin, canControl } from './ui.js';
 import { loadTheme } from './theme.js';
 import { blockedKey, isExitChord, guestApi, plural, albumName, selNo, upNextLine } from './jukebox-core.js';
 import { RETRO_SVG } from './jukebox-retro.js';
-import { renderResults } from './jukebox-view.js';
-import { Viz } from './viz.js';
+import { renderResults, artBox, setArt, rowsSig, artFailed } from './jukebox-view.js';
+import { Viz, setVizZone } from './viz.js';
+import { artCv } from './art.js';
 import { speakerPicker, initialPick } from './jbspeakers.js';   // 0.4.9 F76
 
 let kiosk = null;
@@ -78,6 +79,8 @@ async function hostControls(S) {
       h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Jukebox'), h('button', { type: 'button', class: 'btn sm ghost ww-close', 'aria-label': 'Close', onclick: close }, '✕')),
       h('div', { class: 'row wrap' },
         h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } })) }, b.locked ? 'Unlock queue' : 'Lock queue'),
+        // 0.6.9 J3: the song limit follows each phone's network address too (clearing the browser no longer resets it); this frees everyone again
+        h('button', { class: 'btn sm', disabled: !ctl, 'data-act': 'jb-reset-guests', title: 'Lift bans and give every guest their full song allowance again', onclick: async () => { if (await ask('Reset guests', 'Every guest gets their full song allowance again and bans are lifted. Songs already queued stay.', { ok: 'Reset' })) act(async () => { await api('/jukebox/guests/reset', { method: 'POST' }); toast('Guests reset.'); }); } }, 'Reset guests'),
         h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),
         h('button', { class: 'btn sm danger', onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } }, 'Stop Jukebox')),
       h('div', { class: 'dlbl' }, 'UP NEXT'), rows.length ? h('div', { class: 'jbrows' }, rows) : h('p', { class: 'small dim' }, 'Nothing queued yet.'));
@@ -174,27 +177,42 @@ export function openKiosk(S) {
     root.append(wrap); inp.focus();
   }
   const qrSrc = () => '/api/v1/jukebox/qr.svg?t=' + encodeURIComponent(code || '');
-  const thumb = id => (id ? h('img', { class: 'jb-th', src: `/api/v1/art/track/${id}?size=128`, alt: '', loading: 'lazy' }) : h('span', { class: 'jb-th' }));
+  // 0.6.9 J1: covers come from the Jukebox art endpoint (a song with no picture of its own gets its album's cover); no picture = the tidy
+  // placeholder (artBox), never a broken-image icon. The build's art version keeps them in the browser cache.
+  const jbArt = (id, size) => (id ? `/api/v1/jukebox/art/${id}?size=${size}${artCv() ? '&cv=' + encodeURIComponent(artCv()) : ''}` : '');
+  const thumb = id => artBox(jbArt(id, 128), 'jb-th');
 
   // ---- Modern (bug fixes only): cover, now playing, progress, requester, Search & add | Up next with art, QR ----
+  // 0.6.9 J2: the frame is built ONCE and each second only its text / progress changes. The Up next rows are rebuilt only when the songs
+  // change (rowsSig), so a row's cover <img> is never re-created and a song with no picture never flashes its placeholder every tick.
   const mod = h('div', { class: 'jbm' });
-  const cover = h('img', { class: 'jb-cover', alt: '' });
-  const left = h('div', { class: 'jb-left' }), right = h('div', { class: 'jb-right' }), chips = h('div', { class: 'jb-chips' });
+  let cover = artBox('', 'jb-cover');
+  const disc = h('div', { class: 'jb-disc' }, cover);
+  const mTitle = h('h1', { class: 'jb-title' }), mArtist = h('div', { class: 'jb-artist' }), mProg = h('div', { class: 'jb-prog' }, h('i'), h('b'));
+  const mPos = h('small', { class: 'jb-dim' }), mDur = h('small', { class: 'jb-dim' }), mBy = h('div', { class: 'jb-by' });
+  const left = h('div', { class: 'jb-left' }, disc, h('span', { class: 'jb-kick' }, 'NOW PLAYING'), mTitle, mArtist, mProg,
+    h('div', { class: 'row jb-times' }, mPos, h('span', { class: 'grow' }), mDur), mBy,
+    h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, h('span', { class: 'jb-sico', 'aria-hidden': 'true' }), 'Search & add'));
+  const nextBox = h('div', { class: 'jb-next' }), jUrl = h('code', { class: 'jb-url' }), jQr = h('img', { class: 'jb-qr', alt: 'QR code to join the Jukebox' });
+  const right = h('div', { class: 'jb-right' }, nextBox,
+    h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), jUrl, h('small', { class: 'jb-dim' }, 'No app, no login')), jQr));
+  const chips = h('div', { class: 'jb-chips' });
+  let nextSig = null;
   mod.append(left, right);
   function drawModern(b) {
-    if (b.now?.trackId) { const u = `/api/v1/art/track/${b.now.trackId}?size=512`; if (cover.getAttribute('src') !== u) cover.src = u; } else cover.removeAttribute('src');
+    cover = setArt(cover, b.now?.trackId ? jbArt(b.now.trackId, 512) : '');
     const pos = b.now ? b.now.positionMs : 0, dur = b.now?.durationMs || 0, pct = dur ? Math.min(100, pos / dur * 100) : 0;
-    left.replaceChildren(h('div', { class: 'jb-disc' }, cover), h('span', { class: 'jb-kick' }, 'NOW PLAYING'),
-      h('h1', { class: 'jb-title' }, b.now?.title || 'Add the first song'), h('div', { class: 'jb-artist' }, b.now?.artist || ''),
-      h('div', { class: 'jb-prog', style: `--p:${pct}%` }, h('i'), h('b')),
-      h('div', { class: 'row jb-times' }, h('small', { class: 'jb-dim' }, mss(pos)), h('span', { class: 'grow' }), h('small', { class: 'jb-dim' }, mss(dur))),
-      b.now?.by ? h('div', { class: 'jb-by' }, `Requested by ${b.now.by}`) : null,
-      h('button', { class: 'btn primary jb-big', type: 'button', onclick: openSearch }, h('span', { class: 'jb-sico', 'aria-hidden': 'true' }), 'Search & add'));
-    right.replaceChildren(
-      h('div', { class: 'jb-next' }, h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
-        ...(b.next.length ? b.next.slice(0, 5).map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x.trackId), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
-          : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')])),
-      h('div', { class: 'jb-join' }, h('div', { class: 'jb-jtxt' }, h('b', null, 'Scan to add a song'), h('code', { class: 'jb-url' }, joinUrl), h('small', { class: 'jb-dim' }, 'No app, no login')), h('img', { class: 'jb-qr', src: qrSrc(), alt: 'QR code to join the Jukebox' })));
+    const txt = (e, t) => { if (e.textContent !== t) e.textContent = t; };
+    txt(mTitle, b.now?.title || 'Add the first song'); txt(mArtist, b.now?.artist || ''); mProg.style.setProperty('--p', pct + '%');
+    txt(mPos, mss(pos)); txt(mDur, mss(dur)); txt(mBy, b.now?.by ? `Requested by ${b.now.by}` : ''); mBy.hidden = !b.now?.by;
+    const rows = b.next.slice(0, 5), sig = rowsSig(rows, upNextLine(b.next));
+    if (sig !== nextSig) {
+      nextSig = sig;
+      nextBox.replaceChildren(h('h2', null, h('span', null, 'UP NEXT'), h('span', { class: 'jb-nmeta' }, upNextLine(b.next))),
+        ...(rows.length ? rows.map((x, i) => h('div', { class: 'jb-nrow' }, h('span', { class: 'n' }, String(i + 1)), thumb(x.trackId), h('div', { class: 'jb-t' }, h('b', null, x.title), h('small', null, x.artist, x.by ? h('span', { class: 'by' }, ' · ' + x.by) : null))))
+          : [h('p', { class: 'jb-dim' }, 'Nothing queued yet. Scan the code to add a song.')]));
+    }
+    txt(jUrl, joinUrl); if (jQr.getAttribute('src') !== qrSrc()) jQr.src = qrSrc();
   }
 
   // ---- 0.3.4 H4 Retro CD: rebuilt to the approved render (980 x 551 design stage, scaled to the screen) ----
@@ -211,7 +229,9 @@ export function openKiosk(S) {
   async function loadPicks() { if (!code || Date.now() - picksAt < 45000) return; picksAt = Date.now(); try { picks = await guestApi(code)('/picks?n=5'); } catch { /* keep the old ones */ } }
   function drawRetro(b) {
     const n = b.now, img = q('.jbr-disc img');
-    if (n?.trackId) { const u = `/api/v1/art/track/${n.trackId}?size=512`; if (img.getAttribute('src') !== u) img.src = u; img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
+    // 0.6.9 J1: Jukebox art endpoint (album cover fallback); a song with no picture hides the <img> (the disc face shows) and is not asked for again
+    const u = n?.trackId ? jbArt(n.trackId, 512) : '';
+    if (u && !artFailed.has(u)) { if (img.getAttribute('src') !== u) { img.hidden = true; img.onload = () => { if (img.naturalWidth) img.hidden = false; else artFailed.add(u); }; img.onerror = () => { artFailed.add(u); img.hidden = true; }; img.src = u; } } else { img.removeAttribute('src'); img.hidden = true; }
     q('.jbr-badge.l').textContent = `${plural(b.perGuest, 'pick')} per guest`;
     q('.jbr-badge.r').textContent = b.locked ? 'Requests paused' : `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`;
     q('.jbr-title').textContent = n?.title || 'Add the first song'; q('.jbr-artist').textContent = n?.artist || '';
@@ -231,7 +251,8 @@ export function openKiosk(S) {
     const isRetro = b.style === 'retro';
     root.classList.toggle('retro', isRetro); root.classList.toggle('modern', !isRetro); root.classList.toggle('paused', b.now?.state !== 'playing');
     root.style.setProperty('--beat', String((b.beat ?? 50) / 100));
-    chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null);
+    const cs = [b.perGuest, b.voteSkip, b.locked].join('|');
+    if (chips.dataset.sig !== cs) { chips.dataset.sig = cs; chips.replaceChildren(h('span', { class: 'jb-chip' }, `${plural(b.perGuest, 'song')} per guest`), h('span', { class: 'jb-chip' }, `Vote to skip: ${b.voteSkip ? 'on' : 'off'}`), b.locked ? h('span', { class: 'jb-chip' }, 'Requests paused') : null); }
     if (isRetro) { loadPicks().then(() => board === b && drawRetro(b)); drawRetro(b); } else drawModern(b);
   }
   async function refresh() { try { const [st, b] = await Promise.all([api('/jukebox'), api('/jukebox/board')]); if (!st.running) { closeKiosk(); return; } code = st.code; board = b; draw(); } catch { /* keep the last picture */ } }
@@ -243,10 +264,14 @@ export function openKiosk(S) {
   document.addEventListener('keydown', block, true); document.addEventListener('contextmenu', noMenu, true);
   try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch?.(() => {}); } catch { /* not allowed */ }
   try { navigator.keyboard?.lock?.(['Escape', 'Tab', 'AltLeft', 'MetaLeft', 'F11'])?.catch?.(() => {}); } catch { /* not supported */ }
-  try { viz = new Viz(bg, { preview: false }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
+  // 0.6.9 J5: the background visualizer shows the JUKEBOX's music. It used to follow the zone this PC controls in the app (say Basement), which
+  // is quiet while the Jukebox plays in its own zone, so it sat in its idle picture: an empty bar grid with one lit row across the middle.
+  // crisp: sized in real screen pixels under Display size (html zoom), so the picture is never a stretched low-resolution copy.
+  setVizZone(jbOwn ? 'jukebox' : 'default'); api('/jukebox/zone').then(z => { jbOwn = !!z.own; if (kiosk) setVizZone(jbOwn ? 'jukebox' : 'default'); }).catch(() => {});
+  try { viz = new Viz(bg, { preview: false, crisp: true }); requestAnimationFrame(() => viz?.start?.()); } catch { viz = null; }
   window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: true })); retS = S;
   refresh(); iv = setInterval(refresh, 1000);
-  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
+  kiosk = { root, refresh, close: () => { clearInterval(iv); removeEventListener('resize', fit); viz?.destroy?.(); setVizZone(undefined); document.removeEventListener('keydown', block, true); document.removeEventListener('contextmenu', noMenu, true); root.remove(); document.body.classList.remove('jb-kiosk'); try { navigator.keyboard?.unlock?.(); } catch { /* ignore */ } if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); window.dispatchEvent(new CustomEvent('wavwiz:kiosk', { detail: false })); } };
   paintReturn(S);   // F76: after kiosk is set, so the header's Return to Jukebox goes away
 }
 /** 0.3.5 J14: scale factors for the two stages from the window size in device px and the page zoom (pure). */

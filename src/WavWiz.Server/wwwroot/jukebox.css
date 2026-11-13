@@ -283,3 +283,44 @@ body.jbtv .jbtv-join{display:flex;align-items:center;gap:18px}
 body.jbtv .jbtv-join img{width:clamp(110px,12vw,200px);height:auto;aspect-ratio:1;background:white;padding:8px;border-radius:3px}
 body.jbtv .jbtv-join b{display:block;font-size:clamp(18px,2vw,28px)}
 body.jbtv .jbtv-join small{font-size:clamp(13px,1.2vw,18px);opacity:.8}
+/* ---- 0.6.9 J1/J2: cover art boxes - a tidy placeholder (accent gradient + waveform glyph) under the picture; no broken-image icon, no flash ---- */
+span.jb-art,.jb span.jb-art,.jbg span.jb-art{position:relative;display:inline-block;flex:none;overflow:hidden;vertical-align:middle;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg fill='white' fill-opacity='.78'%3E%3Crect x='9' y='26' width='6' height='12' rx='3'/%3E%3Crect x='19' y='17' width='6' height='30' rx='3'/%3E%3Crect x='29' y='9' width='6' height='46' rx='3'/%3E%3Crect x='39' y='19' width='6' height='26' rx='3'/%3E%3Crect x='49' y='27' width='6' height='10' rx='3'/%3E%3C/g%3E%3C/svg%3E") center/46% no-repeat,linear-gradient(135deg,var(--accent),var(--accent2,var(--accent)))}
+span.jb-art>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s;border-radius:0;margin:0;background:none}
+span.jb-art.has>img{opacity:1}
+span.jb-art.jb-cover{display:block}
+span.jb-art.jb-art0{width:64px;height:64px;border-radius:var(--radius)}
+.jbr-mini span.jb-art{width:100%;height:100%;display:block}
+/* ---- 0.6.9 J4: the guest phone screen - tabs, live Now playing card, your picks, vote progress, queue with your own picks ---- */
+.jbg-tabs{display:flex;gap:0;margin:0 0 10px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.jbg-tab{flex:1;min-height:40px;border:0;background:var(--panel);color:var(--dim);font:inherit;font-weight:600;cursor:pointer}
+.jbg-tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink,var(--bg))}
+.jbg-sbox[hidden]{display:none}
+.jbg-npc{align-items:flex-start;gap:12px}
+.jbg-npc .jb-t{flex:1;min-width:0}
+.jbg-npc .jb-t b{display:block;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jbg-npc.mine{border-color:var(--hl)}
+.jbg-kick{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.1em;color:var(--accent-text,var(--accent));font-weight:700}
+.jbg-by{color:var(--hl-text,var(--hl))!important;font-weight:600}
+.jbg-eq{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.jbg-eq i{display:block;width:3px;height:3px;background:var(--accent);border-radius:1px}
+.jbg-npc.playing .jbg-eq i{animation:jbg-eq .9s ease-in-out infinite alternate}
+.jbg-npc.playing .jbg-eq i:nth-child(2){animation-delay:-.3s}.jbg-npc.playing .jbg-eq i:nth-child(3){animation-delay:-.6s}.jbg-npc.playing .jbg-eq i:nth-child(4){animation-delay:-.15s}
+@keyframes jbg-eq{from{height:3px}to{height:11px}}
+.jbg-prog{position:relative;height:4px;margin:8px 0 3px;background:var(--line);border-radius:2px;overflow:hidden}
+.jbg-prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width 1s linear}
+.jbg-times{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.jb-note.ok{border-color:var(--accent);color:var(--ink)}
+.jbg-qrow .jbg-qn{min-width:1.4em;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+.jbg-qrow.now{background:var(--panel2)}
+.jbg-qrow.mine{box-shadow:inset 3px 0 0 var(--hl)}
+.jbg-qrow.mine b{color:var(--hl-text,var(--hl))}
+.jbg-you{font-size:10px;font-weight:700;letter-spacing:.08em;border:1px solid var(--hl);color:var(--hl-text,var(--hl));border-radius:3px;padding:1px 5px;flex:none}
+.jbg-rm{min-height:34px;padding:4px 10px;flex:none}
+.jbg-vote{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.jbg-vote>span{position:relative}
+.jbg-vote .jbg-vfill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent-soft,var(--panel2));transition:width .4s}
+.jbg-vote.voted{opacity:.85}
+.jbg-vote[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.jbg-npc.playing .jbg-eq i{animation:none;height:7px}.jbg-prog i{transition:none}}
+body.jbtv .jb-np span.jb-art{width:clamp(96px,14vw,220px);height:auto;aspect-ratio:1}
+body.jbtv .jb-np span.jb-art>img{width:100%;height:100%}

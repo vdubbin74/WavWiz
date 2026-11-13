@@ -54,3 +54,19 @@ export function guestApi(code, fetchFn = (...a) => fetch(...a)) {
     return j;
   };
 }
+/** 0.6.9 J4: instant feedback after an add - where the song landed in Up next (server's position: 0 = playing now, 1 = next). */
+export function addedLine(pos) {
+  if (pos === 0) return 'Added! It’s playing now.';
+  if (pos === 1) return 'Added! You’re up next.';
+  if (Number.isFinite(pos) && pos > 1) return `Added! You’re #${pos} in line.`;
+  return 'Added to the queue.';
+}
+/** 0.6.9 J4: "2 of 3 picks left" (the phone's own allowance, server count). */
+export function picksLeftLine(board, gid) { const per = board?.perGuest ?? 3; return `${playsLeft(board, gid)} of ${per} pick${per === 1 ? '' : 's'} left`; }
+/** 0.6.9 J4: vote-to-skip progress 0..1 and its label ("Skip · 1 of 3 votes", "Voted · 2 of 3"). */
+export function voteInfo(board) {
+  const n = Math.max(1, board?.votesNeeded || 1), v = Math.max(0, Math.min(n, board?.votes || 0));
+  return { frac: v / n, label: `${board?.voted ? 'Voted' : 'Skip'} · ${v} of ${n} vote${n === 1 ? '' : 's'}` };
+}
+/** 0.6.9 J4: the live position between board polls (3 s apart): the last server position plus the time since, while playing. */
+export function livePos(now, sinceMs) { if (!now) return 0; const d = now.durationMs || 0, p = (now.positionMs || 0) + (now.state === 'playing' ? Math.max(0, sinceMs) : 0); return d > 0 ? Math.min(d, p) : p; }

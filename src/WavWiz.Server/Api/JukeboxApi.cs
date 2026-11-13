@@ -26,34 +26,54 @@ public static class JukeboxApi
         g.MapPost("/jukebox/lock", async (HttpContext c) => { var b = await c.Request.Body(); jb.SetLocked(b.Bool("locked") ?? true); return Results.Json(jb.State()); }).Req(Role.Control);
         g.MapPost("/jukebox/ban", async (HttpContext c) => { var b = await c.Request.Body(); var gId = b.Str("guest"); if (string.IsNullOrEmpty(gId)) return Ext.Bad("guest missing"); jb.Ban(gId); return Results.Json(new { ok = true }); }).Req(Role.Control);
         g.MapGet("/jukebox/board", () => Results.Json(jb.Board(true))).Req(Role.View);
+        // 0.6.9 J3: host "Reset guests" - lifts bans and gives every guest (phone / network address) their full allowance again
+        g.MapPost("/jukebox/guests/reset", () => { jb.ResetGuests(); return Results.Json(new { ok = true }); }).Req(Role.Control);
+        // 0.6.9 J1: big-screen cover for a queued song - its own picture, else its album's cover (same rule as the Library album tile); 204 = none
+        g.MapGet("/jukebox/art/{id:long}", async (long id, int? size, HttpContext c) => await JbCover(c, id, size)).Req(Role.View);
         // join QR for the big screen: the guest page with this session's code
         g.MapGet("/jukebox/qr.svg", (HttpContext c) => { c.Response.Headers.CacheControl = "no-store"; return jb.Running ? Results.Content(SystemApi.QrSvg(JoinUrl(c)), "image/svg+xml") : Results.NotFound(); }).Req(Role.View);
         // 0.6.8-#6d: the view-only TV page (guest code, no sign-in) shows the same join QR
         g.MapGet("/jukebox/guest/qr.svg", (HttpContext c) => { c.Response.Headers.CacheControl = "no-store"; return jb.Guest(c) ? Results.Content(SystemApi.QrSvg(JoinUrl(c)), "image/svg+xml") : Results.NotFound(); }).Anon();
         g.MapGet("/jukebox/join", (HttpContext c) => jb.Running ? Results.Json(new { url = JoinUrl(c) }) : Results.NotFound()).Req(Role.View);
+        async Task<IResult> JbCover(HttpContext c, long id, int? size)
+        {
+            var t = s.Library.Track(id); if (t == null) return LibraryApi.Send(c, null, 120);
+            var jpg = await s.Art.GetAsync(t, size ?? 192, c.RequestAborted);
+            if (jpg == null && jb.AlbumArtTrack(id) is long aid && aid != id && s.Library.Track(aid) is { } at) jpg = await s.Art.GetAsync(at, size ?? 192, c.RequestAborted);
+            return LibraryApi.Send(c, jpg, 120);
+        }
         string JoinUrl(HttpContext c) => $"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/jukebox.html?j={jb.Code}";
 
         // ---- guests: no sign-in, the session code only ----
         IResult Guard(HttpContext c, Func<IResult> f) => jb.Guest(c) ? f() : Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
-        g.MapGet("/jukebox/guest/board", (HttpContext c, string? g) => Guard(c, () => Results.Json(jb.Board(false, g)))).Anon();   // 0.3.4: ?g=<guest id> marks this phone's picks
+        g.MapGet("/jukebox/guest/board", (HttpContext c, string? g) => Guard(c, () => Results.Json(jb.Board(false, g, jb.NetKey(c.Connection.RemoteIpAddress))))).Anon();   // 0.3.4: ?g=<guest id> marks this phone's picks
         g.MapGet("/jukebox/guest/search", (HttpContext c, string? q) => Guard(c, () => Results.Json(jb.Search(q ?? "")))).Anon();
         g.MapGet("/jukebox/guest/picks", (HttpContext c, int? n) => Guard(c, () => Results.Json(jb.Picks(n ?? 5)))).Anon();   // 0.3.4 H4: Retro CD B1-B5
         g.MapGet("/jukebox/guest/artist", (HttpContext c, string name) => Guard(c, () => Results.Json(jb.ArtistSongs(name)))).Anon();
         g.MapGet("/jukebox/guest/album", (HttpContext c, string artist, string album) => Guard(c, () => Results.Json(jb.AlbumSongs(artist, album)))).Anon();
         // cover art for guests: only songs from the allowed music
-        g.MapGet("/jukebox/guest/art/{id:long}", async (long id, int? size, HttpContext c) => jb.Guest(c) && jb.IsAllowed(id) ? await LibraryApi.Cover(c, s, s.Library.Track(id), size) : Results.NotFound()).Anon();
+        // 0.6.9 J1: a song with no picture of its own gets its album's cover (the album's song that has one), like the big screen
+        g.MapGet("/jukebox/guest/art/{id:long}", async (long id, int? size, HttpContext c) => jb.Guest(c) && jb.IsAllowed(id) ? await JbCover(c, id, size) : Results.NotFound()).Anon();
         g.MapPost("/jukebox/guest/add", async (HttpContext c) =>
         {
             if (!jb.Guest(c)) return Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
             var b = await c.Request.Body(); var gid = (b.Str("guest") ?? "").Trim(); var id = b.Long("trackId");
             if (gid.Length is < 8 or > 64 || id == null) return Ext.Bad("Something went wrong. Reload the page.");
-            var err = jb.Add(gid, b.Str("name") ?? "", id.Value); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { ok = true });
+            var (err, pos) = jb.AddAt(gid, b.Str("name") ?? "", id.Value, jb.NetKey(c.Connection.RemoteIpAddress)); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { ok = true, position = pos });
+        }).Anon();
+        // 0.6.9 J4: a guest removes one of their own picks that has not started yet
+        g.MapPost("/jukebox/guest/remove", async (HttpContext c) =>
+        {
+            if (!jb.Guest(c)) return Results.Json(new { error = "This Jukebox link has ended. Scan the QR code on the big screen again." }, statusCode: 403);
+            var b = await c.Request.Body(); var gid = (b.Str("guest") ?? "").Trim(); var id = b.Long("id");
+            if (gid.Length is < 8 or > 64 || id == null) return Ext.Bad("Something went wrong. Reload the page.");
+            var err = jb.RemovePick(gid, id.Value, jb.NetKey(c.Connection.RemoteIpAddress)); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { ok = true });
         }).Anon();
         g.MapPost("/jukebox/guest/vote", async (HttpContext c) =>
         {
             if (!jb.Guest(c)) return Results.Json(new { error = "This Jukebox link has ended." }, statusCode: 403);
             var b = await c.Request.Body(); var gid = (b.Str("guest") ?? "").Trim(); if (gid.Length is < 8 or > 64) return Ext.Bad("Something went wrong. Reload the page.");
-            var (v, n, sk, err) = jb.Vote(gid); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { votes = v, needed = n, skipped = sk });
+            var (v, n, sk, err) = jb.Vote(gid, jb.NetKey(c.Connection.RemoteIpAddress)); return err != null ? Results.Json(new { error = err }, statusCode: 409) : Results.Json(new { votes = v, needed = n, skipped = sk });
         }).Anon();
 
         // ---- §2 remote mode: this device controls playback but plays nothing and is not a speaker card ----

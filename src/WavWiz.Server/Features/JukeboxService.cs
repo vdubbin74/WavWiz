@@ -64,8 +64,24 @@ public sealed class JukeboxService
     public Action<List<long>>? Borrow;
     public string? Code { get; private set; }
     public bool Locked { get; private set; }
-    private readonly Dictionary<long, (string Guest, string Name)> _req = new();   // queue item id -> requester
+    private readonly Dictionary<long, (string Guest, string Name, string? Net)> _req = new();   // queue item id -> requester (0.6.9 J3: + network key)
     private readonly HashSet<string> _banned = new();
+    // 0.6.9 J3: the per-guest limit, bans and votes also follow the phone's network address, so clearing the browser (a new random guest id)
+    // no longer gives fresh picks. Privacy-light: only a salted hash of the address is kept, in memory, for this Jukebox session (a new salt on
+    // every Start; nothing is saved to disk or sent to any page). Limit: phones behind one shared address (a guest network that NATs every phone
+    // to one IP, a reverse proxy) count as one guest - the host can press Reset guests.
+    private readonly HashSet<string> _bannedNet = new();
+    private readonly HashSet<string> _voteNets = new();
+    private byte[] _salt = RandomNumberGenerator.GetBytes(16);
+    /// <summary>0.6.9 J3: the session key for a client address (salted SHA-256, 16 hex chars), or null when there is no address.</summary>
+    public string? NetKey(System.Net.IPAddress? ip)
+    {
+        if (ip == null) return null;
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+        if (System.Net.IPAddress.IsLoopback(ip)) return null;   // the server PC itself (its own big screen / browser): the guest id alone, as before
+        byte[] salt; lock (_l) salt = _salt;
+        return Convert.ToHexString(HMACSHA256.HashData(salt, ip.GetAddressBytes()))[..16].ToLowerInvariant();
+    }
     private readonly Dictionary<string, DateTime> _artistAt = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _votes = new(); private long _voteItem = -1;
 
@@ -93,7 +109,7 @@ public sealed class JukeboxService
                 _saved = q.Count > 0 ? (q.ToList(), Math.Clamp(now.Index, 0, q.Count - 1)) : null;
                 if (q.Count > 0) Cond.Clear();
             }
-            Running = true; _starting = false; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); _filler.Clear();
+            Running = true; _starting = false; Locked = false; Code = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(); _req.Clear(); _banned.Clear(); _votes.Clear(); _filler.Clear(); _bannedNet.Clear(); _voteNets.Clear(); _salt = RandomNumberGenerator.GetBytes(16);
         }
         _ev.Publish("jukebox", State()); return Code!;
     }
@@ -127,7 +143,18 @@ public sealed class JukeboxService
     public int SavedCount { get { lock (_l) return _saved?.Items.Count ?? 0; } }
     public bool Guest(HttpContext c) => Running && Code != null && CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(c.Request.Headers[Header].ToString() is { Length: > 0 } h ? h : c.Request.Query["j"].ToString()), System.Text.Encoding.UTF8.GetBytes(Code));
     public void SetLocked(bool on) { Locked = on; _ev.Publish("jukebox", State()); }
-    public void Ban(string guest) { lock (_l) _banned.Add(guest); }
+    public void Ban(string guest) { lock (_l) { _banned.Add(guest); foreach (var r in _req.Values) if (r.Guest == guest && r.Net != null) _bannedNet.Add(r.Net); } }
+    /// <summary>0.6.9 J3: host "Reset guests" - lifts bans and frees every guest's waiting picks from the limit (the songs stay queued with
+    /// their requester names), so everyone starts again with their full allowance.</summary>
+    public void ResetGuests()
+    {
+        lock (_l)
+        {
+            _banned.Clear(); _bannedNet.Clear();
+            foreach (var k in _req.Keys.ToList()) { var r = _req[k]; _req[k] = ("", r.Name, null); }
+        }
+        _ev.Publish("queue");
+    }
 
     // ---- allowed music ----
     private (string Where, (string, object?)[] Ps) Allowed(Config c)
@@ -138,6 +165,15 @@ public sealed class JukeboxService
         var w = "missing=0" + (parts.Count > 0 ? " AND (" + string.Join(" OR ", parts) + ")" : "");
         if (c.ExplicitFilter) w += " AND NOT (lower(title) LIKE '%explicit%' OR lower(album) LIKE '%explicit%')";
         return (w, ps.ToArray());
+    }
+    /// <summary>0.6.9 J1: the album cover for a queued song with no picture of its own - the album's first song that has an embedded picture
+    /// (the same rule as the Library's album tile, LibraryBrowse.FirstTrackOfAlbum). Null for Unknown Album or when no song of the album has one.</summary>
+    public long? AlbumArtTrack(long trackId)
+    {
+        var row = _db.Query("SELECT album_artist, album FROM track WHERE id=$i", r => (Ar: r.GetString(0), Al: r.GetString(1)), ("$i", trackId)).FirstOrDefault();
+        if (row.Al == null || Library.OnlineArt.IsUnknown(row.Al)) return null;
+        var id = _db.Scalar("SELECT id FROM track WHERE missing=0 AND has_art=1 AND album_artist=$ar AND album=$al ORDER BY disc_no, track_no, id LIMIT 1", ("$ar", row.Ar), ("$al", row.Al));
+        return id == null ? null : Convert.ToInt64(id);
     }
     public bool IsAllowed(long trackId) { var (w, ps) = Allowed(Cfg()); return Convert.ToInt32(_db.Scalar($"SELECT COUNT(*) FROM track WHERE id=$id AND {w}", ps.Append(("$id", (object?)trackId)).ToArray())) > 0; }
 
@@ -169,18 +205,44 @@ public sealed class JukeboxService
     public object AlbumSongs(string artist, string album) { var (w, ps) = Allowed(Cfg()); return _db.Query($"SELECT id,title,artist,album,duration_ms FROM track WHERE {w} AND album=$al AND (album_artist=$a OR artist=$a) ORDER BY disc_no, track_no", r => new { id = r.GetInt64(0), title = r.GetString(1), artist = r.GetString(2), album = r.GetString(3), durationMs = r.GetInt64(4) }, ps.Append(("$a", (object?)artist)).Append(("$al", (object?)album)).ToArray()); }
 
     /// <summary>A guest adds ONE song. Returns an error sentence for the guest, or null.</summary>
-    public string? Add(string guest, string name, long trackId)
+    public string? Add(string guest, string name, long trackId, string? net = null) => AddAt(guest, name, trackId, net).Err;
+    /// <summary>0.6.9 J4: adds like Add and also says where the song landed in Up next (1 = plays next; 0 = playing now) for "Added - you're #4".</summary>
+    public (string? Err, int Pos) AddAt(string guest, string name, long trackId, string? net = null)
+    {
+        var err = AddCore(guest, name, trackId, net, out var itemId); if (err != null) return (err, -1);
+        lock (_l)
+        {
+            var q = Cond.Queue(); var now = Cond.Now(); var i = q.ToList().FindIndex(x => x.Id == itemId);
+            return (null, i < 0 ? -1 : now.Item?.Id == itemId && now.State != "stopped" ? 0 : Math.Max(1, i - now.Index));
+        }
+    }
+    /// <summary>0.6.9 J4: a guest takes back one of their OWN picks that has not started playing yet (same guest id or same phone address).</summary>
+    public string? RemovePick(string guest, long itemId, string? net = null)
     {
         lock (_l)
         {
             if (!Running) return "The Jukebox is closed.";
+            if (!_req.TryGetValue(itemId, out var r) || !Same(r, guest, net)) return "You can only remove your own picks.";
+            var q = Cond.Queue(); var now = Cond.Now(); var i = q.ToList().FindIndex(x => x.Id == itemId);
+            if (i < 0) return "That song has already played.";
+            if (i <= now.Index || now.Item?.Id == itemId) return "That song is already playing.";
+            Cond.Remove(i); _req.Remove(itemId);
+        }
+        _ev.Publish("queue"); return null;
+    }
+    private string? AddCore(string guest, string name, long trackId, string? net, out long itemId)
+    {
+        itemId = -1;
+        lock (_l)
+        {
+            if (!Running) return "The Jukebox is closed.";
             if (Locked) return "The host has paused requests for now.";
-            if (_banned.Contains(guest)) return "Requests from this phone are turned off by the host.";
+            if (_banned.Contains(guest) || net != null && _bannedNet.Contains(net)) return "Requests from this phone are turned off by the host.";
             var c = Cfg();
             if (!IsAllowed(trackId)) return "That song isn't available here.";
             var q = Cond.Queue(); var now = Cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
             if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
-            var mine = Waiting(guest);
+            var mine = Waiting(guest, net);
             if (mine >= c.PerGuest) return $"You already have {mine} song{(mine == 1 ? "" : "s")} waiting. Add more once one has played.";
             var items = Cond.TracksToItems(new[] { trackId }); if (items.Count == 0) return "That song isn't available here.";
             var it = items[0];
@@ -191,7 +253,8 @@ public sealed class JukeboxService
             if (pos >= 0) Cond.Insert(items, pos); else Cond.Add(items, false);
             var qn = Cond.Queue(); var added = qn.FirstOrDefault(x => !before.Contains(x.Id));
             if (Cond.State == Playback.PlayState.Stopped && added != null) Cond.Jump(qn.ToList().FindIndex(x => x.Id == added.Id));
-            if (added != null) _req[added.Id] = (guest, string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim()[..Math.Min(24, name.Trim().Length)]);
+            if (added != null) itemId = added.Id;
+            if (added != null) _req[added.Id] = (guest, string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim()[..Math.Min(24, name.Trim().Length)], net);
             _artistAt[it.Artist] = Clock();
             _ev.Publish("queue"); return null;
         }
@@ -199,36 +262,39 @@ public sealed class JukeboxService
 
     /// <summary>0.3.5 J18: this guest's picks still to play or playing now - the same count the per-guest limit uses (unchanged since 0.3.0),
     /// so the guest page's "N available plays" always matches what the server allows. A play comes back once that pick has played or is removed.</summary>
-    private int Waiting(string guest)
+    /// 0.6.9 J3: a pick counts for this guest when it carries the guest id OR came from the same network address (a cleared browser).
+    private int Waiting(string guest, string? net = null)
     {
         var q = Cond.Queue(); var now = Cond.Now(); var upcoming = q.Skip(Math.Max(0, now.Index + 1)).Select(x => x.Id).ToHashSet();
         if (now.Item != null && now.State != "stopped") upcoming.Add(now.Item.Id);
-        return _req.Count(kv => kv.Value.Guest == guest && upcoming.Contains(kv.Key));
+        return _req.Count(kv => Same(kv.Value, guest, net) && upcoming.Contains(kv.Key));
     }
+    static bool Same((string Guest, string Name, string? Net) r, string? guest, string? net) => !string.IsNullOrEmpty(guest) && r.Guest == guest || net != null && r.Net == net;
     /// <summary>Vote to skip the current song (one vote per guest per song). Returns (votes, needed, skipped).</summary>
-    public (int Votes, int Needed, bool Skipped, string? Err) Vote(string guest)
+    public (int Votes, int Needed, bool Skipped, string? Err) Vote(string guest, string? net = null)
     {
         lock (_l)
         {
             var c = Cfg(); if (!Running) return (0, 0, false, "The Jukebox is closed."); if (!c.VoteSkip) return (0, 0, false, "Vote to skip is off.");
             var cur = Cond.Now().Item; if (cur == null) return (0, c.VotesNeeded, false, "Nothing is playing.");
-            if (_voteItem != cur.Id) { _votes.Clear(); _voteItem = cur.Id; }
-            _votes.Add(guest);
-            if (_votes.Count >= c.VotesNeeded) { _votes.Clear(); Cond.Next(); _ev.Publish("now"); return (c.VotesNeeded, c.VotesNeeded, true, null); }
+            if (_voteItem != cur.Id) { _votes.Clear(); _voteNets.Clear(); _voteItem = cur.Id; }
+            // 0.6.9 J3: one vote per phone - a cleared browser (new guest id) on the same address does not vote twice
+            if (net == null || _voteNets.Add(net)) _votes.Add(guest);
+            if (_votes.Count >= c.VotesNeeded) { _votes.Clear(); _voteNets.Clear(); Cond.Next(); _ev.Publish("now"); return (c.VotesNeeded, c.VotesNeeded, true, null); }
             return (_votes.Count, c.VotesNeeded, false, null);
         }
     }
 
     /// <summary>Now playing + next songs with requester names (big screen and guest page).</summary>
     /// 0.3.4: <paramref name="me"/> = the asking phone's guest id; only its own picks get mine = true.
-    public object Board(bool host = false, string? me = null)
+    public object Board(bool host = false, string? me = null, string? net = null)
     {
         var now = Cond.Now(); var q = Cond.Queue(); var c = Cfg();
         string? Who(long id) => _req.TryGetValue(id, out var r) ? r.Name : null;
-        int? left = null; if (!string.IsNullOrEmpty(me)) lock (_l) left = Math.Max(0, c.PerGuest - Waiting(me));
-        return new { running = Running, locked = Locked, style = c.Style, playsLeft = left, filler = now.Item != null && _filler.Contains(now.Item.Id), voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
-            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
-            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) &&  r2.Guest == me }) };
+        int? left = null; if (!string.IsNullOrEmpty(me)) lock (_l) left = Math.Max(0, c.PerGuest - Waiting(me, net));
+        return new { running = Running, locked = Locked, style = c.Style, playsLeft = left, filler = now.Item != null && _filler.Contains(now.Item.Id), voteSkip = c.VoteSkip, votesNeeded = c.VotesNeeded, votes = _voteItem == now.Item?.Id ? _votes.Count : 0, voted = !string.IsNullOrEmpty(me) && _voteItem == now.Item?.Id && (_votes.Contains(me) || net != null && _voteNets.Contains(net)), beat = c.Beat, cdSound = c.CdSound, theme = Theme, perGuest = c.PerGuest,
+            now = now.Item == null ? null : new { title = now.Item.Title, artist = now.Item.Artist, album = now.Item.Album, trackId = now.Item.Kind == "track" ? now.Item.RefId : null, by = Who(now.Item.Id), mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(now.Item.Id, out var r0) && Same(r0, me, net), state = now.State, positionMs = now.PositionMs, durationMs = now.DurationMs },
+            next = q.Skip(Math.Max(0, now.Index + 1)).Take(10).Select((x, i) => new { id = x.Id, index = Math.Max(0, now.Index + 1) + i, title = x.Title, artist = x.Artist, trackId = x.Kind == "track" ? x.RefId : null, by = Who(x.Id), guest = host && _req.TryGetValue(x.Id, out var r) && r.Guest.Length > 0 ? r.Guest : null, mine = !string.IsNullOrEmpty(me) && _req.TryGetValue(x.Id, out var r2) && Same(r2, me, net) }) };
     }
 
     /// <summary>Auto-fill: when the queue runs dry, add a random allowed song from the chosen playlist (or genre). Called every second.</summary>
