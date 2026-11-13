@@ -316,6 +316,7 @@ function buildCard(S, ctl) {
 
   if (!open) {
     card.append(head);
+    try { cardDecor?.(card); } catch { /* decoration is cosmetic */ }
     return card;
   }
 
