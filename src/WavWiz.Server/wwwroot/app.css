@@ -5630,3 +5630,8 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 /* 0.6.9 #12 fix: zone-onto-zone = link (dashed accent box + label), clearly different from the reorder insertion line */
 .tree42.zdrag .zwrap42.droplink42{outline:3px dashed var(--accent);outline-offset:-3px;background:color-mix(in srgb,var(--accent) 16%,var(--panel));position:relative}
 .tree42.zdrag .zwrap42.droplink42::after{content:attr(data-linklabel);position:absolute;left:40px;top:0;transform:translateY(-50%);z-index:60;pointer-events:none;background:var(--accent);color:#000;font-weight:700;font-size:12px;padding:4px 10px;border-radius:3px;white-space:nowrap;box-shadow:0 0 0 2px var(--panel)}
+/* 0.6.9 #12 fix: reorder = a solid insertion bar in the gap above / below the card (not the dashed drop-into-zone link highlight) */
+.tree42.zdrag>[data-card].zins-before,.tree42.zdrag>[data-card].zins-after{position:relative;box-shadow:none;overflow:visible}
+.tree42.zdrag>[data-card].zins-before::before,.tree42.zdrag>[data-card].zins-after::before{content:'';position:absolute;left:-4px;right:-4px;height:4px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);pointer-events:none;z-index:5}
+.tree42.zdrag>[data-card].zins-before::before{top:-7px}
+.tree42.zdrag>[data-card].zins-after::before{bottom:-7px}

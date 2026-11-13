@@ -45,3 +45,9 @@ test('speaker drops are untouched: the grip drag still assigns to the zone / Una
   assert.match(tree, /const grab = ev\.target\.closest\('\.zgut42,\.cgrip69'\)/);
   assert.match(tree, /accept: pl => pl\?\.kind === 'zone42'/);
 });
+
+test('the reorder indicator is a solid insertion bar in the gap, distinct from the dashed link outline', () => {
+  assert.match(css, /\.tree42\.zdrag>\[data-card\]\.zins-before::before,\.tree42\.zdrag>\[data-card\]\.zins-after::before\{content:'';position:absolute;left:-4px;right:-4px;height:4px;/);
+  assert.match(css, /\.tree42\.zdrag>\[data-card\]\.zins-after::before\{bottom:-7px\}/);
+  assert.match(css, /\.tree42\.zdrag>\[data-card\]\.zins-before::before\{top:-7px\}/);
+});
