@@ -175,3 +175,26 @@ test('#22b: status retrying shows the last error and the retry time in "Couldn�
   assert.equal(card().querySelector('.qb42-st').textContent, 'Looking…');
   mm._apReset();
 });
+
+test('#30 (t1884): compact buttons, one name ("Search again"), no duplicate footer link while the body offers it; "Searching…" kept', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const m = await openedCard('btn30', url => url.endsWith('/airplay/setup/devices') ? { running: true, devices: [] } : { ok: true });
+  await advance(t, 10);
+  // while searching: the footer link is there, disabled, "Searching…"
+  let foot = card().querySelector('[data-act="apsetup-rescan"]');
+  assert.ok(foot); assert.equal(foot.textContent, 'Searching…'); assert.ok(foot.disabled);
+  await advance(t, m.SCAN_MS);
+  const c = card(), again = c.querySelector('[data-act="apsetup-again"]'), close = c.querySelector('[data-act="apsetup-close"]');
+  assert.equal(again.textContent, 'Search again');
+  assert.equal(c.querySelector('[data-act="apsetup-rescan"]'), null, 'no second Search again / Scan again in the footer');
+  for (const b of [again, close]) { assert.ok(b.classList.contains('btn') && b.classList.contains('sm'), b.dataset.act + ' is a compact btn sm'); assert.ok(!b.classList.contains('primary'), b.dataset.act + ' is not a big filled block'); }
+  assert.doesNotMatch(c.textContent, /Scan again/);
+  m._apReset();
+});
+
+test('#30: the footer link (when shown, e.g. with speakers listed) says "Search again" - "Scan again" is gone from the card', () => {
+  const src = readFileSync(join(js, 'airplaysetup.js'), 'utf8');
+  assert.doesNotMatch(src, /'Scan again'/);
+  assert.match(src, /bodyAgain \? null : h\('button', \{ type: 'button', class: 'linkbtn', 'data-act': 'apsetup-rescan'[^\n]*searching \? 'Searching…' : 'Search again'\)/);
+  assert.match(src, /const bodyAgain = !rows\.length && \(view\.kind === 'err' \|\| view\.kind === 'none'\);/);
+});

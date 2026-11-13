@@ -325,7 +325,9 @@ function buildCard(S, ctl) {
 
   const rows = list.map(speakerRow);
   const searching = scanPhase === 'searching';
-  const again = () => h('button', { type: 'button', class: 'btn primary apsetup-again', 'data-act': 'apsetup-again', onclick: () => rescan() }, 'Search again');
+  // 0.6.9 #30 (t1884): the card's buttons are the normal compact Devices size (btn sm, like a zone card's Settings / Split off), not big filled
+  // blocks; the action is called 'Search again' everywhere, and the footer link is left out while the body shows its own Search again button.
+  const again = () => h('button', { type: 'button', class: 'btn sm apsetup-again', 'data-act': 'apsetup-again', onclick: () => rescan() }, 'Search again');
   let empty = null;
   if (view.kind === 'busy') empty = h('div', { class: 'small dim apsetup-empty', role: 'status' }, view.text);
   else if (view.kind === 'err') empty = h('div', { class: 'small apsetup-empty apsetup-err', role: 'alert' }, h('b', null, view.title), h('p', { class: 'small' }, view.text), again());
@@ -334,6 +336,7 @@ function buildCard(S, ctl) {
       h('li', null, 'Check the speaker is switched on and on the same network as this PC (VPN off).'),
       h('li', null, 'Windows Firewall can block the speakers’ answers. Settings › Network › AirPlay speakers has the firewall rules.')),
     again());
+  const bodyAgain = !rows.length && (view.kind === 'err' || view.kind === 'none');   // 0.6.9 #30: the body has its own Search again
   const listEl = h('div', { class: 'apsetup-list zsp42', role: 'list', 'aria-label': 'AirPlay speakers', 'aria-busy': searching ? 'true' : null },
     rows.length ? rows : empty);
 
@@ -345,8 +348,8 @@ function buildCard(S, ctl) {
 
   const foot = h('div', { class: 'apsetup-foot' },
     h('div', { class: 'apsetup-footnote grow' }, footNote, ap2line),
-    h('button', { type: 'button', class: 'linkbtn', 'data-act': 'apsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy || searching }, searching ? 'Searching…' : 'Scan again'),
-    h('button', { type: 'button', class: 'btn primary', 'data-act': 'apsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
+    bodyAgain ? null : h('button', { type: 'button', class: 'linkbtn', 'data-act': 'apsetup-rescan', onclick: () => rescan(), disabled: !!st(selId).busy || searching }, searching ? 'Searching…' : 'Search again'),
+    h('button', { type: 'button', class: 'btn sm', 'data-act': 'apsetup-close', onclick: () => { setOpen(false); paintInPlace(); } }, 'Close'));
 
   const body = h('div', { class: 'apsetup-body' }, steps, listEl, foot);
   card.append(head, h('div', { class: 'zwrap42 apsetup-wrap' }, body));
