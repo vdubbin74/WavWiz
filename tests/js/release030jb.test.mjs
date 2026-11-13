@@ -28,7 +28,7 @@ test('0.3.0 §1: the kiosk swallows Esc, Alt+Tab, F11, Alt+F4 and the context-me
   assert.match(k, /addEventListener\('keydown', block, true\)/); assert.match(k, /addEventListener\('contextmenu', noMenu, true\)/);
   // 0.7.0 item 5c: 0.4.9 F76 asks "back to the app / stop" between the server's PIN check and closing; a wrong PIN still returns before closeKiosk
   assert.match(k, /api\('\/jukebox\/unlock', \{ method: 'POST', body: \{ pin \} \}\); \} catch \{ toast\([^;]*\); return; \}[\s\S]{0,400}?closeKiosk\(\)/, 'leaving needs the PIN checked by the server');
-  assert.match(k, /setTimeout\(askExit, 1200\)/, 'long-press the corner logo');
+  assert.match(k, /setTimeout\(\(\) => \{ unhold\(\); askExit\(\); \}, HOLD_MS\)/, 'long-press the corner logo'); assert.match(k, /export const HOLD_MS = 1200;/);   // 0.6.9 #18: the hold shows a fill (unhold) and the time is a named constant
   assert.match(k, /new Viz\(bg/, 'visualizer behind'); assert.match(k, /viz\?\.destroy/);
 });
 test('0.3.0 §1: guest page needs no sign-in and uses only the session code; styles use theme variables', () => {

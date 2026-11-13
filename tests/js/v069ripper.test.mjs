@@ -16,7 +16,7 @@ test('ripper: the disc + tracks section keeps its natural height; Ripping + Rece
   assert.match(css, /\.rip-layout\{[^}]*flex:none;min-height:0;overflow:visible\}/);
   assert.doesNotMatch(css, /\.rip-layout\{[^}]*min-height:320px/, 'no squeezable 320px floor');
   assert.doesNotMatch(css, /\.rip-trackcard\{[^}]*height:100%/);
-  assert.match(css, /\.rip-tracks\{[^}]*max-height:clamp\(16rem,56vh,40rem\);overflow-x:hidden;overflow-y:auto/, 'a long disc scrolls inside Tracks');
+  assert.match(css, /\.rip-tracks\{[^}]*max-height:clamp\(16rem,calc\(56vh \/ var\(--z,1\)\),40rem\);overflow-x:hidden;overflow-y:auto/, 'a long disc scrolls inside Tracks');   // 0.7.0 merge: 56vh divided by the Display-size zoom like every vh/vw (release008)
   const r = rd('js/rip.js'), page = r.slice(r.indexOf('export function ripPage'), r.indexOf('export function recentJobs'));
   assert.ok(page.indexOf("class: 'rip-jobs'") > page.indexOf("class: 'rip-layout'"), 'jobs after the grid, as a sibling');
 });

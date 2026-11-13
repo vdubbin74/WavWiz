@@ -30,8 +30,10 @@ test('F10 UI: Editing: picker, no (controlling) on queue options', () => {
   assert.match(s, /editLbl.*pickSel.*sendBtn/s);
   // options are zone names with no "(controlling)" suffix; the word may still appear in a comment
   // 0.7.0 item 5c: 0.4.8 F60 marks the zone that is playing with " (playing)" - that is allowed; "(controlling)" is still not
-  assert.match(s, /cs\.map\(c => h\('option', \{ value: c\.key \}, c\.name(?: \+ \(cur && c\.key === cur\.key \? ' \(playing\)' : ''\))?\)\)/);
+  // 0.6.9 #21: the label is Z.choiceLabel (empty zones add " · no speakers"), still with no "(controlling)"
+  assert.match(s, /cs\.map\(c => h\('option', \{ value: c\.key \}, Z\.choiceLabel\(c, cur\)\)\)/);
   assert.doesNotMatch(s, /c\.name \+ .*controlling/);
+  const z = src('zones40'); assert.match(z, /export const choiceLabel = \(c, cur\) => c\.name \+ [^\n]*\(cur && c\.key === cur\.key \? ' \(playing\)' : ''\);/); assert.doesNotMatch(z.match(/export const choiceLabel[^\n]*/)[0], /controlling/);
 });
 
 test('F8 dragInfo.ref stashed for WebKit drop; listtable accepts lib drag without MIME in types', () => {

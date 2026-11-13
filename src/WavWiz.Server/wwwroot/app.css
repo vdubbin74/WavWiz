@@ -5276,7 +5276,7 @@ html.wtb.wtb-inactive .wtb-btn:not(:hover) { color: color-mix(in srgb, var(--tex
 .rip-meta-row:has(.rip-qual){grid-template-columns:5.5em minmax(0,1fr) minmax(0,1fr)}
 .rip-track-h{margin:0 0 8px;font-size:13px;font-weight:700;flex:none}
 /* One scroller: the track list. Actions stay under it. Same 4-column grid on every row. */
-.rip-tracks{list-style:none;margin:0;padding:0;flex:1 1 auto;min-height:8rem;max-height:clamp(16rem,56vh,40rem);overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;min-width:0}
+.rip-tracks{list-style:none;margin:0;padding:0;flex:1 1 auto;min-height:8rem;max-height:clamp(16rem,calc(56vh / var(--z,1)),40rem);overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable;min-width:0}
 .rip-tr{display:grid;grid-template-columns:auto 2.25em minmax(0,1fr) 4.75em;gap:8px;align-items:center;padding:2px 6px 2px 2px;border-radius:3px;width:100%;box-sizing:border-box;min-width:0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 .rip-tr.off{opacity:.55}
 .rip-check{display:inline-flex;align-items:center;justify-content:center;margin:0;flex:none}
@@ -5673,7 +5673,7 @@ html.wtb .wtb-btn{flex:0 0 calc(46px / var(--z,1));width:calc(46px / var(--z,1))
 html.wtb .wtb-g{font-size:calc(10px / var(--z,1))}
 html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 /* 0.6.9 #15: pairing by approval - admin cards + Player window waiting screen */
-.pairreqs{position:fixed;right:12px;bottom:calc(56px + var(--safe-b,0px));z-index:70;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 24px))}
+.pairreqs{position:fixed;right:12px;bottom:calc(56px + var(--safe-b,0px));z-index:70;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw / var(--z,1) - 24px))}
 .pairreq-card{background:var(--panel,#1d2329);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 .pairreq-t{font-weight:600;margin-bottom:4px}.pairreq-n{overflow-wrap:anywhere}.pairreq-m{margin:6px 0 10px}
 .pairreq-code{font-size:1.25em;letter-spacing:.18em;font-variant-numeric:tabular-nums}

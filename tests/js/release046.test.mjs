@@ -16,10 +16,11 @@ test('F30 zoneOrderAfterDrop: boxes move as a whole, before / after the target',
 });
 test('F30 wiring: pointer engine, saved in the shared device order, tree redraws on a reorder, grab cursor, no link underline', () => {
   const t = src('tree42');
-  assert.match(t, /attachZoneDrag\(root, model\.boxes/);
+  // 0.6.9 #12 (merged into 0.7.0): every card drags; the drop saves ONE shared card order on the server (PUT /zones/order), not the per-device order
+  assert.match(t, /attachZoneDrag\(root, \(\) => shownCards, \(from, to, after\) => putOrder\(moveCard\(shownCards, from, to, after\)\), linkZones\)/);
   assert.match(t, /startPointerDrag\(ev, grab, \(\) => \(\{ kind: 'zone42'/);
-  assert.match(t, /saveOrder\(\{ \.\.\.o, g: zoneOrderAfterDrop/);
-  assert.match(src('devices'), /orderedGroups\(S\.groups \|\| \[\]\)\.map\(g => g\.id\)(?:, openSig42\(\))?\]\);/);   // 0.7.0 item 5c: DIG-R1 appended the open-pref signature
+  assert.match(t, /const putOrder = keys => saveCardOrder\(keys, k => api\('\/zones\/order', \{ method: 'PUT', body: \{ order: k \} \}\)\)/);
+  assert.match(src('devices'), /orderedGroups\(S\.groups \|\| \[\]\)\.map\(g => g\.id\), getCardOrder\(\)(?:, openSig42\(\))?\]\);/);   // 0.7.0 item 5c: DIG-R1 appended the open-pref signature; 0.6.9 #12 the card order
   const c = css();
   assert.match(c, /\.tree42 \.zcard42 \.zc42-body,\.tree42 \.zcard42 \.zname,\.tree42 \.qb42-pick\{cursor:grab/);
   assert.doesNotMatch(c, /\.qb42-pick:hover \.qb42-name\{[^}]*underline/);

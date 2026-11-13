@@ -43,9 +43,10 @@ test('remembered Cast speakers come from zones cast: playerIds only', () => {
 
 test('Cast card sits directly below the AirPlay card (Unassigned, AirPlay, Cast) and never touches it', () => {
   const t = rd('js/tree42.js');
-  const un = t.indexOf('root.append(unBox)'), ap = t.indexOf('airPlaySetupCard(S, ctl)'), cs = t.indexOf('castSetupCard(S, ctl)');
+  // 0.6.9 #12 merged in 0.7.0: Unassigned and AirPlay are cards in the shared card order; Cast follows the AirPlay card wherever it is moved
+  const un = t.indexOf("cardList.push({ key: 'unassigned'"), ap = t.indexOf('airPlaySetupCard(S, ctl)'), cs = t.indexOf('castSetupCard(S, ctl)');
   assert.ok(un > 0 && ap > un && cs > ap, 'order Unassigned < AirPlay < Cast');
-  assert.match(t, /if \(admin\) \{ const csc = castSetupCard\(S, ctl\); if \(csc\) root\.append\(csc\); \}/);
+  assert.match(t, /if \(admin\) \{ const csc = castSetupCard\(S, ctl\); if \(csc\) \{ const apEl = shownCards\.find\(c => c\.key === 'airplay'\)\?\.el; if \(apEl\) apEl\.after\(csc\); else root\.append\(csc\); \} \}/);
   const src = rd('js/castsetup.js');
   assert.match(src, /class: 'qb42 solo idle castsetup-card'/);
   assert.match(src, /data-leader-id.: '__cast__'/);
