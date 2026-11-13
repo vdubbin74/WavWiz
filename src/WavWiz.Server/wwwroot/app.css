@@ -5485,6 +5485,11 @@ html.wtb .drawer.open,html.wtb .drawer.open *{app-region:no-drag;-webkit-app-reg
   pointer-events:none;z-index:6;box-shadow:0 2px 10px color-mix(in srgb,var(--accent) 40%,transparent);
 }
 .azstrip .azbubble[hidden]{display:none}
+/* 0.6.9 #1 follow-up (t1835u): side-panel Library (the narrow PC window's 3-column grid), Local and Remote - the A–Z rail sits flush on the panel's
+   right edge: the scroller takes back the panel body's 10px right padding and the rail drops its 8px right margin, so the grid gets the freed width.
+   Side panel only: the expanded Library, the phone page and the stacked narrow layout keep their own rules. */
+.libpanel .libbody>.lib:not(.expanded)>.libscroll{margin-right:-10px}
+.libpanel .lib:not(.expanded)>.libscroll>.azstrip{margin-right:0}
 @media (pointer:coarse){
   .libscroll>.azstrip,.lib .azstrip{width:22px}
   .azstrip .azbubble{width:44px;height:44px;font-size:20px}
