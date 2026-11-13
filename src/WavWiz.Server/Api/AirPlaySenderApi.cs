@@ -1,4 +1,5 @@
 using System.Net;
+using WavWiz.Server.Media;
 namespace WavWiz.Server.Api;
 
 /// <summary>0.5.0 AirPlay sender, admin-only developer endpoints. Stage 1: discovery (no connection to any speaker).</summary>
@@ -158,7 +159,28 @@ public static class AirPlaySenderApi
     {
         lock (Gate) return s.AirPlayOut ??= new AirPlay.AirPlayOutputs(s.Registry, () => s.AirPlayBrowse, s.Log)   // 0.7.0 t1930: PTP / SETRATEANCHORTIME / metadata must reach wavwiz-server.log
             { AirPlay2Enabled = s.Cfg.AirPlay2Experimental, PreferBuffered = s.Cfg.AirPlay2Buffered, FfmpegPath = s.FfmpegPath,
-              ArtFor = async (it, ct) => it.Kind == "track" && it.RefId is long tid && s.Library.Track(tid) is { } t ? await s.Art.GetAsync(t, 384, ct) : null };   // 0.6.8-#14e
+              ArtFor = (it, ct) => ArtBytes(s, it, ct) };   // 0.7.0 t1960: tracks + radio logo / placeholder (realtime and buffered)
+    }
+
+    /// <summary>0.7.0 t1960: library cover, or radio live art / saved logo (GetRemoteAsync: fetch, JPEG, cache), or the WavWiz placeholder.</summary>
+    internal static async Task<byte[]?> ArtBytes(Services s, QueueItem it, CancellationToken ct)
+    {
+        string? live = null;
+        if (it.Kind == "radio" && it.RefId is long rid)
+            live = s.Registry.Live().Select(cd => cd.LiveArtUrl(rid)).FirstOrDefault(x => x != null);
+        var rawPh = AirPlay.AirPlayArt.LoadPlaceholder();
+        byte[]? ph = rawPh;
+        try { ph = await AirPlay.AirPlayArt.PlaceholderAsync(s.Art, AirPlay.AirPlayArt.Size, CancellationToken.None) ?? rawPh; }
+        catch { ph = rawPh; }
+        try
+        {
+            return await AirPlay.AirPlayArt.BytesAsync(
+                it,
+                async (item, c) => item.RefId is long tid && s.Library.Track(tid) is { } t ? await s.Art.GetAsync(t, AirPlay.AirPlayArt.Size, c) : null,
+                (url, c) => s.Art.GetRemoteAsync(url, AirPlay.AirPlayArt.Size, c),
+                live, ph, ct);
+        }
+        catch (OperationCanceledException) { return it.Kind == "radio" ? ph : null; }
     }
 
     static readonly object Gate = new();

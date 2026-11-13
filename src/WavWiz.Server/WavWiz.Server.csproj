@@ -26,4 +26,7 @@
     <ProjectReference Include="..\WavWiz.Measure\WavWiz.Measure.csproj" />
     <ProjectReference Include="..\WavWiz.PlayerCore\WavWiz.PlayerCore.csproj" />  <!-- 0.7.0: Linux/Pi local audio output (in-server player over ALSA) -->
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\assets\logo-placeholder-512.png" LogicalName="WavWiz.radio-placeholder.png" />
+  </ItemGroup>
 </Project>

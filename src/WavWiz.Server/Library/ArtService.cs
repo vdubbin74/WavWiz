@@ -296,6 +296,9 @@ public sealed class ArtService
     /// <summary>0.3.2 F10/F11: swscale flags that are correct on the shipped ffmpeg build.</summary>
     public const string Sws = "lanczos+bitexact+accurate_rnd+full_chroma_int";
     public Task<byte[]?> ThumbAsync(byte[] raw, int size, CancellationToken ct = default) => ResizeAsync(raw, size, ct);
+    /// <summary>0.7.0 t1960: resize and cache under <paramref name="srcKey"/> (radio placeholder, already-fetched logos in tests).</summary>
+    public Task<byte[]?> ResizeCachedAsync(string srcKey, byte[] raw, int size, CancellationToken ct) =>
+        string.IsNullOrEmpty(srcKey) || raw.Length == 0 ? Task.FromResult<byte[]?>(null) : Cached(srcKey, () => raw, size, ct);
     private async Task<byte[]?> ResizeAsync(byte[] raw, int size, CancellationToken ct)
     {
         if (Sniff(raw) == null) return null;

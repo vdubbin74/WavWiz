@@ -95,4 +95,26 @@ public class AirPlayFakeSpeakerTests
         Assert.Equal(textBefore, fake.Got.Count(g => g.Type == "application/x-dmap-tagged"));
         Assert.True(fake.Got.Count(g => g.Type == "text/parameters") >= 2);
     }
+
+    [Fact]
+    public async Task Metadata_for_radio_sends_artwork_not_image_none()
+    {
+        await using var f = await ServerFixture.StartAsync(); var S = f.Server.S;
+        using var fake = new FakeRaop();
+        var logo = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        var item = new QueueItem(1, "radio", "http://stream.example/x", "Springtime Chill", "Internet radio", "", 0, 12, null, null, "https://example.com/logo.png");
+        var now = new NowPlaying("playing", 0, 0, 0, item, "Springtime Chill / Florito", null, false, "off", 1);
+        await using var outs = new AirPlayOutputs(S.Registry, () => null)
+        {
+            NowFor = _ => now,
+            ArtFor = (it, ct) => AirPlayArt.BytesAsync(it, (_, _) => Task.FromResult<byte[]?>(null), (_, _) => Task.FromResult<byte[]?>(logo), null, logo, ct),
+        };
+        var o = await outs.ConnectAsync("radio-tv", "127.0.0.1:" + fake.Port, 0, 50);
+        Assert.True(o.Subscribed);
+        for (int i = 0; i < 40 && !fake.Got.Any(g => g.Type == "image/png" && g.Method == "SET_PARAMETER"); i++) await Task.Delay(100);
+        var sets = fake.Got.Where(g => g.Method == "SET_PARAMETER").Select(g => g.Type).ToList();
+        Assert.Contains("application/x-dmap-tagged", sets);
+        Assert.Contains("image/png", sets);
+        Assert.DoesNotContain("image/none", sets);
+    }
 }

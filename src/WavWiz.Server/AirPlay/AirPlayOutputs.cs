@@ -192,9 +192,12 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         {
             byte[]? img = null;
             if (n.Item != null && ArtFor != null) { using var cts = new CancellationTokenSource(4000); try { img = await ArtFor(n.Item, cts.Token); } catch { img = null; } }
+            if (img == null && n.Item?.Kind == "radio") img = AirPlayArt.LoadPlaceholder(); // ICY title updates re-send art; never clear with image/none
             if (img != null && img.Length > 512 * 1024) img = null;   // keep the control channel quick
             // no picture: clear the old one ("image/none", empty body) so the previous song's cover does not linger
-            if (!await Send(img ?? Array.Empty<byte>(), img != null ? RaopControls.ImageType(img) : "image/none", at)) o.MetaArt = false;
+            var artType = img != null ? RaopControls.ImageType(img) : "image/none";
+            _log?.Invoke($"airplay {o.Key}: artwork {artType}" + (img != null ? $" {img.Length} bytes" : ""));
+            if (!await Send(img ?? Array.Empty<byte>(), artType, at)) o.MetaArt = false;
         }
         if (plan.HasFlag(AirPlaySetup.MetaSend.Progress) && o.MetaProgress && n.DurationMs > 0)
         {
