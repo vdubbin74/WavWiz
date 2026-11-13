@@ -3,7 +3,7 @@
 // Built here: the in-panel summary with Restore / Cancel, Back up now (a snapshot on the server), Restore from a saved backup, and the Undo restore toast
 // (the server saves a "before restore" snapshot first, so Undo is one call).
 import { h, api, toast } from './util.js';
-import { undoToast, exportBackup } from './settingsui.js';
+import { undoToast, exportBackup, backupRestoreNotes } from './settingsui.js';
 import { pulse } from './motion.js';
 
 let panel = null;
@@ -20,7 +20,7 @@ const summary = pv => h('div', { class: 'bk-sum' },
   h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['', 'Now', 'In the backup'].map(t => h('th', null, t)))),
     h('tbody', null, (pv.sections || []).map(x => h('tr', { class: x.current !== x.incoming ? 'chg' : '' }, h('td', null, x.label), h('td', null, String(x.current)), h('td', null, String(x.incoming)))))),
   pv.songsNotInLibrary ? h('p', { class: 'warn-t small' }, `${pv.songsNotInLibrary} playlist song(s) are not in this library yet; they are skipped.`) : null,
-  h('p', { class: 'small dim' }, 'Passwords, certificates and paired devices are never in a backup, so you keep the ones on this server.'));
+  ...backupRestoreNotes(pv));
 
 const PENDING = 'wavwiz.undoRestore';
 /** After a restore the page reloads once (theme, devices, scenes... all come from the restored data); the Undo toast is shown right after. */

@@ -160,7 +160,9 @@ public class Release030Tests
     [Fact] public void Secret_settings_are_never_backed_up()
     {
         foreach (var k in new[] { "acoustid.apiKey", "nas.share1", "admin.passwordHash", "tls.rootKey", "spotify.token", "x.password" }) Assert.True(BackupService.IsSecretSetting(k), k);
-        foreach (var k in new[] { "tls.redirect", "playback.crossfadeSec", "server.name", "jukebox.pinHash", "ui.checklistDismissed" }) Assert.False(BackupService.IsSecretSetting(k), k);
+        foreach (var k in new[] { "tls.redirect", "playback.crossfadeSec", "server.name", "jukebox.pinHash", "ui.checklistDismissed", "server.id", "airplay.hwaddr" }) Assert.False(BackupService.IsSecretSetting(k), k);
+        foreach (var k in new[] { "server.id", "airplay.hwaddr", "receivers.hw" }) Assert.True(BackupService.IsIdentitySetting(k), k);
+        foreach (var k in new[] { "tls.redirect", "playback.crossfadeSec", "server.name" }) Assert.False(BackupService.IsIdentitySetting(k), k);
     }
 
     [Fact]

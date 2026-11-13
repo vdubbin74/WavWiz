@@ -7,6 +7,16 @@ import { jbPreview } from './jukebox-preview.js';
 import { speakerPicker, applyJukeboxSpeakers, initialPick } from './jbspeakers.js';   // 0.4.9 F76
 
 export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub', 'wavwiz.layout'];
+export const BACKUP_KEEP_NOTE = "Passwords and this server's certificates stay here (they are never in a backup). Pairings are not in the backup: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.";
+export function backupRestoreNotes(pv) {
+  const notes = [h('p', { class: 'small dim' }, (pv && pv.pairingNote) || BACKUP_KEEP_NOTE)];
+  const re = (pv && pv.willReattach) || [];
+  const need = (pv && pv.needPairing) || [];
+  if (re.length) notes.push(h('p', { class: 'small' }, 'Already on this server and will reconnect: ' + re.join(', ') + '.'));
+  if (need.length) notes.push(h('p', { class: 'small' }, 'Pair again to reconnect: ' + need.join(', ') + '.'));
+  return notes;
+}
+
 export const ROLE_NAMES = [['view', 'View', 'can browse and see what plays'], ['control', 'Control', 'can play, pause and change volume'], ['admin', 'Admin', 'can change every setting']];
 
 /** §7.4: "Saved ✓" right beside the changed control, fading after ~1.5 s. */
@@ -105,11 +115,11 @@ export function backupCard(S, { admin, done } = {}) {
     const rows = h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['', 'Now', 'In the file'].map(t => h('th', null, t)))), h('tbody', null, pv.sections.map(x => h('tr', null, h('td', null, x.label), h('td', null, String(x.current)), h('td', null, String(x.incoming))))));
     dialog('Import a backup', [h('p', null, `Backup from WavWiz ${pv.appVersion || '?'}${pv.createdAt ? ', ' + new Date(pv.createdAt).toLocaleString() : ''}. These parts are replaced:`), rows,
       pv.songsNotInLibrary ? h('p', { class: 'warn-t small' }, `${pv.songsNotInLibrary} playlist song(s) are not in this library yet. Add the music folders and let the scan finish, then import again to keep them.`) : null,
-      h('p', { class: 'small dim' }, 'Passwords, certificates and paired devices are never in a backup, so you keep the ones on this server.')],
+      ...backupRestoreNotes(pv)],
       [{ text: 'Import', cls: 'primary', onclick: async () => { try { const r = await api('/backup/import', { method: 'POST', raw }); info.textContent = `Imported. ${r.songsNotInLibrary ? r.songsNotInLibrary + ' song(s) skipped.' : ''}`; done?.(); } catch (e) { toast('Import failed. ' + e.message, true); return false; } } }, { text: 'Cancel' }]);
   });
   return h('div', { class: 'card', id: 'sec-backup' }, h('h3', null, 'Backup ', admin ? null : adminTag()),
-    learn('Save your settings, playlists, scenes, schedules, alarms, EQ presets and device names and delays in one file.', 'The file never holds passwords, certificates, private keys or paired-device tokens. The Jukebox PIN is kept only as a hash. Import shows what will change before anything is replaced.'),
+    learn('Save your settings, playlists, scenes, schedules, alarms, EQ presets and device names and delays in one file.', 'The file never holds passwords, certificates, private keys or paired-device tokens. The Jukebox PIN is kept only as a hash. After a restore onto a fresh install, pair each player again; zones, names, EQ and delays reconnect by computer name. Import shows what will change before anything is replaced.'),
     h('div', { class: 'row wrap' }, adminOnly(S, h('button', { class: 'btn primary', type: 'button', 'aria-disabled': String(!admin), onclick: ev => { ev.preventDefault(); if (admin) exportBackup(); } }, 'Export backup…'), admin),
       adminOnly(S, h('button', { class: 'btn', type: 'button', onclick: () => file.click() }, 'Import backup…'), admin), file), info);
 }

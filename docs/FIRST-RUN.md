@@ -119,7 +119,7 @@ An admin can give any device a **max volume** in its Settings and lock it. While
 
 ### Backup
 
-**File → Back up now** saves a backup on the server (the last 10 are kept); **File → Restore backup…** picks one, shows a summary of what will change, then restores it, and an **Undo restore** button is offered right after. **File → Export settings** downloads a .wavwizbackup file and **File → Import settings…** reads one, with the same summary first. **Settings → General → Backup** (admin) exports and imports a file with a preview. Passwords, certificates and private keys are never included; set those again after restoring on a new PC.
+**File → Back up now** saves a backup on the server (the last 10 are kept); **File → Restore backup…** picks one, shows a summary of what will change, then restores it, and an **Undo restore** button is offered right after. **File → Export settings** downloads a .wavwizbackup file and **File → Import settings…** reads one, with the same summary first. **Settings → General → Backup** (admin) exports and imports a file with a preview. Passwords, certificates and private keys are never included. Pairings are not in the backup either: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.
 
 ## 8. AirPlay tip (VPN / isolation)
 

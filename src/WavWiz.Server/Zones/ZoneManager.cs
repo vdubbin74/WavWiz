@@ -97,6 +97,8 @@ public sealed class ZoneManager
             ("$i", s.Id), ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$m", s.Hello.MachineName), ("$v", s.Hello.AppVersion), ("$t", now), ("$l", s.Hello.LinkType));
         bool isNew = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone WHERE player_id=$p", ("$p", s.Id))) == 0;
         if (isNew && s.IsWeb) isNew = !MergeWebTwin(s);   // 0.6.8-#11e
+        // 0.7.0 (t1915u): a restore keeps speakers as placeholders (old player ids, no pairing). When this PC pairs again, take over the matching row instead of adding a twin.
+        if (isNew) isNew = !WavWiz.Server.Features.BackupService.TryAdoptPlaceholder(_db, s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.Hello.MachineName);
         if (s.IsWeb) lock (_webIp) _webIp[s.Id] = s.Remote.ToString();
         if (isNew)
         {

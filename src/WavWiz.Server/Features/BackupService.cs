@@ -6,10 +6,14 @@ namespace WavWiz.Server.Features;
 
 /// <summary>0.3.0 §7.1: Settings > General > Backup. One .wavwizbackup file (a zip holding backup.json) with settings, playlists, scenes,
 /// schedules/alarms, EQ presets and device names/delays. NEVER certificates, private keys, passwords, API tokens or share credentials
-/// (the Jukebox PIN is stored hashed only). Import shows a preview of what changes, then replaces those tables in one transaction.</summary>
+/// (the Jukebox PIN is stored hashed only). Import shows a preview of what changes, then replaces those tables in one transaction.
+/// 0.7.0 (t1915u–t1917u): pairings and this server's identity (server id, AirPlay hardware address) stay on this install. Imported
+/// speakers are remapped onto a player that is already paired when the computer name or the same speaker output matches; the rest
+/// wait as placeholders and attach when that player pairs.</summary>
 public sealed class BackupService
 {
     public const int Format = 1;
+    public const string PlayerMetaKey = "zones.playerMeta";
     /// <summary>Table, label, and the key columns written (all columns when null).</summary>
     public static readonly (string Table, string Label)[] Tables =
     {
@@ -20,6 +24,14 @@ public sealed class BackupService
     };
     private static readonly Regex Secret = new(@"(pass(word)?|secret|token|apikey|api_key|private|cert|\.key$|^admin\.|^nas\.|^tls\.(?!redirect$))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     public static bool IsSecretSetting(string key) => Secret.IsMatch(key) && !key.EndsWith("pinHash", StringComparison.Ordinal);
+    /// <summary>This install's identity: a fresh CA / AirPlay address / server id must not be overwritten by a backup from another (or wiped) install.</summary>
+    public static bool IsIdentitySetting(string key) => key.Equals("server.id", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("airplay.hwaddr", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("receivers.hw", StringComparison.OrdinalIgnoreCase);
+    public static bool SkipSetting(string key) => IsSecretSetting(key) || IsIdentitySetting(key);
+
+    public readonly record struct PlayerMeta(string Id, string Name, string? MachineName);
+    public const string PairingNote = "Passwords and this server's certificates stay here (they are never in a backup). Pairings are not in the backup: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.";
 
     private readonly Db _db; private readonly EventHub _ev;
     private readonly string? _dir;
@@ -61,12 +73,13 @@ public sealed class BackupService
         foreach (var (t, _) in Tables)
         {
             var rows = Rows(c, t);
-            if (t == "setting") rows = rows.Where(r => !IsSecretSetting(Convert.ToString(r["key"]) ?? "")).ToList();
+            if (t == "setting") rows = rows.Where(r => !SkipSetting(Convert.ToString(r["key"]) ?? "") && Convert.ToString(r["key"]) != PlayerMetaKey).ToList();
             if (t == "playlist_item")   // songs travel by file path (track ids differ on another install)
                 foreach (var r in rows) r["track_path"] = r["track_id"] is null ? null : Db.Scalar(c, "SELECT path FROM track WHERE id=$i", ("$i", r["track_id"]));
             tables[t] = rows;
         }
         doc["tables"] = tables;
+        doc["players"] = Db.Query(c, "SELECT id,name,machine_name FROM player", r => new Dictionary<string, object?> { ["id"] = r.GetString(0), ["name"] = r.GetString(1), ["machineName"] = r.IsDBNull(2) ? null : r.GetString(2) });
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
         {
@@ -99,6 +112,29 @@ public sealed class BackupService
         catch (Exception) { return new(default, "This file can't be read as a WavWiz backup."); }
     }
 
+    public static List<PlayerMeta> PlayersOf(JsonElement root)
+    {
+        var list = new List<PlayerMeta>();
+        if (root.TryGetProperty("players", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var p in arr.EnumerateArray())
+            {
+                var id = p.TryGetProperty("id", out var i) ? i.GetString() : null;
+                var name = p.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+                list.Add(new(id, name, p.TryGetProperty("machineName", out var m) ? m.GetString() : null));
+            }
+        }
+        if (list.Count == 0 && root.TryGetProperty("tables", out var tbl) && tbl.TryGetProperty("zone", out var zs) && zs.ValueKind == JsonValueKind.Array)
+            foreach (var z in zs.EnumerateArray())
+            {
+                var id = z.TryGetProperty("player_id", out var p) ? p.GetString() : null;
+                var name = z.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name) && list.All(x => x.Id != id)) list.Add(new(id, name, null));
+            }
+        return list;
+    }
+
     /// <summary>What an import would change: per section current vs incoming counts, and songs not found in this library.</summary>
     public object Preview(JsonElement root)
     {
@@ -113,10 +149,18 @@ public sealed class BackupService
         }
         if (tbl.TryGetProperty("playlist_item", out var pi))
             foreach (var r in pi.EnumerateArray()) if (r.TryGetProperty("track_path", out var p) && p.ValueKind == JsonValueKind.String && Db.Scalar(c, "SELECT id FROM track WHERE path=$p", ("$p", p.GetString())) == null) missing++;
-        return new { appVersion = root.TryGetProperty("appVersion", out var v) ? v.GetString() : null, createdAt = root.TryGetProperty("createdAt", out var ca) ? ca.GetString() : null, sections = list, songsNotInLibrary = missing };
+        var plan = MatchPlan(c, root);
+        return new {
+            appVersion = root.TryGetProperty("appVersion", out var v) ? v.GetString() : null,
+            createdAt = root.TryGetProperty("createdAt", out var ca) ? ca.GetString() : null,
+            sections = list, songsNotInLibrary = missing,
+            pairingNote = PairingNote,
+            willReattach = plan.Where(x => x.NewId != null).Select(x => x.Meta.Name).ToList(),
+            needPairing = plan.Where(x => x.NewId == null).Select(x => x.Meta.Name).ToList()
+        };
     }
 
-    /// <summary>Replaces the backed-up tables in one transaction. Secrets in the file (if someone edited it) are ignored.</summary>
+    /// <summary>Replaces the backed-up tables in one transaction. Secrets and this install's identity in the file (if present) are ignored. Speakers are remapped onto already-paired players when the computer name or the same speaker output matches.</summary>
     public (int Rows, int Missing) Import(JsonElement root)
     {
         using var c = _db.Open(); using var tx = c.BeginTransaction(); int n = 0, missing = 0;
@@ -125,7 +169,7 @@ public sealed class BackupService
         {
             if (!tbl.TryGetProperty(t, out var arr) || arr.ValueKind != JsonValueKind.Array) continue;
             var cols = Db.Query(c, $"PRAGMA table_info({t})", r => r.GetString(1)).ToHashSet();
-            if (t == "setting") Db.Exec(c, "DELETE FROM setting WHERE key NOT LIKE 'admin.%' AND key NOT LIKE 'tls.%' AND key NOT LIKE 'nas.%'", tx);
+            if (t == "setting") Db.Exec(c, "DELETE FROM setting WHERE key NOT LIKE 'admin.%' AND key NOT LIKE 'tls.%' AND key NOT LIKE 'nas.%' AND key NOT IN ('server.id','airplay.hwaddr','receivers.hw')", tx);
             else Db.Exec(c, $"DELETE FROM {t}", tx);
             foreach (var row in arr.EnumerateArray())
             {
@@ -135,7 +179,8 @@ public sealed class BackupService
                     JsonValueKind.Null => null, JsonValueKind.Number => p.Value.TryGetInt64(out var l) ? l : p.Value.GetDouble(), JsonValueKind.String => p.Value.GetString(),
                     JsonValueKind.True => 1L, JsonValueKind.False => 0L, _ => p.Value.GetRawText()
                 };
-                if (t == "setting" && IsSecretSetting(Convert.ToString(vals.GetValueOrDefault("key")) ?? "")) continue;
+                if (t == "setting" && SkipSetting(Convert.ToString(vals.GetValueOrDefault("key")) ?? "")) continue;
+                if (t == "setting" && Convert.ToString(vals.GetValueOrDefault("key")) == PlayerMetaKey) continue;
                 if (t == "playlist_item" && row.TryGetProperty("track_path", out var tp) && tp.ValueKind == JsonValueKind.String)
                 {
                     var id = Db.Scalar(c, "SELECT id FROM track WHERE path=$p", ("$p", tp.GetString()));
@@ -147,8 +192,154 @@ public sealed class BackupService
                 n++;
             }
         }
+        RemapImported(c, tx, root);
         tx.Commit();
         foreach (var e in new[] { "settings", "playlists", "scenes", "schedules", "zones", "dsp", "favorites" }) _ev.Publish(e);
         return (n, missing);
+    }
+
+    /// <summary>Pair a newly connected player with a restored placeholder (same computer name, or a unique matching device name).</summary>
+    public static bool TryAdoptPlaceholder(Db db, string newId, string name, string? machineName)
+    {
+        if (string.IsNullOrWhiteSpace(newId)) return false;
+        var meta = LoadMeta(db);
+        var taken = db.Query("SELECT id FROM player", r => r.GetString(0)).ToHashSet(StringComparer.Ordinal);
+        taken.Add(newId);
+        var placeholders = db.Query("SELECT player_id,name FROM zone", r => (Id: r.GetString(0), Name: r.GetString(1)))
+            .Where(z => !taken.Contains(z.Id)).ToList();
+        if (placeholders.Count == 0) return false;
+        string? Match(Func<(string Id, string Name), bool> ok)
+        {
+            var hit = placeholders.Where(ok).Select(z => z.Id).Distinct().ToList();
+            return hit.Count == 1 ? hit[0] : null;
+        }
+        var old = !string.IsNullOrWhiteSpace(machineName)
+            ? Match(z => meta.Any(m => m.Id == z.Id && !string.IsNullOrWhiteSpace(m.MachineName) && string.Equals(m.MachineName, machineName, StringComparison.OrdinalIgnoreCase)))
+            : null;
+        old ??= Match(z => string.Equals(z.Name, name, StringComparison.OrdinalIgnoreCase)
+            || meta.Any(m => m.Id == z.Id && string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)));
+        if (old == null) return false;
+        RemapPlayer(db, old, newId);
+        return true;
+    }
+
+    public static void RemapPlayer(Db db, string oldId, string newId)
+    {
+        using var c = db.Open(); using var tx = c.BeginTransaction();
+        RemapPlayer(c, tx, oldId, newId); tx.Commit();
+    }
+
+    private sealed record Match(PlayerMeta Meta, string? NewId);
+    private static List<Match> MatchPlan(SqliteConnection c, JsonElement root)
+    {
+        var incoming = PlayersOf(root);
+        var live = Db.Query(c, "SELECT id,name,machine_name FROM player", r => (Id: r.GetString(0), Name: r.GetString(1), Machine: r.IsDBNull(2) ? null : r.GetString(2)));
+        var liveEps = Db.Query(c, "SELECT player_id,win_endpoint_id FROM output_endpoint", r => (Player: r.GetString(0), Ep: r.GetString(1)));
+        var importedDevs = new List<string>();
+        if (root.TryGetProperty("tables", out var tbl) && tbl.TryGetProperty("output_device", out var od) && od.ValueKind == JsonValueKind.Array)
+            foreach (var r in od.EnumerateArray()) if (r.TryGetProperty("id", out var id) && id.GetString() is { Length: > 0 } s) importedDevs.Add(s);
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        void TrySet(string old, string neu) { if (!map.ContainsKey(old) && !map.ContainsValue(neu)) map[old] = neu; }
+        foreach (var dev in importedDevs)
+        {
+            var (pid, ep) = SplitDeviceId(dev); if (pid == null || ep == null) continue;
+            var hits = liveEps.Where(x => x.Ep == ep).Select(x => x.Player).Distinct().ToList();
+            if (hits.Count == 1) TrySet(pid, hits[0]);
+        }
+        foreach (var p in incoming)
+        {
+            if (string.IsNullOrWhiteSpace(p.MachineName)) continue;
+            if (incoming.Count(x => string.Equals(x.MachineName, p.MachineName, StringComparison.OrdinalIgnoreCase)) != 1) continue; // two PCs on the same reported name: don't guess
+            var hits = live.Where(l => string.Equals(l.Machine, p.MachineName, StringComparison.OrdinalIgnoreCase)).Select(l => l.Id).Distinct().ToList();
+            if (hits.Count == 1) TrySet(p.Id, hits[0]);
+        }
+        foreach (var p in incoming)
+        {
+            var hits = live.Where(l => string.Equals(l.Name, p.Name, StringComparison.OrdinalIgnoreCase)).Select(l => l.Id).Distinct().ToList();
+            if (hits.Count == 1) TrySet(p.Id, hits[0]);
+        }
+        return incoming.Select(p => new Match(p, map.TryGetValue(p.Id, out var n) ? n : null)).ToList();
+    }
+
+    private static void RemapImported(SqliteConnection c, SqliteTransaction tx, JsonElement root)
+    {
+        var plan = MatchPlan(c, root);
+        foreach (var m in plan) if (m.NewId != null && m.NewId != m.Meta.Id) RemapPlayer(c, tx, m.Meta.Id, m.NewId);
+        var json = JsonSerializer.Serialize(plan.Select(m => new { id = m.Meta.Id, name = m.Meta.Name, machineName = m.Meta.MachineName }));
+        Db.Exec(c, "INSERT OR REPLACE INTO setting(key,value_json) VALUES($k,$v)", tx, ("$k", PlayerMetaKey), ("$v", json));
+    }
+
+    private static void RemapPlayer(SqliteConnection c, SqliteTransaction? tx, string oldId, string newId)
+    {
+        if (oldId == newId) return;
+        var zrow = Db.Query(c, "SELECT active_output_device_id FROM zone WHERE player_id=$p", r => r.IsDBNull(0) ? null : r.GetString(0), ("$p", oldId)).FirstOrDefault();
+        var newActive = RewriteDeviceId(zrow, oldId, newId);
+        Db.Exec(c, "UPDATE zone SET player_id=$n, active_output_device_id=$a WHERE player_id=$o", tx, ("$n", newId), ("$a", newActive), ("$o", oldId));
+        var devs = Db.Query(c, "SELECT id FROM output_device", r => r.GetString(0)).Where(id => SplitDeviceId(id).PlayerId == oldId).ToList();
+        foreach (var id in devs)
+        {
+            var nid = RewriteDeviceId(id, oldId, newId);
+            if (nid == id) continue;
+            if (Db.Scalar(c, "SELECT id FROM output_device WHERE id=$i", ("$i", nid)) != null)
+                Db.Exec(c, "DELETE FROM output_device WHERE id=$o", tx, ("$o", id));
+            else
+                Db.Exec(c, "UPDATE output_device SET id=$n WHERE id=$o", tx, ("$n", nid), ("$o", id));
+        }
+        foreach (var (table, col) in new[] { ("output_endpoint", "output_device_id"), ("calibration", "output_device_id"), ("calibration", "reference_device_id"), ("output_device_dsp", "output_device_id") })
+        {
+            var cols = Db.Query(c, $"PRAGMA table_info({table})", r => r.GetString(1)).ToHashSet();
+            if (!cols.Contains(col)) continue;
+            foreach (var old in Db.Query(c, $"SELECT DISTINCT {col} FROM {table} WHERE {col} IS NOT NULL", r => r.GetString(0)))
+            {
+                var nid = RewriteDeviceId(old, oldId, newId);
+                if (nid != old) Db.Exec(c, $"UPDATE {table} SET {col}=$n WHERE {col}=$o", tx, ("$n", nid), ("$o", old));
+            }
+        }
+        if (Db.Query(c, "PRAGMA table_info(output_endpoint)", r => r.GetString(1)).Contains("player_id"))
+            Db.Exec(c, "UPDATE output_endpoint SET player_id=$n WHERE player_id=$o", tx, ("$n", newId), ("$o", oldId));
+        if (Db.Query(c, "PRAGMA table_info(calibration)", r => r.GetString(1)).Contains("player_id"))
+            Db.Exec(c, "UPDATE calibration SET player_id=$n WHERE player_id=$o", tx, ("$n", newId), ("$o", oldId));
+        RewriteSettingPlayerIds(c, tx, oldId, newId);
+    }
+
+    private static void RewriteSettingPlayerIds(SqliteConnection c, SqliteTransaction? tx, string oldId, string newId)
+    {
+        foreach (var key in new[] { "playback.groups", "jukebox.devices" })
+        {
+            var raw = Db.Scalar(c, "SELECT value_json FROM setting WHERE key=$k", ("$k", key)) as string;
+            if (string.IsNullOrEmpty(raw) || !raw.Contains(oldId, StringComparison.Ordinal)) continue;
+            Db.Exec(c, "UPDATE setting SET value_json=$v WHERE key=$k", tx, ("$v", raw.Replace(oldId, newId, StringComparison.Ordinal)), ("$k", key));
+        }
+    }
+
+    public static string RewriteDeviceId(string? id, string oldPid, string newPid)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(oldPid)) return id ?? "";
+        var prefix = "ep:" + oldPid + ":";
+        return id.StartsWith(prefix, StringComparison.Ordinal) ? "ep:" + newPid + ":" + id[prefix.Length..] : id;
+    }
+    public static (string? PlayerId, string? Endpoint) SplitDeviceId(string? id)
+    {
+        if (id == null || !id.StartsWith("ep:", StringComparison.Ordinal)) return (null, null);
+        var rest = id[3..]; var i = rest.IndexOf(':');
+        return i <= 0 ? (null, null) : (rest[..i], rest[(i + 1)..]);
+    }
+
+    public static List<PlayerMeta> LoadMeta(Db db)
+    {
+        try
+        {
+            var raw = db.Setting(PlayerMetaKey); if (string.IsNullOrWhiteSpace(raw)) return new();
+            using var doc = JsonDocument.Parse(raw); var list = new List<PlayerMeta>();
+            foreach (var p in doc.RootElement.EnumerateArray())
+            {
+                var id = p.TryGetProperty("id", out var i) ? i.GetString() : null;
+                var name = p.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+                list.Add(new(id, name, p.TryGetProperty("machineName", out var m) ? m.GetString() : null));
+            }
+            return list;
+        }
+        catch { return new(); }
     }
 }
