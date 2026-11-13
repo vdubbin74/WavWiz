@@ -5642,3 +5642,19 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .tree42.zdrag>[data-card].zins-before::before,.tree42.zdrag>[data-card].zins-after::before{content:'';position:absolute;left:-4px;right:-4px;height:4px;border-radius:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);pointer-events:none;z-index:5}
 .tree42.zdrag>[data-card].zins-before::before{top:-7px}
 .tree42.zdrag>[data-card].zins-after::before{bottom:-7px}
+
+/* ---- 0.6.9 #20 (t1850/t1851): Radio station text takes too much space. Station names clamp to 2 lines and the subtitle (genre / tags / URL)
+   to 1 line, with "…", in tiles and list rows of My stations and the station finder; the full name, tags and address are in the tooltip
+   (stationTip). This overrides the 0.6.9 #2 "names wrap, never …" rule for RADIO ONLY - albums, artists, genres and years keep full titles. ---- */
+.radiotab2 .tile .t1.ell.rad-t1,.radiotab2 .list .item .t1.ell.rad-t1,.radiotab2 .radfind-row .ell.rad-t1,.lib .radiotab2 .tile .t1.ell.rad-t1,.lib .radiotab2 .list .item .t .t1.ell.rad-t1{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.25}
+.radiotab2 .tile .t2.ell.rad-t2,.radiotab2 .list .item .t2.ell.rad-t2,.radiotab2 .radfind-row .ell.rad-t2,.lib .radiotab2 .tile .t2.ell.rad-t2,.lib .radiotab2 .list .item .t .t2.ell.rad-t2{
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+/* tiles: the name always takes its 2 lines, so every tile in a row is the same height and the rows line up */
+.radiotab2 .tilegrid .tile.radtile{align-self:start;min-width:0}
+.radiotab2 .tile .t1.ell.rad-t1{min-height:2.5em}
+/* list rows: one compact height for every station, playing or not (the highlight never grows the row) */
+.radiotab2 .list .item.radrow,.radiotab2 .radfind-row{height:62px;min-height:62px;box-sizing:border-box;padding-top:6px;padding-bottom:6px;align-items:center;overflow:hidden;flex-wrap:nowrap}
+.radiotab2 .list .item.radrow>.t,.radiotab2 .radfind-row>.grow{min-width:0;flex:1 1 auto}
+.radiotab2 .list .item.radrow>.tag,.radiotab2 .list .item.radrow>.btn,.radiotab2 .radfind-row>.btn,.radiotab2 .list .item.radrow>.cover,.radiotab2 .radfind-row>.cover{flex:none}
+.radiotab2 .list .item.radrow .rad-t1 .rad-favmark{vertical-align:-1px}

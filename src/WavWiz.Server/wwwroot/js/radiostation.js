@@ -23,6 +23,12 @@ export const stationSub = r => {
   const mid = [genre, [codec, br].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
   return mid || (r.url || '').replace(/^https?:\/\//, '').slice(0, 40);
 };
+/** 0.6.9 #20 (t1850/t1851): station names and tag strings can be huge ("IBIZA CHILLOUT LOUNGE - Ambient, Deep House, …"): the name is clamped
+ *  to 2 lines and the subtitle to 1 (CSS .rad-t1 / .rad-t2, Radio only - albums and artists keep full titles); this tooltip has it all. */
+export const stationTip = r => {
+  const tags = [r.genre, r.tags].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · ');
+  return [r.name || 'Station', tags, (r.url || r.url_resolved || '').replace(/^https?:\/\//, '')].filter(Boolean).join('\n');
+};
 export const savedRef = r => ({ kind: 'radio', id: r.id });
 /** Unsaved finder hit: queue by URL (ResolveItems kind=url). Play still saves via finder/save. */
 export const finderRef = r => ({ kind: 'url', url: r.url || r.url_resolved, name: r.name || 'Station' });
@@ -126,24 +132,24 @@ export function wireStationChrome(el, r, { S, act, onChange, saved }) {
 
 export function savedStationTile(r, playing, { S, act, onChange }) {
   const can = canControl(S), on = playing === r.id;
-  const el = h('li', { class: 'tile' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id) },
+  const el = h('li', { class: 'tile radtile' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id), title: stationTip(r) },
     h('div', { class: 'tileart' }, stationArt(r, 384, 'lg'),
       on ? h('span', { class: 'tilebadge' }, '▮▮▮ Playing') : null,
       r.favorite ? favMark() : null,
       can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + r.name, onclick: ev => { ev.stopPropagation(); act('/stream/play', { kind: 'radio', id: r.id }); } }, '▶') : null),
-    h('div', { class: 't1 ell', title: r.name }, r.name),
-    h('div', { class: 't2 ell' }, stationSub(r)));
+    h('div', { class: 't1 ell rad-t1' }, r.name),
+    h('div', { class: 't2 ell rad-t2' }, stationSub(r)));
   wireStationChrome(el, r, { S, act, onChange, saved: true });
   return el;
 }
 
 export function savedStationRow(r, playing, { S, act, onChange }) {
   const can = canControl(S), on = playing === r.id;
-  const el = h('li', { class: 'item radrow' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id) },
+  const el = h('li', { class: 'item radrow' + (on ? ' playing' : '') + (r.favorite ? ' rad-fav' : ''), 'data-station': String(r.id), title: stationTip(r) },
     stationArt(r, 96, 'sm'),
     h('div', { class: 't', style: 'min-width:0' },
-      h('div', { class: 't1 ell' }, r.name, r.favorite ? favMark() : null),
-      h('div', { class: 't2 ell' }, stationSub(r))),
+      h('div', { class: 't1 ell rad-t1' }, r.name, r.favorite ? favMark() : null),
+      h('div', { class: 't2 ell rad-t2' }, stationSub(r))),
     on ? h('span', { class: 'tag on' }, 'PLAYING') : null,
     can ? h('button', { class: 'btn primary', 'aria-label': 'Play ' + r.name, onclick: ev => { ev.stopPropagation(); act('/stream/play', { kind: 'radio', id: r.id }); } }, '▶') : null);
   wireStationChrome(el, r, { S, act, onChange, saved: true });
@@ -153,15 +159,15 @@ export function savedStationRow(r, playing, { S, act, onChange }) {
 export function finderStationTile(r, { S, act, onChange, savedIds }) {
   const can = canControl(S);
   const saved = !!(r.url && savedIds?.has(r.url));
-  const el = h('li', { class: 'tile' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '' },
+  const el = h('li', { class: 'tile radtile' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '', title: stationTip(r) },
     h('div', { class: 'tileart' }, stationArt(r, 384, 'lg'),
       saved ? h('span', { class: 'tilebadge' }, 'Saved') : null,
       can ? h('button', { type: 'button', class: 'tileplay', 'aria-label': 'Play ' + (r.name || ''), onclick: ev => {
         ev.stopPropagation();
         stationMenuItems(r, { S, act, onChange, saved: false }).find(i => i.id === 'play')?.onclick?.();
       } }, '▶') : null),
-    h('div', { class: 't1 ell', title: r.name }, r.name || 'Station'),
-    h('div', { class: 't2 ell' }, stationSub(r)));
+    h('div', { class: 't1 ell rad-t1' }, r.name || 'Station'),
+    h('div', { class: 't2 ell rad-t2' }, stationSub(r)));
   wireStationChrome(el, r, { S, act, onChange, saved: false });
   return el;
 }
@@ -169,11 +175,11 @@ export function finderStationTile(r, { S, act, onChange, savedIds }) {
 export function finderStationRow(r, { S, act, onChange, savedIds }) {
   const can = canControl(S);
   const saved = !!(r.url && savedIds?.has(r.url));
-  const el = h('div', { class: 'card row wrap radfind-row' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '' },
+  const el = h('div', { class: 'card row radfind-row' + (saved ? ' rad-saved' : ''), 'data-station-uuid': r.stationuuid || '', title: stationTip(r) },
     stationArt(r, 96, 'sm'),
     h('div', { class: 'grow', style: 'min-width:0' },
-      h('b', { class: 'ell', style: 'display:block' }, r.name || 'Station', saved ? h('span', { class: 'small dim' }, ' · Saved') : null),
-      h('div', { class: 'dim small ell' }, stationSub(r))),
+      h('b', { class: 'ell rad-t1' }, r.name || 'Station', saved ? h('span', { class: 'small dim' }, ' · Saved') : null),
+      h('div', { class: 'dim small ell rad-t2' }, stationSub(r))),
     can ? h('button', { class: 'btn primary', onclick: ev => {
       ev.stopPropagation();
       stationMenuItems(r, { S, act, onChange, saved: false }).find(i => i.id === 'play')?.onclick?.();
