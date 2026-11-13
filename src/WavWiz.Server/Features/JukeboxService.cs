@@ -24,6 +24,8 @@ public sealed class JukeboxService
         public int ArtistCooldownMin { get; set; } public AutoFill Autofill { get; set; } = new(); public int Beat { get; set; } = 50; public bool CdSound { get; set; }
         /// <summary>0.4.9 F76: the Jukebox zone's default speakers (device ids; null = none saved yet) and whether the Jukebox zone shows in Devices when it is not running.</summary>
         public List<long>? DefaultSpeakers { get; set; } public bool ShowInDevices { get; set; } = true;
+        /// <summary>0.6.9 #19 (t1847): the Jukebox zone's OFF / ON (see JukeboxPower). Off by default - fresh setups and installs that never set it.</summary>
+        public bool ZoneOn { get; set; }
     }
     public sealed class AutoFill { public string Kind { get; set; } = "playlist"; public long? Id { get; set; } public string Genre { get; set; } = ""; }
     private static readonly JsonSerializerOptions J = new(JsonSerializerDefaults.Web);
@@ -33,7 +35,7 @@ public sealed class JukeboxService
 
     public string? Update(JsonElement b)
     {
-        if (b.Bool("reset") == true) { _db.Exec("DELETE FROM setting WHERE key='jukebox.config'"); _ev.Publish("jukebox", State()); return null; }
+        if (b.Bool("reset") == true) { _db.Exec("DELETE FROM setting WHERE key='jukebox.config'"); try { Saved?.Invoke(); } catch { } _ev.Publish("jukebox", State()); return null; }
         var node = JsonSerializer.SerializeToNode(Cfg(), J)!.AsObject();
         foreach (var p in b.EnumerateObject())
         {
@@ -47,8 +49,11 @@ public sealed class JukeboxService
         c.PerGuest = Math.Clamp(c.PerGuest, 1, 20); c.VotesNeeded = Math.Clamp(c.VotesNeeded, 1, 50); c.ArtistCooldownMin = Math.Clamp(c.ArtistCooldownMin, 0, 240); c.Beat = Math.Clamp(c.Beat, 0, 100);
         if (c.DefaultSpeakers != null) c.DefaultSpeakers = c.DefaultSpeakers.Where(x => x > 0).Distinct().Take(200).ToList();   // 0.4.9 F76
         _db.SetSetting("jukebox.config", JsonSerializer.Serialize(JsonSerializer.Serialize(c, J)));
-        _ev.Publish("jukebox", State()); return null;
+        try { Saved?.Invoke(); } catch { }   // 0.6.9 #19: the Jukebox zone's speakers follow a saved OFF / ON
+        _ev.Publish("jukebox", State()); _ev.Publish("zones"); return null;
     }
+    /// <summary>0.6.9 #19: runs after the settings are saved (the host wires JukeboxPower.Apply).</summary>
+    public Action? Saved;
     public bool CheckPin(string? pin) { var hj = _db.Setting("jukebox.pinHash"); if (hj == null || string.IsNullOrEmpty(pin)) return false; var hash = JsonSerializer.Deserialize<string>(hj)!; return AuthService.VerifyPassword(pin, hash); }
 
     // ---- session state ----

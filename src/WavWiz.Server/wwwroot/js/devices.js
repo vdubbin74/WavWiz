@@ -21,6 +21,7 @@ import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.
 import { swapQuestion, offerSwap } from './zoneref.js';   // 0.6.8-#15
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
 import { nowLines } from './livemeta.js';   // 0.7.0 radio now-playing
+import { jbSaved, jbValue, jbDirty, jbStage, jbDiscard, jbBody, jbHint, jbGuard, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 
 // Devices are the speakers (one per PC player or browser). ZONES are optional named groups of devices.
 // 0.2.0:
@@ -953,6 +954,7 @@ function tree42Kit(S, ctl, X) {
     const hint = h('div', { class: 'small dim dhint42' }, dcol.closest('.e42') ? HINT42 : HINT42.replace(' on the right', ''));
     const key = jbSel ? 'jb' : spZ ? 's' + spZ.id : zg ? 'z' + zg.id : 'none';
     let pnl = dcol.querySelector('.d42-pane');
+    if (pnl?.dataset.key === 'jb' && key !== 'jb' && jbDirty(S.jb)) leaveJb(S, ctl);   // 0.6.9 #19: unsaved Jukebox zone settings - Save / Discard / Keep editing
     if (!pnl || pnl.dataset.key !== key || (!spZ && pnl._sig !== sig42() && !pnl.contains(document.activeElement) && !hov42(pnl))) {
       pnl?.firstChild?._destroy?.();
       pnl = h('div', { class: 'd42-pane', 'data-key': key });
@@ -1474,11 +1476,14 @@ function onTagAct(ev) {
 }
 if (HASWIN) { document.addEventListener('click', onTagAct, true); document.addEventListener('keydown', onTagAct, true); }
 /** J4: the labeled OFF | ON pill (replaces the unlabeled switch). */
-export function onPill(label, on, can, toggle) {
-  const b = h('button', { type: 'button', class: 'onpill' + (on ? ' on' : ''), role: 'switch', 'aria-checked': String(!!on), 'aria-label': `${label} on or off`, title: on ? 'On - press to switch off' : 'Off - press to switch on',
-    onclick: ev => { ev.stopPropagation(); if (can) toggle(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
-  b._set = v => { b.classList.toggle('on', !!v); b.setAttribute('aria-checked', String(!!v)); b.title = v ? 'On - press to switch off' : 'Off - press to switch on'; };
-  return ro(b, can, 'Your access is view-only.');
+/** 0.6.9 #19: `empty` = the zone has no speakers, so OFF / ON would switch nothing: the pill is shown disabled with that tooltip (never a dead press). */
+export function onPill(label, on, can, toggle, { empty = '', viewOnly = 'Your access is view-only.' } = {}) {
+  const tip = v => empty || (v ? 'On - press to switch off' : 'Off - press to switch on');
+  const b = h('button', { type: 'button', class: 'onpill' + (on ? ' on' : '') + (empty ? ' empty' : ''), role: 'switch', 'aria-checked': String(!!on), 'aria-label': `${label} on or off`, title: tip(on),
+    onclick: ev => { ev.stopPropagation(); if (can && !empty) toggle(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
+  b._set = v => { b.classList.toggle('on', !!v); b.setAttribute('aria-checked', String(!!v)); b.title = b.classList.contains('ro') ? b.title : tip(v); };
+  if (can && empty) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
+  return ro(b, can, viewOnly);
 }
 /** J3: a bar with an optional cap: --v paints the fill, --cap places the marker and the hatched part; input stops at the cap. */
 function capBar(label, value, cap, can, send, title) {
@@ -1574,7 +1579,7 @@ function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null, shared =
   const can = canControl(S), ms = zoneMembers(S.zones, g), muted = zoneMuted(S.zones, g), on = zoneOn(S.zones, g);
   const dot = h('span', { class: 'dot ' + (ms.some(z => z.connected) ? 'ok' : 'off'), title: `${ms.filter(z => z.connected).length} of ${ms.length} online` });
   const name = ro(h('button', { type: 'button', class: 'dname zname ell', title: 'Play in this zone only', onclick: ev => { ev.stopPropagation(); ctl.act(`/groups/${g.id}/activate`); } }, g.name), can, 'Your access is view-only.');
-  const pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+  const pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });
   const bar = capBar(`${g.name} zone volume`, zoneLevel(S.zones, g), zoneCap(S.zones, g), can, v => ctl.act(`/groups/${g.id}/volume`, { set: v }), 'Moves every speaker in this zone together (keeps their balance)');
   const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute zone ' : 'Mute zone ') + g.name, title: muted ? 'Unmute this zone' : 'Mute every speaker in this zone',
     onclick: ev => { ev.stopPropagation(); const m = !zoneMuted(S.zones, g); for (const z of ms) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
@@ -1628,7 +1633,31 @@ function jukeboxCard(S, ctl) {
   const ms = (S.zones || []).filter(z => ids.has(z.id)), on = ms.some(z => z.enabled), muted = ms.length > 0 && ms.every(z => z.muted), sel = Z.current()?.kind === 'jukebox';
   const dot = h('span', { class: 'dot ' + (ms.some(z => z.connected) ? 'ok' : 'off'), title: `${ms.filter(z => z.connected).length} of ${ms.length} online` });
   const name = ro(h('button', { type: 'button', class: 'dname zname ell', title: 'Control the Jukebox zone', onclick: ev => { ev.stopPropagation(); Z.select(Z.JUKEBOX_KEY); } }, 'Jukebox'), can, 'Your access is view-only.');
-  const pill = onPill('Jukebox zone', on, can, () => { const want = !ms.some(z => z.enabled); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+  // 0.6.9 #19 (t1846-t1849): OFF / ON is the saved Jukebox-zone setting (it used to flip the zone's speakers, and with none it did nothing).
+  // Here it is staged with the other Jukebox settings and applied with Save; the speaker picks, volume and mute below stay live.
+  const val = jbValue(jb), nSpk = jb.running === false ? (jb.defaultSpeakers || []).length : ms.length;
+  const pill = onPill('Jukebox zone', val.zoneOn, admin, () => { jbStage(jb, 'zoneOn', !jbValue(jb).zoneOn); paintJb(); }, { viewOnly: 'Only an admin can change this.' });
+  const jbHintEl = h('p', { class: 'small jbzhint', role: 'status' });
+  const perGuest = ro(h('input', { type: 'number', min: 1, max: 20, step: 1, value: val.perGuest, class: 'jbz-per', 'aria-label': 'Songs per guest', oninput: ev => { const n = Math.round(+ev.target.value); if (n >= 1 && n <= 20) { jbStage(jb, 'perGuest', n); paintJb(); } } }), admin, 'Only an admin can change this.');
+  const voteSkip = ro(h('input', { type: 'checkbox', checked: val.voteSkip, class: 'jbz-vote', 'aria-label': 'Vote to skip', onchange: ev => { jbStage(jb, 'voteSkip', ev.target.checked); paintJb(); } }), admin, 'Only an admin can change this.');
+  const savedMsg = h('span', { class: 'small jbz-saved', role: 'status', 'aria-live': 'polite' });
+  const saveBtn = h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'jb-zone-save', disabled: true, onclick: () => saveJb(savedMsg) }, 'Save');
+  const discardBtn = h('button', { type: 'button', class: 'btn sm', 'data-act': 'jb-zone-discard', hidden: true, onclick: () => { jbDiscard(); const v = jbValue(jb); perGuest.value = v.perGuest; voteSkip.checked = v.voteSkip; paintJb(); } }, 'Discard');
+  function paintJb() {
+    const v = jbValue(jb), dirty = jbDirty(jb); pill._set(v.zoneOn); jbHintEl.textContent = jbHint(v.zoneOn, nSpk); jbHintEl.classList.toggle('warn', v.zoneOn && nSpk === 0);
+    saveBtn.disabled = !admin || !dirty; discardBtn.hidden = !dirty; if (dirty) savedMsg.textContent = 'Unsaved changes'; else if (savedMsg.textContent === 'Unsaved changes') savedMsg.textContent = '';
+    savedMsg.classList.toggle('dirty', dirty); jbGuard(dirty);
+  }
+  async function saveJb(msg) {
+    const body = jbBody(jb); if (!Object.keys(body).length) return; saveBtn.disabled = true;
+    try { await api('/jukebox/config', { method: 'PUT', body }); Object.assign(jb, body); jbDiscard(); paintJb(); msg.textContent = '✓ Saved'; setTimeout(() => { if (msg.textContent === '✓ Saved') msg.textContent = ''; }, 4000); ctl.refreshAll?.(); }
+    catch (e) { toast(e.message, true); paintJb(); }
+  }
+  const jbSet = h('div', { class: 'jbzset', 'data-jb-settings': '' },
+    h('label', { class: 'row small' }, h('span', { class: 'grow' }, 'Songs per guest'), perGuest),
+    h('label', { class: 'row small' }, h('span', { class: 'grow' }, 'Vote to skip'), voteSkip),
+    admin ? h('div', { class: 'row jbzsave' }, saveBtn, discardBtn, savedMsg) : null);
+  paintJb();
   const lvl = ms.length ? Math.round(ms.reduce((a, z) => a + z.volume, 0) / ms.length) : 0;
   const bar = capBar('Jukebox zone volume', lvl, 100, can && ms.length > 0, v => api('/jukebox/zone/volume', { method: 'POST', body: { set: v } }).catch(e => toast(e.message, true)), 'Moves every speaker of the Jukebox zone together');
   const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', 'data-icon': muted ? 'mute' : 'volume', onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => ids.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can && ms.length > 0, 'Your access is view-only.');
@@ -1636,17 +1665,26 @@ function jukeboxCard(S, ctl) {
   const pick = async (z, checked) => { const next = new Set(picks); checked ? next.add(z.id) : next.delete(z.id); try { await api('/jukebox/zone', { method: 'PUT', body: { deviceIds: [...next] } }); ctl.refreshAll(); } catch (e) { toast(e.message, true); } };
   const rows = (S.zones || []).slice(0, 200).map(z => h('label', { class: 'jbrow' + (picks.has(z.id) ? ' on' : ''), 'data-device-id': z.id }, ro(h('input', { type: 'checkbox', checked: picks.has(z.id), 'aria-label': `${z.name} plays the Jukebox`, onchange: ev => pick(z, ev.target.checked) }), admin, 'Only an admin can pick the Jukebox devices.'),
     h('span', { class: 'jbn ell' }, z.name), inZone(z) ? h('span', { class: 'small dim jbin ell' }, 'in ' + inZone(z)) : null));
-  return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (on ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
+  return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (val.zoneOn ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), pill),
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, { deviceIds: [...ids] })), h('span', { class: 'dtag zjb', title: 'Guests choose the songs; they play only on these devices' }, 'JUKEBOX'), sel ? Z.controllingTag() : null)),
     Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: jb.own ? () => Z.select(Z.JUKEBOX_KEY) : null, selected: sel }),
-    h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute),
+    jbHintEl, h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute), jbSet,
     h('div', { class: 'dc3mem jbpick' }, h('span', { class: 'dlbl' }, 'SPEAKERS FOR JUKEBOX'),
       h('div', { class: 'dc3chips' }, ms.length ? ms.map(z => h('span', { class: 'zchip', title: z.name }, z.name)) : h('span', { class: 'small dim' }, 'None picked: the Jukebox plays in the main zone')),
       jbDisclosure(ms.length, h('div', { class: 'jblist', role: 'group', 'aria-label': 'Devices for the Jukebox zone' }, rows))));
 }
 /** 0.4.1 L62: with 0 speakers in the Jukebox the long picker folds behind "Choose speakers" (the card was cut off by it); once speakers are picked it is open. The user's own open / close is kept across refreshes. */
 let jbUserOpen = null;
+/** 0.6.9 #19: the Jukebox zone panel was left with unsaved changes (they are kept until the host decides). */
+let jbAsking = false;
+function leaveJb(S, ctl) {
+  if (jbAsking) return; jbAsking = true; const jb = S.jb;
+  dialog('Unsaved Jukebox zone settings', h('p', null, 'You changed the Jukebox zone settings but did not save them.'), [
+    { text: 'Keep editing', onclick: () => { Z.select(Z.JUKEBOX_KEY); } },
+    { text: 'Discard', onclick: () => { jbDiscard(); jbGuard(false); } },
+    { text: 'Save', cls: 'primary', onclick: async () => { try { await api('/jukebox/config', { method: 'PUT', body: jbBody(jb) }); jbDiscard(); jbGuard(false); toast('Jukebox zone saved'); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); } } }], { onClose: () => { jbAsking = false; } });   // ✕ / Esc: nothing is lost - the changes stay staged
+}
 function jbDisclosure(count, list) {
   const d = h('details', { class: 'jbdisc' }, h('summary', null, count ? `Choose speakers (${count} picked)` : 'Choose speakers'), list);
   d.open = jbUserOpen == null ? count > 0 : jbUserOpen; d.addEventListener('toggle', () => { jbUserOpen = d.open; }); return d;

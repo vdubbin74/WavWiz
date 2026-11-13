@@ -30,6 +30,8 @@ export async function startJukebox(S) {
   let cfg; try { cfg = await api('/jukebox/config'); } catch (e) { toast(e.message, true); return; }
   const pin = h('input', { type: 'password', inputmode: 'numeric', maxlength: '8', placeholder: cfg.hasPin ? 'Keep the current PIN' : '4–8 digits', 'aria-label': 'Host PIN' });
   const full = h('input', { type: 'checkbox', checked: true });
+  // 0.6.9 #19: the Jukebox zone's saved OFF / ON (off by default): off = its speakers stay silent while it runs; ticked here = saved on
+  const zoneOn = h('input', { type: 'checkbox', checked: cfg.zoneOn === true, 'data-act': 'jb-zone-on' });
   // 0.4.9 F76: which speakers the Jukebox plays on - prefilled with the default speakers, changeable here, optionally saved as the default
   let zones = S.zones || [], jbz = S.jb; try { [zones, jbz] = await Promise.all([api('/zones'), api('/jukebox/zone')]); } catch { /* keep what we have */ }
   const spk = speakerPicker(zones, initialPick(cfg.defaultSpeakers, jbz?.deviceIds, zones), () => { warn.hidden = true; }, { label: 'Speakers for the Jukebox' });
@@ -39,6 +41,7 @@ export async function startJukebox(S) {
     h('p', null, 'Guests scan a QR code to add songs. The screen locks; only the host PIN gets out.'),
     h('p', { class: 'small' }, `${plural(cfg.perGuest, 'song')} per guest · vote to skip ${cfg.voteSkip ? 'on' : 'off'} · ${cfg.style === 'retro' ? 'Retro CD' : 'Modern'} style. Change these in Settings > Jukebox.`),
     h('div', { class: 'fld jbstart76' }, h('span', null, 'Speakers'), spk, h('label', { class: 'row small' }, saveDef, h('span', null, 'Save as default'))), warn,
+    h('label', { class: 'row' }, zoneOn, h('span', null, 'Jukebox zone on (play guests’ songs on these speakers)')),
     h('label', { class: 'fld' }, h('span', null, 'Host PIN'), pin),
     h('label', { class: 'row' }, full, h('span', null, 'Open the locked big screen on this PC')));
   const d = dialog('Start Jukebox', body, [
@@ -50,6 +53,7 @@ export async function startJukebox(S) {
       const ids = spk.value(); if (!ids.length) { warn.hidden = false; spk.querySelector('input')?.focus(); return; }
       try {
         if (saveDef.checked) await api('/jukebox/config', { method: 'PUT', body: { defaultSpeakers: ids } });
+        if (zoneOn.checked !== (cfg.zoneOn === true)) await api('/jukebox/config', { method: 'PUT', body: { zoneOn: zoneOn.checked } });
         if (p) { if (!/^\d{4,8}$/.test(p)) { toast('The PIN is 4–8 digits.', true); return; } await api('/jukebox/config', { method: 'PUT', body: { pin: p } }); }
         const t = loadTheme(); await api('/jukebox/start', { method: 'POST', body: { deviceIds: ids, theme: { accent: t.accent, accent2: t.accent2, hl: t.hl, bg: t.bg, ink: t.ink } } });
         d.close(); if (full.checked) openKiosk(S);

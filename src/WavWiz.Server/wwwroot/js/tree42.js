@@ -11,6 +11,7 @@ import { airPlaySetupCard, setApCardDecor } from './airplaysetup.js';   // 0.6.8
 import { castSetupCard } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
+import { jbSaved, jbDraft, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
 /** The tree's shape: boxes (a solo zone, or a linked set sharing one queue), the unassigned speakers and the header counts. */
@@ -150,7 +151,7 @@ export function treeEl(S, ctl, kit, st) {
   const zoneWrap = (g, box, leaderOf) => {
     const ms = zoneMembers(S.zones, g), sel = isControlling(g, cur), linked = (g.linked || []).length > 0, on = zoneOn(S.zones, g), connected = ms.filter(z => z.connected).length;
     const name = h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone settings`, onclick: () => st.onZone(g.id) }, g.name);
-    const pill = onPill(`Zone ${g.name}`, on, can, () => { const live = (S.groups || []).find(x => x.id === g.id); if (!live || !canControl(S)) return; const want = !zoneOn(S.zones, live); for (const z of zoneMembers(S.zones, live)) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+    const pill = onPill(`Zone ${g.name}`, on, can, () => { const live = (S.groups || []).find(x => x.id === g.id); if (!live || !canControl(S)) return; const want = !zoneOn(S.zones, live); for (const z of zoneMembers(S.zones, live)) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19: no speakers = nothing to switch
     // 0.4.3 #9: an empty zone has nothing to link (as in the render)
     const lb = (S.groups || []).length < 2 || (!ms.length && !linked) ? null : ro(linked
       ? h('button', { type: 'button', class: 'btn sm zlinkbtn split', 'data-act': 'split', title: 'Give this zone its own music', onclick: ev => { ev.stopPropagation(); Z.splitOff(g, done); } }, 'Split off')
@@ -295,7 +296,7 @@ export function treeEl(S, ctl, kit, st) {
     const jbIdsLive = () => S.jb?.deviceIds || [];
     const jbPhone = phoneMaxBars ? phoneZoneMembers(S.zones, jbIdsLive()) : jbMs;
     const lvl = phoneMaxBars ? phoneZoneLevel(jbPhone) : Math.round(jbMs.reduce((a, z) => a + z.volume, 0) / (jbMs.length || 1) || 0);
-    const muted = (phoneMaxBars ? jbPhone : jbMs).length > 0 && (phoneMaxBars ? jbPhone : jbMs).every(z => z.muted), on = jbMs.some(z => z.enabled);
+    const muted = (phoneMaxBars ? jbPhone : jbMs).length > 0 && (phoneMaxBars ? jbPhone : jbMs).every(z => z.muted), on = jbSaved(jb).zoneOn;   // 0.6.9 #19: the saved Jukebox-zone switch, not 'any speaker on'
     const jbKey = () => { const live = phoneZoneMembers(S.zones, jbIdsLive()); return JSON.stringify(['jukebox', live.map(z => [z.id, z.volCap ?? 100, z.enabled])]); };
     const jbWriter = phoneMaxBars ? phoneZoneVolWriter({
       act: (z, body) => ctl.act(`/zones/${z.id}`, body, 'PATCH'),
@@ -322,7 +323,9 @@ export function treeEl(S, ctl, kit, st) {
     }
     const mute = ro(h('button', { type: 'button', class: 'mutebtn zmute' + (muted ? ' on' : ''), 'aria-pressed': String(muted), 'aria-label': (muted ? 'Unmute' : 'Mute') + ' the Jukebox zone', title: muted ? 'Unmute' : 'Mute', 'data-icon': muted ? 'mute' : 'volume',
       onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => jbIds.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
-    const pill = onPill('Jukebox zone', on, can, () => { const want = !jbMs.some(z => z.enabled); for (const z of jbMs) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); });
+    // 0.6.9 #19: the quick switch saves the Jukebox-zone setting at once (the server switches the zone's speakers to match); an admin setting
+    const pill = onPill('Jukebox zone', on, admin, () => { const want = !jbSaved(S.jb).zoneOn; pill._set(want);
+      api('/jukebox/config', { method: 'PUT', body: { zoneOn: want } }).then(() => { if (S.jb) S.jb.zoneOn = want; if (jbDraft.v) delete jbDraft.v.zoneOn; ctl.refreshAll?.(); }).catch(e => { pill._set(!want); toast(e.message, true); }); }, { viewOnly: 'Only an admin can change this.' });
     const title = h('div', { class: 'qb42-t qb42-pick', role: 'button', tabindex: 0, title: 'Control the Jukebox', 'aria-label': 'Control the Jukebox', 'aria-pressed': String(sel), onclick: pick, onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(ev); } } },
       h('b', { class: 'qb42-name' }, 'Queue: Jukebox'), h('span', { class: 'qb42-st dim' }, jbRank === 1 ? ' · OFFLINE' : now?.state === 'playing' ? ' · PLAYING' : ' · IDLE'));
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': JB, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.pill42,.tog')) return; open(); } },
@@ -467,7 +470,7 @@ export function zonePane(S, ctl, kit, g, st) {
   const root = h('section', { class: 'zpane42', 'aria-label': `Zone settings, ${g.name}`, 'data-group-id': g.id });
   const name = h('input', { type: 'text', maxlength: 60, value: g.name, 'aria-label': 'Zone name', class: 'zp42-name' });
   const saveName = ro(h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'zone-rename', onclick: async () => { const v = name.value.trim(); if (!v) { toast('Type a name first', true); return; } try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); toast('Zone renamed'); done(); } catch (e) { toast(e.message, true); } } }, 'Rename'), admin, 'Only an administrator can rename a zone.');
-  const on = zoneOn(S.zones, g), pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); pill._set(want); });
+  const on = zoneOn(S.zones, g), pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });   // 0.6.9 #19
   // F250-P8: phone zone settings sheet agrees with tree/NP max contract; desktop zonePane stays average.
   const phoneMax = !!kit.phoneMaxBars;
   const gid = g.id;

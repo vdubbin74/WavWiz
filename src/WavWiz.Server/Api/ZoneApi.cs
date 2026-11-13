@@ -356,14 +356,14 @@ public static class ZoneApi
     public static string? PutJukeboxSpeakers(Services s, List<long> ids)
     {
         ids = ids.Distinct().ToList(); var err = s.Links.CheckDevices(ids); if (err != null) return err;
-        if (s.Jukebox.Running) return s.Links.SetJukeboxDevices(ids);
+        if (s.Jukebox.Running) { var e = s.Links.SetJukeboxDevices(ids); Features.JukeboxPower.Apply(s); return e; }
         using var d = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new { defaultSpeakers = ids })); return s.Jukebox.Update(d.RootElement.Clone());
     }
     /// <summary>0.4.9 F76: the Jukebox zone + whether Devices shows it (Settings > Jukebox switch; always while the Jukebox runs) and its default speakers.</summary>
     public static System.Text.Json.Nodes.JsonObject JbView(Services s)
     {
         var n = System.Text.Json.JsonSerializer.SerializeToNode(s.Links.JukeboxView(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!.AsObject(); var c = s.Jukebox.Cfg();
-        n["running"] = s.Jukebox.Running; n["showInDevices"] = c.ShowInDevices; n["defaultSpeakers"] = c.DefaultSpeakers == null ? null : new System.Text.Json.Nodes.JsonArray(c.DefaultSpeakers.Select(x => (System.Text.Json.Nodes.JsonNode?)x).ToArray());
+        n["running"] = s.Jukebox.Running; n["showInDevices"] = c.ShowInDevices; n["zoneOn"] = c.ZoneOn; n["perGuest"] = c.PerGuest; n["voteSkip"] = c.VoteSkip;   /* 0.6.9 #19: the Jukebox zone panel's saved settings */ n["defaultSpeakers"] = c.DefaultSpeakers == null ? null : new System.Text.Json.Nodes.JsonArray(c.DefaultSpeakers.Select(x => (System.Text.Json.Nodes.JsonNode?)x).ToArray());
         return n;
     }
 }

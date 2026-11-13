@@ -64,7 +64,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.History.RemoteScrobble = async loc => { if (s.Remote == null || Library.SubsonicService.ServerIdOf(loc) is not { } sid) return; var song = loc[(Library.SubsonicService.Scheme.Length + sid.Length + 1)..]; await s.Remote.Call(sid, "scrobble", "id=" + Uri.EscapeDataString(song) + "&submission=true"); };
         s.Keep = new Features.KeepPlayingService(db, s.Registry, events) { JukeboxOwns = () => s.Jukebox.Owns };
         s.Keep.Pools["smart"] = id => s.Smart.Resolve(id); s.Keep.PoolNames["smart"] = id => s.Smart.Get(id)?.Name;
-        s.Links.JukeboxRunning = () => s.Jukebox.Active; s.Jukebox.Borrow = ids => s.Links.SetJukeboxDevices(ids); s.Jukebox.Release = () => { var jc = s.Links.JukeboxConductor(); s.Links.Apply(); try { jc?.Stop(); } catch { } events.Publish("zones"); }; s.Links.Apply();
+        s.Links.JukeboxRunning = () => s.Jukebox.Active; s.Jukebox.Borrow = ids => { s.Links.SetJukeboxDevices(ids); Features.JukeboxPower.Apply(s); }; s.Jukebox.Saved = () => Features.JukeboxPower.Apply(s); s.Jukebox.Release = () => { var jc = s.Links.JukeboxConductor(); s.Links.Apply(); Features.JukeboxPower.Apply(s); try { jc?.Stop(); } catch { } events.Publish("zones"); }; s.Links.Apply(); Features.JukeboxPower.Apply(s);   // 0.6.9 #19: a speaker the Jukebox switched off before a restart gets switched back on
         s.Speakers = new Features.SpeakerFollowService(db, zones, dsp, events) { Log = u._log.Write };
         s.RadioFinder = new Features.RadioFinderService(db);
         s.TagFix = new Features.TagFixService(db, lib, s.Art, events, ffmpeg);

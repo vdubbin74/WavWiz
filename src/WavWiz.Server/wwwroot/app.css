@@ -2120,6 +2120,13 @@ dialog.settings-dlg>header{border-bottom:2px solid var(--accent)}
 .onpill.on .op-on{background:var(--accent);color:var(--accent-ink)}
 .onpill:not(.on) .op-off{background:var(--panel2);color:var(--ink)}
 .onpill.ro,.onpill:disabled{cursor:default;opacity:.7}
+/* 0.6.9 #19: a zone with no speakers - the pill is shown disabled (tooltip: add a speaker first), never a dead press */
+.onpill.empty{opacity:.45;cursor:not-allowed}
+/* 0.6.9 #19: the Jukebox zone panel's saved settings (OFF / ON, songs per guest, vote to skip) + Save */
+.zjuke .jbzhint{margin:2px 0 4px;color:var(--dim)} .zjuke .jbzhint.warn{color:var(--hl-text,var(--hl));font-weight:600}
+.zjuke .jbzset{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px;padding-top:8px;border-top:1px solid var(--line)}
+.zjuke .jbzset label.row{align-items:center;gap:8px} .zjuke .jbz-per{width:64px}
+.zjuke .jbzsave{align-items:center;gap:8px;margin-top:2px} .zjuke .jbz-saved{color:var(--ok,var(--accent2));font-weight:600} .zjuke .jbz-saved.dirty{color:var(--hl-text,var(--hl))}
 .onpill:focus-visible{outline:2px solid var(--accent2);outline-offset:1px}
 .vbar{position:relative;flex:1;min-width:0;display:flex;align-items:center;--v:0%}
 .vbar input[type=range]{flex:1;width:100%;min-width:0}
