@@ -70,14 +70,16 @@ test('#21 a stored pick survives a page load: Z.init with the empty start-up zon
   S.groups = groups.slice(0, 2); Z.sync(); assert.equal(ls.getItem('wavwiz.zone'), null, 'a zone that is really gone is still forgotten');
 });
 
-test('#21b (t1854): an empty zone that plays gets the same green dot as a zone with speakers; idle stays grey', async () => {
+test('#21b/#21c (t1854/t1856): green only with an active (online) speaker - an empty zone stays grey while playing; the text cue shows', async () => {
   const Z = await imp('zones40');
-  assert.equal(Z.zoneDot([], { state: 'playing' }), 'ok'); assert.equal(Z.zoneDot([], { state: 'paused' }), 'off');
-  assert.equal(Z.zoneDot([], { state: 'stopped', title: 'Song 23' }), 'off'); assert.equal(Z.zoneDot([], null), 'off');
-  assert.equal(Z.zoneDot([{ connected: true }], null), 'ok', 'zones with speakers keep their online rule'); assert.equal(Z.zoneDot([{ connected: false }], { state: 'playing' }), 'off');
+  for (const st of ['playing', 'paused', 'stopped']) assert.equal(Z.zoneDot([], { state: st }), 'off', 'empty zone stays grey: ' + st);
+  assert.equal(Z.zoneDot([], null), 'off');
+  assert.equal(Z.zoneDot([{ connected: true }], null), 'ok', 'an online speaker = green'); assert.equal(Z.zoneDot([{ connected: false }], { state: 'playing' }), 'off');
   const play = Z.choices([{ id: 4, name: 'Patio', deviceIds: [], playbackId: 'zg:4', now: { state: 'playing' } }], null)[0];
-  assert.equal(Z.choiceLabel(play, null), 'Patio · no speakers · playing');
-  const t = src('tree42.js'); assert.match(t, /off \? null : emptyDot\(g\.now\)/); assert.match(t, /class: 'dot zfold42-dot ze42-dot '/, 'same green as a folded zone with speakers');
-  assert.match(src('devices.js'), /class: 'dot ' \+ Z\.zoneDot\(ms, g\.now\)/, 'zone cards');
-  assert.match(src('zones40.js'), /c\.online \|\| \(c\.empty && c\.now\?\.state === 'playing'\) \? 'ok' : 'off'/, 'zone menu');
+  assert.equal(play.online, false); assert.equal(Z.choiceLabel(play, null), 'Patio · no speakers · playing', 'Queue dropdown text cue');
+  const t = src('tree42.js'); assert.match(t, /class: 'dot zfold42-dot ze42-dot off'/, 'compact row dot is always grey');
+  assert.match(t, /g\.now\?\.state === 'playing' \? 'Playing · no speakers' : 'No speakers'/, 'compact row text cue');
+  assert.match(src('devices.js'), /class: 'dot ' \+ Z\.zoneDot\(ms, g\.now\)/, 'zone cards use the online rule');
+  const z = src('zones40.js'); assert.match(z, /h\('span', \{ class: 'dot ' \+ \(c\.online \? 'ok' : 'off'\), title: [^\n]*\}\), h\('b', \{ class: 'zm-n ell' \}, c\.name\)/, 'zone menu: online rule only, and the zone name stays on the same line (8e466cf had commented it out)');
+  assert.doesNotMatch(z, /c\.empty && c\.now\?\.state === 'playing'\) \? 'ok'/);
 });

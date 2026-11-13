@@ -1577,7 +1577,7 @@ function card3(S, ctl, z, { hl = false, dim = false, addable = false, groups = [
 /** J4 zone card: the same three lines; picking it highlights its speakers (Expanded); ✎ edits it in place (J9 #2). */
 function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null, shared = false } = {}) {
   const can = canControl(S), ms = zoneMembers(S.zones, g), muted = zoneMuted(S.zones, g), on = zoneOn(S.zones, g);
-  const dot = h('span', { class: 'dot ' + Z.zoneDot(ms, g.now), title: ms.length ? `${ms.filter(z => z.connected).length} of ${ms.length} online` : g.now?.state === 'playing' ? 'Playing (no speakers in this zone)' : 'No speakers' });   // 0.6.9 #21b
+  const dot = h('span', { class: 'dot ' + Z.zoneDot(ms, g.now), title: ms.length ? `${ms.filter(z => z.connected).length} of ${ms.length} online` : g.now?.state === 'playing' ? 'Playing, but no speakers in this zone' : 'No speakers' });   // 0.6.9 #21c: grey without an online speaker
   const name = ro(h('button', { type: 'button', class: 'dname zname ell', title: 'Play in this zone only', onclick: ev => { ev.stopPropagation(); ctl.act(`/groups/${g.id}/activate`); } }, g.name), can, 'Your access is view-only.');
   const pill = onPill(`Zone ${g.name}`, on, can, () => { const want = !zoneOn(S.zones, g); for (const z of ms) { z.enabled = want; ctl.act(`/zones/${z.id}`, { enabled: want }, 'PATCH'); } pill._set(want); }, { empty: ms.length ? '' : EMPTY_ZONE_TIP });
   const bar = capBar(`${g.name} zone volume`, zoneLevel(S.zones, g), zoneCap(S.zones, g), can, v => ctl.act(`/groups/${g.id}/volume`, { set: v }), 'Moves every speaker in this zone together (keeps their balance)');

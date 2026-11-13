@@ -248,8 +248,8 @@ export function treeEl(S, ctl, kit, st) {
   };
   // 0.6.9 #21 (t1852/t1853): clicking an empty / offline / folded zone row (not its buttons) CONTROLS that zone, like a full zone box does -
   // before, the row had no click and its name opened the settings, so a zone with no speakers could never be picked here.
-  // 0.6.9 #21b (t1854): an empty zone gets the same green dot as a zone with speakers while its stream plays (grey when idle) - Z.zoneDot
-  const emptyDot = now => { const on = Z.zoneDot([], now) === 'ok'; return h('span', { class: 'dot zfold42-dot ze42-dot ' + (on ? 'ok' : 'off'), title: on ? 'Playing (no speakers in this zone)' : 'Idle', 'aria-label': on ? 'Active' : 'Not active', role: 'img' }); };
+  // 0.6.9 #21c (t1856): an empty zone's dot is always grey - green needs an active (online) speaker; while it plays the note says "Playing · no speakers"
+  const emptyDot = now => h('span', { class: 'dot zfold42-dot ze42-dot off', title: now?.state === 'playing' ? 'Playing, but no speakers in this zone' : 'No speakers', 'aria-label': 'Not active', role: 'img' });
   const pickRow = (el, fn) => { el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; fn();
     // the hovered row is held back from the next patch (F263), so mark it Controlling right away instead of after the pointer leaves
     el.closest('.tree42')?.querySelectorAll('.qb42.empty42.ctl').forEach(x => x !== el && x.classList.remove('ctl')); el.classList.add('ctl'); }); el.title = el.title || 'Click to control this zone'; return el; };

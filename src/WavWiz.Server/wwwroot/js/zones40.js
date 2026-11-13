@@ -42,9 +42,9 @@ export const zoneIdFor = ch => (!ch ? null : ch.kind === 'zone' && ch.overlaps ?
 /** 0.6.9 #21 (t1852/t1853): pure - the quiet note for a picked zone with no speakers ('' otherwise). Picking one is allowed: Now Playing and the
  *  Queue switch to it, and play / queue still work there (nothing is heard until a speaker joins). */
 export const emptyNote = c => !c?.empty ? '' : c.kind === 'jukebox' ? 'No speakers in the Jukebox zone - it plays in the main zone until it has some' : 'No speakers in this zone';
-/** 0.6.9 #21b (t1854): pure - the zone status dot ('ok' green / 'off' grey). A zone with speakers: green when one is online (unchanged rule);
- *  a zone with NO speakers has none to be online, so it is green while its own stream is playing, grey when idle / paused / stopped. */
-export const zoneDot = (ms, now) => (ms || []).length ? ((ms || []).some(z => z.connected) ? 'ok' : 'off') : now?.state === 'playing' ? 'ok' : 'off';
+/** 0.6.9 #21c (t1856): pure - the zone status dot ('ok' green / 'off' grey): green ONLY when an active (online) speaker is in the zone. A zone with
+ *  no speakers stays grey even while its stream plays (the text says "Playing · no speakers" instead). `now` is unused, kept for callers. */
+export const zoneDot = (ms, now) => (ms || []).some(z => z.connected) ? 'ok' : 'off';
 /** Pure: the zone name in a zone list: "Upstairs · no speakers" for an empty zone ("· playing" while its stream plays). */
 export const choiceLabel = (c, cur) => c.name + (c.empty ? ' · no speakers' + (c.now?.state === 'playing' ? ' · playing' : '') : '') + (cur && c.key === cur.key ? ' (playing)' : '');
 /** Pure: "▶ Song" while playing, the dim title while paused, or a plain sentence. */
@@ -162,7 +162,7 @@ function openMenu(anchor) {
     const mh = menu.offsetHeight, up = r.top > vh / 2 || r.bottom + mh + 8 > vh; menu.style.top = Math.max(8, up ? r.top - mh - 6 : r.bottom + 6) + 'px'; };
   menu = h('div', { class: 'zmenu40', role: 'menu', 'aria-label': 'Zones' },
     cs.map(c => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(c.key === sel), 'data-zone-key': c.key, class: 'zm-item' + (c.key === sel ? ' on' : ''), onclick: () => { const edit = !!menu?._for?._link; select(c.key); if (edit) window.dispatchEvent(new CustomEvent('wavwiz:editzone', { detail: c.key })); } },
-      h('span', { class: 'dot ' + (c.online || (c.empty && c.now?.state === 'playing') ? 'ok' : 'off') }),   // 0.6.9 #21b: an empty zone that plays is green h('b', { class: 'zm-n ell' }, c.name), c.linked ? h('span', { class: 'zm-link', title: linkText(c.linkedWith) }, icon('link')) : null, h('span', { class: 'grow' }),
+      h('span', { class: 'dot ' + (c.online ? 'ok' : 'off'), title: c.online ? 'Online' : c.empty ? 'No speakers' : 'Offline' }), h('b', { class: 'zm-n ell' }, c.name), c.linked ? h('span', { class: 'zm-link', title: linkText(c.linkedWith) }, icon('link')) : null, h('span', { class: 'grow' }),
       h('span', { class: 'zm-now ell' }, c.empty && !c.now?.title ? 'No speakers' : nowLabel(c.now)))),
     h('button', { type: 'button', class: 'zm-manage', onclick: () => { closeMenu(); ctl.manage?.(); } }, 'Manage zones in Devices'));
   menu._for = anchor; anchor.setAttribute('aria-expanded', 'true'); document.body.append(menu); pos();
