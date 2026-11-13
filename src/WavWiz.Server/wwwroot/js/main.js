@@ -48,7 +48,6 @@ import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
 import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning, DISPLAY as JB_DISPLAY } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
-import { jbTvChip } from './jbtv.js';
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
@@ -270,8 +269,9 @@ async function startMain() {
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => showEq() }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));
-  const jbtv = jbTvChip(S);   // 0.6.8-#6d
-  const bar = topbar([menubar, jbtv.el, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px', title: 'Connecting…' }, connDot, connTxt), inline], hamburger);
+  // 0.6.9 #26 (t1876): no 'Jukebox TV <address>' pill in the title bar any more (it ate the bar) - the view-only TV address is in the Jukebox host
+  // panel ('Show on a TV…'), next to 'Open on another screen'; the big screen shows its own join QR
+  const bar = topbar([menubar, adminChip(S), h('span', { class: 'conn row', style: 'gap:6px', title: 'Connecting…' }, connDot, connTxt), inline], hamburger);
   installTitlebar(bar);   // 0.6.8-#16: Windows app only - the top bar becomes the themed window title bar
   // 0.2.0 item 31: a role change redraws in place (menus refill themselves); the speaker and the music keep going
   window.addEventListener('wavwiz:auth', () => { drawerEl?.remove(); drawerEl = buildDrawer(); document.body.append(drawerEl); refreshAll(); nowc.draw?.(); devv.draw(); devp.draw(); });

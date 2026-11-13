@@ -31,3 +31,15 @@ export function jbTvChip(S) {
   window.addEventListener('wavwiz:zonesdata', sync);
   return { el: chip, sync };
 }
+/** 0.6.9 #26 (t1876): the same 'Show the Jukebox on a TV' dialog, opened from the Jukebox host panel (the title-bar pill is gone). */
+export async function showTvInfo() {
+  let url = ''; try { url = tvUrlFrom((await api('/jukebox/join'))?.url || ''); } catch { url = ''; }
+  if (!url) { toast('The Jukebox is not running', true); return; }
+  const copy = async () => { try { await navigator.clipboard.writeText(url); toast('TV address copied'); } catch { toast(url); } };
+  dialog('Show the Jukebox on a TV', h('div', { class: 'jbtv-info' },
+    h('p', null, 'Open this address in the TV’s web browser. It shows Now Playing, Up next and the join QR - view only, no sign-in, no sound on the TV.'),
+    h('code', { class: 'jbtv-big' }, url.replace(/^https?:\/\//, '')),
+    h('img', { class: 'jbtv-qr', src: '/api/v1/jukebox/qr.svg', alt: 'QR code guests scan to add songs' }),
+    h('p', { class: 'small dim' }, 'The QR on the TV is the guest link (add songs). The address changes when the Jukebox is restarted.')),
+    [{ text: 'Copy address', keep: true, onclick: copy }, { text: 'Close', cls: 'primary' }]);
+}

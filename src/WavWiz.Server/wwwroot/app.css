@@ -3670,6 +3670,18 @@ html.hold74,html.hold74 body{overflow-y:clip!important}
 .jb-exit76 p{max-width:360px;margin:8px 0 12px}
 .jb-exit76-b{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .jbreturn76{border-radius:3px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff);font-weight:700;margin:0 6px;white-space:nowrap}
+/* 0.6.9 #26 (t1876): phone header - 'Jukebox on' and Return to Jukebox are icon-only squares (labels stay for screen readers / tooltips), so the
+   header never wraps, skews or runs past the right edge; the logo and BETA badge keep their size. Desktop keeps the labeled chip / button. */
+/* desktop: Return to Jukebox no longer grows the bar (the generic .btn height made it 7 px taller than with the Jukebox off) */
+.topbar #jbreturn.jbreturn76{min-height:0;height:30px;padding-top:0;padding-bottom:0;display:inline-flex;align-items:center;flex:none}
+.topbar #jbchip.jbchip{flex:none;white-space:nowrap}
+@media (max-width:900px){
+  .topbar #jbchip.jbchip,.topbar #jbreturn.jbreturn76{flex:none;width:30px;min-width:30px;height:30px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1}
+  .topbar #jbchip .jbc-t,.topbar #jbreturn .jbr-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .topbar #jbreturn .jbr-ic{font-size:0} .topbar #jbreturn .jbr-ic::after{content:'↩';font-size:17px;font-weight:700}   /* Return reads as 'back to', not a second ♫ */
+  /* while the two Jukebox buttons are in the phone header, 'Connected' shows as its dot only (the word stays in the tooltip) so nothing runs off the edge */
+  .topbar:has(#jbchip) .conn #conntxt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
 
 /* 0.4.9 F77: Settings > Playback > Streaming quality */
 .sq77{display:flex;flex-direction:column;gap:6px;margin:6px 0}

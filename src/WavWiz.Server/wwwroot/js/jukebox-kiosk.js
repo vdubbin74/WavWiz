@@ -8,6 +8,7 @@ import { artBox, setArt, rowsSig, artFailed } from './jukebox-view.js';
 import { Viz, setVizZone } from './viz.js';
 import { artCv } from './art.js';
 import { speakerPicker, initialPick } from './jbspeakers.js';   // 0.4.9 F76
+import { showTvInfo } from './jbtv.js';   // 0.6.9 #26
 
 let kiosk = null;
 /** m:ss like the approved renders (1:46 / 4:12). */
@@ -69,7 +70,10 @@ export function jukeboxChip(S, st) {
   let c = document.getElementById('jbchip');
   if (!st?.running) { c?.remove(); if (kiosk) closeKiosk(); paintReturn(S); return; }
   if (!c) { c = h('button', { id: 'jbchip', class: 'chip jbchip', type: 'button', onclick: () => hostControls(S) }); (document.querySelector('.topbar .grow') || document.body).after(c); }
-  c.textContent = st.locked ? '♫ Jukebox on · locked' : '♫ Jukebox on'; paintReturn(S);
+  // 0.6.9 #26 (t1876): icon + label spans - on a phone header only the ♫ shows (the label stays for screen readers / the tooltip), so it never wraps
+  const lbl = st.locked ? 'Jukebox on · locked' : 'Jukebox on';
+  if (c.dataset.lbl !== lbl) { c.dataset.lbl = lbl; c.replaceChildren(h('span', { class: 'jbc-ic', 'aria-hidden': 'true' }, '♫'), h('span', { class: 'jbc-t' }, ' ' + lbl)); c.setAttribute('aria-label', lbl + ' - Jukebox controls'); c.title = lbl + ' - Jukebox controls'; }
+  paintReturn(S);
   if (DISPLAY && !kiosk && !displayLeft) openKiosk(S);   // 0.6.9 #18: ?jukebox=tv shows the big screen whenever the Jukebox runs
 }
 /** 0.3.5 J9 #13: Jukebox host controls are a small panel that drops down from the "Jukebox on" chip (no window). Ban guest and Stop Jukebox keep their confirms. */
@@ -94,7 +98,8 @@ async function hostControls(S) {
         h('button', { class: 'btn sm', disabled: !ctl, onclick: () => act(() => api('/jukebox/lock', { method: 'POST', body: { locked: !b.locked } })) }, b.locked ? 'Unlock queue' : 'Lock queue'),
         // 0.6.9 J3: the song limit follows each phone's network address too (clearing the browser no longer resets it); this frees everyone again
         h('button', { class: 'btn sm', disabled: !ctl, 'data-act': 'jb-reset-guests', title: 'Lift bans and give every guest their full song allowance again', onclick: async () => { if (await ask('Reset guests', 'Every guest gets their full song allowance again and bans are lifted. Songs already queued stay.', { ok: 'Reset' })) act(async () => { await api('/jukebox/guests/reset', { method: 'POST' }); toast('Guests reset.'); }); } }, 'Reset guests'),
-        h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'), h('span', { class: 'grow' }),
+        h('button', { class: 'btn sm', onclick: () => { close(); openKiosk(S); } }, 'Open big screen'),
+        h('button', { class: 'btn sm', type: 'button', 'data-act': 'jb-tv-info', title: 'The view-only TV address (it used to sit in the title bar)', onclick: () => { close(); showTvInfo(); } }, 'Show on a TV…'), h('span', { class: 'grow' }),   // 0.6.9 #26
         h('button', { class: 'btn sm danger', onclick: async () => { if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return; try { await stopWithPin(S); close(); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); } } }, 'Stop Jukebox')),
       // 0.6.9 #18 (t1845): the same big screen in another PC's browser (that browser signs in or pairs once; no host controls without them)
       dispUrl ? h('div', { class: 'jbother' }, h('div', { class: 'dlbl' }, 'OPEN ON ANOTHER SCREEN'),
@@ -156,7 +161,7 @@ export function paintReturn(S = retS) {
   retS = S || retS; let b = document.getElementById('jbreturn');
   const show = jbRunning && !kiosk && retS && isAdmin(retS);
   if (!show) { b?.remove(); return; }
-  if (!b) { b = h('button', { id: 'jbreturn', class: 'btn primary jbreturn76', type: 'button', title: 'Back to the Jukebox screen (it is still running)', onclick: () => openKiosk(retS) }, '♫ Return to Jukebox'); const chip = document.getElementById('jbchip'); (chip || document.querySelector('.topbar .grow') || document.body).after(b); }
+  if (!b) { b = h('button', { id: 'jbreturn', class: 'btn primary jbreturn76', type: 'button', title: 'Back to the Jukebox screen (it is still running)', onclick: () => openKiosk(retS), 'aria-label': 'Return to Jukebox' }, h('span', { class: 'jbr-ic', 'aria-hidden': 'true' }, '♫'), h('span', { class: 'jbr-t' }, ' Return to Jukebox')); const chip = document.getElementById('jbchip'); (chip || document.querySelector('.topbar .grow') || document.body).after(b); }   // 0.6.9 #26: icon-only on a phone header
 }
 export function openKiosk(S) {
   if (kiosk) return;
