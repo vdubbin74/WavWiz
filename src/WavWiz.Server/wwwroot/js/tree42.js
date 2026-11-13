@@ -269,6 +269,28 @@ export function treeEl(S, ctl, kit, st) {
     zoneCtx(g, wrap.firstChild);
     return pickRow(wrap, () => controlZone(g.id));
   };
+  // 0.6.9 #29 (t1882): LINKED zones with no speakers at all. They used to go through emptyBox(leader) - only the leader's name, so the dragged-in
+  // zone vanished, the title never said "Upstairs + Rooftop" and there was no chevron, so they could not be split. Now: ONE card titled with
+  // every name (as a folded linked box), the dot / note of an empty zone, and a working chevron that lists each member zone with its own
+  // 'No speakers' note, drop target and Split off. Nothing here needs a song playing. Linked zones WITH speakers keep queueBox (unchanged).
+  const linkedEmptyBox = box => {
+    const lead = box.leader, sel = box.zones.some(g => isControlling(g, cur)), folded = isFolded(box), name = box.zones.map(g => g.name).join(' + ');
+    const playing = lead.now?.state === 'playing';
+    const member = g => {
+      const row = h('div', { class: 'zwrap42 zempty42 zlink42-m' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
+        h('div', { class: 'ze42-row' }, emptyDot(g.now), h('button', { type: 'button', class: 'dname zname ell', title: `${g.name} - open the zone`, onclick: () => st.onZone(g.id) }, g.name),
+          h('span', { class: 'small dim ze42-note' }, 'No speakers'), h('span', { class: 'grow' }),
+          ro(h('button', { type: 'button', class: 'btn sm zlinkbtn split', 'data-act': 'split', title: 'Give this zone its own music (unlink it)', 'aria-label': `Split ${g.name} off (unlink)`, onclick: ev => { ev.stopPropagation(); Z.splitOff(g, done); } }, 'Split off'), can, 'Your access is view-only.')),
+        h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'));
+      zoneCtx(g, row.firstChild); return row;
+    };
+    const wrap = h('section', { class: 'qb42 empty42 zpick42 linked zlink42' + (folded ? ' zfold42' : '') + (sel ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': 'linked', 'data-leader-id': lead.id, 'aria-label': `${name} (linked, no speakers${folded ? ', collapsed' : ''})` },
+      h('div', { class: 'zwrap42 zempty42 zlink42-h', 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
+        h('div', { class: 'ze42-row' }, foldBtn(box, folded, name), emptyDot(lead.now), h('button', { type: 'button', class: 'dname zname ell', title: `${name} - open the zone`, onclick: () => st.onZone(lead.id) }, name),
+          h('span', { class: 'small dim ze42-note' }, playing ? 'Playing · no speakers' : 'No speakers'), h('span', { class: 'grow' }))),
+      ...(folded ? [] : box.zones.map(member)));
+    return pickRow(wrap, () => controlZone(lead.id));
+  };
   // 0.4.9 F69: ONE manual order list over all zones (the saved zone order). Shown: ACTIVE zones (a speaker online) in that order, then
   // INACTIVE zones (speakers, none online) in that order, then EMPTY zones (no speakers). A zone that comes back online pops into its remembered slot.
   const spk = box => box.zones.flatMap(g => zoneMembers(S.zones, g));
@@ -357,7 +379,7 @@ export function treeEl(S, ctl, kit, st) {
     return el;
   };
   // 0.6.9 #12: every top-level card has a key; the default order is the old one (ranks), a saved server order replaces it exactly
-  const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? emptyBox(b.leader, false, b) : queueBox(b), { key: 'g:' + b.leader.id, keys: b.zones.map(z => 'g:' + z.id) }]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
+  const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? (b.kind === 'linked' ? linkedEmptyBox(b) : emptyBox(b.leader, false, b)) : queueBox(b), { key: 'g:' + b.leader.id, keys: b.zones.map(z => 'g:' + z.id) }]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
   if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox(), { key: 'jukebox', keys: ['jukebox'] }]); }
   const cardList = boxEls.map(([, el, c]) => ({ ...c, el }));
   if (!model.boxes.length) root.append(h('p', { class: 'dim small pad' }, 'Zones hold speakers, like “Downstairs”. An administrator can create one with +.'));
