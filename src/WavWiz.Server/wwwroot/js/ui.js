@@ -8,14 +8,8 @@ export const canControl = S => S.auth && S.auth.role !== 'view';
 /** 0.2.0 item 28: admin-only controls are shown READ-ONLY (disabled, with this hint) to everyone else - never hidden. */
 export const isAdmin = S => S?.auth?.role === 'admin';
 export const ADMIN_HINT = 'Only an administrator can change this. Use File > Sign in as admin.';
-/** The browser speaker id of this page. */
-export function webRoomId() { try { return localStorage.getItem('wavwiz.webRoom.id'); } catch { return null; } }
-/** 0.2.0 item 9: "this device" = the speaker this page plays on: this browser's own web speaker, else a Player on the same PC that the
- * server marked as mine (the WavWiz Player window, or a browser on a PC that runs a Player). */
-export function thisDevice(S, rid = webRoomId()) {
-  const zs = S?.zones || [];
-  return zs.find(z => rid && z.playerId === rid && z.connected) || zs.find(z => z.mine && z.connected) || zs.find(z => rid && z.playerId === rid) || zs.find(z => z.mine) || null;
-}
+// 0.6.9: "this device" lives in thisdevice.js (no DOM imports) so zones40.js can use it to open on the player's own zone; re-exported here unchanged.
+export { webRoomId, thisDevice } from './thisdevice.js';
 /** Can this session change delay/output on zone z? Admins: any device. Everyone else: only their own (server enforces the same). */
 export const canTune = (S, z) => isAdmin(S) || (canControl(S) && !!z?.mine);
 /** Disable a control for non-admins and explain why (title + aria). Returns the element. */

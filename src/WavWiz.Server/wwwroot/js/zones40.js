@@ -4,6 +4,8 @@
 import { h, api, toast, setApiZone, fmtTime } from './util.js';
 import { icon } from './icons.js';
 import { liveSong } from './livemeta.js';
+import { thisDevice } from './thisdevice.js';
+import { orderedGroups } from './devorder.js';
 
 export const ZONE_KEY = 'wavwiz.zone';
 export const JUKEBOX_KEY = 'jukebox';
@@ -22,6 +24,16 @@ export const targetKeys = (groups, jb) => choices(groups, jb).map(c => [c.key, c
 export const targetName = (key, groups, jb) => !key ? '' : targetKeys(groups, jb).find(([k]) => k === key)?.[1] || 'zone unavailable';
 /** Pure: the selected zone (a stale or missing choice falls back to the first zone; null when there are no zones at all). */
 export const resolve = (groups, jb, sel) => { const c = choices(groups, jb); return c.find(x => x.key === sel) || c[0] || null; };
+/** 0.6.9 (t1837u/t1838u): Pure: the zone this player opens on - a zone that holds the player's own speaker `me`. The last pick (`sel`) wins when it
+ * also holds the speaker (e.g. an "Everywhere" zone the user chose); otherwise the smallest such zone, ties in card order (`groups` already ordered).
+ * null when the speaker is in no zone (the caller then keeps the last pick / first card). */
+export function ownZoneKey(groups, me, sel) {
+  if (!me || me.id == null) return null;
+  const has = (groups || []).filter(g => (g.deviceIds || []).some(d => String(d) === String(me.id)));
+  if (!has.length) return null;
+  if (sel && has.some(g => 'g:' + g.id === sel)) return sel;
+  return 'g:' + has.reduce((a, g) => ((g.deviceIds || []).length < (a.deviceIds || []).length ? g : a)).id;
+}
 /** Pure: the zoneId the API wants: null for the house group (old behavior, nothing added to the URL). */
 // 0.4.1: a zone that sits inside a larger one is sent as its zone key (g:<id>): pressing play there makes it play on its own devices automatically.
 export const zoneIdFor = ch => (!ch ? null : ch.kind === 'zone' && ch.overlaps ? ch.key : !ch.playbackId || ch.playbackId === 'default' ? null : ch.playbackId);
@@ -56,11 +68,34 @@ export const queueSuffixFor = c => S && c ? queueSuffix(S.groups, c) : '';
 let S = null, ctl = {}, lastPid = undefined; const chips = new Set(); let menu = null;
 export function init(state, controls = {}) { S = state; ctl = controls; sync(); }
 export const choicesNow = () => S ? choices(S.groups, S.jb) : [];
-export const current = () => S ? resolve(S.groups, S.jb, loadSel()) : null;
+// 0.6.9 (t1838u): with no usable last pick the fallback is the first zone in the Devices card order (not the server's list order)
+export const current = () => S ? resolve(orderedGroups(S.groups || []), S.jb, loadSel()) : null;
+// 0.6.9 (t1837u-t1839u): every player (Windows Player window, phone browser / home-screen app, any web player) opens Now Playing on the zone that
+// holds its own speaker, and does it again when that speaker (re)connects. A zone the user picks by hand sticks for the rest of the session: no later
+// zones refresh, membership change or reconnect moves it. "Session" = this tab / app window (sessionStorage), so a reload of the same window keeps it.
+export const PICKED_KEY = 'wavwiz.zone.picked';
+const ss = () => { try { return globalThis.sessionStorage || null; } catch { return null; } };
+let picked = false, opened = false, wasOn = false;
+export const pickedThisSession = () => picked || ss()?.getItem(PICKED_KEY) === '1';
+export function markPicked() { picked = true; try { ss()?.setItem(PICKED_KEY, '1'); } catch { /* private mode */ } }
+/** Open / connect only: put this player's own zone in the selection unless the user already chose a zone this session. */
+export function autoPick(state = S, me = thisDevice(state)) {
+  if (!state || !Array.isArray(state.groups) || !Array.isArray(state.zones) || pickedThisSession()) return false;
+  if (!me) return false;
+  const on = !!me.connected, fire = !opened || (on && !wasOn);
+  opened = true; wasOn = on;
+  if (!fire) return false;
+  const k = ownZoneKey(orderedGroups(state.groups), me, loadSel());
+  if (!k) return false;
+  if (k !== loadSel()) saveSel(k);
+  return true;
+}
+/** Tests only: forget the open / connect / picked state. */
+export function _resetAutoPick() { picked = false; opened = false; wasOn = false; try { ss()?.removeItem(PICKED_KEY); } catch { /* */ } }
 export const selectedGroupId = () => { const c = current(); return c?.kind === 'zone' ? c.id : null; };
 /** Apply the selection: the API zone, the chips, and (when the stream we show changed) a reload of Now Playing + Queue. Call after zones data changed. */
 export function sync() {
-  if (!S) return; const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
+  if (!S) return; autoPick(); const c = current(), pid = zoneIdFor(c); setApiZone(pid); globalThis.__wavwizZoneKey = c?.key || null;   // 0.5.1: the visualizer / EQ meters feed follows the resolved zone
   // F250-P5: a response/action capability is tied to this actual API route.
   // Keep it through linked visual selections; rotate on every routing change.
   if (!S._streamRoute || S._streamRoute.target !== pid) S._streamRoute = { target: pid };
@@ -70,8 +105,8 @@ export function sync() {
   if (pid !== lastPid) { const first = lastPid === undefined; lastPid = pid; if (!first) ctl.refreshNow?.(); }
   drawChips(); window.dispatchEvent(new CustomEvent('wavwiz:zonesync'));
 }
-export function select(key) { saveSel(key); closeMenu(); sync(); window.dispatchEvent(new CustomEvent('wavwiz:zone', { detail: key })); }
-globalThis.addEventListener?.('storage', ev => { if (ev.key === ZONE_KEY && S) sync(); });   // the mini player / another tab on this browser
+export function select(key) { markPicked(); saveSel(key); closeMenu(); sync(); window.dispatchEvent(new CustomEvent('wavwiz:zone', { detail: key })); }
+globalThis.addEventListener?.('storage', ev => { if (ev.key === ZONE_KEY && S) { if (ev.newValue) markPicked(); sync(); } });   // 0.6.9: a pick in another window of this player counts as a manual pick here   // the mini player / another tab on this browser
 
 function drawChip(b) {
   const c = current(), many = !!c && choicesNow().length > 1;

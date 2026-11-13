@@ -155,9 +155,9 @@ export function mountMini(root, { embedded = false, run = null, home = null, rep
     else if (a === 'close' && !embedded) { if (!send('close')) window.close(); } };
   (embedded ? root : document).addEventListener('keydown', onKey);
   // 0.4.0: the same zone chip as the main app (in the shortcuts row, so the window keeps its size); this window follows the choice made in the app (shared localStorage)
-  const mz = { groups: [], jb: null }; let mzN = 0;
+  const mz = { groups: [], jb: null, zones: undefined }; let mzN = 0;
   if (!embedded) Z.init(mz, { refreshNow: () => poll(), manage: () => toMain({ run: 'devices' }) });   // 0.4.5 F27: no zone chip on the shortcuts row; the zone name on the song line is the picker
-  async function pollZones() { if (embedded || mzN++ % 3) return; try { const [g, jb] = await Promise.all([api('/groups'), api('/jukebox/zone').catch(() => null)]); mz.groups = g; mz.jb = jb; Z.sync(); } catch { /* keep the last list */ } }
+  async function pollZones() { if (embedded || mzN++ % 3) return; try { const [g, jb, zs] = await Promise.all([api('/groups'), api('/jukebox/zone').catch(() => null), api('/zones').catch(() => mz.zones)]); mz.groups = g; mz.jb = jb; mz.zones = zs; Z.sync();   /* 0.6.9: the zones list lets a stand-alone mini player open on its own speaker's zone too */ } catch { /* keep the last list */ } }
   // 0.5.0 F139: shuffle / repeat toggles for both condensed and standalone
   // F230: click = off↔all only; One via long-press / Alt-click
   { const tog = (ic, label, fn) => { const x = b('tog ' + ic, ic, label, fn); x.setAttribute('aria-pressed', 'false'); return x; };
