@@ -86,10 +86,11 @@ public class Release040Stage3Tests
         await admin.PutAsJsonAsync("/api/v1/jukebox/zone", new { deviceIds = new[] { dp } });
         var jc = S.Links.JukeboxConductor(); Assert.NotNull(jc); Assert.Same(jc, S.Links.CondFor("jukebox")); Assert.Equal(new[] { dp }, S.Links.DevicesOf("jukebox")!.ToArray());
         Assert.Equal("jukebox", reg.GroupOf("pc-b")); Assert.Equal("Jukebox", S.Links.KeyName("jukebox"));
-        S.Schedules.Resolve = _ => new List<QueueItem> { Item("Party") };
+        // 0.6.9 #27 (t1877): radio never goes into the running Jukebox's queue (any path, schedules too) - the routing is checked with a song
+        S.Schedules.Resolve = _ => new List<QueueItem> { new(0, "track", "http://127.0.0.1:1/x.flac", "Party", "Artist", "", 1000, null), Item("Party radio") };
         var id = (await (await admin.PostAsJsonAsync("/api/v1/schedules", new { name = "Party", time = "20:00", days = "0123456", action = "play", payload = new { source = "radio", id = 1, zoneKey = "jukebox", fadeMin = 0 } })).Json()).GetProperty("id").GetInt64();
         await admin.PostAsJsonAsync($"/api/v1/schedules/{id}/run", new { });
-        Assert.Contains(jc!.Queue(), q => q.Title == "Party"); Assert.Empty(reg.Default.Queue());
+        Assert.Contains(jc!.Queue(), q => q.Title == "Party"); Assert.DoesNotContain(jc.Queue(), q => q.Kind == "radio"); Assert.Empty(reg.Default.Queue());
         await admin.PostAsync("/api/v1/alarm/stop", null);
         // the Jukebox service plays its guests' songs in its own group, not the house group
         Assert.Same(jc, S.Links.JukeboxConductor());
