@@ -63,14 +63,14 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         try
         {
             if (_outs.TryGetValue(key, out var existing)) return existing;
-            IPEndPoint ep; string name = key; int et = 0; bool ap2 = false; string? model = null; (bool T, bool A, bool P) caps = (true, true, true);
+            IPEndPoint ep; string name = key; int et = 0; bool ap2 = false; string? model = null, manufacturer = null; (bool T, bool A, bool P) caps = (true, true, true);
             if (endpoint != null) { if (endpoint.StartsWith("ap2:")) { ap2 = true; endpoint = endpoint[4..]; } ep = IPEndPoint.Parse(endpoint); }
             else
             {
                 var d = _browser()?.State.Devices(DateTimeOffset.UtcNow).FirstOrDefault(x => x.Id == key) ?? throw new InvalidOperationException("speaker not found; search again");
                 if (AirPlaySetup.IsSelf(d.Name, d.Addresses, d.Host, Local())) throw new InvalidOperationException("this is WavWiz's own AirPlay receiver (audio loop)");   // 0.6.8-#14f
                 caps = MetaCaps(d);
-                var route = d.Route; model = d.Model; int port;
+                var route = d.Route; model = d.Model; manufacturer = d.Manufacturer; int port;
                 if (route == "airplay2-ptp" && AirPlay2Enabled) { ap2 = true; port = d.AirPlayPort; }
                 else if (d.Raop && route is "raop" or "raop-rsa" || (d.Raop && route.StartsWith("airplay2") && d.Encryption.Contains(0)))
                 { et = d.Encryption.Count > 0 && !d.Encryption.Contains(0) ? 1 : 0; port = d.RaopPort; }
@@ -81,7 +81,7 @@ public sealed class AirPlayOutputs : IAsyncDisposable
                 ep = new IPEndPoint(ip, port); name = d.Name;
             }
             Out o;
-            if (ap2) o = await ConnectAp2Async(key, name, ep, model, delayMs, volume, ct);
+            if (ap2) o = await ConnectAp2Async(key, name, ep, model, manufacturer, delayMs, volume, ct);
             else
             {
                 var s = new RaopSession(new RaopOptions { Encryption = et });
@@ -216,10 +216,10 @@ public sealed class AirPlayOutputs : IAsyncDisposable
         meta = new { text = o.MetaText, art = o.MetaArt, progress = o.MetaProgress, sent = o.MetaSent, rejected = o.MetaRejected }, inGroup = o.Subscribed,
     }).ToList();
 
-    async Task<Out> ConnectAp2Async(string key, string name, IPEndPoint ep, string? model, int delayMs, int volume, CancellationToken ct)
+    async Task<Out> ConnectAp2Async(string key, string name, IPEndPoint ep, string? model, string? manufacturer, int delayMs, int volume, CancellationToken ct)
     {
-        var q = AirPlayQuirks.For(model);
-        bool buffered = PreferBuffered && q.Buffered && !string.IsNullOrEmpty(FfmpegPath) && (File.Exists(FfmpegPath) || FfmpegPath == "ffmpeg");
+        var q = AirPlayQuirks.For(model, manufacturer, name);
+        bool buffered = AirPlayQuirks.UseBuffered(PreferBuffered, q, FfmpegPath);
         var ptp = PtpFor(ep.Address);
         var s = new Ap2Session(new Ap2Options { Endpoint = ep, Name = "WavWiz", Buffered = buffered, VolumeDb = RaopControls.ToAirPlayDb(volume, percent: true) }, ptp);
         Ap2Sink? sink = null;
@@ -228,7 +228,7 @@ public sealed class AirPlayOutputs : IAsyncDisposable
             await s.ConnectAsync(ct);
             sink = new Ap2Sink(PlayerId(key), s, ptp, _reg.Clock, buffered, FfmpegPath) { DelayMs = delayMs + q.DefaultDelayMs, Log = m => _log?.Invoke($"airplay {key}: {m}") };
             await sink.StartAsync();
-            _log?.Invoke($"airplay {key}: SETUP type={(buffered ? 103 : 96)} ct={(buffered ? 4 : 2)} audioFormat=0x{(buffered ? 0x400000 : 0x40000):X} ssrc=0x{sink.Ssrc:X8}");
+            _log?.Invoke($"airplay {key}: SETUP type={(buffered ? 103 : 96)} ct={(buffered ? 4 : 2)} audioFormat=0x{(buffered ? 0x400000 : 0x40000):X} ssrc=0x{sink.Ssrc:X8} quirk={q.Label}");
         }
         catch { if (sink != null) await sink.DisposeAsync(); await s.DisposeAsync(); ptp.RemovePeer(ep.Address); throw; }
         var sk = sink;

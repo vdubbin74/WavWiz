@@ -148,6 +148,9 @@ public class AirPlayDiscoveryTests
         Assert.Equal(new[] { "192.168.1.57" }, d.Addresses);
         Assert.Equal(7000, d.AirPlayPort); Assert.False(d.Raop);
         Assert.NotEqual(0UL, d.Features);
+        var quirk = AirPlayQuirks.For(d.Model, d.Manufacturer, d.Name);
+        Assert.Same(AirPlayQuirks.LgWebOs, quirk);
+        Assert.False(AirPlayQuirks.UseBuffered(true, quirk, "ffmpeg"));
     }
 
     [Fact]

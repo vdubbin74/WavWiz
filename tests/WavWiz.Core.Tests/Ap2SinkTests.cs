@@ -17,6 +17,33 @@ public class Ap2SinkTests
         Assert.All(AirPlayQuirks.FirewallRules, r => Assert.Contains("profile=private", r));
     }
 
+    /// <summary>0.7.0 t1956: LG webOS TVs force realtime ALAC even when the global buffered setting is on.
+    /// The TXT model is often only QNED70AUA / OLED65C1PUB, so matching is on manufacturer / name too.</summary>
+    [Fact]
+    public void Lg_webos_tv_is_realtime_when_global_buffered_is_on()
+    {
+        const string ffmpeg = "ffmpeg";
+        var lg = AirPlayQuirks.For("43QNED70AUA", "LG Electronics", "[LG] webOS TV QNED70AUA");
+        Assert.Same(AirPlayQuirks.LgWebOs, lg);
+        Assert.False(lg.Buffered);
+        Assert.Equal("LG webOS TV", lg.Label);
+        Assert.False(AirPlayQuirks.UseBuffered(true, lg, ffmpeg));
+
+        Assert.Same(AirPlayQuirks.LgWebOs, AirPlayQuirks.For("OLED65C1PUB", "LG Electronics", "[LG] webOS TV OLED65C1PUB"));
+        Assert.Same(AirPlayQuirks.LgWebOs, AirPlayQuirks.For(null, "LG Electronics", null));
+        Assert.Same(AirPlayQuirks.LgWebOs, AirPlayQuirks.For(null, null, "[LG] webOS TV QNED70AUA"));
+        Assert.Same(AirPlayQuirks.Default, AirPlayQuirks.For("43QNED70AUA")); // model alone has no LG/webOS marker
+        Assert.Same(AirPlayQuirks.Default, AirPlayQuirks.For(null, "Logitech", "Living room"));
+
+        var sonos = AirPlayQuirks.For("Sonos Era 100");
+        Assert.True(sonos.Buffered);
+        Assert.True(AirPlayQuirks.UseBuffered(true, sonos, ffmpeg));
+        Assert.False(AirPlayQuirks.UseBuffered(false, sonos, ffmpeg));
+        var other = AirPlayQuirks.For("Unknown9,1", "Acme", "Kitchen speaker");
+        Assert.Same(AirPlayQuirks.Default, other);
+        Assert.True(AirPlayQuirks.UseBuffered(true, other, ffmpeg));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
