@@ -2,6 +2,7 @@
 // hotkeys and media keys control. Vocabulary (see ZoneLinks.cs): device = one speaker/output; zone = a named set of devices (a "zone group" row);
 // playback group = the server's per-zone queue/stream. Zones that are LINKED share one playback group (same song, in sync); a zone that is split off has its own.
 import { h, api, toast, setApiZone, fmtTime } from './util.js';
+import { attachCtx, zoneNowMenu42 } from './ctxmenu.js';
 import { icon } from './icons.js';
 import { liveSong } from './livemeta.js';
 import { thisDevice } from './thisdevice.js';
@@ -227,3 +228,51 @@ export function linkMenu(anchor, S_, g, done) {
 }
 export async function splitOff(g, done) { try { await api(`/groups/${g.id}/split`, { method: 'POST' }); toast(`${g.name} now has its own music`); done?.(); } catch (e) { toast(e.message, e.status !== 409); } }   // 409 = nothing to split: the server says why
 export async function linkAll(into, done) { try { await api('/groups/link-all', { method: 'POST', body: { into } }); toast('Every zone now plays the same music'); done?.(); } catch (e) { toast(e.message, true); } }
+
+/** 0.7.1: right-click / long-press on a zone Now Playing bar opens Play/Pause, Previous, Next, Mute for that zone.
+ *  The menu is portaled to document.body (openCtx), so a Devices refresh does not tear it down. Esc / click-outside closes it.
+ *  Long-press on the bar opens this menu; the card's edge-trim stays the drag handle (no conflict). */
+export function wireNowMenu(line, S, ctl, g, { jb = false, name = null, can = true } = {}) {
+  if (!line) return line;
+  const label = name || g?.name || (jb ? 'Jukebox' : 'zone');
+  attachCtx(line, () => {
+    const live = jb ? g : (S.groups || []).find(x => x.id === g.id) || g;
+    const now = jb ? S.jb?.now : live?.now;
+    let muted;
+    if (jb) {
+      const ids = new Set(S.jb?.deviceIds || []);
+      const cur = (S.zones || []).filter(z => ids.has(z.id));
+      muted = cur.length > 0 && cur.every(z => z.muted);
+    } else {
+      const ids = live?.deviceIds || [];
+      const ms = (S.zones || []).filter(z => ids.includes(z.id));
+      muted = ms.length > 0 && ms.every(z => z.muted);
+    }
+    const ch = jb ? choices(S.groups, S.jb).find(c => c.kind === 'jukebox') : choices(S.groups, S.jb).find(c => c.kind === 'zone' && c.id === live.id);
+    const zid = zoneIdFor(ch), q = zid ? '?zoneId=' + encodeURIComponent(zid) : '';
+    const post = path => api(path + q, { method: 'POST', body: {} }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true));
+    const act = {
+      playpause: () => post(now?.state === 'playing' ? '/stream/pause' : '/stream/play'),
+      prev: () => post('/stream/prev'),
+      next: () => post('/stream/next'),
+      mute: () => {
+        if (jb) {
+          const ids = new Set(S.jb?.deviceIds || []);
+          const cur = (S.zones || []).filter(z => ids.has(z.id));
+          const m = !(cur.length > 0 && cur.every(z => z.muted));
+          for (const z of cur) z.muted = m;
+          api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true));
+        } else {
+          const ids = live?.deviceIds || [];
+          const ms = (S.zones || []).filter(z => ids.includes(z.id));
+          const m = !(ms.length > 0 && ms.every(z => z.muted));
+          if (m) for (const z of ms) z.muted = true;
+          ctl.act(`/groups/${live.id}/mute`, { muted: m });
+          try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ }
+        }
+      }
+    };
+    return zoneNowMenu42({ can, playing: now?.state === 'playing', muted }).map(it => ({ ...it, onclick: act[it.id] }));
+  }, `${label} playback`);
+  return line;
+}

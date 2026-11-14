@@ -2,7 +2,7 @@
 // Every zone is a neutral "Queue: <Zone>" box (now playing + one volume + the zone card + its speakers). Zones that play the same music (linked) share ONE accent box
 // "Queue: <Leader> · IN SYNC". The Controlling zone's whole box (card + speakers) gets a thick accent edge; the selected speaker row gets its own highlight.
 import { h, api, toast } from './util.js';
-import { icon, setIcon } from './icons.js';
+import { icon, setIcon, setChev } from './icons.js';
 import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } from './mixer-core.js';   // F250-P8: phone Devices max-based (desktop average untouched)
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
@@ -81,9 +81,13 @@ export function treeEl(S, ctl, kit, st) {
   const folds = loadZoneFolds();
   const isFolded = box => folds.has(boxKey(box));
   const setFolded = (box, v) => { const k = boxKey(box); if (v) folds.add(k); else folds.delete(k); saveZoneFolds(folds); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } };
-  const foldBtn = (box, folded, name) => h('button', { type: 'button', class: 'zfold42-t' + (folded ? '' : ' open'), 'data-act': 'zfold', 'aria-expanded': String(!folded),
-    'aria-label': folded ? `Expand ${name}` : `Collapse ${name} to one row`, title: folded ? 'Expand this zone' : 'Collapse this zone to one row',
-    onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setFolded(box, !folded); } }, folded ? '▸' : '▾');
+  const foldBtn = (box, folded, name) => {
+    const b = h('button', { type: 'button', class: 'plus chv zfold42-t' + (folded ? '' : ' open'), 'data-act': 'zfold', 'aria-expanded': String(!folded),
+      'aria-label': folded ? `Expand ${name}` : `Collapse ${name} to one row`, title: folded ? 'Expand this zone' : 'Collapse this zone to one row',
+      onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setFolded(box, !folded); } });
+    setChev(b, folded ? 'r' : 'd');
+    return b;
+  };
   // control a zone: make it the Controlling one and show Now Playing (phone: the remote; desktop: Now Playing in view / focused, else go there)
   const controlZone = id => { Z.select('g:' + id); const np = !phone && document.querySelector('.nowcol');
     if (np && np.offsetParent && np.getBoundingClientRect().width > 0) { np.scrollIntoView?.({ block: 'nearest' }); (np.querySelector('.tbtn.play, button') || np).focus?.({ preventScroll: true }); } else ctl.go?.('now'); };
@@ -135,7 +139,7 @@ export function treeEl(S, ctl, kit, st) {
   // ---- a speaker row
   const spRow = (z, gid) => {
     const tags = cardTags3(z).filter(t => t.k !== 'muted' || true);
-    const grip = ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} to another zone`, title: 'Drag to another zone', 'data-drag-device': z.id }, '⋮'), admin, 'Only an administrator can change zones.');   // 0.4.3 #9: the render's grip gutter
+    const grip = ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} to another zone`, title: 'Drag to another zone', 'data-drag-device': z.id }), admin, 'Only an administrator can change zones.');   // 0.7.1: left-edge trim is the drag handle (no dots)
     // 0.4.3 #9: no ⋯ button (the render has none): right-click, Shift+F10 / the Menu key, or a long press opens the speaker menu
     const row = h('div', { class: 'sp42' + (st.spk === z.id ? ' sel' : '') + (z.enabled ? '' : ' off') + (z.connected ? '' : ' gone') + (z.muted ? ' muted' : ''), 'data-device-id': z.id, 'data-device': z.name, 'data-zone-id': z.id, 'data-in-zone': gid ?? '', role: 'listitem', 'aria-selected': String(st.spk === z.id) },
       grip, h('span', { class: 'dot ' + dotClass(z), title: z.connected ? 'Online' : 'Offline' }),
@@ -163,8 +167,7 @@ export function treeEl(S, ctl, kit, st) {
     //                              | CONTROLLING / "Queue from X" / other tags ... Link or Split off
     const all3 = zoneTags3(S.zones, g), cnt = all3.find(t => t.k === 'count'), tags = all3.filter(t => t.k !== 'count');
     const badge = h('span', { class: 'zcount42', title: cnt?.title || '', 'aria-label': `${ms.length} speaker${ms.length === 1 ? '' : 's'}` }, icon('volume'), String(ms.length));
-    const gut = h('button', { type: 'button', class: 'zgut42', 'aria-label': `${g.name} zone actions`, title: 'Zone actions',
-      onclick: ev => { ev.stopPropagation(); const r = ev.currentTarget.getBoundingClientRect(); ev.currentTarget.closest('.zwrap42').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.right, clientY: r.top + 8 })); } }, '⋮');
+    const gut = h('button', { type: 'button', class: 'zgut42', 'aria-label': `Drag to reorder ${g.name}`, title: 'Drag to reorder' });
     // t1948u / t1954u: the rest of the zone card (not the name or its own controls) selects this zone for Now Playing + Queue
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': g.id, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.tagact,.dgrip,.dgrip42,.cgrip69,.zgut42,.pill42,.tog')) return; controlZone(g.id); } }, gut,
       h('div', { class: 'zc42-body' },
@@ -235,7 +238,7 @@ export function treeEl(S, ctl, kit, st) {
     if (isFolded(box)) return foldedBox(box, { lead, linked, sel, ms, now });
     const expand = foldBtn(box, false, linked ? 'the linked zones' : lead.name);
     const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : '') + (collapsed ? ' qb42-folded' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
-      h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, expand, title), Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: selectLead, selected: sel }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)),
+      h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, expand), Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: selectLead, selected: sel }), S, ctl, lead, { can }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)),
       ...all.map(g => zoneWrap(g, box, linked && g.id !== lead.id ? lead : null)));
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; controlZone(lead.id); });
     return el;
@@ -249,10 +252,10 @@ export function treeEl(S, ctl, kit, st) {
     const dot = h('span', { class: 'dot zfold42-dot ' + (active.length ? 'ok' : 'off'), title: active.length ? `${active.length} of ${ms.length} speaker${ms.length === 1 ? '' : 's'} active` : 'No active speaker', 'aria-label': active.length ? 'Active' : 'Not active', role: 'img' });
     const name = linked ? box.zones.map(g => g.name).join(' + ') : lead.name;
     // 0.6.8 t1651: the now-playing line sits under the zone name (same .zl-now chrome as an expanded card). Idle / no title = one row, matching the AirPlay card.
-    const line = now?.title ? Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }) : null;
+    const line = now?.title ? Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }), S, ctl, lead, { can }) : null;
     return pickRow(h('section', { class: 'qb42 empty42 zfold42' + ' zpick42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === lead.id ? ' picked' : ''), 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
-        h('div', { class: 'ze42-row' }, foldBtn(box, true, name), dot, zoneName(lead.id, name), foldCount(ms, linked)),
+        h('div', { class: 'ze42-row' }, dot, zoneName(lead.id, name), foldCount(ms, linked), h('span', { class: 'grow' }), foldBtn(box, true, name)),
         line,
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))), () => controlZone(lead.id));
   };
@@ -377,11 +380,11 @@ export function treeEl(S, ctl, kit, st) {
     const jbCollapsed = jbIdle && !isOpen(jbBoxObj, jbIdle);
     const jbList = h('div', { class: 'zsp42', role: 'list', 'aria-label': 'Speakers in the Jukebox' }, jbMs.map(z => spRow(z, JB)));
     if (jbCollapsed) { jbList.hidden = true; jbList.classList.add('zsp42-collapsed'); }
-    const jbExpand = jbIdle ? h('button', { type: 'button', class: 'qb42-exp' + (jbCollapsed ? '' : ' open'), 'aria-expanded': String(!jbCollapsed), 'aria-label': jbCollapsed ? `Show ${jbMs.length} speakers` : 'Hide speakers', title: jbCollapsed ? `Show speakers (${jbMs.length})` : 'Hide speakers',
-      onclick: ev => { ev.stopPropagation(); setOpen(jbBoxObj, jbCollapsed); window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } }, jbCollapsed ? `▸ ${jbMs.length}` : '▾') : null;
+    const jbExpand = jbIdle ? (() => { const b = h('button', { type: 'button', class: 'plus chv qb42-exp' + (jbCollapsed ? '' : ' open'), 'aria-expanded': String(!jbCollapsed), 'aria-label': jbCollapsed ? `Show ${jbMs.length} speakers` : 'Hide speakers', title: jbCollapsed ? `Show speakers (${jbMs.length})` : 'Hide speakers',
+      onclick: ev => { ev.stopPropagation(); setOpen(jbBoxObj, jbCollapsed); window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } }); setChev(b, jbCollapsed ? 'r' : 'd'); return b; })() : null;
     const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' }, card, jbList);
     const el = h('section', { class: 'qb42 solo jb42' + (sel ? ' ctl' : '') + (jbIdle ? ' idle' : '') + (jbCollapsed ? ' qb42-folded' : ''), 'data-box': 'solo', 'data-leader-id': JB, 'aria-label': 'Jukebox' },
-      h('div', { class: 'qb42-head' }, title, Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: pick, selected: sel }), jbExpand, h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)), wrap);
+      h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, jbExpand), Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: pick, selected: sel }), S, ctl, { id: 'jukebox', name: 'Jukebox' }, { jb: true, name: 'Jukebox', can }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)), wrap);
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; pick(ev); });
     return el;
   };
@@ -395,7 +398,7 @@ export function treeEl(S, ctl, kit, st) {
     h('div', { class: 'un42-h' }, h('b', null, 'UNASSIGNED'), h('span', { class: 'un42-n' }, ` ${un.length} `), h('span', { class: 'small dim' }, 'Not in any zone, so silent')),
     h('div', { role: 'list' }, un.length ? un.map(z => {
       const row = h('div', { class: 'sp42 un' + (st.spk === z.id ? ' sel' : '') + (z.connected ? '' : ' gone'), 'data-device-id': z.id, 'data-device': z.name, 'data-zone-id': z.id, 'data-in-zone': '', role: 'listitem' },
-        ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} into a zone`, title: 'Drag into a zone', 'data-drag-device': z.id }, '⋮'), admin, 'Only an administrator can change zones.'),
+        ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} into a zone`, title: 'Drag into a zone', 'data-drag-device': z.id }), admin, 'Only an administrator can change zones.'),
         // 0.6.8 zone fix: the same name + tag line (ANALOG, NO DELAY, REF...) as a speaker in a zone, tags on the second line under the name
         h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'sp42-nt' }, h('button', { type: 'button', class: 'dname sp42-n ell', title: `${z.name} - open its settings`, onclick: () => st.onSpk(z.id) }, z.name),
           h('span', { class: 'dtagrow sp42-tags' }, tagEls3(cardTags3(z)))),
@@ -404,21 +407,21 @@ export function treeEl(S, ctl, kit, st) {
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));
   const decorateCard = (el, key, label) => {
     el.dataset.card = key;
-    // zone queue boxes drag by their ⋮ zone-actions gutter (0.4.9 F69); every other card gets the same ⋮ handle at its left edge
-    if (admin && !el.querySelector('.zgut42') && !el.querySelector(':scope > .cgrip69')) el.prepend(h('span', { class: 'cgrip69', role: 'button', tabindex: 0, title: 'Drag to reorder', 'aria-label': `Reorder ${label} (drag, or Alt+Up / Alt+Down)` }, '⋮'));
+    // 0.7.1: left-edge trim is the drag handle (zone cards already have .zgut42; other cards get .cgrip69)
+    if (admin && !el.querySelector('.zgut42') && !el.querySelector(':scope > .cgrip69')) el.prepend(h('span', { class: 'cgrip69', role: 'button', tabindex: 0, title: 'Drag to reorder', 'aria-label': `Reorder ${label} (drag, or Alt+Up / Alt+Down)` }));
     return el;
   };
   cardList.push({ key: 'unassigned', keys: ['unassigned'], el: unBox });
   // 0.6.8: AirPlay speakers card sits under Unassigned by default (the card itself expands / collapses; no header button)
   if (admin) { setApCardDecor(el => decorateCard(el, 'airplay', 'AirPlay speakers')); const apc = airPlaySetupCard(S, ctl); if (apc) cardList.push({ key: 'airplay', keys: ['airplay'], el: apc }); }
-  // 0.7.0 t1901: the Cast speakers card is a reorder card like AirPlay (same ⋮ handle, saved in the shared card order); by default right below AirPlay
+  // 0.7.0 t1901: the Cast speakers card is a reorder card like AirPlay (same edge-trim handle, saved in the shared card order); by default right below AirPlay
   if (admin) { setCastCardDecor(el => decorateCard(el, 'cast', 'Cast speakers')); const csc = castSetupCard(S, ctl); if (csc) cardList.push({ key: 'cast', keys: ['cast'], el: csc }); }
   shownCards = arrangeCards(cardList, getCardOrder());
   for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'airplay' ? 'AirPlay speakers' : c.key === 'cast' ? 'Cast speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
   root.append(...shownCards.map(c => c.el));
   attachDrag(root, S, move);
-  // 0.4.9 F69: zones drag only by their left-edge ⋮ handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
-  // 0.6.9 #12: ANY card (zones online or not, Jukebox, Unassigned, AirPlay) drags by its ⋮ handle; the drop saves the whole order on the server
+  // 0.4.9 F69: zones drag only by their left-edge trim handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
+  // 0.6.9 #12: ANY card (zones online or not, Jukebox, Unassigned, AirPlay) drags by its edge-trim handle; the drop saves the whole order on the server
   root.dataset.reorder = admin ? '1' : '0';
   // 0.6.9 #12 fix: a zone dropped on the middle of another zone links them (play the same music, in sync) - the 0.4.1 zone-onto-zone action;
   // dropped near a card's top / bottom edge it reorders (insertion line)
@@ -461,8 +464,8 @@ function attachDrag(root, S, move) {
 // A linked set moves as one box. The order is kept on this device (wavwiz.devorder.v1 .g - the 0.3.8 L40 card order the whole Devices UI uses).
 const BOXSKIP = 'button,input,select,textarea,a[href],[role="slider"],[role="switch"],.qb42-vol,.zcard42,.zsp42,.dgrip,.dgrip42,.ctxmenu';
 const ZSKIP = 'button:not(.zname),input,select,textarea,a[href],[role="slider"],.qb42-vol,.zacts,.zgut42,.zl-now,.tagact,.dgrip42,.zsp42';
-// 0.6.9 #12: every top-level card is a drag source and a target - zone boxes (by their ⋮ zone-actions gutter), the Jukebox, Unassigned and the
-// AirPlay card (by their ⋮ .cgrip69 handle). Alt+Up / Alt+Down on a handle moves the card one place. The drop hands (fromKey, toKey, after) to onMove.
+// 0.6.9 #12: every top-level card is a drag source and a target - zone boxes (by their left-edge trim), the Jukebox, Unassigned and the
+// AirPlay card (by their .cgrip69 edge trim). Alt+Up / Alt+Down on a handle moves the card one place. The drop hands (fromKey, toKey, after) to onMove.
 function attachZoneDrag(root, cards, onMove, onLink) {
   if (root._zdrag69) return; root._zdrag69 = true;
   const top = () => [...root.querySelectorAll(':scope > [data-card]')];
@@ -545,7 +548,7 @@ export function zonePane(S, ctl, kit, g, st) {
   const others = (S.groups || []).filter(o => o.id !== g.id);
   root.append(
     h('div', { class: 'zp42-row' }, h('span', { class: 'dlbl' }, 'NAME'), name, saveName, h('span', { class: 'grow' }), h('span', { class: 'dlbl' }, 'ENABLED'), pill),
-    h('div', { class: 'zp42-row zp42-now' }, Z.nowLine(g.now, { at: S._groupsAt || Date.now() })),
+    h('div', { class: 'zp42-row zp42-now' }, Z.wireNowMenu(Z.nowLine(g.now, { at: S._groupsAt || Date.now() }), S, ctl, g, { can })),
     h('div', { class: 'zp42-row dvol' }, h('span', { class: 'dlbl' }, 'VOLUME'), bar.wrap, bar.pct, mute),
     h('div', { class: 'zp42-row' }, h('span', { class: 'dlbl' }, 'QUEUE'), h('b', null, `Queue: ${g.name}`), h('span', { class: 'grow' }), h('button', { type: 'button', class: 'btn sm', 'data-act': 'zone-open-queue', onclick: () => { Z.select('g:' + g.id); ctl.openQueue?.(); } }, 'Open queue')),
     h('div', { class: 'zp42-row zp42-spk' }, h('span', { class: 'dlbl' }, `SPEAKERS IN ${g.name.toUpperCase()}`),

@@ -5736,3 +5736,232 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   html.handset .topbar:not(.wtitlebar){--hdr-gap:4px;--logo-gap:3px;--logo-em:18px;--logo-wm:15px}
 }
 /* end 0.7.0 (t1892) */
+
+
+/* ========================================================================
+   0.7.1: Devices cards — one outer border, themed Now Playing row,
+   left-edge accent trim as the drag handle (no dots, no handle box),
+   shared .plus.chv fold control at the top-right of each card header.
+   Trim variants: default gradient, [data-card-trim=notch] / .trim-notch,
+   [data-card-trim=wave] / .trim-wave. Tokens only (accent, accent-2, ink,
+   dim, panel, line, voltrack) so every theme follows.
+   Layout uses flex + min-width:0 at all widths — no phone-only max-width
+   rules that would also hit a narrow PC window.
+   ======================================================================== */
+
+/* ---- Now Playing bar: a plain themed row, no box of its own ---- */
+.tree42 .zl-now,
+.qb42-head > .zl-now,
+.qb42.idle .qb42-head > .zl-now,
+.zp-row .zl-now,
+.zsh-now .zl-now,
+.zcard .zl-now,
+.zp42-now .zl-now {
+  border: 0;
+  box-shadow: none;
+  margin: 2px 0;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+.tree42 .zl-now.tap:hover,
+.qb42-head > .zl-now.tap:hover,
+.zcard .zl-now.tap:hover,
+.zp-row .zl-now.tap:hover {
+  border: 0;
+  background: color-mix(in srgb, var(--text, var(--ink)) 7%, transparent);
+}
+.tree42 .zl-now .zl-ico,
+.qb42-head > .zl-now .zl-ico,
+.zcard .zl-now .zl-ico {
+  color: var(--accent-text, var(--accent));
+}
+.tree42 .zl-now .zl-t,
+.zcard .zl-now .zl-t { color: var(--ink); }
+.tree42 .zl-now .zl-t .dim,
+.tree42 .zl-now .zl-time,
+.zcard .zl-now .zl-t .dim,
+.zcard .zl-now .zl-time { color: var(--dim); }
+.tree42 .zl-now.empty,
+.zcard .zl-now.empty { color: var(--dim); }
+/* Progress uses the same --voltrack fill as the theme's main sliders / seek bars */
+.tree42 .zl-now .zl-bar,
+.qb42-head > .zl-now .zl-bar,
+.zcard .zl-now .zl-bar,
+.zp-row .zl-now .zl-bar,
+.zsh-now .zl-now .zl-bar,
+.zp42-now .zl-now .zl-bar {
+  height: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--voltrack) 0 0 / var(--p, 0%) 100% no-repeat,
+              color-mix(in srgb, var(--line) 80%, var(--panel2));
+}
+.tree42 .zl-now .zl-bar i,
+.qb42-head > .zl-now .zl-bar i,
+.zcard .zl-now .zl-bar i,
+.zp-row .zl-now .zl-bar i,
+.zsh-now .zl-now .zl-bar i,
+.zp42-now .zl-now .zl-bar i {
+  background: transparent;
+  width: 0;
+}
+
+/* ---- Left-edge trim = the drag handle (no dots, no divider box) ---- */
+.tree42 { --ww-trim-w: 6px; }
+.tree42 .zgut42,
+.tree42 .dgrip42,
+.tree42 .cgrip69,
+.dc3 > .dgrip,
+.zcard > .dgrip,
+.dcard > .dgrip,
+.drow > .dgrip {
+  box-sizing: border-box;
+  width: var(--ww-trim-w, 6px) !important;
+  flex: 0 0 var(--ww-trim-w, 6px) !important;
+  min-width: var(--ww-trim-w, 6px);
+  padding: 0 !important;
+  margin: 0;
+  border: 0 !important;
+  border-right: 0 !important;
+  border-radius: 3px 0 0 3px;
+  font-size: 0 !important;
+  line-height: 0;
+  color: transparent !important;
+  text-indent: -99px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  align-self: stretch;
+  display: flex;
+  opacity: .5;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  box-shadow: none;
+  z-index: 1;
+}
+.dgrip > i { display: none !important; }
+.tree42 .zgut42:hover,
+.tree42 .dgrip42:hover,
+.tree42 .cgrip69:hover,
+.tree42 .zgut42:focus-visible,
+.tree42 .dgrip42:focus-visible,
+.tree42 .cgrip69:focus-visible,
+.dc3 > .dgrip:hover,
+.zcard > .dgrip:hover,
+.dcard > .dgrip:hover {
+  opacity: 1;
+  filter: brightness(1.12);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  color: transparent !important;
+}
+.tree42 .zgut42:active,
+.tree42 .dgrip42:active,
+.tree42 .cgrip69:active,
+.dc3 > .dgrip:active { cursor: grabbing; }
+
+/* Active / playing zone: the trim glows; idle cards stay dimmer */
+.tree42 .qb42.ctl .zgut42,
+.tree42 .qb42:not(.idle) .zgut42,
+.tree42 .qb42.ctl > .cgrip69,
+.tree42 .qb42:not(.idle) > .cgrip69,
+.tree42 .zcard42:not(.off) .zgut42,
+.tree42 .sp42.sel .dgrip42 {
+  opacity: 1;
+  box-shadow: 0 0 10px var(--accent), 0 0 16px color-mix(in srgb, var(--accent2) 50%, transparent);
+}
+
+/* Room for a 6px trim instead of the old 22–42px handle column */
+.tree42 > [data-card]:has(> .cgrip69) { padding-left: 10px; }
+.tree42 > .un42[data-card]:has(> .cgrip69) { padding-left: 14px; }
+.dc3[data-dkind], .zcard[data-dkind], .drow[data-dkind], .dcard[data-dkind] { padding-left: 14px !important; }
+.tree42 .zsp42 { padding-left: 14px; }
+.tree42 .zsp42:has(.sp42)::before { left: 7px; }
+.tree42 .zsp42 > .sp42::before { left: -7px; width: 6px; }
+
+/* Variant B: notched / angled neon edge (repeats down a tall expanded card) */
+html[data-card-trim="notch"] .tree42 .zgut42,
+html[data-card-trim="notch"] .tree42 .dgrip42,
+html[data-card-trim="notch"] .tree42 .cgrip69,
+html[data-card-trim="notch"] .dc3 > .dgrip,
+html[data-card-trim="notch"] .zcard > .dgrip,
+.trim-notch .zgut42,
+.trim-notch .dgrip42,
+.trim-notch .cgrip69,
+.trim-notch .dc3 > .dgrip,
+.trim-notch .zcard > .dgrip {
+  width: 7px !important;
+  flex-basis: 7px !important;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='16' viewBox='0 0 7 16' preserveAspectRatio='none'><path fill='black' d='M0 0h5l2 4-2 4 2 4-2 4H0z'/></svg>") top left / 7px 16px repeat-y;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='16' viewBox='0 0 7 16' preserveAspectRatio='none'><path fill='black' d='M0 0h5l2 4-2 4 2 4-2 4H0z'/></svg>") top left / 7px 16px repeat-y;
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+
+/* Variant C: mini waveform / equalizer bars (Parallel Flow) */
+html[data-card-trim="wave"] .tree42 .zgut42,
+html[data-card-trim="wave"] .tree42 .dgrip42,
+html[data-card-trim="wave"] .tree42 .cgrip69,
+html[data-card-trim="wave"] .dc3 > .dgrip,
+html[data-card-trim="wave"] .zcard > .dgrip,
+.trim-wave .zgut42,
+.trim-wave .dgrip42,
+.trim-wave .cgrip69,
+.trim-wave .dc3 > .dgrip,
+.trim-wave .zcard > .dgrip {
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='24' viewBox='0 0 6 24'><rect x='0.35' y='9' width='1' height='6' rx='0.4' fill='black'/><rect x='1.75' y='4' width='1' height='16' rx='0.4' fill='black'/><rect x='3.15' y='7' width='1' height='10' rx='0.4' fill='black'/><rect x='4.55' y='2' width='1' height='20' rx='0.4' fill='black'/></svg>") top center / 6px 24px repeat-y;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='24' viewBox='0 0 6 24'><rect x='0.35' y='9' width='1' height='6' rx='0.4' fill='black'/><rect x='1.75' y='4' width='1' height='16' rx='0.4' fill='black'/><rect x='3.15' y='7' width='1' height='10' rx='0.4' fill='black'/><rect x='4.55' y='2' width='1' height='20' rx='0.4' fill='black'/></svg>") top center / 6px 24px repeat-y;
+}
+
+/* ---- Shared .plus.chv fold control, top-right of the card header ---- */
+.tree42 .qb42-trow,
+.tree42 .ze42-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tree42 .qb42-trow > .qb42-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.tree42 .qb42-t .qb42-st {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree42 .qb42-trow > .plus.chv,
+.tree42 .ze42-row > .plus.chv,
+.tree42 .qb42-head > .plus.chv {
+  flex: none;
+  margin-left: auto;
+}
+/* Keep the shared 22px accent-boxed chevron look; neutralize the old grey ▸ box */
+.tree42 .zfold42-t.plus.chv,
+.tree42 .qb42-exp.plus.chv {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent-text, var(--accent));
+  font: inherit;
+  letter-spacing: 0;
+}
+.tree42 .zfold42-t.plus.chv:hover,
+.tree42 .qb42-exp.plus.chv:hover,
+.tree42 .zfold42-t.plus.chv:focus-visible,
+.tree42 .qb42-exp.plus.chv:focus-visible {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent-text, var(--accent));
+}
+/* end 0.7.1 Devices cards */

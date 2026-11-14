@@ -1,4 +1,5 @@
 import { h, api, toast } from './util.js';
+import { setChev } from './icons.js';
 
 /** 0.7.0 F169: Google Cast setup card - same inline zone-style card as the AirPlay one, placed directly BELOW it at the bottom of
  *  Zones · Speakers (order: Unassigned, AirPlay speakers, Cast speakers). Same three steps (Find / Test / Add to zone), same row / badge /
@@ -311,14 +312,15 @@ function buildCard(S, ctl) {
   const note = !open ? (n ? `${n} found` : 'Find, test and add') : view.note;
   const step = csStep(st(selId), devs.find(d => d.id === selId));
   const expandNow = () => { if (!open) { setOpen(true); paintInPlace(); scrollToCard(); } };
-  const fold = h('button', { type: 'button', class: 'zfold42-t' + (open ? ' open' : ''), 'data-act': 'castsetup-fold', 'aria-expanded': String(open),
+  const fold = h('button', { type: 'button', class: 'plus chv zfold42-t' + (open ? ' open' : ''), 'data-act': 'castsetup-fold', 'aria-expanded': String(open),
     'aria-label': open ? 'Collapse Cast speakers' : 'Expand Cast speakers', title: open ? 'Collapse' : 'Expand',
-    onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setOpen(!open); paintInPlace(); if (open) scrollToCard(); } }, open ? '▾' : '▸');
+    onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setOpen(!open); paintInPlace(); if (open) scrollToCard(); } });
+  setChev(fold, open ? 'd' : 'r');
   const title = h('div', { class: 'qb42-t qb42-pick', role: 'button', tabindex: '0', title: 'Cast speakers', 'aria-label': 'Cast speakers',
     onclick: ev => { ev.stopPropagation(); expandNow(); },
     onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); expandNow(); } } },
     h('b', { class: 'qb42-name' }, 'Cast speakers'), h('span', { class: 'qb42-st dim' }, note));
-  const head = h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, fold, title));
+  const head = h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, fold));
   const card = h('section', { class: 'qb42 solo idle castsetup-card' + (open ? ' open' : ' qb42-folded'), 'data-leader-id': '__cast__', 'data-castsetup': '1',
     'aria-label': open ? 'Cast speakers (expanded)' : 'Cast speakers (collapsed)' });
   if (!open) { card.append(head); try { cardDecor?.(card); } catch { /* decoration is cosmetic */ } return card; }

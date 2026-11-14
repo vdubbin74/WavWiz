@@ -30,7 +30,7 @@ export function zoneMenuItems(a) {
 
 // 0.4.2: the menus of the new zone tree. Pure item builders (ids are what the tests and the wiring use).
 const IC = {
-  play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', mute: 'M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6', unmute: 'M4 9v6h4l5 4V5L8 9zM16 8a5 5 0 010 8',
+  play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', prev: 'M18 6l-8 6 8 6M6 6v12', next: 'M6 6l8 6-8 6M18 6v12', mute: 'M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6', unmute: 'M4 9v6h4l5 4V5L8 9zM16 8a5 5 0 010 8',
   ctl: 'M12 3l2.5 6 6.5.5-5 4.3 1.6 6.4L12 17l-5.6 3.2L8 13.8 3 9.5 9.5 9z', queue: 'M4 6h12M4 12h12M4 18h8M18 14v6l4-3z', link: 'M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1',
   split: 'M10 14a4 4 0 005.7 0M14 10a4 4 0 00-5.7 0M4 4l16 16', rename: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4', del: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', move: 'M5 12h14M13 6l6 6-6 6', gear: 'M12 9a3 3 0 100 6 3 3 0 000-6zM19 12a7 7 0 00-.1-1.4l2-1.5-2-3.4-2.4 1a7 7 0 00-2.4-1.4L13.7 3h-3.4l-.4 2.3a7 7 0 00-2.4 1.4l-2.4-1-2 3.4 2 1.5a7 7 0 000 2.8l-2 1.5 2 3.4 2.4-1a7 7 0 002.4 1.4l.4 2.3h3.4l.4-2.3a7 7 0 002.4-1.4l2.4 1 2-3.4-2-1.5c.1-.5.1-.9.1-1.4z',
   cal: 'M3 12h4l2-6 4 12 2-6h6', power: 'M12 3v9M6.3 7a8 8 0 1011.4 0', plus: 'M12 5v14M5 12h14',
@@ -54,6 +54,15 @@ export function zoneMenu42(a) {
   l.push({ id: 'rename', ic: 'rename', label: 'Rename', disabled: !a.admin, hint: 'Only an administrator can rename a zone.' },
     { sep: true }, { id: 'delete', ic: 'del', label: 'Delete zone', danger: true, disabled: !a.admin, hint: 'Only an administrator can delete a zone.' });
   return l;
+}
+/** 0.7.1: small menu on a zone's Now Playing bar — Play/Pause, Previous, Next, Mute/Unmute, scoped to that zone. */
+export function zoneNowMenu42(a) {
+  return [
+    { id: 'playpause', ic: a.playing ? 'pause' : 'play', label: a.playing ? 'Pause' : 'Play', disabled: !a.can },
+    { id: 'prev', ic: 'prev', label: 'Previous', disabled: !a.can },
+    { id: 'next', ic: 'next', label: 'Next', disabled: !a.can },
+    { id: 'mute', ic: a.muted ? 'unmute' : 'mute', label: a.muted ? 'Unmute' : 'Mute', disabled: !a.can },
+  ];
 }
 /** SPEAKER (in a zone): Mute/Unmute, Settings, Move to zone (submenu incl. Unassigned), Calibrate, Rename, Enable/Disable. `a.zones` = other zones [{id,name}]. */
 export function speakerMenu42(a) {
@@ -175,11 +184,16 @@ export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
 }
 /** Wire a card: contextmenu (right-click), Shift+F10 / the Menu key, and a long press on touch. `build()` returns the items. */
 export function attachCtx(card, build, label) {
-  const show = (x, y) => openCtx(x, y, build(), { label, from: card });
+  const show = (x, y) => {
+    openCtx(x, y, build(), { label, from: card });
+    try { card.dataset.justmenu = '1'; setTimeout(() => { try { delete card.dataset.justmenu; } catch { /* gone */ } }, 400); } catch { /* no dataset */ }
+  };
   card.addEventListener('contextmenu', ev => { if (ev.target.closest('input,textarea')) return; ev.preventDefault(); ev.stopPropagation(); show(ev.clientX, ev.clientY); });
   card.addEventListener('keydown', ev => { if ((ev.key === 'F10' && ev.shiftKey) || ev.key === 'ContextMenu') { ev.preventDefault(); const t = (document.activeElement && card.contains(document.activeElement)) ? document.activeElement : card; const r = t.getBoundingClientRect(); show(r.left, r.top); } });
+  card.addEventListener('click', ev => { if (card.dataset.justmenu) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
   let t = 0, sx = 0, sy = 0;
-  card.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'touch' || ev.target.closest('button,input,.dgrip,.dgrip42,.vbar')) return; if (ev._ctxDone) return; ev._ctxDone = true; sx = ev.clientX; sy = ev.clientY; t = setTimeout(() => { t = 0; show(sx, sy); }, 550); });
+  // 0.7.1: a press on the edge-trim drag handle starts a drag, not a menu
+  card.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'touch' || ev.target.closest('button,input,.dgrip,.dgrip42,.zgut42,.cgrip69,.vbar')) return; if (ev._ctxDone) return; ev._ctxDone = true; sx = ev.clientX; sy = ev.clientY; t = setTimeout(() => { t = 0; show(sx, sy); }, 550); });
   const stop = () => { if (t) { clearTimeout(t); t = 0; } };
   card.addEventListener('pointerup', stop); card.addEventListener('pointercancel', stop); card.addEventListener('pointermove', ev => { if (t && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) stop(); });
 }

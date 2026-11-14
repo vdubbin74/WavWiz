@@ -379,9 +379,9 @@ function zonesPhone(S, ctl) {
     const mem = groups.filter(x => (x.playbackId || 'default') === key), sel = cur?.kind === 'zone' && mem.some(x => x.id === cur.id);
     rows.push(h('div', { class: 'zp-row' + (sel ? ' zsel-on' : ''), 'data-playback-id': key, 'data-groups': mem.map(x => x.id).join(',') },
       h('div', { class: 'zp-name' }, h('b', null, mem.map(x => x.name).join(' '), mem.length > 1 ? null : null), mem.length > 1 ? h('span', { class: 'zlinkic', title: Z.linkText(mem.map(x => x.name)) }, icon('link')) : null),
-      Z.nowLine(g.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select('g:' + g.id), selected: sel })));
+      Z.wireNowMenu(Z.nowLine(g.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select('g:' + g.id), selected: sel }), S, ctl, g, { can })));
   }
-  if (S.jb?.own) rows.push(h('div', { class: 'zp-row' + (cur?.kind === 'jukebox' ? ' zsel-on' : ''), 'data-playback-id': 'jukebox' }, h('div', { class: 'zp-name' }, h('b', null, 'Jukebox')), Z.nowLine(S.jb.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: cur?.kind === 'jukebox' })));
+  if (S.jb?.own) rows.push(h('div', { class: 'zp-row' + (cur?.kind === 'jukebox' ? ' zsel-on' : ''), 'data-playback-id': 'jukebox' }, h('div', { class: 'zp-name' }, h('b', null, 'Jukebox')), Z.wireNowMenu(Z.nowLine(S.jb.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: cur?.kind === 'jukebox' }), S, ctl, { id: 'jukebox', name: 'Jukebox' }, { jb: true, name: 'Jukebox', can })));
   const g = cur?.kind === 'zone' ? groups.find(x => x.id === cur.id) : null, linked = g && (g.linked || []).length > 0;
   const btns = groups.length < 2 ? null : h('div', { class: 'zp-btns' },
     g ? ro(linked ? h('button', { type: 'button', class: 'btn zlinkbtn split', 'data-act': 'split', onclick: () => Z.splitOff(g, ctl.refreshAll) }, 'Split off ' + g.name)
@@ -1612,7 +1612,7 @@ function zcard3(S, ctl, g, { pick = null, onPick = null, onEdit = null, shared =
   const card = h('div', { class: 'zcard dlike dc3 zc3 hasnow' + (g.active ? ' active' : '') + (muted ? ' muted' : '') + (on ? '' : ' off') + (pick === g.id ? ' picked' : '') + (sel ? ' zsel-on' : '') + (linked ? ' zlinked' : ''), 'data-zone': g.name, 'data-group-id': g.id, 'data-playback-id': g.playbackId || 'default', title: ms.length ? ms.map(z => z.name).join(' · ') : 'No speakers yet' },
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), edit, linkBtn, pill),   /* 0.6.8-#12: link icon right beside OFF/ON */
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, g)), sel ? Z.controllingTag() : null, Z.linkBadge(g), Z.hereTag(g))),
-    shared ? null : Z.nowLine(g.now, { at: S._groupsAt || Date.now(), onSelect: select, selected: sel }),
+    shared ? null : Z.wireNowMenu(Z.nowLine(g.now, { at: S._groupsAt || Date.now(), onSelect: select, selected: sel }), S, ctl, g, { can }),
     h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute));
   zoneCtx(S, ctl, g, card, ms, { onEdit: onEdit && isAdmin(S) ? onEdit : null });
   if (onPick) card.setAttribute('aria-pressed', String(pick === g.id));
@@ -1640,7 +1640,7 @@ function sharedBox(S, ctl, members, inline, opts) {
   const names = members.map(m => m.name).join(' + ');
   return h('div', { class: 'zshared', 'data-playback-id': lead.playbackId || 'default', 'data-members': members.map(m => m.id).join(',') },
     h('div', { class: 'zsh-head' }, h('span', { class: 'zsh-ico', 'aria-hidden': 'true' }, icon('link')), h('b', { class: 'zsh-names' }, names), h('span', { class: 'grow' }), h('span', { class: 'zsh-sync' }, 'IN SYNC')),
-    h('div', { class: 'zsh-now' }, Z.nowLine(lead.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select('g:' + lead.id), selected: !!selMember }),
+    h('div', { class: 'zsh-now' }, Z.wireNowMenu(Z.nowLine(lead.now, { at: S._groupsAt || Date.now(), onSelect: () => Z.select('g:' + lead.id), selected: !!selMember }), S, ctl, lead, { can }),
       h('div', { class: 'zsh-vol' }, h('span', { class: 'dlbl' }, 'SHARED VOLUME'), h('div', { class: 'dvol' }, bar.wrap, bar.pct))),
     h('div', { class: 'zsh-members' }, members.map(m => inline(m) || zcard3(S, ctl, m, { ...opts, shared: true }))));
 }
@@ -1686,7 +1686,7 @@ function jukeboxCard(S, ctl) {
   return h('div', { class: 'zcard dlike dc3 zc3 hasnow zjuke' + (val.zoneOn ? '' : ' off') + (sel ? ' zsel-on' : '') + (muted ? ' muted' : ''), 'data-group-id': 'jukebox', 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' },
     h('div', { class: 'dtop zc-top dc3l1' }, dot, name, h('span', { class: 'small dim zkind' }, 'zone'), h('span', { class: 'grow' }), pill),
     h('div', { class: 'dc3l2' }, h('div', { class: 'dtagrow ztagrow dc3tags' }, tagEls3(zoneTags3(S.zones, { deviceIds: [...ids] })), h('span', { class: 'dtag zjb', title: 'Guests choose the songs; they play only on these devices' }, 'JUKEBOX'), sel ? Z.controllingTag() : null)),
-    Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: sel }),   // 0.6.9 #21: an empty Jukebox can be picked too
+    Z.wireNowMenu(Z.nowLine(jb.own ? jb.now : null, { at: S._groupsAt || Date.now(), onSelect: () => Z.select(Z.JUKEBOX_KEY), selected: sel }), S, ctl, { id: 'jukebox', name: 'Jukebox' }, { jb: true, name: 'Jukebox', can }),   // 0.6.9 #21: an empty Jukebox can be picked too
     jbHintEl, h('div', { class: 'dvol dc3l3' }, bar.wrap, bar.pct, mute), jbSet,
     h('div', { class: 'dc3mem jbpick' }, h('span', { class: 'dlbl' }, 'SPEAKERS FOR JUKEBOX'),
       h('div', { class: 'dc3chips' }, ms.length ? ms.map(z => h('span', { class: 'zchip', title: z.name }, z.name)) : h('span', { class: 'small dim' }, 'None picked: the Jukebox plays in the main zone')),

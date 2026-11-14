@@ -1,4 +1,5 @@
 import { h, api, toast } from './util.js';
+import { setChev } from './icons.js';
 
 /** 0.6.8-#14b: AirPlay setup as an inline collapsible zone-style card at the bottom of Zones · Speakers (below Unassigned).
  *  Three steps (Find / Test / Add to zone). Only what WavWiz really implements is offered: no PIN / password entry,
@@ -337,16 +338,17 @@ function buildCard(S, ctl) {
   const view = apScanView({ phase: scanPhase === 'idle' && open ? 'searching' : scanPhase, n, problem: lastProblem });
   const note = !open ? (n ? `${n} found` : 'Find, test and add') : view.note;
   const step = apStep(st(selId), sel());
-  const fold = h('button', { type: 'button', class: 'zfold42-t' + (open ? ' open' : ''), 'data-act': 'apsetup-fold',
+  const fold = h('button', { type: 'button', class: 'plus chv zfold42-t' + (open ? ' open' : ''), 'data-act': 'apsetup-fold',
     'aria-expanded': String(open), 'aria-label': open ? 'Collapse AirPlay speakers' : 'Expand AirPlay speakers',
     title: open ? 'Collapse' : 'Expand',
-    onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setOpen(!open); paintInPlace(); if (open) scrollToCard(); } }, open ? '▾' : '▸');
+    onclick: ev => { ev.stopPropagation(); ev.preventDefault(); setOpen(!open); paintInPlace(); if (open) scrollToCard(); } });
+  setChev(fold, open ? 'd' : 'r');
   const title = h('div', { class: 'qb42-t qb42-pick', role: 'button', tabindex: '0', title: 'AirPlay speakers',
     'aria-label': 'AirPlay speakers',
     onclick: ev => { ev.stopPropagation(); if (!open) { setOpen(true); paintInPlace(); scrollToCard(); } },
     onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); if (!open) { setOpen(true); paintInPlace(); scrollToCard(); } } } },
     h('b', { class: 'qb42-name' }, 'AirPlay speakers'), h('span', { class: 'qb42-st dim' }, note));
-  const head = h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, fold, title));
+  const head = h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, fold));
 
   const card = h('section', {
     class: 'qb42 solo idle apsetup-card' + (open ? ' open' : ' qb42-folded'),
