@@ -5740,15 +5740,12 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 
 /* ========================================================================
    0.7.1: Devices cards — one outer border, themed Now Playing row,
-   left-edge accent trim as the drag handle (no dots, no handle box),
+   left-edge light-pipe trim as the drag handle (no dots, no handle box),
    shared .plus.chv fold control at the top-right of each card header.
-   Trim variants (switch with html[data-card-trim] or .trim-* on an ancestor):
-     default   — slim accent→accent2 gradient (fallback)
-     wave      — live waveform (Parallel Flow orange/teal; pulses when playing)
-     pipe      — light-pipe (solid accent; a highlight travels while playing)
-     rail      — split-rail (two thin parallel lines, accent + accent2)
-   Tokens only (accent, accent-2, ink, dim, panel, line, voltrack) so every
-   theme follows. Midnight Neon: #FF3C00 / #12D6C2. No dots.
+   The trim is a solid --accent edge in every theme. A highlight travels
+   down it only while the zone is playing; idle cards stay a static solid
+   edge. prefers-reduced-motion: no travel (solid edge only).
+   Tokens only (accent, accent2, ink, dim, panel, line, voltrack).
    Layout uses flex + min-width:0 at all widths — no phone-only max-width
    rules that would also hit a narrow PC window.
    ======================================================================== */
@@ -5861,7 +5858,7 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   user-select: none;
   display: block;
   opacity: .55;
-  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  background: var(--accent);
   box-shadow: none;
   z-index: 2;
 }
@@ -5874,7 +5871,7 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   opacity: 1;
   filter: brightness(1.12);
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
-  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  background: var(--accent);
   color: transparent !important;
 }
 .tree42 .cgrip69:active,
@@ -5886,6 +5883,39 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .tree42 .qb42.playing > .cgrip69 {
   opacity: 1;
   box-shadow: 0 0 10px var(--accent), 0 0 16px color-mix(in srgb, var(--accent2) 50%, transparent);
+}
+
+
+/* Light-pipe highlight: travels down the trim only while the zone plays.
+   Idle / paused / reduced-motion: static solid accent, no travel. */
+.tree42 .cgrip69::after,
+.dc3 > .dgrip::after,
+.zcard > .dgrip::after,
+.dcard > .dgrip::after,
+.drow > .dgrip::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 28%;
+  min-height: 28px;
+  top: -30%;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    color-mix(in srgb, #fff 70%, var(--accent2)) 40%,
+    var(--accent2) 58%,
+    transparent 100%);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent2) 80%, #fff);
+  opacity: 0;
+  pointer-events: none;
+}
+.tree42 .qb42.playing > .cgrip69::after {
+  opacity: 1;
+  animation: ww-pipe 1.8s linear infinite;
+}
+@keyframes ww-pipe {
+  0%   { top: -30%; }
+  100% { top: 100%; }
 }
 
 /* Room for a 6px trim instead of the old 22–42px handle column */
@@ -5963,186 +5993,21 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   filter: none !important;
 }
 
-/* ========== Trim variants ==========
-   Masks / layers use theme tokens so Midnight Neon is #FF3C00 / #12D6C2
-   and other themes follow their accent pair. */
-
-/* Variant: live waveform (tiny vertical Parallel Flow waves).
-   Still when idle; scrolls + pulses while the zone is playing.
-   Strokes use --accent / --accent2 (Midnight Neon: #FF3C00 / #12D6C2). */
-html[data-card-trim="wave"] .tree42 .cgrip69,
-html[data-card-trim="wave"] .dc3 > .dgrip,
-html[data-card-trim="wave"] .zcard > .dgrip,
-.trim-wave .cgrip69,
-.trim-wave .dc3 > .dgrip,
-.trim-wave .zcard > .dgrip {
-  width: 8px !important;
-  flex-basis: 8px !important;
-  min-width: 8px;
-  background: transparent;
-  opacity: .85;
-  box-shadow: none;
-  overflow: hidden;
-}
-html[data-card-trim="wave"] .tree42 .cgrip69::before,
-html[data-card-trim="wave"] .tree42 .cgrip69::after,
-html[data-card-trim="wave"] .dc3 > .dgrip::before,
-html[data-card-trim="wave"] .dc3 > .dgrip::after,
-html[data-card-trim="wave"] .zcard > .dgrip::before,
-html[data-card-trim="wave"] .zcard > .dgrip::after,
-.trim-wave .cgrip69::before,
-.trim-wave .cgrip69::after,
-.trim-wave .dc3 > .dgrip::before,
-.trim-wave .dc3 > .dgrip::after,
-.trim-wave .zcard > .dgrip::before,
-.trim-wave .zcard > .dgrip::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-repeat: repeat-y;
-  background-size: 8px 28px;
-  background-position: 0 0;
-  -webkit-mask-repeat: repeat-y;
-  mask-repeat: repeat-y;
-  -webkit-mask-size: 8px 28px;
-  mask-size: 8px 28px;
-  -webkit-mask-position: 0 0;
-  mask-position: 0 0;
-}
-html[data-card-trim="wave"] .tree42 .cgrip69::before,
-.trim-wave .cgrip69::before,
-html[data-card-trim="wave"] .dc3 > .dgrip::before,
-html[data-card-trim="wave"] .zcard > .dgrip::before,
-.trim-wave .dc3 > .dgrip::before,
-.trim-wave .zcard > .dgrip::before {
-  background: var(--accent);
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M2.4 0 C 5.6 3.5 5.6 7 2.4 10.5 C -0.8 14 -0.8 17.5 2.4 21 C 5.6 24.5 5.6 28 2.4 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
-  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M2.4 0 C 5.6 3.5 5.6 7 2.4 10.5 C -0.8 14 -0.8 17.5 2.4 21 C 5.6 24.5 5.6 28 2.4 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
-}
-html[data-card-trim="wave"] .tree42 .cgrip69::after,
-.trim-wave .cgrip69::after,
-html[data-card-trim="wave"] .dc3 > .dgrip::after,
-html[data-card-trim="wave"] .zcard > .dgrip::after,
-.trim-wave .dc3 > .dgrip::after,
-.trim-wave .zcard > .dgrip::after {
-  background: var(--accent2);
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M5.6 0 C 8.8 3.5 8.8 7 5.6 10.5 C 2.4 14 2.4 17.5 5.6 21 C 8.8 24.5 8.8 28 5.6 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
-  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M5.6 0 C 8.8 3.5 8.8 7 5.6 10.5 C 2.4 14 2.4 17.5 5.6 21 C 8.8 24.5 8.8 28 5.6 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
-}
-html[data-card-trim="wave"] .tree42 .cgrip69:hover,
-.trim-wave .cgrip69:hover {
-  opacity: 1;
-  filter: brightness(1.15);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
-}
-html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69,
-.trim-wave .qb42.playing > .cgrip69 {
-  opacity: 1;
-  animation: ww-wave-pulse 1.1s ease-in-out infinite;
-  box-shadow: 0 0 10px var(--accent), 0 0 16px color-mix(in srgb, var(--accent2) 50%, transparent);
-}
-html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69::before,
-html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69::after,
-.trim-wave .qb42.playing > .cgrip69::before,
-.trim-wave .qb42.playing > .cgrip69::after {
-  animation: ww-wave-scroll .7s linear infinite;
-}
-@keyframes ww-wave-scroll {
-  from { -webkit-mask-position: 0 0; mask-position: 0 0; }
-  to   { -webkit-mask-position: 0 28px; mask-position: 0 28px; }
-}
-@keyframes ww-wave-pulse {
-  0%, 100% { filter: brightness(1) drop-shadow(0 0 3px var(--accent)); }
-  50%      { filter: brightness(1.3) drop-shadow(0 0 7px var(--accent2)); }
-}
-
-/* Variant: light-pipe — solid accent edge; a highlight travels down while playing. */
-html[data-card-trim="pipe"] .tree42 .cgrip69,
-html[data-card-trim="pipe"] .dc3 > .dgrip,
-html[data-card-trim="pipe"] .zcard > .dgrip,
-.trim-pipe .cgrip69,
-.trim-pipe .dc3 > .dgrip,
-.trim-pipe .zcard > .dgrip {
-  background: var(--accent);
-  overflow: hidden;
-}
-html[data-card-trim="pipe"] .tree42 .cgrip69::after,
-html[data-card-trim="pipe"] .dc3 > .dgrip::after,
-html[data-card-trim="pipe"] .zcard > .dgrip::after,
-.trim-pipe .cgrip69::after,
-.trim-pipe .dc3 > .dgrip::after,
-.trim-pipe .zcard > .dgrip::after {
-  content: "";
-  position: absolute;
-  left: -2px;
-  right: -2px;
-  height: 28%;
-  min-height: 28px;
-  top: -30%;
-  background: linear-gradient(180deg,
-    transparent 0%,
-    color-mix(in srgb, #fff 70%, var(--accent2)) 40%,
-    var(--accent2) 58%,
-    transparent 100%);
-  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent2) 80%, #fff);
-  opacity: 0;
-  pointer-events: none;
-}
-html[data-card-trim="pipe"] .tree42 .qb42.playing > .cgrip69::after,
-.trim-pipe .qb42.playing > .cgrip69::after {
-  opacity: 1;
-  animation: ww-pipe 1.8s linear infinite;
-}
-@keyframes ww-pipe {
-  0%   { top: -30%; }
-  100% { top: 100%; }
-}
-/* Preview helper: freeze the traveling light mid-card */
-html.shot-pipe-mid[data-card-trim="pipe"] .tree42 .qb42.playing > .cgrip69::after,
-.trim-pipe.shot-pipe-mid .qb42.playing > .cgrip69::after {
-  animation: none;
-  opacity: 1;
-  top: 42%;
-}
-
-/* Variant: split-rail — two thin parallel vertical lines (accent + accent2). */
-html[data-card-trim="rail"] .tree42 .cgrip69,
-html[data-card-trim="rail"] .dc3 > .dgrip,
-html[data-card-trim="rail"] .zcard > .dgrip,
-.trim-rail .cgrip69,
-.trim-rail .dc3 > .dgrip,
-.trim-rail .zcard > .dgrip {
-  width: 8px !important;
-  flex-basis: 8px !important;
-  min-width: 8px;
-  background-color: transparent;
-  background-image:
-    linear-gradient(var(--accent), var(--accent)),
-    linear-gradient(var(--accent2), var(--accent2));
-  background-size: 2px 100%, 2px 100%;
-  background-position: 1px 0, 5px 0;
-  background-repeat: no-repeat;
-  box-shadow: none;
-  opacity: .75;
-  border-radius: 0;
-}
-html[data-card-trim="rail"] .tree42 .cgrip69:hover,
-.trim-rail .cgrip69:hover {
-  opacity: 1;
-  filter: brightness(1.12);
-  box-shadow: none;
-}
-html[data-card-trim="rail"] .tree42 .qb42.playing > .cgrip69,
-.trim-rail .qb42.playing > .cgrip69 {
-  opacity: 1;
-  filter: drop-shadow(0 0 4px var(--accent)) drop-shadow(0 0 4px var(--accent2));
-}
-
 @media (prefers-reduced-motion: reduce) {
   .tree42 .cgrip69,
-  .tree42 .cgrip69::after {
+  .tree42 .cgrip69::after,
+  .dc3 > .dgrip::after,
+  .zcard > .dgrip::after {
     animation: none !important;
+  }
+  /* No traveling highlight — the trim stays a solid accent edge. */
+  .tree42 .cgrip69::after,
+  .dc3 > .dgrip::after,
+  .zcard > .dgrip::after,
+  .dcard > .dgrip::after,
+  .drow > .dgrip::after,
+  .tree42 .qb42.playing > .cgrip69::after {
+    opacity: 0 !important;
   }
 }
 

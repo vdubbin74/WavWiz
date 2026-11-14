@@ -35,14 +35,17 @@ test('0.7.1: drag handles have no ⋮ glyph; trim / chevron / themed now-line CS
   assert.match(cs, /qb42-trow' \}, title, fold\)/);
   const css = rd('app.css');
   assert.match(css, /0\.7\.1: Devices cards/);
-  assert.match(css, /data-card-trim/);
-  assert.match(css, /trim-wave/);
-  assert.match(css, /trim-pipe/);
-  assert.match(css, /trim-rail/);
-  assert.doesNotMatch(css, /trim-notch/);
-  assert.match(css, /ww-wave-scroll/);
+  // Light-pipe is the default trim (no data-card-trim / variant classes).
   assert.match(css, /ww-pipe/);
-  assert.match(css, /shot-pipe-mid/);
+  assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /\.qb42\.playing > \.cgrip69::after/);
+  assert.doesNotMatch(css, /data-card-trim/);
+  assert.doesNotMatch(css, /trim-wave/);
+  assert.doesNotMatch(css, /trim-pipe/);
+  assert.doesNotMatch(css, /trim-rail/);
+  assert.doesNotMatch(css, /trim-notch/);
+  assert.doesNotMatch(css, /shot-pipe-mid/);
+  assert.doesNotMatch(css, /ww-wave/);
   assert.match(css, /--voltrack/);
   assert.match(css, /\.plus\.chv/);
   assert.match(css, /order:\s*99/);
