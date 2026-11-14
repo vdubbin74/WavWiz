@@ -2,10 +2,12 @@ import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 import { LOGO, emblem } from './logo.js';   // 0.7.0 item 4
 
-export const WHATS_NEW_VERSION = '0.7.0';
+export const WHATS_NEW_VERSION = '0.7.1';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.7.1
+  ['General fixes', 'General fixes.'],
   // 0.7.0
   ['Google Cast speakers', 'Nest speakers, Chromecast Audio and Cast TVs or soundbars on your network show up in a Cast speakers card under AirPlay speakers. Test with a chime, add one to a zone, then use it like any speaker. Sync with other speakers is close but approximate — fine-tune it with the speaker\'s delay.'],
   // 0.6.9

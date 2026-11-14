@@ -1,4 +1,4 @@
-# WavWiz server on Linux without Docker (0.7.0, F166)
+# WavWiz server on Linux without Docker (0.7.1, F166)
 
 Headless server. 0.7.0: the machine's own sound card (ALSA: analog, HDMI, USB DAC) is a WavWiz speaker; also pair a Windows Player,
 phone/browser, Cast or AirPlay speakers.

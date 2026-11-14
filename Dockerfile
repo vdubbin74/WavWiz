@@ -1,6 +1,6 @@
 # F166/F167: WavWiz server (headless) for Linux. Multi-arch: linux/amd64, linux/arm64.
-#   docker build -t docker.io/vdubbin74/wavwiz-server:0.7.0 .
-#   docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.7.0 .
+#   docker build -t docker.io/vdubbin74/wavwiz-server:0.7.1 .
+#   docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/vdubbin74/wavwiz-server:0.7.1 .
 # See docs/DOCKER.md and docs/RASPBERRY-PI.md (0.7.0: arm64 = Raspberry Pi 4/5 on 64-bit Pi OS). 0.7.0: local audio output (ALSA) when started with --device /dev/snd --group-add <host audio GID>.
 
 # ---- build (runs on the build machine's own arch; cross-publishes for the target) ----
@@ -49,6 +49,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${WAVWIZ_HTTP_PORT}/api/v1/discover" >/dev/null || exit 1
 LABEL org.opencontainers.image.title="WavWiz server" \
       org.opencontainers.image.source="https://github.com/vdubbin74/WavWiz" \
-      org.opencontainers.image.version="0.7.0" \
+      org.opencontainers.image.version="0.7.1" \
       org.opencontainers.image.licenses="MIT"
 ENTRYPOINT ["dotnet", "/opt/wavwiz-server/wavwiz-server.dll"]

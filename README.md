@@ -64,7 +64,7 @@ WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an alw
 
 - Homes, shops, restaurants and offices with a Windows PC that stays on, that want multi-zone music without buying into a speaker ecosystem
 - People who already own PCs, speakers, phones and tablets
-- Linux/NAS owners who only need the headless server (pair Windows Players or browsers for sound), and Raspberry Pi 4/5 owners on 64-bit Pi OS. The published Docker image (`0.7.0`, `latest`) is a multi-arch `linux/amd64` + `linux/arm64` manifest; arm64 has been smoke-tested under QEMU only and is not yet verified on real Pi hardware. See [docs/DOCKER.md](docs/DOCKER.md) and [docs/RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
+- Linux/NAS owners who only need the headless server (pair Windows Players or browsers for sound), and Raspberry Pi 4/5 owners on 64-bit Pi OS. The published Docker image (`0.7.1`, `latest`) is a multi-arch `linux/amd64` + `linux/arm64` manifest; arm64 has been smoke-tested under QEMU only and is not yet verified on real Pi hardware. See [docs/DOCKER.md](docs/DOCKER.md) and [docs/RASPBERRY-PI.md](docs/RASPBERRY-PI.md)
 
 ## How it compares
 

@@ -10,6 +10,10 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-14 (beta)
+
+General fixes.
+
 ## [0.7.0] - 2026-11-13 (beta)
 
 General fixes (Devices/zones, AirPlay, radio, Cast, Linux and Raspberry Pi server).
