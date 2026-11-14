@@ -36,7 +36,7 @@ const waitFor = async (fn, tries = 50) => {
 };
 
 const groups = [{ id: 1, name: 'Basement' }, { id: 2, name: 'Upstairs' }];
-const S = { zones: [], groups };
+const S = { auth: { role: 'admin' }, zones: [], groups };
 
 test('t1955u wiring: AirPlay and Cast skip a refresh while a select/input in the card is focused, keep the value, resume on blur/change', () => {
   const ap = src('airplaysetup.js'), cs = src('castsetup.js');
@@ -47,7 +47,7 @@ test('t1955u wiring: AirPlay and Cast skip a refresh while a select/input in the
     assert.match(s, /card\.addEventListener\('focusout', go\)/, `${name} resumes on blur`);
     assert.match(s, /card\.addEventListener\('change', go\)/, `${name} resumes on change`);
     assert.match(s, /syncFields\(card\);   \/\/ t1955u: keep the chosen zone \/ new-zone name across a repaint/, `${name} keeps the chosen value across a repaint`);
-    assert.match(s, /if \(cardEditing\(card\)\) \{ armResume\(card\); return; \}/, `${name} holds the refresh while editing`);
+    assert.match(s, /if \(cardEditing\(root\)\) \{ armResume\(root\); return; \}/, `${name} holds the refresh while editing`);
     assert.match(s, /await refreshIfIdle\(\);/, `${name} poll uses refreshIfIdle`);
     assert.match(s, /if \(seq === scanSeq && !closed && open\) await refreshIfIdle\(\);/, `${name} 1.5s/4s follow-ups use refreshIfIdle`);
   }
@@ -58,34 +58,28 @@ test('t1955u wiring: AirPlay and Cast skip a refresh while a select/input in the
 
 async function addToZone(kind, tag) {
   const file = kind === 'airplay' ? 'airplaysetup.js' : 'castsetup.js';
-  const openKey = kind === 'airplay' ? 'ww.apsetup.open' : 'ww.castsetup.open';
-  const cardSel = kind === 'airplay' ? '.apsetup-card' : '.castsetup-card';
+  const cardSel = '.addspk-dlg';
   const devicesUrl = kind === 'airplay' ? '/airplay/setup/devices' : '/cast/setup/devices';
   const testUrl = kind === 'airplay' ? '/airplay/setup/test' : '/cast/setup/test';
   const queryUrl = kind === 'airplay' ? '/dev/airplay/query' : '/cast/setup/query';
   const dev = kind === 'airplay'
     ? { id: 'k1', name: 'Kitchen', airplay2: false, route: 'raop' }
     : { id: 'c1', name: 'Kitchen', kind: 'speaker' };
-  sessionStorage.setItem(openKey, '0');
-  const m = await import(pathToFileURL(join(js, file)).href + '?' + tag);
+  const add = await import(pathToFileURL(join(js, 'addspeaker.js')).href);
+  const m = await import(pathToFileURL(join(js, file)).href);
+  add._addSpkReset();
   if (kind === 'airplay') m._apReset(); else m._csReset();
   calls.length = 0;
   reply = url => {
-    if (url.endsWith(devicesUrl)) return { devices: [dev], airPlay2Experimental: false, running: true };
-    if (url.endsWith(testUrl) || url.endsWith(queryUrl)) return { ok: true, kind: 'chime' };
+    if (String(url).endsWith(devicesUrl)) return { devices: [dev], airPlay2Experimental: false, running: true };
+    if (String(url).endsWith('/airplay/setup/devices')) return { devices: [], running: true };
+    if (String(url).endsWith('/cast/setup/devices')) return { devices: [], running: true };
+    if (String(url).endsWith(testUrl) || String(url).endsWith(queryUrl)) return { ok: true, kind: 'chime' };
     return { ok: true };
   };
-  const mount = el => { doc.body.replaceChildren(el); return el; };
-  mount(kind === 'airplay' ? m.airPlaySetupCard(S, {}) : m.castSetupCard(S, {}));
-  doc.querySelector(`${cardSel} .qb42-t`).click();
-  const row = await waitFor(() => doc.querySelector(`${cardSel} .apsetup-rowhead[data-id="${dev.id}"]`));
-  row.click();
-  const play = await waitFor(() => doc.querySelector(`${cardSel} [data-act="${kind === 'airplay' ? 'apsetup-test' : 'castsetup-test'}"]`));
-  play.click();
-  const yes = await waitFor(() => doc.querySelector(`${cardSel} [data-act="${kind === 'airplay' ? 'apsetup-heard' : 'castsetup-heard'}"]`));
-  yes.click();
-  const select = await waitFor(() => doc.querySelector(`${cardSel} select.apsetup-zone`));
-  return { m, select, cardSel, refresh: kind === 'airplay' ? m._apRefresh : m._csRefresh, reset: kind === 'airplay' ? m._apReset : m._csReset };
+  add.openAddSpeaker(S, {}, kind);
+  const select = await waitFor(() => doc.querySelector(`${cardSel} .apsetup-row[data-id="${dev.id}"] select.apsetup-zone`));
+  return { m, add, select, cardSel, refresh: kind === 'airplay' ? m._apRefresh : m._csRefresh, reset: kind === 'airplay' ? m._apReset : m._csReset };
 }
 
 async function runHold(kind, tag) {

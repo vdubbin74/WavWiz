@@ -100,7 +100,7 @@ export function apBrowseProblem(r) {
 function within(p, ms) {
   let t = 0;
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The server didn’t answer the AirPlay search in time.'), { status: 0 })), ms); })])
-    .finally(() => clearTimeout(t));
+    .finally(() => safeClear(clearTimeout, t));
 }
 
 // ---------------------------------------------------------------- module state (survives tree rebuilds)
@@ -113,7 +113,8 @@ export const setApCardDecor = fn => { cardDecor = typeof fn === 'function' ? fn 
 let Sref = null, ctlRef = null, devs = [], ap2 = false, selId = null, byId = Object.create(null), timer = 0, closed = true, lastProblem = null;
 // 0.6.9 #22: one search at a time; phase 'idle' | 'searching' | 'done'. Kept in the module so tree rebuilds / repaints never reset it.
 let scanPhase = 'idle', scanSeq = 0, scanTimer = 0;
-function endScan() { scanSeq++; scanPhase = 'idle'; clearTimeout(scanTimer); scanTimer = 0; }
+function safeClear(fn, id) { try { fn(id); } catch { /* node mock timers can throw on a stale id */ } }
+function endScan() { scanSeq++; scanPhase = 'idle'; safeClear(clearTimeout, scanTimer); scanTimer = 0; }
 
 function sel() { return (devs || []).find(d => d.id === selId) || null; }
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
@@ -134,18 +135,21 @@ async function finish() {
     }
   }
 }
-function stopPoll() { if (timer) { clearInterval(timer); timer = 0; } }
+function stopPoll() { if (timer) { safeClear(clearInterval, timer); timer = 0; } }
 // t1955u: a background refresh must not replace the card while a select / input inside it is focused
 // (step 3 "Add to:" — opening the zone dropdown was closed by the ~3 s poll's paintInPlace).
 function cardEditing(card) {
   const el = typeof document !== 'undefined' ? document.activeElement : null;
-  return !!(card && el && card.contains(el) && el.closest?.('select,input,textarea'));
+  const root = card || (typeof document !== 'undefined' ? document.querySelector('.addspk-dlg, .addspk-root, .apsetup-card') : null);
+  return !!(root && el && root.contains(el) && el.closest?.('select,input,textarea'));
 }
 function syncFields(card) {
   if (!card || !selId) return;
   const s = st(selId);
-  const zone = card.querySelector('select.apsetup-zone');
-  const name = card.querySelector('input.apsetup-name');
+  const esc = v => String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const row = card.querySelector('[data-id="' + esc(selId) + '"]') || card;
+  const zone = row.querySelector('select.apsetup-zone');
+  const name = row.querySelector('input.apsetup-name');
   if (zone) s.zonePick = zone.value;
   if (name) s.newName = name.value;
 }
@@ -164,13 +168,13 @@ function armResume(card) {
   card.addEventListener('change', go);
 }
 async function refreshIfIdle() {
-  const card = document.querySelector('.apsetup-card');
-  if (!card || !card.isConnected) return;
+  const root = (typeof document !== 'undefined') && (document.querySelector('.addspk-dlg, .addspk-root') || document.querySelector('.apsetup-card'));
+  if (!root || !root.isConnected) return;
   if (st(selId).busy) return;
-  if (cardEditing(card)) { armResume(card); return; }
+  if (cardEditing(root)) { armResume(root); return; }
   await load();
   if (!open || closed || st(selId).busy) return;
-  const now = document.querySelector('.apsetup-card');
+  const now = document.querySelector('.addspk-dlg, .addspk-root, .apsetup-card');
   if (cardEditing(now)) { armResume(now); return; }
   paintInPlace();
 }
@@ -178,7 +182,7 @@ function startPoll() {
   stopPoll();
   timer = setInterval(async () => {
     if (!open || closed) { stopPoll(); return; }
-    const card = document.querySelector('.apsetup-card');
+    const card = document.querySelector('.addspk-dlg, .addspk-root, .apsetup-card');
     if (!card || !card.isConnected) return;
     await refreshIfIdle();
   }, 3000);
@@ -206,7 +210,7 @@ async function rescan() {
   if (scanPhase === 'searching') return;
   const seq = ++scanSeq;
   const s = st(selId); s.problem = null; s.heard = null; selId = null; lastProblem = null;
-  scanPhase = 'searching'; clearTimeout(scanTimer);
+  scanPhase = 'searching'; safeClear(clearTimeout, scanTimer);
   scanTimer = setTimeout(() => { if (seq === scanSeq && scanPhase === 'searching') { scanPhase = 'done'; paintInPlace(); } }, SCAN_MS);
   paintInPlace();
   let qErr = null;
@@ -215,7 +219,7 @@ async function rescan() {
   await load();
   if (seq !== scanSeq) return;
   if (qErr && !lastProblem && !apFindList(devs).length) lastProblem = qErr;
-  if (lastProblem) { scanPhase = 'done'; clearTimeout(scanTimer); }   // an error ends the search at once
+  if (lastProblem) { scanPhase = 'done'; safeClear(clearTimeout, scanTimer); }   // an error ends the search at once
   paintInPlace();
   for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open) await refreshIfIdle(); }, ms);
 }
@@ -233,12 +237,16 @@ function scrollKeep(fn) {
 
 function paintInPlace() {
   const card = document.querySelector('.apsetup-card');
-  if (!card || !Sref) return;
-  syncFields(card);   // t1955u: keep the chosen zone / new-zone name across a repaint
-  scrollKeep(() => {
-    const fresh = buildCard(Sref, ctlRef);
-    card.replaceWith(fresh);
-  });
+  if (card && Sref) {
+    syncFields(card);   // t1955u: keep the chosen zone / new-zone name across a repaint
+    scrollKeep(() => {
+      const fresh = buildCard(Sref, ctlRef);
+      card.replaceWith(fresh);
+    });
+  }
+  const sheet = typeof document !== 'undefined' ? document.querySelector('.addspk-dlg, .addspk-root') : null;
+  if (sheet) syncFields(sheet);
+  try { window.dispatchEvent(new CustomEvent('wavwiz:apsetup-paint')); } catch { /* node */ }
 }
 
 function btn(text, onclick, cls = '', extra = {}) {
@@ -250,7 +258,7 @@ function openSet() {
 }
 
 async function test(d) {
-  const s = st(d.id); s.busy = 'Connecting…'; s.problem = null; s.heard = null; paintInPlace();
+  selId = d.id; const s = st(d.id); s.busy = 'Connecting…'; s.problem = null; s.heard = null; paintInPlace();
   try {
     const r = await api('/airplay/setup/test', { method: 'POST', body: { key: d.id } });
     s.tested = { key: d.id, kind: r.kind, added: false }; s.busy = ''; s.heard = 'ask';
@@ -258,7 +266,7 @@ async function test(d) {
   paintInPlace();
 }
 async function add(d) {
-  const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
+  selId = d.id; const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
   const body = { key: d.id };
   if (s.zonePick === 'new') body.newZone = (s.newName || d.name).trim();
   else if (s.zonePick !== 'none') body.groupId = Number(s.zonePick);
@@ -407,27 +415,13 @@ function scrollToCard() {
   });
 }
 
-/** Build (or rebuild) the inline card for the zone tree. Admin only; null for everyone else. */
-export function airPlaySetupCard(S, ctl) {
-  if (!S) return null;
-  // isAdmin check deferred to caller (tree42 already gates on admin); still safe if called elsewhere
-  return buildCard(S, ctl);
-}
+/** 0.7.1: the AirPlay card is gone; setup lives in the Add speaker sheet. Kept so older imports stay valid. */
+export function airPlaySetupCard(S, ctl) { return null; }
 
-/** Programmatic open (Devices menu, etc.): expand the card and scroll it into view. */
+/** Programmatic open (Devices menu, etc.): opens the Add speaker sheet on the AirPlay tab. */
 export function openAirPlaySetup(S, ctl) {
   Sref = S; ctlRef = ctl;
-  setOpen(true);
-  // Prefer an in-place expand if the card is already in the tree; else ask Devices to redraw then scroll.
-  const existing = document.querySelector('.apsetup-card');
-  if (existing) { paintInPlace(); scrollToCard(); }
-  else {
-    try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ }
-    setTimeout(scrollToCard, 50);
-  }
-  if (!devs.length) rescan();
-  else startPoll();
-  return { el: () => document.querySelector('.apsetup-card'), close: () => { setOpen(false); paintInPlace(); } };
+  return import('./addspeaker.js').then(m => m.openAddSpeaker(S, ctl, 'airplay'));
 }
 
 /** t1955u / tests: one background refresh (the 3 s poll and the 1.5 s / 4 s follow-ups). Skips while a select or input is focused. */
@@ -438,3 +432,19 @@ export function _apReset() {
   open = false; Sref = null; ctlRef = null; devs = []; ap2 = false; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; heldPaint = false; endScan();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }
+
+/** 0.7.1 sheet hooks: snapshots, test/add/rescan, attach while the sheet is open. */
+export function apSheetAttach(S, ctl) { Sref = S; ctlRef = ctl; if (!open || closed) setOpen(true); else startPoll(); }
+export function apSheetDetach() { setOpen(false); }
+export const apUi = id => st(id);
+export const apSnapshot = () => ({ devs: apFindList(devs), phase: scanPhase, problem: lastProblem, ap2 });
+export const apTest = d => test(d);
+export const apAdd = d => add(d);
+export const apRescan = () => rescan();
+try {
+  window.__wwApSnap = apSnapshot;
+  window.__wwApUi = apUi;
+  window.__wwApTest = apTest;
+  window.__wwApAdd = apAdd;
+  window.__wwApRescan = apRescan;
+} catch { /* node */ }

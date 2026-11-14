@@ -20,23 +20,26 @@ export function zoneOrderAfterDrop(boxes, fromIdx, toIdx, after) {
   rest.splice(at, 0, moving); return rest.flat();
 }
 // ---- 0.6.9 #12: the Devices CARD order is kept on the server (GET / PUT /zones/order), the same for every client and across restarts.
-// Card keys: 'g:<zone id>' (a linked set = all its zone keys), 'jukebox', 'unassigned', 'airplay', 'cast' (0.7.0 t1901). Shown exactly as saved - no rank split,
+// Card keys: 'g:<zone id>' (a linked set = all its zone keys), 'jukebox', 'unassigned'. 0.7.1 drops leftover 'airplay' / 'cast' keys. Shown exactly as saved - no rank split,
 // no pinning; a card the saved list does not name yet (a new zone) slots in after the last saved zone card. Without a saved list the old
-// default order applies (active zones, then offline, then empty, the Jukebox by the same rule, then Unassigned and AirPlay).
+// default order applies (active zones, then offline, then empty, the Jukebox by the same rule, then Unassigned).
 let cardOrder = null, cardOrderAt = 0;
 /** When this client last changed the order itself: a zones read that started before that must not put the old order back. */
 export const cardOrderChangedAt = () => cardOrderAt;
-export const setCardOrder = list => { cardOrder = Array.isArray(list) && list.length ? list.map(String) : null; };
+/** 0.7.1: AirPlay / Cast are no longer Devices cards; drop leftover keys from a saved order. */
+export const RETIRED_CARDS = new Set(['airplay', 'cast']);
+export const dropRetiredCards = list => (list || []).map(String).filter(k => !RETIRED_CARDS.has(k));
+export const setCardOrder = list => { cardOrder = Array.isArray(list) && list.length ? dropRetiredCards(list) : null; if (cardOrder && !cardOrder.length) cardOrder = null; };
 export const getCardOrder = () => cardOrder;
 export const cardKeys = c => (c.keys && c.keys.length ? c.keys : [c.key]).map(String);
 /** Pure: cards ({ key, keys? }) in the default order -> the order to show for the saved key list. */
 export function arrangeCards(cards, saved) {
-  const list = cards || []; if (!saved || !saved.length) return list.slice();
+  const list = (cards || []).filter(c => !RETIRED_CARDS.has(String(c.key))); saved = dropRetiredCards(saved);
+  if (!saved || !saved.length) return list.slice();
   const pos = new Map(saved.map((k, i) => [String(k), i])), at = c => { let m = Infinity; for (const k of cardKeys(c)) if (pos.has(k)) m = Math.min(m, pos.get(k)); return m; };
   const known = list.filter(c => at(c) < Infinity).sort((a, b) => at(a) - at(b)), unknown = list.filter(c => at(c) === Infinity);
   for (const c of unknown) {
     if (String(c.key).startsWith('g:')) { let i = -1; known.forEach((k, j) => { if (String(k.key).startsWith('g:')) i = j; }); known.splice(i + 1, 0, c); }
-    else if (c.key === 'cast' && known.some(k => k.key === 'airplay')) known.splice(known.findIndex(k => k.key === 'airplay') + 1, 0, c);   // 0.7.0 t1901: a new Cast card starts right below AirPlay
     else known.push(c);
   }
   return known;
@@ -55,7 +58,7 @@ export function stepCard(cards, key, how) {
 }
 /** Save a new card order: shown at once on this client (optimistic), then PUT to the server, which tells every other client. */
 export async function saveCardOrder(keys, put) {
-  const prev = cardOrder; setCardOrder(keys); cardOrderAt = Date.now();
+  const prev = cardOrder; keys = dropRetiredCards(keys); setCardOrder(keys); cardOrderAt = Date.now();
   try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ }
   try { await put(keys); return true; }
   catch (e) { setCardOrder(prev); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } throw e; }

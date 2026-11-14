@@ -83,7 +83,7 @@ export function csBrowseProblem(r) {
 /** Rejects after ms so a request that never comes back still ends the search. */
 function within(p, ms) {
   let t = 0;
-  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The server didn’t answer the Cast search in time.'), { status: 0 })), ms); })]).finally(() => clearTimeout(t));
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('The server didn’t answer the Cast search in time.'), { status: 0 })), ms); })]).finally(() => safeClear(clearTimeout, t));
 }
 
 // ---------------------------------------------------------------- module state (survives tree rebuilds)
@@ -99,7 +99,8 @@ let cardDecor = null;
 export const setCastCardDecor = fn => { cardDecor = typeof fn === 'function' ? fn : null; };
 // t1901: one search at a time; phase 'idle' | 'searching' | 'done' (as the AirPlay card). Module state, so repaints / tree rebuilds never reset it.
 let scanPhase = 'idle', scanSeq = 0, scanTimer = 0;
-function endScan() { scanSeq++; scanPhase = 'idle'; clearTimeout(scanTimer); scanTimer = 0; }
+function safeClear(fn, id) { try { fn(id); } catch { /* node mock timers can throw on a stale id */ } }
+function endScan() { scanSeq++; scanPhase = 'idle'; safeClear(clearTimeout, scanTimer); scanTimer = 0; }
 
 function st(id) { if (!id) return stOf(); return byId[id] || (byId[id] = stOf()); }
 function setOpen(v) {
@@ -120,19 +121,22 @@ async function finish() {
     }
   }
 }
-function stopPoll() { if (timer) { clearInterval(timer); timer = 0; } }
+function stopPoll() { if (timer) { safeClear(clearInterval, timer); timer = 0; } }
 // t1955u: a background refresh must not replace the card while a select / input inside it is focused
 // (step 3 "Add to:" — opening the zone dropdown was closed by the ~3 s poll's paintInPlace).
 // 0.7.0 item 5b: still no repaint while the Add-by-IP form is open (that would drop focus in the address box).
 function cardEditing(card) {
   const el = typeof document !== 'undefined' ? document.activeElement : null;
-  return !!(card && el && card.contains(el) && el.closest?.('select,input,textarea'));
+  const root = card || (typeof document !== 'undefined' ? document.querySelector('.addspk-dlg, .addspk-root, .castsetup-card') : null);
+  return !!(root && el && root.contains(el) && el.closest?.('select,input,textarea'));
 }
 function syncFields(card) {
   if (!card || !selId) return;
   const s = st(selId);
-  const zone = card.querySelector('select.apsetup-zone');
-  const name = card.querySelector('input.apsetup-name');
+  const esc = v => String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const row = card.querySelector('[data-id="' + esc(selId) + '"]') || card;
+  const zone = row.querySelector('select.apsetup-zone');
+  const name = row.querySelector('input.apsetup-name');
   if (zone) s.zonePick = zone.value;
   if (name) s.newName = name.value;
 }
@@ -151,13 +155,13 @@ function armResume(card) {
   card.addEventListener('change', go);
 }
 async function refreshIfIdle() {
-  const card = document.querySelector(SEL);
-  if (!card || !card.isConnected) return;
+  const root = (typeof document !== 'undefined') && (document.querySelector('.addspk-dlg, .addspk-root') || document.querySelector(SEL));
+  if (!root || !root.isConnected) return;
   if (st(selId).busy || byIp.open) return;
-  if (cardEditing(card)) { armResume(card); return; }
+  if (cardEditing(root)) { armResume(root); return; }
   await load();
   if (!open || closed || st(selId).busy || byIp.open) return;
-  const now = document.querySelector(SEL);
+  const now = document.querySelector('.addspk-dlg, .addspk-root, .castsetup-card');
   if (cardEditing(now)) { armResume(now); return; }
   paintInPlace();
 }
@@ -165,7 +169,7 @@ function startPoll() {
   stopPoll();
   timer = setInterval(async () => {
     if (!open || closed) { stopPoll(); return; }
-    const card = document.querySelector(SEL);
+    const card = document.querySelector('.addspk-dlg, .addspk-root, .castsetup-card');
     if (!card || !card.isConnected) return;
     await refreshIfIdle();
   }, 3000);
@@ -182,7 +186,7 @@ async function rescan() {
   if (scanPhase === 'searching') return;
   const seq = ++scanSeq;
   const s = st(selId); s.problem = null; s.heard = null; selId = null; lastProblem = null;
-  scanPhase = 'searching'; clearTimeout(scanTimer);
+  scanPhase = 'searching'; safeClear(clearTimeout, scanTimer);
   scanTimer = setTimeout(() => { if (seq === scanSeq && scanPhase === 'searching') { scanPhase = 'done'; if (!byIp.open) paintInPlace(); } }, CS_SCAN_MS);
   paintInPlace();
   let qErr = null;
@@ -191,7 +195,7 @@ async function rescan() {
   await load();
   if (seq !== scanSeq) return;
   if (qErr && !lastProblem && !devs.length) lastProblem = qErr;
-  if (lastProblem) { scanPhase = 'done'; clearTimeout(scanTimer); }   // an error ends the search at once
+  if (lastProblem) { scanPhase = 'done'; safeClear(clearTimeout, scanTimer); }   // an error ends the search at once
   if (!byIp.open) paintInPlace();
   for (const ms of [1500, 4000]) setTimeout(async () => { if (seq === scanSeq && !closed && open) await refreshIfIdle(); }, ms);   // t1955u / item 5b: background refreshes skip while a field is focused or Add by IP is open
 }
@@ -206,16 +210,20 @@ function scrollKeep(fn) {
 }
 function paintInPlace() {
   const card = document.querySelector(SEL);
-  if (!card || !Sref) return;
-  syncFields(card);   // t1955u: keep the chosen zone / new-zone name across a repaint
-  scrollKeep(() => card.replaceWith(buildCard(Sref, ctlRef)));
+  if (card && Sref) {
+    syncFields(card);   // t1955u: keep the chosen zone / new-zone name across a repaint
+    scrollKeep(() => card.replaceWith(buildCard(Sref, ctlRef)));
+  }
+  const sheet = typeof document !== 'undefined' ? document.querySelector('.addspk-dlg, .addspk-root') : null;
+  if (sheet) syncFields(sheet);
+  try { window.dispatchEvent(new CustomEvent('wavwiz:cssetup-paint')); } catch { /* node */ }
 }
 function btn(text, onclick, cls = '', extra = {}) {
   return h('button', { type: 'button', class: 'btn ' + cls, onclick, disabled: !!st(selId).busy, ...extra }, text);
 }
 
 async function test(d) {
-  const s = st(d.id); s.busy = 'Connecting…'; s.problem = null; s.heard = null; paintInPlace();
+  selId = d.id; const s = st(d.id); s.busy = 'Connecting…'; s.problem = null; s.heard = null; paintInPlace();
   try {
     const r = await api('/cast/setup/test', { method: 'POST', body: { key: d.id } });
     s.tested = { key: d.id, kind: r.kind, added: false }; s.busy = ''; s.heard = 'ask';
@@ -247,7 +255,7 @@ function byIpForm() {
     byIp.err ? h('div', { class: 'apsetup-prob other', role: 'alert' }, h('p', { class: 'small' }, byIp.err)) : null);
 }
 async function add(d) {
-  const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
+  selId = d.id; const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
   const body = { key: d.id };
   if (s.zonePick === 'new') body.newZone = (s.newName || d.name).trim();
   else if (s.zonePick !== 'none') body.groupId = Number(s.zonePick);
@@ -355,15 +363,13 @@ function buildCard(S, ctl) {
 
 function scrollToCard() { requestAnimationFrame(() => document.querySelector(SEL)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })); }
 
-/** Build (or rebuild) the inline card for the zone tree (admin only; the caller gates). */
-export function castSetupCard(S, ctl) { return S ? buildCard(S, ctl) : null; }
+/** 0.7.1: the Cast card is gone; setup lives in the Add speaker sheet. Kept so older imports stay valid. */
+export function castSetupCard(S, ctl) { return null; }
 
-/** Programmatic open (Devices menu, etc.). */
+/** Programmatic open (Devices menu, etc.): opens the Add speaker sheet on the Cast tab. */
 export function openCastSetup(S, ctl) {
-  Sref = S; ctlRef = ctl; setOpen(true);
-  if (document.querySelector(SEL)) { paintInPlace(); scrollToCard(); }
-  else { try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } setTimeout(scrollToCard, 50); }
-  if (!devs.length) rescan(); else startPoll();
+  Sref = S; ctlRef = ctl;
+  return import('./addspeaker.js').then(m => m.openAddSpeaker(S, ctl, 'cast'));
 }
 
 /** t1955u / tests: one background refresh (the 3 s poll and the 1.5 s / 4 s follow-ups). Skips while a select or input is focused. */
@@ -374,3 +380,23 @@ export function _csReset() {
   open = false; Sref = null; ctlRef = null; devs = []; selId = null; byId = Object.create(null); stopPoll(); closed = true; lastProblem = null; byIp = ipOf(); heldPaint = false; endScan();
   try { sessionStorage.removeItem(OPEN_KEY); } catch { /* */ }
 }
+
+/** 0.7.1 sheet hooks. */
+export function csSheetAttach(S, ctl) { Sref = S; ctlRef = ctl; if (!open || closed) setOpen(true); else startPoll(); }
+export function csSheetDetach() { setOpen(false); }
+export const csUi = id => st(id);
+export const csSnapshot = () => ({ devs: devs.slice(), phase: scanPhase, problem: lastProblem, byIp: { ...byIp } });
+export const csTest = d => test(d);
+export const csAdd = d => add(d);
+export const csRescan = () => rescan();
+export const csOpenByIp = () => { byIp.open = true; paintInPlace(); setTimeout(() => document.querySelector('.castsetup-ip')?.focus?.(), 0); };
+export const csByIpFormEl = () => byIpForm();
+try {
+  window.__wwCsSnap = csSnapshot;
+  window.__wwCsUi = csUi;
+  window.__wwCsTest = csTest;
+  window.__wwCsAdd = csAdd;
+  window.__wwCsRescan = csRescan;
+  window.__wwCsOpenByIp = csOpenByIp;
+  window.__wwCsByIpForm = csByIpFormEl;
+} catch { /* node */ }

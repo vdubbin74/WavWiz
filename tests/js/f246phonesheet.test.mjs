@@ -17,7 +17,8 @@ assert.match(body, /classList\.toggle\('pd42-open', sel42\)/);
 assert.match(body, /treeTop = sc \? sc\.scrollTop : 0/);
 assert.match(body, /c\.scrollTop = t/);
 assert.match(body, /X\.spk != null \|\| X\.zsel != null/, 'speaker + zone');
-assert.match(body, /reconcile\(list, \[T\.treeNode\(false\), airplayDevicesStrip\(S, ctl\)\]\.filter\(Boolean\)\)/, 'sheet not left under #p-zones list');
+assert.match(body, /reconcile\(list, \[T\.treeNode\(false\)\]\.filter\(Boolean\)\)/, 'phone Devices list is the zone tree (no AirPlay strip)');
+assert.doesNotMatch(body, /airplayDevicesStrip/);
 assert.ok(!/sel42 \? pwrap : null/.test(body), 'no in-list sheet mount');
 
 // Tag delegation still treats portaled sheet as phone page

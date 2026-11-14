@@ -7,8 +7,6 @@ import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } f
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
-import { airPlaySetupCard, setApCardDecor } from './airplaysetup.js';   // 0.6.8-#14b inline card at the bottom of the zone list
-import { castSetupCard, setCastCardDecor } from './castsetup.js';   // 0.7.0 F169: Cast card directly below the AirPlay card
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, jbDraft, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
@@ -96,8 +94,11 @@ export function treeEl(S, ctl, kit, st) {
   const zoneName = (id, label) => h('button', { type: 'button', class: 'dname zname ell', title: `${label} - open the zone settings`, onclick: ev => { ev.stopPropagation(); st.onZone(id); } }, label);
   const create = () => promptName('New zone', '', async v => { await createZone(v, []); done(); });
   // 0.4.3 #9: the counts are plain text inside the accent caps title, as in the render
+  const addZoneBtn = ro(h('button', { type: 'button', class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: create }, '+'), admin);
+  const addSpkBtn = ro(h('button', { type: 'button', class: 'btn sm zadd-spk', 'aria-label': 'Add speaker', title: 'Add speaker',
+    onclick: ev => { ev.stopPropagation(); import('./addspeaker.js').then(m => m.openAddSpeaker(S, ctl)).catch(e => toast(e.message, true)); } }, icon('volume')), admin);
   root.append(h('div', { class: 'pane-h dsec-h tree42-h' }, h('span', { class: 'tree42-n' }, ...countsText(model).split(/(\d+)/).map(x => /^\d+$/.test(x) ? h('span', { class: 'tree42-num' }, x) : x)), h('span', { class: 'grow' }),
-    ro(h('button', { type: 'button', class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: create }, '+'), admin)));
+    addZoneBtn, addSpkBtn));
 
   const move = async (z, toId) => {
     // F269: optimistic - the speaker lands in its new zone at once (S.groups updated locally, tree redrawn); the server answer then confirms, a failure re-reads.
@@ -415,12 +416,9 @@ export function treeEl(S, ctl, kit, st) {
     return el;
   };
   cardList.push({ key: 'unassigned', keys: ['unassigned'], el: unBox });
-  // 0.6.8: AirPlay speakers card sits under Unassigned by default (the card itself expands / collapses; no header button)
-  if (admin) { setApCardDecor(el => decorateCard(el, 'airplay', 'AirPlay speakers')); const apc = airPlaySetupCard(S, ctl); if (apc) cardList.push({ key: 'airplay', keys: ['airplay'], el: apc }); }
-  // 0.7.0 t1901: the Cast speakers card is a reorder card like AirPlay (same edge-trim handle, saved in the shared card order); by default right below AirPlay
-  if (admin) { setCastCardDecor(el => decorateCard(el, 'cast', 'Cast speakers')); const csc = castSetupCard(S, ctl); if (csc) cardList.push({ key: 'cast', keys: ['cast'], el: csc }); }
+  // 0.7.1: AirPlay / Cast cards removed; add those speakers from the header Add speaker button.
   shownCards = arrangeCards(cardList, getCardOrder());
-  for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'airplay' ? 'AirPlay speakers' : c.key === 'cast' ? 'Cast speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
+  for (const c of shownCards) decorateCard(c.el, c.key, c.key === 'unassigned' ? 'Unassigned speakers' : c.key === 'jukebox' ? 'Jukebox' : (c.el.dataset.zone || c.el.querySelector('[data-zone]')?.dataset.zone || 'zone'));
   root.append(...shownCards.map(c => c.el));
   attachDrag(root, S, move);
   // 0.4.9 F69: zones drag only by their left-edge trim handle and only ACTIVE zones; a drop writes the same manual order as Move up / down
@@ -502,7 +500,7 @@ function attachZoneDrag(root, cards, onMove, onLink) {
           drop: () => { if (!where || where.key !== t.dataset.card) return; if (where.link) { onLink(fromZone, where.link); return; } onMove(from, where.key, where.after); } })); });
     };
     const onEnd = () => { offs.forEach(f => f()); offs = []; root.classList.remove('dragging', 'zdrag'); box.classList.remove('drag42-src'); all.forEach(t => { clear(t); t.classList.remove('droppable'); }); setTimeout(() => { delete root.dataset.justdragged; }, 0); };
-    const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'airplay' ? 'AirPlay speakers' : box.dataset.card === 'cast' ? 'Cast speakers' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
+    const title = box.dataset.card === 'unassigned' ? 'Unassigned' : box.dataset.card === 'jukebox' ? 'Jukebox' : (box.querySelector('[data-zone]')?.dataset.zone || 'Zone');
     startPointerDrag(ev, grab, () => ({ kind: 'zone42', id: from, title }), { mode: 'pointer', pin: grab.closest('.zcard42') || box, onStart, onEnd, noSkip: true });
   });
 }

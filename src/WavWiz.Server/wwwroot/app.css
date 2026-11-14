@@ -2985,7 +2985,7 @@ body.devdragging,body.devdragging *{cursor:grabbing!important;user-select:none}
 :is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.dvol-master>:nth-child(4){grid-column:4}
 :is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .dmaster>.mallrow{grid-column:1/-1;grid-row:2;margin:0}
 :is(.devpanel:not(.expanded),.devpanel.expanded .tcol42) .tree42-h{margin:10px 0 8px;padding:0;border:0;min-height:26px;height:auto}
-.devpanel .tree42-h .zadd-new{width:26px;height:26px;min-height:26px;padding:0;border-color:var(--accent);color:var(--accent-text,var(--accent));font-size:16px}
+.devpanel .tree42-h :is(.zadd-new,.zadd-spk){width:26px;height:26px;min-height:26px;padding:0;border-color:var(--accent);color:var(--accent-text,var(--accent));font-size:16px;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .dtagrow.ztagrow.zc42-2:not(:empty){display:flex}   /* line 2 also holds "Queue from X" and Link / Split off, not only tags */
 .drop42{text-align:left}
 .qb42.solo .qb42-t .qb42-name{color:var(--text)}   /* render: a solo box title is plain text; the linked set's title and the live status words are accent */
@@ -3362,8 +3362,9 @@ html.pd42-open .pd42-sheet{pointer-events:auto}
 .desk.listexpanded .plnext.wide .pln-lbl::after{content:':'}
 .desk.listexpanded .listpanel.nbshown .qnextpill{display:none}
 /* 0.4.8 F52: expanded Devices uses the side panel's + New zone button (size, accent border, bright plus, hover, focus) */
-.devpanel .tree42-h .zadd-new:hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
-.devpanel .tree42-h .zadd-new:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.devpanel .tree42-h :is(.zadd-new,.zadd-spk):hover:not([disabled]){background:var(--accent-soft);border-color:var(--accent2);color:var(--accent2-text,var(--accent2))}
+.devpanel .tree42-h :is(.zadd-new,.zadd-spk):focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.devpanel .tree42-h .zadd-spk .ic svg{width:16px;height:16px;display:block}
 /* 0.4.8 F52: no extra divider under the expanded column headers (ZONES · SPEAKERS, Scenes & Schedules, details) - as in the side panel */
 .devpanel .pane-h.dsec-h:is(.tree42-h,.ssc-h),.devpanel.expanded .pane-h.dsec-h{border-bottom:0!important}
 @media (max-width:1100px){ .listpanel .qzwrap .qediting{display:none} .listpanel .qzwrap{gap:4px;margin:0 4px} }
@@ -6045,7 +6046,7 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   margin-left: auto;
   order: 99; /* always the rightmost item, even if earlier in the DOM */
 }
-/* Keep the shared 22px accent-boxed chevron look; neutralize the old grey ▸ box */
+/* Keep the shared 22px accent-boxed chevron look; neutralize the old gray ▸ box */
 .tree42 .zfold42-t.plus.chv,
 .tree42 .qb42-exp.plus.chv {
   width: 22px;
@@ -6068,3 +6069,38 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   color: var(--accent-text, var(--accent));
 }
 /* end 0.7.1 Devices cards */
+
+/* 0.7.1 Add speaker sheet (replaces the AirPlay / Cast Devices cards) */
+dialog.addspk-dlg{width:min(560px,calc(calc(100vw / var(--z,1)) - 16px));max-height:min(720px,calc(calc(100vh / var(--z,1)) - 24px));max-height:min(720px,calc(calc(100dvh / var(--z,1)) - 24px))}
+dialog.addspk-dlg>.body{padding:0;display:flex;flex-direction:column;min-height:0}
+.addspk-root,.addspk-body{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1}
+.addspk-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);padding:0 8px;flex:none;overflow:auto}
+.addspk-tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:700;color:var(--dim);cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex:none;min-height:36px}
+.addspk-tab:hover{color:var(--ink)}
+.addspk-tab.on{color:var(--accent-text,var(--accent));border-bottom-color:var(--accent)}
+.addspk-tab:focus-visible{outline:1px solid var(--accent);outline-offset:-2px}
+.addspk-n{font-size:11px;font-weight:700;min-width:1.25em;padding:0 5px;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:color-mix(in srgb,var(--text) 6%,var(--panel));line-height:1.6}
+.addspk-tab.on .addspk-n{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));color:var(--accent-text,var(--accent))}
+.addspk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);flex:none}
+.addspk-status{flex:1 1 12em;min-width:0;color:var(--dim)}
+.addspk-show{display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--dim);cursor:pointer;flex:none}
+.addspk-show input{margin:0}
+.addspk-panel{padding:10px 12px 14px;overflow:auto;min-height:0;flex:1}
+.addspk-sec{display:flex;flex-direction:column;gap:10px;min-width:0}
+.addspk-rowacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.addspk-rowacts .btn{width:auto;flex:none}
+.addspk-rowacts .apsetup-addto{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.addspk-rowacts .apsetup-zone,.addspk-rowacts .apsetup-name{min-width:8em;flex:1 1 8em}
+.addspk-pair,.addspk-connect,.addspk-found-foot{display:flex;flex-direction:column;gap:6px;padding-top:4px;border-top:1px solid var(--line)}
+.addspk-sec-h{font-size:12.5px}
+.addspk-connect-row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.addspk-qr{width:120px;height:120px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;flex:none}
+.addspk-urlbox{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;flex:1 1 12em}
+.addspk-url{display:block;max-width:100%;overflow:auto;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);font-size:12px}
+.addspk-dlg .apsetup-list{max-height:none}
+.addspk-dlg .apsetup-testbtn{width:auto}
+@media (max-width:700px){
+  /* existing phone dialogs already go fullscreen; keep sheet chrome compact, no phone-only features */
+  dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
+  .addspk-connect-row{justify-content:center}
+}

@@ -57,24 +57,16 @@ test('server error classes come through; Retry only when the server says so; no 
   assert.match(src, /PIN aren’t supported yet|PIN aren't supported yet/);
 });
 
-test('AirPlay speakers card sits below Unassigned as a real zone card; no header AirPlay… button', () => {
+test('0.7.1: AirPlay setup lives in the Add speaker sheet, not a Devices card; AIRPLAY tag unchanged', () => {
   const t = rd('js/tree42.js');
   assert.doesNotMatch(t, /apsetup-btn/);
   assert.doesNotMatch(t, /AirPlay…/);
-  // 0.6.9 #12: every card (zones, Jukebox, Unassigned, AirPlay) is user-orderable; with no saved order AirPlay is still listed after Unassigned, admins only
+  assert.doesNotMatch(t, /airPlaySetupCard\(S, ctl\)/);
   assert.match(t, /cardList\.push\(\{ key: 'unassigned', keys: \['unassigned'\], el: unBox \}\);/);
-  assert.match(t, /if \(admin\) \{[^\n]*const apc = airPlaySetupCard\(S, ctl\); if \(apc\) cardList\.push\(\{ key: 'airplay'/);
-  assert.ok(t.indexOf("key: 'unassigned'") < t.indexOf("key: 'airplay'"));
+  assert.match(t, /class: 'btn sm zadd-spk'/);
   const src = rd('js/airplaysetup.js');
   assert.match(src, /export function openAirPlaySetup/);
-  assert.match(src, /apsetup-card/);
-  assert.match(src, /class: 'qb42 solo idle apsetup-card'/);
-  assert.match(src, /class: 'qb42-head'/);
-  assert.match(src, /class: 'qb42-trow'/);
-  assert.match(src, /class: 'qb42-name' \}, 'AirPlay speakers'/);
-  assert.match(src, /data-leader-id.: '__airplay__/);
-  assert.match(src, /zfold42-t/);
-  assert.doesNotMatch(src, /\bdialog\(/);
+  assert.match(src, /openAddSpeaker\(S, ctl, 'airplay'\)/);
   assert.match(rd('js/devices.js'), /startsWith\('airplay:'\)\) return \{ k: 'otype airplay', text: 'AIRPLAY'/);
   assert.match(rd('js/util.js'), /Object\.assign\(new ApiError\(/);
   assert.match(rd('app.css'), /apsetup-badge\.ap1/);

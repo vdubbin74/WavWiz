@@ -12,7 +12,9 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [0.7.1] - 2026-11-14 (beta)
 
-General fixes.
+### Changed
+- Devices: AirPlay and Cast are no longer separate cards in the zone list. An Add speaker button (speaker icon) sits to the right of New zone and opens a sheet with WavWiz, Browser, AirPlay and Cast tabs. Each tab shows a count of new devices; already-added devices are hidden until you turn on Show added. Test, add to a zone, and Add stay on each row, with the previous card features (HomePod / Apple TV blocked, Needs PIN, AirPlay 2 experimental, TV Allow WavWiz steps, firewall and loopback hints, scan states, Cast Add by IP, Cast sync note). WavWiz and Browser tabs use already-known players (no invented LAN scan). A leftover `airplay` / `cast` card order is dropped.
+
 
 ## [0.7.0] - 2026-11-13 (beta)
 

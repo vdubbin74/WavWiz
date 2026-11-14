@@ -100,6 +100,8 @@ class El extends Node0 {
   focus() { if (doc.activeElement === this) return; doc._blurTo(this); }
   blur() { if (doc.activeElement === this) doc._blurTo(doc.body); }
   click() { this.dispatchEvent(ev('click')); }
+  showModal() { this._open = true; this.setAttribute('open', ''); }
+  close() { this._open = false; this.removeAttribute('open'); }
   scrollIntoView() {}
   getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
 }
@@ -121,7 +123,20 @@ const toasts = doc.createElement('div'); toasts.id = 'toasts'; doc.body.append(t
 /** Install the mini DOM (and storage / fetch stubs) on globalThis. */
 export function installDom() {
   const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
-  Object.assign(globalThis, { document: doc, Element: El, Node: Node0, sessionStorage: mem(), localStorage: mem() });
+  const wls = [];
+  const win = {
+    addEventListener: (type, fn) => { wls.push({ type, fn }); },
+    removeEventListener: (type, fn) => { const i = wls.findIndex(l => l.type === type && l.fn === fn); if (i >= 0) wls.splice(i, 1); },
+    dispatchEvent: ev => { for (const l of wls.slice()) if (l.type === ev.type) l.fn.call(globalThis, ev); return true; },
+  };
+  Object.assign(globalThis, { document: doc, Element: El, Node: Node0, sessionStorage: mem(), localStorage: mem(), window: globalThis });
+  // Prefer a real window event bus; tests that assign ??= later will not overwrite these.
+  if (typeof globalThis.addEventListener !== 'function' || globalThis.addEventListener.length === 0) {
+    /* may already be a no-op stub from a test file imported after; always install ours */
+  }
+  globalThis.addEventListener = win.addEventListener;
+  globalThis.removeEventListener = win.removeEventListener;
+  globalThis.dispatchEvent = win.dispatchEvent;
   globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '[]' });
   return doc;
 }

@@ -12,10 +12,9 @@ globalThis.localStorage ??= globalThis.sessionStorage;
 const dir = process.env.JS_DIR ? 'file://' + process.env.JS_DIR + '/' : new URL('js/', W).href;
 const { csScanView, csBrowseProblem, CS_SCAN_MS } = await import(dir + 'castsetup.js');
 const { apScanView, SCAN_MS } = await import(dir + 'airplaysetup.js');
+const { arrangeCards } = await import(dir + 'devorder.js');
 const cs = rd('js/castsetup.js'), ap = rd('js/airplaysetup.js'), t = rd('js/tree42.js'), o = rd('js/devorder.js');
-const arrangeSrc = o.match(/export function arrangeCards[\s\S]*?\n\}\n/)[0];
-const cardKeysSrc = o.match(/(export )?(const|function) cardKeys[^\n]*\n/)?.[0] || '';
-const arrangeCards = new Function((cardKeysSrc.replace(/^export /, '') || 'const cardKeys = c => c.keys || [c.key];\n') + arrangeSrc.replace('export function', 'function') + '; return arrangeCards;')();
+
 
 test('header status: the same three states and the same deadline as the AirPlay card', () => {
   assert.equal(CS_SCAN_MS, SCAN_MS);
@@ -56,16 +55,11 @@ test('compact buttons and ONE "Search again" wording, as the AirPlay card', () =
   assert.match(ap, /class: 'btn sm', 'data-act': 'apsetup-close'/);
 });
 
-test('a reorder card like AirPlay: data-card="cast", the ⋮ handle (kept across in-place repaints), the shared order', () => {
-  assert.match(cs, /export const setCastCardDecor = fn =>/);
-  assert.equal((cs.match(/try \{ cardDecor\?\.\(card\); \} catch/g) || []).length, 2, 'collapsed and open card both decorated');
-  assert.match(t, /setCastCardDecor\(el => decorateCard\(el, 'cast', 'Cast speakers'\)\)/);
-  assert.match(t, /c\.key === 'cast' \? 'Cast speakers'/);
-  assert.doesNotMatch(t, /apEl\.after\(csc\)/, 'no longer glued after the AirPlay element outside the order');
+test('0.7.1: leftover airplay/cast card keys are dropped from a saved order', () => {
   const card = k => ({ key: k, keys: [k] });
   const cards = ['g:1', 'g:2', 'jukebox', 'unassigned', 'airplay', 'cast'].map(card);
-  assert.deepEqual(arrangeCards(cards, []).map(c => c.key), ['g:1', 'g:2', 'jukebox', 'unassigned', 'airplay', 'cast'], 'default: right below AirPlay');
-  assert.deepEqual(arrangeCards(cards, ['airplay', 'g:2', 'unassigned', 'g:1', 'jukebox']).map(c => c.key), ['airplay', 'cast', 'g:2', 'unassigned', 'g:1', 'jukebox'], 'a 0.6.9 saved order (no cast key): Cast follows AirPlay');
-  assert.deepEqual(arrangeCards(cards, ['cast', 'g:1', 'g:2', 'airplay', 'unassigned', 'jukebox']).map(c => c.key), ['cast', 'g:1', 'g:2', 'airplay', 'unassigned', 'jukebox'], 'moved Cast stays where put');
-  assert.deepEqual(arrangeCards(cards.filter(c => c.key !== 'airplay'), ['g:1']).map(c => c.key), ['g:1', 'g:2', 'jukebox', 'unassigned', 'cast']);
+  assert.deepEqual(arrangeCards(cards, []).map(c => c.key), ['g:1', 'g:2', 'jukebox', 'unassigned']);
+  assert.deepEqual(arrangeCards(cards, ['airplay', 'g:2', 'unassigned', 'g:1', 'jukebox']).map(c => c.key), ['g:2', 'unassigned', 'g:1', 'jukebox']);
+  assert.deepEqual(arrangeCards(cards, ['cast', 'g:1', 'g:2', 'airplay', 'unassigned', 'jukebox']).map(c => c.key), ['g:1', 'g:2', 'unassigned', 'jukebox']);
+  assert.deepEqual(arrangeCards(cards.filter(c => c.key !== 'airplay'), ['g:1']).map(c => c.key), ['g:1', 'g:2', 'jukebox', 'unassigned']);
 });

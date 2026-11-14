@@ -11,7 +11,6 @@ import { whenIdle } from './slider.js';
 import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
 import { speakerSettings } from './spkset.js';
-import { airplayDevicesStrip } from './airplaydevices.js';   // F159
 import { mixerButton } from './mixer.js';   // 0.4.8 F49
 import { pulse } from './motion.js';
 import { lockBody, unlockBody } from './sheetlock.js';   // F262-fix-B: real iOS body lock under the sheet
@@ -1118,8 +1117,7 @@ export function devicesPanel(S, ctl) {
       const tcol = speakersHost();   // F223: same node as standard — move into Speakers column
       // F211: the Speakers column = [MASTER, tree, AirPlay strip] - the same MASTER strip and tree as the side panel; MASTER is kept while busy
       const tn = treeNode(force === true), hadTree = tcol.contains(tn);
-      const ap = airplayDevicesStrip(S, ctl);
-      reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn, ap || null].filter(Boolean));
+      reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn].filter(Boolean));
       if (!hadTree) restoreScroll(tcol);
       reconcile(emain, [sscol, dcol, tcol]);
       reconcile(body, [etop, emain]);
@@ -1313,7 +1311,7 @@ export function devicesView(S, ctl) {
       ptitle.textContent = z ? `Speaker: ${z.name}` : g ? `Zone: ${g.name}` : 'Settings'; pwrap.setAttribute('aria-label', ptitle.textContent); }
     document.documentElement.classList.toggle('pd42-open', sel42);
     // F246: portal sheet to body (true viewport modal above .mini/.tabbar). Keep the same wrap node (F23).
-    reconcile(list, [T.treeNode(false), airplayDevicesStrip(S, ctl)].filter(Boolean));   // F159: AirPlay speakers under the speakers
+    reconcile(list, [T.treeNode(false)].filter(Boolean));
     if (sel42) {
       if (pwrap.parentNode !== document.body) document.body.append(pwrap);
       if (opening) {

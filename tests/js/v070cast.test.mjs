@@ -41,20 +41,15 @@ test('remembered Cast speakers come from zones cast: playerIds only', () => {
   assert.equal(m[1].remembered, true); assert.equal(m[1].online, false);
 });
 
-test('Cast card sits directly below the AirPlay card (Unassigned, AirPlay, Cast) and never touches it', () => {
+test('0.7.1: Cast setup lives in the Add speaker sheet, not a Devices card; CAST tag and sync note stay', () => {
   const t = rd('js/tree42.js');
-  // 0.6.9 #12 merged in 0.7.0: Unassigned and AirPlay are cards in the shared card order. t1901: Cast is a reorder card too (own key 'cast'), by default right below AirPlay
-  const un = t.indexOf("cardList.push({ key: 'unassigned'"), ap = t.indexOf('airPlaySetupCard(S, ctl)'), cs = t.indexOf('castSetupCard(S, ctl)');
-  assert.ok(un > 0 && ap > un && cs > ap, 'order Unassigned < AirPlay < Cast');
-  assert.match(t, /if \(admin\) \{ setCastCardDecor\(el => decorateCard\(el, 'cast', 'Cast speakers'\)\); const csc = castSetupCard\(S, ctl\); if \(csc\) cardList\.push\(\{ key: 'cast', keys: \['cast'\], el: csc \}\); \}/);
+  assert.doesNotMatch(t, /castSetupCard\(S, ctl\)/);
+  assert.doesNotMatch(t, /cardList\.push\(\{ key: 'cast'/);
+  assert.match(t, /class: 'btn sm zadd-spk'/);
   const src = rd('js/castsetup.js');
-  assert.match(src, /class: 'qb42 solo idle castsetup-card'/);
-  assert.match(src, /data-leader-id.: '__cast__'/);
-  assert.match(src, /class: 'qb42-name' \}, 'Cast speakers'/);
-  assert.doesNotMatch(src, /\.apsetup-card/);          // its own selector: the AirPlay card's in-place repaint can't hit it
-  assert.doesNotMatch(src, /\bdialog\(/);
+  assert.match(src, /export function openCastSetup/);
+  assert.match(src, /openAddSpeaker\(S, ctl, 'cast'\)/);
   assert.match(SYNC_NOTE, /roughly/);                  // honest about Cast buffering
-  assert.match(rd('app.css'), /\.apsetup-card,\.castsetup-card\{/);
   _csReset();
 });
 
@@ -64,10 +59,9 @@ test('a Cast speaker gets a CAST tag like AIRPLAY / HDMI', () => {
   assert.match(d, /startsWith\('airplay:'\)\) return \{ k: 'otype airplay', text: 'AIRPLAY'/);
 });
 
-test('0.7.0 F169 preview fixes: Cast card restored open after a reload scans by itself; setup cards keep the normal 10 px tree gap', () => {
+test('0.7.1: opening the Add speaker sheet starts a Cast scan (no Devices card to restore)', () => {
   const src = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/castsetup.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(open && closed\) \{ closed = false; setTimeout\(\(\) => \{ if \(open && !closed\) \{ rescan\(\); startPoll\(\); \} \}, 0\); \}/);
-  const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
-  assert.match(css, /\.apsetup-card,\.castsetup-card\{margin:0;min-width:0\}/);
-  assert.match(css, /\.tree42>\.apsetup-card:last-child,\.tree42>\.castsetup-card:last-child\{margin-bottom:8px\}/);
+  assert.match(src, /export function csSheetAttach/);
+  assert.match(src, /if \(!open \|\| closed\) setOpen\(true\)/);
+  assert.match(src, /if \(open && !was\) \{ closed = false; rescan\(\); startPoll\(\); \}/);
 });
