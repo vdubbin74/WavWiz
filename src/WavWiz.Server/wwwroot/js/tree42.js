@@ -237,7 +237,7 @@ export function treeEl(S, ctl, kit, st) {
     const collapsed = false; box._collapsed = false;   // F266: speakers always listed while the box is open (old idle auto-fold removed)
     if (isFolded(box)) return foldedBox(box, { lead, linked, sel, ms, now });
     const expand = foldBtn(box, false, linked ? 'the linked zones' : lead.name);
-    const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : '') + (collapsed ? ' qb42-folded' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
+    const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : '') + (lead.now?.state === 'playing' ? ' playing' : '') + (collapsed ? ' qb42-folded' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
       h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, expand), Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: selectLead, selected: sel }), S, ctl, lead, { can }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)),
       ...all.map(g => zoneWrap(g, box, linked && g.id !== lead.id ? lead : null)));
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; controlZone(lead.id); });
@@ -253,7 +253,7 @@ export function treeEl(S, ctl, kit, st) {
     const name = linked ? box.zones.map(g => g.name).join(' + ') : lead.name;
     // 0.6.8 t1651: the now-playing line sits under the zone name (same .zl-now chrome as an expanded card). Idle / no title = one row, matching the AirPlay card.
     const line = now?.title ? Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: () => controlZone(lead.id), selected: sel }), S, ctl, lead, { can }) : null;
-    return pickRow(h('section', { class: 'qb42 empty42 zfold42' + ' zpick42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
+    return pickRow(h('section', { class: 'qb42 empty42 zfold42' + ' zpick42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (sel && linked ? ' ctlz' : '') + (playing ? ' playing' : ' idle'), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': `${name} (collapsed)` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === lead.id ? ' picked' : ''), 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
         h('div', { class: 'ze42-row' }, dot, zoneName(lead.id, name), foldCount(ms, linked), h('span', { class: 'grow' }), foldBtn(box, true, name)),
         line,
@@ -294,10 +294,10 @@ export function treeEl(S, ctl, kit, st) {
         h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'));
       zoneCtx(g, row.firstChild); return row;
     };
-    const wrap = h('section', { class: 'qb42 empty42 zpick42 linked zlink42' + (folded ? ' zfold42' : '') + (sel ? ' ctlz' : '') + (playing ? '' : ' idle'), 'data-box': 'linked', 'data-leader-id': lead.id, 'aria-label': `${name} (linked, no speakers${folded ? ', collapsed' : ''})` },
+    const wrap = h('section', { class: 'qb42 empty42 zpick42 linked zlink42' + (folded ? ' zfold42' : '') + (sel ? ' ctlz' : '') + (playing ? ' playing' : ' idle'), 'data-box': 'linked', 'data-leader-id': lead.id, 'aria-label': `${name} (linked, no speakers${folded ? ', collapsed' : ''})` },
       h('div', { class: 'zwrap42 zempty42 zlink42-h', 'data-group-id': lead.id, 'data-drop': lead.id, 'data-zone': lead.name },
-        h('div', { class: 'ze42-row' }, foldBtn(box, folded, name), emptyDot(lead.now), zoneName(lead.id, name),
-          h('span', { class: 'small dim ze42-note' }, playing ? 'Playing · no speakers' : 'No speakers'), h('span', { class: 'grow' }))),
+        h('div', { class: 'ze42-row' }, emptyDot(lead.now), zoneName(lead.id, name),
+          h('span', { class: 'small dim ze42-note' }, playing ? 'Playing · no speakers' : 'No speakers'), h('span', { class: 'grow' }), foldBtn(box, folded, name))),
       ...(folded ? [] : box.zones.map(member)));
     return pickRow(wrap, () => controlZone(lead.id));
   };
@@ -325,11 +325,13 @@ export function treeEl(S, ctl, kit, st) {
     const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB), pickJb = () => { Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
     const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); } }, 'Jukebox');
     if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
+      const jbFoldBox = { leader: { id: JB } }, jbFolded = isFolded(jbFoldBox);
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
           h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
-            ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.')),
-          jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : null));   // F160
+            ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.'),
+            foldBtn(jbFoldBox, jbFolded, 'Jukebox')),
+          jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : (jbFolded ? null : h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))));
       wrap.classList.add('zpick42'); return pickRow(wrap, pickJb);   // 0.6.9 #21 / t1954u: the row picks the (empty) Jukebox zone; the name opens its settings
     }
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
@@ -383,7 +385,7 @@ export function treeEl(S, ctl, kit, st) {
     const jbExpand = jbIdle ? (() => { const b = h('button', { type: 'button', class: 'plus chv qb42-exp' + (jbCollapsed ? '' : ' open'), 'aria-expanded': String(!jbCollapsed), 'aria-label': jbCollapsed ? `Show ${jbMs.length} speakers` : 'Hide speakers', title: jbCollapsed ? `Show speakers (${jbMs.length})` : 'Hide speakers',
       onclick: ev => { ev.stopPropagation(); setOpen(jbBoxObj, jbCollapsed); window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } }); setChev(b, jbCollapsed ? 'r' : 'd'); return b; })() : null;
     const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox', 'data-playback-id': jb.zoneId || 'jukebox' }, card, jbList);
-    const el = h('section', { class: 'qb42 solo jb42' + (sel ? ' ctl' : '') + (jbIdle ? ' idle' : '') + (jbCollapsed ? ' qb42-folded' : ''), 'data-box': 'solo', 'data-leader-id': JB, 'aria-label': 'Jukebox' },
+    const el = h('section', { class: 'qb42 solo jb42' + (sel ? ' ctl' : '') + (jbIdle ? ' idle' : '') + (now?.state === 'playing' ? ' playing' : '') + (jbCollapsed ? ' qb42-folded' : ''), 'data-box': 'solo', 'data-leader-id': JB, 'aria-label': 'Jukebox' },
       h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, jbExpand), Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: pick, selected: sel }), S, ctl, { id: 'jukebox', name: 'Jukebox' }, { jb: true, name: 'Jukebox', can }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)), wrap);
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; pick(ev); });
     return el;
@@ -407,8 +409,9 @@ export function treeEl(S, ctl, kit, st) {
     }) : h('div', { class: 'drop42' }, 'Drop speakers here to unassign them')));
   const decorateCard = (el, key, label) => {
     el.dataset.card = key;
-    // 0.7.1: left-edge trim is the drag handle (zone cards already have .zgut42; other cards get .cgrip69)
-    if (admin && !el.querySelector('.zgut42') && !el.querySelector(':scope > .cgrip69')) el.prepend(h('span', { class: 'cgrip69', role: 'button', tabindex: 0, title: 'Drag to reorder', 'aria-label': `Reorder ${label} (drag, or Alt+Up / Alt+Down)` }));
+    // 0.7.1: full-height left-edge trim on every top-level card is the drag handle.
+    // Inner .zgut42 (zone name row) is hidden; it must not block the outer .cgrip69.
+    if (admin && !el.querySelector(':scope > .cgrip69') && !el.querySelector(':scope > .zgut42')) el.prepend(h('span', { class: 'cgrip69', role: 'button', tabindex: 0, title: 'Drag to reorder', 'aria-label': `Reorder ${label} (drag, or Alt+Up / Alt+Down)` }));
     return el;
   };
   cardList.push({ key: 'unassigned', keys: ['unassigned'], el: unBox });

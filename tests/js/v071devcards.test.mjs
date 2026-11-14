@@ -36,12 +36,23 @@ test('0.7.1: drag handles have no ⋮ glyph; trim / chevron / themed now-line CS
   const css = rd('app.css');
   assert.match(css, /0\.7\.1: Devices cards/);
   assert.match(css, /data-card-trim/);
-  assert.match(css, /trim-notch/);
   assert.match(css, /trim-wave/);
+  assert.match(css, /trim-pipe/);
+  assert.match(css, /trim-rail/);
+  assert.doesNotMatch(css, /trim-notch/);
+  assert.match(css, /ww-wave-scroll/);
+  assert.match(css, /ww-pipe/);
+  assert.match(css, /shot-pipe-mid/);
   assert.match(css, /--voltrack/);
   assert.match(css, /\.plus\.chv/);
-  // flattened now-playing bar: a 0.7.1 rule clears the old box border
+  assert.match(css, /order:\s*99/);
+  // flattened now-playing bar and speaker rows: no inner box
   assert.match(css, /\.tree42 \.zl-now[\s\S]{0,400}border:\s*0/);
+  assert.match(css, /\.tree42 \.zsp42 > \.sp42[\s\S]{0,280}border:\s*0/);
+  assert.match(tree, /:scope > \.cgrip69/);
+  assert.match(tree, /foldBtn\(box, folded, name\)\)\)\,/);
+  assert.match(tree, /foldBtn\(jbFoldBox, jbFolded, 'Jukebox'\)/);
+  assert.match(tree, /\? ' playing'/);
 });
 
 test('0.7.1 wireNowMenu is exported and attachCtx marks justmenu (refresh-safe portal)', async () => {

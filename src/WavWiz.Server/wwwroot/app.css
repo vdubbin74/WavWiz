@@ -5742,9 +5742,13 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
    0.7.1: Devices cards — one outer border, themed Now Playing row,
    left-edge accent trim as the drag handle (no dots, no handle box),
    shared .plus.chv fold control at the top-right of each card header.
-   Trim variants: default gradient, [data-card-trim=notch] / .trim-notch,
-   [data-card-trim=wave] / .trim-wave. Tokens only (accent, accent-2, ink,
-   dim, panel, line, voltrack) so every theme follows.
+   Trim variants (switch with html[data-card-trim] or .trim-* on an ancestor):
+     default   — slim accent→accent2 gradient (fallback)
+     wave      — live waveform (Parallel Flow orange/teal; pulses when playing)
+     pipe      — light-pipe (solid accent; a highlight travels while playing)
+     rail      — split-rail (two thin parallel lines, accent + accent2)
+   Tokens only (accent, accent-2, ink, dim, panel, line, voltrack) so every
+   theme follows. Midnight Neon: #FF3C00 / #12D6C2. No dots.
    Layout uses flex + min-width:0 at all widths — no phone-only max-width
    rules that would also hit a narrow PC window.
    ======================================================================== */
@@ -5809,18 +5813,38 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   width: 0;
 }
 
-/* ---- Left-edge trim = the drag handle (no dots, no divider box) ---- */
+/* ---- Left-edge trim = the drag handle on the OUTER card only ---- */
 .tree42 { --ww-trim-w: 6px; }
-.tree42 .zgut42,
-.tree42 .dgrip42,
+/* Cards are not row-flex; pin the trim to the left edge so it runs the full card height. */
+.tree42 .qb42:has(> .cgrip69),
+.tree42 .un42:has(> .cgrip69),
+.tree42 > [data-card]:has(> .cgrip69) {
+  position: relative;
+  padding-left: 10px;
+}
+/* The inset Controlling accent and a fat left border would hide the trim — the trim is the left edge. */
+.tree42 .qb42.solo.ctl:has(> .cgrip69),
+.tree42 .qb42.ctl:has(> .cgrip69),
+.tree42 .qb42.playing:has(> .cgrip69),
+.tree42 .qb42.linked:has(> .cgrip69),
+.tree42 .qb42.ctlz:has(> .cgrip69) {
+  border-left-width: 1px !important;
+  box-shadow: none;
+}
 .tree42 .cgrip69,
+.tree42 > [data-card] > .zgut42,
 .dc3 > .dgrip,
 .zcard > .dgrip,
 .dcard > .dgrip,
 .drow > .dgrip {
   box-sizing: border-box;
+  position: absolute !important;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  height: auto !important;
   width: var(--ww-trim-w, 6px) !important;
-  flex: 0 0 var(--ww-trim-w, 6px) !important;
+  flex: none !important;
   min-width: var(--ww-trim-w, 6px);
   padding: 0 !important;
   margin: 0;
@@ -5835,19 +5859,14 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   cursor: grab;
   touch-action: none;
   user-select: none;
-  align-self: stretch;
-  display: flex;
-  opacity: .5;
+  display: block;
+  opacity: .55;
   background: linear-gradient(180deg, var(--accent), var(--accent2));
   box-shadow: none;
-  z-index: 1;
+  z-index: 2;
 }
 .dgrip > i { display: none !important; }
-.tree42 .zgut42:hover,
-.tree42 .dgrip42:hover,
 .tree42 .cgrip69:hover,
-.tree42 .zgut42:focus-visible,
-.tree42 .dgrip42:focus-visible,
 .tree42 .cgrip69:focus-visible,
 .dc3 > .dgrip:hover,
 .zcard > .dgrip:hover,
@@ -5858,18 +5877,13 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   background: linear-gradient(180deg, var(--accent), var(--accent2));
   color: transparent !important;
 }
-.tree42 .zgut42:active,
-.tree42 .dgrip42:active,
 .tree42 .cgrip69:active,
 .dc3 > .dgrip:active { cursor: grabbing; }
 
 /* Active / playing zone: the trim glows; idle cards stay dimmer */
-.tree42 .qb42.ctl .zgut42,
-.tree42 .qb42:not(.idle) .zgut42,
 .tree42 .qb42.ctl > .cgrip69,
 .tree42 .qb42:not(.idle) > .cgrip69,
-.tree42 .zcard42:not(.off) .zgut42,
-.tree42 .sp42.sel .dgrip42 {
+.tree42 .qb42.playing > .cgrip69 {
   opacity: 1;
   box-shadow: 0 0 10px var(--accent), 0 0 16px color-mix(in srgb, var(--accent2) 50%, transparent);
 }
@@ -5878,43 +5892,258 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .tree42 > [data-card]:has(> .cgrip69) { padding-left: 10px; }
 .tree42 > .un42[data-card]:has(> .cgrip69) { padding-left: 14px; }
 .dc3[data-dkind], .zcard[data-dkind], .drow[data-dkind], .dcard[data-dkind] { padding-left: 14px !important; }
-.tree42 .zsp42 { padding-left: 14px; }
-.tree42 .zsp42:has(.sp42)::before { left: 7px; }
-.tree42 .zsp42 > .sp42::before { left: -7px; width: 6px; }
 
-/* Variant B: notched / angled neon edge (repeats down a tall expanded card) */
-html[data-card-trim="notch"] .tree42 .zgut42,
-html[data-card-trim="notch"] .tree42 .dgrip42,
-html[data-card-trim="notch"] .tree42 .cgrip69,
-html[data-card-trim="notch"] .dc3 > .dgrip,
-html[data-card-trim="notch"] .zcard > .dgrip,
-.trim-notch .zgut42,
-.trim-notch .dgrip42,
-.trim-notch .cgrip69,
-.trim-notch .dc3 > .dgrip,
-.trim-notch .zcard > .dgrip {
-  width: 7px !important;
-  flex-basis: 7px !important;
-  background: linear-gradient(180deg, var(--accent), var(--accent2));
-  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='16' viewBox='0 0 7 16' preserveAspectRatio='none'><path fill='black' d='M0 0h5l2 4-2 4 2 4-2 4H0z'/></svg>") top left / 7px 16px repeat-y;
-  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='16' viewBox='0 0 7 16' preserveAspectRatio='none'><path fill='black' d='M0 0h5l2 4-2 4 2 4-2 4H0z'/></svg>") top left / 7px 16px repeat-y;
-  filter: drop-shadow(0 0 3px var(--accent));
+/* ---- Inner zone header + speaker rows: plain, not boxed ----
+   The queue / zone / AirPlay / Cast / Jukebox / Unassigned card keeps the
+   one outer border and the edge trim. Speaker rows are flush rows with a
+   thin separator. No second trim on speakers (a 3px faint tick is the
+   drag hit-target only, so it does not read as a box). */
+.tree42 .qb42 .zcard42 {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0;
+  margin: 2px 0 0;
+}
+.tree42 .qb42 .zcard42 > .zgut42 {
+  /* hidden: the outer .cgrip69 is the card trim and drag handle */
+  width: 0 !important;
+  min-width: 0 !important;
+  flex: 0 0 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+.tree42 .zsp42 { padding-left: 8px; }
+.tree42 .zsp42:has(.sp42)::before,
+.tree42 .zsp42 > .sp42::before { display: none !important; }
+.tree42 .zsp42 > .sp42,
+.tree42 .un42 .sp42,
+.tree42 .ze42-gone > .sp42 {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  min-height: 30px;
+}
+.tree42 .zsp42 > .sp42:last-child,
+.tree42 .un42 .zsp42 > .sp42:last-child,
+.tree42 .ze42-gone > .sp42:last-child { border-bottom: 0; }
+/* Speaker drag strip: a faint tick, never a boxed trim */
+.tree42 .sp42 > .dgrip42 {
+  width: 3px !important;
+  flex: 0 0 3px !important;
+  min-width: 3px;
+  margin: 8px 8px 8px 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--dim) 40%, transparent) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  opacity: 1 !important;
+  cursor: grab;
+  overflow: hidden;
+  font-size: 0 !important;
+  color: transparent !important;
+  text-indent: -99px;
+}
+.tree42 .sp42 > .dgrip42:hover,
+.tree42 .sp42 > .dgrip42:focus-visible {
+  background: var(--accent) !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
-/* Variant C: mini waveform / equalizer bars (Parallel Flow) */
-html[data-card-trim="wave"] .tree42 .zgut42,
-html[data-card-trim="wave"] .tree42 .dgrip42,
+/* ========== Trim variants ==========
+   Masks / layers use theme tokens so Midnight Neon is #FF3C00 / #12D6C2
+   and other themes follow their accent pair. */
+
+/* Variant: live waveform (tiny vertical Parallel Flow waves).
+   Still when idle; scrolls + pulses while the zone is playing.
+   Strokes use --accent / --accent2 (Midnight Neon: #FF3C00 / #12D6C2). */
 html[data-card-trim="wave"] .tree42 .cgrip69,
 html[data-card-trim="wave"] .dc3 > .dgrip,
 html[data-card-trim="wave"] .zcard > .dgrip,
-.trim-wave .zgut42,
-.trim-wave .dgrip42,
 .trim-wave .cgrip69,
 .trim-wave .dc3 > .dgrip,
 .trim-wave .zcard > .dgrip {
-  background: linear-gradient(180deg, var(--accent), var(--accent2));
-  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='24' viewBox='0 0 6 24'><rect x='0.35' y='9' width='1' height='6' rx='0.4' fill='black'/><rect x='1.75' y='4' width='1' height='16' rx='0.4' fill='black'/><rect x='3.15' y='7' width='1' height='10' rx='0.4' fill='black'/><rect x='4.55' y='2' width='1' height='20' rx='0.4' fill='black'/></svg>") top center / 6px 24px repeat-y;
-  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='6' height='24' viewBox='0 0 6 24'><rect x='0.35' y='9' width='1' height='6' rx='0.4' fill='black'/><rect x='1.75' y='4' width='1' height='16' rx='0.4' fill='black'/><rect x='3.15' y='7' width='1' height='10' rx='0.4' fill='black'/><rect x='4.55' y='2' width='1' height='20' rx='0.4' fill='black'/></svg>") top center / 6px 24px repeat-y;
+  width: 8px !important;
+  flex-basis: 8px !important;
+  min-width: 8px;
+  background: transparent;
+  opacity: .85;
+  box-shadow: none;
+  overflow: hidden;
+}
+html[data-card-trim="wave"] .tree42 .cgrip69::before,
+html[data-card-trim="wave"] .tree42 .cgrip69::after,
+html[data-card-trim="wave"] .dc3 > .dgrip::before,
+html[data-card-trim="wave"] .dc3 > .dgrip::after,
+html[data-card-trim="wave"] .zcard > .dgrip::before,
+html[data-card-trim="wave"] .zcard > .dgrip::after,
+.trim-wave .cgrip69::before,
+.trim-wave .cgrip69::after,
+.trim-wave .dc3 > .dgrip::before,
+.trim-wave .dc3 > .dgrip::after,
+.trim-wave .zcard > .dgrip::before,
+.trim-wave .zcard > .dgrip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat-y;
+  background-size: 8px 28px;
+  background-position: 0 0;
+  -webkit-mask-repeat: repeat-y;
+  mask-repeat: repeat-y;
+  -webkit-mask-size: 8px 28px;
+  mask-size: 8px 28px;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+}
+html[data-card-trim="wave"] .tree42 .cgrip69::before,
+.trim-wave .cgrip69::before,
+html[data-card-trim="wave"] .dc3 > .dgrip::before,
+html[data-card-trim="wave"] .zcard > .dgrip::before,
+.trim-wave .dc3 > .dgrip::before,
+.trim-wave .zcard > .dgrip::before {
+  background: var(--accent);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M2.4 0 C 5.6 3.5 5.6 7 2.4 10.5 C -0.8 14 -0.8 17.5 2.4 21 C 5.6 24.5 5.6 28 2.4 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M2.4 0 C 5.6 3.5 5.6 7 2.4 10.5 C -0.8 14 -0.8 17.5 2.4 21 C 5.6 24.5 5.6 28 2.4 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
+}
+html[data-card-trim="wave"] .tree42 .cgrip69::after,
+.trim-wave .cgrip69::after,
+html[data-card-trim="wave"] .dc3 > .dgrip::after,
+html[data-card-trim="wave"] .zcard > .dgrip::after,
+.trim-wave .dc3 > .dgrip::after,
+.trim-wave .zcard > .dgrip::after {
+  background: var(--accent2);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M5.6 0 C 8.8 3.5 8.8 7 5.6 10.5 C 2.4 14 2.4 17.5 5.6 21 C 8.8 24.5 8.8 28 5.6 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='28' viewBox='0 0 8 28'><path d='M5.6 0 C 8.8 3.5 8.8 7 5.6 10.5 C 2.4 14 2.4 17.5 5.6 21 C 8.8 24.5 8.8 28 5.6 31.5' fill='none' stroke='black' stroke-width='1.35' stroke-linecap='round'/></svg>");
+}
+html[data-card-trim="wave"] .tree42 .cgrip69:hover,
+.trim-wave .cgrip69:hover {
+  opacity: 1;
+  filter: brightness(1.15);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69,
+.trim-wave .qb42.playing > .cgrip69 {
+  opacity: 1;
+  animation: ww-wave-pulse 1.1s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--accent), 0 0 16px color-mix(in srgb, var(--accent2) 50%, transparent);
+}
+html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69::before,
+html[data-card-trim="wave"] .tree42 .qb42.playing > .cgrip69::after,
+.trim-wave .qb42.playing > .cgrip69::before,
+.trim-wave .qb42.playing > .cgrip69::after {
+  animation: ww-wave-scroll .7s linear infinite;
+}
+@keyframes ww-wave-scroll {
+  from { -webkit-mask-position: 0 0; mask-position: 0 0; }
+  to   { -webkit-mask-position: 0 28px; mask-position: 0 28px; }
+}
+@keyframes ww-wave-pulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 3px var(--accent)); }
+  50%      { filter: brightness(1.3) drop-shadow(0 0 7px var(--accent2)); }
+}
+
+/* Variant: light-pipe — solid accent edge; a highlight travels down while playing. */
+html[data-card-trim="pipe"] .tree42 .cgrip69,
+html[data-card-trim="pipe"] .dc3 > .dgrip,
+html[data-card-trim="pipe"] .zcard > .dgrip,
+.trim-pipe .cgrip69,
+.trim-pipe .dc3 > .dgrip,
+.trim-pipe .zcard > .dgrip {
+  background: var(--accent);
+  overflow: hidden;
+}
+html[data-card-trim="pipe"] .tree42 .cgrip69::after,
+html[data-card-trim="pipe"] .dc3 > .dgrip::after,
+html[data-card-trim="pipe"] .zcard > .dgrip::after,
+.trim-pipe .cgrip69::after,
+.trim-pipe .dc3 > .dgrip::after,
+.trim-pipe .zcard > .dgrip::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 28%;
+  min-height: 28px;
+  top: -30%;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    color-mix(in srgb, #fff 70%, var(--accent2)) 40%,
+    var(--accent2) 58%,
+    transparent 100%);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent2) 80%, #fff);
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-card-trim="pipe"] .tree42 .qb42.playing > .cgrip69::after,
+.trim-pipe .qb42.playing > .cgrip69::after {
+  opacity: 1;
+  animation: ww-pipe 1.8s linear infinite;
+}
+@keyframes ww-pipe {
+  0%   { top: -30%; }
+  100% { top: 100%; }
+}
+/* Preview helper: freeze the traveling light mid-card */
+html.shot-pipe-mid[data-card-trim="pipe"] .tree42 .qb42.playing > .cgrip69::after,
+.trim-pipe.shot-pipe-mid .qb42.playing > .cgrip69::after {
+  animation: none;
+  opacity: 1;
+  top: 42%;
+}
+
+/* Variant: split-rail — two thin parallel vertical lines (accent + accent2). */
+html[data-card-trim="rail"] .tree42 .cgrip69,
+html[data-card-trim="rail"] .dc3 > .dgrip,
+html[data-card-trim="rail"] .zcard > .dgrip,
+.trim-rail .cgrip69,
+.trim-rail .dc3 > .dgrip,
+.trim-rail .zcard > .dgrip {
+  width: 8px !important;
+  flex-basis: 8px !important;
+  min-width: 8px;
+  background-color: transparent;
+  background-image:
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent2), var(--accent2));
+  background-size: 2px 100%, 2px 100%;
+  background-position: 1px 0, 5px 0;
+  background-repeat: no-repeat;
+  box-shadow: none;
+  opacity: .75;
+  border-radius: 0;
+}
+html[data-card-trim="rail"] .tree42 .cgrip69:hover,
+.trim-rail .cgrip69:hover {
+  opacity: 1;
+  filter: brightness(1.12);
+  box-shadow: none;
+}
+html[data-card-trim="rail"] .tree42 .qb42.playing > .cgrip69,
+.trim-rail .qb42.playing > .cgrip69 {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px var(--accent)) drop-shadow(0 0 4px var(--accent2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree42 .cgrip69,
+  .tree42 .cgrip69::after {
+    animation: none !important;
+  }
 }
 
 /* ---- Shared .plus.chv fold control, top-right of the card header ---- */
@@ -5936,11 +6165,20 @@ html[data-card-trim="wave"] .zcard > .dgrip,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Grow spacer stays visible so the chevron can sit in the top-right,
+   including collapsed / linked-empty / Jukebox compact headers. */
+.tree42 .qb42.zfold42 .ze42-row .grow,
+.tree42 .ze42-row .grow {
+  display: block !important;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .tree42 .qb42-trow > .plus.chv,
 .tree42 .ze42-row > .plus.chv,
 .tree42 .qb42-head > .plus.chv {
   flex: none;
   margin-left: auto;
+  order: 99; /* always the rightmost item, even if earlier in the DOM */
 }
 /* Keep the shared 22px accent-boxed chevron look; neutralize the old grey ▸ box */
 .tree42 .zfold42-t.plus.chv,
