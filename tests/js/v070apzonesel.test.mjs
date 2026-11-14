@@ -78,6 +78,10 @@ async function addToZone(kind, tag) {
     return { ok: true };
   };
   add.openAddSpeaker(S, {}, kind);
+  await waitFor(() => doc.querySelector(`${cardSel} .apsetup-row[data-id="${dev.id}"]`));
+  const ui = (kind === 'airplay' ? window.__wwApUi : window.__wwCsUi)?.(dev.id);
+  if (ui) ui.heard = 'yes';
+  window.dispatchEvent(new CustomEvent(kind === 'airplay' ? 'wavwiz:apsetup-paint' : 'wavwiz:cssetup-paint'));
   const select = await waitFor(() => doc.querySelector(`${cardSel} .apsetup-row[data-id="${dev.id}"] select.apsetup-zone`));
   return { m, add, select, cardSel, refresh: kind === 'airplay' ? m._apRefresh : m._csRefresh, reset: kind === 'airplay' ? m._apReset : m._csReset };
 }

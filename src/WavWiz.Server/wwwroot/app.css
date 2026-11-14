@@ -6083,6 +6083,7 @@ dialog.addspk-dlg>.body{padding:0;display:flex;flex-direction:column;min-height:
 .addspk-tab.on .addspk-n{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));color:var(--accent-text,var(--accent))}
 .addspk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);flex:none}
 .addspk-status{flex:1 1 12em;min-width:0;color:var(--dim)}
+.addspk-bar-acts{display:flex;align-items:center;gap:10px;flex:none;margin-left:auto}
 .addspk-show{display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--dim);cursor:pointer;flex:none}
 .addspk-show input{margin:0}
 .addspk-panel{padding:10px 12px 14px;overflow:auto;min-height:0;flex:1}
@@ -6099,8 +6100,15 @@ dialog.addspk-dlg>.body{padding:0;display:flex;flex-direction:column;min-height:
 .addspk-url{display:block;max-width:100%;overflow:auto;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);font-size:12px}
 .addspk-dlg .apsetup-list{max-height:none}
 .addspk-dlg .apsetup-testbtn{width:auto}
-@media (max-width:700px){
-  /* existing phone dialogs already go fullscreen; keep sheet chrome compact, no phone-only features */
-  dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
-  .addspk-connect-row{justify-content:center}
+/* Phone-only (html.handset = isRealPhone): sit in the viewport above the in-flow mini player + tab bar.
+   Uses --safe-t / --safe-b and --addspk-dock (measured from those bars). A narrow PC window is not a handset. */
+html.handset dialog.addspk-dlg{
+  width:calc(100vw / var(--z,1));max-width:calc(100vw / var(--z,1));
+  height:auto;margin:var(--safe-t,0px) 0 calc(8px + var(--safe-b,0px) + var(--addspk-dock,0px));
+  max-height:calc(100vh / var(--z,1) - 8px - var(--safe-t,0px) - var(--safe-b,0px) - var(--addspk-dock,0px));
+  max-height:calc(100dvh / var(--z,1) - 8px - var(--safe-t,0px) - var(--safe-b,0px) - var(--addspk-dock,0px));
+  border-radius:0;border-left:0;border-right:0;box-sizing:border-box;
 }
+html.handset dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
+html.handset dialog.addspk-dlg .addspk-panel{min-height:0;padding-bottom:18px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:18px}
+html.handset .addspk-connect-row{justify-content:center}

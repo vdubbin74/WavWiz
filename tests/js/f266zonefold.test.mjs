@@ -15,12 +15,12 @@ test('F266 fold state persists per zone in localStorage (wavwiz.zfold)', async (
   T.saveZoneFolds(new Set(['3', '7']), st); assert.deepEqual([...T.loadZoneFolds(st)], ['3', '7']);
   st.setItem('wavwiz.zfold', 'garbage'); assert.deepEqual([...T.loadZoneFolds(st)], []);
 });
-test('F266 tree42: folded box = compact empty-zone row with toggle + green dot; open box toggle on the title row; idle ▸ n toggle removed', () => {
+test('F266 tree42: folded box = compact empty-zone row with green dot + name, chevron top-right; open box toggle on the title row; idle ▸ n toggle removed', () => {
   const t = src('tree42.js');
   assert.match(t, /if \(isFolded\(box\)\) return foldedBox\(box, \{ lead, linked, sel, ms, now \}\);/);
-  assert.match(t, /class: 'qb42 empty42 zfold42'/); assert.match(t, /foldBtn\(box, true, name\), dot,/);
+  assert.match(t, /class: 'qb42 empty42 zfold42'/); assert.match(t, /dot, zoneName\(lead\.id, name\), foldCount\(ms, linked\), h\('span', \{ class: 'grow' \}\), foldBtn\(box, true, name\)/);
   assert.match(t, /const active = ms\.filter\(z => z\.enabled !== false && z\.connected\)/); assert.match(t, /'dot zfold42-dot ' \+ \(active\.length \? 'ok' : 'off'\)/);
-  assert.match(t, /h\('div', \{ class: 'qb42-head' \}, h\('div', \{ class: 'qb42-trow' \}, expand, title\), Z\.nowLine\(/);
+  assert.match(t, /h\('div', \{ class: 'qb42-head' \}, h\('div', \{ class: 'qb42-trow' \}, title, expand\), Z\.wireNowMenu\(Z\.nowLine\(/);
   assert.doesNotMatch(t, /class: 'qb42-exp' \+ \(collapsed/, 'old zone speakers toggle gone');
 });
 test('F266 devices.js: fold changes rebuild the tree (fold signature + storage signature)', () => {

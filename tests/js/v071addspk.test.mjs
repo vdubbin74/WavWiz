@@ -174,9 +174,17 @@ test('sheet: admin-only, tabs with new counts, default WavWiz, AirPlay scan, Sho
   sheet().querySelector('[data-addspk-tab="airplay"]').click();
   await tick(80);
   assert.match(status(), /2 new on this network|Looking/);
-  const kit = await waitFor(() => [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('Kitchen')));
+  let kit = await waitFor(() => [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('Kitchen')));
   assert.ok(kit.querySelector('[data-act="airplay-test"]'), 'Test on the row without a prior test');
-  assert.ok(kit.querySelector('[data-act="airplay-add"]'), 'Add on the row without a prior test');
+  assert.equal(kit.querySelector('[data-act="airplay-add"]'), null, 'Add stays hidden until Test is heard');
+  assert.equal(kit.querySelector('select.apsetup-zone'), null, 'zone dropdown waits for heard yes');
+  const st = window.__wwApUi?.('k1');
+  assert.ok(st, 'AirPlay row UI state is shared with the sheet');
+  st.heard = 'yes'; st.newName = st.newName || 'Kitchen';
+  window.dispatchEvent(new CustomEvent('wavwiz:apsetup-paint'));
+  await tick(10);
+  kit = [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('Kitchen'));
+  assert.ok(kit.querySelector('[data-act="airplay-add"]'), 'Add appears after heard yes');
   assert.ok(kit.querySelector('select.apsetup-zone'));
   const hp = [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('HomePod'));
   assert.ok(hp && hp.className.includes('blocked'));
@@ -188,7 +196,16 @@ test('sheet: admin-only, tabs with new counts, default WavWiz, AirPlay scan, Sho
   await tick(80);
   assert.equal(sheet().querySelector('[data-id="c1"]'), null, 'added Cast hidden by default');
   const tv = await waitFor(() => [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('Den TV')));
-  assert.ok(tv.querySelector('[data-act="cast-test"]') && tv.querySelector('[data-act="cast-add"]'));
+  assert.ok(tv.querySelector('[data-act="cast-test"]'));
+  assert.equal(tv.querySelector('[data-act="cast-add"]'), null, 'Cast Add waits for heard yes');
+  const csUi = window.__wwCsUi?.('c2');
+  assert.ok(csUi, 'Cast row UI state is shared with the sheet');
+  csUi.heard = 'yes';
+
+  window.dispatchEvent(new CustomEvent('wavwiz:cssetup-paint'));
+  await tick(10);
+  const tv2 = [...sheet().querySelectorAll('.apsetup-row')].find(r => r.textContent.includes('Den TV'));
+  assert.ok(tv2.querySelector('[data-act="cast-add"]'), 'Cast Add appears after heard yes');
   assert.match(sheet().textContent, /line up only roughly|Fine-tune with the speaker/);
   assert.ok(sheet().querySelector('[data-act="castsetup-byip"]'), 'Add by IP link');
   add._addSpkReset();
@@ -245,7 +262,13 @@ test('t1955u sheet: a refresh tick while the Add-to select is focused does not r
     return { ok: true };
   };
   add.openAddSpeaker(admin({ groups: [{ id: 1, name: 'Basement' }, { id: 2, name: 'Upstairs' }] }), {}, 'airplay');
-  const row = await waitFor(() => [...(sheet()?.querySelectorAll('.apsetup-row') || [])].find(r => r.getAttribute('data-id') === 'k1'));
+  const row0 = await waitFor(() => [...(sheet()?.querySelectorAll('.apsetup-row') || [])].find(r => r.getAttribute('data-id') === 'k1'));
+  assert.equal(row0.querySelector('select.apsetup-zone'), null, 'Add-to waits for heard yes');
+  const st = window.__wwApUi?.('k1');
+  assert.ok(st); st.heard = 'yes';
+  window.dispatchEvent(new CustomEvent('wavwiz:apsetup-paint'));
+  await tick(10);
+  const row = sheet().querySelector('.apsetup-row[data-id="k1"]');
   const select = row.querySelector('select.apsetup-zone');
   select.focus();
   assert.equal(doc.activeElement, select);
@@ -268,4 +291,19 @@ test('t1955u sheet: a refresh tick while the Add-to select is focused does not r
   assert.ok(ip2, 'Add-by-IP form still open');
   assert.equal(ip2.value, '192.168.1.40', 'typed address kept across an AirPlay poll');
   add._addSpkReset(); ap._apReset(); cs._csReset();
+});
+
+test('CSS: phone sheet docks above mini/tabbar on html.handset only; Search again stays with Show added', () => {
+  const css = rd('app.css');
+  const at = css.indexOf('0.7.1 Add speaker sheet');
+  assert.ok(at >= 0);
+  const block = css.slice(at);
+  assert.match(block, /html\.handset dialog\.addspk-dlg/);
+  assert.match(block, /var\(--safe-b/);
+  assert.match(block, /var\(--addspk-dock/);
+  assert.match(block, /\.addspk-bar-acts/);
+  assert.doesNotMatch(block, /@media \(max-width:700px\)/, 'phone sheet rules are not width-based (narrow PC is not a phone)');
+  const src = rd('js/addspeaker.js');
+  assert.match(src, /ui\.heard === 'yes'/);
+  assert.match(src, /document\.documentElement\.classList\.contains\('handset'\)/);
 });

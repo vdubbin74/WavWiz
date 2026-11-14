@@ -27,12 +27,16 @@ test('0.7.0 Pi: the tarball carries install.sh + the systemd unit; install.sh re
   assert.match(u, /#AmbientCapabilities=CAP_NET_BIND_SERVICE/);
 });
 
-test('0.7.0 Pi: docs are honest — unverified on real hardware, not published, 32-bit unsupported; CHANGELOG has 0.7.0', () => {
+test('0.7.0 Pi: docs are honest — published in 0.7.1, unverified on real hardware, 32-bit unsupported; CHANGELOG has 0.7.0', () => {
   const pi = R('docs/RASPBERRY-PI.md');
   assert.match(pi, /not yet verified on real Raspberry Pi hardware/);
   assert.match(pi, /32-bit Raspberry Pi OS is not supported/);
   assert.match(pi, /avahi-daemon/);
-  assert.match(R('docs/DOCKER.md'), /not on Docker Hub yet/);
+  const docker = R('docs/DOCKER.md');
+  assert.match(docker, /Published image/);
+  assert.match(docker, /docker\.io\/vdubbin74\/wavwiz-server/);
+  assert.match(docker, /not yet verified on real Pi hardware/);
+  assert.doesNotMatch(docker, /not on Docker Hub yet/);
   assert.match(R('docs/LINUX.md'), /RASPBERRY-PI\.md/);
-  assert.match(R('CHANGELOG.md'), /## \[0\.7\.0\] - in development[\s\S]*Raspberry Pi[\s\S]*## \[0\.6\.8\]/);
+  assert.match(R('CHANGELOG.md'), /## \[0\.7\.0\] - 2026-11-13 \(beta\)[\s\S]*Raspberry Pi[\s\S]*## \[0\.6\.8\]/);
 });

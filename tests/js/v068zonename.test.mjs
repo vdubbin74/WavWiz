@@ -13,8 +13,8 @@ const css = () => readFileSync(join(www, 'app.css'), 'utf8');
 test('collapsed zone card: name row has no title; now-playing uses expanded .zl-now under it; idle omits the line', () => {
   const t = js('tree42.js');
   const fold = t.slice(t.indexOf('const foldedBox ='), t.indexOf('const emptyBox ='));
-  assert.match(fold, /foldBtn\(box, true, name\), dot,/);
-  assert.match(fold, /now\?\.title \? Z\.nowLine\(now,/);
+  assert.match(fold, /dot, zoneName\(lead\.id, name\), foldCount\(ms, linked\), h\('span', \{ class: 'grow' \}\), foldBtn\(box, true, name\)/);
+  assert.match(fold, /now\?\.title \? Z\.wireNowMenu\(Z\.nowLine\(now,/);
   assert.match(fold, /onSelect: \(\) => controlZone\(lead\.id\)/);
   assert.doesNotMatch(fold, /ze42-note/);
   assert.doesNotMatch(fold, /▶ \$\{now\.title/);

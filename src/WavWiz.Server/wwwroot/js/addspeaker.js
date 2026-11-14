@@ -51,6 +51,8 @@ const localSt = id => localUi[id] || (localUi[id] = { zonePick: 'none', newName:
 function closeSheet() {
   apSheetDetach();
   csSheetDetach();
+  try { window.removeEventListener('resize', syncSheetDock); } catch { /* node */ }
+  try { dlg?.el?.style?.removeProperty('--addspk-dock'); } catch { /* */ }
   dlg = null; host = null;
 }
 function sheetShouldHold(ev) {
@@ -70,11 +72,41 @@ function paint() {
   if (!host || !host.isConnected || !Sref) return;
   const { ap, cs } = snapshots();
   host.replaceChildren(sheetBody(Sref, ctlRef, ap, cs));
+  syncSheetDock();
 }
 function snapshots() {
   const ap = window.__wwApSnap ? window.__wwApSnap() : { devs: [], phase: 'idle', problem: null, ap2: false };
   const cs = window.__wwCsSnap ? window.__wwCsSnap() : { devs: [], phase: 'idle', problem: null, byIp: { open: false } };
   return { ap, cs };
+}
+
+
+/** Room taken by the in-flow phone mini player + tab bar, for html.handset only (never a narrow PC window). */
+function sheetDockPx() {
+  try {
+    if (typeof document === 'undefined' || !document.documentElement.classList.contains('handset')) return 0;
+    const vis = el => {
+      if (!el) return false;
+      const st = getComputedStyle(el), r = el.getBoundingClientRect();
+      return st.display !== 'none' && st.visibility !== 'hidden' && r.height > 0;
+    };
+    let h = 0;
+    const mini = document.querySelector('#app > .mini');
+    if (vis(mini)) {
+      const st = getComputedStyle(mini);
+      h += mini.getBoundingClientRect().height + (parseFloat(st.marginTop) || 0) + (parseFloat(st.marginBottom) || 0);
+    }
+    const tabs = document.querySelector('#app > .tabbar');
+    if (vis(tabs)) h += tabs.getBoundingClientRect().height;
+    return Math.max(0, Math.round(h));
+  } catch { return 0; }
+}
+function syncSheetDock() {
+  const el = dlg?.el;
+  if (!el || typeof el.style?.setProperty !== 'function') return;
+  const px = sheetDockPx();
+  if (px) el.style.setProperty('--addspk-dock', px + 'px');
+  else el.style.removeProperty('--addspk-dock');
 }
 
 /** Open the Add speaker sheet. `initialTab` is one of TABS. Admin only. */
@@ -86,6 +118,8 @@ export function openAddSpeaker(S, ctl, initialTab) {
   if (dlg?.el?.isConnected) { paint(); try { dlg.el.querySelector(`[data-addspk-tab="${tab}"]`)?.focus?.(); } catch { /* */ } return dlg; }
   host = h('div', { class: 'addspk-root', 'data-addspk': '1' });
   dlg = dialog('Add speaker', host, [], { cls: 'addspk-dlg', onClose: closeSheet });
+  syncSheetDock();
+  try { window.addEventListener('resize', syncSheetDock); } catch { /* node */ }
   attachModules(S, ctl);
   listen();
   fetchLan();
@@ -131,12 +165,13 @@ function sheetBody(S, ctl, ap, cs) {
   const status = statusLine(tab, { zones, groups, ap, cs, counts });
   const bar = h('div', { class: 'addspk-bar' },
     h('div', { class: 'addspk-status small', role: 'status' }, status),
-    h('label', { class: 'addspk-show small' },
-      h('input', { type: 'checkbox', 'data-act': 'addspk-show-added', checked: showAdded, onchange: ev => { showAdded = ev.target.checked; paint(); } }),
-      'Show added'),
-    h('button', { type: 'button', class: 'btn sm apsetup-again', 'data-act': 'addspk-again',
-      onclick: () => searchAgain(tab), disabled: (tab === 'airplay' && ap.phase === 'searching') || (tab === 'cast' && cs.phase === 'searching') },
-      (tab === 'airplay' && ap.phase === 'searching') || (tab === 'cast' && cs.phase === 'searching') ? 'Searching…' : 'Search again'));
+    h('div', { class: 'addspk-bar-acts' },
+      h('label', { class: 'addspk-show small' },
+        h('input', { type: 'checkbox', 'data-act': 'addspk-show-added', checked: showAdded, onchange: ev => { showAdded = ev.target.checked; paint(); } }),
+        'Show added'),
+      h('button', { type: 'button', class: 'btn sm apsetup-again', 'data-act': 'addspk-again',
+        onclick: () => searchAgain(tab), disabled: (tab === 'airplay' && ap.phase === 'searching') || (tab === 'cast' && cs.phase === 'searching') },
+        (tab === 'airplay' && ap.phase === 'searching') || (tab === 'cast' && cs.phase === 'searching') ? 'Searching…' : 'Search again')));
 
   let panel;
   if (tab === 'wavwiz') panel = wavwizPanel(S, ctl, groups, zones);
@@ -337,16 +372,22 @@ function foundRow(kind, d, snap) {
         h('li', null, 'Cast devices buffer a few seconds before they start. Play it again.'),
         h('li', null, 'Still silent: the PC firewall may block the device from fetching WavWiz’s audio. Allow WavWiz on the private network.')])));
   const canAct = row.pick && !ui.added && !d.added;
+  const canAdd = canAct && ui.heard === 'yes';   // same safety step as the old AirPlay / Cast cards
   if (canAct) {
-    extras.push(h('div', { class: 'addspk-rowacts' },
+    const acts = [
       h('button', { type: 'button', class: 'btn sm', 'data-act': kind + '-test', disabled: !!ui.busy,
         onclick: () => (kind === 'airplay' ? window.__wwApTest : window.__wwCsTest)?.(d) },
         ui.busy && ui.busy !== 'Adding…' ? ui.busy : (ui.heard ? 'Play again' : 'Test')),
-      h('label', { class: 'apsetup-addto' }, h('span', { class: 'small dim' }, 'Add to:'), zoneSelect(ui, kind + '-zone')),
-      ui.zonePick === 'new' ? h('input', { type: 'text', class: 'apsetup-name', value: ui.newName || '', 'aria-label': 'New zone name', maxlength: 40, oninput: ev => { ui.newName = ev.target.value; } }) : null,
-      h('button', { type: 'button', class: 'btn sm primary', 'data-act': kind + '-add', disabled: !!ui.busy,
-        onclick: () => (kind === 'airplay' ? window.__wwApAdd : window.__wwCsAdd)?.(d) },
-        ui.busy === 'Adding…' ? 'Adding…' : 'Add')));
+    ];
+    if (canAdd) {
+      acts.push(
+        h('label', { class: 'apsetup-addto' }, h('span', { class: 'small dim' }, 'Add to:'), zoneSelect(ui, kind + '-zone')),
+        ui.zonePick === 'new' ? h('input', { type: 'text', class: 'apsetup-name', value: ui.newName || '', 'aria-label': 'New zone name', maxlength: 40, oninput: ev => { ui.newName = ev.target.value; } }) : null,
+        h('button', { type: 'button', class: 'btn sm primary', 'data-act': kind + '-add', disabled: !!ui.busy,
+          onclick: () => (kind === 'airplay' ? window.__wwApAdd : window.__wwCsAdd)?.(d) },
+          ui.busy === 'Adding…' ? 'Adding…' : 'Add'));
+    }
+    extras.push(h('div', { class: 'addspk-rowacts' }, ...acts));
   }
   return h('div', { class: 'apsetup-row' + (canAct ? '' : '') + (row.pick ? '' : ' blocked') + (d.added || d.remembered || ui.added ? ' added' : ''),
     'data-id': d.id, 'data-kind': kind, role: 'listitem' },
@@ -362,6 +403,7 @@ function foundRow(kind, d, snap) {
 
 /** Test helper: reset module state. */
 export function _addSpkReset() {
+  try { window.removeEventListener('resize', syncSheetDock); } catch { /* node */ }
   try { dlg?.close?.(); } catch { /* already closed */ }
   try { document.querySelectorAll('dialog.addspk-dlg').forEach(el => el.remove()); } catch { /* node */ }
   tab = 'wavwiz'; showAdded = false; Sref = null; ctlRef = null; dlg = null; host = null; lan = null;

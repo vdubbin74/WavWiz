@@ -266,7 +266,9 @@ async function test(d) {
   paintInPlace();
 }
 async function add(d) {
-  selId = d.id; const s = st(d.id); s.busy = 'Adding…'; s.problem = null; paintInPlace();
+  selId = d.id; const s = st(d.id);
+  if (s.heard !== 'yes' || s.added) return;   // same safety step as the old cards: Test and Yes first
+  s.busy = 'Adding…'; s.problem = null; paintInPlace();
   const body = { key: d.id };
   if (s.zonePick === 'new') body.newZone = (s.newName || d.name).trim();
   else if (s.zonePick !== 'none') body.groupId = Number(s.zonePick);
