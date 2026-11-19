@@ -93,7 +93,7 @@ export function favActionForTrack(S, trackId, title = '') {
 export function attachItem(S, el, ref, title, { menu = [], more = true, count = null, kind = '', phoneSong = null } = {}) {
   // Desktop right-click used to open sheet() — a centered dialog (far from the cursor).
   // Now: shared openCtx at the pointer; keyboard / ⋯ anchors to the focused control; phone keeps the existing bottom sheet.
-  const isPhone = () => matchMedia('(max-width:900px)').matches;
+  const isPhone = () => typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');   // 0.7.1: a real phone only (html.handset) - a narrow PC window keeps the desktop menu
   const favItem = () => favActionForTrack(S, trackIdFromRef(ref), title);
   const ctxItems = () => {
     const fav = favItem();

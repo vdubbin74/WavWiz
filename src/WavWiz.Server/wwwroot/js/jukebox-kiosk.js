@@ -119,7 +119,7 @@ export const jukeboxRunning = () => jbRunning;
 /** 0.3.5 J15: tray "Stop Jukebox..." - the usual confirm, then stop (admin; others are told to sign in). */
 export async function askStopJukebox(S) {
   if (!isAdmin(S)) { toast('Only an administrator can stop Jukebox from here. Use the host PIN on the big screen, or sign in as admin.', true); return; }
-  if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true }))) return;
+  if (!(await ask('Stop Jukebox', 'Guests can no longer add songs. The music keeps playing.', { ok: 'Stop', danger: true, anchor: () => { const c = document.querySelector('#jbchip'); return c && c.offsetParent ? c : undefined; } }))) return;   // t2035u: tray / menu - next to the Jukebox chip, else the usual rule
   try { await stopWithPin(S); toast('Jukebox stopped.'); } catch (e) { toast(e.message, true); }
 }
 async function stopWithPin(S, pin) { await api('/jukebox/stop', { method: 'POST', body: { pin: pin || '' } }); }

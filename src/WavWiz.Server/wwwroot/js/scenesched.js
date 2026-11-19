@@ -4,6 +4,7 @@
 import { wsel } from './wwselect.js';
 import * as Z from './zones40.js';
 import { h, api, toast, dialog, ask } from './util.js';
+import { inlineDraft, editingIn } from './popover.js';   // 0.7.1 t2033u
 import { canControl, isAdmin, adminOnly } from './ui.js';
 import { undoToast } from './settingsui.js';
 
@@ -56,7 +57,7 @@ function moreMenu(items) {
   const btn = h('button', { class: 'btn sm iconsq', type: 'button', 'aria-haspopup': 'menu', 'aria-label': 'More', title: 'More' }, '⋯');
   btn.addEventListener('click', ev => {
     ev.stopPropagation(); document.querySelectorAll('.ss-menu').forEach(m => m.remove());
-    const m = h('div', { class: 'ss-menu menu-pop', role: 'menu' }, items.filter(Boolean).map(([t, fn, dis]) => h('button', { role: 'menuitem', type: 'button', disabled: dis, onclick: () => { m.remove(); fn(); } }, t)));
+    const m = h('div', { class: 'ss-menu menu-pop', role: 'menu' }, items.filter(Boolean).map(([t, fn, dis]) => h('button', { role: 'menuitem', type: 'button', disabled: dis, onclick: () => { m.remove(); btn.focus({ preventScroll: true }); fn(); } }, t)));   // t2035u: focus back on ⋯ first - a confirm opens next to it
     btn.after(m); const off = e => { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; document.addEventListener('pointerdown', off, true);
     m.querySelector('button:not([disabled])')?.focus();
   });
@@ -79,6 +80,7 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
       const [scenes, rows, ck, sl, stations] = await Promise.all([api('/scenes'), api('/schedules'), api('/schedules/clock'), api('/sleep'), api('/radio').catch(() => [])]);
       data = { ...data, scenes, rows, now: ck.now, server: ck.server, sleep: sl, stations };
     } catch (e) { body.replaceChildren(h('p', { class: 'err' }, 'Scenes and schedules could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
+    if (editingIn(body)) return;   // t2033u: a scene name is being typed - redraw when it ends
     draw();
   }
   function drawHead() {
@@ -140,8 +142,13 @@ export function openScenesSchedules(S, refresh, { at } = {}) {
   }
 
   async function runScene(sc) { try { await api(`/scenes/${sc.id}/apply`, { method: 'POST' }); toast(`${sc.name} is on`); load(); refresh?.(); } catch (e) { toast('The scene could not run. ' + e.message, true); } }
-  async function capture() { const n = h('input', { type: 'text', maxlength: 60, value: 'Party', 'aria-label': 'Scene name' });
-    dialog('New scene from current setup', h('div', { class: 'field' }, h('label', null, 'Name'), n), [{ text: 'Save', cls: 'primary', onclick: async () => { try { await api('/scenes/capture', { method: 'POST', body: { name: n.value } }); load(); } catch (e) { toast(e.message, true); return false; } } }, { text: 'Cancel' }]); }
+  // 0.7.1 t2033u: the new scene's name is typed in a draft card at the top of the Scenes column (no centered pop-up)
+  function capture(ev) {
+    const col = ev?.currentTarget?.closest?.('.ss-col') || body.querySelector('.ss-col[data-col="scenes"]'); if (!col) return;
+    const hd = col.querySelector('.ss-ch');
+    inlineDraft(col, { before: hd ? hd.nextSibling : undefined, cls: 'ss-draft', label: 'New scene name', placeholder: 'Scene name, e.g. Party', ok: 'Save', hint: 'Saves which speakers are on and how loud they are right now. Enter to save · Esc to cancel',
+      opener: ev?.currentTarget?.isConnected ? ev.currentTarget : null, onEnd: () => setTimeout(load, 0), save: async v => { await api('/scenes/capture', { method: 'POST', body: { name: v } }); toast(`Scene “${v}” saved`); } });
+  }
   async function captureInto(sc) { if (!(await ask('Update scene', `Replace “${sc.name}” with the speakers and volumes playing now?`, { ok: 'Update' }))) return; try { await api('/scenes/capture', { method: 'POST', body: { name: sc.name, id: sc.id } }); load(); } catch (e) { toast(e.message, true); } }
   async function dupScene(sc) { try { await api('/scenes', { method: 'POST', body: { name: (sc.name + ' copy').slice(0, 60), icon: sc.icon, members: sc.members } }); load(); } catch (e) { toast(e.message, true); } }
   async function delScene(sc) {

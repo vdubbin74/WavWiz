@@ -6112,3 +6112,52 @@ html.handset dialog.addspk-dlg{
 html.handset dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
 html.handset dialog.addspk-dlg .addspk-panel{min-height:0;padding-bottom:18px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:18px}
 html.handset .addspk-connect-row{justify-content:center}
+
+/* ===== 0.7.1 t2033u / t2035u: names typed in place + small confirms next to their button (popover.js) - no centered pop-ups for these ===== */
+/* Daylight / any light theme: the danger button text was pale pink on cream - use a deep red that reads on light backgrounds */
+:root[data-scheme=light] .btn.danger{color:color-mix(in srgb,var(--red) 70%,#000);border-color:color-mix(in srgb,var(--red) 55%,transparent)}
+:root[data-scheme=light] .btn.danger:hover:not(:disabled){background:color-mix(in srgb,var(--red) 10%,transparent)}
+.wwpop{position:fixed;z-index:1550;width:max-content;min-width:220px;max-width:min(340px,calc(calc(100vw / var(--z,1)) - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:3px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:10px 12px;display:flex;flex-direction:column;gap:8px;animation:wwpopIn .12s ease-out}
+.wwpop-caret{position:absolute;left:calc(var(--caret-x,24px) - 6px);width:10px;height:10px;background:var(--panel);border:1px solid var(--accent);transform:rotate(45deg)}
+.wwpop[data-side=below] .wwpop-caret{top:-6px;border-right:0;border-bottom:0}
+.wwpop[data-side=above] .wwpop-caret{bottom:-6px;border-left:0;border-top:0}
+.wwpop-h{font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text,var(--accent));overflow-wrap:anywhere}
+.wwpop-b{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto}
+.wwpop-t{margin:0;font-size:12.5px;line-height:1.4;color:var(--dim);max-width:300px}
+.wwpop-b label.row{gap:6px;align-items:center;font-size:12px}
+.wwpop-f{display:flex;gap:8px;justify-content:flex-end}
+.wwpop-f .btn{min-height:26px;padding:2px 12px}
+.wwpop.danger,.wwpop.danger .wwpop-caret{border-color:var(--red)} .wwpop.danger .wwpop-h{color:var(--red)}
+.wwpop.danger .btn.danger,:root[data-scheme=light] .wwpop.danger .btn.danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+@keyframes wwpopIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.wwpop[data-side=above]{animation-name:wwpopUp} @keyframes wwpopUp{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+/* a real phone only (html.handset); a narrow PC window keeps the anchored popover */
+.wwpop.wwpop-sheet{left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;min-width:0;border:0;border-top:3px solid var(--accent);border-radius:12px 12px 0 0;padding:8px 16px calc(16px + var(--safe-b,0px));animation:wwpopSheet .18s ease-out;max-height:calc(80dvh / var(--z,1))}
+html:not(.handset) .wwpop.wwpop-sheet{left:50%;right:auto;bottom:auto;top:30%;transform:translateX(-50%);width:min(380px,calc(100vw / var(--z,1) - 24px));border:1px solid var(--accent);border-radius:3px;animation:none}   /* no anchor on a PC: centered, still small */
+.wwpop.wwpop-sheet.danger{border-top-color:var(--red)}
+html.handset .wwpop-sheet .wwpop-f .btn{min-height:44px;flex:1}
+html.handset .wwpop-sheet .wwpop-t{max-width:none;font-size:14px}
+html.handset .wwpop-sheet .wwpop-h{font-size:13px}
+.wwpop-grab{width:40px;height:4px;border-radius:2px;background:var(--line);align-self:center;margin-bottom:4px}
+html:not(.handset) .wwpop-grab{display:none}
+.wwpop-scrim{position:fixed;inset:0;z-index:1549;background:rgba(0,0,0,.5)}
+@keyframes wwpopSheet{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+/* rename in place */
+.wwinl{display:inline-flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0}
+.wwinl-in{flex:1 1 auto;min-width:60px;width:100%;font:inherit;font-weight:700;color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:3px;padding:2px 6px;box-shadow:0 0 0 2px var(--accent-soft)}
+.wwinl-in:focus{outline:none}
+.wwinl.bad .wwinl-in{border-color:var(--red)} .wwinl.busy{opacity:.6}
+.wwinl-b{flex:none;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--dim);cursor:pointer;font-size:13px;line-height:1;padding:0}
+.wwinl-b.ok{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.wwinl-b:hover{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-size ✓ / ✕ */
+.wwinl ~ span,.wwinl ~ .small{display:none}   /* "No speakers" etc. step aside while the name is typed */
+/* new item in place: a draft card in its list - flat single border like the zone cards, accent edge on the left */
+.wwdraft{position:relative;border:1px solid var(--accent);border-radius:3px;background:var(--panel);padding:8px 10px 8px 14px;display:flex;flex-direction:column;gap:4px;box-shadow:0 0 0 3px var(--accent-soft);animation:wwpopIn .14s ease-out;min-width:0}
+.wwdraft::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);border-radius:3px 0 0 3px}
+.wwdraft-row{display:flex;align-items:center;gap:6px;min-width:0}
+.wwdraft-row .btn{min-height:26px;padding:2px 12px;flex:none}
+.wwdraft .wwinl-in{font-size:13.5px}
+.wwdraft.bad{border-color:var(--red)} .wwdraft.bad .wwdraft-hint{color:var(--red)} .wwdraft.busy{opacity:.6}
+.zaddmenu .wwdraft{margin:4px;box-shadow:none}
+@media (prefers-reduced-motion:reduce){.wwpop,.wwdraft{animation:none}}

@@ -73,8 +73,28 @@ export function dialog(title, body, buttons = [], opts = {}) {
 
 export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-/** 0.3.0: the app's confirm dialog (replaces window.confirm). Resolves true/false. */
-export function ask(title, text, { ok = 'OK', danger = false, cancel = 'Cancel' } = {}) {
+/** 0.7.1 t2035u: the control the user just pressed - a confirm opens next to it. Focus first (Chromium / WebView2 focus a clicked button);
+ *  else the last pressed control (Safari does not focus buttons) if it is still on screen. Never a menu item (the menu is gone by now). */
+const ANCHOR_SEL = 'button,[role="button"],a,input,select,.wwsel';
+let lastPress = null;
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('pointerdown', ev => { const b = ev.target?.closest?.(ANCHOR_SEL); lastPress = b ? { el: b, t: Date.now() } : null; }, true);
+const anchorOk = el => !!el && typeof document !== 'undefined' && el !== document.body && el !== document.documentElement && el.isConnected && !el.closest?.('.ctxmenu,.wwpop') && !!el.matches?.(ANCHOR_SEL);
+/** A focused row / card (a context menu gives focus back to it on close) is a fine anchor too, unless it is a whole big list. */
+const focusOk = el => anchorOk(el) || (!!el && el !== document.body && el !== document.documentElement && el.isConnected && !el.closest?.('.ctxmenu,.wwpop,dialog.page') && el.hasAttribute?.('tabindex') && !((el.getBoundingClientRect?.().height || 0) > 240));
+export function askAnchor() {
+  if (typeof document === 'undefined') return null;
+  const a = document.activeElement; if (focusOk(a)) return a;
+  return lastPress && Date.now() - lastPress.t < 4000 && anchorOk(lastPress.el) ? lastPress.el : null;
+}
+/** 0.3.0: the app's confirm (replaces window.confirm). Resolves true/false.
+ *  0.7.1 t2035u: a small popover next to the pressed button (`anchor`: an element or a function returning one; default: askAnchor()).
+ *  A real phone gets a bottom sheet. No anchor on a PC (or anchor: null) = the old centered window. */
+export function ask(title, text, { ok = 'OK', danger = false, cancel = 'Cancel', anchor } = {}) {
+  let at = typeof anchor === 'function' ? anchor() : anchor;
+  if (at === undefined) at = askAnchor();
+  if (at && !at.isConnected) at = null;
+  const phone = typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');
+  if (at || (phone && anchor !== null)) return import('./popover.js').then(m => m.confirmAt(at || null, { title, text, ok, cancel, danger }));
   return new Promise(res => {
     let done = false; const fin = v => { if (!done) { done = true; res(v); } };
     dialog(title, h('p', null, text), [{ text: ok, cls: danger ? 'danger' : 'primary', onclick: () => fin(true) }, { text: cancel, onclick: () => fin(false) }], { cls: 'ask-dlg', onClose: () => fin(false) });

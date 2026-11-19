@@ -530,10 +530,16 @@ export function openQueue() {
   if (P6.list === 'expanded') { pulse(listt.el); return; }
   setList('expanded');
 }
+/** 0.7.1 t2033u: File > New zone in a narrow window - go to Devices and use its + (a draft zone card with the name focused, no pop-up). */
+function newZoneNarrow() {
+  go('devices');
+  setTimeout(() => { const b = [...document.querySelectorAll('.tree42-h .zadd-new')].find(x => x.offsetParent !== null && !x.disabled);
+    if (b) { b.click(); pulseSel(b.closest('.tree42-h')); } else editZone(S, null, refreshAll); }, 80);   // no tree on screen: the old zone form
+}
 /** 0.3.6 K17: File > New (and Ctrl+Shift+Z / S / A / H) jumps to that editor in the expanded Devices view. */
 export function openNew(kind) {
   if (!isAdmin(S)) { toast('Only an administrator can create this.', true); return; }
-  if (!wide()) { if (kind === 'zone') return editZone(S, null, refreshAll); return openScenesSchedules(S, refreshAll, kind === 'alarm' ? { at: 'alarm' } : {}); }
+  if (!wide()) { if (kind === 'zone') return newZoneNarrow(); return openScenesSchedules(S, refreshAll, kind === 'alarm' ? { at: 'alarm' } : {}); }
   const was = P6.exp === 'dev'; if (!was) toggleDevExpanded(true);
   const run = () => {
     if (kind === 'zone') { document.querySelector('.devpanel .zadd-new')?.click(); pulseSel('.devpanel .tree42-h'); }

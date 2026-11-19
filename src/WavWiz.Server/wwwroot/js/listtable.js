@@ -279,7 +279,7 @@ export function listTable(S, ctl) {
     const up = async e => { if (e.pointerId !== pid) return; const was = moved, rows = pdrag?.rows; end(); if (!was || !rows) return;
       // swallow the click that follows a real drag so it doesn't also jump / play the row
       const eat = c => { c.stopPropagation(); c.preventDefault(); }; addEventListener('click', eat, { capture: true, once: true }); setTimeout(() => removeEventListener('click', eat, true), 0);
-      try { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(); else await moveRows(rows, t); }
+      try { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(e?.target?.isConnected ? e.target : undefined); else await moveRows(rows, t); }
       catch (err) { toast(err.message, true); ctl.refreshAll?.(); } finally { setTimeout(draw, 0); } };
     pdrag = { rows: null, cancel };
     addEventListener('pointermove', move, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', cancel, true);
@@ -306,7 +306,7 @@ export function listTable(S, ctl) {
     const rows = ev.dataTransfer.getData(QMIME), ref = ev.dataTransfer.getData(MIME) || (dragInfo.ref ? JSON.stringify(dragInfo.ref) : '');
     try {
       if (rows && !dragging) return;   // F46: a row drop only counts inside a live drag session that started in this table
-      if (rows) { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(); else await moveRows(JSON.parse(rows), t); }
+      if (rows) { if (!canDragRows({ can: true, locked: L.locked })) { toast(SORT_LOCK_HINT.replace('Sorting is', 'Reordering is')); return; } if (sort) await applySortAsOrder(ev?.currentTarget || undefined); else await moveRows(JSON.parse(rows), t); }
       else if (ref) { const body = { ...JSON.parse(ref), at: sort ? (t < order.length ? order[t] : V.queue.length) : t }; const r = await qapi('/queue/add', { method: 'POST', body }); const n = r?.added ?? 0; toast(n ? `Added to the queue` : 'Nothing to add'); if (n) ctl.refreshAll?.(); }
     } catch (e) { toast(e.message, true); ctl.refreshAll?.(); }
   });
@@ -334,8 +334,8 @@ export function listTable(S, ctl) {
     catch (e) { toast(e.message, true); ctl.refreshAll?.(); }
   });
   /** 0.3.7 L29: while a sort is showing a drag cannot place a row (the view is not the queue order) - offer to make the sort the real order. */
-  async function applySortAsOrder() {
-    if (!await ask(APPLY_SORT_Q, 'The queue is rearranged to match what you see now. You can undo it with Ctrl+Z.', { ok: 'Apply sort' })) return;
+  async function applySortAsOrder(anchor) {   // t2035u: anchor = where the row was dropped
+    if (!await ask(APPLY_SORT_Q, 'The queue is rearranged to match what you see now. You can undo it with Ctrl+Z.', { ok: 'Apply sort', anchor: anchor?.closest?.('[data-row],tr,.qrow') || anchor })) return;
     const n = V.queue.length, ord = sortedIndexes(V.queue, sort), mv = movesFor([...Array(n).keys()], ord);
     for (const m of mv) await qapi('/queue/move', { method: 'POST', body: m });
     undo = ord; sort = null; buildHead(); toast('Sort applied as the queue order'); ctl.refreshAll?.();

@@ -1,6 +1,7 @@
 // WavWiz 0.4.2: the zone tree. A zone holds its own speakers (nested); a speaker belongs to exactly one zone or to "Unassigned".
 // Every zone is a neutral "Queue: <Zone>" box (now playing + one volume + the zone card + its speakers). Zones that play the same music (linked) share ONE accent box
 // "Queue: <Leader> · IN SYNC". The Controlling zone's whole box (card + speakers) gets a thick accent edge; the selected speaker row gets its own highlight.
+import { inlineDraft, inlineName } from './popover.js';   // 0.7.1 t2033u: names are typed in place, not in a centered pop-up
 import { h, api, toast } from './util.js';
 import { icon, setIcon, setChev } from './icons.js';
 import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } from './mixer-core.js';   // F250-P8: phone Devices max-based (desktop average untouched)
@@ -91,8 +92,9 @@ export function treeEl(S, ctl, kit, st) {
     if (np && np.offsetParent && np.getBoundingClientRect().width > 0) { np.scrollIntoView?.({ block: 'nearest' }); (np.querySelector('.tbtn.play, button') || np).focus?.({ preventScroll: true }); } else ctl.go?.('now'); };
   const zname = id => groups.find(g => g.id === id)?.name || '';
   // t1954u: the zone NAME opens settings (stopPropagation so it does not also select); the rest of the box / card selects the zone
-  const zoneName = (id, label) => h('button', { type: 'button', class: 'dname zname ell', title: `${label} - open the zone settings`, onclick: ev => { ev.stopPropagation(); st.onZone(id); } }, label);
-  const create = () => promptName('New zone', '', async v => { await createZone(v, []); done(); });
+  const zoneName = (id, label) => h('button', { type: 'button', class: 'dname zname ell', title: `${label} - open the zone settings`, onclick: ev => { ev.stopPropagation(); st.onZone(id); }, 'data-zname': id }, label);
+  // t2033u: + puts a draft zone card at the top of the tree with its name focused (no centered pop-up)
+  const create = ev => { const hd = root.querySelector('.tree42-h'); inlineDraft(root, { before: hd ? hd.nextSibling : undefined, cls: 'zdraft42', label: 'New zone name', placeholder: 'Name the new zone, e.g. Downstairs', opener: ev?.currentTarget || null, save: async v => { await createZone(v, []); done(); } }); };
   // 0.4.3 #9: the counts are plain text inside the accent caps title, as in the render
   const addZoneBtn = ro(h('button', { type: 'button', class: 'btn sm zadd-new', 'aria-label': 'New zone', title: 'New zone', onclick: create }, '+'), admin);
   const addSpkBtn = ro(h('button', { type: 'button', class: 'btn sm zadd-spk', 'aria-label': 'Add speaker', title: 'Add speaker',
@@ -115,14 +117,17 @@ export function treeEl(S, ctl, kit, st) {
     try { await api((playing ? '/stream/pause' : '/stream/play') + q, { method: 'POST', body: {} }); ctl.refreshAll?.(); } catch (e) { toast(e.message, true); }
   };
   const openQueue = g => { Z.select('g:' + g.id); ctl.openQueue?.(); };
-  const rename = g => promptName(`Rename zone ${g.name}`, g.name, async v => { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); done(); });
+  // t2033u: Rename edits the zone name where it is shown; the old one-field window only if that name is not on screen
+  const rename = (g, el) => { const save = async v => { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); done(); };
+    const lab = root.querySelector(`[data-zname="${g.id}"]`) || el?.querySelector?.('.zname');
+    return lab ? inlineName(lab, { value: g.name, label: `Zone name (was ${g.name})`, opener: el || null, save }) : promptName(`Rename zone ${g.name}`, g.name, save); };
   const speakerSettings = z => st.onSpk(z.id, true);
 
   // ---- context menus
   const zoneCtx = (g, el) => attachCtx(el, () => {
     const live = (S.groups || []).find(x => x.id === g.id); if (!live) return []; g = live;   // F263: retained row, fresh inventory
     const ms = zoneMembers(S.zones, g), others = (S.groups || []).filter(o => o.id !== g.id && o.playbackId !== g.playbackId), muted = zoneMuted(S.zones, g);
-    const act = { playpause: () => playPause(g), mute: () => { const m = !zoneMuted(S.zones, g); if (m) for (const z of zoneMembers(S.zones, g)) z.muted = true; ctl.act(`/groups/${g.id}/mute`, { muted: m }); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } /* t1894: speakers show it at once */ }, control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g), delete: () => confirmRemoveZone(S, g, done) };
+    const act = { playpause: () => playPause(g), mute: () => { const m = !zoneMuted(S.zones, g); if (m) for (const z of zoneMembers(S.zones, g)) z.muted = true; ctl.act(`/groups/${g.id}/mute`, { muted: m }); try { window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } catch { /* node */ } /* t1894: speakers show it at once */ }, control: () => Z.select('g:' + g.id), queue: () => openQueue(g), settings: () => st.onZone(g.id), movetop: () => moveZone(g, 'top'), moveup: () => moveZone(g, 'up'), movedown: () => moveZone(g, 'down'), movebottom: () => moveZone(g, 'bottom'), split: () => Z.splitOff(g, done), rename: () => rename(g, el), delete: () => confirmRemoveZone(S, g, done, root.querySelector(`[data-zname="${g.id}"]`) || el.querySelector(".zname") || el) };
     return zoneMenu42({ admin, can, playing: g.now?.state === 'playing', muted, controlling: isControlling(g, cur), order: orderOf(g), linked: (g.linked || []).length > 0, others: others.map(o => ({ id: o.id, name: o.name })) })
       .map(it => it.sep ? it : it.sub ? { ...it, sub: it.sub.map(s => ({ ...s, onclick: () => linkTo(g, s.zone) })) } : { ...it, onclick: act[it.id] });
   }, `${g.name} zone actions`);
@@ -130,7 +135,8 @@ export function treeEl(S, ctl, kit, st) {
   const speakerCtx = (z, el, inZone) => attachCtx(el, () => {
     const live = (S.zones || []).find(x => x.id === z.id); if (!live) return []; z = live;   // F263: current speaker, not old poll objects
     const act = { mute: () => { const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH'); }, settings: () => speakerSettings(z), calibrate: () => openCalibration(S, ctl.refreshAll, z.id, { quick: true }),
-      rename: () => promptName(`Rename ${z.name}`, z.name, async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }), off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH') };
+      rename: () => { const save = async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }, lab = el.querySelector('.sp42-n');   // t2033u: in place
+        return lab ? inlineName(lab, { value: z.name, label: `Speaker name (was ${z.name})`, opener: el, save }) : promptName(`Rename ${z.name}`, z.name, save); }, off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH') };
     if (!inZone) return unassignedMenu42({ admin, zones: (S.groups || []).map(g => ({ id: g.id, name: g.name })) }).map(it => it.sub ? { ...it, sub: it.sub.map(s => ({ ...s, onclick: () => move(z, s.zone) })) } : { ...it, onclick: act[it.id] });
     const mine = (S.groups || []).find(g => (g.deviceIds || []).includes(z.id));
     return speakerMenu42({ admin, can, muted: !!z.muted, on: !!z.enabled, canCalibrate: canTune(S, z) && z.connected, zones: (S.groups || []).filter(g => g.id !== mine?.id).map(g => ({ id: g.id, name: g.name })) })
@@ -561,6 +567,6 @@ export function zonePane(S, ctl, kit, g, st) {
       others.length ? ro(h('button', { type: 'button', class: 'btn', 'data-act': 'zone-link', onclick: ev => Z.linkMenu(ev.currentTarget, S, g, done) }, icon('link'), ' Link to…'), can, 'Your access is view-only.') : null,
       (g.linked || []).length ? ro(h('button', { type: 'button', class: 'btn', 'data-act': 'zone-split', onclick: () => Z.splitOff(g, done) }, 'Split off'), can, 'Your access is view-only.') : null,
       h('span', { class: 'grow' }),
-      ro(h('button', { type: 'button', class: 'btn danger', 'data-act': 'zone-delete', onclick: () => confirmRemoveZone(S, g, done) }, 'Delete zone'), admin, 'Only an administrator can delete a zone.')));
+      ro(h('button', { type: 'button', class: 'btn danger', 'data-act': 'zone-delete', onclick: ev => confirmRemoveZone(S, g, done, ev.currentTarget) }, 'Delete zone'), admin, 'Only an administrator can delete a zone.')));
   return root;
 }

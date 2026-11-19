@@ -3,6 +3,7 @@
 // Profiles are stored on the server (/profiles); loading one snaps the sliders and shows "Loaded <name>". Nothing here opens a window.
 import { wsel } from './wwselect.js';
 import { h, api, toast } from './util.js';
+import { inlineDraft } from './popover.js';   // 0.7.1 t2033u
 import { icon } from './icons.js';
 import { isAdmin, canTune, canControl, ADMIN_HINT } from './ui.js';
 import { flatEq } from './eq.js';
@@ -314,7 +315,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const eqOn = h('button', { type: 'button', class: 'onpill spk-eqon', role: 'switch', 'data-act': 'eq-on', 'aria-label': 'EQ on or off', onclick: () => { if (!real || !tune) return; edit(c => { c.bypass = !c.bypass; }); paintEqCtl(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
   ro(eqOn, tune, 'Only this device’s own owner or an admin can change the sound.');
   const resetBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'eq-reset', title: 'Back to flat', onclick: () => { if (!real) return; edit(c => { c.graphicDb = new Array(10).fill(0); c.bass = { ...c.bass, gainDb: 0 }; c.treble = { ...c.treble, gainDb: 0 }; c.balance = 0; c.trimDb = 0; }); paintEq(); syncSliders(); paintPresets(); } }, 'Reset'), tune, 'Only this device’s own owner or an admin can change the sound.');
-  const saveAsBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'preset-saveas', onclick: () => { if (!real) return; parts.promptName?.('Save as preset', '', async v => { const body = { name: v, preset: { ...real.cur, name: v } }; await api('/dsp/presets', { method: 'POST', body }); real.presets = await api('/dsp/presets'); toast(`Saved preset “${v}”`); paintPresets(); }); } }, 'Save as preset'), admin || tune, 'Only this device’s own owner or an admin can save presets.');
+  const saveAsBtn = ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'preset-saveas', onclick: ev => { if (!real) return; const at = ev.currentTarget.closest('.spk-presets'); inlineDraft(at.parentNode, { before: at.nextSibling, cls: 'spk-predraft', label: 'Preset name', placeholder: 'Preset name', ok: 'Save', hint: 'Enter to save · Esc to cancel', opener: ev.currentTarget, save: async v => { const body = { name: v, preset: { ...real.cur, name: v } }; await api('/dsp/presets', { method: 'POST', body }); real.presets = await api('/dsp/presets'); toast(`Saved preset “${v}”`); paintPresets(); } }); } }, 'Save as preset'), admin || tune, 'Only this device’s own owner or an admin can save presets.');   // 0.7.1 t2033u: the preset name is typed under the preset row (no pop-up)
   const eqCtl = h('span', { class: 'spk-eqctl' }, eqOn);
   const paintEqCtl = () => { const on = real ? !real.cur.bypass : false; eqOn.classList.toggle('on', on); eqOn.setAttribute('aria-checked', String(on)); };
   // 0.4.4 F20: one themed dropdown "Preset: <name> ▾" (8 built-ins, then My presets; Custom when the bands match none), Reset + Save as preset beside it
@@ -332,7 +333,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const limiter = h('label', { class: 'spk-loud spk-limiter' }, h('input', { type: 'checkbox', 'data-act': 'limiter', onchange: ev => edit(c => { c.limiter = { ...c.limiter, enabled: ev.target.checked }; }) }), ' Limiter ', h('span', { class: 'small dim' }, 'Protects the speaker.'));
   const extraSw = h('div', { class: 'spk-sw' }, loud, preamp, limiter);
   const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), eqCtl), presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
-  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: () => parts.onRename(z) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, h('div', { class: 'spk-body' }, left, right));
+  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, h('div', { class: 'spk-body' }, left, right));
   capTitle();
   root.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('input[type=text],select')) { ev.stopPropagation(); if (anyDirty()) cancelAndClose(); else { root._teardownLive?.(); parts.onDone?.(); } } });
   // live values are patched in place - an open slider is never rebuilt

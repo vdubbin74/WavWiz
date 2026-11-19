@@ -1,6 +1,7 @@
 import { wsel } from './wwselect.js';
 import { orderedZones, orderedGroups, attachDevDrag, setLinkHandler, getCardOrder } from './devorder.js';
 import { h, api, toast, dialog } from './util.js';
+import { confirmNear, inlineName, inlineDraft, editingIn } from './popover.js';   // 0.7.1 t2033u / t2035u
 import { roomPill, roomPillClass } from './diag.js';
 import { centerEq } from './centerview.js';
 import { latencyControl, clampMs } from './latency.js';
@@ -165,7 +166,10 @@ const ro = (el, ok, hint = ADMIN_HINT) => { if (!ok) { el.disabled = true; el.ti
 const OWN_HINT = 'Only an administrator can change another device\'s output or delay. You can change them on the device you are using.';
 
 /** Confirm + remove a zone (the group only; its devices stay and become Unassigned). */
-export function confirmRemoveZone(S, g, done) {
+export function confirmRemoveZone(S, g, done, anchor) {
+  const n = (g.deviceIds || []).length, who = (S.zones || []).filter(z => (g.deviceIds || []).includes(z.id)).map(z => z.name).join(', ');
+  const near = confirmNear(anchor, { title: `Remove zone “${g.name}”?`, danger: true, ok: 'Remove zone', text: (g.active ? 'It is playing now: playback stops first. ' : '') + 'The zone and its settings are deleted. ' + (n ? `${n} speaker${n === 1 ? '' : 's'} move to Unassigned (${who}).` : 'Its devices are not touched.') });
+  if (near) return near.then(async yes => { if (!yes) return; try { await api(`/groups/${g.id}`, { method: 'DELETE' }); toast(`Zone “${g.name}” removed`); } catch (e) { toast(e.message, true); return; } done?.(); });
   dialog(`Remove zone “${g.name}”?`, h('div', null, h('p', null, 'The zone and its settings are deleted. Its devices are not touched - they simply move to Unassigned.'), (g.deviceIds || []).length ? h('p', { class: 'small', 'data-confirm-speakers': '' }, `${g.deviceIds.length} speaker${g.deviceIds.length === 1 ? '' : 's'} will move to Unassigned: ${(S.zones || []).filter(z => g.deviceIds.includes(z.id)).map(z => z.name).join(', ')}.`) : null,
     g.active ? h('p', { class: 'warnc' }, 'This zone is the one playing now: playback stops first.') : null),
   [{ text: 'Remove zone', cls: 'danger', onclick: async () => { try { await api(`/groups/${g.id}`, { method: 'DELETE' }); toast(`Zone “${g.name}” removed`); } catch (e) { toast(e.message, true); return false; } done?.(); } }, { text: 'Cancel' }]);
@@ -366,7 +370,7 @@ function zonesStrip(S, ctl, compact) {
     ro(h('button', { class: 'zname ell', title: 'Play in this zone only', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.name), can, 'Your access is view-only.'),
     h('span', { class: 'small dim' }, String(g.members)), (g.linked || []).length ? h('span', { class: 'zlinkic', title: Z.linkText(g.linked) }, icon('link')) : null, g.active ? h('span', { class: 'badge-active' }, 'ACTIVE') : null,
     compact ? null : ro(h('button', { class: 'zbtn zedit', 'aria-label': `Edit zone ${g.name}`, title: 'Edit zone', onclick: () => editZone(S, g, ctl.refreshAll) }, '✎'), admin),
-    compact ? null : ro(h('button', { class: 'zbtn danger', 'aria-label': `Remove zone ${g.name}`, title: 'Remove zone', onclick: () => confirmRemoveZone(S, g, ctl.refreshAll) }, '✕'), admin)));
+    compact ? null : ro(h('button', { class: 'zbtn danger', 'aria-label': `Remove zone ${g.name}`, title: 'Remove zone', onclick: ev => confirmRemoveZone(S, g, ctl.refreshAll, ev.currentTarget) }, '✕'), admin)));
   const jb = S.jb?.own ? [h('span', { class: 'zchip' + (cur?.kind === 'jukebox' ? ' zsel-on' : ''), 'data-zone': 'Jukebox', 'data-group-id': 'jukebox' }, h('button', { class: 'zname ell', title: 'Control the Jukebox zone', onclick: () => Z.select(Z.JUKEBOX_KEY) }, 'Jukebox'), h('span', { class: 'small dim' }, String((S.jb.deviceIds || []).length)))] : [];
   return h('div', { class: 'dzones' }, h('span', { class: 'dlbl' }, 'ZONES'), zs.length ? [...zs, ...jb] : h('span', { class: 'small dim' }, 'None yet (optional groups, like “Downstairs”)'), add);
 }
@@ -440,7 +444,7 @@ function zoneEditView(S, ctl, side, g, setEdit, setPick) {
   const boxes = (S.zones || []).map(z => h('label', { class: 'row zsmember' }, ro(h('input', { type: 'checkbox', checked: picked.has(z.id), onchange: ev => { ev.target.checked ? picked.add(z.id) : picked.delete(z.id); } }), admin), h('span', { class: 'dot ' + dotClass(z) }), h('span', { class: 'ell' }, z.name)));
   const save = ro(h('button', { class: 'btn primary', onclick: async () => { try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: name.value, deviceIds: [...picked] } }); toast('Zone saved'); ctl.refreshAll(); } catch (e) { toast(e.message, true); } } }, 'Save'), admin);
   const play = ro(h('button', { class: 'btn', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.active ? '▶ Playing here' : '▶ Play here only'), can, 'Your access is view-only.');
-  const del = ro(h('button', { class: 'btn danger', onclick: () => confirmRemoveZone(S, g, () => { setEdit(null); setPick('all'); ctl.refreshAll(); }) }, 'Remove zone'), admin);
+  const del = ro(h('button', { class: 'btn danger', onclick: ev => confirmRemoveZone(S, g, () => { setEdit(null); setPick('all'); ctl.refreshAll(); }, ev.currentTarget) }, 'Remove zone'), admin);
   side.classList.add('editing');
   side.append(back, h('div', { class: 'dlbl' }, 'ZONE NAME'), name, h('div', { class: 'dlbl' }, 'DEVICES'), h('div', { class: 'zsmembers' }, boxes.length ? boxes : h('p', { class: 'small dim' }, 'No devices yet.')),
     h('div', { class: 'zsactions' }, save, play, del));
@@ -666,7 +670,7 @@ function moreMenu(S, ctl, z, cur, histHost = null) {
     item(z.reference ? 'Reference speaker ✓' : 'Set as reference', () => setReference(ctl, z), admin && !z.reference, z.reference ? 'Already the reference speaker' : ADMIN_HINT),
     item('Delay history', () => delayHistory(S, ctl, z, cur, histHost), !!cur, 'No output yet.'),
     cur?.kind === 'bluetooth' ? item('Follow this speaker', async () => { try { await api('/speakers/profiles/capture', { method: 'POST', body: { deviceId: z.id, name: cur.name, follow: true } }); toast('Saved profile and enabled Follow this speaker'); } catch (e) { toast(e.message, true); } }, canTune(S, z), OWN_HINT) : null,
-    item('Forget device…', () => forget(ctl, z), admin, ADMIN_HINT, 'danger'));
+    item('Forget device…', () => forget(ctl, z, wrap.querySelector('button')), admin, ADMIN_HINT, 'danger'));
   const btn = h('button', { type: 'button', class: 'btn dmorebtn', 'aria-haspopup': 'menu', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); menu.hidden ? open() : close(); } }, 'More ▾');
   const outside = ev => { if (!wrap.contains(ev.target)) close(); };
   const esc = ev => { if (ev.key === 'Escape' && !menu.hidden) { ev.preventDefault(); ev.stopPropagation(); close(); btn.focus(); } };
@@ -729,7 +733,10 @@ function rename(S, ctl, z, from) {
   nm.replaceWith(box); input.focus(); input.select();
 }
 async function setReference(ctl, z) { try { const r = await api('/calibration/reference', { method: 'PUT', body: { zoneId: z.id } }); toast(r?.groupId ? `${z.name} is now the reference for its zone` : `${z.name} is now the reference speaker`); ctl.refreshAll(); } catch (e) { toast(e.message, true); } }
-function forget(ctl, z) {
+function forget(ctl, z, anchor) {
+  const go = async () => { try { await api(`/players/${encodeURIComponent(z.playerId)}`, { method: 'DELETE' }); toast(`${z.name} was forgotten`); ctl.refreshAll(); } catch (e) { toast(e.message, true); return false; } };
+  const near = confirmNear(anchor, { title: `Forget “${z.name}”?`, danger: true, ok: 'Forget device', text: 'Its pairing is revoked and it leaves the device list and any zone. Saved delays are kept. ' + (z.isWeb ? 'A browser speaker comes back by itself the next time WavWiz is opened there.' : 'The PC can pair again from WavWiz Player (Pair again… in the tray menu).') });
+  if (near) return near.then(yes => { if (yes) go(); });
   dialog(`Forget “${z.name}”?`, h('div', null, h('p', null, 'Its pairing is revoked and it disappears from the device list and from any zone. Saved delays for its speakers are kept.'),
     h('p', { class: 'small dim' }, z.isWeb ? 'A browser speaker comes back by itself the next time WavWiz is opened there.' : 'The PC can be paired again from WavWiz Player (Pair again… in the tray menu) with a new 6-digit code.')),
   [{ text: 'Forget device', cls: 'danger', onclick: async () => { try { await api(`/players/${encodeURIComponent(z.playerId)}`, { method: 'DELETE' }); toast(`${z.name} was forgotten`); ctl.refreshAll(); } catch (e) { toast(e.message, true); return false; } } }, { text: 'Cancel' }]);
@@ -932,6 +939,7 @@ function tree42Kit(S, ctl, X) {
   // F269: zone membership (which speaker is in which zone). A change is the user's own move (or another client's): rebuild at once, never held by hover.
   const memSig42 = () => treeMoveSig42(S.groups) + '|' + treeSwitchSig42(S.zones);   // t1894 + t1897: + who is muted / switched off
   const treeNode = force => {
+    if (tnode && editingIn(tnode)) return tnode;   // 0.7.1 t2033u: a name is being typed in the tree - keep it (and the text); popover.js redraws when the edit ends
     // 0.6.9 #12: a card-order change (this user's drop / Move up, or another client's) is a deliberate move like F269 membership: rebuild at once, never held by hover
     const sg = sig42(), lv = live42(), openSg = openSig42(), mem = memSig42() + '|' + JSON.stringify(getCardOrder()), memMoved = !!tnode && mem !== tmem;
     // DIG-R1: open preference change always rebuilds (foldSig also guards patch paths)
@@ -968,7 +976,8 @@ function tree42Kit(S, ctl, X) {
       pnl?.firstChild?._destroy?.();
       pnl = h('div', { class: 'd42-pane', 'data-key': key });
       if (spZ) {
-        const sp = speakerSettings(S, ctl, spZ, { onDone: () => X.setSpk(null), outputPicker: zz => outputPicker(S, ctl, zz), promptName, onRename: z => promptName(`Rename ${z.name}`, z.name, async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }),
+        const sp = speakerSettings(S, ctl, spZ, { onDone: () => X.setSpk(null), outputPicker: zz => outputPicker(S, ctl, zz), promptName, onRename: (z, btn) => { const save = async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); };   // t2033u: the name is typed where the Rename button was
+          return btn ? inlineName(btn, { value: z.name, label: `Speaker name (was ${z.name})`, setText: false, save }) : promptName(`Rename ${z.name}`, z.name, save); },
           tags: z => tagEls3(cardTags3(z)), zoneRow: z => zoneRow42(z, orderedGroups(S.groups || [])),   // F264: live groups, not the build-time snapshot
           calibrate: zz => h('button', { type: 'button', class: 'btn calbtn' + (zz.badge === 'recheck' || zz.badge === 'uncalibrated' ? ' primary' : ''), disabled: !(canTune(S, zz) && zz.connected && !zz.reference) || undefined, title: zz.reference ? 'This is the reference speaker.' : '', onclick: () => openCalibration(S, ctl.refreshAll, zz.id, { quick: true }) }, 'Calibrate'),
           calhelp: () => calHelpLink('calhelp-dev'),   // 0.4.5 F29
@@ -1410,7 +1419,8 @@ function speakerRow(S, ctl, z, hl, { dim = false, groups = [], addable = false }
 function addToZoneMenu(S, ctl, z, anchor, groups) {
   document.querySelector('.zaddmenu')?.remove();
   const m = h('div', { class: 'dmenu zaddmenu', role: 'menu' }, (groups || []).length ? groups.map(g => h('button', { type: 'button', role: 'menuitem', onclick: async () => { m.remove(); const q = swapQuestion(S, z, g.id); try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: [...new Set([...(g.deviceIds || []), z.id])] } }); toast(`${z.name} added to ${g.name}`); ctl.refreshAll(); offerSwap(q, g.id, z, ctl.refreshAll); } catch (e) { toast(e.message, true); } } }, g.name))
-    : h('p', { class: 'small dim pad' }, 'No zones yet.'), h('button', { type: 'button', role: 'menuitem', onclick: () => { m.remove(); editZone(S, null, ctl.refreshAll); } }, '+ New zone…'));
+    : h('p', { class: 'small dim pad' }, 'No zones yet.'), h('button', { type: 'button', role: 'menuitem', onclick: ev => { const b = ev.currentTarget; b.hidden = true;   // t2033u: the new zone's name is typed right here, then this speaker goes in it
+      inlineDraft(m, { before: null, label: 'New zone name', placeholder: 'New zone name', hint: `Enter to create with ${z.name}`, opener: anchor, onEnd: () => m.remove(), save: async v => { await createZone(v, [z.id]); toast(`${z.name} is in the new zone ${v}`); ctl.refreshAll(); } }); } }, '+ New zone…'));
   anchor.after(m); m.querySelector('button')?.focus();
   const off = ev => { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('pointerdown', off, true); } }; setTimeout(() => document.addEventListener('pointerdown', off, true), 0);
   m.addEventListener('keydown', ev => { if (ev.key === 'Escape') { m.remove(); anchor.focus(); } });
@@ -1527,9 +1537,9 @@ function promptName(title, value, onSave) {
 function speakerCtx(S, ctl, z, card, openIt) {
   attachCtx(card, () => {
     const admin = isAdmin(S), can = canControl(S);
-    const act = { settings: () => openIt?.(), rename: () => promptName(`Rename ${z.name}`, z.name, async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }),
+    const act = { settings: () => openIt?.(), rename: () => { const save = async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }, lab = card.querySelector('.dname'); return lab ? inlineName(lab, { value: z.name, label: `Speaker name (was ${z.name})`, opener: card, save }) : promptName(`Rename ${z.name}`, z.name, save); },
       mute: () => { const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH'); }, off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH'),
-      calibrate: () => openCalibration(S, ctl.refreshAll, z.id, { quick: true }), move: () => addToZoneMenu(S, ctl, z, card, S.groups || []), remove: () => forget(ctl, z) };
+      calibrate: () => openCalibration(S, ctl.refreshAll, z.id, { quick: true }), move: () => addToZoneMenu(S, ctl, z, card, S.groups || []), remove: () => forget(ctl, z, card.querySelector('.dname') || card) };
     return speakerMenuItems({ admin, can, muted: !!z.muted, on: !!z.enabled, canCalibrate: canTune(S, z) && z.connected }).map(it => it.sep ? it : { ...it, onclick: act[it.id] });
   }, `${z.name} actions`);
 }
@@ -1537,9 +1547,9 @@ function speakerCtx(S, ctl, z, card, openIt) {
 function zoneCtx(S, ctl, g, card, ms, { onEdit = null } = {}) {
   attachCtx(card, () => {
     const admin = isAdmin(S), can = canControl(S), muted = zoneMuted(S.zones, g), on = zoneOn(S.zones, g), linked = (g.linked || []).length > 0, canLink = (S.groups || []).length > 1;
-    const act = { settings: () => (onEdit ? onEdit(g.id) : editZone(S, g, ctl.refreshAll)), rename: () => promptName(`Rename zone ${g.name}`, g.name, async v => { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); ctl.refreshAll?.(); }),
+    const act = { settings: () => (onEdit ? onEdit(g.id) : editZone(S, g, ctl.refreshAll)), rename: () => { const save = async v => { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: v, deviceIds: g.deviceIds || [] } }); ctl.refreshAll?.(); }, lab = card.querySelector('.zname, .dname'); return lab ? inlineName(lab, { value: g.name, label: `Zone name (was ${g.name})`, opener: card, save }) : promptName(`Rename zone ${g.name}`, g.name, save); },
       mute: () => { const m = !zoneMuted(S.zones, g); for (const z of zoneMembers(S.zones, g)) z.muted = m; ctl.act(`/groups/${g.id}/mute`, { muted: m }); }, off: () => { for (const z of ms) ctl.act(`/zones/${z.id}`, { enabled: !on }, 'PATCH'); },
-      split: () => Z.splitOff(g, ctl.refreshAll), link: () => Z.linkMenu(card, S, g, ctl.refreshAll), remove: () => confirmRemoveZone(S, g, ctl.refreshAll) };
+      split: () => Z.splitOff(g, ctl.refreshAll), link: () => Z.linkMenu(card, S, g, ctl.refreshAll), remove: () => confirmRemoveZone(S, g, ctl.refreshAll, card.querySelector('.zname, .dname') || card) };
     return zoneMenuItems({ admin, can, muted, on, linked, canLink }).map(it => it.sep ? it : { ...it, onclick: act[it.id] });
   }, `${g.name} zone actions`);
 }
@@ -1726,7 +1736,7 @@ function zoneInline(S, ctl, g, close) {
   const err = h('span', { class: 'small err', role: 'status' });
   const save = ro(h('button', { type: 'button', class: 'btn sm primary', onclick: async () => { try { { const body = { name: name.value, deviceIds: [...picked] }; if (g) await api(`/groups/${g.id}`, { method: 'PATCH', body }); else await createZone(body.name, body.deviceIds); } toast(g ? 'Zone saved' : `Zone “${name.value.trim()}” created`); close(); ctl.refreshAll(); } catch (e) { err.textContent = e.message; } } }, g ? 'Save' : 'Create zone'), admin);
   const play = g ? ro(h('button', { type: 'button', class: 'btn sm', onclick: () => ctl.act(`/groups/${g.id}/activate`) }, g.active ? '▶ Playing here' : '▶ Play here only'), can, 'Your access is view-only.') : null;
-  const del = g ? ro(h('button', { type: 'button', class: 'btn sm danger', onclick: () => confirmRemoveZone(S, g, () => { close(); ctl.refreshAll(); }) }, 'Remove zone'), admin) : null;
+  const del = g ? ro(h('button', { type: 'button', class: 'btn sm danger', onclick: ev => confirmRemoveZone(S, g, () => { close(); ctl.refreshAll(); }, ev.currentTarget) }, 'Remove zone'), admin) : null;
   const el = h('div', { class: 'zcard zinline card', 'data-group-id': g?.id ?? 'new', role: 'group', 'aria-label': g ? `Zone settings for ${g.name}` : 'New zone' },
     h('div', { class: 'row' }, h('b', null, g ? 'Edit zone' : 'New zone'), h('span', { class: 'grow' }), h('button', { type: 'button', class: 'linkbtn', onclick: close }, '▲ Close')),
     h('div', { class: 'dlbl' }, 'ZONE NAME'), name, h('div', { class: 'dlbl' }, 'DEVICES'), h('div', { class: 'zsmembers' }, boxes.length ? boxes : h('p', { class: 'small dim' }, 'No devices yet.')),

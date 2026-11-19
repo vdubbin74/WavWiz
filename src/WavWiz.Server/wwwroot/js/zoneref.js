@@ -18,9 +18,9 @@ export function swapQuestion(S, z, toId) {
   return `${g.name} already has a reference. Make ${z.name} the reference instead?`;
 }
 /** After a successful move: ask (only when it applies) and swap only on yes. */
-export async function offerSwap(q, toId, z, refresh) {
+export async function offerSwap(q, toId, z, refresh, anchor) {
   if (!q) return false;
-  if (!await ask('Reference speaker', q, { ok: 'Make it the reference', cancel: 'Keep the current one' })) return false;
+  if (!await ask('Reference speaker', q, { ok: 'Make it the reference', cancel: 'Keep the current one', anchor: anchor || (() => document.querySelector(`.tree42 [data-device-id="${z.id}"] .sp42-n`) || undefined) })) return false;   // t2035u: next to the speaker that just moved
   try { await api(`/groups/${toId}/reference`, { method: 'PUT', body: { zoneId: z.id } }); toast(`${z.name} is now the reference`); refresh?.(); return true; }
   catch (e) { toast(e.message, true); return false; }
 }

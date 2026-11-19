@@ -1,5 +1,6 @@
 import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, ask } from './util.js';
+import { confirmNear } from './popover.js';   // 0.7.1 t2035u
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
 import { networkCard, diagnosticsView, listenText } from './diag.js';
@@ -252,6 +253,9 @@ export async function openSettings(S, refresh, nav, section) {
   }
   function revokeToken(t) {
     const rm = h('input', { type: 'checkbox', checked: true, id: 'rev-rm' });
+    const go = async () => { try { await api(`/tokens/${t.id}${rm.checked ? '?removeFromList=1' : ''}`, { method: 'DELETE' }); toast('Revoked'); } catch (e) { toast(e.message, true); return false; } draw(); };
+    const near = confirmNear(undefined, { title: `Revoke “${t.name}”?`, danger: true, ok: 'Revoke', text: 'This device is signed out at once and can no longer control WavWiz or play music. Speakers it opened in a browser leave the device list.', extra: h('label', { class: 'row small' }, rm, 'Also remove its WavWiz Player from the device list') });   // t2035u: next to its Revoke button
+    if (near) return near.then(yes => { if (yes) go(); });
     dialog(`Revoke “${t.name}”?`, h('div', null, h('p', null, 'This device is signed out at once and can no longer control WavWiz or play music. A player that is still running will say “not paired” and offer to pair again.'),
       h('p', { class: 'small dim' }, 'Speakers it opened in a browser leave the device list at once, on every open page.'),
       h('label', { class: 'row' }, rm, 'Also remove its WavWiz Player from the device list')),

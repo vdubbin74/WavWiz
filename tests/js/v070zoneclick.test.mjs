@@ -34,7 +34,7 @@ const zones = [
 
 test('t1954u wiring: the zone name opens settings (stopPropagation); the rest of the box / card selects the zone', () => {
   const t = src('tree42.js'), z = src('zones40.js'), m = src('main.js');
-  assert.match(t, /const zoneName = \(id, label\) => h\('button', \{ type: 'button', class: 'dname zname ell', title: `\$\{label\} - open the zone settings`, onclick: ev => \{ ev\.stopPropagation\(\); st\.onZone\(id\); \} \}, label\);/);
+  assert.match(t, /const zoneName = \(id, label\) => h\('button', \{ type: 'button', class: 'dname zname ell', title: `\$\{label\} - open the zone settings`, onclick: ev => \{ ev\.stopPropagation\(\); st\.onZone\(id\); \}, 'data-zname': id \}, label\);/   /* 0.7.1 t2033u: data-zname lets Rename find the label */);
   assert.match(t, /const card = h\('div', \{ class: 'zcard42' \+ \(on \? '' : ' off'\), 'data-group-id': g\.id, onclick: ev => \{ ev\.stopPropagation\(\); if \(ev\.target\.closest\([^)]+\)\) return; controlZone\(g\.id\); \}/);
   assert.match(t, /const controlZone = id => \{ Z\.select\('g:' \+ id\);/);
   assert.match(t, /title: 'Jukebox - open the zone settings \(pick its speakers\)', onclick: ev => \{ ev\.stopPropagation\(\); open\(\); \}/);

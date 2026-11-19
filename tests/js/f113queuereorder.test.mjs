@@ -13,7 +13,7 @@ test('F113: pointer mode = pointer row reorder, rows not HTML5-draggable', () =>
   assert.match(l, /usesPointer\(dndMode\(\), ev\.pointerType\)/);
   assert.match(l, /Math\.hypot\(e\.clientX - x0, y - y0\) < 5/);
   assert.match(l, /await moveRows\(rows, t\)/);
-  assert.match(l, /if \(sort\) await applySortAsOrder\(\); else await moveRows\(rows, t\)/);
+  assert.match(l, /if \(sort\) await applySortAsOrder\([^;]*\); else await moveRows\(rows, t\)/);
   assert.match(l, /insLine\.hidden = false;[^\n]*Move here/);
 });
 test('F113: F46 guards remain (HTML5 session, settling, cancel on collapse/resize, no move unless moved)', () => {

@@ -32,6 +32,8 @@ class Node0 {
   get children() { return this.childNodes.filter(n => n.nodeType === 1); }
   get firstElementChild() { return this.children[0] || null; }
   get firstChild() { return this.childNodes[0] || null; }
+  get nextSibling() { const p = this.parentNode; if (!p) return null; return p.childNodes[p.childNodes.indexOf(this) + 1] || null; }
+  after(...ns) { const p = this.parentNode; if (!p) return; const ref = this.nextSibling; for (const n of ns) p.insertBefore(typeof n === 'string' ? doc.createTextNode(n) : n, ref); }
   contains(n) { for (; n; n = n.parentNode) if (n === this) return true; return false; }
   _detach(n) { if (!n.parentNode) return; const p = n.parentNode; if (n.contains(doc.activeElement) && n.isConnected) doc._blurTo(doc.body); p.childNodes.splice(p.childNodes.indexOf(n), 1); n.parentNode = null; }
   insertBefore(n, ref) {
@@ -99,6 +101,7 @@ class El extends Node0 {
   closest(sel) { for (let n = this; n && n.nodeType === 1; n = n.parentNode) if (matches(n, sel)) return n; return null; }
   focus() { if (doc.activeElement === this) return; doc._blurTo(this); }
   blur() { if (doc.activeElement === this) doc._blurTo(doc.body); }
+  select() { this._selected = true; }
   click() { this.dispatchEvent(ev('click')); }
   showModal() { this._open = true; this.setAttribute('open', ''); }
   close() { this._open = false; this.removeAttribute('open'); }

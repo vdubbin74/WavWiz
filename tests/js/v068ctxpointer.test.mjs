@@ -63,7 +63,7 @@ test('Library attachItem opens openCtx at the pointer; sheet/song sheet stay pho
   assert.match(s, /openCtx\(x, y, ctxItems\(\)/);
   assert.match(s, /ev\.type === 'contextmenu'/);
   assert.match(s, /openAt\(ev\.clientX, ev\.clientY/);
-  assert.match(s, /max-width:900px/);
+  assert.match(s, /contains\('handset'\)/);   // 0.7.1: real phones only (was max-width:900px, which also hit a narrow PC window)
   assert.match(s, /if \(isPhone\(\)\) return openPhoneSheet\(\)/);
   assert.match(s, /openSongSheet/);
   assert.match(s, /return sheet\(title/);
