@@ -19,6 +19,7 @@ import { itemArtUrl } from './art.js';
 import * as Z from './zones40.js';
 import { attachCtx, closeCtx, speakerMenuItems, zoneMenuItems } from './ctxmenu.js';
 import { swapQuestion, offerSwap } from './zoneref.js';   // 0.6.8-#15
+import { speakerRefSec } from './refrec.js';   // 0.7.1: recommended reference
 import { treeEl, zonePane, crumb, HINT42, movePlan, isControlling, createZone } from './tree42.js';
 import { nowLines } from './livemeta.js';   // 0.7.0 radio now-playing
 import { jbSaved, jbHint, jbAutosave, jbFlushAll, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19; 0.7.1 t2040u: saved on each change
@@ -625,10 +626,12 @@ function cardSettings(S, ctl, z) {
     'btn calbtn' + (z.badge === 'recheck' || z.badge === 'uncalibrated' ? ' primary' : ''));
   const eqHost = h('div', { class: 'dseq' }), histHost = h('div', { class: 'dshist' });   // 0.3.5 J9 #4/#5: Sound / EQ and Delay history fold out here
   const more = moreMenu(S, ctl, z, cur, histHost);
+  const refSec = speakerRefSec(S, z, admin, ctl.refreshAll);
   const el = h('div', { class: 'dsettings', role: 'group', id: `dset-${z.id}`, 'aria-label': `${z.name} settings` },
     sec('OUTPUT', out.el),
     sec('MAX VOLUME', volCapControl(S, ctl, z, admin)),
     cur ? sec('DELAY', h('div', { class: 'ddelay' }, delay, calib, calHelpLink('calhelp-dev')), note) : null,   // 0.4.5 F29
+    refSec ? sec('REFERENCE', refSec) : null,   // 0.7.1: the zone's reference / RECOMMENDED + one-tap Use
     h('div', { class: 'dssec' }, h('div', { class: 'row dsbtns' },
       btn('Test sound', testSound, can && z.connected, can ? 'This device is offline.' : 'Your access is view-only.'),
       btn('Sound / EQ', ev => { const b = ev.currentTarget; if (eqHost.firstChild) { eqHost._eq?.destroy(); eqHost._eq = null; eqHost.replaceChildren(); b.classList.remove('on'); return; } b.classList.add('on'); eqHost._eq = centerEq(S, eqHost, { deviceId: cur?.deviceId }); }   /* 0.3.7 L7: the SAME EQ + All sound settings as the center, for this speaker */, tune && !!cur, cur ? OWN_HINT : 'No output yet.'),
@@ -929,7 +932,7 @@ function tree42Kit(S, ctl, X) {
     (S.groups || []).map(g => [g.now?.state, g.now?.title, g.now?.artist, g.now?.durationMs, Math.floor((g.now?.positionMs || 0) / 10000), (g.now?.positionMs || 0) > 0]), S.jb?.own ? [S.jb.now?.title, S.jb.now?.state] : null]);
   const openSig42 = () => { let a = '', b = ''; try { a = sessionStorage.getItem('wavwiz.qb42.open') || ''; } catch { /* */ } try { b = localStorage.getItem('wavwiz.zfold') || ''; } catch { /* */ } return a + '|' + b; };   // F266: zone folds rebuild the tree   // DIG-R1: idle expand preference participates in cache
   const sig42 = () => JSON.stringify([!!S.cast?.active, (S.zones || []).map(z => [z.id, z.name, z.enabled, z.connected, z.muted, z.volLocked, z.volCap, z.room?.state, z.reference, chosenOutput(z)?.notCalibrated, z.outputs?.length]),
-    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
+    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online, g.referenceId, g.refNote, g.recommendedId, g.refFlag?.kind]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
   const st42 = { get spk() { return X.spk; }, get zone() { return X.zsel; },
     onZone: id => { X.zsel = id; X.spk = null; try { sessionStorage.removeItem('wavwiz.spk'); } catch { /* private mode */ } if (X.size === 'expanded' || X.size === 'phone') X.draw(true); else { X.f69from = X.size; ctl.setDevSize?.('expanded'); } },
     onSpk: id => { const z = (S.zones || []).find(x => x.id === id); const g = (S.groups || []).find(x => (x.deviceIds || []).includes(id)); X.zsel = g ? g.id : null; if (X.size === 'expanded' || X.size === 'phone') X.setSpk(id); else { X.f69from = X.size; X.spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } void z; } };
@@ -983,6 +986,7 @@ function tree42Kit(S, ctl, X) {
           tags: z => tagEls3(cardTags3(z)), zoneRow: z => zoneRow42(z, orderedGroups(S.groups || [])),   // F264: live groups, not the build-time snapshot
           calibrate: zz => h('button', { type: 'button', class: 'btn calbtn' + (zz.badge === 'recheck' || zz.badge === 'uncalibrated' ? ' primary' : ''), disabled: !(canTune(S, zz) && zz.connected && !zz.reference) || undefined, title: zz.reference ? 'This is the reference speaker.' : '', onclick: () => openCalibration(S, ctl.refreshAll, zz.id, { quick: true }) }, 'Calibrate'),
           calhelp: () => calHelpLink('calhelp-dev'),   // 0.4.5 F29
+          refCard: zz => speakerRefSec(S, zz, isAdmin(S), ctl.refreshAll),   // 0.7.1
           more: zz => moreMenu(S, ctl, zz, chosenOutput(zz), null) });
         pnl.append(sp);
       } else if (jbSel) { jbUserOpen = true; const c = jukeboxCard(S, ctl); if (c) { c.classList.add('jbpane76'); pnl.append(h('div', { class: 'pane-h dsec-h' }, h('span', null, 'JUKEBOX ZONE SETTINGS')), c); } }

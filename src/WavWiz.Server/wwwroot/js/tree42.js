@@ -8,6 +8,7 @@ import { phoneZoneMembers, phoneZoneLevel, phoneZoneVolWriter, uniqueMembers } f
 import { startPointerDrag, pointerDropTarget } from './pdrag.js';
 import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
+import { flagNote, useRef, zoneRefBlock } from './refrec.js';   // 0.7.1: recommended reference + flags (never switched by itself)
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
@@ -183,8 +184,12 @@ export function treeEl(S, ctl, kit, st) {
         h('div', { class: 'dtagrow ztagrow zc42-2' }, sel ? Z.controllingTag() : null, S.cast?.active && (S.cast.zones || []).includes(g.id) ? h('span', { class: 'dtag zcast', title: `Playing what a phone sends to ${S.cast.name}` }, S.cast.kind === 'spotify' ? 'SPOTIFY' : 'AIRPLAY') : null, leaderOf ? h('span', { class: 'small dim zc42-q' }, `Queue from ${leaderOf.name}`) : null, tagEls3(tags), lb && linked ? h('span', { class: 'zacts zc42-lb' }, lb) : null)));
     const list = h('div', { class: 'zsp42', role: 'list', 'aria-label': `Speakers in ${g.name}` }, ms.length ? ms.map(z => spRow(z, g.id)) : h('div', { class: 'drop42' }, 'Drop speakers here'));
     if (box && box._collapsed) { list.hidden = true; list.classList.add('zsp42-collapsed'); }
-    // 0.6.8-#15: quiet note after the zone's reference speaker left (the server picked a new one and re-based the delays)
-    const note = g.refNote ? h('div', { class: 'zrefnote42', role: 'status' }, h('span', { class: 'grow' }, g.refNote), h('button', { type: 'button', class: 'zrefnote-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { ev.stopPropagation(); dismissNote(g, done); } }, '✕')) : null;
+    // 0.6.8-#15: quiet note about the zone's reference. 0.7.1: when the reference left, nothing is picked for the user - the note names the
+    // recommended replacement with a one-tap Use (admin); the switch re-bases the saved delays as before.
+    const fn = flagNote(S, g) || (g.refNote ? { text: g.refNote, use: null } : null);
+    const note = fn ? h('div', { class: 'zrefnote42', role: 'status' }, h('span', { class: 'grow' }, fn.text),
+      fn.use && isAdmin(S) ? h('button', { type: 'button', class: 'btn sm zrefnote-use', 'data-act': 'use-recommended', onclick: ev => { ev.stopPropagation(); useRef(g, fn.use, done); } }, `Use ${fn.use.name}`) : null,
+      h('button', { type: 'button', class: 'zrefnote-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { ev.stopPropagation(); dismissNote(g, done); } }, '✕')) : null;
     const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-playback-id': g.playbackId || 'default', 'data-zone': g.name }, card, note, list);
     zoneCtx(g, wrap);
     return wrap;
@@ -569,6 +574,7 @@ export function zonePane(S, ctl, kit, g, st) {
       ms.length ? h('ul', { class: 'zp42-list' }, ms.map(z => h('li', null, h('button', { type: 'button', class: 'dname ell', onclick: () => st.onSpk(z.id) }, z.name), h('span', { class: 'grow' }),
         ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'zone-remove-speaker', 'aria-label': `Remove ${z.name} from ${g.name}`, onclick: async () => { try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: (g.deviceIds || []).filter(x => x !== z.id) } }); toast(`${z.name} is now unassigned`); done(); } catch (e) { toast(e.message, true); } } }, 'Remove'), admin, 'Only an administrator can change zones.'))))
         : h('p', { class: 'small dim' }, 'No speakers yet. Drag a speaker here, or use Add to zone.')),
+    ms.length ? h('div', { class: 'zp42-row zp42-refrow' }, zoneRefBlock(S, g, admin, done)) : null,   // 0.7.1: reference + recommendation
     kit.receiverBlock ? h('div', { class: 'zp42-row zp42-recv' }, kit.receiverBlock(g, admin)) : null,
     h('div', { class: 'zp42-row zp42-acts' },
       others.length ? ro(h('button', { type: 'button', class: 'btn', 'data-act': 'zone-link', onclick: ev => Z.linkMenu(ev.currentTarget, S, g, done) }, icon('link'), ' Link to…'), can, 'Your access is view-only.') : null,

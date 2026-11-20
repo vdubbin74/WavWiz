@@ -1,5 +1,5 @@
 // 0.6.8-#15: one reference speaker per zone (the zone's timing clock for calibration). The server keeps at most one per zone (none until the user
-// picks one), picks a new one when it leaves and 2+ speakers remain, re-bases the saved offsets and leaves a quiet note. This module: the swap prompt after a move, the note, and which
+// picks one); 0.7.1: when it leaves, none is picked - the zone is flagged with the recommended one (refrec.js). This module: the swap prompt after a move, the note, and which
 // reference a calibration starts from. Pure helpers are exported for tests.
 import { api, toast, ask } from './util.js';
 

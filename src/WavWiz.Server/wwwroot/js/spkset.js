@@ -311,6 +311,9 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const paintCal = async () => { const o = cur(); if (!o?.deviceId) { calLine.textContent = 'Calibration: Not calibrated'; return; }
     try { const hs = await api(`/outputs/${encodeURIComponent(o.deviceId)}/calibrations`); calLine.textContent = calText(hs); } catch { calLine.textContent = 'Calibration: unknown'; } };
   const left = h('div', { class: 'spk-left' }, vol, capRow, delay, balance, bass, treble, trim);
+  // 0.7.1: REFERENCE card - the zone's reference / RECOMMENDED + one-tap Use, and its flags (built by the caller, refrec.js)
+  const refCard = parts.refCard ? parts.refCard(z) : null;
+  const refHost = refCard ? h('div', { class: 'spk-ref', 'data-act': 'spk-reference' }, h('div', { class: 'dlbl' }, 'REFERENCE'), refCard) : null;
   // ---- 0.4.2: EQ on/off, Reset, PRESETS row (8 built-ins, then "My presets"), Save as preset, loudness
   const eqOn = h('button', { type: 'button', class: 'onpill spk-eqon', role: 'switch', 'data-act': 'eq-on', 'aria-label': 'EQ on or off', onclick: () => { if (!real || !tune) return; edit(c => { c.bypass = !c.bypass; }); paintEqCtl(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
   ro(eqOn, tune, 'Only this device’s own owner or an admin can change the sound.');
@@ -333,7 +336,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const limiter = h('label', { class: 'spk-loud spk-limiter' }, h('input', { type: 'checkbox', 'data-act': 'limiter', onchange: ev => edit(c => { c.limiter = { ...c.limiter, enabled: ev.target.checked }; }) }), ' Limiter ', h('span', { class: 'small dim' }, 'Protects the speaker.'));
   const extraSw = h('div', { class: 'spk-sw' }, loud, preamp, limiter);
   const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), eqCtl), presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
-  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, h('div', { class: 'spk-body' }, left, right));
+  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, refHost, h('div', { class: 'spk-body' }, left, right));
   capTitle();
   root.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('input[type=text],select')) { ev.stopPropagation(); if (anyDirty()) cancelAndClose(); else { root._teardownLive?.(); parts.onDone?.(); } } });
   // live values are patched in place - an open slider is never rebuilt

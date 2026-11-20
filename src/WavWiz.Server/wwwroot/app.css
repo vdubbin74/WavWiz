@@ -6337,3 +6337,17 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .tree42 .first42-t{font-size:14px}
 .tree42 .first42-p{margin:0;white-space:normal;max-width:52ch}
 .tree42 .first42-add{margin-top:2px}
+
+/* 0.7.1: recommended reference speaker + reference flags (refrec.js) */
+.dtag.rec{background:var(--hl,#FFCB3D);border-color:var(--hl,#FFCB3D);color:#111}
+.dtag.rec.warn{background:none;border-color:var(--amber,#ffb300);color:var(--amber,#ffb300)}
+.zp42-refrow{display:block}
+.zp42-ref{display:flex;flex-direction:column;gap:6px;min-width:0}
+.zp42-ref>.row,.dsrefsec>.row,.spk-ref .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.zp42-ref .zp42-refpick{max-width:100%;min-width:0}
+.zp42-why,.zp42-flag{margin:0}
+.zp42-rec .grow{min-width:0;flex:1 1 140px}
+.spk-ref{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-bottom:1px solid var(--line);min-width:0}
+.dsrefsec{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dsrefsec p{margin:0}
+.zrefnote42 .zrefnote-use{padding:2px 8px;font-size:12px}

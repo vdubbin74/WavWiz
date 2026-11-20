@@ -333,6 +333,17 @@ public static class ZoneApi
             var b = await c.Request.Body(); var sp = b.Long("zoneId") ?? 0; var e = s.Zones.SetZoneReference(id, sp);
             return e != null ? Ext.Bad(e, e.Contains("not found") ? 404 : 409) : Results.Json(new { ok = true, groupId = id, zoneId = sp });
         }).Req(Role.Admin);
+        // 0.7.1: reference candidates ranked best first with a one-line reason (a zone's speakers, or every speaker for "Whole house").
+        // defaultId = the reference Calibrate starts from: the zone's own (or, for the whole house, the internal house reference) when online, else the recommended one.
+        g.MapGet("/calibration/ranking", (long? groupId) =>
+        {
+            var rk = s.Zones.RefRanking(groupId);
+            long cur = groupId is long gg ? (s.Zones.ZoneReferenceMap().TryGetValue(gg, out var r) ? r : 0) : s.Zones.ReferenceZoneId;
+            var rec = rk.FirstOrDefault(x => x.Connected);
+            long? def = rk.Any(x => x.Id == cur && x.Connected) ? cur : groupId == null && rec.Id != 0 ? rec.Id : null;
+            return Results.Json(new { groupId, referenceId = groupId == null ? (long?)null : cur == 0 ? null : cur, recommendedId = rec.Id == 0 ? (long?)null : rec.Id, defaultId = def,
+                ranking = rk.Select(x => new { id = x.Id, name = x.Name, connected = x.Connected, reason = x.Reason, warn = x.Warn }) });
+        }).Req(Role.View);
         g.MapDelete("/groups/{id:long}/reference-note", (long id) => { s.Zones.SetRefNote(id, false); s.Events.Publish("zones"); return Results.Json(new { ok = true }); }).Req(Role.Control);
 
         g.MapPost("/calibration/ear/play", async (HttpContext c) =>

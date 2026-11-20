@@ -1,0 +1,98 @@
+using System.Net;
+using System.Text.Json;
+using WavWiz.Server.Zones;
+namespace WavWiz.Server.Tests;
+
+/// <summary>0.7.1 reference speakers: a recommended reference per zone (ranked, with a one-line reason), no automatic re-pick when the reference
+/// leaves (a flag with the recommended replacement instead), and the house reference kept internal (no REF tag on an Unassigned speaker).</summary>
+public class Release071ReferenceTests
+{
+    static ZoneRefs.Cand C(long id, int tier, double? ms = null, double inst = 0, bool on = true) => new(id, tier <= 1, on, inst, tier, ms);
+
+    [Fact]
+    public void Rank_orders_by_kind_then_lowest_delay_then_steadiest_then_online()
+    {
+        var r = ZoneRefs.Rank(new[] { C(1, ZoneRefs.TierBluetooth, 0), C(2, ZoneRefs.TierNetwork, 0), C(3, ZoneRefs.TierBrowser, 0), C(4, ZoneRefs.TierPcWired, 50), C(5, ZoneRefs.TierServerWired, 90) });
+        Assert.Equal(new long[] { 5, 4, 3, 2, 1 }, r.Select(x => x.Id).ToArray());
+        Assert.Equal(new long[] { 7, 6 }, ZoneRefs.Rank(new[] { C(6, 1, 30), C(7, 1, 12) }).Select(x => x.Id).ToArray());                 // lowest delay
+        Assert.Equal(new long[] { 9, 8 }, ZoneRefs.Rank(new[] { C(8, 1, 12, inst: 4), C(9, 1, 12, inst: 1) }).Select(x => x.Id).ToArray());   // steadiest
+        Assert.Equal(new long[] { 11, 10 }, ZoneRefs.Rank(new[] { C(10, 1, 12, on: false), C(11, 1, 12) }).Select(x => x.Id).ToArray());      // online
+        Assert.Equal(new long[] { 13, 12 }, ZoneRefs.Rank(new[] { C(12, 1, null), C(13, 1, 40) }).Select(x => x.Id).ToArray());            // unknown delay sorts last
+        Assert.Equal(11, ZoneRefs.Recommend(new[] { C(10, 0, 0, on: false), C(11, 3) })!.Id);   // only an online speaker is recommended
+        Assert.Null(ZoneRefs.Recommend(new[] { C(10, 0, on: false) }));
+    }
+
+    [Fact]
+    public void Tier_reason_and_warning()
+    {
+        Assert.Equal(ZoneRefs.TierServerWired, ZoneRefs.TierOf("local-abc", "analog", false, false));
+        Assert.Equal(ZoneRefs.TierServerWired, ZoneRefs.TierOf("pc1", "usb", false, onServer: true));
+        Assert.Equal(ZoneRefs.TierPcWired, ZoneRefs.TierOf("pc1", "hdmi", false, false));
+        Assert.Equal(ZoneRefs.TierBrowser, ZoneRefs.TierOf("web-1", "analog", true, false));
+        Assert.Equal(ZoneRefs.TierBrowser, ZoneRefs.TierOf("pc1", "other", false, false));
+        Assert.Equal(ZoneRefs.TierNetwork, ZoneRefs.TierOf("airplay:k", "other", false, false));
+        Assert.Equal(ZoneRefs.TierNetwork, ZoneRefs.TierOf("cast:k", "other", false, false));
+        Assert.Equal(ZoneRefs.TierBluetooth, ZoneRefs.TierOf("pc1", "bluetooth", false, true));
+        Assert.Equal(ZoneRefs.TierBluetooth, ZoneRefs.TierOf("pc1", "other", false, false, hasBtAddress: true));
+        Assert.Equal("Wired output on the server, lowest delay (12 ms)", ZoneRefs.Reason(new(1, true, true, 0, 0, 12, OnServer: true)));
+        Assert.Equal("Wired output on a PC", ZoneRefs.Reason(C(1, 1)));
+        Assert.StartsWith("Bluetooth", ZoneRefs.Reason(C(1, 4)));
+        Assert.True(ZoneRefs.Warn(C(1, 4))); Assert.True(ZoneRefs.Warn(C(1, 3))); Assert.False(ZoneRefs.Warn(C(1, 2)));
+    }
+
+    [Fact]
+    public void A_reference_that_leaves_is_flagged_never_replaced()
+    {
+        var members = new Dictionary<long, List<long>> { [10] = new() { 1, 2, 9 }, [20] = new() { 3, 4 } };   // 4 (ref of 10) moved to zone 20
+        var (map, ch) = ZoneRefs.Normalize(new Dictionary<long, long> { [10] = 4, [20] = 3 }, members, id => C(id, id == 9 ? 0 : 2), houseRef: 4);
+        Assert.False(map.ContainsKey(10)); Assert.Equal(3, map[20]);
+        Assert.Equal(new ZoneRefs.Change(10, 4, 0), Assert.Single(ch));
+    }
+
+    static async Task<Dictionary<string, JsonElement>> Groups(HttpClient c) => (await c.GetJson("/api/v1/groups")).EnumerateArray().ToDictionary(z => z.GetProperty("name").GetString()!);
+    static long? L(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt64() : null;
+
+    [Fact]
+    public async Task Recommendation_flag_one_tap_switch_and_hidden_house_reference_end_to_end()
+    {
+        await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Wired A", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Other B");
+        await using var c = await FakePc.StartAsync(f, "pc-c", "BT C", kind: "bluetooth", bt: "AA:BB:CC:DD:EE:01");
+        await a.WaitConnected(); await b.WaitConnected(); await c.WaitConnected();
+        for (int i = 0; i < 100 && S.Zones.Zones().Count < 3; i++) await Task.Delay(50);
+        var dev = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
+        long dA = dev["pc-a"], dB = dev["pc-b"], dC = dev["pc-c"];
+        long deck = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Deck", deviceIds = new[] { dC, dB, dA } })).Json()).GetProperty("id").GetInt64();
+
+        // a zone with no reference: recommended (wired first, with a reason) but NOT set
+        var g = (await Groups(admin))["Deck"];
+        Assert.Null(L(g, "referenceId")); Assert.Equal(dA, L(g, "recommendedId"));
+        Assert.StartsWith("Wired output", g.GetProperty("recommendedReason").GetString()); Assert.False(g.GetProperty("recommendedWarn").GetBoolean());
+        var rk = await admin.GetJson($"/api/v1/calibration/ranking?groupId={deck}");
+        Assert.Equal(new[] { dA, dB, dC }, rk.GetProperty("ranking").EnumerateArray().Select(x => x.GetProperty("id").GetInt64()).ToArray());
+        Assert.True(rk.GetProperty("ranking")[2].GetProperty("warn").GetBoolean());   // Bluetooth: allowed, last, with a warning
+        Assert.Equal(JsonValueKind.Null, rk.GetProperty("defaultId").ValueKind);        // no silent default for a zone without a reference
+
+        // the user picks Bluetooth C (allowed); the recommendation stays A
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/reference", new { zoneId = dC })).StatusCode);
+        g = (await Groups(admin))["Deck"]; Assert.Equal(dC, L(g, "referenceId")); Assert.Equal(dA, L(g, "recommendedId"));
+        Assert.Equal(dC, (await admin.GetJson($"/api/v1/calibration/ranking?groupId={deck}")).GetProperty("defaultId").GetInt64());
+
+        // the reference leaves: nothing is picked for the user; a "left" flag names the recommended replacement
+        Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{deck}", new { deviceIds = new[] { dB, dA } })).StatusCode);
+        g = (await Groups(admin))["Deck"];
+        Assert.Null(L(g, "referenceId"));
+        var flag = g.GetProperty("refFlag"); Assert.Equal("left", flag.GetProperty("kind").GetString());
+        Assert.Equal(dC, L(flag, "oldId")); Assert.Equal(dA, L(flag, "nextId")); Assert.Contains("BT C", flag.GetProperty("text").GetString());
+        g = (await Groups(admin))["Deck"]; Assert.Null(L(g, "referenceId"));   // still none on the next read
+        // one tap: use the recommended one -> flag cleared
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/reference", new { zoneId = dA })).StatusCode);
+        g = (await Groups(admin))["Deck"]; Assert.Equal(dA, L(g, "referenceId")); Assert.Equal(JsonValueKind.Null, g.GetProperty("refFlag").ValueKind);
+
+        // the house reference stays internal: an Unassigned house reference shows no REF tag, but still times an Unassigned speaker
+        S.Zones.ReferenceZoneId = dC;
+        var zs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("id").GetInt64(), z => z.GetProperty("reference").GetBoolean());
+        Assert.False(zs[dC]); Assert.True(zs[dA]);
+        Assert.Equal(dC, S.Zones.ReferenceFor(dC));
+    }
+}

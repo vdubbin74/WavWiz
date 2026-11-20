@@ -34,19 +34,19 @@ public class ZoneReferenceTests
         var (map, ch) = ZoneRefs.Normalize(new Dictionary<long, long>(), new Dictionary<long, List<long>> { [1] = new() { 7 }, [2] = new() { 8, 9 } }, id => C(id), houseRef: 0);
         Assert.Empty(map); Assert.Empty(ch);
         Assert.Empty(ZoneRefs.Normalize(null, new Dictionary<long, List<long>> { [1] = new() { 7 } }, id => C(id), houseRef: 0).Map);   // first run, no house reference
-        // the reference left and only one speaker is left: that speaker is not made the reference by itself
+        // the reference left and only one speaker is left: that speaker is not made the reference by itself (0.7.1: the zone is flagged)
         (map, ch) = ZoneRefs.Normalize(new Dictionary<long, long> { [1] = 7 }, new Dictionary<long, List<long>> { [1] = new() { 8 } }, id => C(id), houseRef: 0);
-        Assert.Empty(map); Assert.Empty(ch);
+        Assert.Empty(map); Assert.Equal(new ZoneRefs.Change(1, 7, 0), Assert.Single(ch));
     }
 
     [Fact]
-    public void Normalize_keeps_valid_references_and_replaces_one_that_left_with_a_change_note()
+    public void Normalize_keeps_valid_references_and_flags_one_that_left()
     {
         var members = new Dictionary<long, List<long>> { [10] = new() { 1, 2, 9 }, [20] = new() { 3, 4 } };   // 4 (ref of 10) moved to zone 20, which keeps 3
         var stored = new Dictionary<long, long> { [10] = 4, [20] = 3 };
         var (map, ch) = ZoneRefs.Normalize(stored, members, id => C(id, wired: id == 9), houseRef: 4);
-        Assert.Equal(9, map[10]); Assert.Equal(3, map[20]);
-        Assert.Equal(new ZoneRefs.Change(10, 4, 9), Assert.Single(ch));
+        Assert.False(map.ContainsKey(10)); Assert.Equal(3, map[20]);   // 0.7.1: no automatic re-pick
+        Assert.Equal(new ZoneRefs.Change(10, 4, 0), Assert.Single(ch));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class ZoneReferenceTests
         // move the reference A into Patio: Patio keeps C, A joins as a regular speaker; Living has only B left, which is not made the reference by itself
         Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{patio}", new { deviceIds = new[] { dC, dA } })).StatusCode);
         g = await Groups(admin);
-        Assert.Equal(dC, RefOf(g["Patio"])); Assert.Null(RefOf(g["Living"])); Assert.Null(Note(g["Living"]));
+        Assert.Equal(dC, RefOf(g["Patio"])); Assert.Null(RefOf(g["Living"])); Assert.Contains("The reference A left this zone", Note(g["Living"]));   // 0.7.1: flagged, not re-picked
         Assert.Equal((100.0, -20.0, Dev(dA)), Cal(dB));   // nothing re-based: applied delays and offsets as they were
 
         // swap on "yes": A becomes Patio's reference (the legacy "Set as reference" endpoint now targets the speaker's zone)
@@ -118,11 +118,11 @@ public class ZoneReferenceTests
         Assert.Equal(dB, house.GetProperty("zoneId").GetInt64()); Assert.Equal("B", house.GetProperty("name").GetString());
         Assert.Equal((80.0, -40.0, Dev(dA)), Cal(dC));
 
-        // removal: take A (the reference) out of a 3-speaker Patio -> new reference + note; dismissing clears it
+        // removal: take A (the reference) out of a 3-speaker Patio -> 0.7.1: no new reference, a "left" note naming A; offsets untouched; dismissing clears it
         Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{patio}", new { deviceIds = new[] { dC, dA, dB } })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{patio}", new { deviceIds = new[] { dC, dB } })).StatusCode);
-        g = await Groups(admin); var r = RefOf(g["Patio"]); Assert.True(r == dB || r == dC); Assert.Equal(ZoneManager.RefNoteText, Note(g["Patio"]));
-        Assert.Equal(0.0, Cal(r!.Value).Raw);
+        g = await Groups(admin); Assert.Null(RefOf(g["Patio"])); Assert.Contains("The reference A left this zone", Note(g["Patio"]));
+        Assert.Equal((80.0, -40.0, Dev(dA)), Cal(dC));
         Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{patio}/reference-note")).StatusCode);
         Assert.Null(Note((await Groups(admin))["Patio"]));
         Assert.Equal(dB, S.Zones.ReferenceFor(dA));   // A is in no zone now: falls back to the house reference
