@@ -231,6 +231,8 @@ public sealed class ZoneLinks
     public Func<bool>? JukeboxRunning;
     /// <summary>0.4.9 F76 fix: null when every id is a known device, else the error.</summary>
     public string? CheckDevices(IEnumerable<long> deviceIds) { var ids = _db.Query("SELECT id FROM zone", r => r.GetInt64(0)).ToHashSet(); return deviceIds.All(ids.Contains) ? null : "device not found"; }
+    /// <summary>0.7.1 t2038u: only the ids that are still devices (a saved Jukebox default speaker can outlive a removed device).</summary>
+    public List<long> KnownDevices(IEnumerable<long> deviceIds) { var ids = _db.Query("SELECT id FROM zone", r => r.GetInt64(0)).ToHashSet(); return deviceIds.Where(ids.Contains).Distinct().ToList(); }
     public List<long> JukeboxDeviceIds() { var ps = JukeboxPlayers(); return _db.Query("SELECT id,player_id FROM zone", r => (Id: r.GetInt64(0), P: r.GetString(1))).Where(x => ps.Contains(x.P)).Select(x => x.Id).OrderBy(x => x).ToList(); }
     /// <summary>The Conductor the Jukebox plays in: its own zone once speakers are picked, else the house group (0.3.9 behavior).</summary>
     public Conductor? JukeboxConductor() => JukeboxPlayers().Count > 0 ? _reg.Get(JukeboxGroup) : null;

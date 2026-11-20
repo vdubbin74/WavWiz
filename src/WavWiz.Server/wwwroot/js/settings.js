@@ -2,9 +2,10 @@ import { wsel } from './wwselect.js';
 import { h, api, toast, dialog, ask } from './util.js';
 import { confirmNear } from './popover.js';   // 0.7.1 t2035u
 import { adminOnly, ADMIN_HINT } from './ui.js';
+import { jbFlushAll } from './jbcfg.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
 import { networkCard, diagnosticsView, listenText } from './diag.js';
-import { pulseSel } from './motion.js';
+import { pulse, pulseSel } from './motion.js';
 import { remoteView } from './remote.js';
 import { aboutBody } from './about.js';
 import { appearancePane } from './appearance.js';
@@ -73,12 +74,12 @@ export async function openSettings(S, refresh, nav, section) {
   const body = h('div', { class: 'settings-body' });
   // 0.2.1 F8: theme / viz open Appearance (one page) - the visualizer panel's Looks button unfolds the looks gallery there
   let app = null;
-  const d = dialog('Settings', body, [{ text: 'Close' }], { cls: 'settings-dlg', onClose: () => { app?.hide?.(); refresh?.(); } });   // 0.2.5 C: up to ~1200 px wide
+  const d = dialog('Settings', body, [{ text: 'Close' }], { cls: 'settings-dlg', onClose: () => { jbFlushAll(); app?.hide?.(); refresh?.(); } });   // t2040u: a Jukebox number still waiting for its pause is saved on close   // 0.2.5 C: up to ~1200 px wide
   let active = sectionFor(section);
   let devSub = section === 'phone' || section === 'calibration' ? 'calibration' : 'players';
   const search = settingsSearch(body, { show: g => { active = g; body._paint?.(); }, showSub: sub => { devSub = sub; body._paint?.(); } });
   d.el.querySelector('header .grow').after(search.el);
-  const focusSec = section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-away' : section === 'airplay' ? 'sec-airplay-out' : null;   // F159: airplay   // F117
+  const focusSec = section === 'phone' ? 'sec-phone' : section === 'players' ? 'sec-players' : section === 'remote' || section === 'access' ? 'sec-away' : section === 'airplay' ? 'sec-airplay-out' : null;   // F159: airplay   // F117
 
   const draw = async () => {
     let roots = [], st = null, settings = {}, tokens = [], rc = null;
@@ -232,7 +233,8 @@ export async function openSettings(S, refresh, nav, section) {
     // 0.3.1 B12: one fixed-size shell - the tab menu stays pinned, only the content area below it scrolls
     body.replaceChildren(navEl, h('div', { class: 'settings-scroll' }, ...sections)); masonry(sections);
     body._paint = paint; search.reindex();
-    if (focusSec) requestAnimationFrame(() => body.querySelector('#' + focusSec)?.scrollIntoView({ block: 'start' }));
+    if (focusSec) requestAnimationFrame(() => showSec(focusSec));
+    d.el._goSec = sec => { active = sectionFor(sec); if (sec === 'phone' || sec === 'calibration') devSub = 'calibration'; paint(); requestAnimationFrame(() => showSec(sec === 'phone' ? 'sec-phone' : 'sec-' + sec)); };   // t2042u: a Phone & HTTPS link inside Settings switches in place
 
     paint();
     function paint() {
@@ -244,6 +246,8 @@ export async function openSettings(S, refresh, nav, section) {
     }
   };
 
+  /** 0.7.1 t2042u: scroll to a card and highlight it (the same pulse as File > New). */
+  function showSec(id) { const el = body.querySelector('#' + id); if (!el) return; el.scrollIntoView({ block: 'start' }); pulse(el); }
   /** B10: move the section's reset bar into a flex row with its sub-tab bar (the tabs take the free space and scroll sideways; the button never overlaps). */
   function placeReset(sec) {
     const bar = sec.querySelector(':scope > .secbar'), sub = sec.querySelector('.subtabs');

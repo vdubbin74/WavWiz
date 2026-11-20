@@ -38,7 +38,7 @@ public static class DiagnosticsApi
             new { id = "speaker", title = "Check that a speaker shows up in Devices", done = speakers > 0, detail = speakers > 0 ? $"{speakers} speaker(s) online now{(players > 0 ? $", {players} PC player(s) paired" : "")}." : "This browser joins as a speaker by itself (tap once to allow sound). For a PC with speakers, open WavWiz Player there and type the 6-digit code from Settings > Players.", action = "devices", required = true },
             new { id = "test", title = "Play a test song or test sound", done = firstSound, detail = firstSound ? "Sound has gone out to your speakers." : "Pick any song in the Library, or use Test sound on a speaker in Devices.", action = "library", required = true },
             new { id = "calibrate", title = "Calibrate your speakers (optional)", done = cals > 0, detail = cals > 0 ? "At least one speaker has a measured delay." : "Open Devices, pick a speaker and choose Calibrate. Until then the delay is shown as unknown, never zero.", action = "devices", required = false },
-            new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone, and for reliable sound when a phone plays as a speaker.", action = "settings:phone", required = false },
+            new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Devices > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone, and for reliable sound when a phone plays as a speaker.", action = "settings:phone", required = false },
         };
         var req = items.Cast<dynamic>().Where(i => i.required).ToList();
         return new { items, done = req.All(i => (bool)i.done), dismissed, remaining = req.Count(i => !(bool)i.done) };
@@ -92,14 +92,14 @@ public static class DiagnosticsApi
             checks.Add(await AirPlayPtpFirewall());
 
         // --- certificate ---
-        if (!s.Ca.Enabled) checks.Add(new("tls", "HTTPS certificate", "unknown", "HTTPS is not set up. That is fine for music; phones need it for the microphone (calibration) and for the phone-as-a-device page.", "Settings > Phone & HTTPS > Set up HTTPS."));
+        if (!s.Ca.Enabled) checks.Add(new("tls", "HTTPS certificate", "unknown", "HTTPS is not set up. That is fine for music; phones need it for the microphone (calibration) and for the phone-as-a-device page.", "Settings > Devices > Phone & HTTPS > Set up HTTPS."));
         else
         {
             var exp = s.Ca.ServerCertExpires; var days = exp == null ? (double?)null : (exp.Value - DateTimeOffset.UtcNow).TotalDays;
             checks.Add(new("tls", "HTTPS certificate", days is null ? "warn" : days < 0 ? "fail" : days < 30 ? "warn" : "ok",
                 days is null ? "The server certificate could not be read." : days < 0 ? "The server certificate has expired." : $"Valid for another {days:0} days (renews itself).",
-                days is null or < 30 ? "Settings > Phone & HTTPS > Set up HTTPS again (this keeps the phone's trusted profile)." : null));
-            checks.Add(new("tls-phone", "Phone trusts the certificate", "unknown", "WavWiz cannot see this from the PC.", "On the phone open the set-up page (QR code in Settings > Phone & HTTPS) and tap 'Check my phone'."));
+                days is null or < 30 ? "Settings > Devices > Phone & HTTPS > Set up HTTPS again (this keeps the phone's trusted profile)." : null));
+            checks.Add(new("tls-phone", "Phone trusts the certificate", "unknown", "WavWiz cannot see this from the PC.", "On the phone open the set-up page (QR code in Settings > Devices > Phone & HTTPS) and tap 'Check my phone'."));
         }
 
         // --- ffmpeg ---

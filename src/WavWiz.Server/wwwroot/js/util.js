@@ -16,6 +16,18 @@ export function h(tag, attrs, ...kids) {
   return e;
 }
 
+/** 0.7.1 t2042u: the phone certificate card is Settings > Devices (Calibration) > Phone & HTTPS. Inside a hint that phrase is a link that
+ *  opens Settings there and highlights the card (an open Settings window switches in place). */
+export const PHONE_HTTPS = 'Settings > Devices > Phone & HTTPS';
+export function openPhoneHttps() {
+  const open = typeof document !== 'undefined' && document.querySelector('dialog.settings-dlg[open]');
+  if (open?._goSec) open._goSec('phone'); else window.dispatchEvent(new CustomEvent('wavwiz:go', { detail: 'settings:phone' }));
+}
+export function linkSettings(text) {
+  const s = String(text ?? ''), i = s.indexOf(PHONE_HTTPS); if (i < 0) return s;
+  return [s.slice(0, i), h('a', { href: '#sec-phone', class: 'setlink', 'data-go': 'settings:phone', onclick: ev => { ev.preventDefault(); openPhoneHttps(); } }, PHONE_HTTPS), linkSettings(s.slice(i + PHONE_HTTPS.length))].flat();
+}
+
 export class ApiError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 
 // 0.4.0: the zone this page controls. Playback calls (/stream, /queue, saving the queue as a playlist) carry ?zoneId=<playback group> when it is not the house group,
@@ -34,6 +46,7 @@ export async function api(path, opts = {}) {
   const init = { method: opts.method || 'GET', headers: {}, credentials: 'same-origin' };
   if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
   if (opts.raw) { init.body = opts.raw; init.headers['Content-Type'] = 'application/octet-stream'; }
+  if (opts.keepalive) init.keepalive = true;   // t2040u: a save sent while the page closes still arrives
   let r;
   try { r = await fetch('/api/v1' + path, init); } catch (e) { throw new ApiError('Cannot reach the WavWiz server. Check that it is running and you are on the home network.', 0); }
   let data = null; const text = await r.text(); try { data = text ? JSON.parse(text) : null; } catch { /* not json */ }

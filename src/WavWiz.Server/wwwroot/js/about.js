@@ -219,7 +219,7 @@ export const WHATS_NEW = [
   ['QR code goes straight to calibration', 'Scanning the Calibrate speakers QR code now takes your phone straight on to calibration, with a Continue to secure calibration button right on the page.'],
   ['Install steps when needed', 'If your phone does not trust WavWiz yet, the set-up page shows the download button and the install steps for your phone right away.'],
   ['Song title on phones', 'On a phone, Now Playing shows the song title and artist again, in every control panel style.'],
-  ['Certificate says WavWiz', 'The security certificate and the phone profile are now named WavWiz everywhere. If your server still had an older certificate, it gets a new one: install and trust it on each phone once (open the set-up page from the QR code in Settings > Phone & HTTPS).'],
+  ['Certificate says WavWiz', 'The security certificate and the phone profile are now named WavWiz everywhere. If your server still had an older certificate, it gets a new one: install and trust it on each phone once (open the set-up page from the QR code in Settings > Devices > Phone & HTTPS).'],
 ];
 
 const CREDITS = [

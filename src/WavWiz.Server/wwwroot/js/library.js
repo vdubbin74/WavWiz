@@ -167,18 +167,35 @@ export function libraryView(S, opts = {}) {
 
   // 0.2.1 F5: the filter box is ONE persistent element. Redraws never re-create or re-parent it while you type (that dropped focus after
   // every keystroke); filtering is debounced, and focus + caret are restored if a layout switch ever has to move it.
-  const search = h('input', { type: 'search', placeholder: searchPlaceholder('local'), 'aria-label': 'Search the library', oninput: ev => { clearTimeout(search._t); search._t = setTimeout(() => { const q = ev.target.value.trim(); if (q !== st.q) { st.q = q; draw(); } }, 250); } });
-  const searchField = h('div', { class: 'field libsearch' }, search);
+  const runQuery = () => { clearTimeout(search._t); const q = search.value.trim(); if (q !== st.q) { setQuery(q); draw(); } };
+  const search = h('input', { type: 'search', enterkeyhint: 'search', placeholder: searchPlaceholder('local'), 'aria-label': 'Search the library', oninput: () => { clearTimeout(search._t); search._t = setTimeout(runQuery, 250); } });
+  // 0.7.1 t2049u: the iOS keyboard stayed up over the results. A <form> gives iOS a Search key; Search / Enter runs the search now and
+  // closes the keyboard (blur). Touching or scrolling the results (phone) and opening a result also close it; while it is open the page
+  // gets a spacer the keyboard's height (visualViewport) so the last row can scroll above it and the mini player / tab bar.
+  const searchField = h('form', { class: 'field libsearch', role: 'search', action: '', onsubmit: ev => { ev.preventDefault(); runQuery(); search.blur(); } }, search);
+  const kbPad = h('div', { class: 'lib-kbpad', 'aria-hidden': 'true' });
+  const handset = () => !!document.documentElement?.classList?.contains('handset');
+  const dropKb = () => { if (document.activeElement === search) search.blur(); };
+  const kbInset = () => { const vv = window.visualViewport; return vv ? Math.max(0, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0))) : 0; };
+  const paintKb = () => { const px = handset() && document.activeElement === search ? kbInset() : 0; kbPad.style.height = px ? px + 'px' : ''; kbPad.hidden = !px; };
+  kbPad.hidden = true;
+  search.addEventListener('focus', () => { paintKb(); setTimeout(paintKb, 350); });   // the keyboard animates in
+  search.addEventListener('focusout', paintKb);
   // F239: source tabs (Local|Remote|Radio|Playlists) above search — xtabs underline chrome in compact + expanded
   const srcSlot = h('div', { class: 'libsrcslot' });
   const tabsSlot = h('div', { class: 'libtabslot' }), headRow = h('div', { class: 'row libhead' }, tabsSlot);
   head.append(headRow);
-  root.append(srcSlot, searchField, head, tools, countEl, crumbs, h('div', { class: 'libscroll' }, content, strip));
+  const scrollEl = h('div', { class: 'libscroll', ontouchstart: () => { if (handset()) dropKb(); } }, content, strip);
+  root.append(srcSlot, searchField, head, tools, countEl, crumbs, scrollEl, kbPad);
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(azResize).observe(strip.parentElement);
   if (typeof window !== 'undefined') {
     window.addEventListener('scroll', azResize, true);
     window.addEventListener('resize', azResize);
     window.visualViewport?.addEventListener('resize', azResize);
+    window.visualViewport?.addEventListener('resize', paintKb);
+    // t2049u: starting to scroll (a finger drag anywhere but the search box) closes the keyboard. Not 'scroll': iOS scrolls the page itself
+    // to bring the focused box into view, which would close the keyboard the moment it opens.
+    window.addEventListener('touchmove', ev => { if (handset() && document.activeElement === search && !searchField.contains(ev.target)) dropKb(); }, { passive: true, capture: true });
   }
 
   /** F239/t2544u: search always under source tabs — never into headRow (that jumped lines on expand). Preserve focus + caret. */
@@ -282,7 +299,12 @@ export function libraryView(S, opts = {}) {
     return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)),
       T.tools.length ? toolsSel(T.tools) : null);   // F172: the "⋯" dropdown = Tools only (Local)
   };
-  const push = page => { st.stack.push(page); draw(); };
+  const push = page => { dropKb(); st.stack.push(page); draw(); };   // t2049u: opening a result closes the keyboard first
+  // 0.7.1 t2046u-t2048u: an artist / album opened from search results is a page ON TOP of the results (Back returns to them). draw() used to
+  // check the search first, so every tap redrew the same results. st.qBase = how many pages were open when the search started; a new or
+  // cleared search drops only the pages opened from the results.
+  function setQuery(q) { if (!st.q && q) st.qBase = st.stack.length; if (st.q) st.stack.length = Math.min(st.stack.length, st.qBase ?? 0); st.q = q; }
+  const onResult = () => !!st.q && st.stack.length > (st.qBase ?? 0);   // a page opened from the search results is showing
   const back = () => { st.stack.pop(); draw(); };
   const save = () => saveLibPrefs(P);
   // 0.2.1 F4: Expanded = tiles on every tab by default (per-tab Tiles/List); the narrow panel keeps its own album grid/list choice.
@@ -602,14 +624,15 @@ export function libraryView(S, opts = {}) {
     placeSearch();
     search.placeholder = searchPlaceholder(st.source);   // 0.6.9 #4: one wording per source, the same in the side panel and the Expanded view
     crumbs.replaceChildren();
-    if (st.stack.length) crumbs.append(h('button', { class: 'btn', onclick: back }, '‹ Back'), h('b', { class: 'ell' }, st.stack[st.stack.length - 1].title));
+    if (st.stack.length && !(st.q && !onResult()))   // t2046u: the results page itself has no Back (it would pop a page under the results)
+      crumbs.append(h('button', { class: 'btn', onclick: back }, '‹ Back'), h('b', { class: 'ell' }, st.stack[st.stack.length - 1].title));
     content.replaceChildren(h('p', { class: 'dim' }, 'Loading…')); drawTools(pageKind());
     try {
       root.dataset.tab = st.tab;
       const onExtra = (((st.source === 'radio' || st.source === 'playlists') && !st.stack.length) || (st.source === 'local' && EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length));
       root.classList.toggle('extratab', onExtra);
       let nodes;
-      if (st.q) {
+      if (st.q && !onResult()) {
         nodes = (st.source === 'remote' && st.rsid) ? await remoteFind(st.rsid, st.q) : (st.source === 'local' || st.source === 'remote' ? await findPage(st.q) : await extraPage(st.source));
       } else if (st.stack.length) nodes = await st.stack[st.stack.length - 1].load();
       else if (st.source === 'radio') nodes = await extraPage('radio');

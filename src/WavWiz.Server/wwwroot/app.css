@@ -6161,3 +6161,16 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .wwdraft.bad{border-color:var(--red)} .wwdraft.bad .wwdraft-hint{color:var(--red)} .wwdraft.busy{opacity:.6}
 .zaddmenu .wwdraft{margin:4px;box-shadow:none}
 @media (prefers-reduced-motion:reduce){.wwpop,.wwdraft{animation:none}}
+/* 0.7.1 t2036u: the OFF | ON face of a switch never takes the click - it falls through to the checkbox under it, so a switch works even when
+   it is not wrapped in a <label> (Settings > Jukebox: CD-changer sound, Show Jukebox zone in Devices did nothing) */
+.switch>span{pointer-events:none}
+/* 0.7.1 t2049u: phone Library search - spacer the height of the open keyboard (set by library.js only on html.handset) */
+.lib-kbpad{flex:none;pointer-events:none}
+/* 0.7.1 t2050u: the phone's full-screen Now Playing keeps the bottom tab bar (F250-P5 hid it). Real phones only (html.handset): a narrow
+   PC window keeps its full-height Now Playing. The tab bar owns the bottom safe-area inset; the REMOTE / mic strip docks above it in flow,
+   and Now Playing's grid shrinks the art (minmax(0,1fr) row) so volume, Queue / Sound and More playback controls stay above both. */
+@media(max-width:900px){
+  html.handset #app>.desk[data-view=now]~.tabbar{display:flex}
+  html.handset #app>.desk[data-view=now]~.tabbar>button.on{background:none;font-weight:600}
+  html.handset #app>.desk[data-view=now]~.tabbar>button.on::before{opacity:.55}
+}

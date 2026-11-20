@@ -5,6 +5,7 @@ import { h, api, toast, dialog, ask } from './util.js';
 import { adminOnly } from './ui.js';
 import { jbPreview } from './jukebox-preview.js';
 import { speakerPicker, applyJukeboxSpeakers, initialPick } from './jbspeakers.js';   // 0.4.9 F76
+import { jbAutosave } from './jbcfg.js';   // 0.7.1 t2040u
 
 export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub', 'wavwiz.layout'];
 export const BACKUP_KEEP_NOTE = "Passwords and this server's certificates stay here (they are never in a backup). Pairings are not in the backup: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.";
@@ -22,7 +23,8 @@ export const ROLE_NAMES = [['view', 'View', 'can browse and see what plays'], ['
 /** §7.4: "Saved ✓" right beside the changed control, fading after ~1.5 s. */
 export function savedMark(el) {
   if (!el || !el.isConnected || el === document.body) return;
-  const host = el.closest('label,.row,.setrow,.field') || el.parentElement; if (!host) return;
+  let host = el.closest('label,.row,.setrow,.field') || el.parentElement; if (!host) return;
+  if (host.classList?.contains('switch')) host = host.parentElement?.closest('label,.row,.setrow,.field') || host.parentElement || host;   // 0.7.1: a <label class="switch"> is too small - mark its row
   host.querySelector(':scope > .savedok')?.remove();
   const m = h('span', { class: 'savedok', role: 'status', 'aria-live': 'polite' }, 'Saved ✓'); host.append(m);
   setTimeout(() => m.classList.add('fade'), 1100); setTimeout(() => m.remove(), 1600);
@@ -144,17 +146,27 @@ export const JB_DEFAULTS = { style: 'modern', folders: [], playlists: [], perGue
 export function jukeboxPane(S, settings, { admin }) {
   const box = h('div', { class: 'jbset' });
   let cfg = { ...JB_DEFAULTS }, roots = [], playlists = [], genres = [];
-  const save = async (patch, el) => { cfg = { ...cfg, ...patch }; try { await api('/jukebox/config', { method: 'PUT', body: patch }); savedMark(el); paintPreview(); } catch (e) { toast('Not saved. ' + e.message, true); } };
+  // 0.7.1 t2040u: every change saves at once (typed numbers after a short pause, see jbAutosave); a failed save shows the error and the control goes back
+  let lastEl = null; const saved = { ...JB_DEFAULTS };
+  const sv = jbAutosave((patch, o) => api('/jukebox/config', { method: 'PUT', body: patch, keepalive: o?.keepalive }), {
+    onSaved: patch => { Object.assign(saved, patch); savedMark(lastEl); paintPreview(); },
+    onError: (e, patch) => { toast('Not saved. ' + e.message, true); cfg = { ...cfg, ...Object.fromEntries(Object.keys(patch).map(k => [k, saved[k]])) }; revert(patch); paintPreview(); }, owner: box });
+  const save = (patch, el) => { cfg = { ...cfg, ...patch }; lastEl = el; return sv.now(patch); };
+  const saveLater = (patch, el) => { cfg = { ...cfg, ...patch }; lastEl = el; sv.later(patch); };
+  // put a control back to the saved value (switches and numbers carry data-jbk = their key)
+  function revert(patch) { for (const k of Object.keys(patch)) box.querySelectorAll(`[data-jbk="${k}"]`).forEach(el => { if (el.type === 'checkbox') el.checked = k === 'showInDevices' ? saved[k] !== false : !!saved[k]; else el.value = saved[k]; }); }
   // 0.3.4 H4b: one preview card per style (true layout, scaled); picking a card switches the style
   const cards = h('div', { class: 'jbcards', role: 'radiogroup', 'aria-label': 'Display style' });
   function paintPreview() { cards.querySelectorAll('.jbcard').forEach(c => { const on = c.dataset.style === cfg.style; c.classList.toggle('on', on); c.setAttribute('aria-checked', String(on)); }); }
   async function load() {
-    try { [cfg, roots, playlists, genres] = await Promise.all([api('/jukebox/config'), api('/library/roots').catch(() => []), api('/playlists').catch(() => []), api('/library/genres').catch(() => [])]); cfg = { ...JB_DEFAULTS, ...cfg }; } catch (e) { box.replaceChildren(h('p', { class: 'err' }, 'Jukebox settings could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
+    try { [cfg, roots, playlists, genres] = await Promise.all([api('/jukebox/config'), api('/library/roots').catch(() => []), api('/playlists').catch(() => []), api('/library/genres').catch(() => [])]); cfg = { ...JB_DEFAULTS, ...cfg }; Object.assign(saved, cfg); } catch (e) { box.replaceChildren(h('p', { class: 'err' }, 'Jukebox settings could not be loaded. ', h('button', { class: 'btn sm', onclick: load }, 'Retry'))); return; }
     const A = el => adminOnly(S, el, admin);
     const card = (v, t, sub) => A(h('button', { type: 'button', role: 'radio', class: 'jbcard' + (cfg.style === v ? ' on' : ''), 'data-style': v, 'aria-checked': String(cfg.style === v), 'aria-label': `${t} style`, onclick: ev => { if (cfg.style !== v) save({ style: v }, ev.currentTarget); } },
       jbPreview(v), h('span', { class: 'jbcard-l' }, h('span', { class: 'jbradio', 'aria-hidden': 'true' }), h('span', { class: 'grow' }, h('b', null, t), h('small', null, sub)), h('span', { class: 'jbcard-live' }, 'LIVE PREVIEW'))));
-    const num = (k, min, max, l) => A(h('input', { type: 'number', min, max, value: cfg[k], style: 'width:80px', 'aria-label': l, onchange: ev => save({ [k]: Math.max(min, Math.min(max, +ev.target.value || min)) }, ev.target) }));
-    const tog = (k, l) => h('label', { class: 'row' }, h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg[k], 'aria-label': l, onchange: ev => save({ [k]: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })), l);
+    const num = (k, min, max, l) => A(h('input', { type: 'number', min, max, value: cfg[k], style: 'width:80px', 'aria-label': l, 'data-jbk': k,
+      oninput: ev => { const n = Math.round(+ev.target.value); if (ev.target.value !== '' && n >= min && n <= max) saveLater({ [k]: n }, ev.target); },   // t2040u: saved after a short pause while typing
+      onchange: ev => { const n = Math.max(min, Math.min(max, Math.round(+ev.target.value) || min)); ev.target.value = n; save({ [k]: n }, ev.target); } }));
+    const tog = (k, l) => h('label', { class: 'row' }, h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg[k], 'aria-label': l, 'data-jbk': k, onchange: ev => save({ [k]: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })), l);
     const multi = (list, key, label, val, txt) => h('div', { class: 'jbsrc', role: 'group', 'aria-label': label }, list.length ? list.map(x => h('label', { class: 'row small' }, A(h('input', { type: 'checkbox', checked: (cfg[key] || []).includes(val(x)), onchange: ev => { const set = new Set(cfg[key] || []); ev.target.checked ? set.add(val(x)) : set.delete(val(x)); save({ [key]: [...set] }, ev.target); } })), txt(x))) : h('span', { class: 'small dim' }, 'None yet.'));
     const pin = A(h('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: 8, placeholder: cfg.hasPin ? '•••• (set)' : '4-8 digits', 'aria-label': 'Host PIN', style: 'width:120px' }));
     // 0.6.8-#6a: the server fills from a playlist, a genre, or (neither) any allowed song - say so instead of a lone "Off"
@@ -170,12 +182,12 @@ export function jukeboxPane(S, settings, { admin }) {
         h('div', { class: 'jbretro-opts' }, h('div', { class: 'jbsub' }, 'RETRO CD OPTIONS'),
           h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Bubble light pulse'), h('div', { class: 'small dim' }, 'Lights pulse with the beat. 50% default, 100% max.')),
             (() => { const out = h('span', { class: 'jbbeatv' }, (cfg.beat ?? 50) + '%'); return [A(h('input', { type: 'range', min: 0, max: 100, step: 1, value: cfg.beat ?? 50, class: 'jbbeat', 'aria-label': 'Bubble light pulse', oninput: ev => { out.textContent = ev.target.value + '%'; }, onchange: ev => save({ beat: +ev.target.value }, ev.target) })), out]; })()),
-          h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'CD-changer sound'), h('div', { class: 'small dim' }, 'A soft click and whirr between songs. Off by default.')), h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg.cdSound, 'aria-label': 'CD-changer sound', onchange: ev => save({ cdSound: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })))),
+          h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'CD-changer sound'), h('div', { class: 'small dim' }, 'A soft click and whirr between songs. Off by default.')), h('label', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: !!cfg.cdSound, 'aria-label': 'CD-changer sound', 'data-jbk': 'cdSound', onchange: ev => save({ cdSound: ev.target.checked }, ev.target) })), h('span', { 'aria-hidden': 'true' })))),
         h('p', { class: 'small dim' }, 'The big screen and the guest page use this style and your theme colors.')),
       // 0.4.9 F76: the Jukebox zone - its default speakers (also applied to the zone now) and whether Devices lists it when the Jukebox is not running
       h('div', { class: 'card', id: 'sec-jbzone' }, h('h3', null, 'Jukebox zone ', admin ? null : adminTag()),
         h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Show Jukebox zone in Devices'), h('div', { class: 'small dim' }, 'While the Jukebox is running it always shows.')),
-          h('span', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: cfg.showInDevices !== false, 'aria-label': 'Show Jukebox zone in Devices', 'data-act': 'jb-show', onchange: ev => save({ showInDevices: ev.target.checked }, ev.target).then(() => window.dispatchEvent(new CustomEvent('wavwiz:zones-changed'))) })), h('span', { 'aria-hidden': 'true' }))),
+          h('label', { class: 'switch' }, A(h('input', { type: 'checkbox', role: 'switch', checked: cfg.showInDevices !== false, 'aria-label': 'Show Jukebox zone in Devices', 'data-act': 'jb-show', 'data-jbk': 'showInDevices', onchange: ev => save({ showInDevices: ev.target.checked }, ev.target).then(() => window.dispatchEvent(new CustomEvent('wavwiz:zones-changed'))) })), h('span', { 'aria-hidden': 'true' }))),
         h('div', { class: 'setrow', style: 'align-items:flex-start' }, h('div', { class: 'grow' }, h('div', null, 'Default speakers'), h('div', { class: 'small dim' }, 'The Jukebox plays on these. Start Jukebox… starts with them picked.')),
           speakerPicker(S.zones || [], initialPick(cfg.defaultSpeakers, S.jb?.deviceIds, S.zones), async ids => { if (!admin) return; await save({ defaultSpeakers: ids }, box.querySelector('#sec-jbzone .jbspk76')); try { await applyJukeboxSpeakers(ids); } catch (e) { toast(e.message, true); } }, { disabled: !admin, label: 'Default speakers' }))),
       h('div', { class: 'card', id: 'sec-jbsources' }, h('h3', null, 'Allowed music ', admin ? null : adminTag()), learn('Guests can only search and add songs from these folders and playlists. Nothing ticked means the whole library.'),

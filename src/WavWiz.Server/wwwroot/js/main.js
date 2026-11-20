@@ -200,7 +200,14 @@ function createPhoneTabs() {
   return h('nav', { class: 'tabbar', 'aria-label': 'Main navigation' },
     [['library', 'library', 'Library'], ['queue', 'queue', 'Queue'], ['devices', 'devices', 'Devices'], ['settings', 'gear', 'Settings']].map(([k, ic, label]) =>
       h('button', { type: 'button', 'data-k': k, ...(k === 'settings' ? { 'aria-haspopup': 'dialog', 'aria-expanded': 'false' } : {}),
-        onclick: ev => k === 'settings' ? openPhoneSettings(ev.currentTarget) : go(k) }, icon(ic), h('span', null, label))));
+        onclick: ev => phoneTab(k, ev.currentTarget) }, icon(ic), h('span', null, label))));
+}
+/** 0.7.1 t2050u: the tab bar stays on the phone's full-screen Now Playing (html.handset only). A tab collapses Now Playing and goes there;
+ *  the tab Now Playing was opened from returns to it as it was (same page, scroll and Library search), like the collapse chevron. */
+function phoneTab(k, from) {
+  if (k === 'settings') { if (S.view === 'now') go('now:collapse'); return openPhoneSettings(from); }
+  if (S.view === 'now' && go.phoneNowReturn?.view === k) return go('now:collapse');
+  go(k);
 }
 function openPhoneSettings(from) {
   const view = S.view;
@@ -656,7 +663,9 @@ export function go(k, force) {
     go.phoneNowReturn = null;
   }
   else if (!content.firstChild) content.replaceChildren(views.library.el);
-  tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.k === k; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  // t2050u: on Now Playing the tab it collapses back to stays lit (no tab is the current page there, so no aria-current)
+  const tabK = k === 'now' ? go.phoneNowReturn?.view : k;
+  tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.k === tabK; b.classList.toggle('on', on); if (on && k !== 'now') b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   navButtons.forEach(b => b.classList.toggle('on', b.dataset.k === k));
   document.querySelectorAll('.navwide [data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === k));
   if (k === 'now') { nowc.drawChecklist(); nowc.el?.querySelector('.np-phone-collapse')?.focus({ preventScroll: true }); }

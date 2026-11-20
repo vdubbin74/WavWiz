@@ -1,4 +1,4 @@
-import { h, api, toast, ask } from './util.js';
+import { h, api, toast, ask, linkSettings } from './util.js';
 import { vizStats, webgl2Ok, vizPrefs, vizName } from './viz.js';
 import { loadReact } from './vizcore.js';
 import { airplayDevCard } from './airplaydev.js';
@@ -97,7 +97,7 @@ export async function clientChecks(S, server, { loc = globalThis.location, fetch
     if (loc.protocol === 'https:') rows.push({ id: 'c-https', title: 'HTTPS from this device', status: 'ok', detail: `This page is open over HTTPS and this device trusts ${name}'s certificate.` });
     else { const sm = await ping(`https://${host}:${server.httpsPort}/api/v1/ping?t=${Date.now()}`);
       rows.push(sm >= 0 ? { id: 'c-https', title: 'HTTPS from this device', status: 'ok', detail: `https://${host}:${server.httpsPort} answers and is trusted here.` }
-        : { id: 'c-https', title: 'HTTPS from this device', status: 'warn', detail: `https://${host}:${server.httpsPort} was refused from this device: the certificate is not trusted here, or the port is blocked.`, fix: 'Only needed for phone microphones and phone speakers. Settings > Phone & HTTPS shows how to trust it.' }); }
+        : { id: 'c-https', title: 'HTTPS from this device', status: 'warn', detail: `https://${host}:${server.httpsPort} was refused from this device: the certificate is not trusted here, or the port is blocked.`, fix: 'Only needed for phone microphones and phone speakers. Settings > Devices > Phone & HTTPS shows how to trust it.' }); }
   }
   return rows;
 }
@@ -115,7 +115,7 @@ export function diagnosticsView(S) {
   const statusCard = st => { const sum = d ? statusSummary(st.warnings, [...d.checks, ...cRows]) : (st.warnings.length ? null : { cls: 'okc', text: 'Everything looks fine.' });
     return h('div', { class: 'card', id: 'sec-status' }, h('h3', null, 'Status'),
       h('div', { class: 'small dim' }, `${st.display} • ${st.library.tracks} tracks • ${st.playersConnected} player(s) connected • listening on ${listenText(st.listen, st.bind)}`),
-      st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, w))) : null,
+      st.warnings.length ? h('ul', null, st.warnings.map(w => h('li', { class: 'warnc' }, linkSettings(w)))) : null,
       sum ? h('p', { class: sum.cls, 'data-sum': '1' }, sum.text) : null); };
   // F111: build() once (and on manual Refresh); the 15 s interval calls refresh(), which patches Status / checks / Devices in place.
   // Viz / Receivers / Network / AirPlay (developer) cards are never recreated by the interval, so nothing flashes or loses scroll.
@@ -123,7 +123,7 @@ export function diagnosticsView(S) {
   const clientCard = h('div', { class: 'card', id: 'diag-client' });
   const statusSlot = h('div'), checkedP = h('p', { class: 'small dim' }), checksCard = h('div', { class: 'card' }), devSlot = h('div');
   const chkNodes = list => list.map(c => h('div', { class: 'chk ' + (c.status === 'ok' ? 'done' : '') }, h('span', { class: 'mark ' + c.status }, ICON[c.status] || '?'),
-    h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ' + c.fix) : null)));
+    h('div', { class: 'grow' }, h('div', null, h('b', null, c.title), ' ', h('span', { class: 'dim' }, c.detail)), c.fix ? h('div', { class: 'small warnc' }, 'What to do: ', linkSettings(c.fix)) : null)));
   const devNodes = () => {
     const open = new Set([...devSlot.querySelectorAll('details[open]')].map(x => x.dataset.dev));
     return d.devices.length ? d.devices.map(r => h('div', { class: 'card' }, h('div', { class: 'row wrap' }, h('b', { class: 'grow' }, r.name), h('span', { class: 'pill ' + roomPillClass(r.state) }, r.state), h('span', { class: 'pill' }, r.link || 'link unknown')),
@@ -191,7 +191,7 @@ export async function checklistCard(S, go, force = false) {
   if (!force && (c.dismissed || local)) return null;
   const dismiss = () => dismissChecklist(S);
   return h('div', { class: 'card', style: 'border-color:var(--accent)' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, c.done ? 'All set up 🎉' : `Getting started (${c.remaining} to go)`), h('button', { class: 'btn', onclick: dismiss }, c.done ? 'Hide' : 'Hide this')),
-    c.items.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''), h('div', { class: 'grow' }, h('div', null, h('b', null, i.title), i.required ? '' : h('span', { class: 'dim small' }, ' (optional)')), h('div', { class: 'small dim' }, i.detail), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => go(i.action) }, 'Do this') : null))));
+    c.items.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''), h('div', { class: 'grow' }, h('div', null, h('b', null, i.title), i.required ? '' : h('span', { class: 'dim small' }, ' (optional)')), h('div', { class: 'small dim' }, linkSettings(i.detail)), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => go(i.action) }, 'Do this') : null))));
 }
 
 /** 0.2.0 items 11 + 24: the ONE Getting started dialog. Opens by itself on first run (until done or dismissed) and ALWAYS from
@@ -205,7 +205,7 @@ export async function gettingStartedBody(S, go, { close } = {}) {
   const goClose = k => { close?.(); go(k); };
   const step = (n, it, title, actions, roNote) => h('div', { class: 'gs-step chk ' + (it.done ? 'done' : '') },
     h('span', { class: 'mark', 'aria-hidden': 'true' }, it.done ? '✓' : String(n)),
-    h('div', { class: 'grow' }, h('b', null, title), h('div', { class: 'small dim' }, it.detail), roNote ? h('div', { class: 'small warn' }, roNote) : null,
+    h('div', { class: 'grow' }, h('b', null, title), h('div', { class: 'small dim' }, linkSettings(it.detail)), roNote ? h('div', { class: 'small warn' }, roNote) : null,
       actions ? h('div', { class: 'row wrap', style: 'margin-top:6px;gap:6px' }, actions) : null));
   const folderBtn = h('button', { class: 'btn', onclick: () => goClose('settings:library') }, 'Choose a music folder…');
   if (!admin) { folderBtn.disabled = true; folderBtn.title = ADMIN_HINT; }
@@ -226,7 +226,7 @@ export async function gettingStartedBody(S, go, { close } = {}) {
     h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'A few quick steps and WavWiz is playing in sync on your speakers.'),
     steps,
     rest.length ? h('details', { open: c.done }, h('summary', { class: 'small' }, 'More (optional)'), rest.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''),
-      h('div', { class: 'grow' }, h('b', null, i.title), h('div', { class: 'small dim' }, i.detail), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => goClose(i.action) }, 'Do this') : null)))) : null,
+      h('div', { class: 'grow' }, h('b', null, i.title), h('div', { class: 'small dim' }, linkSettings(i.detail)), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => goClose(i.action) }, 'Do this') : null)))) : null,
     h('label', { class: 'row small', style: 'gap:6px;margin-top:10px' }, h('input', { type: 'checkbox', checked: c.dismissed || checklistDismissedLocal(), onchange: ev => dismissChecklist(S, ev.target.checked) }), "Don't open this by itself again (Help > Getting started always opens it)"));
   const holder = h('div', null, body);
   async function refresh() { const nb = await gettingStartedBody(S, go, { close }); holder.replaceChildren(nb); }

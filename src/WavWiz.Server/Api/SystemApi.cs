@@ -34,7 +34,7 @@ public static class SystemApi
         if (!File.Exists(s.FfmpegPath) && s.FfmpegPath != "ffmpeg") w.Add("ffmpeg was not found - playback and library scanning will not work. Re-run the installer (Repair).");
         if (Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM library_root")) == 0) w.Add("No music folders yet - add one in Settings > Library.");
         if (s.Audio.Sessions.Count == 0) w.Add("No player is connected - start WavWiz Player on a PC with speakers.");
-        if (!s.Ca.Enabled) w.Add("Phone calibration needs HTTPS - set up the local certificate in Settings > Phone & HTTPS.");
+        if (!s.Ca.Enabled) w.Add("Phone calibration needs HTTPS - set up the local certificate in Settings > Devices > Phone & HTTPS.");
         return w;
     }
 

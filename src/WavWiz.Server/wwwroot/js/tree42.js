@@ -10,7 +10,7 @@ import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
-import { jbSaved, jbDraft, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
+import { jbSaved, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
 /** The tree's shape: boxes (a solo zone, or a linked set sharing one queue), the unassigned speakers and the header counts. */
@@ -376,7 +376,7 @@ export function treeEl(S, ctl, kit, st) {
       onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).filter(z => jbIds.has(z.id)), m = !(cur.length > 0 && cur.every(z => z.muted)); for (const z of cur) z.muted = m; api('/jukebox/zone/mute', { method: 'POST', body: { muted: m } }).then(() => ctl.refreshAll?.()).catch(e => toast(e.message, true)); mute.classList.toggle('on', m); mute.setAttribute('aria-pressed', String(m)); mute.setAttribute('aria-label', (m ? 'Unmute' : 'Mute') + ' the Jukebox zone'); mute.title = m ? 'Unmute' : 'Mute'; setIcon(mute, m ? 'mute' : 'volume'); } }, icon(muted ? 'mute' : 'volume')), can, 'Your access is view-only.');
     // 0.6.9 #19: the quick switch saves the Jukebox-zone setting at once (the server switches the zone's speakers to match); an admin setting
     const pill = onPill('Jukebox zone', on, admin, () => { const want = !jbSaved(S.jb).zoneOn; pill._set(want);
-      api('/jukebox/config', { method: 'PUT', body: { zoneOn: want } }).then(() => { if (S.jb) S.jb.zoneOn = want; if (jbDraft.v) delete jbDraft.v.zoneOn; ctl.refreshAll?.(); }).catch(e => { pill._set(!want); toast(e.message, true); }); }, { viewOnly: 'Only an admin can change this.' });
+      api('/jukebox/config', { method: 'PUT', body: { zoneOn: want } }).then(() => { if (S.jb) S.jb.zoneOn = want; ctl.refreshAll?.(); }).catch(e => { pill._set(!want); toast(e.message, true); }); }, { viewOnly: 'Only an admin can change this.' });
     const title = h('div', { class: 'qb42-t qb42-pick', role: 'button', tabindex: 0, title: 'Control the Jukebox', 'aria-label': 'Control the Jukebox', 'aria-pressed': String(sel), onclick: pick, onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(ev); } } },
       h('b', { class: 'qb42-name' }, 'Queue: Jukebox'), h('span', { class: 'qb42-st dim' }, jbRank === 1 ? ' · OFFLINE' : now?.state === 'playing' ? ' · PLAYING' : ' · IDLE'));
     const card = h('div', { class: 'zcard42' + (on ? '' : ' off'), 'data-group-id': JB, onclick: ev => { ev.stopPropagation(); if (ev.target.closest('button,input,select,a[href],[role="slider"],[role="switch"],.pill42,.tog,.cgrip69,.zgut42')) return; pickJb(); } },

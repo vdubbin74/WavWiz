@@ -73,7 +73,7 @@ async function boot() {
   if (mode === 'setup-phone') return setupPhone();
   if (mode === 'needs-https') return show(h('div', { class: 'card warn' }, h('h2', { text: 'Secure connection needed' }),
     h('p', { text: 'Phones only allow the microphone on a secure (https) page. Secure connections are switched off on this WavWiz server.' }),
-    h('p', { class: 'small', text: 'An admin can switch them on in Settings › Calibration › Phone & HTTPS on the PC. Or use “Use this PC’s microphone” (recommended) or “By ear” on the PC.' }),
+    h('p', { class: 'small', text: 'An admin can switch them on in Settings > Devices > Phone & HTTPS on the PC. Or use “Use this PC’s microphone” (recommended) or “By ear” on the PC.' }),
     h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => location.reload() }, 'Retry'))));
   ready();
 }
