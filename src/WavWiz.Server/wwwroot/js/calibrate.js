@@ -36,6 +36,8 @@ export function offerResume(groups) {
   const ids = Array.isArray(groups) && groups.length ? groups : null;
   undoToast('Calibration ended - the music is paused', () => ids ? Promise.all(ids.map(g => api('/stream/resume?zoneId=' + encodeURIComponent(g), { method: 'POST' }))) : api('/stream/resume', { method: 'POST' }), 30000, 'Resume');
 }
+/** 0.7.1: the measured speakers that sound earlier than the reference (pure). */
+export const fasterThanRef = props => (props || []).filter(p => Number.isFinite(p.fasterMs) && p.fasterMs > 0);
 export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   // a phone is a microphone, never the place that runs the wizard: it goes to the mic-only page (which makes its own link when signed in)
   if (isPhoneUa() && !isPlayerUa()) { location.href = '/calmic.html'; return; }
@@ -182,6 +184,16 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     runView = { stop }; poll();
   }
 
+  // 0.7.1: the reference keeps its delay (never shifted up). A speaker that sounds earlier than it is offered as the new reference (admin, one tap);
+  // the saved delays are re-based on it and the others are calibrated again against it.
+  function fasterBox(props, phone) {
+    const fast = fasterThanRef(props); if (!fast.length || phone) return null;
+    return h('div', { class: 'calfaster', role: 'status' }, fast.map(p => h('div', { class: 'row' },
+      h('span', { class: 'grow small' }, `${p.zoneName} is ${Math.round(p.fasterMs)} ms faster than the reference.`),
+      admin ? h('button', { class: 'btn small', 'data-act': 'make-faster-ref', onclick: async () => {
+        try { await api('/calibration/reference', { method: 'PUT', body: { zoneId: p.zoneId } }); toast(`${p.zoneName} is now the reference - calibrate again so the others line up with it`); endSession(); st.ref = p.zoneId; st.sel.delete(p.zoneId); intro(); }
+        catch (e) { toast(calFix(e.message), true); } } }, `Make ${p.zoneName} the reference`) : null)));
+  }
   function results(sid, props, messages, phone) {
     sessionId = sid;
     const checks = new Map(props.map(p => [p.zoneId, p.commit]));
@@ -196,6 +208,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
             !p.isReference && isLowConfidence(p) ? h('button', { class: 'btn small calbyear', 'data-act': 'f22-byear', title: 'Mic confidence is too low — line up by ear', onclick: () => { st.sel = new Set([p.zoneId]); ear(); } }, 'By ear') : null)))))
         : h('p', { class: 'err' }, 'Nothing could be measured.'),
       messages.length ? h('ul', { class: 'small amber' }, messages.map(m => h('li', null, m))) : null,
+      fasterBox(props, phone),
       low.length ? h('p', { class: 'amber', role: 'status' }, 'Low confidence on ', low.map(p => p.zoneName).join(', '), ' — use By ear for those speakers instead of saving a weak result.') : null,
       phone ? h('p', { class: 'small dim' }, 'You can also save on the phone.') : null,
       h('div', { class: 'row' }, h('button', { class: 'btn', 'data-act': 'calretry', onclick: () => { endSession(); intro(); } }, 'Retry'),

@@ -6355,3 +6355,5 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .reflag-h{color:var(--amber,#ffb300);font-weight:700;font-size:13px}
 .reflag p{margin:0}
 .reflag-acts{display:flex;flex-wrap:wrap;gap:6px}
+.calfaster{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:8px 10px;border-left:3px solid var(--amber,#ffb300);background:color-mix(in srgb,var(--amber,#ffb300) 8%,transparent)}
+.calfaster .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}

@@ -8,7 +8,8 @@ namespace WavWiz.Server.Calibration;
 
 /// <summary>Confidence is ALWAYS 0..1 (0.3.7 L26); SnrDb / PeakDb / RmsDb are the raw numbers of that attempt.</summary>
 public sealed record RunResult(string ZoneId, string Kind, bool Ok, double? RawLatencyMs, double Confidence, string? Note, double SnrDb = 0, double PeakDb = -120, double RmsDb = -120);
-public sealed record Proposal(long ZoneId, string ZoneName, string DeviceId, double OffsetMs, double ProposedLatencyMs, double SpreadMs, double Confidence, string? Warning, bool Commit);
+/// <param name="FasterMs">0.7.1: the speaker sounds this many ms EARLIER than the reference (null = not faster). Calibrate offers to make it the reference.</param>
+public sealed record Proposal(long ZoneId, string ZoneName, string DeviceId, double OffsetMs, double ProposedLatencyMs, double SpreadMs, double Confidence, string? Warning, bool Commit, double? FasterMs = null);
 
 public sealed class CalSession
 {
@@ -482,25 +483,27 @@ public sealed class CalibrationService
         // 0.3.1 B3: skipped speakers keep their delay; say so in the summary
         long[] skipped; lock (s.L) skipped = s.Skipped.ToArray();
         foreach (var z in skipped) msgs.Add($"Skipped {_zones.Zone(z)?.Name ?? "a speaker"}: its delay is unchanged");
-        // absolute = reference's applied delay + offset; if anything would go below 0, shift the whole house up (the reference included) so the earliest speaker is 0
-        double shift = Math.Max(0, -(raw.Select(r => refLatency + r.Offset).Append(refLatency).Min()));
-        if (shift > 0.5) msgs.Add($"some speakers sound EARLIER than the reference, so every speaker (including the reference) gets +{shift:0} ms to keep them aligned");
+        // absolute = reference's applied delay + offset. 0.7.1: the reference keeps its delay (0 ms for a new one) and is never re-measured or shifted.
+        // A speaker that sounds EARLIER than the reference is said so and offered as the reference instead (its delay is clamped at 0 meanwhile).
+        const double FasterTol = 1.0;
         foreach (var r in raw)
         {
             var z = _zones.Zone(r.Zone); if (z == null) continue;
             var act = z.Outputs.FirstOrDefault(o => o.Active); if (act == null) continue;
-            double prop = Math.Round(Math.Clamp(refLatency + r.Offset + shift, 0, 2000), 1);
+            double prop = Math.Round(Math.Clamp(refLatency + r.Offset, 0, 2000), 1);
+            double? faster = r.Offset < -FasterTol ? Math.Round(-r.Offset, 1) : null;
+            if (faster is double fm) msgs.Add(refLatency + r.Offset < 0
+                ? $"{z.Name} sounds {fm:0} ms EARLIER than the reference {refZone?.Name}, so it cannot be lined up by adding delay (its delay is set to 0). Make {z.Name} the reference, then calibrate again."
+                : $"{z.Name} sounds {fm:0} ms earlier than the reference {refZone?.Name}. It may make a better reference.");
             {
                 var zr = runs.Where(x => x.Zone == r.Zone).ToList(); double q = zr.Count == 0 ? 0 : zr.Average(x => CalQuality.Clamp01(x.Conf));   // per-test qualities are 0..1 (L26)
                 double overall = CalQuality.Clamp01(r.Conf * (0.4 + 0.6 * q));      // overall = timing agreement x signal quality: a quiet recording can no longer look 92% sure
                 string? why = r.Warn;
                 if (overall < 0.4 && why == null) why = q >= 0.5 ? $"The test sound was loud and clear, but its timing varied by {r.Spread:0} ms between the runs, so the delay is uncertain. A wired PC mic can have uneven capture timing; try again with the mic nearer and the room quiet."
                     : "The test sound was weak at the microphone - turn the speaker or the mic's Windows input level up, or move the mic closer.";
-                props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(overall, 2), why, overall >= 0.4));
+                props.Add(new Proposal(z.Id, z.Name, act.DeviceId, Math.Round(r.Offset, 1), prop, Math.Round(r.Spread, 1), Math.Round(overall, 2), why, overall >= 0.4, faster));
             }
         }
-        if (shift > 0.5 && refZone?.Outputs.FirstOrDefault(o => o.Active) is { } ra && !props.Any(p => p.ZoneId == refZone.Id))
-            props.Add(new Proposal(refZone.Id, refZone.Name, ra.DeviceId, 0, Math.Round(refLatency + shift, 1), 0, 1, "reference shifted to keep every speaker non-negative", true));
         return (props, msgs);
     }
 

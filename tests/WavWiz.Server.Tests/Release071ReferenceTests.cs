@@ -142,4 +142,38 @@ public class Release071ReferenceTests
         Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
         Assert.Contains(deck.ToString(), S.Db.Setting(ZoneManager.RefOutKey));
     }
+
+    [Fact]
+    public async Task Calibration_never_shifts_the_reference_and_offers_a_faster_speaker_as_the_reference()
+    {
+        await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var S = f.Server.S;
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Ref A", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Fast B", kind: "analog");
+        await using var c = await FakePc.StartAsync(f, "pc-c", "Slow C", kind: "analog");
+        await a.WaitConnected(); await b.WaitConnected(); await c.WaitConnected();
+        for (int i = 0; i < 100 && S.Zones.Zones().Count < 3; i++) await Task.Delay(50);
+        long Id(string p) => S.Zones.Zones().First(z => z.PlayerId == p).Id;
+        long dA = Id("pc-a"), dB = Id("pc-b"), dC = Id("pc-c");
+        (List<Calibration.Proposal> P, List<string> M) Run(double refMs, double bMs, double cMs)
+        {
+            var sess = new Calibration.CalSession { Mode = "pc-mic", ReferenceZoneId = dA, Quick = true };
+            foreach (var x in new[] { refMs - 0.2, refMs, refMs + 0.2 }) sess.Runs.Add((dA, "ref", x, 1));
+            foreach (var x in new[] { bMs - 0.2, bMs, bMs + 0.2 }) sess.Runs.Add((dB, "dev", x, 1));
+            foreach (var x in new[] { cMs - 0.2, cMs, cMs + 0.2 }) sess.Runs.Add((dC, "dev", x, 1));
+            return S.Cal.Finish(sess);
+        }
+        // a new reference (0 ms): B sounds 20 ms earlier -> said so, offered as reference, clamped to 0; the reference is NOT shifted up or proposed
+        var (p, m) = Run(100, 80, 115);
+        Assert.DoesNotContain(p, x => x.ZoneId == dA);
+        var pb = p.Single(x => x.ZoneId == dB); Assert.Equal(0, pb.ProposedLatencyMs); Assert.Equal(20, pb.FasterMs);
+        var pc = p.Single(x => x.ZoneId == dC); Assert.Equal(15, pc.ProposedLatencyMs, 1); Assert.Null(pc.FasterMs);   // C lines up with no shift added
+        Assert.Contains(m, x => x.Contains("Fast B sounds 20 ms EARLIER than the reference Ref A") && x.Contains("Make Fast B the reference"));
+        Assert.DoesNotContain(m, x => x.Contains("including the reference"));
+        // an existing reference with a saved 30 ms delay (upgrade): it keeps it; B 20 ms earlier still fits (10 ms) and is only mentioned
+        string devA = S.Zones.Zone(dA)!.Outputs.First(o => o.Active).DeviceId;
+        S.Db.Exec("INSERT INTO calibration(output_device_id,latency_ms,raw_latency_ms,method,measured_at,is_current) VALUES($d,30,0,'test',$t,1)", ("$d", devA), ("$t", DateTimeOffset.UtcNow.ToString("O")));
+        (p, m) = Run(100, 80, 115);
+        Assert.Equal(10, p.Single(x => x.ZoneId == dB).ProposedLatencyMs, 1); Assert.Equal(45, p.Single(x => x.ZoneId == dC).ProposedLatencyMs, 1);
+        Assert.Contains(m, x => x.Contains("may make a better reference")); Assert.DoesNotContain(p, x => x.ZoneId == dA);
+        Assert.Equal(30, S.Zones.Zone(dA)!.Outputs.First(o => o.Active).LatencyMs);
+    }
 }
