@@ -19,7 +19,7 @@ public class Release071PhoneScopeTests
         await using var a = await FakePc.StartAsync(f, "pc-a", "Deck amp", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Deck PC");
         await using var c = await FakePc.StartAsync(f, "pc-c", "Kitchen", kind: "analog");
         await a.WaitConnected(); await b.WaitConnected(); await c.WaitConnected();
-        for (int i = 0; i < 100 && S.Zones.Zones().Count < 3; i++) await Task.Delay(50);
+        for (int i = 0; i < 200 && S.Zones.Zones().Count(z => z.Connected && z.Outputs.Any(o => o.Active)) < 3; i++) await Task.Delay(50);   // every speaker playing to an output (under load this lags the connect)
         var dev = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
         long dA = dev["pc-a"], dB = dev["pc-b"], dC = dev["pc-c"];
         long deck = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Roof deck", deviceIds = new[] { dA, dB } })).Json()).GetProperty("id").GetInt64();
@@ -69,7 +69,7 @@ public class Release071PhoneScopeTests
         await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
         await using var a = await FakePc.StartAsync(f, "pc-a", "Deck amp", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Deck PC");
         await a.WaitConnected(); await b.WaitConnected();
-        for (int i = 0; i < 100 && S.Zones.Zones().Count < 2; i++) await Task.Delay(50);
+        for (int i = 0; i < 200 && S.Zones.Zones().Count(z => z.Connected && z.Outputs.Any(o => o.Active)) < 2; i++) await Task.Delay(50);   // every speaker playing to an output (under load this lags the connect)
         var dev = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
         long dA = dev["pc-a"], dB = dev["pc-b"];
         long deck = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Roof deck", deviceIds = new[] { dA, dB } })).Json()).GetProperty("id").GetInt64();
