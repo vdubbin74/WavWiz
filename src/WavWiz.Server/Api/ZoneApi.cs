@@ -346,6 +346,12 @@ public static class ZoneApi
         }).Req(Role.View);
         // 0.7.1: "Keep it and recalibrate" - the reference's current output becomes its new baseline (clears the "Reference output changed" flag)
         g.MapPost("/groups/{id:long}/reference-output", (long id) => { var e = s.Zones.AcceptRefOutput(id); return e != null ? Ext.Bad(e, 409) : Results.Json(new { ok = true }); }).Req(Role.Admin);
+        // 0.7.1: a zone's "vs house" fine-tune (ms, -200..+200; + = this zone plays later). Applied at playback; saved delays are untouched.
+        g.MapPut("/groups/{id:long}/house-offset", async (long id, HttpContext c) =>
+        {
+            var b = await c.Request.Body(); var ms = b.Num("ms"); if (ms == null) return Ext.Bad("ms is required");
+            var e = s.Zones.SetHouseOffset(id, ms.Value); return e != null ? Ext.Bad(e, e.Contains("not found") ? 404 : 400) : Results.Json(new { ok = true, groupId = id, ms = s.Zones.HouseOffsets().GetValueOrDefault(id) });
+        }).Req(Role.Admin);
         g.MapDelete("/groups/{id:long}/reference-note", (long id) => { s.Zones.SetRefNote(id, false); s.Events.Publish("zones"); return Results.Json(new { ok = true }); }).Req(Role.Control);
 
         g.MapPost("/calibration/ear/play", async (HttpContext c) =>

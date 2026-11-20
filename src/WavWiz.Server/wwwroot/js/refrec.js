@@ -86,6 +86,7 @@ export function speakerRefSec(S, z, admin, done) {
   if (isRef) {
     lines.push(h('div', { class: 'row' }, h('b', null, `Reference for ${g.name}`), isRec ? recTag(st.reason, st.warn) : null));
     lines.push(h('p', { class: 'small dim' }, 'Its delay stays fixed; the other speakers in the zone are measured against it.' + (isRec ? ' ' + st.reason + '.' : '')));
+    lines.push(h('p', { class: 'small dim dsreftiming' }, `${g.name} timing vs house: ${offText(g.houseOffsetMs)} (zone settings).`));
     const of = outputFlagCard(S, g, admin, done); if (of) lines.push(of);
     if (!isRec && st.rec) lines.push(h('div', { class: 'row zp42-rec' }, recTag(st.reason, st.warn), h('b', null, st.rec.name), h('span', { class: 'small dim grow' }, st.reason),
       h('button', { type: 'button', class: 'btn sm', 'data-act': 'use-recommended', disabled: !admin, title: admin ? '' : ro, onclick: () => useRef(g, st.rec, done) }, `Use ${st.rec.name}`)));
@@ -97,4 +98,25 @@ export function speakerRefSec(S, z, admin, done) {
     lines.push(h('p', { class: 'small dim' }, st.ref ? `Measured against ${st.ref.name}, the reference for ${g.name}.` : `${g.name} has no reference yet.`));
   }
   return h('div', { class: 'dsrefsec' }, ...lines);
+}
+
+// ---- 0.7.1: zone timing "vs house" - an always-on offset added to every speaker of the zone at playback (the saved delays stay as they are).
+// 0 = exactly as calibrated (every upgrade starts there). + = the zone sounds later than the rest of the house, - = earlier.
+export const HOUSE_OFF_MAX = 200;
+/** "+5 ms" / "−3 ms" / "0 ms" (pure). */
+export const offText = ms => { const v = Math.round((+ms || 0) * 10) / 10; return v > 0 ? `+${v} ms` : v < 0 ? `−${Math.abs(v)} ms` : '0 ms'; };
+/** The next fine-tune value after a step, clamped (pure). */
+export const stepOff = (ms, d) => Math.max(-HOUSE_OFF_MAX, Math.min(HOUSE_OFF_MAX, Math.round(((+ms || 0) + d) * 10) / 10));
+/** Zone settings: TIMING vs house with − / + (1 ms; Shift = 10 ms) and Reset. Saved after a short pause. */
+export function zoneTimingRow(S, g, admin, done) {
+  let v = +(g.houseOffsetMs || 0), t = 0;
+  const ro = 'Only an administrator can change the zone timing.';
+  const out = h('output', { class: 'mono zt42-v', 'aria-live': 'polite' }, offText(v));
+  const save = () => { clearTimeout(t); t = setTimeout(async () => { try { const r = await api(`/groups/${g.id}/house-offset`, { method: 'PUT', body: { ms: v } }); g.houseOffsetMs = r?.ms ?? v; done?.(); } catch (e) { toast(e.message, true); } }, 400); };
+  const set = nv => { v = nv; out.textContent = offText(v); reset.disabled = !admin || v === 0; save(); };
+  const btn = (txt, d, label) => h('button', { type: 'button', class: 'btn sm zt42-b', 'aria-label': label, 'data-act': d < 0 ? 'zt-minus' : 'zt-plus', disabled: !admin, title: admin ? `${label} (Shift: 10 ms)` : ro, onclick: ev => set(stepOff(v, d * (ev.shiftKey ? 10 : 1))) }, txt);
+  const reset = h('button', { type: 'button', class: 'btn sm', 'data-act': 'zt-reset', disabled: !admin || v === 0, title: admin ? 'Back to 0 ms (as calibrated)' : ro, onclick: () => set(0) }, 'Reset');
+  return h('div', { class: 'zt42', 'data-act': 'zone-timing' },
+    h('div', { class: 'row' }, h('span', { class: 'dlbl' }, 'TIMING VS HOUSE'), btn('−', -1, `${g.name} earlier`), out, btn('+', 1, `${g.name} later`), reset),
+    h('p', { class: 'small dim' }, `Fine-tune ${g.name} against the other zones when you can hear two zones at once. + plays it later, − earlier. Each speaker's own delay stays as calibrated.`));
 }

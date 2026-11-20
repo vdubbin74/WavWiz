@@ -179,4 +179,39 @@ public class Release071ReferenceTests
         Assert.Contains(m, x => x.Contains("may make a better reference")); Assert.DoesNotContain(p, x => x.ZoneId == dA);
         Assert.Equal(30, S.Zones.Zone(dA)!.Outputs.First(o => o.Active).LatencyMs);
     }
+
+    [Fact]
+    public async Task Zone_vs_house_offset_is_applied_live_clamped_and_zero_keeps_the_saved_delay()
+    {
+        await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Deck Pi", kind: "analog"); await a.WaitConnected();
+        for (int i = 0; i < 100 && S.Zones.Zones().Count < 1; i++) await Task.Delay(50);
+        long dA = S.Zones.Zones().Single().Id;
+        string dev = S.Zones.Zone(dA)!.Outputs.First(o => o.Active).DeviceId;
+        S.Db.Exec("INSERT INTO calibration(output_device_id,latency_ms,raw_latency_ms,method,measured_at,is_current) VALUES($d,40,0,'test',$t,1)", ("$d", dev), ("$t", DateTimeOffset.UtcNow.ToString("O")));
+        long deck = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Deck", deviceIds = new[] { dA } })).Json()).GetProperty("id").GetInt64();
+        async Task<double> Lat(double want) { for (int i = 0; i < 100 && Math.Abs(a.Client.State.LatencyMs - want) > 0.01; i++) await Task.Delay(30); return a.Client.State.LatencyMs; }
+        S.Zones.PushZone(S.Audio.Get("pc-a")!);
+        Assert.Equal(40, await Lat(40));   // no offset (every upgrade): exactly the saved delay
+        Assert.Equal(0, (await Groups(admin))["Deck"].GetProperty("houseOffsetMs").GetDouble());
+
+        // +15 ms = the zone sounds 15 ms later: the engine gets 15 ms less of "play early"; the saved delay is untouched
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/house-offset", new { ms = 15 })).StatusCode);
+        Assert.Equal(25, await Lat(25));
+        Assert.Equal(40, S.Zones.Zone(dA)!.Outputs.First(o => o.Active).LatencyMs);
+        Assert.Equal(15, (await Groups(admin))["Deck"].GetProperty("houseOffsetMs").GetDouble());
+        Assert.Equal(15, (await admin.GetJson("/api/v1/zones")).EnumerateArray().Single().GetProperty("houseOffsetMs").GetDouble());
+        // clamped to the small fine-tune range; a viewer cannot change it
+        var r = await (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/house-offset", new { ms = 999 })).Json(); Assert.Equal(ZoneManager.HouseOffMaxMs, r.GetProperty("ms").GetDouble());
+        Assert.Equal(40 - ZoneManager.HouseOffMaxMs, await Lat(40 - ZoneManager.HouseOffMaxMs));
+        Assert.Equal(HttpStatusCode.Forbidden, (await f.As(f.Token(Role.View)).PutAsJsonAsync($"/api/v1/groups/{deck}/house-offset", new { ms = 1 })).StatusCode);
+        // leaving the zone drops its offset live
+        Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{deck}", new { deviceIds = Array.Empty<long>() })).StatusCode);
+        Assert.Equal(40, await Lat(40));
+        // back in, then the zone is deleted: back to the saved delay, and the setting is gone
+        Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{deck}", new { deviceIds = new[] { dA } })).StatusCode);
+        Assert.Equal(40 - ZoneManager.HouseOffMaxMs, await Lat(40 - ZoneManager.HouseOffMaxMs));
+        Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{deck}")).StatusCode);
+        Assert.Equal(40, await Lat(40)); Assert.Empty(S.Zones.HouseOffsets());
+    }
 }

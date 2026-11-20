@@ -6362,3 +6362,9 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .calrec .grow{min-width:0;flex:1 1 160px}
 .calnoref{margin:6px 0 0}
 .calnextbest{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.zp42-timing{display:block}
+.zt42{display:flex;flex-direction:column;gap:4px;min-width:0}
+.zt42>.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.zt42 .zt42-v{min-width:64px;text-align:center}
+.zt42 .zt42-b{min-width:32px}
+.zt42 p{margin:0}

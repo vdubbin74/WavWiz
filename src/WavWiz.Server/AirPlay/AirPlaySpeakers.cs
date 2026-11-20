@@ -75,6 +75,7 @@ public static class AirPlaySpeakers
         var z = s.Zones.Zones().FirstOrDefault(x => x.PlayerId == pid); if (z == null) return;
         outs.SetEnabled(k, z.Enabled);
         await outs.SetVolumeAsync(k, z.Muted ? 0 : (int)Math.Round(z.Volume));
-        var o = z.Outputs.FirstOrDefault(); if (o != null && !o.NotCalibrated && double.IsFinite(o.LatencyMs)) outs.SetDelay(k, (int)Math.Round(o.LatencyMs));
+        // 0.7.1: minus the zone's "vs house" offset (+ = the zone sounds later; 0 = the saved delay as before)
+        var o = z.Outputs.FirstOrDefault(); if (o != null && (!o.NotCalibrated || z.HouseOffsetMs != 0) && double.IsFinite(o.LatencyMs)) outs.SetDelay(k, (int)Math.Round(o.LatencyMs - z.HouseOffsetMs));
     }
 }

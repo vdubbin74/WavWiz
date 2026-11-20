@@ -12,10 +12,12 @@ public sealed record OutputDto(long EndpointDbId, string DeviceId, string Endpoi
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
     bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null, double? VolCap = null, bool VolLocked = false,
-    long? TimedBy = null);   // 0.7.1: the speaker this one is calibrated against (its zone's reference, else the internal house reference; null = none)
+    long? TimedBy = null,   // 0.7.1: the speaker this one is calibrated against (its zone's reference, else the internal house reference; null = none)
+    double HouseOffsetMs = 0);   // 0.7.1: its zone's "vs house" offset, added at playback (the Outputs' LatencyMs stay the saved delays)
 public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false,
     long? ReferenceId = null, string? RefNote = null,   // 0.6.8-#15: the zone's reference speaker + a quiet "Reference changed, re-check timing" note
-    long? RecommendedId = null, string? RecommendedReason = null, bool RecommendedWarn = false, RefFlagDto? RefFlag = null);   // 0.7.1: recommendation + flag
+    long? RecommendedId = null, string? RecommendedReason = null, bool RecommendedWarn = false, RefFlagDto? RefFlag = null,   // 0.7.1: recommendation + flag
+    double HouseOffsetMs = 0);   // 0.7.1: the zone's "vs house" fine-tune
 /// <summary>0.7.1: why a zone's reference needs a look. Kind: "left" (the reference left the zone; none is set until the user picks one),
 /// "changed" (pre-0.7.1 note), "offline" (the reference is not connected; Calibrate offers a session-only stand-in). Next = the recommended replacement.</summary>
 /// "output" (the reference's output or its type changed since it became the reference: switch back / use the next best / keep it and recalibrate).
@@ -250,9 +252,51 @@ public sealed class ZoneManager
                 var r = Resolve(key, ParseKind(info.Kind), s.Id, prevConnected, info.Codec, info.WinLatencyMs);
                 lat = r.LatencyMs; src = SourceName(r.Source); notCal = r.NotCalibrated; recheck = r.RecheckDue;
                 rev = _dsp.Effective(key).Revision;
+                // 0.7.1: its zone's "vs house" offset (0 = exactly the saved delay, so an upgrade plays as before). The delay is how late the output
+                // is (the engine plays that much EARLY), so a zone that should sound N ms later gets N ms less.
+                var off = HouseOffsetOfSpeaker(z.Id); _pushedOff[s.Id] = off; if (off != 0) lat -= off;
             }
         }
         s.SendJson(MsgType.ZoneUpdate, new ZoneUpdate(z.Volume, z.Muted, z.Enabled, epId, lat, src, rev, notCal, recheck));
+    }
+
+    // ---------------- 0.7.1: each zone's always-on "vs house" offset (ms, + = the zone sounds later). Added to every speaker of the zone at playback; the saved
+    // (calibrated) delays are never changed by it. Starts at 0: the players already schedule audio by the delay their output REPORTS
+    // (WASAPI stream latency / ALSA delay), so the zone references' reported delays are already lined up - seeding the offset from their
+    // difference would count it twice. The fine-tune is for what no output reports (amps, DSP, a TV's sound mode, AirPlay / Cast buffers).
+    public const string HouseOffKey = "zones.houseOffsetMs";
+    public const double HouseOffMaxMs = 200;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, double> _pushedOff = new(), _extOff = new();
+    /// <summary>Called for an AirPlay / Cast speaker whose zone offset changed (wired to AirPlaySpeakers.Push / CastSpeakers.Push).</summary>
+    public Action<string>? ExternalDelayChanged;
+    public Dictionary<long, double> HouseOffsets()
+    {
+        try { return JsonSerializer.Deserialize<Dictionary<string, double>>(_db.Setting(HouseOffKey) ?? "{}")!.Where(kv => long.TryParse(kv.Key, out _) && double.IsFinite(kv.Value)).ToDictionary(kv => long.Parse(kv.Key), kv => kv.Value); }
+        catch { return new(); }
+    }
+    public double HouseOffsetOfSpeaker(long speakerId) => GroupOfSpeaker(speakerId) is long g && HouseOffsets().TryGetValue(g, out var v) ? v : 0;
+    public string? SetHouseOffset(long groupId, double ms)
+    {
+        if (!double.IsFinite(ms)) return "the offset must be a number";
+        if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group WHERE id=$i", ("$i", groupId))) == 0) return "zone not found";
+        var m = HouseOffsets(); ms = Math.Round(Math.Clamp(ms, -HouseOffMaxMs, HouseOffMaxMs), 1);
+        if (ms == 0) m.Remove(groupId); else m[groupId] = ms;
+        SaveHouseOffsets(m); RepushDelays(); _ev.Publish("zones"); return null;
+    }
+    void SaveHouseOffsets(Dictionary<long, double> m) => _db.SetSetting(HouseOffKey, JsonSerializer.Serialize(m.ToDictionary(kv => kv.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), kv => kv.Value)));
+    /// <summary>Re-send the delay of every speaker whose zone offset changed (offset edited, a speaker moved, a zone deleted).</summary>
+    public void RepushDelays()
+    {
+        foreach (var s in _host.Sessions)
+        {
+            var z = ZoneRow(s.Id); if (z == null) continue;
+            if (_pushedOff.GetValueOrDefault(s.Id) != HouseOffsetOfSpeaker(z.Id)) PushZone(s);
+        }
+        foreach (var (id, pid) in _db.Query("SELECT id,player_id FROM zone WHERE player_id LIKE 'airplay:%' OR player_id LIKE 'cast:%'", r => (r.GetInt64(0), r.GetString(1))))
+        {
+            var off = HouseOffsetOfSpeaker(id); if (_extOff.GetValueOrDefault(pid) == off) continue;
+            _extOff[pid] = off; try { ExternalDelayChanged?.Invoke(pid); } catch { }
+        }
     }
 
     public void PushDsp(PlayerSession s)
@@ -494,7 +538,7 @@ public sealed class ZoneManager
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null || ext, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlayingFor(z.PlayerId), StreamAgeMsFor(z.PlayerId)), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
                 IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), IsRef(z.Id), unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked,
-                TimedBy(z.Id)));
+                TimedBy(z.Id), HouseOffsetOfSpeaker(z.Id)));
         }
         return res;
     }
@@ -642,7 +686,7 @@ public sealed class ZoneManager
     {
         var devs = _db.Query("SELECT id,player_id,enabled FROM zone", r => (Id: r.GetInt64(0), Player: r.GetString(1), On: r.GetInt32(2) != 0)).ToDictionary(x => x.Id);
         var mem = _db.Query("SELECT group_id,device_id FROM zone_group_member", r => (G: r.GetInt64(0), D: r.GetInt64(1))).ToLookup(x => x.G, x => x.D);
-        var res = new List<ZoneGroupDto>(); var zref = ZoneReferenceMap(); var notes = RefNotes(); var outs = RefOuts();   // 0.6.8-#15
+        var res = new List<ZoneGroupDto>(); var zref = ZoneReferenceMap(); var notes = RefNotes(); var outs = RefOuts(); var hoff = HouseOffsets();   // 0.6.8-#15
         var names = _db.Query("SELECT id,name FROM zone", r => (Id: r.GetInt64(0), N: r.GetString(1))).ToDictionary(x => x.Id, x => x.N);
         string? nameOf(long id) => names.TryGetValue(id, out var n) ? n : null;
         foreach (var g in _db.Query("SELECT id,name FROM zone_group ORDER BY sort,id", r => (Id: r.GetInt64(0), Name: r.GetString(1))))
@@ -656,7 +700,8 @@ public sealed class ZoneManager
             var rec = ZoneRefs.Recommend(ids.Select(RefCand));   // 0.7.1: best-ranked online speaker (with an offline reference: the next best)
             var flag = FlagOf(g.Id, ids, rid, note, nameOf, rec, outs);
             res.Add(new ZoneGroupDto(g.Id, g.Name, ids, ids.Count, online, on, active, ZoneVolume.Level(vols.Select(x => x.V).ToList()), vols.Count > 0 && vols.All(x => x.M),
-                rid, note != null ? (flag?.Text ?? RefNoteText) : null, rec?.Id, rec == null ? null : ZoneRefs.Reason(rec), rec != null && ZoneRefs.Warn(rec), flag));
+                rid, note != null ? (flag?.Text ?? RefNoteText) : null, rec?.Id, rec == null ? null : ZoneRefs.Reason(rec), rec != null && ZoneRefs.Warn(rec), flag,
+                hoff.GetValueOrDefault(g.Id)));
         }
         return res;
     }
@@ -825,6 +870,7 @@ public sealed class ZoneManager
         var g = Groups().FirstOrDefault(x => x.Id == id); if (g == null) return "zone not found";
         var pid = Links?.PlaybackId(id) ?? Conductor.DefaultGroupId;
         _db.Exec("DELETE FROM zone_group_member WHERE group_id=$g", ("$g", id)); _db.Exec("DELETE FROM zone_group WHERE id=$g", ("$g", id)); Links?.Forget(id);
+        { var ho = HouseOffsets(); if (ho.Remove(id)) SaveHouseOffsets(ho); RepushDelays(); }   // 0.7.1: its speakers lose the zone's offset
         bool houseUsed = Links?.ZoneList().Any(z => Links.PlaybackId(z.Id) == Conductor.DefaultGroupId) ?? false;
         if (pid == Conductor.DefaultGroupId && !houseUsed) _reg.Default.Clear();
         else if (Links?.ZoneList().Any(z => Links.PlaybackId(z.Id) == pid) == false) _reg.Get(pid)?.Stop();   // a group only this zone used (Prune normally drops it already)
