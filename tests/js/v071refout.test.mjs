@@ -71,3 +71,18 @@ test('the reference speaker settings and the zone settings show the card; the tr
   assert.match(t, /fn\.review \? h\('button', \{ type: 'button', class: 'btn sm zrefnote-use', 'data-act': 'ref-review'/);
   assert.match(t, /st\.onZone\(g\.id\); \} \}, 'Review'\)/);
 });
+
+test('polish: the card does not repeat its heading, one "Use <next best>" only, and Use is the primary button only when the zone has no reference', async () => {
+  const { speakerRefSec, zoneRefBlock } = await imp('refrec.js');
+  const g2 = { ...g, recommendedId: 2, recommendedReason: 'Wired output on a WavWiz player' };   // the next best is also the recommended one
+  const S = { zones, groups: [g2] };
+  for (const el of [speakerRefSec(S, zones[0], true, () => {}), zoneRefBlock(S, g2, true, () => {})]) {
+    assert.equal((el.textContent.match(/Reference output changed/g) || []).length, 1, el.textContent);
+    assert.equal([...el.querySelectorAll('button')].filter(b => b.textContent === 'Use Deck Pi').length, 1, 'one Use Deck Pi');
+    assert.equal(el.querySelector('.dtag.rec')?.textContent, 'RECOMMENDED', 'the tag still shows');
+  }
+  const noFlag = { ...g2, refFlag: null };
+  assert.equal(zoneRefBlock({ zones, groups: [noFlag] }, noFlag, true, () => {}).querySelector('[data-act="use-recommended"]').classList.contains('primary'), false, 'a chosen reference: Use is not pushed');
+  const none = { ...noFlag, referenceId: null };
+  assert.equal(zoneRefBlock({ zones, groups: [none] }, none, true, () => {}).querySelector('[data-act="use-recommended"]').classList.contains('primary'), true, 'no reference yet: Use is the main action');
+});

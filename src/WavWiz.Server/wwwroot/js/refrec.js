@@ -48,12 +48,15 @@ export function outputFlagCard(S, g, admin, done) {
   };
   return h('div', { class: 'reflag', role: 'status', 'data-flag': 'output' },
     h('div', { class: 'reflag-h' }, 'Reference output changed'),
-    h('p', { class: 'small' }, f.text),
+    h('p', { class: 'small' }, String(f.text || '').replace(/^Reference output changed:\s*/, '')),   // the heading already says it
     h('div', { class: 'row reflag-acts' },
       h('button', { type: 'button', class: 'btn sm', 'data-act': 'ref-switch-back', disabled: !admin || f.wasEndpointId == null, title: !admin ? ro : f.wasEndpointId == null ? `${f.wasName} is not connected right now` : '', onclick: back }, `Switch back to ${f.wasName}`),
       next ? h('button', { type: 'button', class: 'btn sm', 'data-act': 'ref-next-best', disabled: !admin, title: admin ? (f.nextReason || '') : ro, onclick: () => useRef(g, next, done) }, `Use ${next.name}`) : null,
       h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'ref-keep-recal', disabled: !admin, title: admin ? '' : ro, onclick: keep }, 'Keep it and recalibrate')));
 }
+
+/** The output-changed card already offers "Use <next best>": no second button for the same speaker. */
+const dupNext = (f, z) => !!(f && f.kind === 'output' && z && f.nextId === z.id);
 
 /** Zone settings: the REFERENCE row - the reference (or "None yet"), RECOMMENDED + reason, Use <rec> (one tap), Pick another. */
 export function zoneRefBlock(S, g, admin, done) {
@@ -70,7 +73,7 @@ export function zoneRefBlock(S, g, admin, done) {
       st.refIsRec ? recTag(st.reason, st.warn) : null, h('span', { class: 'grow' }), pick),
     st.refIsRec ? h('p', { class: 'small dim zp42-why' }, st.reason) : null,
     st.offer ? h('div', { class: 'row zp42-rec' }, recTag(st.reason, st.warn), h('b', null, st.offer.name), h('span', { class: 'small dim grow' }, st.reason),
-      h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'use-recommended', disabled: !admin, title: admin ? `Make ${st.offer.name} the reference` : ro, onclick: () => useRef(g, st.offer, done) }, `Use ${st.offer.name}`)) : null,
+      dupNext(st.flag, st.offer) ? null : h('button', { type: 'button', class: 'btn sm' + (st.ref ? '' : ' primary'), 'data-act': 'use-recommended', disabled: !admin, title: admin ? `Make ${st.offer.name} the reference` : ro, onclick: () => useRef(g, st.offer, done) }, `Use ${st.offer.name}`)) : null,
     st.warn && st.offer ? h('p', { class: 'small amber' }, 'Bluetooth, AirPlay and Cast can be the reference, but their delay can drift; a wired speaker keeps better time.') : null,
     outputFlagCard(S, g, admin, done),
     st.flag && st.flag.kind === 'offline' ? h('p', { class: 'small amber zp42-flag', role: 'status' }, st.flag.text, ' Calibrate can use a stand-in for one session.') : null,
@@ -89,7 +92,7 @@ export function speakerRefSec(S, z, admin, done) {
     lines.push(h('p', { class: 'small dim dsreftiming' }, `${g.name} timing vs house: ${offText(g.houseOffsetMs)} (zone settings).`));
     const of = outputFlagCard(S, g, admin, done); if (of) lines.push(of);
     if (!isRec && st.rec) lines.push(h('div', { class: 'row zp42-rec' }, recTag(st.reason, st.warn), h('b', null, st.rec.name), h('span', { class: 'small dim grow' }, st.reason),
-      h('button', { type: 'button', class: 'btn sm', 'data-act': 'use-recommended', disabled: !admin, title: admin ? '' : ro, onclick: () => useRef(g, st.rec, done) }, `Use ${st.rec.name}`)));
+      dupNext(st.flag, st.rec) ? null : h('button', { type: 'button', class: 'btn sm', 'data-act': 'use-recommended', disabled: !admin, title: admin ? '' : ro, onclick: () => useRef(g, st.rec, done) }, `Use ${st.rec.name}`)));
   } else if (isRec) {
     lines.push(h('div', { class: 'row' }, recTag(st.reason, st.warn), h('span', { class: 'small dim grow' }, st.reason)));
     lines.push(h('div', { class: 'row' }, h('span', { class: 'small grow' }, st.ref ? `${g.name}'s reference is ${st.ref.name}.` : `${g.name} has no reference yet.`),
