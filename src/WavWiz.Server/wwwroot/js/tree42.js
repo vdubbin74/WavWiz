@@ -189,7 +189,8 @@ export function treeEl(S, ctl, kit, st) {
     const fn = flagNote(S, g) || (g.refNote ? { text: g.refNote, use: null } : null);
     const note = fn ? h('div', { class: 'zrefnote42', role: 'status' }, h('span', { class: 'grow' }, fn.text),
       fn.use && isAdmin(S) ? h('button', { type: 'button', class: 'btn sm zrefnote-use', 'data-act': 'use-recommended', onclick: ev => { ev.stopPropagation(); useRef(g, fn.use, done); } }, `Use ${fn.use.name}`) : null,
-      h('button', { type: 'button', class: 'zrefnote-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { ev.stopPropagation(); dismissNote(g, done); } }, '✕')) : null;
+      fn.review ? h('button', { type: 'button', class: 'btn sm zrefnote-use', 'data-act': 'ref-review', title: 'Switch back, use the next best, or keep it and recalibrate', onclick: ev => { ev.stopPropagation(); st.onZone(g.id); } }, 'Review') : null,
+      fn.review ? null : h('button', { type: 'button', class: 'zrefnote-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: ev => { ev.stopPropagation(); dismissNote(g, done); } }, '✕')) : null;
     const wrap = h('div', { class: 'zwrap42' + (sel ? ' ctl' : '') + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-playback-id': g.playbackId || 'default', 'data-zone': g.name }, card, note, list);
     zoneCtx(g, wrap);
     return wrap;

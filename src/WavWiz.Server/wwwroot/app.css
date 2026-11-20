@@ -6351,3 +6351,7 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .dsrefsec{display:flex;flex-direction:column;gap:6px;min-width:0}
 .dsrefsec p{margin:0}
 .zrefnote42 .zrefnote-use{padding:2px 8px;font-size:12px}
+.reflag{border:1px solid var(--amber,#ffb300);border-left:3px solid var(--amber,#ffb300);background:color-mix(in srgb,var(--amber,#ffb300) 8%,transparent);border-radius:3px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.reflag-h{color:var(--amber,#ffb300);font-weight:700;font-size:13px}
+.reflag p{margin:0}
+.reflag-acts{display:flex;flex-wrap:wrap;gap:6px}

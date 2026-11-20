@@ -95,4 +95,51 @@ public class Release071ReferenceTests
         Assert.False(zs[dC]); Assert.True(zs[dA]);
         Assert.Equal(dC, S.Zones.ReferenceFor(dC));
     }
+
+    [Fact]
+    public async Task Reference_output_changed_flag_switch_back_next_best_or_keep_and_no_flag_on_upgrade()
+    {
+        await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Amp A", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Pi B", kind: "analog");
+        await a.WaitConnected(); await b.WaitConnected();
+        for (int i = 0; i < 100 && S.Zones.Zones().Count < 2; i++) await Task.Delay(50);
+        var dev = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
+        long dA = dev["pc-a"], dB = dev["pc-b"];
+        long deck = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Deck", deviceIds = new[] { dA, dB } })).Json()).GetProperty("id").GetInt64();
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/reference", new { zoneId = dA })).StatusCode);
+        string devA = (string)S.Db.Scalar("SELECT active_output_device_id FROM zone WHERE id=$i", ("$i", dA))!;
+        async Task<JsonElement> Flag() => (await Groups(admin))["Deck"].GetProperty("refFlag");
+        Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
+
+        // the type of the remembered output changes (wired -> Bluetooth): flagged, with the next best and the way back
+        S.Db.Exec("UPDATE output_device SET kind='bluetooth' WHERE id=$d", ("$d", devA));
+        var fl = await Flag();
+        Assert.Equal("output", fl.GetProperty("kind").GetString()); Assert.Equal(dA, L(fl, "refId")); Assert.Equal(dB, L(fl, "nextId"));
+        Assert.Equal("analog", fl.GetProperty("wasKind").GetString()); Assert.Equal("bluetooth", fl.GetProperty("nowKind").GetString());
+        Assert.Contains("Reference output changed", fl.GetProperty("text").GetString()); Assert.Contains("wired → Bluetooth", fl.GetProperty("text").GetString());
+        Assert.Equal(dA, L((await Groups(admin))["Deck"], "referenceId"));   // never switched by itself
+        // keep it and recalibrate: the current output is the new baseline
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync($"/api/v1/groups/{deck}/reference-output", new { })).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
+
+        // a different output device: flagged; "switch back" uses the remembered device's endpoint and clears it
+        S.Db.Exec("UPDATE output_device SET kind='analog' WHERE id=$d", ("$d", devA));
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync($"/api/v1/groups/{deck}/reference-output", new { })).StatusCode);
+        S.Db.Exec("INSERT INTO output_device(id,kind,friendly_name) VALUES('dev-usb','usb','USB DAC')");
+        S.Db.Exec("UPDATE zone SET active_output_device_id='dev-usb' WHERE id=$i", ("$i", dA));
+        fl = await Flag(); Assert.Equal("output", fl.GetProperty("kind").GetString()); Assert.Equal("USB DAC", fl.GetProperty("nowName").GetString());
+        long ep = L(fl, "wasEndpointId")!.Value;
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync($"/api/v1/zones/{dA}/output", new { endpointId = ep })).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
+        // use the next best: one tap, flag gone (the new reference's output is remembered)
+        S.Db.Exec("UPDATE zone SET active_output_device_id='dev-usb' WHERE id=$i", ("$i", dA));
+        Assert.Equal(dB, L(await Flag(), "nextId"));
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/groups/{deck}/reference", new { zoneId = dB })).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
+
+        // upgrade: a reference with no remembered output gets its current one silently - no flag
+        S.Db.DeleteSetting(ZoneManager.RefOutKey);
+        Assert.Equal(JsonValueKind.Null, (await Flag()).ValueKind);
+        Assert.Contains(deck.ToString(), S.Db.Setting(ZoneManager.RefOutKey));
+    }
 }

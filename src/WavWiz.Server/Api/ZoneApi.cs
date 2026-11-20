@@ -344,6 +344,8 @@ public static class ZoneApi
             return Results.Json(new { groupId, referenceId = groupId == null ? (long?)null : cur == 0 ? null : cur, recommendedId = rec.Id == 0 ? (long?)null : rec.Id, defaultId = def,
                 ranking = rk.Select(x => new { id = x.Id, name = x.Name, connected = x.Connected, reason = x.Reason, warn = x.Warn }) });
         }).Req(Role.View);
+        // 0.7.1: "Keep it and recalibrate" - the reference's current output becomes its new baseline (clears the "Reference output changed" flag)
+        g.MapPost("/groups/{id:long}/reference-output", (long id) => { var e = s.Zones.AcceptRefOutput(id); return e != null ? Ext.Bad(e, 409) : Results.Json(new { ok = true }); }).Req(Role.Admin);
         g.MapDelete("/groups/{id:long}/reference-note", (long id) => { s.Zones.SetRefNote(id, false); s.Events.Publish("zones"); return Results.Json(new { ok = true }); }).Req(Role.Control);
 
         g.MapPost("/calibration/ear/play", async (HttpContext c) =>

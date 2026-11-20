@@ -30,7 +30,28 @@ export function flagNote(S, g) {
   const f = g?.refFlag; if (!f) return null;
   if (f.kind === 'left') { const next = f.nextId != null ? byId(S, f.nextId) : null; return { kind: 'left', text: f.text, use: next }; }
   if (f.kind === 'changed') return { kind: 'changed', text: f.text, use: null };
+  if (f.kind === 'output') return { kind: 'output', text: `Reference output changed: ${byId(S, f.refId)?.name ?? 'the reference'}.`, use: null, review: true };   // the 3 choices are in zone settings
   return null;   // "offline" shows in zone settings and Calibrate, not as a note (the OFFLINE tag is already on the speaker)
+}
+
+/** "Reference output changed": the reference now plays through another output (or another type) than when it became the reference. Three
+ *  choices: switch back to that output, use the next best speaker, or keep it and recalibrate the zone (its output becomes the new baseline). */
+export function outputFlagCard(S, g, admin, done) {
+  const f = g?.refFlag; if (!f || f.kind !== 'output') return null;
+  const ref = byId(S, f.refId), next = f.nextId != null ? byId(S, f.nextId) : null, ro = 'Only an administrator can change the reference speaker.';
+  const back = async () => { try { await api(`/zones/${f.refId}/output`, { method: 'POST', body: { endpointId: f.wasEndpointId } }); toast(`${ref?.name ?? 'The reference'} plays through ${f.wasName} again`); done?.(); } catch (e) { toast(e.message, true); } };
+  const keep = async () => {
+    try { await api(`/groups/${g.id}/reference-output`, { method: 'POST', body: {} }); toast(`Kept ${ref?.name ?? 'the reference'} on ${f.nowName} - recalibrate ${g.name} so the others line up with it`); done?.(); }
+    catch (e) { toast(e.message, true); return; }
+    try { const m = await import('./calibrate.js'); m.openCalibration(S, done, null, { groupId: g.id }); } catch { /* Calibrate opens from the speaker settings */ }
+  };
+  return h('div', { class: 'reflag', role: 'status', 'data-flag': 'output' },
+    h('div', { class: 'reflag-h' }, 'Reference output changed'),
+    h('p', { class: 'small' }, f.text),
+    h('div', { class: 'row reflag-acts' },
+      h('button', { type: 'button', class: 'btn sm', 'data-act': 'ref-switch-back', disabled: !admin || f.wasEndpointId == null, title: !admin ? ro : f.wasEndpointId == null ? `${f.wasName} is not connected right now` : '', onclick: back }, `Switch back to ${f.wasName}`),
+      next ? h('button', { type: 'button', class: 'btn sm', 'data-act': 'ref-next-best', disabled: !admin, title: admin ? (f.nextReason || '') : ro, onclick: () => useRef(g, next, done) }, `Use ${next.name}`) : null,
+      h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'ref-keep-recal', disabled: !admin, title: admin ? '' : ro, onclick: keep }, 'Keep it and recalibrate')));
 }
 
 /** Zone settings: the REFERENCE row - the reference (or "None yet"), RECOMMENDED + reason, Use <rec> (one tap), Pick another. */
@@ -50,6 +71,7 @@ export function zoneRefBlock(S, g, admin, done) {
     st.offer ? h('div', { class: 'row zp42-rec' }, recTag(st.reason, st.warn), h('b', null, st.offer.name), h('span', { class: 'small dim grow' }, st.reason),
       h('button', { type: 'button', class: 'btn sm primary', 'data-act': 'use-recommended', disabled: !admin, title: admin ? `Make ${st.offer.name} the reference` : ro, onclick: () => useRef(g, st.offer, done) }, `Use ${st.offer.name}`)) : null,
     st.warn && st.offer ? h('p', { class: 'small amber' }, 'Bluetooth, AirPlay and Cast can be the reference, but their delay can drift; a wired speaker keeps better time.') : null,
+    outputFlagCard(S, g, admin, done),
     st.flag && st.flag.kind === 'offline' ? h('p', { class: 'small amber zp42-flag', role: 'status' }, st.flag.text, ' Calibrate can use a stand-in for one session.') : null,
     st.flag && st.flag.kind === 'left' ? h('p', { class: 'small amber zp42-flag', role: 'status' }, st.flag.text) : null);
 }
@@ -63,6 +85,7 @@ export function speakerRefSec(S, z, admin, done) {
   if (isRef) {
     lines.push(h('div', { class: 'row' }, h('b', null, `Reference for ${g.name}`), isRec ? recTag(st.reason, st.warn) : null));
     lines.push(h('p', { class: 'small dim' }, 'Its delay stays fixed; the other speakers in the zone are measured against it.' + (isRec ? ' ' + st.reason + '.' : '')));
+    const of = outputFlagCard(S, g, admin, done); if (of) lines.push(of);
     if (!isRec && st.rec) lines.push(h('div', { class: 'row zp42-rec' }, recTag(st.reason, st.warn), h('b', null, st.rec.name), h('span', { class: 'small dim grow' }, st.reason),
       h('button', { type: 'button', class: 'btn sm', 'data-act': 'use-recommended', disabled: !admin, title: admin ? '' : ro, onclick: () => useRef(g, st.rec, done) }, `Use ${st.rec.name}`)));
   } else if (isRec) {
