@@ -19,6 +19,7 @@ import { loadPanels, savePanels } from './panels.js';
 import { scaleTo, phoneZoneMembers, phoneZoneLevel } from './mixer-core.js';   // 0.4.9 F68 + F250-P8: phone NP max-based; Jukebox bound via same contract
 import { zoneLink, current as currentZone } from './zones40.js';   // 0.4.5 F27: the inline "on <zone> ▾" is the only Controlling picker in Now Playing views
 import { loadEqLock, saveEqLock } from './eqstyle.js';
+import { guardMedia } from './phonepause.js';
 import { loadLooks, btnOpacity, overlayButtons, looksRows, getLook, setLook, resetLooks, stepPct, ovSvg } from './looks.js';
 
 /** Now Playing - 0.0.8 layout per the "waveform river" mockup:
@@ -503,8 +504,8 @@ export function createNow(S, ctl) {
     drawMine(); barT1.textContent = t1.textContent; barT2.textContent = t2.textContent; barPlay.classList.toggle('playing', playing); setIcon(barPlay, playing ? 'pause' : 'play');
     { const bk = npKey(ait, srcSm); if (barCover.dataset.src !== bk) { barCover.dataset.src = bk; barArtB.setCover(npCover(ait, 96, 'sm')); } }
     document.title = it ? `${t1.textContent} - WavWiz` : `WavWiz BETA ${S.auth?.appVersion ?? ''}`;
-    setMediaSession(n, { play: () => act('/stream/resume'), pause: () => act('/stream/pause'), nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
-      seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: () => act('/stream/stop') },
+    setMediaSession(n, { play: guardMedia('play', () => act('/stream/resume')), pause: guardMedia('pause', () => act('/stream/pause')),   /* t2044u: an interruption only drops this phone */ nexttrack: () => act('/stream/next'), previoustrack: () => act('/stream/prev'),
+      seekto: d => act('/stream/seek', { ms: Math.round((d.seekTime || 0) * 1000) }), stop: guardMedia('stop', () => act('/stream/stop')) },
       smoothPosition(n), S._smooth);   // F248: paused and playing share the reconciled ingest clock
     // Up next
     // 0.4.9 F73: the server says what really plays next (shuffle pick, Repeat All wrap, Repeat One); the list neighbour only for an older server

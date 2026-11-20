@@ -1,3 +1,4 @@
+import { guardMedia } from './phonepause.js';   // 0.7.1 t2044u: a call / app switch on a phone speaker must not pause the zone
 // WavWiz 0.3.8 L45: media keys. (1) navigator.mediaSession handlers + metadata for browsers (phone / desktop browser tabs that play audio).
 // (2) The WavWiz Player forwards the global media keys (RegisterHotKey, see MediaKeys.cs) as { cmd: 'media', key } host messages; the same actions run here,
 // and volume keys answer with a themed on-screen indicator (posted back to the host, which shows it even when the window is minimized).
@@ -31,7 +32,7 @@ export function installMedia({ S, api, act, masterLevel, allMuted } = {}) {
   host?.addEventListener?.('message', ev => { const m = ev.data || {}; if (m.cmd === 'media') run(m.key); });
   const ms = globalThis.navigator?.mediaSession;
   if (ms) {
-    for (const [name, key] of [['play', 'playpause'], ['pause', 'playpause'], ['nexttrack', 'next'], ['previoustrack', 'prev']]) { try { ms.setActionHandler(name, () => run(key)); } catch { /* unsupported action */ } }
+    for (const [name, key] of [['play', 'playpause'], ['pause', 'playpause'], ['nexttrack', 'next'], ['previoustrack', 'prev']]) { try { ms.setActionHandler(name, guardMedia(name, () => run(key))); } catch { /* unsupported action */ } }
     const paint = () => {
       // F206: playbackState only - art.js setMediaSession is the single MediaMetadata owner (artwork-less metadata here flashed the logo on iOS)
       try { const st = S.now?.state === 'playing' ? 'playing' : S.now?.state === 'paused' ? 'paused' : 'none'; if (ms.playbackState !== st) ms.playbackState = st; } catch { /* ignore */ }

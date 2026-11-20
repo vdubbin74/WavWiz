@@ -9,11 +9,14 @@ import { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName } from './phon
 import { phoneRole, setPhoneRole } from './calmic-core.js';
 import { isRemote } from './remotemode.js';
 import { EqChain, eqPlan } from './roomeq.js';
+import { notePhone } from './phonepause.js';   // 0.7.1 t2044u/t2045u: interruptions drop out only this phone
 export { isPhoneUa, isTvUa, isPlayerUa, wantsAutoJoin, deviceName };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const idKey = 'wavwiz.webRoom.id', nameKey = 'wavwiz.webRoom.name', wantKey = 'wavwiz.webRoom.autojoin';
 export function roomId() { let id = localStorage.getItem(idKey); if (!id) { id = 'web-' + [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join(''); localStorage.setItem(idKey, id); } return id; }
+/** 0.7.1 t2044u: after a call / another app, start the silent element again so the phone keeps playing as media (rejoin). */
+export function resumeSilent() { try { if (silentEl?.paused) { const p = silentEl.play(); p && p.catch(() => {}); } } catch { /* optional */ } }
 /** 0.2.0 item 1: every browser names itself from its user agent ("LG TV browser", "iPhone", "Chrome on Windows"); an admin can rename it in Devices. */
 export function defaultRoomName() { let n = null; try { n = localStorage.getItem(nameKey); } catch { /* ignore */ } return n || deviceName(); }
 
@@ -40,10 +43,12 @@ export class PhoneRoom {
     this.ctx = sharedCtx();
     this.gain = this.ctx.createGain(); this.gain.connect(this.ctx.destination); this.applyGain();
     this.eq = new EqChain(this.ctx, this.gain); this.applyEq();      // 0.4.3 #10: the speaker's EQ (music only; the test chime stays dry)
-    this._onCtx = () => { this.emit(); const st = this.ctx.state; if (st === 'running' && this._lastSt && this._lastSt !== 'running') this.resync('ctx ' + this._lastSt + '>running'); this._lastSt = st; }; this._lastSt = this.ctx.state; this.ctx.addEventListener?.('statechange', this._onCtx);   // 0.4.6 F44: suspended / interrupted -> running re-measures
+    this._onCtx = () => { this.emit(); const st = this.ctx.state; notePhone('ctx', st); if (st === 'running' && this._lastSt && this._lastSt !== 'running') resumeSilent(); if (st === 'running' && this._lastSt && this._lastSt !== 'running') this.resync('ctx ' + this._lastSt + '>running'); this._lastSt = st; }; this._lastSt = this.ctx.state; this.ctx.addEventListener?.('statechange', this._onCtx);   // 0.4.6 F44: suspended / interrupted -> running re-measures
     this.running = true;
-    this.vis = () => { this.emit(); if (!document.hidden) this.onVisible().catch(() => {}); };   // F244: a healthy foreground return must not restart scheduled audio
+    notePhone('active', this.ctx.state);
+    this.vis = () => { notePhone(document.hidden ? 'hidden' : 'shown'); this.emit(); if (!document.hidden) this.onVisible().catch(() => {}); };   // F244: a healthy foreground return must not restart scheduled audio
     document.addEventListener('visibilitychange', this.vis);
+    this.hide = () => notePhone('hidden'); window.addEventListener?.('pagehide', this.hide);   // t2045u: app switch / leaving
     this.timer = setInterval(() => { this.pairNow(); this.watchdog(); this.sendStatus(); this.emit(); }, 1000);
     this.clockTimer = setInterval(() => this.pingClock(), 1000);
     await this.syncClock(); await this.connect(); this.resync('start');   // F44: the full re-measure runs in the background (start stays as fast as before)
@@ -247,7 +252,7 @@ export class PhoneRoom {
   }
 
   async stop() {
-    this.running = false; clearInterval(this.timer); clearInterval(this.clockTimer); clearTimeout(this._nrt); clearTimeout(this._crt); document.removeEventListener('visibilitychange', this.vis); this.ctx?.removeEventListener?.('statechange', this._onCtx);
+    this.running = false; clearInterval(this.timer); clearInterval(this.clockTimer); clearTimeout(this._nrt); clearTimeout(this._crt); document.removeEventListener('visibilitychange', this.vis); window.removeEventListener?.('pagehide', this.hide); notePhone('inactive'); this.ctx?.removeEventListener?.('statechange', this._onCtx);
     try { this.send(MSG.Bye, { reason: 'closed by the user' }); } catch { /* socket gone */ }
     try { this.ws?.close(); } catch { /* ok */ } try { this.cws?.close(); } catch { /* ok */ }
     this.dropAudio(); this.eq?.disconnect(); this.eq = null; this._eqKey = undefined; try { this.gain?.disconnect(); } catch { /* ok */ }      // the shared AudioContext stays open for the next start (never closed: iOS)
@@ -296,6 +301,7 @@ export function unlockAudio() {
       const sr = 8000, n = sr, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf), w = (o, t) => [...t].forEach((ch, i) => dv.setUint8(o + i, ch.charCodeAt(0)));
       w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, n * 2, true);
       silentEl = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); silentEl.volume = 0.01;
+      silentEl.addEventListener?.('pause', () => notePhone('silent-pause')); silentEl.addEventListener?.('playing', () => notePhone('silent-play'));   // t2045u: another app took the audio
     }
     const p = silentEl.play(); p && p.catch(() => {});
   } catch { /* optional */ }
