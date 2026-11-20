@@ -39,8 +39,8 @@ public sealed class ServerFixture : IAsyncDisposable
     }
 
     public string Token(Role role, string name = "t") => Server.S.Auth.CreateToken(name, role);
-    /// <summary>0.6.8 zone fix: a fresh server puts its first speaker into an "Everywhere" zone and every later speaker waits, silent, in Unassigned.
-    /// Call before any speaker connects to start like a house without zones (every speaker Unassigned) instead.</summary>
+    /// <summary>0.6.8 zone fix: a fresh server used to put its first speaker into an "Everywhere" zone. 0.7.1 t2078u: it no longer does (every speaker
+    /// starts Unassigned, silent), so this only marks the one-time migration done; kept so older tests read the same.</summary>
     public void SkipEverywhere() => Server.S.Db.SetSetting(Zones.ZoneManager.EverywhereKey, "done");
     /// <summary>0.6.8 zone fix: put every known speaker into the "Everywhere" zone (what a user does after adding speakers), so they all play the house music.</summary>
     public void JoinEverywhere()

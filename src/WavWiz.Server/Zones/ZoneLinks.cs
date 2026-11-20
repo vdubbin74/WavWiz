@@ -11,7 +11,7 @@ namespace WavWiz.Server.Zones;
 ///   playback group = one Conductor (queue, now playing, engine). Zones that are LINKED share one; a split zone has its own.
 /// State: setting zone.links = { "&lt;zone id&gt;": "&lt;playback group id&gt;" }. A zone with no entry is in the house group "default", so every existing install starts with all zones LINKED = exactly 0.3.9 (this is the migration: nothing to convert).
 /// A device plays the group of the zone it belongs to; a device in no zone is SILENT (0.6.8 zone fix: there is no hidden house fallback for speakers any
-/// more - a fresh setup and an upgrade get a real "Everywhere" zone instead, see ZoneManager.MigrateEverywhere). Devices picked for the Jukebox zone play "jukebox" instead
+/// more - an upgrade from before 0.6.8 gets a real "Everywhere" zone instead, see ZoneManager.MigrateEverywhere; 0.7.1: a fresh setup gets no zone, the user makes the first one). Devices picked for the Jukebox zone play "jukebox" instead
 /// (setting jukebox.devices = player ids; empty = the Jukebox plays in the house group like in 0.3.9).
 /// </summary>
 public sealed class ZoneLinks

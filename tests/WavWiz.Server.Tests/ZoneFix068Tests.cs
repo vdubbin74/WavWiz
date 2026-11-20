@@ -5,8 +5,8 @@ using WavWiz.Server.Playback;
 using WavWiz.Server.Zones;
 namespace WavWiz.Server.Tests;
 
-/// <summary>0.6.8 zone fix (t1800u): a speaker in no zone is silent (no hidden house fallback), a fresh setup and an upgrade get a real "Everywhere"
-/// zone, deleting a zone takes its music with it, and no speaker is the reference until the user picks one.</summary>
+/// <summary>0.6.8 zone fix (t1800u): a speaker in no zone is silent (no hidden house fallback), an upgrade from before 0.6.8 gets a real "Everywhere"
+/// zone (0.7.1 t2078u: a fresh setup gets none - the user makes the first zone), deleting a zone takes its music with it, and no speaker is the reference until the user picks one.</summary>
 public class ZoneFix068Tests
 {
     static async Task<Dictionary<string, long>> Devices(HttpClient admin) => (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!, z => z.GetProperty("id").GetInt64());
@@ -16,36 +16,54 @@ public class ZoneFix068Tests
     static async Task Until(Func<bool> ok, string what) { for (int i = 0; i < 100 && !ok(); i++) await Task.Delay(50); Assert.True(ok(), what); }
     static QueueItem Radio(string title) => new(0, "radio", "http://127.0.0.1:1/x", title, "Test", "", 0, null);
 
+    // 0.7.1 t2078u: replaces the 0.6.8 "Fresh setup puts the first speaker into Everywhere" test - the user asked for no automatic zone:
+    // a fresh setup has no zone, every speaker starts in Unassigned (silent) and the user creates the first zone.
     [Fact]
-    public async Task Fresh_setup_puts_the_first_speaker_into_Everywhere_and_a_speaker_in_no_zone_stays_silent()
+    public async Task Fresh_setup_makes_no_zone_every_speaker_waits_in_Unassigned_until_the_user_makes_one()
     {
         await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S; var reg = S.Registry;
-        Assert.Equal("pending", S.Db.Setting(ZoneManager.EverywhereKey));   // empty database: waits for the first speaker
+        Assert.Equal("done", S.Db.Setting(ZoneManager.EverywhereKey));   // empty database: nothing to migrate, nothing to wait for
         await using var a = await FakePc.StartAsync(f, "pc-a", "Living room"); await a.WaitConnected(); await Until(() => S.Zones.Zones().Count == 1, "first speaker");
         await using var b = await FakePc.StartAsync(f, "pc-b", "Kitchen"); await b.WaitConnected(); await Until(() => S.Zones.Zones().Count == 2, "second speaker");
-        var dev = await Devices(admin); var g = await Groups(admin);
-        Assert.Equal(new[] { ZoneManager.EverywhereName }, g.Keys.ToArray());   // exactly one real zone, no extras
-        Assert.Equal(new[] { dev["pc-a"] }, g["Everywhere"].GetProperty("deviceIds").EnumerateArray().Select(x => x.GetInt64()).ToArray());
-        Assert.Equal("done", S.Db.Setting(ZoneManager.EverywhereKey));
-        // the first speaker plays the house music; the second waits in Unassigned and hears nothing
+        var dev = await Devices(admin);
+        Assert.Empty(await Groups(admin));                                  // no "Everywhere" (or any) zone made for the user
+        foreach (var p in new[] { "pc-a", "pc-b" }) { Assert.Equal(ConductorRegistry.SilentGroupId, reg.GroupOf(p)); Assert.True(reg.IsSilent(p)); Assert.False(Hears(f, p)); }
+        // the user makes the first zone with the first speaker: it plays the house music, the other still waits in Unassigned
+        long living = await MakeZone(admin, "Living room", dev["pc-a"]);
         Assert.Equal(Conductor.DefaultGroupId, reg.GroupOf("pc-a")); Assert.True(Hears(f, "pc-a"));
-        Assert.Equal(ConductorRegistry.SilentGroupId, reg.GroupOf("pc-b")); Assert.True(reg.IsSilent("pc-b")); Assert.False(Hears(f, "pc-b"));
+        Assert.True(reg.IsSilent("pc-b")); Assert.False(Hears(f, "pc-b"));
         long tid = await E2ETests.AddClickTrack(f, admin, 20); long mark = reg.Clock.NowUs;
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/v1/stream/play", new { kind = "tracks", ids = new[] { tid } })).StatusCode);
         for (int i = 0; i < 100 && a.Clicks(mark).Count < 4; i++) await Task.Delay(100);
-        Assert.True(a.Clicks(mark).Count >= 4, "Everywhere plays"); Assert.Empty(b.Clicks(mark)); Assert.False(reg.Playing("pc-b"));
-        // add the second speaker: it plays; take the first out of every zone: it goes silent at once
-        Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{g["Everywhere"].GetProperty("id").GetInt64()}", new { deviceIds = new[] { dev["pc-b"] } })).StatusCode);
+        Assert.True(a.Clicks(mark).Count >= 4, "the first zone plays"); Assert.Empty(b.Clicks(mark)); Assert.False(reg.Playing("pc-b"));
+        // move the zone to the second speaker: it plays; the first goes silent at once
+        Assert.Equal(HttpStatusCode.OK, (await admin.PatchAsJsonAsync($"/api/v1/groups/{living}", new { deviceIds = new[] { dev["pc-b"] } })).StatusCode);
         Assert.True(Hears(f, "pc-b")); Assert.False(Hears(f, "pc-a")); Assert.True(reg.IsSilent("pc-a"));
         mark = reg.Clock.NowUs + 1_000_000; for (int i = 0; i < 100 && b.Clicks(mark).Count < 3; i++) await Task.Delay(100);
         Assert.True(b.Clicks(mark).Count >= 3, "the added speaker plays"); Assert.Empty(a.Clicks(mark));
-        // a reconnect does not bring the house music back to a speaker in no zone
-        Assert.False(Hears(f, "pc-a"));
-        // no auto-REF: the first speaker of a fresh setup is not the reference (NO DELAY shows instead, client side)
+        // no auto-REF
         var zs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("playerId").GetString()!);
         Assert.False(zs["pc-a"].GetProperty("reference").GetBoolean()); Assert.False(zs["pc-b"].GetProperty("reference").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, (await Groups(admin))["Everywhere"].GetProperty("referenceId").ValueKind);
-        Assert.Equal(0, S.Zones.ReferenceZoneId);   // fresh install: house reference = none
+        Assert.Equal(JsonValueKind.Null, (await Groups(admin))["Living room"].GetProperty("referenceId").ValueKind);
+        Assert.Equal(0, S.Zones.ReferenceZoneId);
+        // a restart (the migration runs again) still makes no zone
+        Assert.Equal("skipped", S.Zones.MigrateEverywhere()); Assert.Equal(new[] { "Living room" }, (await Groups(admin)).Keys.ToArray());
+    }
+
+    [Fact]
+    public async Task A_setup_still_waiting_for_its_first_speaker_and_an_existing_Everywhere_zone_are_left_alone()
+    {
+        await using var f = await ServerFixture.StartAsync(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        // a 0.6.8-0.7.0 database that never saw a speaker ("pending"): 0.7.1 marks it done and makes no zone, even when a speaker arrives
+        S.Db.SetSetting(ZoneManager.EverywhereKey, "pending");
+        Assert.Equal("skipped", S.Zones.MigrateEverywhere()); Assert.Equal("done", S.Db.Setting(ZoneManager.EverywhereKey));
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Living room"); await a.WaitConnected(); await Until(() => S.Zones.Zones().Count == 1, "speaker");
+        Assert.Empty(await Groups(admin));
+        // an install that already has the automatic "Everywhere" zone keeps it exactly as it is (no deletion, no rename, still plays)
+        var dev = await Devices(admin); long every = await MakeZone(admin, "Everywhere", dev["pc-a"]);
+        Assert.Equal("skipped", S.Zones.MigrateEverywhere()); S.Links.Apply();
+        var g = await Groups(admin); Assert.Equal(new[] { "Everywhere" }, g.Keys.ToArray()); Assert.Equal(every, g["Everywhere"].GetProperty("id").GetInt64());
+        Assert.True(Hears(f, "pc-a"));
     }
 
     [Fact]

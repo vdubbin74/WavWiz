@@ -75,8 +75,9 @@ export function speakerMenu42(a) {
     { id: 'off', ic: 'power', label: a.on ? 'Disable' : 'Enable', disabled: !a.can },
   ];
 }
-/** UNASSIGNED speaker: Add to zone (submenu), Settings. */
+/** UNASSIGNED speaker: Add to zone (submenu), Settings. 0.7.1 t2078u: with no zone yet an admin gets "Add to a new zone" (was a disabled Add to zone). */
 export function unassignedMenu42(a) {
+  if (a.admin && !(a.zones || []).length) return [{ id: 'newzone', ic: 'plus', label: 'Add to a new zone' }, { id: 'settings', ic: 'gear', label: 'Settings', }];
   return [
     { id: 'add', ic: 'plus', label: 'Add to zone', sub: (a.zones || []).map(z => ({ id: 'move:' + z.id, label: z.name, zone: z.id })), disabled: !a.admin || !(a.zones || []).length, hint: (a.zones || []).length ? 'Only an administrator can change zones.' : 'Create a zone first.' },
     { id: 'settings', ic: 'gear', label: 'Settings', },

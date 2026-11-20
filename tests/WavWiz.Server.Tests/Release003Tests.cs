@@ -101,7 +101,7 @@ public class ZonesAndForgetTests
         // a device that is in no zone is "unassigned"
         var zs = await admin.GetJson("/api/v1/zones"); Assert.All(zs.EnumerateArray(), z => Assert.Contains(gid, z.GetProperty("groupIds").EnumerateArray().Select(x => x.GetInt64())));
         Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
-        Assert.DoesNotContain((await admin.GetJson("/api/v1/groups")).EnumerateArray(), x => x.GetProperty("id").GetInt64() == gid);   // (the fresh setup's "Everywhere" zone stays)
+        Assert.DoesNotContain((await admin.GetJson("/api/v1/groups")).EnumerateArray(), x => x.GetProperty("id").GetInt64() == gid);
         zs = await admin.GetJson("/api/v1/zones"); Assert.Equal(2, zs.GetArrayLength()); Assert.All(zs.EnumerateArray(), z => Assert.Equal(0, z.GetProperty("groupIds").GetArrayLength()));       // devices are untouched
         Assert.Equal(HttpStatusCode.NotFound, (await admin.DeleteAsync($"/api/v1/groups/{gid}")).StatusCode);
     }

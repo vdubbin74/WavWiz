@@ -103,8 +103,7 @@ public sealed class ZoneManager
         if (isNew)
         {
             int sort = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(sort),0)+1 FROM zone"));
-            var dev = _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));
-            AdoptFirstSpeaker(dev);   // 0.6.8 zone fix: a fresh setup puts its first speaker into "Everywhere"
+            _db.Insert("INSERT INTO zone(name,player_id,sort) VALUES($n,$p,$s)", ("$n", string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name), ("$p", s.Id), ("$s", sort));   // 0.7.1 t2078u: starts in Unassigned
         }
         if (s.OwnerTokenId != null) _db.Exec("UPDATE player SET owner_token_id=$o WHERE id=$i", ("$o", s.OwnerTokenId), ("$i", s.Id));
         Rooms.Connected(s.Id, string.IsNullOrWhiteSpace(s.Hello.Name) ? s.Hello.MachineName : s.Hello.Name, s.Hello.LinkType, s.Remote.ToString());
@@ -680,43 +679,34 @@ public sealed class ZoneManager
         _db.SetSetting(ModelKey, "2"); return moved;
     }
 
-    // ---------------- 0.6.8 zone fix: a real "Everywhere" zone instead of the hidden house fallback ----------------
+    // ---------------- 0.6.8 zone fix: a real "Everywhere" zone instead of the hidden house fallback (0.7.1: upgrades only) ----------------
     public const string EverywhereKey = "zones.everywhere", EverywhereName = "Everywhere";
-    private readonly object _everywhereLock = new();   // AdoptFirstSpeaker can run on two connecting players at once
     /// <summary>
-    /// 0.6.8 zone fix. A speaker in no zone is silent now (ZoneLinks.Apply), so the house needs a real zone to play in. Runs once per database
-    /// (setting <see cref="EverywhereKey"/>):
+    /// 0.6.8 zone fix. A speaker in no zone is silent (ZoneLinks.Apply), so a house that used to play everything in the hidden house group needs a real
+    /// zone. Runs once per database (setting <see cref="EverywhereKey"/>):
     /// <list type="bullet">
-    /// <item>fresh setup (no speakers, no zones): nothing yet - the FIRST speaker that shows up goes into a new "Everywhere" zone (<see cref="AdoptFirstSpeaker"/>);</item>
-    /// <item>upgrade of a house without any named zone (every speaker played in the hidden house group): "Everywhere" is created with all of those
-    ///   speakers. It plays in the house group, so the music and queue carry on exactly as before;</item>
-    /// <item>upgrade of a house that already has named zones: nothing changes. Speakers outside every zone go silent (the UI already said so).</item>
+    /// <item>0.7.1 t2078u - fresh setup (no speakers, no zones): NO zone is made. Every new speaker starts in Unassigned and the user creates their
+    ///   first zone in Devices (0.6.8-0.7.0 put the first speaker into an automatic "Everywhere" zone; a database still waiting for that first speaker,
+    ///   "pending", is treated the same way and simply marked done);</item>
+    /// <item>upgrade from before 0.6.8 of a house without any named zone (every speaker played in the hidden house group): "Everywhere" is created with
+    ///   all of those speakers. It plays in the house group, so the music and queue carry on exactly as before;</item>
+    /// <item>upgrade of a house that already has named zones: nothing changes. Existing zones (an "Everywhere" made by 0.6.8-0.7.0 too) are never touched.</item>
     /// </list>
     /// It also clears a reference speaker that 0.6.8-#15 picked by itself for a one-speaker zone (no speaker is REF until the user picks one).
-    /// Returns what it did ("pending", "created", "kept") for the log and the tests.
+    /// Returns what it did ("fresh", "created", "kept", "skipped") for the log and the tests.
     /// </summary>
     public string MigrateEverywhere()
     {
-        var done = _db.Setting(EverywhereKey); if (done is "done" or "pending") return "skipped";
+        var done = _db.Setting(EverywhereKey);
+        if (done == "pending") { _db.SetSetting(EverywhereKey, "done"); return "skipped"; }   // 0.7.1: no longer waits to adopt a first speaker
+        if (done == "done") return "skipped";
         DropAutoReferences();
         bool hasZones = Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0;
         if (hasZones) { _db.SetSetting(EverywhereKey, "done"); return "kept"; }
         var devs = _db.Query("SELECT id FROM zone ORDER BY sort,id", r => r.GetInt64(0));
-        if (devs.Count == 0) { _db.SetSetting(EverywhereKey, "pending"); return "pending"; }
+        if (devs.Count == 0) { _db.SetSetting(EverywhereKey, "done"); return "fresh"; }
         var (_, err) = CreateGroup(EverywhereName, devs); if (err != null) { _log?.Invoke("everywhere zone: " + err); return "failed"; }
         _db.SetSetting(EverywhereKey, "done"); _log?.Invoke($"zones: created \"{EverywhereName}\" with {devs.Count} speaker(s) that played in the house group"); return "created";
-    }
-    /// <summary>0.6.8 zone fix: the first speaker of a fresh setup goes into a new "Everywhere" zone. Only while the setup is still waiting for it
-    /// (<see cref="MigrateEverywhere"/> left "pending"); later speakers wait in Unassigned, silent, until the user adds them to a zone.</summary>
-    public void AdoptFirstSpeaker(long deviceId)
-    {
-        lock (_everywhereLock)
-        {
-            if (_db.Setting(EverywhereKey) != "pending") return;
-            _db.SetSetting(EverywhereKey, "done");
-            if (Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM zone_group")) > 0) return;   // the user made a zone before any speaker came
-            var (_, err) = CreateGroup(EverywhereName, new[] { deviceId }); if (err != null) _log?.Invoke("everywhere zone: " + err);
-        }
     }
     /// <summary>0.6.8 zone fix: 0.6.8-#15 auto-picked the only speaker of a zone as its reference. Forget those picks once (a reference that is also the
     /// house reference the user chose is kept), so a lone speaker shows NO DELAY instead of REF until the user picks a reference.</summary>

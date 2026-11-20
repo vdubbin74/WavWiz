@@ -109,6 +109,7 @@ public class LocalAudio070Tests
         var z = zones.EnumerateArray().Single(x => x.GetProperty("playerId").GetString() == la!.PlayerId);
         Assert.True(z.GetProperty("connected").GetBoolean());
         Assert.Equal(Environment.MachineName, z.GetProperty("name").GetString());
+        f.JoinEverywhere();   // 0.7.1 t2078u: a fresh setup no longer puts its first speaker into a zone by itself - the user does (this is that step)
         // silence before play (the sink runs from the start: silence is real zeros, no dither), then music reaches the ALSA device
         await Until(() => File.Exists(raw) && new FileInfo(raw).Length > 48000, "sink writing silence"); Assert.False(HasClick(raw), "noise before play");
         long tid = await E2ETests.AddClickTrack(f, admin, 6);

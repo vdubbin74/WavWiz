@@ -11,12 +11,12 @@ public class Release020Tests
     private static async Task<(ServerFixture f, HttpClient admin, FakePc a, FakePc b, long ida, long idb)> TwoPcs()
     {
         var f = await ServerFixture.StartAsync(); await f.SetupAdmin(); var admin = f.As(f.Token(Role.Admin, "admin"));
-        // Kitchen connects first and is adopted into "Everywhere"; Garage stays Unassigned so PUT /calibration/reference
-        // sets the house reference (0.6.8-#15: a speaker already in a zone would only set that zone's reference, and
-        // GET /calibration/reference reports the house reference, not that zone's). Starting both at once made this
-        // test flake: whichever player won AdoptFirstSpeaker landed in Everywhere.
+        // Kitchen connects first and goes into a zone ("Everywhere", made here like a user would - 0.7.1 t2078u: a fresh setup no longer makes one);
+        // Garage stays Unassigned so PUT /calibration/reference sets the house reference (0.6.8-#15: a speaker already in a zone would only set
+        // that zone's reference, and GET /calibration/reference reports the house reference, not that zone's).
         var a = await FakePc.StartAsync(f, "pc-a", "Kitchen"); await a.WaitConnected();
-        for (int i = 0; i < 100 && f.Server.S.Db.Setting(ZoneManager.EverywhereKey) != "done"; i++) await Task.Delay(50);
+        for (int i = 0; i < 100 && f.Server.S.Zones.Zones().Count < 1; i++) await Task.Delay(50);
+        f.JoinEverywhere();
         var b = await FakePc.StartAsync(f, "pc-b", "Garage"); await b.WaitConnected();
         var zs = await admin.GetJson("/api/v1/zones");
         for (int i = 0; i < 100 && zs.GetArrayLength() < 2; i++) { await Task.Delay(50); zs = await admin.GetJson("/api/v1/zones"); }

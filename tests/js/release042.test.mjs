@@ -52,7 +52,7 @@ test('speaker + unassigned menus', async () => {
   assert.deepEqual(s[2].sub.map(i => i.label), ['B', 'Unassigned']); assert.ok(s.every(i => i.ic));
   assert.equal(speakerMenu42({ admin: true, can: true, muted: true, on: false, zones: [] })[0].label, 'Unmute'); assert.equal(speakerMenu42({ admin: true, can: true, on: false, zones: [] })[5].label, 'Enable');
   assert.ok(speakerMenu42({ admin: false, can: true, zones: [] })[2].disabled);
-  const u = unassignedMenu42({ admin: true, zones: [{ id: 2, name: 'B' }] }); assert.deepEqual(u.map(i => i.label), ['Add to zone', 'Settings']); assert.ok(unassignedMenu42({ admin: true, zones: [] })[0].disabled);
+  const u = unassignedMenu42({ admin: true, zones: [{ id: 2, name: 'B' }] }); assert.deepEqual(u.map(i => i.label), ['Add to zone', 'Settings']); assert.ok(unassignedMenu42({ admin: false, zones: [] })[0].disabled); assert.equal(unassignedMenu42({ admin: true, zones: [] })[0].id, 'newzone');   // 0.7.1 t2078u: no zone yet = Add to a new zone
 });
 test('groupPresets: Flat + 7 ordered built-ins, then My presets', async () => {
   const { groupPresets } = await imp('eqsettings');

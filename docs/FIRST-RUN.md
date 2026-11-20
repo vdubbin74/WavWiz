@@ -62,7 +62,7 @@ On an iPhone or iPad, open WavWiz in Safari, tap **Share** and choose **Add to H
 ## 6. Devices, zones and delay
 
 - **Devices → Devices & zones** opens the expanded Devices view. **Master volume** and **Mute all** sit at the top; every speaker has its own volume, Mute and on/off switch. The volume and Mute on the Now Playing panel control only the device you are using.
-- **Zones** are optional groups (for example "Downstairs"): pick one in the zones sidebar to filter the cards, or edit it in place.
+- **Zones** hold your speakers (for example "Living room" or "Downstairs"). A new install has no zones: every new speaker starts in **Unassigned** and stays silent until it is in a zone. Make your first zone with **+ Add zone** in Devices (or **Add to zone** on a speaker), then add speakers to it. Pick a zone to control it, or edit it in place.
 - In the **Expanded** Devices view, each card shows the name with up to two tags (**REF** for the reference speaker, **MUTED**, **NO DELAY**, **OFFLINE**, or a phone's **SPEAKER** role), one status line (playing · output · delay), and the volume with a round **Mute** button on the right. Its chevron button opens the device's settings in a wide center column (Scenes & Schedules folds into a bar and Zones slides left while it is open): **Volume**, **Volume cap**, **Delay** (slider, exact ms and **Calibrate**), **Balance**, **Bass**, **Treble**, the 10-band EQ, the **Output**, **Test sound** and **More** (Rename, Set as reference, Delay history, Forget). Balance is applied by WavWiz Player, so it has no effect on a browser speaker. Controls only an administrator may change stay visible but read-only for everyone else.
 - **Click and drag:** click anywhere on a speaker card to open its settings, or anywhere on a zone card to expand it (there is no arrow). The On/Off switch, Mute, volume, delay, pencil and drag handle keep their own actions. Drag cards by the handle to reorder them; the order is remembered on that device. The master row has **All off**, **All on** and a master volume, and the **Now playing** strip shows the current song on zones that are playing (the whole house still shares one queue).
 - **Profiles:** the row at the top of the speaker settings saves everything above as a named profile (**Save**, **Save as…**) and loads it on any device. A dot by the name shows unsaved changes. In the scene editor, each device can pick a profile; a scene never changes a max-volume cap.
@@ -128,11 +128,12 @@ AirPlay discovery uses your **local** network (multicast / mDNS). Many **VPN** c
 
 If **WavWiz – Everywhere** does not appear on iPhone, iPad, or Mac:
 
-1. Confirm the phone/Mac is on the **same home Wi-Fi** as the server (not guest Wi-Fi).
-2. Pause or disconnect the **VPN** (or allow LAN access in the VPN app).
-3. Confirm Windows network is **Private** and WavWiz Server is running.
-4. Retry AirPlay from Control Center / the app’s AirPlay icon.
-5. Still stuck? Open **Help → Diagnostics** and use **Restart AirPlay** (and **Clear orphans** if it lists leftover receiver processes).
+1. Check that at least one speaker is **in a zone and online** (Devices). WavWiz – Everywhere is hidden while every speaker is Unassigned or offline, because it would have nowhere to play.
+2. Confirm the phone/Mac is on the **same home Wi-Fi** as the server (not guest Wi-Fi).
+3. Pause or disconnect the **VPN** (or allow LAN access in the VPN app).
+4. Confirm Windows network is **Private** and WavWiz Server is running.
+5. Retry AirPlay from Control Center / the app’s AirPlay icon.
+6. Still stuck? Open **Help → Diagnostics** and use **Restart AirPlay** (and **Clear orphans** if it lists leftover receiver processes).
 
 AirPlay is built in for this beta; WavWiz is **not** affiliated with Apple. AirPlay is a trademark of Apple Inc.
 

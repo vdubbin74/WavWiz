@@ -137,6 +137,7 @@ export function treeEl(S, ctl, kit, st) {
     const act = { mute: () => { const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH'); }, settings: () => speakerSettings(z), calibrate: () => openCalibration(S, ctl.refreshAll, z.id, { quick: true }),
       rename: () => { const save = async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); ctl.refreshAll?.(); }, lab = el.querySelector('.sp42-n');   // t2033u: in place
         return lab ? inlineName(lab, { value: z.name, label: `Speaker name (was ${z.name})`, opener: el, save }) : promptName(`Rename ${z.name}`, z.name, save); }, off: () => ctl.act(`/zones/${z.id}`, { enabled: !z.enabled }, 'PATCH') };
+    act.newzone = () => firstZoneWith(z, el.querySelector('.saddzone'));   // 0.7.1 t2078u: no zone yet - the first one, with this speaker
     if (!inZone) return unassignedMenu42({ admin, zones: (S.groups || []).map(g => ({ id: g.id, name: g.name })) }).map(it => it.sub ? { ...it, sub: it.sub.map(s => ({ ...s, onclick: () => move(z, s.zone) })) } : { ...it, onclick: act[it.id] });
     const mine = (S.groups || []).find(g => (g.deviceIds || []).includes(z.id));
     return speakerMenu42({ admin, can, muted: !!z.muted, on: !!z.enabled, canCalibrate: canTune(S, z) && z.connected, zones: (S.groups || []).filter(g => g.id !== mine?.id).map(g => ({ id: g.id, name: g.name })) })
@@ -401,10 +402,16 @@ export function treeEl(S, ctl, kit, st) {
   const boxEls = model.boxes.map(b => [rank(b), rank(b) === 2 ? (b.kind === 'linked' ? linkedEmptyBox(b) : emptyBox(b.leader, false, b)) : queueBox(b), { key: 'g:' + b.leader.id, keys: b.zones.map(z => 'g:' + z.id) }]);   // F205: offline-with-speakers (rank 1) = full queueBox chrome; compact row only for 0 speakers
   if (jbRank >= 0) { const r = jbRank, at = boxEls.findIndex(x => x[0] > r); boxEls.splice(at < 0 ? boxEls.length : at, 0, [r, jbBox(), { key: 'jukebox', keys: ['jukebox'] }]); }
   const cardList = boxEls.map(([, el, c]) => ({ ...c, el }));
-  if (!model.boxes.length) root.append(h('p', { class: 'dim small pad' }, 'Zones hold speakers, like “Downstairs”. An administrator can create one with +.'));
-  const addMenu = (z, btn) => { const r = btn.getBoundingClientRect(); openCtx(r.left, r.bottom + 2, groups.length ? groups.map(g => ({ id: 'move:' + g.id, label: g.name, onclick: () => move(z, g.id) })) : [{ id: 'none', label: 'Create a zone first', disabled: true }], { label: `Add ${z.name} to a zone`, from: btn }); };
+  // 0.7.1 t2078u: a fresh setup has no zone (no automatic "Everywhere"), so the first thing a new user sees here says what to do: make a zone
+  if (!model.boxes.length) root.append(h('section', { class: 'first42', 'aria-label': 'No zones yet' },
+    h('b', { class: 'first42-t' }, 'No zones yet'),
+    h('p', { class: 'small dim first42-p' }, admin ? 'Speakers stay silent until they are in a zone. Add a zone (like “Living room”), then add speakers to it.' : 'Speakers stay silent until they are in a zone. An administrator can add one.'),
+    admin ? h('button', { type: 'button', class: 'btn sm primary first42-add', 'data-act': 'first-zone', onclick: create }, '+ Add zone') : null));
+  // 0.7.1 t2078u: with no zone yet, "Add to zone" makes the first one with this speaker in it (was a disabled "Create a zone first")
+  const firstZoneWith = (z, btn) => { const hd = root.querySelector('.tree42-h'); inlineDraft(root, { before: hd ? hd.nextSibling : undefined, cls: 'zdraft42', label: 'New zone name', placeholder: 'Name the new zone, e.g. Living room', hint: `Enter to create with ${z.name}`, opener: btn || null, save: async v => { await createZone(v, [z.id]); toast(`${z.name} is in the new zone ${v}`); done(); } }); };
+  const addMenu = (z, btn) => { const r = btn.getBoundingClientRect(); openCtx(r.left, r.bottom + 2, groups.length ? groups.map(g => ({ id: 'move:' + g.id, label: g.name, onclick: () => move(z, g.id) })) : [{ id: 'new', label: `+ New zone with ${z.name}`, onclick: () => firstZoneWith(z, btn) }], { label: `Add ${z.name} to a zone`, from: btn }); };
   const unBox = h('section', { class: 'un42' + (un.length ? '' : ' empty'), 'data-drop': 'none', 'aria-label': 'Unassigned speakers' },
-    h('div', { class: 'un42-h' }, h('b', null, 'UNASSIGNED'), h('span', { class: 'un42-n' }, ` ${un.length} `), h('span', { class: 'small dim' }, 'Not in any zone, so silent')),
+    h('div', { class: 'un42-h' }, h('b', null, 'UNASSIGNED'), h('span', { class: 'un42-n' }, ` ${un.length} `), h('span', { class: 'small dim' }, groups.length ? 'Not in any zone, so silent' : 'Silent until added to a zone')),
     h('div', { role: 'list' }, un.length ? un.map(z => {
       const row = h('div', { class: 'sp42 un' + (st.spk === z.id ? ' sel' : '') + (z.connected ? '' : ' gone'), 'data-device-id': z.id, 'data-device': z.name, 'data-zone-id': z.id, 'data-in-zone': '', role: 'listitem' },
         ro(h('span', { class: 'dgrip42', role: 'img', 'aria-label': `Drag ${z.name} into a zone`, title: 'Drag into a zone', 'data-drag-device': z.id }), admin, 'Only an administrator can change zones.'),
