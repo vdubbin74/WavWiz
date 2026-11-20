@@ -596,7 +596,7 @@ let eqSheet = null;
 export function closePhoneEqSheet() { eqSheet?.close(); }
 export function openPhoneEqSheet() {
   if (eqSheet) { eqSheet.x.focus(); return eqSheet; }
-  eqSheet = openPhoneSound(S, { mount: el => document.body.append(el), from: nowc.el?.querySelector('.np-phone-sound') || document.activeElement, refreshAll, onClose: () => { eqSheet = null; } });
+  eqSheet = openPhoneSound(S, { mount: el => document.body.append(el), from: [...(nowc.el?.querySelectorAll('.np-phone-sound') || [])].find(b => b.getClientRects?.().length) || document.activeElement, refreshAll, onClose: () => { eqSheet = null; } });
   return eqSheet;
 }
 export function showEq() {

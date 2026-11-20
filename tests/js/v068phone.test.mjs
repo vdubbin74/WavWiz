@@ -15,7 +15,7 @@ test('0.6.8-#11 isHandset: phones yes; iPad, Android tablet, PC no', async () =>
 });
 test('0.6.8-#11a/d phone row: moon Sleep only on handsets; pins gated', () => {
   const n = js('now.js');
-  assert.match(n, /isHandset\(\) \? \[mkSleepIc\(\)\] : \[mkMix\(\), mkSleepIc\(\), mkSc\('np-phone-shortcuts'\)\]/);
+  assert.match(n, /isHandset\(\) \? \[mkSleepIc\(\), mkSoundX\(\)\] : \[mkMix\(\), mkSleepIc\(\), mkSc\('np-phone-shortcuts'\)\]/);   // 0.7.1 t2051u: + Sound (moved from the Queue / Sound pair); still no mixer / pins
   assert.match(n, /icon\('moon'\), h\('span', \{ class: 'npsl-t' \}\)/);
   assert.match(js('scenesched.js'), /querySelector\('\.npsl-t'\)/);
   assert.match(js('main.js'), /if \(isHandset\(\)\) return;   \/\/ 0\.6\.8-#11d/);

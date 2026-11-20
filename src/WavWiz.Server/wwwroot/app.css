@@ -6174,3 +6174,11 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
   html.handset #app>.desk[data-view=now]~.tabbar>button.on{background:none;font-weight:600}
   html.handset #app>.desk[data-view=now]~.tabbar>button.on::before{opacity:.55}
 }
+/* 0.7.1 t2051u: phone Now Playing - the tab bar already has Queue, so the Queue / Sound pair is hidden and Sound sits in More playback
+   controls next to Sleep. html.handset only: a narrow PC window (no tab bar on Now Playing) keeps the pair and has no extra Sound button. */
+.np-phone-xsound{display:none}
+@media(max-width:900px){
+  html.handset .np-phone-full .np-phone-actions{display:none}
+  html.handset .np-phone-full .np-phone-xsound{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+  html.handset .np-phone-full .np-phone-xsound .ic svg{width:18px;height:18px}
+}
