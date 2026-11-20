@@ -110,6 +110,9 @@ function topbar(extra, lead) {
 
 function fatal(msg) { app.replaceChildren(topbar(), h('div', { class: 'card auth' }, h('h2', null, 'WavWiz is not reachable'), h('p', { class: 'err' }, msg), h('button', { class: 'btn', onclick: () => location.reload() }, 'Try again'))); }
 
+/** 0.7.1 t2072: first-run setup finished in the WavWiz Player window: the Player fetches the window's own (non-admin) session now, so the next launch opens signed in. */
+function setupDone(win = globalThis.window) { try { if (isPlayerUa()) win?.chrome?.webview?.postMessage({ cmd: 'setup-done' }); } catch { /* browser */ } }
+
 function renderSetup() {
   const pw = h('input', { type: 'password', autocomplete: 'new-password', minlength: 8, id: 'pw1' }), pw2 = h('input', { type: 'password', autocomplete: 'new-password', id: 'pw2' }), msg = h('p', { class: 'err', role: 'alert' });
   // F166: headless (Linux/Docker) server: 15-min LAN window, then the code from claim.txt
@@ -130,7 +133,7 @@ function renderSetup() {
   const form = h('form', { class: 'card auth', onsubmit: async ev => {
     ev.preventDefault(); msg.textContent = '';
     if (pw.value !== pw2.value) { msg.textContent = 'The two passwords are different.'; return; }
-    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value, claimCode: code?.value || undefined } }); location.reload(); } catch (e) { msg.textContent = e.message; }
+    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value, claimCode: code?.value || undefined } }); setupDone(); location.reload(); } catch (e) { msg.textContent = e.message; }
   } },
     h('h2', null, 'Welcome to WavWiz'), h('p', { class: 'dim' }, 'Choose an administrator password for this WavWiz server (at least 8 characters). It never leaves your home network. Nothing was generated or shown by the installer.'),
     banner,

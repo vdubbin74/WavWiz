@@ -151,8 +151,11 @@ public class PairRequest069Tests
         var root = AppContext.BaseDirectory; while (!File.Exists(Path.Combine(root, "WavWiz.sln"))) root = Path.GetDirectoryName(root)!;
         var forms = File.ReadAllText(Path.Combine(root, "src", "WavWiz.Player", "Forms.cs"));
         var app = File.ReadAllText(Path.Combine(root, "src", "WavWiz.Player", "PlayerApp.cs"));
-        Assert.Contains("new DpapiSecretStore().Load(\"uitoken\")", forms);
-        Assert.Contains("if (have.Any(c => c.Name == \"wavwiz_session\")) return;", forms);
+        // 0.7.1 t2072: the saved window session comes from WindowSessionKeeper (asked for with the Player token on the server PC only); the cookie is
+        // only ever the window session (WindowCookieStep), never the Player token
+        Assert.Contains("var ui = await WindowSessionKeeper.EnsureAsync(new DpapiSecretStore(), _set.ServerHost, _set.HttpPort); if (string.IsNullOrEmpty(ui)) return;", forms);
+        Assert.Contains("PairingClient.WindowCookieStep(ui, have, first)", forms);
+        Assert.Contains("CreateCookie(\"wavwiz_session\", ui,", forms);
         Assert.DoesNotContain("Load(\"token\")", forms);
         Assert.Contains("await EnsureWindowSession(cw);", forms);
         Assert.Contains("if (!here && code == null)", app);   // no code typed -> approval

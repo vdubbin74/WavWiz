@@ -103,6 +103,8 @@ internal sealed class PlayerApp : ApplicationContext
                 }
                 else { problem = r.Error; Log("pairing failed: " + r.Error); }
             }
+            // 0.7.1 t2072: paired before the admin password existed (fresh Server + Player install) or before 0.7.1: ask for the window session now
+            { var host = _s.ServerHost; var port = _s.HttpPort; _ = Task.Run(async () => { try { await WindowSessionKeeper.EnsureAsync(_secrets, host, port, _cts.Token, Log); } catch { } }); }
             if (string.IsNullOrEmpty(_s.ServerId))
             {
                 var who = await PairingClient.WhoAreYouAsync(_s.ServerHost, _s.HttpPort, _cts.Token);

@@ -65,3 +65,10 @@ test('t2072 E: the code-pairing hint names Settings > Devices > Pair a phone or 
   assert.match(main, /Settings > Devices > Pair a phone or a PC player/);
   assert.doesNotMatch(main, /Settings > Players/);
 });
+
+test('t2072 gap: finishing first-run setup in the Player window tells the Player (setup-done) before the reload', () => {
+  const at = main.indexOf('function renderSetup('); const body = main.slice(at, main.indexOf('\n}\n', at));
+  assert.match(body, /await api\('\/auth\/setup'[^;]*;\s*setupDone\(\); location\.reload\(\);/);
+  const fn = main.slice(main.indexOf('function setupDone('), main.indexOf('function renderSetup('));
+  assert.match(fn, /isPlayerUa\(\)/); assert.match(fn, /postMessage\(\{ cmd: 'setup-done' \}\)/);
+});

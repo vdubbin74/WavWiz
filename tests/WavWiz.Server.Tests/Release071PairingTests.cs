@@ -117,6 +117,123 @@ public class Release071PairingTests
         Assert.DoesNotContain("Settings → Players", doc);
     }
 
+    // ---- 0.7.1 t2072 (gap): an already-paired Player on the server PC gets its window session later ----
+
+    sealed class MemStore : WavWiz.PlayerCore.ISecretStore
+    {
+        public readonly Dictionary<string, string> D = new();
+        public string? Load(string n) => D.TryGetValue(n, out var v) ? v : null;
+        public void Save(string n, string v) => D[n] = v;
+        public void Delete(string n) => D.Remove(n);
+    }
+    static (string Host, int Port) HostOf(ServerFixture f) { var u = new Uri(f.Base); return (u.Host, u.Port); }
+    static int WindowTokens(ServerFixture f) => Convert.ToInt32(f.Server.S.Db.Scalar("SELECT COUNT(*) FROM api_token WHERE role='control' AND revoked=0 AND name LIKE '%(Player window)%'"));
+
+    [Fact]
+    public async Task Fresh_install_order_pair_before_setup_then_setup_then_relaunch_opens_the_window_signed_in_as_control()
+    {
+        await using var f = await ServerFixture.StartAsync(WindowsPc);
+        var (host, port) = HostOf(f);
+        // 1. the installer starts the Player before anyone chose a password: it pairs (no code) and gets no window session
+        var p = await Post(f.Http, "/api/v1/auth/pair-player", new { playerId = "pc-combo", name = "Combo PC" });
+        var store = new MemStore(); store.Save("token", p.GetProperty("token").GetString()!);
+        Assert.Equal(JsonValueKind.Null, p.GetProperty("uiToken").ValueKind);
+        // the window asks at once: not yet (setup page), nothing saved
+        var early = await PairingClient.RequestWindowSessionAsync(host, port, store.Load("token")!);
+        Assert.Equal(409, early.Status); Assert.Null(early.UiToken);
+        Assert.Null(await WindowSessionKeeper.EnsureAsync(store, host, port)); Assert.Null(store.Load("uitoken"));
+        // 2. first-run setup in the Player window: that window holds an admin cookie for now
+        var setupCookie = await f.SetupAdmin();
+        Assert.Equal(Role.Admin, f.Server.S.Auth.Validate(setupCookie)!.Role);
+        // ... and the page tells the Player (setup-done), which fetches the window's own session
+        var ui = await WindowSessionKeeper.EnsureAsync(store, host, port);
+        Assert.NotNull(ui); Assert.Equal(ui, store.Load("uitoken"));
+        var w = f.Server.S.Auth.Validate(ui)!;
+        Assert.Equal(Role.Control, w.Role); Assert.Null(w.PlayerId); Assert.Contains("Player window", w.Name);
+        // a saved session is never asked for again
+        Assert.Equal(ui, await WindowSessionKeeper.EnsureAsync(store, host, port)); Assert.Equal(1, WindowTokens(f));
+        // 3. relaunch: the first window replaces the setup admin cookie with the Control session and signs the admin one out
+        Assert.Equal(WindowCookieAction.Replace, PairingClient.WindowCookieStep(ui, setupCookie, firstWindowThisRun: true));
+        Assert.True(await PairingClient.SignOutSessionAsync(host, port, setupCookie));
+        Assert.Null(f.Server.S.Auth.Validate(setupCookie));
+        var st = await f.As(ui!).GetJson("/api/v1/auth/state");
+        Assert.True(st.GetProperty("authenticated").GetBoolean()); Assert.Equal("control", st.GetProperty("role").GetString());
+        Assert.False(st.GetProperty("elevated").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_player_paired_before_0_7_1_gets_its_window_session_at_the_next_launch()
+    {
+        await using var f = await ServerFixture.StartAsync(WindowsPc);
+        await f.SetupAdmin();
+        var (host, port) = HostOf(f);
+        var old = f.Server.S.Auth.CreateToken("Player Study PC", Role.Player, "pc-old");   // what an older pairing left: a Player token, no window session
+        var store = new MemStore(); store.Save("token", old);
+        var ui = await WindowSessionKeeper.EnsureAsync(store, host, port);
+        Assert.Equal(Role.Control, f.Server.S.Auth.Validate(ui)!.Role);
+        Assert.Equal("Study PC (Player window)", f.Server.S.Auth.Validate(ui)!.Name);
+    }
+
+    [Fact]
+    public async Task Window_session_needs_a_player_token_never_a_phone_admin_or_no_token()
+    {
+        await using var f = await ServerFixture.StartAsync(WindowsPc);
+        await f.SetupAdmin();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.Http.PostAsync("/api/v1/auth/window-session", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await f.As(f.Token(Role.Control)).PostAsync("/api/v1/auth/window-session", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await f.As(f.Token(Role.Admin)).PostAsync("/api/v1/auth/window-session", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.As("not-a-token").PostAsync("/api/v1/auth/window-session", null)).StatusCode);
+        var revoked = f.Server.S.Auth.CreateToken("Player Gone", Role.Player, "pc-gone"); f.Server.S.Auth.Revoke(f.Server.S.Auth.Validate(revoked)!.TokenId);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await f.As(revoked).PostAsync("/api/v1/auth/window-session", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_remote_players_token_is_refused()
+    {
+        await using var f = await ServerFixture.StartAsync(c => { c.TestHeadless = false; c.TestInContainer = false; c.TestTreatAllClientsAsRemote = true; });
+        await f.SetupAdmin();
+        var code = (await (await f.As(f.Token(Role.Admin)).PostAsync("/api/v1/pairing/code", null)).Json()).GetProperty("code").GetString();
+        var p = await Post(f.Http, "/api/v1/auth/pair-player", new { playerId = "pc-far", name = "Far PC", code });
+        var (host, port) = HostOf(f);
+        var a = await PairingClient.RequestWindowSessionAsync(host, port, p.GetProperty("token").GetString()!);
+        Assert.Equal(403, a.Status); Assert.Null(a.UiToken);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Docker_and_headless_servers_refuse_the_window_session(bool headless, bool container)
+    {
+        await using var f = await ServerFixture.StartAsync(c => { c.TestHeadless = headless; c.TestInContainer = container; });
+        await f.SetupAdmin();
+        var p = await Post(f.Http, "/api/v1/auth/pair-player", new { playerId = "pc-dk", name = "Docker host" });
+        var (host, port) = HostOf(f);
+        var a = await PairingClient.RequestWindowSessionAsync(host, port, p.GetProperty("token").GetString()!);
+        Assert.Equal(403, a.Status); Assert.Null(a.UiToken);
+        Assert.Equal(0, WindowTokens(f));
+    }
+
+    [Fact]
+    public async Task The_keeper_never_asks_for_a_server_on_another_pc_and_keeps_quiet_when_the_server_is_down()
+    {
+        var store = new MemStore(); store.Save("token", "x");
+        Assert.Null(await WindowSessionKeeper.EnsureAsync(store, "192.0.2.10", 47900));       // another PC: approval / code only, no request
+        Assert.Null(await WindowSessionKeeper.EnsureAsync(store, "127.0.0.1", 1));            // nobody listening: null, no exception
+        Assert.Null(store.Load("uitoken"));
+        Assert.Equal(0, (await PairingClient.RequestWindowSessionAsync("127.0.0.1", 1, "x")).Status);
+    }
+
+    [Theory]
+    [InlineData(null, null, true, WindowCookieAction.None)]
+    [InlineData(null, "admin", true, WindowCookieAction.None)]
+    [InlineData("ui", null, true, WindowCookieAction.Inject)]
+    [InlineData("ui", null, false, WindowCookieAction.Inject)]
+    [InlineData("ui", "ui", true, WindowCookieAction.None)]          // the window session itself (also when elevated with Sign in as admin...)
+    [InlineData("ui", "admin", true, WindowCookieAction.Replace)]    // next launch after setup / an earlier admin sign-in: back to Control
+    [InlineData("ui", "admin", false, WindowCookieAction.None)]      // signed in as admin during this run: stays until the Player restarts
+    public void Window_cookie_rules(string? saved, string? cookie, bool first, WindowCookieAction expected)
+        => Assert.Equal(expected, PairingClient.WindowCookieStep(saved, cookie, first));
+
     static string FindRoot()
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);

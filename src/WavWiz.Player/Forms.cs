@@ -300,7 +300,7 @@ public sealed class WebUiForm : Form
                 else BeginInvoke(() => ShowProblem("The WavWiz window stopped drawing.", "The page's display process ended (" + e.ProcessFailedKind + ")."));
             };
             cw.DocumentTitleChanged += (_, _) => Text = $"{cw.DocumentTitle} - {WavWizInfo.DisplayName}";
-            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (FolderPick.Parse(j) is { } fp) { BeginInvoke(() => PickFolder(cw, fp)); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
+            cw.WebMessageReceived += (_, e) => { try { var j = e.WebMessageAsJson; var wa = TitleBar.Parse(j); if (wa != TitleBar.Act.None) { WinAct(wa); return; } if (FolderPick.Parse(j) is { } fp) { BeginInvoke(() => PickFolder(cw, fp)); return; } if (j.Contains("\"mini\"")) MiniRequested?.Invoke(j.Contains("\"toggle\"")); else if (j.Contains("\"jukebox\"")) JukeboxState?.Invoke(j.Contains("\"running\":true")); else if (j.Contains("\"osd\"")) ShowOsd(j); else if (j.Contains("\"setup-done\"")) _ = WindowSessionKeeper.EnsureAsync(new DpapiSecretStore(), _set.ServerHost, _set.HttpPort); } catch { } };   // 0.3.2 F3: Devices > Mini player; 0.3.5 J15: Jukebox on/off for the tray
             cw.ContainsFullScreenElementChanged += (_, _) => SetFull(cw.ContainsFullScreenElement);       // visualizer full screen
             ApplyZoom();
             await ClearCacheOnVersionChange(cw, folder);
@@ -316,17 +316,25 @@ public sealed class WebUiForm : Form
     /// <summary>
     /// 0.6.9 #15: the window's own sign-in. When the administrator approved this PC (or a pairing code was typed) the server also gave a normal
     /// paired Control session for the window ("&lt;name&gt; (Player window)" in Settings > Devices > Paired devices &amp; tokens). It is stored with DPAPI next to the Player token and
-    /// put into the window's cookie jar - only when the window has no WavWiz session of its own, so an administrator who signed in here stays signed in.
+    /// put into the window's cookie jar when the window has no WavWiz session of its own. 0.7.1 t2072: the server PC's own Player asks for it with its
+    /// Player token when it has none (WindowSessionKeeper), and at the first window of a run a different cookie (an admin sign-in from first-run setup)
+    /// is replaced, so the next launch opens as the normal Control session; an admin sign-in during this run stays until the Player restarts.
     /// The Player (audio) token is never used for the page and can never be elevated.
     /// </summary>
+    private static bool _windowSessionChecked;   // 0.7.1 t2072: first window of this Player run
     private async Task EnsureWindowSession(CoreWebView2 cw)
     {
         try
         {
-            var ui = new DpapiSecretStore().Load("uitoken"); if (string.IsNullOrEmpty(ui) || _url.Length == 0) return;
+            if (_url.Length == 0) return;
+            bool first = !_windowSessionChecked; _windowSessionChecked = true;   // any window of this run counts (setup done in it: reopening keeps that sign-in)
+            // 0.7.1 t2072: an already-paired Player on the server PC without one asks for it now (fresh install: it paired before setup; or paired before 0.7.1)
+            var ui = await WindowSessionKeeper.EnsureAsync(new DpapiSecretStore(), _set.ServerHost, _set.HttpPort); if (string.IsNullOrEmpty(ui)) return;
             var u = new Uri(_url);
-            var have = await cw.CookieManager.GetCookiesAsync(u.GetLeftPart(UriPartial.Authority) + "/");
-            if (have.Any(c => c.Name == "wavwiz_session")) return;
+            var have = (await cw.CookieManager.GetCookiesAsync(u.GetLeftPart(UriPartial.Authority) + "/")).FirstOrDefault(c => c.Name == "wavwiz_session")?.Value;
+            var step = PairingClient.WindowCookieStep(ui, have, first);
+            if (step == WindowCookieAction.None) return;   // replace: an admin sign-in left from setup becomes the Control session
+            if (step == WindowCookieAction.Replace && have != null) { var h0 = u.Host; var p0 = u.Port; _ = Task.Run(() => PairingClient.SignOutSessionAsync(h0, p0, have)); }
             var c = cw.CookieManager.CreateCookie("wavwiz_session", ui, u.Host, "/");
             c.IsHttpOnly = true; c.SameSite = CoreWebView2CookieSameSiteKind.Strict; c.IsSecure = u.Scheme == Uri.UriSchemeHttps; c.Expires = DateTime.Now.AddDays(365);
             cw.CookieManager.AddOrUpdateCookie(c);

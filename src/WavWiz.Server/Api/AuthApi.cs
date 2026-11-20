@@ -110,6 +110,19 @@ public static class AuthApi
             return Results.Json(new { ok = true, token = tok, uiToken = ui, audioPort = s.Audio.Port, clockPort = s.Clock.Port });
         }).Anon();
 
+        // 0.7.1 t2072: a Player that is already paired on the server PC asks for its window session later - on a fresh Server + Player install it pairs
+        // BEFORE the admin password exists (so pair-player gave it none), and Players paired before 0.7.1 never got one. Only with the Player's own
+        // token (Bearer, Role.Player) and only when LocalWindowSession allows it (this PC, setup done, not headless/container/bridge/test-remote).
+        // The answer is a normal NON-admin Control session for the window.
+        g.MapPost("/auth/window-session", (HttpContext c) =>
+        {
+            var w = c.Who()!;
+            if (w.Role != Role.Player || string.IsNullOrEmpty(w.PlayerId)) return Ext.Bad("Only the WavWiz Player on this PC can ask for this.", 403);
+            if (s.Auth.SetupRequired) return Ext.Bad("Set the administrator password first (in the WavWiz window on this PC).", 409);
+            if (!LocalWindowSession(s.Cfg, false, c.Connection.RemoteIpAddress, s.Cfg.InContainer)) return Ext.Bad("Only the WavWiz Player on the server PC itself gets a window session this way. Ask the administrator to approve this PC, or pair with a code.", 403);
+            return Results.Json(new { ok = true, uiToken = s.Auth.CreateToken(WindowName(w.Name), Role.Control) });
+        }).Req(Role.None);
+
         // ---- 0.6.9 #15: pairing by approval (no code to type). See PairRequests for the rules. ----
         g.MapPost("/auth/pair-request", async (HttpContext c) =>
         {
