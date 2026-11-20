@@ -29,8 +29,16 @@ test('CSS: one rule per style on the playing trim; Waveform is the default and u
   const sel = id => new RegExp(`html\\[data-edgelight="${id}"\\]\\)?[^{]*\\.qb42\\.playing > \\.cgrip69::after \\{`);
   for (const id of ['pipe', 'comet', 'pulse', 'dual', 'wave', 'off']) assert.match(css, sel(id), id);
   assert.match(css, /:is\(html\[data-edgelight="wave"\], html:not\(\[data-edgelight\]\)\)/, 'Waveform without the attribute too');
-  assert.match(css, /mask-image: repeating-linear-gradient\(180deg,[^;]*transparent 44px\)/, 'fixed 44px wavelength (same on collapsed and expanded)');
-  assert.match(css, /@keyframes ww-lp-wave \{ 0% \{ transform: translateY\(0\); \} 100% \{ transform: translateY\(44px\); \} \}/, 'moves exactly one wavelength: seamless, same speed on any card');
+  // t2057u / t2058u: Waveform = two interwoven wave lines (main + second theme color), only on PLAYING zones
+  const W = ':is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69';
+  assert.ok(css.includes(W + '::before { background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,'), 'line 1: theme main color through an SVG wave mask');
+  assert.ok(css.includes(W + '::after { background: var(--accent2); -webkit-mask-image: url("data:image/svg+xml,'), 'line 2: theme second color');
+  const masks = [...css.matchAll(/mask-image: url\("data:image\/svg\+xml,([^"]+)"\)/g)].map(m => decodeURIComponent(m[1]));
+  assert.ok(masks.some(m => m.includes("M5 -2 C 8.6 4.5 8.6 13.5 5 20 C 1.4 26.5 1.4 35.5 5 42")) && masks.some(m => m.includes("M5 -2 C 1.4 4.5 1.4 13.5 5 20 C 8.6 26.5 8.6 35.5 5 42")), 'the two lines are half a wave apart (woven)');
+  assert.match(css, /mask-size: 10px 40px;/, 'fixed 40px wavelength in px: a collapsed card shows fewer waves, same size');
+  assert.match(css, /@keyframes ww-lp-wave \{ 0% \{ transform: translateY\(0\); \} 100% \{ transform: translateY\(40px\); \} \}/, 'moves exactly one wavelength: seamless, same speed on any card');
+  assert.ok(!/\.qb42:not\(\.playing\)[^{]*cgrip69::(before|after)[^{]*\{[^}]*mask-image/.test(css) && !css.includes('.qb42.idle > .cgrip69::before'), 'idle / empty zones: plain edge, no wave');
+  assert.ok(css.includes(W + '::before, ' + W + '::after { opacity: 1 !important; transform: translateY(0); }'), 'reduced motion: the wave stands still');
   assert.match(css, /--lp-t: clamp\(8px, 22%, 64px\)/, 'Light pipe head scales with the card (was 28% with a 28px floor = a smear on a 42px card)');
   assert.doesNotMatch(css, /@keyframes ww-pipe/, 'the old top-animating travel is gone');
   const kf = [...css.matchAll(/@keyframes ww-lp-[a-z]+ \{([^\n]*)\}/g)].map(m => m[1]).join(' ');

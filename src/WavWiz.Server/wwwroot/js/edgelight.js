@@ -3,7 +3,7 @@
 // across tabs. prefers-reduced-motion always gets a static lit edge (CSS). The trim is the drag grip whatever the style.
 export const EDGE_KEY = 'wavwiz.edgelight';
 export const EDGE_STYLES = [
-  ['wave', 'Waveform', 'A steady stream of light, the same size and speed on every card'],
+  ['wave', 'Waveform', 'Two woven waves in your theme colors flow down a playing zone’s edge'],
   ['pipe', 'Light pipe', 'One light travels down the edge'],
   ['comet', 'Clean comet', 'A crisp, quick comet with a short tail'],
   ['pulse', 'Pulse', 'The edge kicks bright on a beat with a comet'],
