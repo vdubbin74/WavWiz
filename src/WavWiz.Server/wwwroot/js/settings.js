@@ -4,9 +4,9 @@ import { confirmNear } from './popover.js';   // 0.7.1 t2035u
 import { adminOnly, ADMIN_HINT } from './ui.js';
 import { jbFlushAll } from './jbcfg.js';
 import { THEME_RESET_KEYS, savedMark, learn, adminTag, resetBar, settingsSearch, ROLE_NAMES, jukeboxPane, backupCard, calibrationExtras } from './settingsui.js';
-import { networkCard, diagnosticsView, listenText } from './diag.js';
+import { networkCard, diagnosticsView } from './diag.js';
 import { pulse, pulseSel } from './motion.js';
-import { remoteView } from './remote.js';
+import { awayPanel } from './remote.js';   // 0.7.1 t2073
 import { aboutBody } from './about.js';
 import { appearancePane } from './appearance.js';
 import { npPreview, npStyleThumb } from './nppreview.js';
@@ -174,13 +174,11 @@ export async function openSettings(S, refresh, nav, section) {
     panes.library.push(historyCard(S), lastFmCard(admin));
 
     // Network
-    panes.network.push(h('div', { class: 'card' }, h('h3', null, 'Home network'),
-      h('p', { class: 'dim small' }, 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.'),
-      h('p', { class: 'small' }, `Listening on ${listenText(st.listen, st.bind)}`),   // 0.6.8-#9
-      h('button', { class: 'btn', onclick: () => { const go = () => body.querySelector('#sec-away')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); const tab = body.querySelector('#stab-network'); if (tab && tab.getAttribute('aria-selected') !== 'true') { tab.click(); requestAnimationFrame(go); } else go(); } }, 'Away-from-home access (Tailscale)')));
-    // F117: Away-from-home access is a normal Network card, right after Home network (local, then remote)
-    { const rv = remoteView(S); panes.network.push(h('div', { class: 'card setpage', id: 'sec-away' }, rv.el)); }
-    panes.network.push(networkCard({ auth: { role: admin ? 'admin' : 'view' } }));      // 0.1.3: Private/Public, re-detect, use the new address
+    // 0.7.1 t2073: ONE Home network card (it was a "Home network" card + a "Network" card, both saying where WavWiz listens), then the
+    // Away-from-home panel, whose header replaces the old full-width button that only scrolled down to it. Local first, then remote (F117).
+    panes.network.push(networkCard({ auth: { role: admin ? 'admin' : 'view' } }, { title: 'Home network',      // 0.1.3: Private/Public, re-detect, use the new address
+      intro: 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.' }));
+    panes.network.push(awayPanel(S, { onLoad: () => search.reindex() }).el);
     // 0.1.2: AirPlay + Spotify Connect with level (0…+6 dB) arrows
     const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : rc.airplay.installed ? 'Not running - see Diagnostics.' : 'Not installed on this PC.') : '';
     const levelRow = (key, label, cur) => {
@@ -248,7 +246,7 @@ export async function openSettings(S, refresh, nav, section) {
   };
 
   /** 0.7.1 t2042u: scroll to a card and highlight it (the same pulse as File > New). */
-  function showSec(id) { const el = body.querySelector('#' + id); if (!el) return; el.scrollIntoView({ block: 'start' }); pulse(el); }
+  function showSec(id) { const el = body.querySelector('#' + id); if (!el) return; el._reveal?.(); el.scrollIntoView({ block: 'start' }); pulse(el); }   // t2073: opens a folded panel
   /** B10: move the section's reset bar into a flex row with its sub-tab bar (the tabs take the free space and scroll sideways; the button never overlaps). */
   function placeReset(sec) {
     const bar = sec.querySelector(':scope > .secbar'), sub = sec.querySelector('.subtabs');

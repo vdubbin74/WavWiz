@@ -85,7 +85,7 @@ export function settingsSearch(body, { show, showSub }) {
     const hits = idx.filter(x => q.split(/\s+/).every(w => x.text.includes(w)));
     out.textContent = hits.length ? `${hits.length} found` : 'Nothing found';
     hits.forEach(x => x.el.classList.add('sethit'));
-    if (hits[0] && jump !== false) { show(hits[0].g); if (hits[0].sub) showSub(hits[0].sub); const d = hits[0].el.closest('details'); if (d) d.open = true; requestAnimationFrame(() => hits[0].el.scrollIntoView({ block: 'center', behavior: 'smooth' })); }
+    if (hits[0] && jump !== false) { show(hits[0].g); if (hits[0].sub) showSub(hits[0].sub); const d = hits[0].el.closest('details'); if (d) d.open = true; hits[0].el.closest('[data-fold]')?._reveal?.();   /* 0.7.1 t2073: a hit inside the folded Away-from-home panel opens it */ requestAnimationFrame(() => hits[0].el.scrollIntoView({ block: 'center', behavior: 'smooth' })); }
   };
   input.addEventListener('input', () => run(true)); input.addEventListener('keydown', ev => { if (ev.key === 'Enter') run(true); });
   return { el: h('span', { class: 'row setsearch-w' }, input, out), reindex, run };

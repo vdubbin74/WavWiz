@@ -39,7 +39,7 @@ test('t2042u: the phrase is a link; it opens Settings > Devices > Calibration at
   assert.match(st, /const focusSec = section === 'phone' \? 'sec-phone' :/, 'settings:phone lands on the card');
   assert.match(st, /let devSub = section === 'phone' \|\| section === 'calibration' \? 'calibration' : 'players';/, 'in the Calibration sub-section');
   assert.match(st, /sectionFor\(section\)/); assert.match(st, /section === 'phone' \|\| section === 'devices'/);
-  assert.match(st, /function showSec\(id\) \{ const el = body\.querySelector\('#' \+ id\); if \(!el\) return; el\.scrollIntoView\(\{ block: 'start' \}\); pulse\(el\); \}/, 'scrolled to and highlighted');
+  assert.match(st, /function showSec\(id\) \{ const el = body\.querySelector\('#' \+ id\); if \(!el\) return; (?:el\._reveal\?\.\(\); )?el\.scrollIntoView\(\{ block: 'start' \}\); pulse\(el\); \}/, 'scrolled to and highlighted');
   assert.match(st, /d\.el\._goSec = sec => \{ active = sectionFor\(sec\); if \(sec === 'phone' \|\| sec === 'calibration'\) devSub = 'calibration'; paint\(\);/);
   assert.match(dg, /'What to do: ', linkSettings\(c\.fix\)/); assert.match(dg, /linkSettings\(w\)/); assert.match(dg, /linkSettings\(i\.detail\)/);
 });

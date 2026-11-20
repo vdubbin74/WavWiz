@@ -6312,3 +6312,19 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .menubar:not(.kbd) :is(.mtop,.mpanel button):focus-visible{outline:none!important;box-shadow:none}
 .menubar.kbd .mtop:focus{outline:2px solid var(--hl,var(--accent))!important;outline-offset:-2px;background:var(--accent-soft)}
 .menubar.kbd .mpanel button:focus{outline:2px solid var(--hl,var(--accent))!important;outline-offset:-2px;background:var(--accent-soft)}
+
+/* 0.7.1 t2073u: Settings > Network > Away-from-home access is a fold. Its full-width header replaces the old "Away-from-home access (Tailscale)"
+   button, which only scrolled to the section right under it. Closed when this PC has no Tailscale address, open when it has one; remembered. */
+.card.awayfold{padding:0;overflow:hidden}
+.awayhead{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;margin:0;padding:12px 14px;border:0;border-radius:0;background:color-mix(in srgb,var(--accent2) 7%,transparent);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.awayhead .awt{flex:1;min-width:0;font-size:16px;font-weight:600;letter-spacing:.01em}
+.awayhead .awaypill{flex:none;font-size:11px}
+.awayhead .awchev{flex:none;width:9px;height:9px;margin:0 4px 3px 2px;border-right:2px solid var(--accent2);border-bottom:2px solid var(--accent2);transform:rotate(-45deg);transition:transform .18s}
+.awayhead[aria-expanded=true] .awchev{transform:rotate(45deg)}
+.awayhead:hover{background:color-mix(in srgb,var(--accent2) 14%,transparent)}
+.awayhead:focus-visible{outline:2px solid var(--hl);outline-offset:-2px}
+.awayfold.open .awayhead{border-bottom:1px solid var(--line)}
+.awaybody{padding:12px}
+.awaybody[hidden]{display:none}
+@media (max-width:600px){ .awayhead{flex-wrap:wrap} .awayhead .awt{flex-basis:calc(100% - 30px)} .awayhead .awaypill{order:3} }
+.awayhead .awaypill.ok{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 55%,transparent)}

@@ -61,7 +61,7 @@ function receiversCard(S) {
   return box;
 }
 /** 0.1.3: which address WavWiz listens on, Private/Public network, re-detect, use the new address. */
-export function networkCard(S) {
+export function networkCard(S, { title = 'Network', intro = null } = {}) {   // 0.7.1 t2073: Settings > Network uses it as the one "Home network" card
   const box = h('div', { class: 'card', id: 'diag-network' }), out = h('div'), admin = S?.auth?.role === 'admin';
   async function use(addr) {
     if (!(await ask('Switch address', `Switch WavWiz to ${addr}? It restarts, and players reconnect on their own within a minute.`, { ok: 'Switch' }))) return;
@@ -78,7 +78,7 @@ export function networkCard(S) {
       d.adapters.length ? h('table', { class: 'tbl small' }, h('tbody', null, d.adapters.map(a => h('tr', null, h('td', { class: 'mono' }, a.address), h('td', null, `${a.kind}: ${a.name}`), h('td', null, prof(a.profile)), h('td', null, a.isBind ? h('b', null, 'in use') : admin && d.canRebind && a.kind !== 'Virtual' ? h('button', { class: 'btn', 'data-use': a.address, onclick: () => use(a.address) }, `Use ${a.address}`) : ''))))) : h('div', { class: 'small dim' }, 'No home-network address found. Is this PC connected to your router?'),
       h('p', { class: 'small dim' }, 'WavWiz only opens its firewall ports on Private networks. If a network shows Public, Windows hides WavWiz from your phones and other PCs.'));
   }
-  paint(false); box.append(h('div', { class: 'row wrap' }, h('h3', { class: 'grow' }, 'Network'), h('button', { class: 'btn', 'data-act': 'redetect', onclick: () => paint(true) }, 'Re-detect')), out);
+  paint(false); box.append(h('div', { class: 'row wrap' }, h('h3', { class: 'grow' }, title), h('button', { class: 'btn', 'data-act': 'redetect', onclick: () => paint(true) }, 'Re-detect')), intro ? h('p', { class: 'dim small' }, intro) : null, out);
   return box;
 }
 
