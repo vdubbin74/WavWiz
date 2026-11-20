@@ -11,7 +11,8 @@ public sealed record OutputDto(long EndpointDbId, string DeviceId, string Endpoi
     string? MeasuredWith = null, string? MeasuredAt = null);     // 0.2.5: how and when the current delay was set (card note "Measured with … · date")
 public sealed record ZoneDto(long Id, string Name, string PlayerId, bool Connected, bool Enabled, double Volume, bool Muted, string? ActiveDeviceId, string? ActiveEndpointId,
     string Badge, string BadgeText, double? SyncErrorMs, double? BufferMs, int? Underruns, int? HardResyncs, double? RatioPpm, string? Link, string? RemoteIp, string? Health, List<OutputDto> Outputs, RoomState? Room = null, bool IsWeb = false, List<long>? GroupIds = null,
-    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null, double? VolCap = null, bool VolLocked = false);
+    bool Mine = false, bool Reference = false, bool OutputUnavailable = false, string? ChosenDeviceId = null, long? OwnerTokenId = null, string? LastSeen = null, double? VolCap = null, bool VolLocked = false,
+    long? TimedBy = null);   // 0.7.1: the speaker this one is calibrated against (its zone's reference, else the internal house reference; null = none)
 public sealed record ZoneGroupDto(long Id, string Name, List<long> DeviceIds, int Members, int Online, int Enabled, bool Active, double Volume = 0, bool Muted = false,
     long? ReferenceId = null, string? RefNote = null,   // 0.6.8-#15: the zone's reference speaker + a quiet "Reference changed, re-check timing" note
     long? RecommendedId = null, string? RecommendedReason = null, bool RecommendedWarn = false, RefFlagDto? RefFlag = null);   // 0.7.1: recommendation + flag
@@ -458,6 +459,7 @@ public sealed class ZoneManager
         var rows = _db.Query("SELECT id,name,player_id,enabled,volume,muted,active_output_device_id,sort FROM zone ORDER BY sort,id",
             r => new ZRow(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetDouble(4), r.GetInt32(5) != 0, r.IsDBNull(6) ? null : r.GetString(6), r.GetInt32(7)));
         var memberships = _db.Query("SELECT device_id,group_id FROM zone_group_member", r => (Dev: r.GetInt64(0), Grp: r.GetInt64(1))).ToLookup(x => x.Dev, x => x.Grp);
+        long? TimedBy(long id) { var g = memberships[id].FirstOrDefault(); return g != 0 && zref.TryGetValue(g, out var r) ? r : house != 0 ? house : (long?)null; }   // same rule as ReferenceFor
         bool IsRef(long id) => refSet.Contains(id);   // 0.7.1: the house reference (a speaker in no zone) is internal only - no REF tag in the UI
         foreach (var z in rows)
         {
@@ -491,7 +493,8 @@ public sealed class ZoneManager
             bool unavailable = s != null && z.ActiveDevice != null && !outs.Any(o => o.DeviceId == z.ActiveDevice && o.Connected);
             res.Add(new ZoneDto(z.Id, z.Name, z.PlayerId, s != null || ext, z.Enabled, z.Volume, z.Muted, act?.DeviceId ?? z.ActiveDevice, act?.EndpointId, badge, text,
                 (s?.IsWeb ?? false) ? null : st?.SyncErrorMs, st?.BufferMs, st?.Underruns, st?.HardResyncs, st?.RatioPpm, s?.LinkType, s?.Remote.ToString(), s == null ? null : Health(s), outs, Rooms.State(z.PlayerId, s != null, st, StreamPlayingFor(z.PlayerId), StreamAgeMsFor(z.PlayerId)), s?.IsWeb ?? z.PlayerId.StartsWith("web-"), memberships[z.Id].OrderBy(x => x).ToList(),
-                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), IsRef(z.Id), unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked));
+                IsMine(z.PlayerId, s?.OwnerTokenId ?? owner, s, who, remote), IsRef(z.Id), unavailable, z.ActiveDevice, null, seen.GetValueOrDefault(z.PlayerId), VolCapOf(z.Id).Cap, VolCapOf(z.Id).Locked,
+                TimedBy(z.Id)));
         }
         return res;
     }

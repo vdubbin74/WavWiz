@@ -36,6 +36,16 @@ export function offerResume(groups) {
   const ids = Array.isArray(groups) && groups.length ? groups : null;
   undoToast('Calibration ended - the music is paused', () => ids ? Promise.all(ids.map(g => api('/stream/resume?zoneId=' + encodeURIComponent(g), { method: 'POST' }))) : api('/stream/resume', { method: 'POST' }), 30000, 'Resume');
 }
+/** 0.7.1: the zones Calibrate can pick (at least one connected speaker), in the zone order (pure). */
+export const calZones = (S, zones) => (S.groups || []).filter(g => (zones || []).some(z => (g.deviceIds || []).includes(z.id)));
+/** 0.7.1: the connected speakers a scope measures: a zone's, or (null = Whole house) all of them (pure). */
+export const scopeMembers = (zones, g) => g ? (zones || []).filter(z => (g.deviceIds || []).includes(z.id)) : (zones || []);
+/** 0.7.1: the RECOMMENDED reference for a scope: a zone's (from the zone) or the whole house's (server ranking); null when none is online (pure). */
+export function recFor(g, rankAll, zones) {
+  const on = id => (zones || []).find(z => z.id === id) || null;
+  if (g) { const z = on(g.recommendedId); return z ? { id: z.id, name: z.name, reason: g.recommendedReason || '', warn: !!g.recommendedWarn } : null; }
+  const r = (rankAll?.ranking || []).find(x => x.connected && on(x.id)); return r ? { id: r.id, name: on(r.id).name, reason: r.reason || '', warn: !!r.warn } : null;
+}
 /** 0.7.1: the measured speakers that sound earlier than the reference (pure). */
 export const fasterThanRef = props => (props || []).filter(p => Number.isFinite(p.fasterMs) && p.fasterMs > 0);
 export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
@@ -49,36 +59,71 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   const d = dialog('Calibrate speakers', outer, [], { onClose: () => { cleanup(); opts.onClose?.(); refresh && refresh(); } });
   if (zones.length < 2) { body.replaceChildren(h('p', null, 'You need at least two connected speakers: one is the reference (the one you leave alone) and the others are measured against it.'), h('p', { class: 'dim' }, 'You can still type a delay by hand: open a speaker’s Settings and use Delay.')); return; }
 
-  const admin = isAdmin(S) || !!opts.linkAdmin, mine = thisDevice(S), house = refFor(S, presetZoneId ?? (!admin ? mine?.id : null));   // 0.6.8-#15: the zone's own reference
+  const admin = isAdmin(S) || !!opts.linkAdmin, mine = thisDevice(S);
+  // 0.7.1: an admin picks WHAT to calibrate - "Whole house" (every connected speaker against one chosen reference, from one spot) or one zone
+  // (its speakers against that zone's own reference). Opened from a speaker in a zone (or a zone's flag) it starts on that zone.
+  const calGroups = admin ? calZones(S, zones) : [];
+  const pg = opts.groupId != null ? calGroups.find(g => g.id === opts.groupId) : presetZoneId != null ? calGroups.find(g => (g.deviceIds || []).includes(presetZoneId)) : null;
+  let rankAll = null; if (admin) { try { rankAll = await api('/calibration/ranking'); } catch { /* older server: the old defaults */ } }
+  const scope0 = pg ? pg.id : 'all';
+  const house = admin && scope0 !== 'all' ? (S.zones || []).find(z => z.id === pg.referenceId) || null
+    : admin && !presetZoneId && rankAll?.defaultId != null ? (zones.find(z => z.id === rankAll.defaultId) || refFor(S, null))
+    : refFor(S, presetZoneId ?? (!admin ? mine?.id : null));   // 0.6.8-#15: the zone's own reference
   const hold = !!(house && !house.connected);
+  const nextBest = hold && pg?.recommendedId != null ? zones.find(z => z.id === pg.recommendedId) : null;   // 0.7.1: the offline reference's next best
   if (hold) {
     body.replaceChildren(h('div', { class: 'card', role: 'alert' }, h('h3', { class: 'amber' }, `The reference speaker “${house.name}” is offline`),
-      h('p', null, 'Calibration measures every speaker against the house reference speaker, so it must be on and connected.'),
+      h('p', null, 'Calibration measures the speakers against this reference speaker, so it must be on and connected.'),
       h('p', { class: 'small' }, admin ? 'Turn it on, or pick another reference: Devices > Expanded > Settings > More > Set as reference.' : 'Turn it on, or ask an administrator to pick another reference.'),
+      admin && nextBest ? h('div', { class: 'row calnextbest' }, h('span', { class: 'dtag rec' + (pg.recommendedWarn ? ' warn' : ''), title: pg.recommendedReason || '' }, 'NEXT BEST'), h('b', null, nextBest.name), h('span', { class: 'small dim grow' }, pg.recommendedReason || ''),
+        h('button', { class: 'btn small primary', 'data-act': 'standin-next-best', onclick: () => { st.ref = nextBest.id; st.sel.delete(st.ref); intro(); } }, 'Use for this session')) : null,
       admin ? h('div', { class: 'field' }, h('label', null, 'Use another reference for this calibration'), wsel({ onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, h('option', { value: '' }, 'Pick a speaker…'), zones.map(z => h('option', { value: z.id }, z.name)))) : null));
   }
   if (hold && !admin) return;
   if (!admin && (!mine || !zones.some(z => z.id === mine.id))) { body.replaceChildren(h('p', null, 'You can calibrate the speaker you are using. This browser is not playing as a speaker yet (or it is offline).'), h('p', { class: 'small dim' }, ADMIN_HINT.replace('change this', 'calibrate other speakers'))); return; }
-  const defRef = house?.connected ? house.id : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);
-  const st = { ref: defRef, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : zones.filter(z => z.id !== defRef).map(z => z.id)), level: -12, testVolume: 100, quality: 'quick' };
+  const defRef = house?.connected ? house.id : admin && scope0 !== 'all' ? null : (zones.find(z => z.outputs.find(o => o.active)?.kind === 'wired')?.id ?? zones[0].id);   // 0.7.1: a zone with no reference waits for the user's pick
+  const st = { ref: defRef, scope: scope0, sel: new Set(!admin ? [mine.id] : presetZoneId ? [presetZoneId] : scopeMembers(zones, pg).filter(z => z.id !== defRef).map(z => z.id)), level: -12, testVolume: 100, quality: 'quick' };
   api('/settings').then(x => { const v = x?.['calibration.testLevelDb']; if (Number.isFinite(v)) st.level = v; }).catch(() => {});   // 0.3.0 §7.2: default from Settings > Devices > Calibration
-  if (presetZoneId && presetZoneId === st.ref) { const other = zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
-  if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the house reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
+  if (presetZoneId && presetZoneId === st.ref) { const other = scopeMembers(zones, pg).find(z => z.id !== presetZoneId) || zones.find(z => z.id !== presetZoneId); if (admin && other) st.ref = other.id; }
+  if (!admin && mine && st.ref === mine.id) { body.replaceChildren(h('p', null, `${mine.name} is the reference speaker, so it is the one the others are measured against - there is nothing to calibrate on it.`)); return; }
 
   const vv = h('span', { class: 'small mono' }, st.testVolume + '%'), capEl = h('p', { class: 'small amber calcap', hidden: true });
   // 0.4.9 F71: the max-volume lock no longer limits the test sound (it is bypassed for the sound only, then everything is restored)
   const capNote = () => { capEl.hidden = false; capEl.textContent = st.testVolume >= 100 ? 'Calibration plays at full volume. Max-volume locks are bypassed for the test sound only; your volume settings come back afterward.' : `The test sound plays at ${st.testVolume}%. Max-volume locks are bypassed for the test sound only; your volume settings come back afterward.`; }; capNote();
+  // 0.7.1: switching Whole house / a zone: the zone's own reference (none = wait for the user), and every other connected speaker of it
+  function setScope(v) {
+    const g = v === 'all' ? null : calGroups.find(x => x.id === v); st.scope = g ? g.id : 'all';
+    const r = g ? zones.find(z => z.id === g.referenceId) : (rankAll?.defaultId != null ? zones.find(z => z.id === rankAll.defaultId) : null) || zones.find(z => z.id === st.ref) || zones[0];
+    st.ref = r ? r.id : null; st.sel = new Set(scopeMembers(zones, g).filter(z => z.id !== st.ref).map(z => z.id)); intro();
+  }
   function speakersBox() {
     queueMicrotask(capNote);
+    const g = st.scope === 'all' ? null : calGroups.find(x => x.id === st.scope) || null, pool = admin ? scopeMembers(zones, g) : zones;
     const refZ = zones.find(z => z.id === st.ref);
-    const refSel = wsel({ 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value; st.sel.delete(st.ref); intro(); } }, zones.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.reference ? ' (house reference)' : '') + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));
+    const refSel = wsel({ 'aria-label': 'Reference speaker', onchange: ev => { st.ref = +ev.target.value || null; st.sel.delete(st.ref); intro(); } },
+      st.ref == null ? h('option', { value: '', selected: true }, 'Pick a reference…') : null,
+      pool.map(z => h('option', { value: z.id, selected: z.id === st.ref }, z.name + (z.outputs.find(o => o.active)?.kind === 'bluetooth' ? ' (Bluetooth)' : ''))));   // 0.7.1: the house reference is internal (no label)
     if (!admin) { refSel.disabled = true; refSel.title = 'Only an administrator can change the reference speaker.'; }
+    const scopeSel = admin && calGroups.length ? wsel({ 'aria-label': 'What to calibrate', 'data-act': 'cal-scope', onchange: ev => setScope(ev.target.value === 'all' ? 'all' : +ev.target.value) },
+      h('option', { value: 'all', selected: st.scope === 'all' }, 'Whole house - every speaker, one reference'), calGroups.map(x => h('option', { value: x.id, selected: st.scope === x.id }, x.name))) : null;
+    const rec = admin ? recFor(g, rankAll, zones) : null;
+    const recRow = rec ? (rec.id === st.ref
+      ? h('p', { class: 'small calrec' }, h('span', { class: 'dtag rec' + (rec.warn ? ' warn' : ''), title: rec.reason }, 'RECOMMENDED'), ' ', rec.reason)
+      : h('div', { class: 'row calrec' }, h('span', { class: 'dtag rec' + (rec.warn ? ' warn' : ''), title: rec.reason }, 'RECOMMENDED'), h('b', null, rec.name), h('span', { class: 'small dim grow' }, rec.reason),
+        h('button', { type: 'button', class: 'btn small' + (st.ref == null ? ' primary' : ''), 'data-act': 'cal-use-recommended', onclick: async () => {
+          // a zone: one tap makes it the zone's reference (saved; delays re-based). Whole house: the reference for this session.
+          if (g) { try { await api(`/groups/${g.id}/reference`, { method: 'PUT', body: { zoneId: rec.id } }); g.referenceId = rec.id; toast(`${rec.name} is now the reference for ${g.name}`); } catch (e) { toast(calFix(e.message), true); return; } }
+          st.ref = rec.id; st.sel.delete(rec.id); intro(); } }, `Use ${rec.name}`),
+        h('button', { type: 'button', class: 'btn small', 'data-act': 'cal-pick-another', onclick: () => { refSel.focus?.(); refSel.click?.(); } }, 'Pick another'))) : null;
+    const noRef = admin && g && st.ref == null ? h('p', { class: 'small amber calnoref', role: 'status' }, `${g.name} has no reference yet. Use the recommended one, or pick another.`) : null;
     const names = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref).map(z => z.name);
     const anyWeb = zones.some(z => st.sel.has(z.id) && isWebSpeaker(z));
     return h('details', { class: 'card calspk', open: anyWeb || undefined }, h('summary', null, h('b', null, 'Speakers: '), `reference ${refZ?.name ?? '?'} · measures ${names.length ? names.join(', ') : 'nothing yet'}`),
-      h('div', { class: 'field' }, h('label', null, 'Reference speaker (left as it is)'), refSel,
-        refZ && refZ.outputs.find(o => o.active)?.kind === 'bluetooth' ? h('p', { class: 'small amber calbtref' }, 'This reference plays over Bluetooth, whose delay can change when it reconnects. A wired speaker makes a steadier reference.') : null),
-      h('div', { class: 'field' }, h('label', null, 'Speakers to calibrate'), zones.filter(z => z.id !== st.ref).map(z => { const own = admin || z.id === mine?.id; const web = isWebSpeaker(z); return h('label', { class: 'row' + (own ? '' : ' ro'), title: web ? `${webSpeakerKind(z)} plays chirps in sync (tap to unlock sound first)` : (own ? '' : 'Only an administrator can calibrate other speakers.') }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), disabled: !own, onchange: ev => { ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id); intro(); } }), z.name, h('span', { class: 'small dim' }, web ? `${webSpeakerKind(z)} · chirps OK` : (z.outputs.find(o => o.active)?.label ?? ''))); }),
+      scopeSel ? h('div', { class: 'field calscope' }, h('label', null, 'Calibrate'), scopeSel) : null,
+      h('div', { class: 'field' }, h('label', null, 'Reference speaker (left as it is)'), refSel, noRef, recRow,
+        refZ && refZ.outputs.find(o => o.active)?.kind === 'bluetooth' ? h('p', { class: 'small amber calbtref' }, 'This reference plays over Bluetooth, whose delay can change when it reconnects. A wired speaker makes a steadier reference.') : null,
+        refZ && /^(airplay|cast):/.test(refZ.playerId || '') ? h('p', { class: 'small amber calbtref' }, 'This reference plays over AirPlay / Cast, whose network delay can drift. A wired speaker makes a steadier reference.') : null),
+      h('div', { class: 'field' }, h('label', null, 'Speakers to calibrate'), pool.filter(z => z.id !== st.ref).map(z => { const own = admin || z.id === mine?.id; const web = isWebSpeaker(z); return h('label', { class: 'row' + (own ? '' : ' ro'), title: web ? `${webSpeakerKind(z)} plays chirps in sync (tap to unlock sound first)` : (own ? '' : 'Only an administrator can calibrate other speakers.') }, h('input', { type: 'checkbox', checked: st.sel.has(z.id), disabled: !own, onchange: ev => { ev.target.checked ? st.sel.add(z.id) : st.sel.delete(z.id); intro(); } }), z.name, h('span', { class: 'small dim' }, web ? `${webSpeakerKind(z)} · chirps OK` : (z.outputs.find(o => o.active)?.label ?? ''))); }),
         admin ? null : h('p', { class: 'small dim' }, 'You can calibrate the speaker you are using; the result is saved only to it.')),
       h('div', { class: 'field calquality' }, h('label', { class: 'row calthorough' }, h('input', { type: 'checkbox', 'data-act': 'thorough', 'aria-label': 'Thorough', checked: st.quality === 'thorough', onchange: ev => { st.quality = ev.target.checked ? 'thorough' : 'quick'; } }), h('b', null, 'Thorough'), h('span', { class: 'small dim' }, ' three tests per speaker, with a drift check. Off = Quick: one test per speaker.'))),
       h('div', { class: 'field' }, h('label', null, 'Test sound level'), h('input', { type: 'range', min: -40, max: -6, value: st.level, oninput: ev => st.level = +ev.target.value, 'aria-label': 'Test sound level' })),
@@ -112,6 +157,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
 
   // ------------------------------------------------------------ 1. this PC's microphone (the server runs the measurement)
   async function startPcMic(pc, mic) {
+    if (st.ref == null) return toast('Pick a reference speaker first (the recommended one is a good choice).', true);   // 0.7.1
     const zs = picked(); if (!zs.length) return toast(calFix('Choose at least one speaker to calibrate.'), true);
     let sess;
     try { sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'pc-mic', micPlayerId: pc.playerId, micId: mic.id, referenceZoneId: st.ref, zoneIds: zs, levelDb: st.level, testVolume: st.testVolume, quality: st.quality } }); }
@@ -219,6 +265,7 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
 
   // ------------------------------------------------------------ by ear (no microphone, works on http)
   async function ear() {
+    if (st.ref == null) return toast('Pick a reference speaker first (the recommended one is a good choice).', true);   // 0.7.1
     runView?.stop(); runView = null; pcCard?.stop(); pcCard = null;
     const zs = zones.filter(z => st.sel.has(z.id) && z.id !== st.ref && (admin || z.id === mine?.id)); const refZ = zones.find(z => z.id === st.ref); let i = 0;
     try { const sess = await api('/calibration/sessions', { method: 'POST', body: { mode: 'ear', referenceZoneId: st.ref, linkToken: opts.link } }); sessionId = sess.id; } catch (e) { toast(calFix(e.message), true); }   // pauses the music

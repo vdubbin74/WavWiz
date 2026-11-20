@@ -8,6 +8,8 @@ const groupOf = (S, id) => (S.groups || []).find(g => (g.deviceIds || []).includ
 export function refFor(S, speakerId) {
   const zs = S.zones || [], byId = id => zs.find(z => z.id === id) || null, g = speakerId != null ? groupOf(S, speakerId) : null;
   if (g?.referenceId != null && byId(g.referenceId)) return byId(g.referenceId);
+  const me = speakerId != null ? byId(speakerId) : null;   // 0.7.1: the server says which speaker times this one (the house reference is not shown as REF)
+  if (me?.timedBy != null && byId(me.timedBy)) return byId(me.timedBy);
   return zs.find(z => z.reference && !groupOf(S, z.id)) || zs.find(z => z.reference) || null;
 }
 /** The question to ask after moving a reference speaker into a zone that already has its own, or null. Pure; uses the state BEFORE the move. */

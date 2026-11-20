@@ -3,6 +3,7 @@
 // recommendedId + a one-line reason, and refFlag (the reference left the zone, is offline, ...). Nothing here changes a reference by itself:
 // every switch is one tap by the user (PUT /groups/{id}/reference, which re-bases the saved delays as before).
 import { h, api, toast } from './util.js';
+import { wsel } from './wwselect.js';
 
 const byId = (S, id) => (S.zones || []).find(z => z.id === id) || null;
 export const groupOfSpeaker = (S, id) => (S.groups || []).find(g => (g.deviceIds || []).includes(id)) || null;
@@ -59,7 +60,7 @@ export function zoneRefBlock(S, g, admin, done) {
   const st = refState(S, g); if (!st) return null;
   const ms = (S.zones || []).filter(z => (g.deviceIds || []).includes(z.id));
   const ro = 'Only an administrator can change the reference speaker.';
-  const pick = h('select', { class: 'zp42-refpick', 'aria-label': `Reference speaker of ${g.name}`, disabled: !admin || !ms.length, title: admin ? '' : ro,
+  const pick = wsel({ class: 'zp42-refpick', 'aria-label': `Reference speaker of ${g.name}`, disabled: !admin || !ms.length, title: admin ? '' : ro,
     onchange: ev => { const z = byId(S, +ev.target.value); if (z) useRef(g, z, done); } },
     h('option', { value: '', selected: !st.ref }, st.ref ? 'Pick another…' : 'Pick a speaker…'),
     ms.filter(z => z.id !== st.ref?.id).map(z => h('option', { value: z.id }, z.name + (z.id === st.rec?.id ? ' (recommended)' : ''))));

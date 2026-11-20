@@ -94,6 +94,9 @@ public class Release071ReferenceTests
         var zs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("id").GetInt64(), z => z.GetProperty("reference").GetBoolean());
         Assert.False(zs[dC]); Assert.True(zs[dA]);
         Assert.Equal(dC, S.Zones.ReferenceFor(dC));
+        // the UI learns which speaker times each one without a REF tag on the house reference (Calibrate for a regular user)
+        var tb = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("id").GetInt64(), z => L(z, "timedBy"));
+        Assert.Equal(dC, tb[dC]); Assert.Equal(dA, tb[dB]); Assert.Equal(dA, tb[dA]);
     }
 
     [Fact]

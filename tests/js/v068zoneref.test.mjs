@@ -28,6 +28,6 @@ test('wiring: tree move + Add to zone offer the swap, zone cards show the dismis
   const t = rd('tree42.js'), d = rd('devices.js');
   assert.match(t, /swapQuestion\(S, z, toId\)[\s\S]*applyMovePlan/); assert.match(t, /offerSwap\(q, toId, z, done\)/); assert.match(t, /zrefnote42[\s\S]*dismissNote\(g, done\)/);
   assert.match(d, /offerSwap\(q, g\.id, z, ctl\.refreshAll\)/);
-  assert.match(rd('calibrate.js'), /house = refFor\(S, presetZoneId/);
+  assert.match(rd('calibrate.js'), /: refFor\(S, presetZoneId/);   // 0.7.1: an admin's zone / Whole house pick comes first
   assert.match(rd('zoneref.js'), /\/groups\/\$\{toId\}\/reference/);
 });

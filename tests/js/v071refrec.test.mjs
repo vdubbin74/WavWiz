@@ -59,7 +59,7 @@ test('zone settings REFERENCE row: None yet + RECOMMENDED + one-tap Use (admin);
   el.remove();
   const v = zoneRefBlock(S, g0, false, () => {});
   assert.equal(v.querySelector('[data-act="use-recommended"]').hasAttribute('disabled'), true);
-  assert.equal(v.querySelector('select').hasAttribute('disabled'), true);
+  assert.equal(v.querySelector('.zp42-refpick').hasAttribute('disabled'), true);
 });
 
 test('speaker settings REFERENCE card: the recommended speaker offers "Use as reference"; the reference says its delay stays fixed', async () => {
