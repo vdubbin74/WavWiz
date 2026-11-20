@@ -6328,3 +6328,7 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .awaybody[hidden]{display:none}
 @media (max-width:600px){ .awayhead{flex-wrap:wrap} .awayhead .awt{flex-basis:calc(100% - 30px)} .awayhead .awaypill{order:3} }
 .awayhead .awaypill.ok{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 55%,transparent)}
+
+/* 0.7.1 t2075u: Settings > Network > AirPlay & Spotify Connect: the boost hint and the row ranges wrap - never cut off with "..." */
+#sec-airplay .boost-hint,#sec-airplay .boost-range{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+#sec-airplay .boost-hint{margin:12px 0 0;max-width:68ch}

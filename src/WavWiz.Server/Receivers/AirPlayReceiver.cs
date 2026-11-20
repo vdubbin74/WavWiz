@@ -68,12 +68,14 @@ public sealed class AirPlayReceiver : IDisposable
     }
     private volatile float _phoneGain = 1f;
     private float LevelGain() => (float)Math.Pow(10, LevelDb / 20.0);
-    private void SetGainFromPhone(float phoneGain) { _phoneGain = phoneGain; Feed.Gain = phoneGain * LevelGain(); }
+    private void SetGainFromPhone(float phoneGain) { _phoneGain = phoneGain; ApplyLevelGain(); }
+    /// <summary>0.7.1 t2075: phone volume x the saved boost, now - also for a session already playing (ZoneReceivers.ApplyLevels for each zone's own name).</summary>
+    public void ApplyLevelGain() => Feed.Gain = _phoneGain * LevelGain();
     public void SetLevelDb(double db)
     {
         db = Math.Clamp(Math.Round(db), 0, 6);
         _s.Db.SetSetting("airplay.levelDb", db.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Feed.Gain = _phoneGain * LevelGain();
+        ApplyLevelGain();
     }
 
     public bool Installed => _proc.Installed;

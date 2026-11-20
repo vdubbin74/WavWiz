@@ -29,6 +29,9 @@ function masonry(sections) {
   const ro = new ResizeObserver(es => es.forEach(e => fit(e.target)));
   for (const sec of sections) sec.querySelectorAll?.(':scope > *, :scope > .devsubsec > *').forEach(c => ro.observe(c));
 }
+/** 0.7.1 t2075: what the AirPlay / Spotify Connect boost rows do (they were read as an AirPlay-out volume). */
+export const BOOST_HINT = 'Makes music sent from a phone up to 6 dB louder, on top of the phone\'s volume. Applies to every WavWiz AirPlay / Spotify name a phone can pick. Not used when WavWiz plays to AirPlay speakers.';
+
 export const GROUPS = [
   ['general', 'General'],
   ['appearance', 'Appearance'],
@@ -190,21 +193,22 @@ export async function openSettings(S, refresh, nav, section) {
         try { await putSettings({ [key]: v }); val = v; shown.textContent = `+${v} dB`; } catch (e) { toast(e.message, true); }
       };
       return h('div', { class: 'row', style: 'margin-top:8px;gap:8px;align-items:center' },
-        h('span', { style: 'min-width:140px' }, label),
+        h('span', { style: 'min-width:170px' }, label),
         h('button', { class: 'btn', 'aria-label': `${label} down 1 dB`, disabled: !admin, onclick: () => set(val - 1) }, '▼'),
         shown,
         h('button', { class: 'btn', 'aria-label': `${label} up 1 dB`, disabled: !admin, onclick: () => set(val + 1) }, '▲'),
-        h('span', { class: 'dim small' }, '0 dB default, +6 dB max (after phone volume)'));
+        h('span', { class: 'dim small boost-range' }, 'Extra level, 0 to +6\u00a0dB'));
     };
     const apLv = typeof settings['airplay.levelDb'] === 'number' ? settings['airplay.levelDb'] : (rc?.airplay?.levelDb ?? 0);
     const spLv = typeof settings['spotify.levelDb'] === 'number' ? settings['spotify.levelDb'] : (rc?.spotify?.levelDb ?? 0);
     panes.network.push(h('div', { class: 'card', id: 'sec-airplay' }, h('h3', null, 'AirPlay & Spotify Connect'),
       h('p', null, h('b', null, 'AirPlay: '), '“WavWiz – Everywhere” is always on. On an iPhone, iPad or Mac, pick it in Control Center > AirPlay (or the AirPlay button in any app); it plays in every zone. ', h('span', { class: 'dim small' }, apState)),
-      levelRow('airplay.levelDb', 'AirPlay level', apLv),
+      levelRow('airplay.levelDb', 'AirPlay boost', apLv),   // 0.7.1 t2075: was "AirPlay level" (read as AirPlay out)
       admin
         ? h('label', { class: 'row', style: 'margin-top:12px' }, h('input', { type: 'checkbox', id: 'spotify-enabled', checked: settings['spotify.enabled'] === true, onchange: ev => putSettings({ 'spotify.enabled': ev.target.checked }) }), h('b', null, 'Spotify Connect'), h('span', { class: 'dim small' }, 'Requires Spotify Premium.'))
         : h('p', { style: 'margin-top:12px' }, h('b', null, 'Spotify Connect: '), settings['spotify.enabled'] === true ? 'On' : 'Off', ' ', h('span', { class: 'dim small' }, 'Requires Spotify Premium.')),
-      levelRow('spotify.levelDb', 'Spotify Connect level', spLv)));
+      levelRow('spotify.levelDb', 'Spotify Connect boost', spLv),
+      h('p', { class: 'small dim boost-hint' }, BOOST_HINT)));
     panes.network.push(airplayOutCard(admin));
     if (admin) {
       const curPw = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Current password' });

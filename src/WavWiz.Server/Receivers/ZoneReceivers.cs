@@ -88,6 +88,16 @@ public sealed class ZoneReceivers : IDisposable
         Sync(); _s.Events.Publish("receivers"); return null;
     }
 
+    /// <summary>0.7.1 t2075: Settings > Network "AirPlay boost" / "Spotify Connect boost" changed - every zone's own receiver applies it at once
+    /// (was: only "WavWiz – Everywhere"; a zone's own name kept the old level until the phone volume changed or the next session).</summary>
+    public void ApplyLevels()
+    {
+        List<AirPlayReceiver> ap; List<SpotifyReceiver> sp;
+        lock (_l) { ap = _ap.Values.ToList(); sp = _sp.Values.ToList(); }
+        foreach (var r in ap) try { r.ApplyLevelGain(); } catch { }
+        foreach (var r in sp) try { r.ApplyLevelGain(); } catch { }
+    }
+
     /// <summary>Make the running receivers match the settings and the current zones: start, stop, rename, and move each one to its zone's CURRENT playback group.</summary>
     public void Sync()
     {
