@@ -330,15 +330,15 @@ export function treeEl(S, ctl, kit, st) {
   const jbRank = !jb || !(jb.own || admin) || (jb.showInDevices === false && !jb.running) ? -1 : !jbMs.length ? 2 : jbMs.some(z => z.connected) ? 0 : 1;
   const jbBox = () => {
     const sel = cur?.kind === 'jukebox', open = () => st.onZone(JB), pickJb = () => { Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };
-    const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); } }, 'Jukebox');
+    const nameBtn = h('button', { type: 'button', class: 'dname zname ell', title: 'Jukebox - open the zone settings (pick its speakers)', onclick: ev => { ev.stopPropagation(); open(); }, 'aria-label': 'Jukebox - open the zone settings' }, 'Jukebox');
     if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
-      const jbFoldBox = { leader: { id: JB } }, jbFolded = isFolded(jbFoldBox);
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
-          h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' }),
-            ro(h('button', { type: 'button', class: 'btn sm jb42-set', 'data-act': 'jb-settings', title: 'Jukebox zone settings', 'aria-label': 'Jukebox zone settings', onclick: ev => { ev.stopPropagation(); open(); } }, 'Settings'), admin, 'Only an administrator can pick the Jukebox speakers.'),
-            foldBtn(jbFoldBox, jbFolded, 'Jukebox')),
-          jbRank === 1 ? h('div', { class: 'zsp42 ze42-gone', role: 'list', 'aria-label': 'Speakers in the Jukebox (offline)' }, ...jbMs.map(z => spRow(z, JB))) : (jbFolded ? null : h('div', { class: 'drop42 ze42-drop' }, 'Drop speakers here'))));
+          h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })
+            // 0.7.1 t2077u: no "Settings" button (it did exactly what the name does: open the Jukebox zone settings) and no chevron - all it
+            // folded was a "Drop speakers here" hint that only shows while dragging, and this row is not a drop target (speakers are picked
+            // in the Jukebox settings). With speakers the full Jukebox card below keeps its chevron for the speaker list.
+            )));
       wrap.classList.add('zpick42'); return pickRow(wrap, pickJb);   // 0.6.9 #21 / t1954u: the row picks the (empty) Jukebox zone; the name opens its settings
     }
     const now = jb.own && jb.now && jb.now.state !== 'stopped' ? jb.now : null, pick = ev => { ev?.stopPropagation?.(); Z.select(Z.JUKEBOX_KEY); const np = !phone && document.querySelector('.nowcol'); if (!(np && np.offsetParent)) ctl.go?.('now'); };

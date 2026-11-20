@@ -54,7 +54,7 @@ test('0.7.1: drag handles have no ⋮ glyph; trim / chevron / themed now-line CS
   assert.match(css, /\.tree42 \.zsp42 > \.sp42[\s\S]{0,280}border:\s*0/);
   assert.match(tree, /:scope > \.cgrip69/);
   assert.match(tree, /foldBtn\(box, folded, name\)\)\)\,/);
-  assert.match(tree, /foldBtn\(jbFoldBox, jbFolded, 'Jukebox'\)/);
+  assert.doesNotMatch(tree, /foldBtn\(jbFoldBox/);   // 0.7.1 t2077u: the empty Jukebox row folded nothing - its chevron is gone (v071jbrow.test.mjs)
   assert.match(tree, /\? ' playing'/);
 });
 
