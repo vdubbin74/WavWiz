@@ -72,6 +72,12 @@ test('t2077u: an empty Jukebox row has no Settings button and no chevron; the na
   assert.equal(Z.current()?.kind, 'jukebox', 'the rest of the row picks the Jukebox');
   assert.deepEqual(opened, []);
   assert.equal(row.dataset.card, 'jukebox', 'still a reorderable top-level card with its saved-order key');
+  // 0.7.1 t2078u: the same grey status dot as every other empty zone, before the name
+  const dot = row.querySelector('.ze42-row .dot');
+  assert.ok(dot, 'an empty Jukebox has a status dot');
+  assert.ok(dot.classList.contains('ze42-dot') && dot.classList.contains('off'), 'grey, like an empty zone');
+  assert.equal(dot.getAttribute('title'), 'No speakers');
+  assert.equal(dot.nextElementSibling ?? dot.nextSibling, name, 'dot, then the name');
   root.remove();
 });
 

@@ -335,7 +335,7 @@ export function treeEl(S, ctl, kit, st) {
     if (jbRank === 2) {   // F205: only an EMPTY Jukebox is the compact row; offline-with-speakers uses the full card below
       const wrap = h('section', { class: 'qb42 empty42 jb42' + (jbRank === 1 ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': JB, 'data-group-id': JB, 'aria-label': `Jukebox (${jbRank === 1 ? 'offline' : 'no speakers'})` },
         h('div', { class: 'zwrap42 zempty42' + (st.zone === JB ? ' picked' : ''), 'data-group-id': JB, 'data-zone': 'Jukebox' },
-          h('div', { class: 'ze42-row' }, nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })
+          h('div', { class: 'ze42-row' }, emptyDot(null), nameBtn, h('span', { class: 'small dim ze42-note' }, jbRank === 1 ? 'Offline' : 'No speakers'), h('span', { class: 'grow' })   // 0.7.1 t2078u: the same grey dot as every empty zone
             // 0.7.1 t2077u: no "Settings" button (it did exactly what the name does: open the Jukebox zone settings) and no chevron - all it
             // folded was a "Drop speakers here" hint that only shows while dragging, and this row is not a drop target (speakers are picked
             // in the Jukebox settings). With speakers the full Jukebox card below keeps its chevron for the speaker list.
