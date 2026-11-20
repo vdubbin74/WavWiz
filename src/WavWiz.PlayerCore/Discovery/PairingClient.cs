@@ -15,8 +15,16 @@ public sealed record ApprovalAnswer(string Status, PairResult? Result = null, st
 /// (anything extra that was pasted is ignored). Redirects are NEVER followed: the 0.0.1 bug was a redirect to https:// that a player without the
 /// server's certificate authority could not follow ("The SSL connection could not be established").
 /// </summary>
+/// <summary>0.7.1 t2072: what the Player does with its saved window session after a pairing.</summary>
+public enum WindowTokenAction { Save, Keep, Delete }
+
 public static class PairingClient
 {
+    /// <summary>0.7.1 t2072: a new window session is saved; a pairing on the server PC itself that returns none (before setup, or an older server)
+    /// keeps the saved one (the same server, so it is still good); pairing with another server without one drops it (it would not work there).</summary>
+    public static WindowTokenAction WindowTokenStep(string? newUiToken, bool serverIsThisPc) =>
+        !string.IsNullOrEmpty(newUiToken) ? WindowTokenAction.Save : serverIsThisPc ? WindowTokenAction.Keep : WindowTokenAction.Delete;
+
     /// <summary>"http://192.168.1.10:47800/x" -> "192.168.1.10"; "myserver" stays; garbage -> null.</summary>
     public static string? NormalizeHost(string? input, out int? port)
     {
@@ -88,7 +96,7 @@ public static class PairingClient
             using var r = await http.PostAsJsonAsync("/api/v1/auth/pair-request", new { kind = "player", playerId, name, machine }, ct);
             JsonElement root = default; try { root = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct)).RootElement; } catch { }
             if (r.IsSuccessStatusCode && Str(root, "id") is { } id) return new ApprovalRequest(id, Str(root, "secret"), Str(root, "match"), null);
-            if (r.StatusCode == HttpStatusCode.NotFound) return new ApprovalRequest(null, null, null, "This WavWiz server is older and cannot approve PCs. Type the 6-digit pairing code instead (Settings > Players > Pair a PC).");
+            if (r.StatusCode == HttpStatusCode.NotFound) return new ApprovalRequest(null, null, null, "This WavWiz server is older and cannot approve PCs. Type the 6-digit pairing code instead (Settings > Devices > Pair a phone or a PC player).");
             return new ApprovalRequest(null, null, null, Str(root, "error") ?? $"The server answered {(int)r.StatusCode}.");
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}." + DockerHint(host), true); }

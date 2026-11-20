@@ -99,7 +99,7 @@ public class PairRequest069Tests
     }
 
     [Fact]
-    public async Task A_code_from_the_admin_also_opens_the_player_window_but_pairing_on_the_server_pc_without_a_code_does_not()
+    public async Task A_code_from_the_admin_also_opens_the_player_window_and_so_does_pairing_on_the_server_pc_after_setup()
     {
         await using (var f = await ServerFixture.StartAsync(c => c.TestTreatAllClientsAsRemote = true))
         {
@@ -109,11 +109,12 @@ public class PairRequest069Tests
             Assert.Equal(Role.Control, f.Server.S.Auth.Validate(p.GetProperty("uiToken").GetString()!)!.Role);
             Assert.Equal(Role.Player, f.Server.S.Auth.Validate(p.GetProperty("token").GetString()!)!.Role);
         }
-        await using (var f = await ServerFixture.StartAsync())
+        // 0.7.1 t2072: the server PC's own Player window gets a normal Control session (was: none - the window then asked for approval nobody could give)
+        await using (var f = await ServerFixture.StartAsync(c => { c.TestHeadless = false; c.TestInContainer = false; }))
         {
             await f.SetupAdmin();
             var p = await Post(f.Http, "/api/v1/auth/pair-player", new { playerId = "pc-l", name = "Server PC" });
-            Assert.Equal(JsonValueKind.Null, p.GetProperty("uiToken").ValueKind);
+            Assert.Equal(Role.Control, f.Server.S.Auth.Validate(p.GetProperty("uiToken").GetString()!)!.Role);
         }
     }
 

@@ -42,9 +42,14 @@ public sealed class ServerConfig
     public string? RemoteCertCtAcknowledgedAt { get; set; }
     /// <summary>Tests only: behave as if every client were another PC (not serialized). Lets a loopback test exercise the 'other device' paths such as the https redirect and pairing codes.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool TestTreatAllClientsAsRemote { get; set; }
+    /// <summary>0.7.1 t2072 tests: force Headless / InContainer for this instance only (null = the real check).</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool? TestHeadless { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] public bool? TestInContainer { get; set; }
+    /// <summary>Running in a container (Docker/Podman), see NetworkHelper.InContainer.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool InContainer => TestInContainer ?? Net.NetworkHelper.InContainer();
 
     /// <summary>F166: no "this PC" browser (Linux/Docker). First-run uses the claim code / 15-min LAN window. WAVWIZ_HEADLESS=0/1 overrides; default = not Windows.</summary>
-    [System.Text.Json.Serialization.JsonIgnore] public bool Headless => Environment.GetEnvironmentVariable("WAVWIZ_HEADLESS")?.Trim() switch { "1" or "true" => true, "0" or "false" => false, _ => !OperatingSystem.IsWindows() };
+    [System.Text.Json.Serialization.JsonIgnore] public bool Headless => TestHeadless ?? Environment.GetEnvironmentVariable("WAVWIZ_HEADLESS")?.Trim() switch { "1" or "true" => true, "0" or "false" => false, _ => !OperatingSystem.IsWindows() };
 
     /// <summary>0.7.0 Linux/Pi local audio output (ALSA: headphone jack, HDMI, USB DAC). "auto" (default) = on when the server is not on Windows,
     /// libasound.so.2 loads and /dev/snd exists (Docker: --device /dev/snd); "on" / "off" force it. WAVWIZ_LOCAL_AUDIO overrides. Windows uses the WavWiz Player app.</summary>

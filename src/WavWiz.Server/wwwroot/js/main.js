@@ -65,7 +65,7 @@ import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
-import { startPairRequests, playerApprovalScreen } from './pairreq.js';   // 0.6.9 #15
+import { startPairRequests, playerApprovalScreen, serverPcSignIn } from './pairreq.js';   // 0.6.9 #15, 0.7.1 t2072
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
 document.documentElement.classList.toggle('handset', isRealPhone());   // 0.7.0 (t1892): phone-only header sizes follow the device, never a narrow PC window
@@ -143,8 +143,11 @@ function renderSetup() {
 }
 
 function renderLogin(start) {
-  // 0.6.9 #15: the WavWiz Player window never opens on the sign-in tabs - it asks the administrator for approval and waits
-  if (!start && isPlayerUa()) { const w = playerApprovalScreen({ name: deviceName(), other: m => renderLogin(m) }); app.replaceChildren(topbar(), w.el); return; }
+  // 0.7.1 t2072: on the PC that runs the server (window or browser) the administrator password comes first; approval / a code are secondary links
+  const local = !!S.auth?.thisMachine;
+  if (local && (!start || start === 'admin')) { const w = serverPcSignIn({ player: isPlayerUa(), other: m => renderLogin(m), login: async password => { await api('/auth/login', { method: 'POST', body: { password } }); location.reload(); } }); app.replaceChildren(topbar(), w.el); w.focus(); return; }
+  // 0.6.9 #15: the WavWiz Player window on another PC never opens on the sign-in tabs - it asks the administrator for approval and waits
+  if ((!start || start === 'approve') && isPlayerUa()) { const w = playerApprovalScreen({ name: deviceName(), local, other: m => renderLogin(m) }); app.replaceChildren(topbar(), w.el); return; }
   const mode = { v: start === 'admin' ? 'admin' : 'pair' };
   const root = h('div', { class: 'card auth' });
   const draw = () => {
@@ -157,7 +160,7 @@ function renderLogin(start) {
       h('div', { class: 'tabs', role: 'tablist' }, h('button', { class: mode.v === 'pair' ? 'on' : '', onclick: () => { mode.v = 'pair'; draw(); } }, 'Pair with code'), h('button', { class: mode.v === 'admin' ? 'on' : '', onclick: () => { mode.v = 'admin'; draw(); } }, 'Administrator')),
       mode.v === 'pair'
         ? h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/pair', { method: 'POST', body: { code: code.value, name: name.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
-            h('p', { class: 'dim' }, 'On the PC that runs WavWiz open Settings > Players > Pair, and type the 6-digit code here.'),
+            h('p', { class: 'dim' }, 'On a screen signed in as administrator open Settings > Devices > Pair a phone or a PC player, and type the 6-digit code here.'),
             h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), msg, h('button', { class: 'btn primary' }, 'Pair'))
         : h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/login', { method: 'POST', body: { password: pw.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
             h('div', { class: 'field' }, h('label', { for: 'pw' }, 'Administrator password'), pw), msg, h('button', { class: 'btn primary' }, 'Sign in')));

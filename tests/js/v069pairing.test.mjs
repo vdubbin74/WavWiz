@@ -37,7 +37,7 @@ test('0.6.9 #15: the Player window asks, shows the code, polls, and reloads once
 });
 
 test('0.6.9 #15: main.js shows the approval screen for the Player UA and runs the admin cards on the pairing event', () => {
-  assert.match(main, /if \(!start && isPlayerUa\(\)\) \{ const w = playerApprovalScreen\(/);
+  assert.match(main, /if \(\(!start \|\| start === 'approve'\) && isPlayerUa\(\)\) \{ const w = playerApprovalScreen\(/);   // 0.7.1 t2072: off the server PC
   assert.match(main, /m\.type === 'pairing'\) pairReqs\?\.refresh\(\)/);
   assert.match(main, /startPairRequests\(\(\) => isAdmin\(S\)\)/);
 });

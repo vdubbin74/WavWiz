@@ -38,17 +38,21 @@ export function startPairRequests(isAdmin) {
 
 const KEY = 'wavwiz.pairreq.v1';
 /** Player window side: asks for approval at once, shows the match code, polls every 2 s, reloads signed in on approval. */
-export function playerApprovalScreen({ name = 'Player window', other, store = globalThis.sessionStorage, poll = 2000, reload = () => location.reload() } = {}) {
+export function playerApprovalScreen({ name = 'Player window', other, local = false, store = globalThis.sessionStorage, poll = 2000, reload = () => location.reload() } = {}) {
   const status = h('p', { class: 'pairwait-st', role: 'status' }, 'Asking WavWiz for permission…');
   const code = h('div', { class: 'pairwait-code', 'aria-label': 'Match code' }, '····');
   const again = h('button', { class: 'btn primary', type: 'button', hidden: true, onclick: () => { again.hidden = true; ask(); } }, 'Ask again');
   const root = h('div', { class: 'card auth pairwait' },
     h('h2', null, 'Use WavWiz on this PC'),
-    h('p', null, 'This PC is asking the WavWiz administrator for permission. On any phone or PC signed in as administrator, a card appears: check that it shows this code, then press Approve.'),
+    // 0.7.1 t2072: on the server PC itself there is usually no other admin screen yet - say so, and offer the password first
+    h('p', null, local
+      ? 'This is the PC that runs the WavWiz server. The quickest way in is to sign in as administrator here. Or approve this window from another phone or PC that is already signed in as administrator: check that it shows this code, then press Approve.'
+      : 'This PC is asking the WavWiz administrator for permission. On any phone or PC signed in as administrator, a card appears: check that it shows this code, then press Approve.'),
     code, status, again,
     h('p', { class: 'dim small' }, 'Nothing is shared until the administrator approves. ',
-      h('a', { href: '#', onclick: ev => { ev.preventDefault(); stop(); other?.('pair'); } }, 'Pair with a code instead'), ' · ',
-      h('a', { href: '#', onclick: ev => { ev.preventDefault(); stop(); other?.('admin'); } }, 'Sign in as administrator')));
+      ...(local ? [adminLink(), ' · ', pairLink()] : [pairLink(), ' · ', adminLink()])));
+  function pairLink() { return h('a', { href: '#', onclick: ev => { ev.preventDefault(); stop(); other?.('pair'); } }, 'Pair with a code instead'); }
+  function adminLink() { return h('a', { href: '#', onclick: ev => { ev.preventDefault(); stop(); other?.('admin'); } }, 'Sign in as administrator'); }
   let timer = 0, live = true;
   const stop = () => { live = false; clearTimeout(timer); };
   const save = r => { try { store?.setItem(KEY, JSON.stringify(r)); } catch { /* private mode */ } };
@@ -68,4 +72,23 @@ export function playerApprovalScreen({ name = 'Player window', other, store = gl
   }
   const cur = load(); if (cur?.match) { code.textContent = cur.match; status.textContent = 'Waiting for the administrator to approve…'; tick(); } else ask();
   return { el: root, stop };
+}
+
+/** 0.7.1 t2072: the sign-in page on the PC that runs the server (auth/state thisMachine). The administrator password box comes first; asking for
+ *  approval (Player window) or pairing with a code are secondary links. login(password) signs in (and reloads); other('approve' | 'pair'). */
+export function serverPcSignIn({ login, other, player = false } = {}) {
+  const pw = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw', autofocus: true });
+  const msg = h('p', { class: 'err', role: 'alert' });
+  const link = (text, m) => h('a', { href: '#', 'data-alt': m, onclick: ev => { ev.preventDefault(); other?.(m); } }, text);
+  const form = h('form', { onsubmit: async ev => { ev.preventDefault(); msg.textContent = ''; try { await login?.(pw.value); } catch (e) { msg.textContent = e.message; } } },
+    h('div', { class: 'field' }, h('label', { for: 'pw' }, 'Administrator password'), pw), msg,
+    h('button', { class: 'btn primary', type: 'submit' }, 'Sign in'));
+  const el = h('div', { class: 'card auth serverpc-signin' },
+    h('h2', null, 'Sign in as administrator'),
+    h('p', { class: 'dim' }, 'This is the PC that runs the WavWiz server. Type the administrator password you chose when WavWiz was set up.'),
+    form,
+    h('p', { class: 'dim small serverpc-alt' }, ...(player
+      ? [link('Ask for approval from another phone or PC instead', 'approve'), ' · ', link('Pair with a code instead', 'pair')]
+      : [link('Pair with a code instead', 'pair')])));
+  return { el, focus: () => pw.focus() };
 }

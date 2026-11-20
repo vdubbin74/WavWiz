@@ -132,7 +132,7 @@ The installer is **not Authenticode-signed yet**, so Windows SmartScreen may war
 2. Verify the published SHA-256 if one is listed on the release.
 3. Run the installer:
    - On the music PC: install **WavWiz Server**, keep the **Private / home-network** address (do not bind to all interfaces), finish, open the web UI, set an administrator password, and add music folders in **File → Settings… → Library**.
-   - On each PC with speakers: install **WavWiz Player**; it discovers the server—pair with the 6-digit code from **Settings → Devices** if asked.
+   - On each PC with speakers: install **WavWiz Player**; it discovers the server—approve it on an admin screen when the approval box appears, or type the 6-digit code from **Settings → Devices → Pair a phone or a PC player**.
    - On phones and tablets: open the server's web page in the browser on your home Wi-Fi.
 4. Read [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for Private network, devices and calibration, the menus and Settings, AirPlay, and optional Spotify Connect tips.
 

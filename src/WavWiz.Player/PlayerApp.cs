@@ -88,7 +88,7 @@ internal sealed class PlayerApp : ApplicationContext
                     using var a = new ApprovalForm(_s);
                     var dr = a.ShowDialog();
                     if (dr == DialogResult.OK && a.Result != null) r = a.Result;
-                    else { problem = a.WantsCode ? "Type the 6-digit pairing code (Settings > Players > Pair a PC)." : a.Problem ?? "Not paired yet. Press Connect to ask the administrator again, or type a pairing code."; Log("approval: " + (a.Problem ?? dr.ToString())); continue; }
+                    else { problem = a.WantsCode ? "Type the 6-digit pairing code (Settings > Devices > Pair a phone or a PC player)." : a.Problem ?? "Not paired yet. Press Connect to ask the administrator again, or type a pairing code."; Log("approval: " + (a.Problem ?? dr.ToString())); continue; }
                 }
                 else
                 {
@@ -98,7 +98,8 @@ internal sealed class PlayerApp : ApplicationContext
                 if (r.Token != null)
                 {
                     _secrets.Save("token", r.Token); token = r.Token; if (r.AudioPort > 0) _s.AudioPort = r.AudioPort;
-                    if (r.UiToken != null) _secrets.Save("uitoken", r.UiToken); else _secrets.Delete("uitoken");   // 0.6.9 #15: the window's own session (WebUiForm.EnsureWindowSession)
+                    // 0.6.9 #15: the window's own session (WebUiForm.EnsureWindowSession). 0.7.1 t2072: a local re-pair that returns none keeps the saved one.
+                    switch (PairingClient.WindowTokenStep(r.UiToken, !string.IsNullOrWhiteSpace(_s.ServerHost) && PairingClient.IsThisMachine(_s.ServerHost))) { case WindowTokenAction.Save: _secrets.Save("uitoken", r.UiToken!); break; case WindowTokenAction.Delete: _secrets.Delete("uitoken"); break; }
                 }
                 else { problem = r.Error; Log("pairing failed: " + r.Error); }
             }

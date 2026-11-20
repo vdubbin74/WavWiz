@@ -26,7 +26,7 @@ If the PC’s address changes later (new router, new adapter), open **Settings �
 
 ## 3. Set the administrator password
 
-After Server install, open the WavWiz web page (shortcut or the address the wizard shows).
+After Server install, open **WavWiz Player** on the server PC (the last installer page offers it), or the WavWiz web page on that PC (shortcut or the address the wizard shows). Setting the password in the Player window keeps that window signed in.
 
 1. Choose a strong **administrator password** when prompted.
 2. You will need it for Settings that change the house (library folders, network options, Spotify Connect, and so on).
@@ -50,7 +50,8 @@ Internet radio and optional CD ripping are separate tools inside the app—they 
 
 ## 5. Pair players and phones
 
-- **Player PCs:** install Player; it usually finds the server. If asked, type the 6-digit code from **Settings → Devices → Pair a phone or a PC player** (or **Devices → Pair a player…**).
+- **The Player on the server PC** pairs by itself, with no code. Once the administrator password exists its window opens signed in as a normal (non-admin) user; **File → Sign in as admin…** asks for the password when you need admin. If the window ever shows the sign-in page, the password box comes first there.
+- **Player PCs:** install Player; it usually finds the server. Press **Connect** with no code: an approval box appears on every screen signed in as administrator—check that it shows the same 4-digit code as the Player and press **Approve**. Or type the 6-digit code from **Settings → Devices → Pair a phone or a PC player** (or **Devices → Pair a player…**).
 - **Phones and browsers:** open the server's address on the same Wi-Fi and complete pairing if prompted. Every browser that opens WavWiz joins as a speaker by itself, with a readable name such as "Chrome on Windows". Sound on iPhone often needs a first tap to unlock audio.
 - **Removing a device:** **Settings → Devices → Paired devices & tokens → Revoke** (or **Forget device…** in a device card's settings) removes it from the Devices list on every open page right away; it has to pair again to come back.
 

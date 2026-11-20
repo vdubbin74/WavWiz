@@ -45,7 +45,7 @@ public sealed class ConnectForm : Form
         t.Controls.Add(_status); t.Controls.Add(_list); t.Controls.Add(_again); t.Controls.Add(_manual); t.Controls.Add(_hostHint); t.Controls.Add(_host);
         t.Controls.Add(new Label { Text = serverIsHere ? "Pairing code (6 digits):" : "Pairing code (optional):", AutoSize = true, Margin = new Padding(3, U(12), 3, 0) }); t.Controls.Add(_code);
         // 0.6.9 #15: no code needed - Connect asks the administrator, who approves this PC on any phone or PC signed in as administrator
-        t.Controls.Add(new Label { Text = serverIsHere ? "The WavWiz server is on this PC, so no code is needed." : "Leave it empty and press Connect: the administrator approves this PC on any phone or PC signed in to WavWiz. Or type the code from Settings > Players > Pair a PC.", AutoSize = true, MaximumSize = new Size(U(420), 0), ForeColor = Color.DimGray });
+        t.Controls.Add(new Label { Text = serverIsHere ? "The WavWiz server is on this PC, so no code is needed." : "Leave it empty and press Connect: the administrator approves this PC on any phone or PC signed in to WavWiz. Or type the code from Settings > Devices > Pair a phone or a PC player.", AutoSize = true, MaximumSize = new Size(U(420), 0), ForeColor = Color.DimGray });
         t.Controls.Add(_msg);
         var ok = new Button { Text = "Connect", AutoSize = true }; var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true };
         var fl = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Width = U(420) }; fl.Controls.Add(cancel); fl.Controls.Add(ok); t.Controls.Add(fl);
@@ -315,7 +315,7 @@ public sealed class WebUiForm : Form
 
     /// <summary>
     /// 0.6.9 #15: the window's own sign-in. When the administrator approved this PC (or a pairing code was typed) the server also gave a normal
-    /// paired Control session for the window ("&lt;name&gt; (Player window)" in Settings > Players). It is stored with DPAPI next to the Player token and
+    /// paired Control session for the window ("&lt;name&gt; (Player window)" in Settings > Devices > Paired devices &amp; tokens). It is stored with DPAPI next to the Player token and
     /// put into the window's cookie jar - only when the window has no WavWiz session of its own, so an administrator who signed in here stays signed in.
     /// The Player (audio) token is never used for the page and can never be elevated.
     /// </summary>

@@ -97,13 +97,16 @@ public static class AuthApi
             if (!local)
             {
                 if (s.Auth.IsLimited(ip)) return Ext.Bad("Too many attempts. Wait a minute and try again.", 429);
-                if (!s.Auth.ConsumePairingCode((b.Str("code") ?? "").Trim())) { s.Auth.NoteFailure(ip); return Ext.Bad("That code is wrong or has expired. Create a new one in Settings > Pair a PC.", 401); }
+                if (!s.Auth.ConsumePairingCode((b.Str("code") ?? "").Trim())) { s.Auth.NoteFailure(ip); return Ext.Bad("That code is wrong or has expired. Create a new one in Settings > Devices > Pair a phone or a PC player.", 401); }
             }
             s.Db.Exec("UPDATE api_token SET revoked=1 WHERE player_id=$p", ("$p", pid));
             var tok = s.Auth.CreateToken("Player " + (b.Str("name") ?? pid), Role.Player, pid);
             // 0.6.9 #15: a code from an administrator also opens the Player WINDOW (a normal paired Control session, like a phone that typed the code),
-            // so the window never lands on the sign-in page. Pairing on the server PC itself (no code, no admin consent) gets no window session.
-            var ui = local ? null : s.Auth.CreateToken(WindowName(b.Str("name") ?? pid), Role.Control);
+            // so the window never lands on the sign-in page. 0.7.1 t2072: pairing on the server PC itself (no code) also gets one once the administrator
+            // password exists - a normal NON-admin Control session, like a paired phone (admin still needs the password). Never before setup (the window
+            // shows the setup page), never on a headless/Docker server, never from a Docker bridge address, never under TestTreatAllClientsAsRemote.
+            var ui = !local || LocalWindowSession(s.Cfg, s.Auth.SetupRequired, c.Connection.RemoteIpAddress, s.Cfg.InContainer)
+                ? s.Auth.CreateToken(WindowName(b.Str("name") ?? pid), Role.Control) : null;
             return Results.Json(new { ok = true, token = tok, uiToken = ui, audioPort = s.Audio.Port, clockPort = s.Clock.Port });
         }).Anon();
 
@@ -201,6 +204,17 @@ public static class AuthApi
             c.SetSession(s.Auth.CreateToken("Browser on server PC", Role.Admin));
             return Results.Json(new { ok = true, setupRequired = false });
         }).Anon();
+    }
+
+    /// <summary>0.7.1 t2072: may a Player that paired on the server PC itself (no code) also get a window session? Only after the admin password exists,
+    /// only on a Windows-style server with a real "this PC" (not headless, not in a container), only when the caller is not on a Docker bridge address
+    /// (172.17-31: a container NATed to the host must never count as this PC) and never under TestTreatAllClientsAsRemote. The session is Role.Control.</summary>
+    internal static bool LocalWindowSession(ServerConfig cfg, bool setupRequired, System.Net.IPAddress? remote, bool inContainer)
+    {
+        if (setupRequired || cfg.TestTreatAllClientsAsRemote || cfg.Headless || inContainer || remote == null) return false;
+        var ip = remote.IsIPv4MappedToIPv6 ? remote.MapToIPv4() : remote;
+        if (Net.NetworkHelper.IsDockerBridgeAddress(ip)) return false;
+        return AuthService.IsThisMachine(ip);
     }
 
     /// <summary>0.6.9 #15: the token name the Players list shows for a Player window session.</summary>
