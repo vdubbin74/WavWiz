@@ -302,7 +302,7 @@ export async function openSettings(S, refresh, nav, section) {
         DEF_SORTS.map(([v, t]) => h('option', { value: v, selected: p.defSort === v }, t)));
       const remember = h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: p.remember, 'aria-label': 'Remember view per tab', 'data-libpref': 'remember', onchange: ev => set({ remember: ev.target.checked }) }), h('span', { 'aria-hidden': 'true' }));
       box.replaceChildren(h('h3', null, 'Library view'),
-        h('p', { class: 'dim small' }, 'How the expanded Library opens on this device.'),
+        h('p', { class: 'dim small' }, 'How the Library looks on this device. Tile size applies to the side panel, the expanded Library and the phone Library.'),
         h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Default view'), seg([['grid', 'Tiles'], ['list', 'List']], p.defView, 'defView', 'Default view')),
         h('div', { class: 'setrow' }, h('div', { class: 'grow' }, 'Tile size'), seg(TILE_SIZES, p.tileSize, 'tileSize', 'Tile size')),
         h('div', { class: 'setrow' }, h('div', { class: 'grow' }, h('div', null, 'Default sort'), h('div', { class: 'small dim' }, 'Artist, Album, Recently added, or Year')), sort),
