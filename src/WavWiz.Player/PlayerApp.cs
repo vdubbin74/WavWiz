@@ -146,6 +146,8 @@ internal sealed class PlayerApp : ApplicationContext
             var r = await ServerFinder.FindAsync(TimeSpan.FromSeconds(6), new ServerFinder.Options(WantedId: _s.ServerId, Log: Log), _cts.Token);
             var b = r.FirstOrDefault(x => x.Id == _s.ServerId);
             if (b == null) { Log("server not found on the network (it may be switched off)"); return; }
+            // 0.7.1 t2069u: never 'move' from a working address to a Docker container address this PC cannot reach
+            if (!string.IsNullOrEmpty(_s.ServerHost) && ServerFinder.Unreachable(b.Host, ServerFinder.LocalInterfaces())) { Log($"server announced {b.Host} (inside Docker, not reachable from here); keeping {_s.ServerHost}"); return; }
             if (!string.IsNullOrEmpty(b.Host) && b.Host != _s.ServerHost)
             {
                 Log($"server moved: {_s.ServerHost} -> {b.Host}"); _s.ServerHost = b.Host; if (b.HttpPort > 0) _s.HttpPort = b.HttpPort; _s.Save();

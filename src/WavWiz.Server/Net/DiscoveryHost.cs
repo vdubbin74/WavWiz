@@ -58,7 +58,7 @@ public sealed class DiscoveryHost : IDisposable
     {
         if (!_cfg.Discovery) return;
         var bind = IPAddress.Parse(_cfg.BindAddress.Trim('[', ']'));
-        var announce = NetworkHelper.AdvertiseAddress(bind);
+        var announce = NetworkHelper.AdvertiseAddress(bind);     // a local address: sockets and the mDNS interface
         foreach (var t in BindTargets(bind, announce, OperatingSystem.IsWindows()))
         {
             try
@@ -71,7 +71,8 @@ public sealed class DiscoveryHost : IDisposable
         }
         // Wildcard bind: advertise and join mDNS on a real LAN address, never 0.0.0.0 (A records would be unusable and self-detection would fail).
         var mdns = bind.Equals(IPAddress.Any) || bind.Equals(IPAddress.IPv6Any) ? announce : bind;
-        if (!IPAddress.IsLoopback(mdns) && !mdns.Equals(IPAddress.Any) && !mdns.Equals(IPAddress.IPv6Any)) StartMdns(mdns);
+        // 0.7.1 t2069u: the A record carries the address other devices can reach (WAVWIZ_ADVERTISE_ADDRESS in Docker bridge mode), the socket stays on the local interface
+        if (!IPAddress.IsLoopback(mdns) && !mdns.Equals(IPAddress.Any) && !mdns.Equals(IPAddress.IPv6Any)) StartMdns(mdns, RecordAddress(_cfg, mdns));
     }
 
     private async Task UdpLoop(Socket s)
@@ -95,7 +96,10 @@ public sealed class DiscoveryHost : IDisposable
     // ---------------- multicast DNS ----------------
     private static readonly IPAddress MdnsGroup = IPAddress.Parse("224.0.0.251");
 
-    private void StartMdns(IPAddress bind)
+    /// <summary>0.7.1 t2069u (pure): the address put in the mDNS A record - the configured advertise address, else the interface itself.</summary>
+    public static IPAddress RecordAddress(ServerConfig cfg, IPAddress iface) => NetworkHelper.ConfiguredAdvertise(cfg) ?? iface;
+
+    private void StartMdns(IPAddress bind, IPAddress rec)
     {
         try
         {
@@ -105,8 +109,8 @@ public sealed class DiscoveryHost : IDisposable
             s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(MdnsGroup, bind));
             s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, bind.GetAddressBytes());
             s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 255); s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
-            _mdns = s; _bind = bind; _ = Task.Run(() => MdnsLoop(s, bind));
-            _ = Task.Run(async () => { for (int i = 0; i < 3 && !_cts.IsCancellationRequested; i++) { await Task.Delay(i == 0 ? 500 : 2000, _cts.Token); Announce(s, bind); } });
+            _mdns = s; _bind = rec; _ = Task.Run(() => MdnsLoop(s, rec));
+            _ = Task.Run(async () => { for (int i = 0; i < 3 && !_cts.IsCancellationRequested; i++) { await Task.Delay(i == 0 ? 500 : 2000, _cts.Token); Announce(s, rec); } });
         }
         catch (Exception e) { Problem = (Problem == null ? "" : Problem + " | ") + "Bonjour/mDNS unavailable: " + e.Message; _log?.Invoke("mDNS unavailable: " + e.Message); }
     }

@@ -51,7 +51,7 @@ public static class HomeAssistantApi
 
     public static void Map(RouteGroupBuilder g, Services s)
     {
-        g.MapGet("/ha", () => Results.Json(new { api = ApiVersion, server = s.Db.Setting("server.name")?.Trim('"') ?? Environment.MachineName, version = WavWiz.Core.WavWizInfo.Version })).Req(Role.View);
+        g.MapGet("/ha", () => Results.Json(new { api = ApiVersion, server = s.DisplayName, version = WavWiz.Core.WavWizInfo.Version })).Req(Role.View);
         g.MapGet("/ha/players", () => Results.Json(new { players = Players(s).Select(p => p.P) })).Req(Role.View);
         g.MapGet("/ha/players/{id}", (string id) => Find(s, id) is { } p ? Results.Json(p) : Ext.Bad("no such player", 404)).Req(Role.View);
 

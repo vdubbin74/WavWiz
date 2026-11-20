@@ -137,6 +137,30 @@ Not yet verified on real hardware.
 
 **Bridge** works, but automatic discovery and mDNS (AirPlay/Spotify advertising) usually will not cross the Docker bridge. Add the server by address/QR in the Player. Ports:
 
+**Bridge mode: set the advertise address (0.7.1).** In bridge mode the container only knows its own Docker address (172.17.x–172.31.x),
+which no other device can reach, so Players that found the server were told to connect there and failed. Set
+`WAVWIZ_ADVERTISE_ADDRESS` to **this host's home-network address** (the one you open the web page on, e.g. `192.168.1.20`); the discovery
+answer and the Bonjour/mDNS record then carry that address. It must be an IPv4 address (a name is ignored, and the log says so). When the
+server sees it is in a bridge-mode container without it, the log says so at start:
+`Docker bridge network detected: this container's address (172.18.0.3) cannot be reached from other devices …`.
+Players (0.7.1) also skip a Docker-internal address when the answer came from a reachable one (the host, through the published discovery
+port), and never "move" a working connection to one — but setting the address is the reliable fix.
+
+**Server name.** Docker names a container after its id (`3f2a9c1b7d4e`), so Players listed "WavWiz on 3f2a9c1b7d4e". A container whose
+host name is only its id now shows as **WavWiz (Docker)**. Set `WAVWIZ_SERVER_NAME` (or `hostname:` in compose) for your own name; the
+server name an admin sets in Settings always wins.
+
+```yaml
+    # bridge mode instead of network_mode: host
+    ports: ["47800:47800", "47443:47443", "47801:47801", "47802:47802/udp", "47803:47803/udp"]
+    environment:
+      WAVWIZ_DATA: /data
+      WAVWIZ_ADVERTISE_ADDRESS: "192.168.1.20"   # this host's home-network address
+      WAVWIZ_SERVER_NAME: "Living room NAS"      # optional
+```
+
+Ports:
+
 | Port | Proto | Use | Env override |
 |---|---|---|---|
 | 47800 | TCP | HTTP web UI / API | `WAVWIZ_HTTP_PORT` |
@@ -153,7 +177,7 @@ Not yet verified on real hardware.
     ports: ["47800:47800", "47443:47443", "47801:47801", "47802:47802/udp", "47803:47803/udp"]
 ```
 
-Other env: `WAVWIZ_DISCOVERY=0`, `WAVWIZ_AIRPLAY=0`, `WAVWIZ_BIND` (default `0.0.0.0` in the image), `WAVWIZ_FFMPEG`.
+Other env: `WAVWIZ_ADVERTISE_ADDRESS` (bridge mode, above), `WAVWIZ_SERVER_NAME`, `WAVWIZ_DISCOVERY=0`, `WAVWIZ_AIRPLAY=0`, `WAVWIZ_BIND` (default `0.0.0.0` in the image), `WAVWIZ_FFMPEG`.
 
 ## Side-by-side test (keep a live server untouched)
 

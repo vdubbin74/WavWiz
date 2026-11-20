@@ -11,6 +11,10 @@ services:
     environment:
       WAVWIZ_DATA: /data
       # TZ: America/Chicago        # alarms/schedules use this time zone
+      # WAVWIZ_SERVER_NAME: "Living room NAS"   # the name Players show (default: the host name; a bare container id shows as "WavWiz (Docker)")
+      # Bridge mode only (no network_mode: host): publish the ports (docs/DOCKER.md) and tell Players this host's home-network address,
+      # otherwise they are given the container's 172.x address, which they cannot reach.
+      # WAVWIZ_ADVERTISE_ADDRESS: "192.168.1.20"
     volumes:
       - ./wavwiz-data:/data            # settings, library DB, backups, HTTPS CA, claim.txt (must be writable by uid 10001)
       - /path/to/your/music:/music:ro  # your music; add /music under Settings > Library. SMB/NFS: mount on the host first.

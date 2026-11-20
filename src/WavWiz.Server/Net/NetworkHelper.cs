@@ -91,6 +91,72 @@ public static class NetworkHelper
     /// For a single address: that address, labelled by its kind. Cached 30 s (it is on every /status).</summary>
     /// <summary>IPv4 to put in mDNS A records and beacons. A specific bind is returned as-is. A wildcard bind (0.0.0.0 / ::)
     /// picks a reachable home-network address (LAN first, then Tailscale/VPN) — never 0.0.0.0 itself.</summary>
+    // ---------------- 0.7.1 t2069u: Docker (bridge mode) ----------------
+    /// <summary>Tests: pretend to be (or not be) in a container / to have these IPv4 addresses.</summary>
+    public static Func<bool>? ContainerOverride;
+    public static Func<IEnumerable<IPAddress>>? LocalIPv4Override;
+
+    /// <summary>Running in a container: /.dockerenv (Docker), /run/.containerenv (Podman) or DOTNET_RUNNING_IN_CONTAINER=true (Microsoft base images).</summary>
+    public static bool InContainer()
+    {
+        if (ContainerOverride != null) return ContainerOverride();
+        try { return File.Exists("/.dockerenv") || File.Exists("/run/.containerenv") || string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    /// <summary>Docker's default bridge pools: 172.17.0.0 - 172.31.255.255 (172.16.x is left alone: home routers use it).</summary>
+    public static bool IsDockerBridgeAddress(IPAddress ip) =>
+        ip.AddressFamily == AddressFamily.InterNetwork && ip.GetAddressBytes() is var b && b[0] == 172 && b[1] >= 17 && b[1] <= 31;
+
+    /// <summary>This machine's non-loopback IPv4 addresses on interfaces that are up.</summary>
+    public static List<IPAddress> LocalIPv4()
+    {
+        if (LocalIPv4Override != null) return LocalIPv4Override().ToList();
+        var l = new List<IPAddress>();
+        try
+        {
+            foreach (var n in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (n.OperationalStatus != OperationalStatus.Up || n.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (var u in n.GetIPProperties().UnicastAddresses)
+                    if (u.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address)) l.Add(u.Address);
+            }
+        }
+        catch { }
+        return l;
+    }
+
+    /// <summary>Docker bridge mode: in a container and every address it has is a Docker bridge address (so nothing it could advertise is reachable).</summary>
+    public static bool BridgeMode() => InContainer() && LocalIPv4() is { Count: > 0 } a && a.All(IsDockerBridgeAddress);
+
+    /// <summary>The configured advertise address (server.json "advertiseAddress" / WAVWIZ_ADVERTISE_ADDRESS) when it is a usable IPv4 address, else null.</summary>
+    public static IPAddress? ConfiguredAdvertise(ServerConfig cfg) =>
+        IPAddress.TryParse(cfg.AdvertiseAddress?.Trim() ?? "", out var ip) && ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip) && !ip.Equals(IPAddress.Any) && !ip.Equals(IPAddress.Broadcast) ? ip : null;
+
+    /// <summary>The address Players are told to use: the configured advertise address first, else the listening / LAN address.</summary>
+    public static IPAddress ResolveAdvertise(ServerConfig cfg, IPAddress bind) => ConfiguredAdvertise(cfg) ?? AdvertiseAddress(bind);
+
+    /// <summary>The start-up log line for Docker networking problems, or null when there is nothing to say.</summary>
+    public static string? DockerHint(ServerConfig cfg)
+    {
+        if (!string.IsNullOrWhiteSpace(cfg.AdvertiseAddress) && ConfiguredAdvertise(cfg) == null)
+            return $"WAVWIZ_ADVERTISE_ADDRESS \"{cfg.AdvertiseAddress}\" is not an IPv4 address (like 192.168.1.20), so it is ignored.";
+        if (ConfiguredAdvertise(cfg) is { } a) return BridgeMode() ? $"Docker bridge network: telling Players to use {a} (WAVWIZ_ADVERTISE_ADDRESS)." : null;
+        if (!BridgeMode()) return null;
+        var mine = string.Join(", ", LocalIPv4());
+        return $"Docker bridge network detected: this container's address ({mine}) cannot be reached from other devices, so WavWiz Players and phones will not find this server by themselves. "
+             + "Set WAVWIZ_ADVERTISE_ADDRESS to this host's home-network address (for example 192.168.1.20) and publish the ports (docs/DOCKER.md), or use network_mode: host.";
+    }
+
+    /// <summary>The server name before an admin sets one: WAVWIZ_SERVER_NAME / server.json "serverName", else the computer name -
+    /// except a container whose computer name is only its id (Docker's default hostname, e.g. 3f2a9c1b7d4e), which shows as "WavWiz (Docker)".</summary>
+    public static string DefaultServerName(ServerConfig cfg, string machineName, bool inContainer)
+    {
+        if (!string.IsNullOrWhiteSpace(cfg.ServerName)) return cfg.ServerName.Trim();
+        if (inContainer && System.Text.RegularExpressions.Regex.IsMatch(machineName ?? "", "^[0-9a-f]{12}([0-9a-f]{52})?$")) return "WavWiz (Docker)";
+        return string.IsNullOrWhiteSpace(machineName) ? "WavWiz" : machineName;
+    }
+
     public static IPAddress AdvertiseAddress(IPAddress bind)
     {
         if (!bind.Equals(IPAddress.Any) && !bind.Equals(IPAddress.IPv6Any)) return bind;

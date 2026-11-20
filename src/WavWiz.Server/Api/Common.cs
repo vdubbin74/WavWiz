@@ -45,10 +45,13 @@ public sealed class Services
         string host = "";
         if (System.Net.IPAddress.TryParse(raw, out var ip) && !System.Net.IPAddress.IsLoopback(ip))
             host = (ip.Equals(System.Net.IPAddress.Any) || ip.Equals(System.Net.IPAddress.IPv6Any) ? Net.NetworkHelper.AdvertiseAddress(ip) : ip).ToString();
+        if (host.Length > 0 && Net.NetworkHelper.ConfiguredAdvertise(Cfg) is { } adv) host = adv.ToString();     // 0.7.1 t2069u: Docker bridge (a loopback-only server advertises nothing)
         if (host is "0.0.0.0" or "::" or "::1" or "127.0.0.1") host = "";
-        return new(ServerId, ServerName ?? Environment.MachineName, host, Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
+        return new(ServerId, DisplayName, host, Cfg.HttpPort, Cfg.HttpsPort, Audio.Port, WavWiz.Core.WavWizInfo.Version);
     }
     public string? ServerName => Db.Setting("server.name") is string s ? JsonSerializer.Deserialize<string>(s) : null;
+    /// <summary>0.7.1 t2069u: the admin's server name, else WAVWIZ_SERVER_NAME, else the computer name ("WavWiz (Docker)" for a bare container id).</summary>
+    public string DisplayName => ServerName is { Length: > 0 } n ? n : Net.NetworkHelper.DefaultServerName(Cfg, Environment.MachineName, Net.NetworkHelper.InContainer());
 }
 
 public static class Ext

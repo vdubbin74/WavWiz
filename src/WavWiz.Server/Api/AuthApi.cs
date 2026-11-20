@@ -22,7 +22,7 @@ public static class AuthApi
                 claim = s.Auth.SetupRequired && s.Claim is { Enabled: true } cl ? new { windowSecondsLeft = cl.WindowSecondsLeft, codeRequired = !cl.WindowOpen, file = cl.FilePath } : null,
                 authenticated = w != null && w.Role != Role.Player, role = w?.Role.ToString().ToLowerInvariant(), name = w?.Name,
                 elevated = w?.Elevated ?? false, baseRole = w == null ? null : (w.Elevated ? w.BaseRole : w.Role).ToString().ToLowerInvariant(),
-                https = c.Request.IsHttps, tlsEnabled = s.Ca.Enabled, serverName = s.ServerName ?? Environment.MachineName, serverId = s.ServerId,
+                https = c.Request.IsHttps, tlsEnabled = s.Ca.Enabled, serverName = s.DisplayName, serverId = s.ServerId,
             });
         }).Anon();
 

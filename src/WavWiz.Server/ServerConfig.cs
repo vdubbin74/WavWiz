@@ -51,6 +51,13 @@ public sealed class ServerConfig
     public string LocalAudio { get; set; } = "auto";
     /// <summary>0.7.0: extra ALSA PCM names offered as outputs (from ~/.asoundrc or /etc/asound.conf, e.g. a softvol or loopback PCM). WAVWIZ_ALSA_DEVICES (comma separated) overrides.</summary>
     public string[]? AlsaDevices { get; set; }
+    /// <summary>0.7.1 t2069u: the IPv4 address Players and phones should use to reach this server (the discovery answer, Bonjour/mDNS A record and
+    /// the Player's 'found at' address). Needed in Docker bridge mode, where the server only sees its container address (172.17-31.x) that the
+    /// rest of the home network cannot reach: set it to the host's LAN address. Empty = automatic (the listening address). WAVWIZ_ADVERTISE_ADDRESS overrides.</summary>
+    public string? AdvertiseAddress { get; set; }
+    /// <summary>0.7.1 t2069u: the name Players show for this server before an admin names it (Settings > server name wins). Empty = the computer
+    /// name, or "WavWiz (Docker)" when the computer name is only a container id. WAVWIZ_SERVER_NAME overrides.</summary>
+    public string? ServerName { get; set; }
     /// <summary>Tests only: read the sound-card list from this folder instead of /proc/asound.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public string? TestProcAsound { get; set; }
 
@@ -81,6 +88,8 @@ public sealed class ServerConfig
         if (Environment.GetEnvironmentVariable("WAVWIZ_BIND") is { Length: > 0 } b) cfg.BindAddress = b;
         if (Environment.GetEnvironmentVariable("WAVWIZ_FFMPEG") is { Length: > 0 } f) cfg.FfmpegPath = f;
         if (Environment.GetEnvironmentVariable("WAVWIZ_LOCAL_AUDIO") is { Length: > 0 } la) cfg.LocalAudio = la.Trim();     // 0.7.0 auto|on|off
+        if (Environment.GetEnvironmentVariable("WAVWIZ_ADVERTISE_ADDRESS") is { Length: > 0 } adv) cfg.AdvertiseAddress = adv.Trim();     // 0.7.1 t2069u Docker bridge
+        if (Environment.GetEnvironmentVariable("WAVWIZ_SERVER_NAME") is { Length: > 0 } sn) cfg.ServerName = sn.Trim();
         if (Environment.GetEnvironmentVariable("WAVWIZ_ALSA_DEVICES") is { Length: > 0 } ad) cfg.AlsaDevices = ad.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         // F166: Linux/Docker overrides (side-by-side tests, bridge mode). Unset = server.json / defaults, so Windows is unchanged.
         static int? Int(string n) => int.TryParse(Environment.GetEnvironmentVariable(n), out var v) && v is >= 0 and <= 65535 ? v : null;

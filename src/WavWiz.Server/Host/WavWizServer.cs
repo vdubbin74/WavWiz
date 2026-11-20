@@ -82,6 +82,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.ZoneRecv.ActiveZones = () => Receivers.ZoneReceivers.ActiveZoneIds(s.Zones.Zones()); s.ZoneRecv.AnyActive = () => Receivers.ZoneReceivers.AnyActiveSpeaker(s.Zones.Zones());   // AirPlay names show only with a live speaker
         s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!).Concat(s.ZoneRecv.MdnsGroups(host, ip).Select(g => g.ToList()));
         s.Discovery.Start();
+        if (Net.NetworkHelper.DockerHint(cfg) is { } dockerHint) u._log.Write(dockerHint);     // 0.7.1 t2069u: Docker bridge mode without WAVWIZ_ADVERTISE_ADDRESS (or a bad one)
         if (!System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(cfg.BindAddress.Trim('[', ']'))) || cfg.TestTreatAllClientsAsRemote) { s.Spotify.Apply(); s.ZoneRecv.Sync(); }   // Sync starts house AirPlay too, once a speaker is live
         _ = Task.Run(async () => { for (int i = 0; i < 20 && !(s.AirPlay?.Ready ?? true); i++) await Task.Delay(500); if (s.AirPlay?.Ready == true) s.Discovery?.AnnounceSoon(); });
 

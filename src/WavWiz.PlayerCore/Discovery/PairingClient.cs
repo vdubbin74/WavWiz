@@ -60,8 +60,20 @@ public static class PairingClient
             if (r.StatusCode == HttpStatusCode.TooManyRequests) return new PairResult(null, err ?? "Too many attempts. Wait a minute and try again.");
             return new PairResult(null, err ?? $"The server answered {(int)r.StatusCode}.");
         }
-        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new PairResult(null, $"Could not reach the WavWiz server at {host}. Is it switched on, and is this PC on the same home network?", Retryable: true); }
-        catch (HttpRequestException e) { return new PairResult(null, $"Could not reach the WavWiz server at {host}: {Plain(e)}", Retryable: true); }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new PairResult(null, $"Could not reach the WavWiz server at {host}. Is it switched on, and is this PC on the same home network?" + DockerHint(host), Retryable: true); }
+        catch (HttpRequestException e) { return new PairResult(null, $"Could not reach the WavWiz server at {host}: {Plain(e)}" + DockerHint(host), Retryable: true); }
+    }
+
+    /// <summary>0.7.1 t2069u (pure): a Docker container address this PC cannot reach gets a plain hint ("" otherwise).</summary>
+    public static string DockerHint(string host, IReadOnlyList<(IPAddress Ip, IPAddress Mask)>? ifs = null) =>
+        ServerFinder.Unreachable(host, ifs ?? ServerFinder.LocalInterfaces())
+            ? $" {host} is an address inside Docker that other computers cannot reach. Type the address of the computer that runs Docker instead (and on the server set WAVWIZ_ADVERTISE_ADDRESS to it, see docs/DOCKER.md)."
+            : "";
+    /// <summary>0.7.1 t2069u (pure): addresses to try, most likely to work first - Docker container addresses this PC cannot reach go last (never dropped).</summary>
+    public static List<string> OrderCandidates(IEnumerable<string> hosts, IReadOnlyList<(IPAddress Ip, IPAddress Mask)>? ifs = null)
+    {
+        var l = ifs ?? ServerFinder.LocalInterfaces();
+        return hosts.Where(h => !string.IsNullOrWhiteSpace(h)).Distinct(StringComparer.OrdinalIgnoreCase).Select((h, i) => (h, i)).OrderBy(x => ServerFinder.Unreachable(x.h, l) ? 1 : 0).ThenBy(x => x.i).Select(x => x.h).ToList();
     }
 
     private static string? Str(JsonElement r, string n) => r.ValueKind == JsonValueKind.Object && r.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
@@ -79,8 +91,8 @@ public static class PairingClient
             if (r.StatusCode == HttpStatusCode.NotFound) return new ApprovalRequest(null, null, null, "This WavWiz server is older and cannot approve PCs. Type the 6-digit pairing code instead (Settings > Players > Pair a PC).");
             return new ApprovalRequest(null, null, null, Str(root, "error") ?? $"The server answered {(int)r.StatusCode}.");
         }
-        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}.", true); }
-        catch (HttpRequestException e) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}: {Plain(e)}", true); }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}." + DockerHint(host), true); }
+        catch (HttpRequestException e) { return new ApprovalRequest(null, null, null, $"Could not reach the WavWiz server at {host}: {Plain(e)}" + DockerHint(host), true); }
     }
 
     /// <summary>0.6.9 #15: how is the request doing? Approved = the Player token + the window session (handed out once).</summary>

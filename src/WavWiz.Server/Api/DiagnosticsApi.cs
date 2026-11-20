@@ -185,7 +185,7 @@ public static class DiagnosticsApi
         };
     }
 
-    internal static string ServerLabel(Services s) => s.ServerName is { Length: > 0 } n ? n : Environment.MachineName;
+    internal static string ServerLabel(Services s) => s.DisplayName;
     /// <summary>0.6.8-#7: the address a self-check connects to: the bind address, or for a wildcard bind the PC's first private LAN IPv4 (loopback if none).</summary>
     internal static IPAddress ProbeAddress(IPAddress bind)
     {
