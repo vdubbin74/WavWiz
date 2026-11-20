@@ -5,6 +5,7 @@ import { viewForMode } from './viewmode.js';
 import './marquee.js';   // 0.4.8 F62: shared now-playing marquee (main app + phone)
 import { libCountLabel } from './libcount.js';   // 0.4.4 F7
 import './sliderstyle.js';   // 0.3.3 G11
+import './edgelight.js';    // 0.7.1 t2055u: Zone edge light (html[data-edgelight])
 import './pwa.js';
 import { installOrientationGuard } from './orientlock.js';   // F262-fix: phone is portrait-only
 installOrientationGuard();

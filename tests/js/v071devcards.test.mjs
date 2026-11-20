@@ -36,7 +36,7 @@ test('0.7.1: drag handles have no ⋮ glyph; trim / chevron / themed now-line CS
   const css = rd('app.css');
   assert.match(css, /0\.7\.1: Devices cards/);
   // Light-pipe is the default trim (no data-card-trim / variant classes).
-  assert.match(css, /ww-pipe/);
+  assert.match(css, /ww-lp-one/);   // 0.7.1 t2055u: the light styles (Zone edge light) replaced the single ww-pipe travel
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /\.qb42\.playing > \.cgrip69::after/);
   assert.doesNotMatch(css, /data-card-trim/);

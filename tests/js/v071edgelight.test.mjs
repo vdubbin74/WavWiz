@@ -1,0 +1,46 @@
+// 0.7.1 t2052u / t2055u: Settings > Appearance > Zone edge light. Six styles, default Waveform, per device (localStorage), applied live as
+// html[data-edgelight]; reduced motion = a static lit edge; transform / opacity animations only; a short card gets no smear.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const dir = process.env.JS_DIR || new URL('../../src/WavWiz.Server/wwwroot/js', import.meta.url).pathname;
+const css = readFileSync(join(dir, '../app.css'), 'utf8'), rd = f => readFileSync(join(dir, f), 'utf8');
+const mem = () => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+
+test('styles, default and persistence', async () => {
+  const e = await import(pathToFileURL(join(dir, 'edgelight.js')).href);
+  assert.deepEqual(e.EDGE_STYLES.map(([id, nm]) => nm), ['Waveform', 'Light pipe', 'Clean comet', 'Pulse', 'Dual streak', 'Off']);
+  const st = mem(); assert.equal(e.loadEdge(st), 'wave', 'default Waveform');
+  for (const id of ['pipe', 'comet', 'pulse', 'dual', 'off', 'wave']) { assert.equal(e.applyEdge(id, st), id); assert.equal(e.loadEdge(st), id); }
+  assert.equal(e.applyEdge('bogus', st), 'wave'); st.setItem(e.EDGE_KEY, 'nope'); assert.equal(e.loadEdge(st), 'wave');
+});
+test('Appearance row: Zone edge light radios apply live; reset + reapply include it; main.js loads it at boot', () => {
+  const ap = rd('appearance.js');
+  assert.match(ap, /'Zone edge light'/); assert.match(ap, /role: 'radiogroup', 'aria-label': 'Zone edge light'/);
+  assert.match(ap, /'data-edge': id, title: tip, onclick: \(\) => \{ applyEdge\(id\); draw\(\); \}/);
+  assert.match(rd('settingsui.js'), /THEME_RESET_KEYS = \[[^\]]*'wavwiz\.edgelight'\]/);
+  assert.match(rd('settings.js'), /el\.applyEdge\?\.\(el\.loadEdge\(\)\)/);
+  assert.match(rd('main.js'), /import '\.\/edgelight\.js';/);
+  assert.match(rd('edgelight.js'), /document\.documentElement\.dataset\.edgelight = s;/);
+});
+test('CSS: one rule per style on the playing trim; Waveform is the default and uses a fixed px wavelength; no smear on short cards', () => {
+  const sel = id => new RegExp(`html\\[data-edgelight="${id}"\\]\\)?[^{]*\\.qb42\\.playing > \\.cgrip69::after \\{`);
+  for (const id of ['pipe', 'comet', 'pulse', 'dual', 'wave', 'off']) assert.match(css, sel(id), id);
+  assert.match(css, /:is\(html\[data-edgelight="wave"\], html:not\(\[data-edgelight\]\)\)/, 'Waveform without the attribute too');
+  assert.match(css, /mask-image: repeating-linear-gradient\(180deg,[^;]*transparent 44px\)/, 'fixed 44px wavelength (same on collapsed and expanded)');
+  assert.match(css, /@keyframes ww-lp-wave \{ 0% \{ transform: translateY\(0\); \} 100% \{ transform: translateY\(44px\); \} \}/, 'moves exactly one wavelength: seamless, same speed on any card');
+  assert.match(css, /--lp-t: clamp\(8px, 22%, 64px\)/, 'Light pipe head scales with the card (was 28% with a 28px floor = a smear on a 42px card)');
+  assert.doesNotMatch(css, /@keyframes ww-pipe/, 'the old top-animating travel is gone');
+  const kf = [...css.matchAll(/@keyframes ww-lp-[a-z]+ \{([^\n]*)\}/g)].map(m => m[1]).join(' ');
+  assert.doesNotMatch(kf, /\b(top|height|left|box-shadow|filter|background)\s*:/, 'transform / opacity only');
+  assert.match(css, /html\[data-edgelight="off"\] \.tree42 \.qb42\.playing > \.cgrip69::after \{ opacity: 0; animation: none; \}/);
+});
+test('reduced motion: static lit edge for every style; the trim stays the drag grip', () => {
+  const i = css.indexOf('@media (prefers-reduced-motion: reduce) {\n  html .tree42 .qb42.playing > .cgrip69'); assert.ok(i > 0);
+  const b = css.slice(i, css.indexOf('\n}\n', i));
+  assert.match(b, /animation: none !important/); assert.match(b, /::after, html \.tree42 \.qb42\.playing > \.cgrip69::before \{ opacity: 0 !important; \}/); assert.match(b, /> \.cgrip69 \{ opacity: 1 !important; \}/);
+  assert.match(css, /\.qb42\.playing > \.cgrip69::after \{\n  top: 0;[^}]*pointer-events: none;/, 'the light never takes the pointer');
+  assert.match(rd('tree42.js'), /closest\('\.zgut42,\.cgrip69'\)/, 'drag still starts on the trim');
+});

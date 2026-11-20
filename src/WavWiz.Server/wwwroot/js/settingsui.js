@@ -7,7 +7,7 @@ import { jbPreview } from './jukebox-preview.js';
 import { speakerPicker, applyJukeboxSpeakers, initialPick } from './jbspeakers.js';   // 0.4.9 F76
 import { jbAutosave } from './jbcfg.js';   // 0.7.1 t2040u
 
-export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub', 'wavwiz.layout'];
+export const THEME_RESET_KEYS = ['wavwiz.theme.v1', 'wavwiz.viz.v1', 'wavwiz.npstyle.v1', 'wavwiz.eqstyle.v1', 'wavwiz.uiscale', 'wavwiz.appsub', 'wavwiz.layout', 'wavwiz.edgelight'];
 export const BACKUP_KEEP_NOTE = "Passwords and this server's certificates stay here (they are never in a backup). Pairings are not in the backup: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.";
 export function backupRestoreNotes(pv) {
   const notes = [h('p', { class: 'small dim' }, (pv && pv.pairingNote) || BACKUP_KEEP_NOTE)];

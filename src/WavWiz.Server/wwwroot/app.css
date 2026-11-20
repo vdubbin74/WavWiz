@@ -5910,13 +5910,73 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
   opacity: 0;
   pointer-events: none;
 }
+/* 0.7.1 t2052u / t2055u: Settings > Appearance > Zone edge light (edgelight.js sets html[data-edgelight]; default Waveform).
+   The old head was 28% of the card with a 28px floor, a white-hot gradient and a glow, so on a collapsed card (~42px) it filled most
+   of the edge and read as a smear; it also animated `top` (layout every frame). Every style now moves ONE full-height layer with
+   transform only; the bright parts are a static mask on that layer with a crisp 2px head. Waveform uses a fixed 44px wavelength and
+   a fixed speed, so a collapsed card shows fewer comets at the same size, speed and brightness as an expanded one. Off and
+   prefers-reduced-motion: a static lit edge. The trim stays the drag grip (pointer-events on the trim, none on the light). */
 .tree42 .qb42.playing > .cgrip69::after {
-  opacity: 1;
-  animation: ww-pipe 1.8s linear infinite;
+  top: 0; bottom: 0; left: 0; right: 0; height: auto; min-height: 0; box-shadow: none; opacity: 0;
+  background: linear-gradient(90deg, transparent 18%, color-mix(in srgb, #fff 85%, var(--accent2)) 50%, transparent 82%), var(--accent2);
+  will-change: transform; pointer-events: none;
 }
-@keyframes ww-pipe {
-  0%   { top: -30%; }
-  100% { top: 100%; }
+/* Light pipe (the 0.7.1 look, cleaned up): one comet, head scaled to the card (8-64px), no smear */
+html[data-edgelight="pipe"] .tree42 .qb42.playing > .cgrip69::after {
+  --lp-t: clamp(8px, 22%, 64px); opacity: .95;
+  -webkit-mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.45) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), transparent calc(50% + 3px));
+          mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.45) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), transparent calc(50% + 3px));
+  animation: ww-lp-one 1.8s linear infinite;
+}
+/* Clean comet: crisp core, short tail, faster with a slight ease-in */
+html[data-edgelight="comet"] .tree42 .qb42.playing > .cgrip69 { box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); }
+html[data-edgelight="comet"] .tree42 .qb42.playing > .cgrip69::after {
+  --lp-t: min(34%, 72px); opacity: 1;
+  -webkit-mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.35) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 2px));
+          mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.35) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 2px));
+  animation: ww-lp-one 1.15s cubic-bezier(.45, 0, .75, 1) infinite;
+}
+/* Pulse: the trim kicks bright on a beat (sharp attack, slow release; 120 bpm, --lp-beat) and a comet runs once per two beats */
+html[data-edgelight="pulse"] .tree42 .qb42.playing > .cgrip69 { box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 75%, transparent); animation: ww-lp-beat var(--lp-beat, .5s) cubic-bezier(.1, .8, .3, 1) infinite; }
+html[data-edgelight="pulse"] .tree42 .qb42.playing > .cgrip69::after {
+  --lp-t: min(38%, 84px); opacity: 1;
+  background: linear-gradient(90deg, transparent 15%, #fff 50%, transparent 85%), color-mix(in srgb, var(--accent2) 80%, #fff);
+  -webkit-mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.4) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 2px));
+          mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), rgba(0,0,0,.4) calc(50% - var(--lp-t) / 2), #000 calc(50% - 1px), #000 50%, transparent calc(50% + 2px));
+  animation: ww-lp-one calc(var(--lp-beat, .5s) * 2) cubic-bezier(.2, .6, .4, 1) infinite;
+}
+/* Dual streak: two staggered streaks and a faint shimmer running up the edge; a wider glow */
+html[data-edgelight="dual"] .tree42 .qb42.playing > .cgrip69 { box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 3px var(--accent); }
+html[data-edgelight="dual"] .tree42 .qb42.playing > .cgrip69::after {
+  --lp-t: min(24%, 56px); opacity: 1;
+  -webkit-mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), #000 calc(50% - 1px), transparent calc(50% + 2px), transparent calc(84% - var(--lp-t)), rgba(0,0,0,.55) calc(84% - 1px), transparent calc(84% + 2px));
+          mask-image: linear-gradient(180deg, transparent calc(50% - var(--lp-t)), #000 calc(50% - 1px), transparent calc(50% + 2px), transparent calc(84% - var(--lp-t)), rgba(0,0,0,.55) calc(84% - 1px), transparent calc(84% + 2px));
+  animation: ww-lp-dual 1.5s linear infinite;
+}
+html[data-edgelight="dual"] .tree42 .qb42.playing > .cgrip69::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(100% + 44px); pointer-events: none; will-change: transform;
+  background: repeating-linear-gradient(180deg, transparent 0 10px, color-mix(in srgb, #fff 45%, var(--accent)) 10px 12px, transparent 12px 22px);
+  opacity: .28; animation: ww-lp-shim 2.4s linear infinite;
+}
+/* Waveform (default): a steady train of comets, fixed 44px wavelength, ~105px/s on every card */
+:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69 { box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after {
+  --lp-w: 44px; top: calc(var(--lp-w) * -1); opacity: 1;
+  -webkit-mask-image: repeating-linear-gradient(180deg, transparent 0, transparent 8px, rgba(0,0,0,.18) 16px, rgba(0,0,0,.55) 30px, #000 37px, #000 39px, transparent 41px, transparent 44px);
+          mask-image: repeating-linear-gradient(180deg, transparent 0, transparent 8px, rgba(0,0,0,.18) 16px, rgba(0,0,0,.55) 30px, #000 37px, #000 39px, transparent 41px, transparent 44px);
+  animation: ww-lp-wave .42s linear infinite;
+}
+/* Off: a static lit edge, no travel */
+html[data-edgelight="off"] .tree42 .qb42.playing > .cgrip69::after { opacity: 0; animation: none; }
+@keyframes ww-lp-one { 0% { transform: translateY(-52%); } 100% { transform: translateY(calc(50% + var(--lp-t))); } }
+@keyframes ww-lp-dual { 0% { transform: translateY(-84%); } 100% { transform: translateY(calc(50% + var(--lp-t))); } }
+@keyframes ww-lp-wave { 0% { transform: translateY(0); } 100% { transform: translateY(44px); } }
+@keyframes ww-lp-shim { 0% { transform: translateY(-44px); } 100% { transform: translateY(0); } }
+@keyframes ww-lp-beat { 0% { opacity: 1; } 100% { opacity: .7; } }
+@media (prefers-reduced-motion: reduce) {
+  html .tree42 .qb42.playing > .cgrip69, html .tree42 .qb42.playing > .cgrip69::after, html .tree42 .qb42.playing > .cgrip69::before { animation: none !important; }
+  html .tree42 .qb42.playing > .cgrip69::after, html .tree42 .qb42.playing > .cgrip69::before { opacity: 0 !important; }
+  html .tree42 .qb42.playing > .cgrip69 { opacity: 1 !important; }
 }
 
 /* Room for a 6px trim instead of the old 22–42px handle column */
@@ -6182,3 +6242,17 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
   html.handset .np-phone-full .np-phone-xsound{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
   html.handset .np-phone-full .np-phone-xsound .ic svg{width:18px;height:18px}
 }
+/* 0.7.1 t2055u: Settings > Appearance > Zone edge light - six choices wrap; each has a tiny static picture of the trim */
+.setrow.edgelight{flex-wrap:wrap}
+.setrow.edgelight .edgeseg{display:flex;flex-wrap:wrap;gap:4px}
+.edsw{display:inline-block;width:5px;height:16px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--accent)}
+.edsw.wave{background:repeating-linear-gradient(180deg,var(--accent) 0 3px,var(--accent2) 3px 5px,#fff 5px 6px,var(--accent) 6px 8px)}
+.edsw.pipe{background:linear-gradient(180deg,var(--accent) 35%,var(--accent2) 55%,#fff 62%,var(--accent) 66%)}
+.edsw.comet{background:linear-gradient(180deg,var(--accent) 45%,var(--accent2) 70%,#fff 76%,var(--accent) 79%)}
+.edsw.pulse{background:linear-gradient(180deg,color-mix(in srgb,#fff 35%,var(--accent)),var(--accent2) 70%,#fff 76%,var(--accent) 80%);box-shadow:0 0 5px var(--accent)}
+.edsw.dual{background:linear-gradient(180deg,var(--accent) 15%,var(--accent2) 30%,#fff 34%,var(--accent) 38%,var(--accent) 60%,var(--accent2) 75%,#fff 79%,var(--accent) 83%)}
+.edsw.off{background:var(--accent)}
+.setrow.edgelight .edgeseg{border:0;overflow:visible;max-width:100%}
+.setrow.edgelight .edgeseg>button{border:1px solid var(--line)!important;border-radius:4px;display:inline-flex;align-items:center}
+.setrow.edgelight>.grow{flex:1 1 240px;min-width:200px}
+.setrow.edgelight .edgeseg{flex:0 1 auto}

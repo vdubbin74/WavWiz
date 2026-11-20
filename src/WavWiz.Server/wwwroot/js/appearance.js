@@ -5,6 +5,7 @@ import { h, api, toast, debounce } from './util.js';
 import { SCALES, loadScale, applyScale, scaleFactor } from './uiscale.js';
 import { LAYOUTS, loadLayout, saveLayout } from './panels.js';
 import { SLIDER_STYLES, loadSlider, applySlider } from './sliderstyle.js';
+import { EDGE_STYLES, loadEdge, applyEdge } from './edgelight.js';   // 0.7.1 t2055u
 import { NP_SEEKS, NP_BUTTONS, NP_ARTS, NP_EFFECTS, NP_COLORS, loadNpPrefs, saveNpPrefs } from './npstyle.js';
 import { npSeekMini, npBtnMini, npArtMini } from './npmini.js';
 import { Viz, vizPrefs, saveVizPrefs, ENGINES, spectrumTap, isRealPhone as isPhone } from './viz.js';   // 0.6.8-#5: phone-only Appearance rules follow the device, not the window width
@@ -203,7 +204,11 @@ function displaySizeCard() {
       // 0.3.3 G11: volume slider style (this phone or PC only)
       h('div', { class: 'setrow sliderstyle', id: 'sec-sliderstyle' }, h('div', { class: 'grow' }, h('div', null, 'Slider style'), h('div', { class: 'small dim' }, 'Every slider in WavWiz: volume, seek bars, EQ faders and settings. Gradient blends your theme’s main and second colors. Flat uses the main color. Default: Gradient.')),
         h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Slider style' }, SLIDER_STYLES.map(([id, nm]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadSlider() === id), class: loadSlider() === id ? 'on' : '', 'data-slider': id, onclick: () => { applySlider(id); draw(); } },
-          h('span', { class: 'slsw ' + id, 'aria-hidden': 'true' }), nm)))));
+          h('span', { class: 'slsw ' + id, 'aria-hidden': 'true' }), nm)))),
+      // 0.7.1 t2055u: how a playing zone's left edge lights up in Devices (this phone or PC only)
+      h('div', { class: 'setrow edgelight', id: 'sec-edgelight' }, h('div', { class: 'grow' }, h('div', null, 'Zone edge light'), h('div', { class: 'small dim' }, 'How the left edge of a playing zone lights up in Devices. Off keeps a lit edge with no motion. Default: Waveform.')),
+        h('div', { class: 'seg wrap edgeseg', role: 'radiogroup', 'aria-label': 'Zone edge light' }, EDGE_STYLES.map(([id, nm, tip]) => h('button', { type: 'button', role: 'radio', 'aria-checked': String(loadEdge() === id), class: loadEdge() === id ? 'on' : '', 'data-edge': id, title: tip, onclick: () => { applyEdge(id); draw(); } },
+          h('span', { class: 'edsw ' + id, 'aria-hidden': 'true' }), nm)))));
   }
   draw();
   return { el: box, reload: draw };

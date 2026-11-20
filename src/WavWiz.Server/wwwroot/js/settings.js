@@ -67,6 +67,7 @@ async function reapplyLooks() {
   try { const t = await import('./theme.js'); t.applyTheme(t.loadTheme()); } catch { /* ignore */ }
   try { const u = await import('./uiscale.js'); u.applyScale(u.loadScale()); } catch { /* ignore */ }
   try { const sl = await import('./sliderstyle.js'); sl.applySlider?.(sl.loadSlider()); } catch { /* ignore */ }
+  try { const el = await import('./edgelight.js'); el.applyEdge?.(el.loadEdge()); } catch { /* ignore */ }   // 0.7.1 t2055u
   try { window.dispatchEvent(new CustomEvent('wavwiz:viz')); window.dispatchEvent(new CustomEvent('wavwiz:eqstyle')); } catch { /* ignore */ }
 }
 export async function openSettings(S, refresh, nav, section) {
