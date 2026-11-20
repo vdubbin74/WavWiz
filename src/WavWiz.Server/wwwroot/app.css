@@ -6307,3 +6307,8 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .hamburger.logomenu:focus-visible{outline:2px solid var(--accent2-text,var(--accent2));outline-offset:2px}
 @media (max-width:900px){ .topbar:has(> .hamburger.logomenu) .logo .brand-emblem{display:none} }
 @media (prefers-reduced-motion:reduce){ .hamburger.logomenu,.hamburger.logomenu .hb-emblem{transition:none} .hamburger.logomenu:active .hb-emblem{transform:none} }
+/* 0.7.1 t2069u: the menu bar shows focus cues only while it is used from the keyboard (menu.js sets .menubar.kbd) - no outline stuck on
+   File after a mouse-opened menu closes (Esc / Alt used to turn that leftover focus into a :focus-visible box). Keyboard use keeps a clear cue. */
+.menubar:not(.kbd) :is(.mtop,.mpanel button):focus-visible{outline:none!important;box-shadow:none}
+.menubar.kbd .mtop:focus{outline:2px solid var(--hl,var(--accent))!important;outline-offset:-2px;background:var(--accent-soft)}
+.menubar.kbd .mpanel button:focus{outline:2px solid var(--hl,var(--accent))!important;outline-offset:-2px;background:var(--accent-soft)}

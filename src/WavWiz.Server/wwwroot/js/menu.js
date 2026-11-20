@@ -125,6 +125,36 @@ function menuActions(S, ctl, desktop = false) {
   };
 }
 
+/** 0.7.1 t2069u: no stuck focus box on File (Player title bar). A menu opened with the mouse left File focused, and the next key (Esc to
+ *  close it, or Alt for a shortcut) turned that leftover focus into keyboard focus, so the themed :focus-visible outline stayed on File.
+ *  The bar now shows focus cues only while it is used from the keyboard (.menubar.kbd): Tab / arrows / Enter / Space / Home / End, or Alt
+ *  alone / F10 (Windows-style: focuses File; again leaves the bar). A mouse-opened menu that closes hands the focus back (blur). */
+export function menuFocusCues(bar, { closeAll, isOpen }, doc = globalThis.document, win = globalThis.window) {
+  const NAV_KEYS = new Set(['Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Home', 'End']);
+  let viaKeys = false, altAlone = false;
+  const setKeys = on => { viaKeys = on; bar.classList.toggle('kbd', on); };
+  const inBar = () => doc.activeElement && doc.activeElement !== doc.body && bar.contains(doc.activeElement);
+  const dropFocus = () => { if (!viaKeys && inBar()) doc.activeElement.blur(); };
+  const leaveBar = () => { closeAll(); if (inBar()) doc.activeElement.blur(); setKeys(false); };
+  const editing = () => doc.activeElement?.closest?.('input,textarea,select,[contenteditable=""],[contenteditable=true]');
+  const enterBar = () => { if (!bar.isConnected || (bar.getClientRects && !bar.getClientRects().length)) return false; setKeys(true); bar.querySelector('.mtop')?.focus(); return true; };
+  doc.addEventListener('pointerdown', () => setKeys(false), true);
+  doc.addEventListener('keydown', ev => {
+    if (ev.key === 'Alt') { altAlone = !ev.repeat || altAlone; return; }
+    altAlone = false;
+    if (ev.key === 'F10' && !ev.shiftKey && !ev.ctrlKey && !ev.altKey) { if (inBar()) { ev.preventDefault(); leaveBar(); } else if (!editing() && enterBar()) ev.preventDefault(); return; }
+    if (NAV_KEYS.has(ev.key)) setKeys(true);
+  }, true);
+  doc.addEventListener('keyup', ev => {
+    if (ev.key !== 'Alt' || !altAlone) return; altAlone = false;
+    if (inBar()) leaveBar(); else if (!editing()) enterBar();
+  }, true);
+  win?.addEventListener?.('blur', () => { altAlone = false; });
+  /** Esc: closes the menus; from the mouse the focus goes too. From the keyboard File keeps its cue (like Windows); a second Esc leaves the bar. */
+  const escape = () => { const was = isOpen(); closeAll(); if (!viaKeys) dropFocus(); else if (!was && inBar()) leaveBar(); };
+  return { dropFocus, escape, keyboard: () => viaKeys };
+}
+
 export function createMenuBar(S, ctl) {
   const A = menuActions(S, ctl, true);
   let openGroup = null;
@@ -140,13 +170,14 @@ export function createMenuBar(S, ctl) {
     closeAll();
     if (!was) { group.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); openGroup = group; }
   };
+  const cues = menuFocusCues(bar, { closeAll, isOpen: () => !!openGroup || !!bar.querySelector('.msub.open') }), dropFocus = cues.dropFocus;     // 0.7.1 t2069u
 
   function item(label, onclick, opts = {}) {
     return h('button', {
       type: 'button',
       class: opts.check ? 'check' : (opts.nocheck ? 'nocheck' : ''),
       disabled: opts.disabled || undefined,
-      onclick: ev => { ev.stopPropagation(); closeAll(); onclick?.(); },
+      onclick: ev => { ev.stopPropagation(); closeAll(); dropFocus(); onclick?.(); },
     }, mlbl(label));
   }
   /** 0.3.6 K16: a choice-list item opens a flyout on hover (or Right arrow / click); it opens toward the free side of the screen and fills asynchronously. */
@@ -166,7 +197,7 @@ export function createMenuBar(S, ctl) {
     };
     const open = () => { if (disabled) return; sub.parentElement?.querySelectorAll(':scope>.msub.open').forEach(x => { if (x !== sub) x.classList.remove('open'); }); if (!sub.classList.contains('open')) { sub.classList.add('open'); fill(); } };
     const btn = h('button', { type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', disabled: disabled || undefined,
-      onclick: ev => { ev.stopPropagation(); if (fn) { closeAll(); fn(); } else open(); },
+      onclick: ev => { ev.stopPropagation(); if (fn) { closeAll(); dropFocus(); fn(); } else open(); },
       onmouseenter: open, onfocus: () => {},
       onkeydown: ev => { if (ev.key === 'ArrowRight') { ev.preventDefault(); open(); panel.querySelector('button')?.focus(); } } }, mlbl(label));
     if (disabled) btn.title = ADMIN_HINT;
@@ -180,7 +211,7 @@ export function createMenuBar(S, ctl) {
     const group = h('div', { class: 'mgroup' });
     // 0.2.1 F6: Windows-style - one click opens a menu; while any menu is open, hovering another top-level menu switches to it (no click);
     // a click outside or Esc closes; Left / Right move between open menus.
-    const btn = h('button', { class: 'mtop', type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); toggle(group, btn); },
+    const btn = h('button', { class: 'mtop', type: 'button', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: ev => { ev.stopPropagation(); toggle(group, btn); if (!group.classList.contains('open')) dropFocus(); },
       onmouseenter: () => { if (openGroup && openGroup !== group) toggle(group, btn); },
       onkeydown: ev => { if (!openGroup || (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft')) return; ev.preventDefault(); const tops = [...bar.querySelectorAll('.mtop')], i = tops.indexOf(btn), n = tops[(i + (ev.key === 'ArrowRight' ? 1 : tops.length - 1)) % tops.length]; n.focus(); toggle(n.parentElement, n); } }, label);
     const panel = h('div', { class: 'mpanel', role: 'menu' }, ...kids.filter(Boolean));
@@ -210,7 +241,8 @@ export function createMenuBar(S, ctl) {
   topSpec('Help', 'help');
 
   document.addEventListener('click', () => closeAll());
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeAll(); });
+  // Esc closes the menus; from the mouse the focus goes too. From the keyboard File keeps its cue (like Windows) and a second Esc leaves the bar.
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cues.escape(); });
   return bar;
 }
 

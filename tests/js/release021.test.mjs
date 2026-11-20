@@ -79,7 +79,7 @@ test('0.2.1 F4: Expanded Library opens in tiles on every tab (Large), list toggl
 test('0.2.1 F6: Windows-style menu bar - click opens, hover switches while a menu is open, click outside / Esc closes', () => {
   const m = src('menu.js');
   assert.match(m, /onmouseenter: \(\) => \{ if \(openGroup && openGroup !== group\) toggle\(group, btn\); \}/);
-  assert.match(m, /document\.addEventListener\('click', \(\) => closeAll\(\)\)/); assert.match(m, /ev\.key === 'Escape'\) closeAll\(\)/);
+  assert.match(m, /document\.addEventListener\('click', \(\) => closeAll\(\)\)/); assert.match(m, /ev\.key === 'Escape'\) cues\.escape\(\)/); assert.match(m, /const escape = \(\) => \{ const was = isOpen\(\); closeAll\(\);/);   // 0.7.1 t2069u: Esc still closes (and drops a mouse focus)
   assert.match(m, /ArrowRight/);
 });
 
