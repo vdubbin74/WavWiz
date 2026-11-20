@@ -46,11 +46,19 @@ export function recFor(g, rankAll, zones) {
   if (g) { const z = on(g.recommendedId); return z ? { id: z.id, name: z.name, reason: g.recommendedReason || '', warn: !!g.recommendedWarn } : null; }
   const r = (rankAll?.ranking || []).find(x => x.connected && on(x.id)); return r ? { id: r.id, name: on(r.id).name, reason: r.reason || '', warn: !!r.warn } : null;
 }
+/** 0.7.1: the zone a phone's mic page starts on: the zone asked for, else the speaker's zone, else the zone selected in this player (pure). */
+export function phoneScope(S, presetZoneId, opts = {}, store = globalThis.localStorage) {
+  const gs = S?.groups || [];
+  if (opts.groupId != null && gs.some(g => g.id === opts.groupId)) return String(opts.groupId);
+  const pg = presetZoneId != null ? gs.find(g => (g.deviceIds || []).includes(presetZoneId)) : null; if (pg) return String(pg.id);
+  let sel = null; try { sel = /^g:(\d+)$/.exec(store?.getItem('wavwiz.zone') || '')?.[1] ?? null; } catch { /* private mode */ }
+  return sel && gs.some(g => String(g.id) === sel) ? sel : null;
+}
 /** 0.7.1: the measured speakers that sound earlier than the reference (pure). */
 export const fasterThanRef = props => (props || []).filter(p => Number.isFinite(p.fasterMs) && p.fasterMs > 0);
 export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
   // a phone is a microphone, never the place that runs the wizard: it goes to the mic-only page (which makes its own link when signed in)
-  if (isPhoneUa() && !isPlayerUa()) { location.href = '/calmic.html'; return; }
+  if (isPhoneUa() && !isPlayerUa()) { const z = phoneScope(S, presetZoneId, opts); location.href = '/calmic.html' + (z ? '?zone=' + z : ''); return; }   // 0.7.1: the zone goes along
   const zones = S.zones.filter(z => z.connected && z.outputs.some(o => o.active));
   // 0.4.5 F29: the numbered step strip + '? How calibration works' sit above every view of the window
   const body = h('div', { class: 'calview' }), strip = calStrip(1), outer = h('div', { class: 'calx' }, h('div', { class: 'row calguide-top' }, h('span', { class: 'grow' }), calHelpLink()), strip.el, body); let sessionId = null, phoneCard = null, pcCard = null, runView = null;
@@ -137,7 +145,8 @@ export async function openCalibration(S, refresh, presetZoneId, opts = {}) {
     runView?.stop(); runView = null; strip.set(1);
     pcCard ??= pcMicCard(S, admin, { start: (pc, mic) => startPcMic(pc, mic) });  // 0.4.4 F21: always show PC+mic pickers + Start (no auto-start)
     const usePhone = !opts.link;
-    if (usePhone) phoneCard ??= phoneMicCard(S, admin, { onSession: id => watchPhone(id) });
+    if (usePhone) phoneCard ??= phoneMicCard(S, admin, { onSession: id => watchPhone(id), scope: () => String(st.scope) });
+    if (usePhone && admin) phoneCard.setScope?.(String(st.scope));   // 0.7.1: the phone measures what is chosen here (Whole house / a zone)
     const earCard = h('div', { class: 'card calway', 'aria-label': 'By ear' }, h('div', { class: 'calway-h' }, h('span', { class: 'calnum' }, '3'), h('h3', null, 'By ear')),
       h('p', { class: 'small dim' }, 'No microphone? Line them up by listening. Also used when a mic measurement is not confident enough.'), earList(),
       h('div', { class: 'row' }, h('span', { class: 'grow' }), h('button', { class: 'btn', onclick: () => { if (!picked().length) return toast(calFix('Choose at least one speaker to calibrate.'), true); ear(); } }, 'Line up by ear')));
@@ -358,8 +367,8 @@ export function phoneStatusText(st) {
   const what = { opened: 'tap Start on the phone', measuring: 'measuring - keep the house quiet', done: 'measured - save the results here or on the phone' }[st.state] || 'connected';
   return ['ok', `Phone connected: ${st.device || 'phone'} - ${what}`];
 }
-function phoneMicCard(S, admin, { onSession } = {}) {
-  let link = null, timer = null, stopped = false;
+function phoneMicCard(S, admin, { onSession, scope } = {}) {
+  let link = null, timer = null, stopped = false, sent = null;
   const qr = h('div', { class: 'pm-qr' }, h('span', { class: 'small dim' }, 'Making a QR code…'));
   const short = h('code', { class: 'pm-link' }, '…');
   const dot = h('span', { class: 'dot' }), stTxt = h('span', null, 'Waiting for your phone…');
@@ -371,8 +380,9 @@ function phoneMicCard(S, admin, { onSession } = {}) {
     h('p', { class: 'small dim' }, 'The phone only listens. It does not join as a speaker or play music.'));
   const paint = st => { const [k, t] = phoneStatusText(st); dot.className = 'dot ' + (k === 'ok' ? 'ok' : k === 'bad' ? 'bad' : 'wait'); stTxt.textContent = t; if (st?.sessionId && st.state === 'measuring') onSession?.(st.sessionId); };
   async function make() {
-    try { link = await api('/calibration/phone-link', { method: 'POST', body: {} }); }
+    try { sent = admin && scope ? scope() : null; link = await api('/calibration/phone-link', { method: 'POST', body: sent ? { scope: sent } : {} }); }
     catch (e) { qr.replaceChildren(h('p', { class: 'small err' }, e.message)); return; }
+    if (admin && scope && scope() !== sent) { const v = scope(); sent = null; setScope(v); }   // changed while the link was being made
     qr.replaceChildren(h('img', { src: `/api/v1/calibration/phone-link/${link.token}/qr.svg`, alt: 'QR code that opens the calibration mic page on your phone', width: 168, height: 168 }));
     short.textContent = link.shortUrl.replace(/^http:\/\//, '');
     notes.replaceChildren(
@@ -391,7 +401,9 @@ function phoneMicCard(S, admin, { onSession } = {}) {
   const onPush = ev => { if (link && ev.detail?.token === link.token) poll(); };
   window.addEventListener('wavwiz:calphone', onPush);
   make();
-  return { el, stop: () => { stopped = true; clearTimeout(timer); window.removeEventListener('wavwiz:calphone', onPush); } };
+  // 0.7.1: Calibrate's Whole house / zone choice follows to the phone (its plan is read when the page opens or the choice changes there)
+  const setScope = v => { if (!admin || v == null || v === sent) return; sent = v; if (link) api(`/calibration/phone-link/${link.token}/scope`, { method: 'PUT', body: { scope: v } }).catch(() => {}); };
+  return { el, setScope, stop: () => { stopped = true; clearTimeout(timer); window.removeEventListener('wavwiz:calphone', onPush); } };
 }
 
 // ------------------------------------------------------------ 0.4.5 F29: the step strip, By ear lines, the help sheet

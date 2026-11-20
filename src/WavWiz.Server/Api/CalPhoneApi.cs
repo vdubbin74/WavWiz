@@ -18,6 +18,9 @@ public sealed class CalPhoneLink
     /// <summary>0.2.5: "Stop using as mic" from Devices: the phone page stops and the code no longer authorizes anything.</summary>
     public bool Stopped { get; set; }
     public string? SessionId { get; set; }
+    /// <summary>0.7.1: what an administrator's link calibrates: "all" (Whole house) or a zone id, as picked in Calibrate on the PC (or on the phone).
+    /// Null = not picked yet (the phone page then starts on the phone's own selected zone).</summary>
+    public string? Scope { get; set; }
 }
 
 /// <summary>
@@ -77,13 +80,54 @@ public static class CalPhoneApi
     }
     public static CalPhoneLink? LinkOf(HttpContext c) => c.Items["calLink"] as CalPhoneLink;
 
+    /// <summary>0.7.1: "all" or a zone id (as text); anything else = null.</summary>
+    public static string? CleanScope(string? v) => v == "all" ? "all" : long.TryParse(v, out var id) && id > 0 ? id.ToString() : null;
+    static object? Pick((long Id, string Name, bool Connected, string Reason, bool Warn) x) => x.Id == 0 ? null : new { id = x.Id, name = x.Name, reason = x.Reason, warn = x.Warn };
+    /// <summary>0.7.1: an administrator, or the administrator's own link code itself.</summary>
+    static bool AdminFor(HttpContext c, CalPhoneLink l) => ZoneApi.IsAdmin(c) || (l.ByAdmin && LinkOf(c)?.Token == l.Token);
+
+    /// <summary>
+    /// 0.7.1: what the phone measures. An administrator's link follows the Whole house / zone choice (?scope=, else the one picked in Calibrate):
+    /// a zone = its connected speakers against THAT zone's own reference (none = wait for the user's pick - the recommended one is offered, never
+    /// set by itself); Whole house = every speaker against the internal house reference, as before. A regular user's link: their own speaker
+    /// against its zone's reference (unchanged). An offline reference comes with the next best speaker as a stand-in for this session.
+    /// </summary>
+    public static object Plan(Services s, CalPhoneLink l, string? scopeQ)
+    {
+        var zs = s.Zones.Zones(null, null).Where(z => z.Connected && z.Outputs.Any(o => o.Active)).ToList();
+        var groups = l.ByAdmin ? s.Zones.Groups().Where(g => g.DeviceIds.Any(d => zs.Any(z => z.Id == d))).ToList() : new();
+        var sc = l.ByAdmin ? CleanScope(scopeQ) ?? l.Scope : null;
+        long? gid = sc != null && sc != "all" && groups.FirstOrDefault(g => g.Id.ToString() == sc) is { } pg ? pg.Id : null;
+        long refId; WavWiz.Server.Zones.ZoneDto? rz;
+        if (gid is long zg)
+        {
+            refId = s.Zones.ZoneReferenceMap().TryGetValue(zg, out var r) ? r : 0; rz = refId == 0 ? null : s.Zones.Zone(refId);
+            if (rz == null) refId = 0;
+        }
+        else
+        {
+            refId = l.OwnerZoneId is long oz && !l.ByAdmin ? s.Zones.ReferenceFor(oz) : s.Zones.ReferenceZoneId; rz = refId == 0 ? null : s.Zones.Zone(refId);   // 0.6.8-#15
+            if (rz == null) { var w = zs.FirstOrDefault(z => z.Outputs.First(o => o.Active).Kind == "wired") ?? zs.FirstOrDefault(); if (w != null) { refId = w.Id; rz = s.Zones.Zone(w.Id); } }
+        }
+        var members = gid is long mg ? groups.First(g => g.Id == mg).DeviceIds.ToHashSet() : null;
+        var speakers = zs.Where(z => z.Id != refId && (members == null || members.Contains(z.Id)) && (l.ByAdmin || z.Id == l.OwnerZoneId)).Select(z => new { id = z.Id, name = z.Name }).ToList();
+        var rank = l.ByAdmin ? s.Zones.RefRanking(gid) : new();
+        var rec = rank.FirstOrDefault(x => x.Connected && zs.Any(z => z.Id == x.Id));
+        var next = rz is { Connected: false } ? rank.FirstOrDefault(x => x.Connected && x.Id != refId && zs.Any(z => z.Id == x.Id)) : default;
+        return new { reference = rz == null ? null : new { id = rz.Id, name = rz.Name, connected = rz.Connected }, speakers, allSpeakers = l.ByAdmin,
+            scope = l.ByAdmin ? (gid is long sg ? sg.ToString() : "all") : null, scopeSet = sc != null,
+            zones = groups.Select(g => new { id = g.Id, name = g.Name, referenceId = g.ReferenceId }).ToList(),
+            recommended = Pick(rec), nextBest = Pick(next) };
+    }
+
     public static void Map(RouteGroupBuilder g, WebApplication app, Services s)
     {
-        g.MapPost("/calibration/phone-link", (HttpContext c) =>
+        g.MapPost("/calibration/phone-link", async (HttpContext c) =>
         {
             bool admin = ZoneApi.IsAdmin(c) || LinkOf(c)?.ByAdmin == true;
             long? owner = LinkOf(c)?.OwnerZoneId ?? s.Zones.Zones(c.Who(), c.Connection.RemoteIpAddress).FirstOrDefault(z => z.Mine)?.Id;
             var l = Create(admin, DateTimeOffset.UtcNow, owner); var host = PhoneApi.PhoneHost(c, s);
+            if (admin) { var b = await c.Request.Body(); l.Scope = CleanScope(b.Str("scope")); }   // 0.7.1: the Whole house / zone choice of Calibrate
             // 0.2.5: signsIn stays false - the mic-only page needs no sign-in; allSpeakers says whether the phone may measure every speaker (an admin's link)
             return Results.Json(new { token = l.Token, shortUrl = $"http://{host}:{s.Cfg.HttpPort}/c/{l.Token}", secureUrl = SecureUrl(host, s.Cfg.HttpsPort, l.Token), micUrl = MicPage + "?cal=" + l.Token, https = s.Ca.Enabled, signsIn = false, allSpeakers = l.ByAdmin, ownSpeaker = l.OwnerZoneId != null, expires = l.Expires });
         }).Req(Role.Control);
@@ -117,16 +161,36 @@ public static class CalPhoneApi
         }).Req(Role.View);
 
         // 0.2.5: what the phone's mic-only page will measure: the house reference and the speakers this link may calibrate (never the phone itself - it is not a speaker)
-        g.MapGet("/calibration/phone-link/{token}/plan", (string token, HttpContext c) =>
+        g.MapGet("/calibration/phone-link/{token}/plan", (string token, string? scope, HttpContext c) =>
         {
             var l = Valid(token, DateTimeOffset.UtcNow); if (l == null || l.Stopped) return Ext.Bad("This phone link has expired. Scan the new QR code on the PC.", 404);
-            var zs = s.Zones.Zones(null, null).Where(z => z.Connected && z.Outputs.Any(o => o.Active)).ToList();
-            var refId = l.OwnerZoneId is long oz && !l.ByAdmin ? s.Zones.ReferenceFor(oz) : s.Zones.ReferenceZoneId; var rz = refId == 0 ? null : s.Zones.Zone(refId);   // 0.6.8-#15
-            if (rz == null) { var w = zs.FirstOrDefault(z => z.Outputs.First(o => o.Active).Kind == "wired") ?? zs.FirstOrDefault(); if (w != null) { refId = w.Id; rz = s.Zones.Zone(w.Id); } }
-            var speakers = zs.Where(z => z.Id != refId && (l.ByAdmin || z.Id == l.OwnerZoneId)).Select(z => new { id = z.Id, name = z.Name }).ToList();
             var host = PhoneApi.PhoneHost(c, s);
-            return Results.Json(new { reference = rz == null ? null : new { id = rz.Id, name = rz.Name, connected = rz.Connected }, speakers, allSpeakers = l.ByAdmin, device = l.Device,
-                https = s.Ca.Enabled, secureUrl = SecureUrl(host, s.Cfg.HttpsPort, l.Token), host, httpPort = s.Cfg.HttpPort, httpsPort = s.Cfg.HttpsPort, patternMs = new WavWiz.Measure.ChirpPattern().LengthMs, quality = "quick" });
+            var p = System.Text.Json.JsonSerializer.SerializeToNode(Plan(s, l, scope), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!.AsObject();
+            p["device"] = l.Device; p["https"] = s.Ca.Enabled; p["secureUrl"] = SecureUrl(host, s.Cfg.HttpsPort, l.Token); p["host"] = host; p["httpPort"] = s.Cfg.HttpPort; p["httpsPort"] = s.Cfg.HttpsPort;
+            p["patternMs"] = new WavWiz.Measure.ChirpPattern().LengthMs; p["quality"] = "quick";
+            return Results.Json(p);
+        }).Req(Role.Control);
+
+        // 0.7.1: Calibrate on the PC (or the phone page) changes Whole house / zone: the phone follows it (an administrator's link only)
+        g.MapPut("/calibration/phone-link/{token}/scope", async (string token, HttpContext c) =>
+        {
+            var l = Valid(token, DateTimeOffset.UtcNow); if (l == null || l.Stopped) return Ext.Bad("This phone link has expired. Make a new one.", 404);
+            if (!l.ByAdmin || !AdminFor(c, l)) return Ext.Bad(ZoneApi.AdminOnly("choose what the phone calibrates"), 403);
+            var b = await c.Request.Body(); l.Scope = CleanScope(b.Str("scope"));
+            s.Events.Publish("calphone", new { token = l.Token, state = l.State, device = l.Device });
+            return Results.Json(new { ok = true, scope = l.Scope });
+        }).Req(Role.Control);
+
+        // 0.7.1: one tap on the phone page - make a speaker the reference (its zone's; a speaker in no zone: the house reference), exactly like
+        // "Set as reference" on the PC (the saved delays are re-based, nothing is recalibrated). An administrator's link only.
+        g.MapPost("/calibration/phone-link/{token}/reference", async (string token, HttpContext c) =>
+        {
+            var l = Valid(token, DateTimeOffset.UtcNow); if (l == null || l.Stopped) return Ext.Bad("This phone link has expired. Make a new one.", 404);
+            if (!l.ByAdmin || !AdminFor(c, l)) return Ext.Bad(ZoneApi.AdminOnly("change the reference speaker"), 403);
+            var b = await c.Request.Body(); var id = b.Long("zoneId") ?? 0;
+            if (s.Zones.Zone(id) == null) return Ext.Bad("device not found", 404);
+            if (s.Zones.GroupOfSpeaker(id) is long gid) { var e = s.Zones.SetZoneReference(gid, id); return e != null ? Ext.Bad(e, 409) : Results.Json(new { ok = true, zoneId = id, groupId = gid }); }
+            s.Zones.ReferenceZoneId = id; s.Events.Publish("zones"); return Results.Json(new { ok = true, zoneId = id });
         }).Req(Role.Control);
 
         // 0.2.5: "Stop using as mic" (Devices > Calibration mic line, or the PC's Calibrate screen): the phone page stops, its code stops working

@@ -101,3 +101,51 @@ export function guideStep(i, n) { return `Step ${i + 1} of ${n}`; }
 export function countdownOn(store) { try { return store.getItem(COUNTDOWN_KEY) === '1'; } catch { return false; } }
 export function setCountdown(store, on) { try { store.setItem(COUNTDOWN_KEY, on ? '1' : '0'); } catch { /* private mode */ } }
 export function skipNote(name) { return `Skipped ${name}: its delay is unchanged`; }
+
+// ---- 0.7.1: Whole house / one zone on the phone mic page (the same rules as Calibrate on the PC) ----
+/** The scope asked for in the address: ?zone=<zone id> or ?zone=all (from the player or Calibrate). null = none. */
+export function urlScope(search) { try { const z = new URLSearchParams(search).get('zone') || ''; return z === 'all' || /^[1-9]\d{0,15}$/.test(z) ? z : null; } catch { return null; } }
+/** The zone selected in this phone's player ("g:<id>" in wavwiz.zone), or null. */
+export function storedScope(store) { try { const m = /^g:([1-9]\d{0,15})$/.exec(store?.getItem('wavwiz.zone') || ''); return m ? m[1] : null; } catch { return null; } }
+/** Which scope to load first: the address wins, then (only when Calibrate on the PC chose nothing) the phone's selected zone, if the link may
+ *  pick and that zone can be calibrated. null = keep what the server sent. */
+export function firstScope(plan, fromUrl, fromStore) {
+  if (!plan || !plan.allSpeakers) return null;
+  const ok = v => v === 'all' || (plan.zones || []).some(z => String(z.id) === String(v));
+  if (fromUrl && ok(fromUrl)) return fromUrl;
+  if (!plan.scopeSet && fromStore && ok(fromStore)) return fromStore;
+  return null;
+}
+/** What one run measures (pure): the reference - or the session stand-in when the reference is offline - and the other speakers. */
+export function runPlan(plan, standIn) {
+  if (!plan) return plan;
+  const ref = standIn ? { id: standIn.id, name: standIn.name, connected: true, standIn: true } : plan.reference || null;
+  return { ...plan, reference: ref, speakers: (plan.speakers || []).filter(z => !ref || z.id !== ref.id) };
+}
+/** The measured speakers that sound earlier than the reference (pure). The reference itself is never moved. */
+export const fasterOf = props => (props || []).filter(p => Number.isFinite(p.fasterMs) && p.fasterMs > 0);
+/** "Calibrate: Whole house / <zone>" + what the chosen reference needs: none yet (RECOMMENDED + Use), offline (NEXT BEST + Use for this session),
+ *  or a better one available (RECOMMENDED, one tap). Nothing is picked by itself. h = the page's element helper. */
+export function scopeBlock(h, plan, { standIn = null, onScope, onUse, onStandIn } = {}) {
+  if (!plan || !plan.allSpeakers || !(plan.zones || []).length) return null;
+  const cur = plan.scope || 'all', zone = (plan.zones || []).find(z => String(z.id) === cur) || null, ref = plan.reference, rec = plan.recommended, nb = plan.nextBest;
+  const sel = h('select', { class: 'scopesel', 'aria-label': 'What to calibrate', 'data-act': 'cal-scope', onchange: ev => onScope?.(ev.target.value) },
+    h('option', { value: 'all', selected: cur === 'all' }, 'Whole house - every speaker, one reference'),
+    (plan.zones || []).map(z => h('option', { value: String(z.id), selected: String(z.id) === cur }, z.name)));
+  const tag = (t, warn, why) => h('span', { class: 'rtag' + (warn ? ' warn' : ''), title: why || '' }, t);
+  const lines = [];
+  if (standIn) lines.push(h('p', { class: 'small scopenote', role: 'status' }, `Using ${standIn.name} as the reference for this session only.`));
+  else if (zone && !ref) {
+    lines.push(h('p', { class: 'small warn-t scopenote', role: 'status' }, `${zone.name} has no reference yet. Use the recommended one, or pick one on the PC.`));
+    if (rec) lines.push(h('div', { class: 'row scoperec' }, tag('RECOMMENDED', rec.warn, rec.reason), h('b', null, rec.name), h('span', { class: 'small dim grow' }, rec.reason),
+      h('button', { class: 'btn small', type: 'button', 'data-act': 'use-recommended', onclick: () => onUse?.(rec) }, `Use ${rec.name}`)));
+  } else if (ref && ref.connected === false) {
+    lines.push(h('p', { class: 'small warn-t scopenote', role: 'status' }, `The reference ${ref.name} is offline. Turn it on, or use the next best speaker for this session.`));
+    if (nb) lines.push(h('div', { class: 'row scoperec' }, tag('NEXT BEST', nb.warn, nb.reason), h('b', null, nb.name), h('span', { class: 'small dim grow' }, nb.reason),
+      h('button', { class: 'btn small', type: 'button', 'data-act': 'standin-next-best', onclick: () => onStandIn?.(nb) }, 'Use for this session')));
+  } else if (ref && rec && rec.id !== ref.id) {
+    lines.push(h('div', { class: 'row scoperec' }, tag('RECOMMENDED', rec.warn, rec.reason), h('b', null, rec.name), h('span', { class: 'small dim grow' }, rec.reason),
+      h('button', { class: 'btn small ghost', type: 'button', 'data-act': 'use-recommended', onclick: () => (zone ? onUse?.(rec) : onStandIn?.(rec)) }, `Use ${rec.name}`)));
+  }
+  return h('div', { class: 'scope', 'data-scope': cur }, h('label', { class: 'small dim' }, 'Calibrate'), sel, ...lines);
+}

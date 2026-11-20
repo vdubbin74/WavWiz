@@ -2,7 +2,7 @@
 // Order is the whole point (see calmic-core.js): nothing here joins as a speaker, opens /ws/room, creates an AudioContext or plays a sound before
 // the microphone is open. The Start tap sets the audio session to play-and-record, asks for the microphone, and only then creates a capture-only
 // AudioContext. The speakers play the test sounds; this phone only listens and uploads what it heard.
-import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine, guideGroups, guideText, guideStep, countdownOn, setCountdown, skipNote, COUNTDOWN_S } from './calmic-core.js';
+import { openMicFirst, requestMicSync, buildPlan, calCode, pageMode, phoneName, DENIED_HELP, DENIED_HELP_AA, diagLine, guideGroups, guideText, guideStep, countdownOn, setCountdown, skipNote, COUNTDOWN_S, urlScope, storedScope, firstScope, runPlan, fasterOf, scopeBlock } from './calmic-core.js';
 import { mountA2hs, rememberedNote } from './a2hs.js';
 import { CalError, environment, classifyMicError, describe, detailsText, rms } from './calerrors.js';
 import { OffsetEstimator, pairClocks } from './roomsched.js';
@@ -21,6 +21,8 @@ const log = []; const track = m => { log.push(`${(performance.now() / 1000).toFi
 window.__wwCalMic = { log, order: [] };                      // read by the browser tests (order of mic / audio / network steps)
 const order = m => window.__wwCalMic.order.push(m);
 
+const zone0 = urlScope(location.search);   // 0.7.1: ?zone= from the player / Calibrate (Whole house or one zone)
+let standIn = null;   // 0.7.1: the next best speaker standing in for an offline reference, this session only
 let code = calCode(location.search), plan = null, sid = null, stopped = false, state = 'opened', helloTimer = 0, mic = null, wake = null, hidden = false;
 
 async function call(path, { method = 'GET', body, raw, keepalive } = {}) {
@@ -61,12 +63,12 @@ function show(...nodes) { nodes.push(diag()); $('loading').hidden = true; const 
 async function boot() {
   let signedIn = false;
   if (!code) {   // opened without a code (from the phone-role menu): mint one if this browser is signed in
-    try { const r = await fetch('/api/v1/calibration/phone-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', credentials: 'same-origin' }); if (r.ok) { const j = await r.json(); code = j.token; signedIn = true; history.replaceState(null, '', '/calmic.html?cal=' + code); } } catch { /* offline */ }
+    try { const r = await fetch('/api/v1/calibration/phone-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(zone0 ? { scope: zone0 } : {}), credentials: 'same-origin' }); if (r.ok) { const j = await r.json(); code = j.token; signedIn = true; history.replaceState(null, '', '/calmic.html?cal=' + code + (zone0 ? '&zone=' + zone0 : '')); } } catch { /* offline */ }
   }
   if (!code) return show(h('div', { class: 'card' }, h('h2', { text: 'Scan the QR code on the PC' }),
     h('p', { text: 'On the WavWiz PC open Calibrate › Use your phone, and scan the QR code with this phone’s camera. It opens this page with a one-time code.' }),
     h('p', { class: 'small' }, 'Want to play music on this phone instead? ', h('a', { href: '/?role=speaker' }, 'Open WavWiz as a speaker'))));
-  try { plan = await call(`/calibration/phone-link/${code}/plan`); }
+  try { plan = await call(`/calibration/phone-link/${code}/plan`); const sc = firstScope(plan, zone0, storedScope(globalThis.localStorage)); if (sc && sc !== plan.scope) plan = await call(`/calibration/phone-link/${code}/plan?scope=${encodeURIComponent(sc)}`); }
   catch (e) { return show(h('div', { class: 'card bad' }, h('h2', { text: 'This link has expired' }), h('p', { text: e.message }), h('p', { class: 'small', text: 'Open Calibrate on the PC again and scan the new QR code.' }))); }
   const mode = pageMode({ protocol: location.protocol, httpsEnabled: !!plan.https, code, signedIn });
   hello('opened'); helloTimer = setInterval(() => hello(state), 5000);
@@ -123,9 +125,26 @@ function setupPhone() {
 }
 
 // ------------------------------------------------------------ ready: what will be measured + Start
+/** 0.7.1: Whole house / a zone on the phone: load that scope's plan (its own reference and speakers); the PC's link follows it. */
+async function setScope(v) {
+  standIn = null;
+  try { plan = await call(`/calibration/phone-link/${code}/plan?scope=${encodeURIComponent(v)}`); call(`/calibration/phone-link/${code}/scope`, { method: 'PUT', body: { scope: v } }).catch(() => {}); ready(); }
+  catch (e) { ready(e.message); }
+}
+/** 0.7.1: one tap - make a speaker the reference (a zone's: saved, delays re-based, nothing recalibrated). */
+async function makeRef(z) {
+  try { await call(`/calibration/phone-link/${code}/reference`, { method: 'POST', body: { zoneId: z.id } }); plan = await call(`/calibration/phone-link/${code}/plan?scope=${encodeURIComponent(plan.scope || 'all')}`); standIn = null; ready(`${z.name} is now the reference.`); }
+  catch (e) { ready(e.message); }
+}
+const scopeUi = () => scopeBlock(h, plan, { standIn, onScope: setScope, onUse: makeRef, onStandIn: z => { standIn = z; ready(); } });
 function ready(note) {
   state = 'opened';
-  const ref = plan.reference, others = (plan.speakers || []).filter(z => !ref || z.id !== ref.id);
+  const rp = runPlan(plan, standIn), ref = rp.reference, others = rp.speakers, pickUi = scopeUi();
+  // 0.7.1: a zone without a reference, an offline reference or nothing else to measure: the choice stays on screen, nothing starts by itself
+  if (pickUi && (!ref || ref.connected === false || !others.length)) return show(note ? h('div', { class: 'card warn' }, note) : null,
+    h('div', { class: 'card' }, h('h2', { text: 'What to calibrate' }), pickUi,
+      ref && ref.connected !== false && !others.length ? h('p', { class: 'small', text: `Nothing else to measure here: ${ref.name} is the reference.` }) : null,
+      h('div', { class: 'row' }, backBtn())));
   if (ref && !others.length && !plan.allSpeakers) return show(h('div', { class: 'card' }, h('h2', { text: 'Scan the QR code on the PC' }),
     h('p', { text: 'This phone is ready to be a calibration mic, but this link has no speakers it may measure (you can only calibrate your own speaker, and this phone is not one).' }),
     h('p', { text: 'On the WavWiz PC, an administrator opens Devices › Calibrate speakers › Use your phone. Scan that QR code with this phone.' })));
@@ -143,9 +162,9 @@ function ready(note) {
     run(started);
   });
   show(note ? h('div', { class: 'card warn' }, note) : null,
-    h('div', { class: 'card' }, h('h2', { text: 'Stand where you usually listen' }),
+    h('div', { class: 'card' }, pickUi, h('h2', { text: 'Stand where you usually listen' }),
       h('ul', { class: 'fix' }, h('li', { text: 'Hold the phone at ear height and keep still.' }), h('li', { text: 'Keep the room quiet. Music pauses while WavWiz measures.' }), h('li', { text: 'Keep this page open. The screen stays on.' })),
-      h('p', { class: 'small', text: `Reference: ${ref.name}. Measures:` }), h('div', { class: 'spk' }, others.map(z => h('span', { text: z.name }))),
+      h('p', { class: 'small', text: `Reference: ${ref.name}${ref.standIn ? ' (this session only)' : ''}. Its delay stays as it is. Measures:` }), h('div', { class: 'spk' }, others.map(z => h('span', { text: z.name }))),
       h('p', { class: 'small', text: 'Tap Allow microphone, then tap Allow when the phone asks.' }), start, h('div', { class: 'row' }, backBtn())));
 }
 
@@ -191,10 +210,10 @@ async function run(started) {
     if (off.rttMs > 60) note('The Wi-Fi round trip is slow; the result may be less exact.', true);
     // 5. session (the music pauses on the server side)
     if (canceled) return;
-    try { creating = call('/calibration/sessions', { method: 'POST', body: { mode: 'phone', referenceZoneId: plan.reference.id, micSource: 'phone', micProcessing: mic.rawOk ? 'raw' : 'processed', linkToken: code } }); const s = await creating; creating = null; sid = s.id; if (canceled) { sid = null; call(`/calibration/sessions/${s.id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true }).catch(() => {}); return; } }
+    try { creating = call('/calibration/sessions', { method: 'POST', body: { mode: 'phone', referenceZoneId: runPlan(plan, standIn).reference.id, micSource: 'phone', micProcessing: mic.rawOk ? 'raw' : 'processed', linkToken: code } }); const s = await creating; creating = null; sid = s.id; if (canceled) { sid = null; call(`/calibration/sessions/${s.id}/end`, { method: 'POST', body: { reason: 'canceled' }, keepalive: true }).catch(() => {}); return; } }
     catch (e) { throw new CalError('SESSION_FAILED', e.message); }
     order('session'); note('Music is paused while calibrating.');
-    const steps = buildPlan(plan); let done = 0, heard = 0, failed = 0;
+    const steps = buildPlan(runPlan(plan, standIn)); let done = 0, heard = 0, failed = 0;
     const groups = guideGroups(steps), skipped = [];
     mark('heard', 'run');
     // 0.3.1 B3: guided - a stop before each speaker; nothing plays until Ready (optional 5 s countdown); speakers can be skipped
@@ -348,6 +367,8 @@ function results(fin, failed, retry) {
         h('td', null, retry ? h('button', { class: 'btn ghost small retry', onclick: () => retry(p.zoneId) }, 'Retry') : null)))))
       : h('p', { class: 'err-t', text: 'Nothing could be measured.' }),
     (fin.messages || []).length ? h('ul', { class: 'notes' }, fin.messages.map(m => h('li', { text: m }))) : null,
+    ...fasterOf(props).map(p => h('div', { class: 'calfaster', role: 'status', 'data-faster': p.zoneId }, h('p', { class: 'small', text: `${p.zoneName} is ${Math.round(p.fasterMs)} ms faster than the reference, so it cannot be lined up by adding delay. Make it the reference, then calibrate again.` }),
+      plan.allSpeakers ? h('button', { class: 'btn small', type: 'button', 'data-act': 'make-faster-ref', onclick: async () => { releaseMic(); if (sid) { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'redo' } }).catch(() => {}); sid = null; } makeRef({ id: p.zoneId, name: p.zoneName }); } }, `Make ${p.zoneName} the reference`) : null)),   // 0.7.1
     failed ? h('p', { class: 'small', text: `${failed} test sound(s) were not heard. Moving closer, turning the speaker up or a quieter room usually helps.` }) : null,
     h('div', { class: 'row' }, h('button', { class: 'btn ghost', onclick: async () => { releaseMic(); if (sid) { await call(`/calibration/sessions/${sid}/end`, { method: 'POST', body: { reason: 'redo' } }).catch(() => {}); sid = null; } ready(); } }, 'Redo'), h('span', { class: 'grow' })), save));
 }
