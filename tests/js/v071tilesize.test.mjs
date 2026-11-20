@@ -1,5 +1,6 @@
 // 0.7.1 t2061u: Settings > Library > Tile size did nothing. library.js sets .lib[data-tiles], but every layout fixed its tile columns
 // (expanded panel 132px !important, side panel 3 columns, phone / narrow page 2 columns), so no size ever changed anything.
+// t2062u: Large (the default) must equal the 0.7.1 look on every layout, so nothing changes after an update; Medium and Small step down.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,12 +22,14 @@ test('expanded Library (PC wide): each size has its own column width, after (and
     const m = css.slice(fixed).match(new RegExp(`\\.desk\\.libexpanded \\.libpanel \\.lib\\[data-tiles=${sz}\\] \\.tilegrid\\{grid-template-columns:repeat\\(auto-fill,(\\d+)px\\)!important\\}`));
     assert.ok(m, sz); px[sz] = +m[1];
   }
-  assert.ok(px.large > px.medium && px.medium > px.small, JSON.stringify(px)); assert.equal(px.medium, 132, 'Medium = the 0.7.1 look');
+  assert.ok(px.large > px.medium && px.medium > px.small, JSON.stringify(px)); assert.equal(px.large, 132, 'Large (the default) = the 0.7.1 look');
+  assert.ok(px.small >= 96, 'Small tiles stay at least ~100px wide');
 });
-test('side panel (PC) and the phone / narrow page: 2 / 3 / 4 columns for Large / Medium / Small', () => {
+test('Large (the default) = the 0.7.1 look; side panel 3 / 4 / 5 columns, phone / narrow page 2 / 3 / 4', () => {
   const side = after('.desk.libexpanded .libpanel .tilegrid{grid-template-columns:repeat(auto-fill,132px)!important');
-  for (const [sz, n] of [['large', 2], ['medium', 3], ['small', 4]]) {
+  for (const [sz, n] of [['large', 3], ['medium', 4], ['small', 5]])
     assert.ok(css.indexOf(`:is(.lib.compact[data-tiles=${sz}], .libpanel .lib[data-tiles=${sz}]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(${n},minmax(0,1fr))`, side) > side, 'side ' + sz);
+  for (const [sz, n] of [['large', 2], ['medium', 3], ['small', 4]]) {
     assert.ok(css.indexOf(`  .view .lib[data-tiles=${sz}] .tilegrid{grid-template-columns:repeat(${n},minmax(0,1fr))`, after('.view .phone-library .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr))')) > 0, 'page ' + sz);
   }
 });

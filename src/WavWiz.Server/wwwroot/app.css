@@ -6274,16 +6274,16 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .setrow.edgelight .edgeseg{flex:0 1 auto}
 /* 0.7.1 t2061u: Settings > Library > Tile size did nothing. Library.js sets .lib[data-tiles], but only the old --tmin rule on .lib.expanded
    read it, and later layout rules fixed the columns for every size (the expanded panel at 132px !important, the side panel at 3 columns,
-   the phone / narrow page at 2). Each layout now follows the size. Medium = the 0.7.1 look of each layout; phones and the narrow page keep
-   Large = their 2 columns and never go below about 72px a tile (Small = 4 columns). */
+   the phone / narrow page at 2). Each layout now follows the size. Large (the default) = the 0.7.1 look of every layout, so nothing changes after
+   an update; Medium and Small step down. Phones and the narrow page never go below about 72px a tile (Small = 4 columns). */
 @media (min-width:901px){
-  .desk.libexpanded .libpanel .lib[data-tiles=large] .tilegrid{grid-template-columns:repeat(auto-fill,160px)!important}
-  .desk.libexpanded .libpanel .lib[data-tiles=medium] .tilegrid{grid-template-columns:repeat(auto-fill,132px)!important}
-  .desk.libexpanded .libpanel .lib[data-tiles=small] .tilegrid{grid-template-columns:repeat(auto-fill,104px)!important}
+  .desk.libexpanded .libpanel .lib[data-tiles=large] .tilegrid{grid-template-columns:repeat(auto-fill,132px)!important}
+  .desk.libexpanded .libpanel .lib[data-tiles=medium] .tilegrid{grid-template-columns:repeat(auto-fill,112px)!important}
+  .desk.libexpanded .libpanel .lib[data-tiles=small] .tilegrid{grid-template-columns:repeat(auto-fill,96px)!important}
 }
-:is(.lib.compact[data-tiles=large], .libpanel .lib[data-tiles=large]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(2,minmax(0,1fr))}
-:is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(3,minmax(0,1fr))}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px}
+:is(.lib.compact[data-tiles=large], .libpanel .lib[data-tiles=large]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(3,minmax(0,1fr))}
+:is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px}
+:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 5px}
 @media (max-width:900px){
   .view .lib[data-tiles=large] .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .view .lib[data-tiles=medium] .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px}
@@ -6298,5 +6298,8 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
   .view .lib:is([data-tiles=medium],[data-tiles=small]) .tile .t2{font-size:.72rem}
   .view .lib[data-tiles=small] .tile .t3{display:none}
 }
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .tileplay{width:26px;height:26px;right:4px;bottom:4px;font-size:10px}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t3{display:none}
+:is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) .tile .tileplay{width:26px;height:26px;right:4px;bottom:4px;font-size:10px}
+:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .tileplay{width:22px;height:22px;right:3px;bottom:3px;font-size:9px}
+:is(.lib.compact, .libpanel .lib:not(.expanded)):is([data-tiles=medium],[data-tiles=small]) .tile .t3{display:none}
+:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t1{font-size:11px;line-height:1.25;overflow-wrap:anywhere}
+:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t2{display:none}
