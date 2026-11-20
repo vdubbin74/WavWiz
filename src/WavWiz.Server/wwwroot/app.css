@@ -1029,7 +1029,6 @@ html.tv .np-ctlpanel .np-volrow input[type=range]{min-width:220px}
    (only artist photos are round), hover lift + round Play + heart, genre/year color blocks with a tilted cover collage, folder mosaics */
 .lib.expanded{--tmin:clamp(150px,calc(13.5vw / var(--z,1)),230px)}
 .lib.expanded[data-tiles=medium]{--tmin:clamp(130px,calc(10.5vw / var(--z,1)),180px)}
-.lib.expanded[data-tiles=small]{--tmin:clamp(104px,calc(7.6vw / var(--z,1)),140px)}
 .lib.expanded .tilegrid{grid-template-columns:repeat(auto-fill,minmax(var(--tmin),1fr));gap:20px 16px;padding:4px 2px 12px}
 .lib.expanded .tile{padding:6px;margin:-6px;border-radius:4px;transition:transform .16s ease,background-color .16s ease,box-shadow .16s ease}
 .lib.expanded .tile:hover,.lib.expanded .tile:focus-within{transform:translateY(-3px);background:var(--panel2);box-shadow:0 10px 24px rgba(0,0,0,.35)}
@@ -6275,34 +6274,25 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 /* 0.7.1 t2061u: Settings > Library > Tile size did nothing. Library.js sets .lib[data-tiles], but only the old --tmin rule on .lib.expanded
    read it, and later layout rules fixed the columns for every size (the expanded panel at 132px !important, the side panel at 3 columns,
    the phone / narrow page at 2). Each layout now follows the size. Large (the default) = the 0.7.1 look of every layout, so nothing changes after
-   an update; Medium and Small step down. Phones and the narrow page never go below about 72px a tile (Small = 4 columns). */
+   an update; Medium steps down one. 0.7.1 t2066u: two sizes only (Small is gone; a stored 'small' loads as Medium, libsort.js). */
 @media (min-width:901px){
   .desk.libexpanded .libpanel .lib[data-tiles=large] .tilegrid{grid-template-columns:repeat(auto-fill,132px)!important}
   .desk.libexpanded .libpanel .lib[data-tiles=medium] .tilegrid{grid-template-columns:repeat(auto-fill,112px)!important}
-  .desk.libexpanded .libpanel .lib[data-tiles=small] .tilegrid{grid-template-columns:repeat(auto-fill,96px)!important}
 }
 :is(.lib.compact[data-tiles=large], .libpanel .lib[data-tiles=large]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(3,minmax(0,1fr))}
 :is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 6px}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) :is(.tilegrid, .tilegrid.tg-radio, .radiotab2 .tilegrid){grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 5px}
 @media (max-width:900px){
   .view .lib[data-tiles=large] .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .view .lib[data-tiles=medium] .tilegrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px}
-  .view .lib[data-tiles=small] .tilegrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 8px}
 }
 /* smaller tiles get a smaller play button and text so the art stays visible (phone / narrow page and the side panel) */
 @media (max-width:900px){
   .view .lib[data-tiles=medium] .tile .tileplay{width:34px;height:34px;right:6px;bottom:6px;font-size:12px}
-  .view .lib[data-tiles=small] .tile .tileplay{width:28px;height:28px;right:4px;bottom:4px;font-size:11px}
   .view .lib[data-tiles=medium] .tile .t1{font-size:.88rem}
-  .view .lib[data-tiles=small] .tile .t1{font-size:.78rem;margin-top:5px}
-  .view .lib:is([data-tiles=medium],[data-tiles=small]) .tile .t2{font-size:.72rem}
-  .view .lib[data-tiles=small] .tile .t3{display:none}
+  .view .lib[data-tiles=medium] .tile .t2{font-size:.72rem}
 }
 :is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) .tile .tileplay{width:26px;height:26px;right:4px;bottom:4px;font-size:10px}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .tileplay{width:22px;height:22px;right:3px;bottom:3px;font-size:9px}
-:is(.lib.compact, .libpanel .lib:not(.expanded)):is([data-tiles=medium],[data-tiles=small]) .tile .t3{display:none}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t1{font-size:11px;line-height:1.25;overflow-wrap:anywhere}
-:is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t2{display:none}
+:is(.lib.compact[data-tiles=medium], .libpanel .lib[data-tiles=medium]:not(.expanded)) .tile .t3{display:none}
 /* 0.7.1 t2063u: the Parallel Flow emblem is the menu button wherever the hamburger shows (phone, narrow PC; wide PC has none).
    Theme colors come from logo.js (top wave = Wav color, bottom = Wiz). The header logo keeps only the wordmark next to it, so there is
    one emblem. Reads as a button: themed surface + border, a glow while pressed / while the menu is open, a focus ring; 44px hit area. */

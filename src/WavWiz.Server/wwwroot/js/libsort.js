@@ -24,14 +24,15 @@ export const cmpName = (a, b) => coll.compare(String(a ?? ''), String(b ?? ''));
 // 0.2.1 F4 + F8: the Expanded Library opens in tiles on every tab (Large tiles by default). Settings > Library > Library view sets the default
 // view, the tile size, the default album sort and whether a tab remembers its own Tiles/List choice. All per browser (this device).
 export const VIEW_TABS = ['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites', 'remote', 'radio', 'playlists'];
-export const TILE_SIZES = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
+// 0.7.1 t2066u: two sizes. Large (default) = the 0.7.1 look; Medium = one step down. A stored 'small' (0.7.0 and earlier) loads as 'medium'.
+export const TILE_SIZES = [['medium', 'Medium'], ['large', 'Large']];
 export const DEF_SORTS = [['artist', 'Artist A–Z'], ['name', 'Album A–Z'], ['recent', 'Recently added'], ['year', 'Year']];
 export const LIB_VIEW_DEFAULTS = Object.freeze({ defView: 'grid', tileSize: 'large', defSort: 'artist', remember: true });
 export function loadLibPrefs(store = globalThis.localStorage) {
   let p = null; try { p = JSON.parse(store?.getItem(LIB_KEY) || 'null'); } catch { /* corrupt */ }
   p = p && typeof p === 'object' ? p : {};
   const D = LIB_VIEW_DEFAULTS;
-  const defView = p.defView === 'list' ? 'list' : D.defView, tileSize = TILE_SIZES.some(([v]) => v === p.tileSize) ? p.tileSize : D.tileSize;
+  const defView = p.defView === 'list' ? 'list' : D.defView, tileSize = p.tileSize === 'small' ? 'medium' : TILE_SIZES.some(([v]) => v === p.tileSize) ? p.tileSize : D.tileSize;
   const defSort = DEF_SORTS.some(([v]) => v === p.defSort) ? p.defSort : D.defSort, remember = p.remember !== false;
   const sort = {}, flip = {}, views = {};
   for (const k of Object.keys(SORTS)) { sort[k] = SORTS[k].some(([v]) => v === p.sort?.[k]) ? p.sort[k] : (k === 'albums' ? defSort : DEFAULT_SORT[k]); flip[k] = p.flip?.[k] === true; }
