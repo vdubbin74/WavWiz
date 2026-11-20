@@ -119,7 +119,8 @@ public class Release020Tests
         string refJson = ""; for (var swR = System.Diagnostics.Stopwatch.StartNew(); swR.ElapsedMilliseconds < 10000; await Task.Delay(50)) { refJson = await (await admin.GetAsync("/api/v1/calibration/reference")).Content.ReadAsStringAsync(); if (refJson.Contains("\"connected\":true")) break; }   // 0.4.4 H3: poll
         Assert.Equal("{\"zoneId\":" + idb + ",\"name\":\"Garage\",\"connected\":true}", refJson);
         var zs = await admin.GetJson("/api/v1/zones");
-        Assert.True(zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == idb).GetProperty("reference").GetBoolean());
+        Assert.False(zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == idb).GetProperty("reference").GetBoolean());   // 0.7.1: the house reference is internal (no REF tag); it still times the Unassigned speakers
+        Assert.Equal(idb, zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == idb).GetProperty("timedBy").GetInt64());
         Assert.False(zs.EnumerateArray().First(z => z.GetProperty("id").GetInt64() == ida).GetProperty("reference").GetBoolean());
         Assert.Equal("{\"calibration.referenceZoneId\":" + idb + "}", "{\"calibration.referenceZoneId\":" + f.Server.S.Db.Setting("calibration.referenceZoneId") + "}");
         var s = await (await admin.PostAsJsonAsync("/api/v1/calibration/sessions", new { mode = "phone" })).Json();      // no reference given -> the house reference
