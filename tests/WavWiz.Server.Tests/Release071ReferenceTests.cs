@@ -214,4 +214,38 @@ public class Release071ReferenceTests
         Assert.Equal(HttpStatusCode.OK, (await admin.DeleteAsync($"/api/v1/groups/{deck}")).StatusCode);
         Assert.Equal(40, await Lat(40)); Assert.Empty(S.Zones.HouseOffsets());
     }
+
+    [Fact]
+    public async Task Upgrade_keeps_references_and_delays_exactly_no_flags_no_offsets()
+    {
+        await using var f = await ServerFixture.StartAsync(); f.SkipEverywhere(); var admin = f.As(f.Token(Role.Admin)); var S = f.Server.S;
+        await using var a = await FakePc.StartAsync(f, "pc-a", "Den", kind: "analog"); await using var b = await FakePc.StartAsync(f, "pc-b", "Den BT", kind: "bluetooth", bt: "AA:BB:CC:DD:EE:02");
+        await a.WaitConnected(); await b.WaitConnected();
+        for (int i = 0; i < 100 && S.Zones.Zones().Count < 2; i++) await Task.Delay(50);
+        long Id(string p) => S.Zones.Zones().First(z => z.PlayerId == p).Id;
+        long dA = Id("pc-a"), dB = Id("pc-b");
+        long den = (await (await admin.PostAsJsonAsync("/api/v1/groups", new { name = "Den", deviceIds = new[] { dA, dB } })).Json()).GetProperty("id").GetInt64();
+        // a 0.7.0 database: the user chose the Bluetooth speaker as Den's reference (not the recommended one), both calibrated (reference at 12 ms)
+        string Dev(long z) => S.Zones.Zone(z)!.Outputs.First(o => o.Active).DeviceId;
+        foreach (var (z, l) in new[] { (dA, 57.0), (dB, 12.0) })
+            S.Db.Exec("INSERT INTO calibration(output_device_id,latency_ms,raw_latency_ms,method,measured_at,is_current) VALUES($d,$l,0,'mic',$t,1)", ("$d", Dev(z)), ("$l", l), ("$t", DateTimeOffset.UtcNow.ToString("O")));
+        S.Db.SetSetting(ZoneRefs.MapKey, ZoneRefs.MapJson(new Dictionary<long, long> { [den] = dB }));
+        S.Db.DeleteSetting(ZoneManager.RefOutKey); S.Db.DeleteSetting(ZoneManager.HouseOffKey); S.Db.DeleteSetting(ZoneRefs.NoteKey);
+        var raw0 = S.Db.Query("SELECT output_device_id,latency_ms,COALESCE(raw_latency_ms,0) FROM calibration ORDER BY id", r => (r.GetString(0), r.GetDouble(1), r.GetDouble(2))).ToList();
+
+        var g = (await Groups(admin))["Den"];
+        Assert.Equal(dB, L(g, "referenceId"));                                     // the user's reference is kept (even though A is recommended)
+        Assert.Equal(dA, L(g, "recommendedId"));                                   // ... the better one is only offered
+        Assert.Equal(JsonValueKind.Null, g.GetProperty("refFlag").ValueKind);     // no flag on upgrade
+        Assert.Equal(JsonValueKind.Null, g.GetProperty("refNote").ValueKind);
+        Assert.Equal(0, g.GetProperty("houseOffsetMs").GetDouble());
+        Assert.Equal(57, S.Zones.Zone(dA)!.Outputs.First(o => o.Active).LatencyMs); Assert.Equal(12, S.Zones.Zone(dB)!.Outputs.First(o => o.Active).LatencyMs);
+        S.Zones.PushZone(S.Audio.Get("pc-a")!); S.Zones.PushZone(S.Audio.Get("pc-b")!);
+        for (int i = 0; i < 100 && (a.Client.State.LatencyMs != 57 || b.Client.State.LatencyMs != 12); i++) await Task.Delay(30);
+        Assert.Equal(57, a.Client.State.LatencyMs); Assert.Equal(12, b.Client.State.LatencyMs);   // identical playback timing
+        Assert.Equal(raw0, S.Db.Query("SELECT output_device_id,latency_ms,COALESCE(raw_latency_ms,0) FROM calibration ORDER BY id", r => (r.GetString(0), r.GetDouble(1), r.GetDouble(2))).ToList());   // nothing re-based
+        Assert.Contains(den.ToString(), S.Db.Setting(ZoneManager.RefOutKey));   // the reference's output becomes its baseline, silently
+        var zs = (await admin.GetJson("/api/v1/zones")).EnumerateArray().ToDictionary(z => z.GetProperty("id").GetInt64(), z => z.GetProperty("reference").GetBoolean());
+        Assert.True(zs[dB]); Assert.False(zs[dA]);   // REF tag unchanged
+    }
 }
