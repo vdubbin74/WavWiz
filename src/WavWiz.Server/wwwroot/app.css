@@ -5958,29 +5958,33 @@ html[data-edgelight="dual"] .tree42 .qb42.playing > .cgrip69::before {
   background: repeating-linear-gradient(180deg, transparent 0 10px, color-mix(in srgb, #fff 45%, var(--accent)) 10px 12px, transparent 12px 22px);
   opacity: .28; animation: ww-lp-shim 2.4s linear infinite;
 }
-/* Waveform (default, t2057u/t2058u): two interwoven wave lines - the theme's main color and its second color, half a wave apart -
-   flowing down the edge of a PLAYING zone only. Fixed 40px wavelength and 3.6px swing (an SVG mask tile, repeat-y), so a collapsed card
-   shows fewer waves at the same size and speed as an expanded one. Each line is a layer one wavelength taller than the card that moves
-   exactly one wavelength per loop (transform only): seamless. While the wave shows, the trim is 10px wide over a dim tint of the main
-   color. Idle / empty zones keep the plain solid edge (no wave); reduced motion shows the wave standing still. */
+/* Waveform (default, t2057u/t2058u/t2060u): two interwoven glowing wave lines - the theme's main color and its second color, half a
+   wave apart - on PLAYING zones only. They take turns: one swells (wider swing) and brightens while the other shrinks and dims, crossfading
+   every 1.4s, so the pair weaves and breathes; a slow downward drift (40px per 2.8s) keeps it flowing. Each line's glow is in its mask
+   (a soft wide stroke under the crisp 2px core), so it costs nothing per frame. Fixed 40px wavelength in px: a collapsed card shows fewer
+   waves at the same size. Animated: `scale` (swing), `opacity` (brightness) and `translate` (drift) only - composited.
+   The layers are one wave taller than the card and clipped to its height (clip-path), but may glow 6px past the 10px edge.
+   Idle / empty zones keep the plain solid edge; reduced motion shows the glowing wave standing still. */
 :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69 {
-  --ww-trim-w: 10px; opacity: 1;
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel, #000)) !important;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent);
+  --ww-trim-w: 10px; opacity: 1; overflow: visible; clip-path: inset(0 -6px 0 -6px);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel, #000)) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::before,
 :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after {
-  content: ""; position: absolute; left: 0; right: 0; top: -40px; bottom: 0; height: auto; min-height: 0; box-shadow: none; opacity: 1;
-  -webkit-mask-repeat: repeat-y; mask-repeat: repeat-y; -webkit-mask-size: 10px 40px; mask-size: 10px 40px;
-  pointer-events: none; will-change: transform; animation: ww-lp-wave .6s linear infinite;
+  content: ""; position: absolute; left: -2px; right: auto; width: 14px; top: -40px; bottom: 0; height: auto; min-height: 0; box-shadow: none;
+  -webkit-mask-repeat: repeat-y; mask-repeat: repeat-y; -webkit-mask-size: 14px 40px; mask-size: 14px 40px;
+  pointer-events: none; will-change: transform, opacity; transform: none;
+  animation: ww-lp-weave 1.4s ease-in-out infinite alternate, ww-lp-drift 2.8s linear infinite;
 }
-:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::before { background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cpath d='M5 -2 C 8.6 4.5 8.6 13.5 5 20 C 1.4 26.5 1.4 35.5 5 42' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cpath d='M5 -2 C 8.6 4.5 8.6 13.5 5 20 C 1.4 26.5 1.4 35.5 5 42' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E"); }
-:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after { background: var(--accent2); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cpath d='M5 -2 C 1.4 4.5 1.4 13.5 5 20 C 8.6 26.5 8.6 35.5 5 42' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cpath d='M5 -2 C 1.4 4.5 1.4 13.5 5 20 C 8.6 26.5 8.6 35.5 5 42' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E"); }
+:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::before { background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='40' viewBox='0 0 14 40'%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.12' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.32' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='1' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='40' viewBox='0 0 14 40'%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.12' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.32' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='1' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+:is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after { background: var(--accent2); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='40' viewBox='0 0 14 40'%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.12' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.32' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='1' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='40' viewBox='0 0 14 40'%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.12' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='0.32' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42' fill='none' stroke='%23000' stroke-opacity='1' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); animation-delay: -1.4s, 0s; }
 /* Off: a static lit edge, no travel */
 html[data-edgelight="off"] .tree42 .qb42.playing > .cgrip69::after { opacity: 0; animation: none; }
 @keyframes ww-lp-one { 0% { transform: translateY(-52%); } 100% { transform: translateY(calc(50% + var(--lp-t))); } }
 @keyframes ww-lp-dual { 0% { transform: translateY(-84%); } 100% { transform: translateY(calc(50% + var(--lp-t))); } }
-@keyframes ww-lp-wave { 0% { transform: translateY(0); } 100% { transform: translateY(40px); } }
+@keyframes ww-lp-weave { 0% { scale: 1.3 1; opacity: 1; } 100% { scale: .7 1; opacity: .45; } }
+@keyframes ww-lp-drift { 0% { translate: 0 0; } 100% { translate: 0 40px; } }
 @keyframes ww-lp-shim { 0% { transform: translateY(-44px); } 100% { transform: translateY(0); } }
 @keyframes ww-lp-beat { 0% { opacity: 1; } 100% { opacity: .7; } }
 @media (prefers-reduced-motion: reduce) {
@@ -5988,7 +5992,7 @@ html[data-edgelight="off"] .tree42 .qb42.playing > .cgrip69::after { opacity: 0;
   html .tree42 .qb42.playing > .cgrip69::after, html .tree42 .qb42.playing > .cgrip69::before { opacity: 0 !important; }
   html .tree42 .qb42.playing > .cgrip69 { opacity: 1 !important; }
   /* Waveform: the two lines stand still */
-  :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::before, :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after { opacity: 1 !important; transform: translateY(0); }
+  :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::before, :is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69::after { opacity: .9 !important; scale: 1 1; translate: 0 0; }
 }
 
 /* Room for a 6px trim instead of the old 22–42px handle column */

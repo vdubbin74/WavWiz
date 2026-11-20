@@ -34,11 +34,19 @@ test('CSS: one rule per style on the playing trim; Waveform is the default and u
   assert.ok(css.includes(W + '::before { background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,'), 'line 1: theme main color through an SVG wave mask');
   assert.ok(css.includes(W + '::after { background: var(--accent2); -webkit-mask-image: url("data:image/svg+xml,'), 'line 2: theme second color');
   const masks = [...css.matchAll(/mask-image: url\("data:image\/svg\+xml,([^"]+)"\)/g)].map(m => decodeURIComponent(m[1]));
-  assert.ok(masks.some(m => m.includes("M5 -2 C 8.6 4.5 8.6 13.5 5 20 C 1.4 26.5 1.4 35.5 5 42")) && masks.some(m => m.includes("M5 -2 C 1.4 4.5 1.4 13.5 5 20 C 8.6 26.5 8.6 35.5 5 42")), 'the two lines are half a wave apart (woven)');
-  assert.match(css, /mask-size: 10px 40px;/, 'fixed 40px wavelength in px: a collapsed card shows fewer waves, same size');
-  assert.match(css, /@keyframes ww-lp-wave \{ 0% \{ transform: translateY\(0\); \} 100% \{ transform: translateY\(40px\); \} \}/, 'moves exactly one wavelength: seamless, same speed on any card');
+  const A = 'M7 -2 C 10.6 4.5 10.6 13.5 7 20 C 3.4 26.5 3.4 35.5 7 42', B = 'M7 -2 C 3.4 4.5 3.4 13.5 7 20 C 10.6 26.5 10.6 35.5 7 42';
+  assert.ok(masks.some(m => m.includes(A)) && masks.some(m => m.includes(B)), 'the two lines are half a wave apart (woven)');
+  // t2060u: each line glows (a soft wide stroke under the crisp core, in the mask) and the two ALTERNATE (one swells + brightens while the other dims)
+  const mA = masks.find(m => m.includes(A));
+  assert.match(mA, /stroke-opacity='0\.12' stroke-width='9'/); assert.match(mA, /stroke-opacity='0\.32' stroke-width='5'/); assert.match(mA, /stroke-opacity='1' stroke-width='2'/);
+  assert.match(css, /mask-size: 14px 40px;/, 'fixed 40px wavelength in px: a collapsed card shows fewer waves, same size');
+  assert.match(css, /animation: ww-lp-weave 1\.4s ease-in-out infinite alternate, ww-lp-drift 2\.8s linear infinite;/);
+  assert.ok(css.includes(W + '::after { background: var(--accent2);') && /::after \{ background: var\(--accent2\);[^}]*animation-delay: -1\.4s, 0s; \}/.test(css), 'the second line is half a cycle behind: they take turns');
+  assert.match(css, /@keyframes ww-lp-weave \{ 0% \{ scale: 1\.3 1; opacity: 1; \} 100% \{ scale: \.7 1; opacity: \.45; \} \}/, 'swing + brightness: scale and opacity only');
+  assert.match(css, /@keyframes ww-lp-drift \{ 0% \{ translate: 0 0; \} 100% \{ translate: 0 40px; \} \}/, 'slow drift of exactly one wavelength: seamless');
+  assert.match(css, /cgrip69 \{\n  --ww-trim-w: 10px; opacity: 1; overflow: visible; clip-path: inset\(0 -6px 0 -6px\);/, 'clipped to the card height, glow may spill 6px sideways');
   assert.ok(!/\.qb42:not\(\.playing\)[^{]*cgrip69::(before|after)[^{]*\{[^}]*mask-image/.test(css) && !css.includes('.qb42.idle > .cgrip69::before'), 'idle / empty zones: plain edge, no wave');
-  assert.ok(css.includes(W + '::before, ' + W + '::after { opacity: 1 !important; transform: translateY(0); }'), 'reduced motion: the wave stands still');
+  assert.ok(css.includes(W + '::before, ' + W + '::after { opacity: .9 !important; scale: 1 1; translate: 0 0; }'), 'reduced motion: the glowing wave stands still');
   assert.match(css, /--lp-t: clamp\(8px, 22%, 64px\)/, 'Light pipe head scales with the card (was 28% with a 28px floor = a smear on a 42px card)');
   assert.doesNotMatch(css, /@keyframes ww-pipe/, 'the old top-animating travel is gone');
   const kf = [...css.matchAll(/@keyframes ww-lp-[a-z]+ \{([^\n]*)\}/g)].map(m => m[1]).join(' ');
