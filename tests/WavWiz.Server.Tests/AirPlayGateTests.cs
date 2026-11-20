@@ -29,11 +29,12 @@ public class AirPlayGateTests
     }
 
     [Fact]
-    public void House_needs_any_live_speaker()
+    public void House_needs_a_live_speaker_in_a_zone()
     {
         Assert.False(ZoneReceivers.AnyActiveSpeaker(Array.Empty<ZoneDto>()));
         Assert.False(ZoneReceivers.AnyActiveSpeaker(new[] { D(1, false, new() { 10 }), D(2, true, null, unavailable: true) }));
-        Assert.True(ZoneReceivers.AnyActiveSpeaker(new[] { D(1, false, new() { 10 }), D(2, true, new()) }));   // an Unassigned live speaker plays in the house group
+        Assert.False(ZoneReceivers.AnyActiveSpeaker(new[] { D(1, false, new() { 10 }), D(2, true, new()) }));   // 0.7.1 t2078u: an Unassigned live speaker is silent - does not count
+        Assert.True(ZoneReceivers.AnyActiveSpeaker(new[] { D(1, true, new() { 10 }), D(2, true, new()) }));
     }
 
     [Fact]

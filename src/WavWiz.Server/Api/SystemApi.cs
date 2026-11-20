@@ -221,6 +221,7 @@ public static class SystemApi
     public static object ReceiversDto(Services s) => new
     {
         airplay = new { name = Receivers.AirPlayReceiver.Name, enabled = s.Cfg.AirPlay, installed = s.AirPlay?.Installed ?? false, running = s.AirPlay?.Running ?? false, ready = s.AirPlay?.Ready ?? false, port = s.Cfg.AirPlayPort, inSession = s.AirPlay?.InSession ?? false, title = s.AirPlay?.Title, lastSender = s.AirPlay?.LastSender, levelDb = s.AirPlay?.LevelDb ?? 0, lastError = s.AirPlay?.LastError, restarts = s.AirPlay?.Restarts ?? 0 },
+        houseReady = s.ZoneRecv?.HouseAllowed ?? true,   // 0.7.1 t2078u: false = "WavWiz – Everywhere" hidden until a speaker in a zone is online
         spotify = new { name = Receivers.SpotifyReceiver.Name, enabled = s.Spotify?.Enabled ?? false, installed = s.Spotify?.Installed ?? false, running = s.Spotify?.Running ?? false, port = s.Cfg.SpotifyPort, inSession = s.Spotify?.SessionActive ?? false, title = s.Spotify?.Title, user = s.Spotify?.User, levelDb = s.Spotify?.LevelDb ?? 0, zeroconfFallback = s.Spotify?.ZeroconfFallback ?? false, lastError = s.Spotify?.LastError, restarts = s.Spotify?.Restarts ?? 0 },
     };
     /// <summary>One bad stored value must not break GET /settings.</summary>

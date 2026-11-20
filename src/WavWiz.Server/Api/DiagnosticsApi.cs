@@ -78,11 +78,13 @@ public static class DiagnosticsApi
         if (s.AirPlay is { } ap)
             checks.Add(!s.Cfg.AirPlay ? new DiagCheck("airplay", "AirPlay speaker", "ok", "Switched off in server.json (airPlay: false).", null)
                 : !ap.Installed ? new DiagCheck("airplay", "AirPlay speaker", "warn", "The AirPlay receiver is not installed.", "Run the WavWiz installer again.")
+                : !ap.Running && s.ZoneRecv is { HouseAllowed: false } ? new DiagCheck("airplay", "AirPlay speaker", "ok", $"\"{Receivers.AirPlayReceiver.Name}\" is hidden on phones until a speaker in a zone is online (add a speaker to a zone in Devices).", null)   // 0.7.1 t2078u
                 : ap.Running && ap.Ready ? new DiagCheck("airplay", "AirPlay speaker", "ok", $"\"{Receivers.AirPlayReceiver.Name}\" is listening on TCP {s.Cfg.AirPlayPort}{(ap.InSession ? " and is playing from a phone or Mac" + (ap.Title != null ? $" ({ap.Title})" : "") : "")}; mDNS (Bonjour) is {(s.Discovery?.MdnsActive == true ? "on" : "off")}.", s.Discovery?.MdnsActive == true ? null : "Without mDNS iPhones cannot see the speaker; check that UDP 5353 is allowed on the private network.")
                 : new DiagCheck("airplay", "AirPlay speaker", "fail", "The AirPlay receiver is not running" + (ap.LastError != null ? $" ({ap.LastError})" : "") + ".", $"Another program may be using TCP {s.Cfg.AirPlayPort}. Restart the WavWiz service."));
         if (s.Spotify is { } sp)
             checks.Add(!sp.Enabled ? new DiagCheck("spotify", "Spotify Connect", "ok", "Off (optional add-on; turn it on in Settings > Network).", null)
                 : !sp.Installed ? new DiagCheck("spotify", "Spotify Connect", "warn", "librespot is not installed.", "Run the WavWiz installer again.")
+                : !sp.Running && s.ZoneRecv is { HouseAllowed: false } ? new DiagCheck("spotify", "Spotify Connect", "ok", $"\"{Receivers.SpotifyReceiver.Name}\" is hidden in the Spotify app until a speaker in a zone is online (add a speaker to a zone in Devices).", null)   // 0.7.1 t2078u
                 : sp.Running ? new DiagCheck("spotify", "Spotify Connect", "ok", $"\"{Receivers.SpotifyReceiver.Name}\" is available in the Spotify app on this network (zeroconf TCP {s.Cfg.SpotifyPort}{(sp.ZeroconfFallback ? ", advertised by WavWiz" : "")}){(sp.SessionActive ? "; playing" + (sp.Title != null ? $" {sp.Title}" : "") : "")}. Requires Spotify Premium.", null)
                 : new DiagCheck("spotify", "Spotify Connect", "fail", "librespot is not running" + (sp.LastError != null ? $" ({sp.LastError})" : "") + ".", "Turn Spotify Connect off and on again, or restart the WavWiz service."));
 

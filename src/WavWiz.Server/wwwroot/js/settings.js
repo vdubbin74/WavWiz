@@ -183,7 +183,8 @@ export async function openSettings(S, refresh, nav, section) {
       intro: 'WavWiz listens only on the address chosen at install (never “all interfaces” unless you opt in). Away-from-home access uses Tailscale only — nothing is opened to the public internet.' }));
     panes.network.push(awayPanel(S, { onLoad: () => search.reindex() }).el);
     // 0.1.2: AirPlay + Spotify Connect with level (0…+6 dB) arrows
-    const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : rc.airplay.installed ? 'Not running - see Diagnostics.' : 'Not installed on this PC.') : '';
+    // 0.7.1 t2078u: the house name waits for a live speaker in a zone (houseReady false = hidden on phones, not broken)
+    const apState = rc?.airplay ? (rc.airplay.running && rc.airplay.ready ? (rc.airplay.inSession ? 'Playing from a phone or Mac now.' : 'Ready.') : !rc.airplay.installed ? 'Not installed on this PC.' : rc.houseReady === false ? 'Hidden until a speaker in a zone is online.' : 'Not running - see Diagnostics.') : '';
     const levelRow = (key, label, cur) => {
       let val = Math.max(0, Math.min(6, Math.round(Number(cur) || 0)));
       const shown = h('span', { class: 'mono', style: 'min-width:3.5em;text-align:center' }, `+${val} dB`);
@@ -202,7 +203,7 @@ export async function openSettings(S, refresh, nav, section) {
     const apLv = typeof settings['airplay.levelDb'] === 'number' ? settings['airplay.levelDb'] : (rc?.airplay?.levelDb ?? 0);
     const spLv = typeof settings['spotify.levelDb'] === 'number' ? settings['spotify.levelDb'] : (rc?.spotify?.levelDb ?? 0);
     panes.network.push(h('div', { class: 'card', id: 'sec-airplay' }, h('h3', null, 'AirPlay & Spotify Connect'),
-      h('p', null, h('b', null, 'AirPlay: '), '“WavWiz – Everywhere” is always on. On an iPhone, iPad or Mac, pick it in Control Center > AirPlay (or the AirPlay button in any app); it plays in every zone. ', h('span', { class: 'dim small' }, apState)),
+      h('p', null, h('b', null, 'AirPlay: '), '“WavWiz – Everywhere” shows while a speaker in a zone is online. On an iPhone, iPad or Mac, pick it in Control Center > AirPlay (or the AirPlay button in any app); it plays in every zone. ', h('span', { class: 'dim small' }, apState)),
       levelRow('airplay.levelDb', 'AirPlay boost', apLv),   // 0.7.1 t2075: was "AirPlay level" (read as AirPlay out)
       admin
         ? h('label', { class: 'row', style: 'margin-top:12px' }, h('input', { type: 'checkbox', id: 'spotify-enabled', checked: settings['spotify.enabled'] === true, onchange: ev => putSettings({ 'spotify.enabled': ev.target.checked }) }), h('b', null, 'Spotify Connect'), h('span', { class: 'dim small' }, 'Requires Spotify Premium.'))

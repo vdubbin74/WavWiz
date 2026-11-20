@@ -79,7 +79,8 @@ public sealed class WavWizServer : IAsyncDisposable
         s.Remote = new Library.SubsonicService(db, cfg.DataDir); Playback.Conductor.RemoteResolver = s.Remote.StreamUrl;     // F164
         s.AirPlay = new Receivers.AirPlayReceiver(s, u._log.Write); s.Spotify = new Receivers.SpotifyReceiver(s, u._log.Write);
         s.ZoneRecv = new Receivers.ZoneReceivers(s, u._log.Write); s.Links.Applied += () => s.ZoneRecv.Sync();
-        s.ZoneRecv.ActiveZones = () => Receivers.ZoneReceivers.ActiveZoneIds(s.Zones.Zones()); s.ZoneRecv.AnyActive = () => Receivers.ZoneReceivers.AnyActiveSpeaker(s.Zones.Zones());   // AirPlay names show only with a live speaker
+        s.ZoneRecv.ActiveZones = () => Receivers.ZoneReceivers.ActiveZoneIds(s.Zones.Zones()); s.ZoneRecv.AnyActive = () => Receivers.ZoneReceivers.AnyActiveSpeaker(s.Zones.Zones());   // AirPlay names show only with a live speaker (house: one in a zone)
+        s.Spotify.HouseGate = () => s.ZoneRecv.HouseAllowed;   // 0.7.1 t2078u
         s.Discovery.Extra = (host, ip) => new[] { s.AirPlay is { Running: true } ap ? ap.MdnsRecords(host, ip) : null, s.Spotify?.MdnsRecords(host, ip) }.Where(g => g != null).Select(g => g!).Concat(s.ZoneRecv.MdnsGroups(host, ip).Select(g => g.ToList()));
         s.Discovery.Start();
         if (Net.NetworkHelper.DockerHint(cfg) is { } dockerHint) u._log.Write(dockerHint);     // 0.7.1 t2069u: Docker bridge mode without WAVWIZ_ADVERTISE_ADDRESS (or a bad one)

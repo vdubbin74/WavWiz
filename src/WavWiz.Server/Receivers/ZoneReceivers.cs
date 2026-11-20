@@ -12,7 +12,9 @@ public sealed record ZoneReceiverTarget(long Id, string Key, string Name, int Po
 /// 0.4.0 Stage 4: ONE name per zone. A zone that has "AirPlay" and/or "Spotify Connect" switched on shows up on phones as "WavWiz – &lt;zone name&gt;" (the same
 /// name for both), and what a phone sends plays in THAT zone's playback group (its linked zones too), never in another zone. Off by default per zone: an
 /// idle zone with no receiver costs nothing, an enabled one costs one small child process per protocol (shairplay = AirPlay 1 / RAOP, librespot).
-/// The "WavWiz – Everywhere" receivers of 0.3.9 stay exactly as they were (house group).
+/// The house "WavWiz – Everywhere" receivers play in the house group and link every named zone into it for the session (ZoneLinks.EverywhereBegin).
+/// 0.7.1 t2078u: they show on phones only while a speaker IN A ZONE is online (an Unassigned speaker is silent, so it does not count), and a zone
+/// named "Everywhere" gets "WavWiz – Everywhere zone" for its own receiver so two names never clash (<see cref="NameOf"/>).
 /// Settings: receivers.zones = { "&lt;zone id&gt;": { airplay, spotify } }, receivers.ports and receivers.hw (stable per-zone ports and AirPlay hardware addresses).
 /// </summary>
 public sealed class ZoneReceivers : IDisposable
@@ -24,21 +26,32 @@ public sealed class ZoneReceivers : IDisposable
     private bool _disposed; private string? _gateSig;
     /// <summary>Zone ids (playback groups) with at least one active speaker right now; null = no gate (tests / early start).</summary>
     public Func<HashSet<long>>? ActiveZones;
-    /// <summary>True when any speaker the house "Everywhere" receiver can play to is active.</summary>
+    /// <summary>True when the house "Everywhere" receiver has a speaker to play to: an active speaker in a named zone (<see cref="AnyActiveSpeaker"/>).</summary>
     public Func<bool>? AnyActive;
 
     /// <summary>Active speaker: online like Devices (live player session, or a connected AirPlay-out sink), and its chosen output not unavailable. Muted / volume 0 still counts.</summary>
     public static bool IsActive(Zones.ZoneDto d) => d.Connected && !d.OutputUnavailable;
     /// <summary>Zone ids that have at least one active speaker as a member. Unassigned speakers belong to no zone.</summary>
     public static HashSet<long> ActiveZoneIds(IEnumerable<Zones.ZoneDto> devices) => devices.Where(IsActive).SelectMany(d => d.GroupIds ?? new()).ToHashSet();
-    /// <summary>Everywhere links every zone into the house group, and Unassigned speakers already play in the house group, so any active speaker counts.</summary>
-    public static bool AnyActiveSpeaker(IEnumerable<Zones.ZoneDto> devices) => devices.Any(IsActive);
+    /// <summary>Everywhere links every named zone into the house group. Unassigned speakers are silent (0.6.8 zone fix, ZoneLinks.Apply), so only an
+    /// active speaker that is IN a zone counts. 0.7.1 t2078u: was any active speaker, so "WavWiz – Everywhere" showed on phones and played nowhere when
+    /// every speaker was Unassigned (no zones yet, or the "Everywhere" zone deleted).</summary>
+    public static bool AnyActiveSpeaker(IEnumerable<Zones.ZoneDto> devices) => devices.Any(d => IsActive(d) && d.GroupIds is { Count: > 0 });
     /// <summary>Should a zone's receiver run: toggle on AND (no gate wired, or the zone has an active speaker).</summary>
     public static bool ZoneGate(bool toggle, long zoneId, HashSet<long>? active) => toggle && (active == null || active.Contains(zoneId));
     public ZoneReceivers(Services s, Action<string>? log) { _s = s; _log = log; }
 
     public sealed record ZoneCfg(bool AirPlay, bool Spotify);
-    public static string NameOf(string zoneName) => Prefix + zoneName.Trim();
+    /// <summary>A zone's own AirPlay / Spotify name. 0.7.1 t2078u: a zone called "Everywhere" (0.6.8-0.7.0 made one on a fresh setup) would show the same
+    /// "WavWiz – Everywhere" as the house receiver - two identical names on the phone, one playing everywhere, one in that zone. That zone's own name
+    /// gets " zone" instead: the house name that phones and the Spotify app already know stays as it is, and no zone name is refused.</summary>
+    public static string NameOf(string zoneName)
+    {
+        var n = Prefix + zoneName.Trim();
+        return string.Equals(n, AirPlayReceiver.Name, StringComparison.OrdinalIgnoreCase) || string.Equals(n, SpotifyReceiver.Name, StringComparison.OrdinalIgnoreCase) ? n + " zone" : n;
+    }
+    /// <summary>0.7.1 t2078u: the house receivers' gate right now (Settings / Diagnostics say why "WavWiz – Everywhere" is hidden).</summary>
+    public bool HouseAllowed { get { try { return AnyActive?.Invoke() ?? true; } catch { return true; } } }
 
     public Dictionary<long, ZoneCfg> Config()
     {
@@ -139,14 +152,21 @@ public sealed class ZoneReceivers : IDisposable
         }
     }
     private string Sig(HashSet<long>? active) { bool any; try { any = AnyActive?.Invoke() ?? true; } catch { any = true; } return (any ? "1" : "0") + ":" + (active == null ? "*" : string.Join(",", active.OrderBy(x => x))); }
-    /// <summary>House "WavWiz – Everywhere" AirPlay: runs only while AirPlay is on in server settings AND some speaker is active. True when it started/stopped.</summary>
+    /// <summary>House "WavWiz – Everywhere": AirPlay runs only while AirPlay is on in server settings AND a speaker in a zone is active; 0.7.1 t2078u:
+    /// Spotify Connect (when switched on) follows the same gate. True when one started/stopped.</summary>
     private bool HouseGate()
     {
-        var h = _s.AirPlay; if (h == null || !_s.Cfg.AirPlay || IsLoopbackOnly()) return false;
-        bool any; try { any = AnyActive?.Invoke() ?? true; } catch { any = true; }
-        if (any && !h.Running) { h.Start(); _ = Task.Run(async () => { for (int i = 0; i < 20 && !h.Ready; i++) await Task.Delay(500); if (h.Ready) _s.Discovery?.AnnounceSoon(); }); return true; }
-        if (!any && h.Running) { h.Stop(); _log?.Invoke("airplay: no live speaker - \"" + AirPlayReceiver.Name + "\" hidden until one is online"); return true; }
-        return false;
+        if (IsLoopbackOnly()) return false;
+        bool any = HouseAllowed, changed = false;
+        var h = _s.AirPlay;
+        if (h != null && _s.Cfg.AirPlay)
+        {
+            if (any && !h.Running) { h.Start(); _ = Task.Run(async () => { for (int i = 0; i < 20 && !h.Ready; i++) await Task.Delay(500); if (h.Ready) _s.Discovery?.AnnounceSoon(); }); changed = true; }
+            else if (!any && h.Running) { h.Stop(); _log?.Invoke("airplay: no live speaker in a zone - \"" + AirPlayReceiver.Name + "\" hidden until one is online"); changed = true; }
+        }
+        var sp = _s.Spotify;
+        if (sp != null && sp.Enabled && sp.Installed && sp.Running != any) { sp.Apply(); changed = true; if (!any) _log?.Invoke("spotify: no live speaker in a zone - \"" + SpotifyReceiver.Name + "\" hidden until one is online"); }
+        return changed;
     }
     /// <summary>Called every couple of seconds: re-Sync only when the set of zones with a live speaker (or "any speaker") changed.</summary>
     public void Tick()

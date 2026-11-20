@@ -86,10 +86,13 @@ public sealed class SpotifyReceiver : IDisposable
     public string? LastError => _proc.LastError;
     public int Restarts => _proc.Restarts;
 
-    /// <summary>Start or stop to match the admin setting.</summary>
+    /// <summary>0.7.1 t2078u: the house receiver also waits for a live speaker in a zone (ZoneReceivers sets this; null = no gate, tests / early start).</summary>
+    public Func<bool>? HouseGate;
+    /// <summary>Start or stop to match the admin setting (and, for the house receiver, <see cref="HouseGate"/>).</summary>
     public void Apply()
     {
-        if (Enabled) { Bind(); EnsureHook(); _proc.Start(); }
+        bool gate; try { gate = _zt != null || (HouseGate?.Invoke() ?? true); } catch { gate = true; }
+        if (Enabled && gate) { Bind(); EnsureHook(); _proc.Start(); }
         else { _proc.Stop(); End(); ZeroconfFallback = false; }
     }
 
