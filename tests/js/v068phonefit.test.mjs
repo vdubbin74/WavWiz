@@ -41,6 +41,6 @@ assert.match(css, /html\.wtb \.topbar\.wtitlebar \.conn #conntxt\{position:absol
 assert.ok(!/html\.wtb[^{]*\{[^}]*#conn\.dot[^}]*display:\s*none/.test(css), 'narrow wtb does not hide the dot');
 
 const main = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/main.js', import.meta.url), 'utf8');
-assert.match(main, /class: 'iconbtn hamburger'[\s\S]*class: 'hb-bars'/);
+assert.match(main, /class: 'iconbtn hamburger logomenu'[^\n]*emblem\('pf-emblem hb-emblem'\)/);   // 0.7.1 t2063u: the emblem replaced the CSS bars
 assert.match(main, /class: 'dot', id: 'conn'/);
 console.log('v068phonefit ok');

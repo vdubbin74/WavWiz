@@ -27,6 +27,7 @@ import { loadLayout, saveLayout, setLocked, CLEAR_LOCK_HINT } from './plcols.js'
 import { installMiniTargets, pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { GLIDE, glide, holdFor, holdPage, pulse, pulseSel, reduced } from './motion.js';
 import { brandMark } from './brand.js';
+import { emblem } from './logo.js';   // 0.7.1 t2063u: the menu button
 import { installTitlebar, titlebarLogo } from './titlebar.js';   // 0.6.8-#16
 import { loadNpPrefs, npVars, applyNpColor, applyNpClasses } from './npstyle.js';
 import { createMenuBar, createPhoneDrawerNav, drawerOutsideClick } from './menu.js';
@@ -274,7 +275,8 @@ async function startMain() {
   content = h('main', { class: 'view', id: 'view', tabindex: -1 });
   S.view = wide() ? 'library' : 'now';
 
-  const hamburger = h('button', { class: 'iconbtn hamburger', 'aria-label': 'Menu', 'aria-expanded': 'false', onclick: () => toggleDrawer(true) }, h('span', { class: 'hb-bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')));
+  // 0.7.1 t2063u: the menu button IS the Parallel Flow emblem (theme colors: top = Wav, bottom = Wiz); the header logo then shows the wordmark only (CSS)
+  const hamburger = h('button', { type: 'button', class: 'iconbtn hamburger logomenu', 'aria-label': 'Menu', 'aria-expanded': 'false', title: 'Menu', onclick: () => toggleDrawer(true) }, emblem('pf-emblem hb-emblem'));
   const menubar = createMenuBar(S, { go, refreshAll, act, openSetup, openMini, openQueue, openNew, jumpTo, openPlaylist, toggleLib: f => toggleLib(f), toggleLibExpanded: f => toggleLibExpanded(f), toggleDev: f => toggleDev(f), toggleDevExpanded: f => toggleDevExpanded(f), setDevSize: (sz, hl) => setDevSize(sz, hl), toggleList: f => toggleList(f) });
   const inline = h('nav', { class: 'navwide', 'aria-label': 'Sections' }, [['playlists', 'Playlists'], ['radio', 'Radio'], ['scenes', 'Scenes & Schedules'], ['devices', 'Devices & zones']].map(([k, t]) => h('button', { class: 'iconbtn', 'data-k': k, onclick: () => go(k) }, t)),
     control ? h('button', { class: 'iconbtn', onclick: () => openCalibration(S, refreshAll) }, '🎤 Calibrate') : null, h('button', { class: 'iconbtn', onclick: () => showEq() }, '🎚 Sound'), h('button', { class: 'iconbtn', onclick: () => openSettings(S, refreshAll, go) }, '⚙ Settings'));

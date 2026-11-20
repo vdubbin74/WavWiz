@@ -6303,3 +6303,17 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 :is(.lib.compact, .libpanel .lib:not(.expanded)):is([data-tiles=medium],[data-tiles=small]) .tile .t3{display:none}
 :is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t1{font-size:11px;line-height:1.25;overflow-wrap:anywhere}
 :is(.lib.compact[data-tiles=small], .libpanel .lib[data-tiles=small]:not(.expanded)) .tile .t2{display:none}
+/* 0.7.1 t2063u: the Parallel Flow emblem is the menu button wherever the hamburger shows (phone, narrow PC; wide PC has none).
+   Theme colors come from logo.js (top wave = Wav color, bottom = Wiz). The header logo keeps only the wordmark next to it, so there is
+   one emblem. Reads as a button: themed surface + border, a glow while pressed / while the menu is open, a focus ring; 44px hit area. */
+.iconbtn.hamburger.logomenu{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:10px;
+  background:color-mix(in srgb,var(--panel) 88%,var(--accent));border:1px solid color-mix(in srgb,var(--line) 70%,var(--accent));
+  box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 6%,transparent);transition:border-color .15s,box-shadow .15s,background .15s}
+.hamburger.logomenu .hb-emblem{height:32px;width:auto;margin:0;transition:transform .12s ease-out;pointer-events:none}
+.hamburger.logomenu:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.hamburger.logomenu:active,.hamburger.logomenu[aria-expanded=true]{border-color:var(--accent);background:color-mix(in srgb,var(--panel) 78%,var(--accent));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 24%,transparent),0 0 16px color-mix(in srgb,var(--accent) 40%,transparent)}
+.hamburger.logomenu:active .hb-emblem{transform:scale(.92)}
+.hamburger.logomenu:focus-visible{outline:2px solid var(--accent2-text,var(--accent2));outline-offset:2px}
+@media (max-width:900px){ .topbar:has(> .hamburger.logomenu) .logo .brand-emblem{display:none} }
+@media (prefers-reduced-motion:reduce){ .hamburger.logomenu,.hamburger.logomenu .hb-emblem{transition:none} .hamburger.logomenu:active .hb-emblem{transform:none} }
