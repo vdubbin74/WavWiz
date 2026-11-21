@@ -33,9 +33,10 @@ export function installSliderGuard(doc = document) {
   doc.addEventListener('keyup', ev => { if (isRange(ev.target)) setTimeout(release, 0); }, true);
   doc.addEventListener('wheel', ev => {
     const r = ev.target; if (!isRange(r) || !(r.matches(':hover') || doc.activeElement === r)) return;
-    // DIG §11: in the Master volume mixer, wheel only nudges ranges inside the focused (.ctl) box
-    const inMixer = r.closest?.('dialog.mixer-dlg');
-    if (inMixer && !r.closest?.('.mv-master.ctl, .mv-card.ctl')) return;
+    // DIG §11 (kept by 0.7.2): in the Volume Mixer (now a mode of the Devices tree) the wheel only nudges ranges inside the zone box touched last
+    // (.mx-ctl); anywhere else in the mixer the wheel scrolls the list as usual
+    const inMixer = r.closest?.('.tree42.mx-on');
+    if (inMixer && !r.closest?.('section.qb42.mx-ctl')) return;
     ev.preventDefault(); if (locked(r)) return;
     const v = wheelValue({ value: r.value, min: r.min || 0, max: r.max || 100, step: r.step || 1, coarse: r.dataset.coarse }, ev.deltaY || -ev.deltaX, ev.shiftKey);
     if (String(v) === r.value) return;

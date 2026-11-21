@@ -9,7 +9,7 @@ export const SHORTCUTS = [
   { id: 'home', keys: 'Alt+H', label: 'Home (default screen)', group: 'Windows' },
   { id: 'eq', keys: 'Alt+E', label: 'Sound / EQ', group: 'Windows' },
   { id: 'queue', keys: 'Alt+Q', label: 'Queue', group: 'Windows' },
-  { id: 'mixer', keys: 'Alt+V', label: 'Master volume (every zone and speaker)', group: 'Windows' },
+  { id: 'mixer', keys: 'Alt+V', label: 'Master volume (the Volume Mixer in Devices)', group: 'Windows' },
   { id: 'fullscreen', keys: 'F11', label: 'Fullscreen on / off', group: 'Windows' },   // 0.5.0 F120
   { id: 'settings', keys: 'Ctrl+,', label: 'Settings', group: 'Windows' },
   { id: 'new-zone', keys: 'Ctrl+Shift+Z', label: 'New zone', group: 'Create' },

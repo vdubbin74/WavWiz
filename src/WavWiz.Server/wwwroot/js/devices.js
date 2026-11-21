@@ -12,7 +12,7 @@ import { whenIdle } from './slider.js';
 import { scenesColumn } from './scenesched.js';
 import { undoToast } from './settingsui.js';
 import { speakerSettings } from './spkset.js';
-import { mixerButton } from './mixer.js';   // 0.4.8 F49
+import { mixerButton, mixerBar, isMixerOpen, setMixer } from './mixer.js';   // 0.4.8 F49; 0.7.2: the Volume Mixer is a Devices mode
 import { pulse } from './motion.js';
 import { lockBody, unlockBody } from './sheetlock.js';   // F262-fix-B: real iOS body lock under the sheet
 import { itemArtUrl } from './art.js';
@@ -852,7 +852,7 @@ const EMPTY = 'No devices yet. Every browser that opens WavWiz joins as a speake
 /** 0.4.2: the tree + detail pane, shared by the side panel and the phone page. X = { spk, zsel, size, draw(force), setSpk(id) } (live state of the caller). */
 /** 0.4.9 F82: copy the live parts (now-playing lines, volume bars and %, tag rows) of a freshly built tree into the shown one, node for
  *  node; 0 (caller rebuilds) when the two do not line up. A part the user is using (focus, a dragged slider) is left alone. */
-const LIVE42 = ['.zl-now', '.qb42-t', '.qb42-vol', '.sp42-v', '.sp42-tags', '.ztagrow'];   // F232: title PLAYING/PAUSED with live now
+const LIVE42 = ['.zl-now', '.qb42-t', '.qb42-vol', '.sp42-v', '.sp42-tags', '.ztagrow', '.mx-vol'];   // 0.7.2: + the Volume Mixer speaker bars   // F232: title PLAYING/PAUSED with live now
 /** DIG-R1: collapse/expand lives on .zsp42 / .qb42-exp — outside patchRows42 skel — so compare explicitly. */
 export function foldSig42(root) {
   return [...root.querySelectorAll('section.qb42[data-leader-id]')].map(e => {
@@ -932,7 +932,7 @@ function tree42Kit(S, ctl, X) {
     (S.groups || []).map(g => [g.now?.state, g.now?.title, g.now?.artist, g.now?.durationMs, Math.floor((g.now?.positionMs || 0) / 10000), (g.now?.positionMs || 0) > 0]), S.jb?.own ? [S.jb.now?.title, S.jb.now?.state] : null]);
   const openSig42 = () => { let a = '', b = ''; try { a = sessionStorage.getItem('wavwiz.qb42.open') || ''; } catch { /* */ } try { b = localStorage.getItem('wavwiz.zfold') || ''; } catch { /* */ } return a + '|' + b; };   // F266: zone folds rebuild the tree   // DIG-R1: idle expand preference participates in cache
   const sig42 = () => JSON.stringify([!!S.cast?.active, (S.zones || []).map(z => [z.id, z.name, z.enabled, z.connected, z.muted, z.volLocked, z.volCap, z.room?.state, z.reference, chosenOutput(z)?.notCalibrated, z.outputs?.length]),
-    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online, g.referenceId, g.refNote, g.recommendedId, g.refFlag?.kind, g.houseOffsetMs]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
+    (S.groups || []).map(g => [g.id, g.name, g.deviceIds, g.playbackId, g.linked, g.online, g.referenceId, g.refNote, g.recommendedId, g.refFlag?.kind, g.houseOffsetMs]), Z.current()?.key, X.spk, X.zsel, isAdmin(S), canControl(S), S.jb?.deviceIds, S.jb?.own, S.jb?.showInDevices, S.jb?.running, orderedGroups(S.groups || []).map(g => g.id), getCardOrder(), openSig42(), isMixerOpen()]);   // 0.6.9 #12: the shared card order (Jukebox / Unassigned / AirPlay moves too) rebuilds   // 0.4.6 F30 + DIG-R1 open pref
   const st42 = { get spk() { return X.spk; }, get zone() { return X.zsel; },
     onZone: id => { X.zsel = id; X.spk = null; try { sessionStorage.removeItem('wavwiz.spk'); } catch { /* private mode */ } if (X.size === 'expanded' || X.size === 'phone') X.draw(true); else { X.f69from = X.size; ctl.setDevSize?.('expanded'); } },
     onSpk: id => { const z = (S.zones || []).find(x => x.id === id); const g = (S.groups || []).find(x => (x.deviceIds || []).includes(id)); X.zsel = g ? g.id : null; if (X.size === 'expanded' || X.size === 'phone') X.setSpk(id); else { X.f69from = X.size; X.spk = id; try { sessionStorage.setItem('wavwiz.spk', String(id)); } catch { /* private mode */ } ctl.setDevSize?.('expanded', id); } void z; } };
@@ -1023,6 +1023,20 @@ function tree42Kit(S, ctl, X) {
   return { treeNode, restoreScroll, paintDetail, sig42 };
 }
 
+/** 0.7.2: the Volume Mixer bar in a Devices column (kept node; null when the mode is off). */
+const mxBar = host => !isMixerOpen() ? null : (host.querySelector(':scope > .mx-bar') || mixerBar());
+/** 0.7.2: phone / narrow page - the page itself scrolls (sticky has nothing to hold on to), so the bar is pinned (fixed, on body, out of any
+ *  transformed ancestor) right under the app header; a spacer keeps its place under the page title. off = remove both. */
+let mxPinned = null;
+const mxPlace = () => { const b = mxPinned; if (!b) return; const tb = [...document.querySelectorAll('.topbar')].find(e => e.getClientRects().length); b.style.setProperty('--mxtop', Math.max(0, Math.round(tb ? tb.getBoundingClientRect().bottom : 0)) + 'px'); };
+function pinMxBar(root, off = false) {
+  const sp = root.querySelector(':scope > .mx-bar-space');
+  if (off || !isMixerOpen()) { sp?.remove(); if (mxPinned) { mxPinned.remove(); mxPinned = null; window.removeEventListener('scroll', mxPlace, true); } return; }
+  if (!mxPinned) { mxPinned = mixerBar(); mxPinned.classList.add('mx-bar-pin'); document.body.append(mxPinned); window.addEventListener('scroll', mxPlace, { capture: true, passive: true }); }
+  const space = sp || h('div', { class: 'mx-bar-space', 'aria-hidden': 'true' }); if (!sp) root.querySelector(':scope > .pagetitle')?.after(space);
+  mxPlace(); space.style.height = (mxPinned.offsetHeight + 10) + 'px';
+}
+export { setMixer };
 /** Right-hand panel of the desktop layout in three sizes. ctl.setDevSize(size, highlightZoneId) switches size. */
 export function devicesPanel(S, ctl) {
   const root = h('section', { class: 'devpanel', 'aria-label': 'Devices and zones' }), body = h('div', { class: 'devbody' });
@@ -1132,7 +1146,7 @@ export function devicesPanel(S, ctl) {
       const tcol = speakersHost();   // F223: same node as standard — move into Speakers column
       // F211: the Speakers column = [MASTER, tree, AirPlay strip] - the same MASTER strip and tree as the side panel; MASTER is kept while busy
       const tn = treeNode(force === true), hadTree = tcol.contains(tn);
-      reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), tn].filter(Boolean));
+      reconcile(tcol, [keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), mxBar(tcol), tn].filter(Boolean));
       if (!hadTree) restoreScroll(tcol);
       reconcile(emain, [sscol, dcol, tcol]);
       reconcile(body, [etop, emain]);
@@ -1144,7 +1158,7 @@ export function devicesPanel(S, ctl) {
     // F223: .devbody is not the scroller — persistent .tcol42 holds MASTER+tree (+ bits that used to scroll with body)
     const tcol = speakersHost();
     const tn = treeNode(force === true), hadTree = tcol.contains(tn);
-    reconcile(tcol, [castBar(S, ctl, tcol), keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), btHint(S, ctl), keepMic(kid(tcol, 'dmicline'), S), tn, ssCompact(S, ctl)].filter(Boolean));
+    reconcile(tcol, [castBar(S, ctl, tcol), keepSection(kid(tcol, 'dmaster'), masterRow(S, ctl), busy), mxBar(tcol), btHint(S, ctl), keepMic(kid(tcol, 'dmicline'), S), tn, ssCompact(S, ctl)].filter(Boolean));
     if (!hadTree) restoreScroll(tcol);
     reconcile(body, [tcol]);
     alignMasterSoon(body);
@@ -1299,6 +1313,7 @@ export function devicesView(S, ctl) {
     const sp = sheetSp();
     if (sp) { try { sp._discardSession?.(); } catch { /* */ } try { sp._teardownLive?.(); } catch { /* */ } try { sp._destroy?.(); } catch { /* */ } }
     spk = null; zsel = null; wasSel = false; opener = null; lastTrigger = null;
+    pinMxBar(root, true); if (isMixerOpen() && window.innerWidth <= 900) setMixer(false);   // 0.7.2: leaving the phone Devices page ends the Volume Mixer
     try { sessionStorage.removeItem('wavwiz.spk.phone'); } catch { /* private mode */ }
     if (history.state?.pd42) { const { pd42, ...rest } = history.state; try { history.replaceState(rest, ''); } catch { /* sandboxed */ } }
     unlock();
@@ -1315,6 +1330,7 @@ export function devicesView(S, ctl) {
     clearTimeout(pending); pending = 0; keepExpandFocus(list);
     const busy = { v: false };      // 0.2.3 fix: cards are kept and patched in place, exactly like the side panel
     reconcile(top, [castBar(S, ctl, top), keepSection(top.querySelector(":scope > .dmaster"), masterRow(S, ctl), busy), keepMic(top.querySelector(".dmicline"), S)].filter(Boolean));
+    pinMxBar(root);   // 0.7.2: the Volume Mixer bar, pinned under the app header while the page scrolls
     const sel42 = X.spk != null || X.zsel != null;
     // 0.4.6 F41: opening a speaker / zone remembers where the tree was scrolled; closing returns to the tree at that spot (the standalone PWA has no Back)
     const sc = scroller(root);

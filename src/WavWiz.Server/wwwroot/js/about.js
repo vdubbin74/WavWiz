@@ -8,6 +8,7 @@ export const WHATS_NEW_VERSION = '0.7.2';
 export const WHATS_NEW = [
   // 0.7.2
   ['Announce to the house', 'Hold Announce in Devices on a PC or a phone and talk: a chime plays, the music turns down 12 dB (it never pauses) and every speaker in the zone - or Everywhere - hears you, then the music fades back when you let go. On a phone, open WavWiz from its https:// address so the browser allows the microphone. The chime can be turned off in Settings > Playback.'],
+  ['Volume mixer in Devices', 'The mixer button and Alt+V now turn the Devices panel into a volume mixer: every zone and speaker in the same order, one line each with volume, mute and a chevron for Max volume and Delay. Done or Esc goes back.'],
   ['New zone edge lights', 'Settings > Appearance > Zone edge light has Heartbeat, Heartthrob and Gradient instead of Clean comet, Pulse and Dual streak. If you picked one of those, you get its new counterpart automatically.'],
   ['Line up two zones with your phone', 'In a zone\'s settings, Timing vs house now has Check with phone: stand where you hear both zones and WavWiz plays a few chirps from each, measures which one is late and suggests the value that lines them up. An administrator taps Apply; nothing else changes.'],
   ['Play your record player, TV and PC sound', 'Aux in, S/PDIF in, microphones and what the server PC is playing show up under Library > Inputs once WavWiz Player runs on the server PC. Play one in a zone or Everywhere like a radio station; Stop brings your queue back paused. Turntable mode starts when the needle drops and stops after the side ends. An administrator turns inputs on in Settings > Devices > Audio inputs.'],
@@ -96,7 +97,7 @@ export const WHATS_NEW = [
   ['Smoother layout', 'Nothing jumps when panels slide, expand or collapse, the mixer sliders line up, and the mini player is no longer cut off.'],
   // 0.4.8 (only what shipped)
   ['Queue picker', 'Pick which zone\'s queue you see from the "Queue:" dropdown. The playing zone is marked "(playing)".'],
-  ['Master Volume mixer', 'One window for every zone and speaker volume, with each speaker\'s Delay and Max volume, in 2 columns with long sliders. Open it with the mixer button in the player bar.'],
+  ['Volume mixer', 'The Devices panel turns into a volume mixer: every zone and speaker in the same order, one line per speaker with its volume, mute and a chevron for Delay and Max volume. Open it with the mixer button in the player bar or Alt+V; Done or Esc goes back.'],
   ['Scrolling song titles', 'Long titles and artists scroll so you can read them, everywhere, including the phone and the mini player.'],
   ['Live now playing', 'Zone and speaker cards show the current song right away.'],
   ['Tidier layout', 'A player bar for the full-screen Queue, Roomy uses the Classic Devices bar, a full-height expanded Devices with no player in the way, a vertical Devices count, a smaller Delay box, a + button in Devices, a mini player that fits at 200%, and full-screen sound settings on the phone.'],

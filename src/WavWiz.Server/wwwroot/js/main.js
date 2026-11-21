@@ -61,7 +61,7 @@ import { isDevDragging, setCardOrder, cardOrderChangedAt } from './devorder.js';
 import { newKindForKey, isTypingTarget } from './menusub.js';
 import { installHotkeys } from './hotkeys.js';
 import { toggleAppFull, installAppFull } from './fullscreen.js';   // 0.5.0 F120
-import { openMixer } from './mixer.js';   // 0.4.8 F49
+import { isMixerOpen, setMixer } from './mixer.js';   // 0.4.8 F49; 0.7.2: the Volume Mixer is a Devices mode (the window is gone)
 import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
@@ -368,7 +368,7 @@ async function startMain() {
     ev.preventDefault(); togglePinFor(id);
   });
   // 0.3.8 L44: the approved global shortcuts (one table in hotkeys.js)
-  window.addEventListener('wavwiz:mixer', () => openMixer(S, { act, refreshAll: () => refreshZones() }));   // 0.4.8 F49: player bar / Devices / Alt+V / phone
+  window.addEventListener('wavwiz:mixer', () => openMixerMode());   // 0.4.8 F49 entry points (player bar / Devices / Alt+V / menu / pin) -> 0.7.2 Devices Volume Mixer
   installHotkeys(id => {
     switch (id) {
       case 'playpause': return act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/play', S.now?.state === 'playing' ? undefined : {});
@@ -591,6 +591,18 @@ export function runShortcut(id) {
     case 'settings': return openSettings(S, refreshAll, go);
     default: return undefined;
   }
+}
+/** 0.7.2 (t2148u): the Master volume button / Alt+V / menu / pin open the Devices panel straight into the Volume Mixer; again (Devices on screen) closes it.
+ *  PC: a railed / closed Devices panel opens at its normal size (an expanded one stays expanded); phone and narrow windows go to the Devices page. */
+export function openMixerMode() {
+  if (pageDlg) { pageDlg.close(); pageDlg = null; }
+  const shown = [...document.querySelectorAll('.devpanel .tree42, #p-zones .tree42')].some(t => t.offsetParent && t.getBoundingClientRect().width > 0);
+  if (isMixerOpen() && shown) { setMixer(false); return; }
+  if (wide()) {
+    if (desk?.classList.contains('tight') && !P6.exp) { if (!desk.classList.contains('devopen')) devOpen(true); }
+    else if (P6.dev === 'rail' && P6.exp !== 'dev') setDevSize('standard');
+  } else if (S.view !== 'devices') go('devices');
+  setMixer(true);
 }
 /** 0.3.7 L5: Home = the default Home Screen: Library left, EQ centre, Devices right, Queue bottom centre, Now Playing at the narrow bar. Same glide as everything else. */
 export function goHome() {

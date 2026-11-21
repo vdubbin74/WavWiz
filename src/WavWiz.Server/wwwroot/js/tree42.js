@@ -13,6 +13,7 @@ import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDrop
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 import { announceButton } from './announce.js';   // 0.7.2 hold-to-talk
+import { isMixerOpen, mixerCtlKey, mixVol, mixChev, mixDrawer } from './mixer.js';   // 0.7.2 t2148u: the Volume Mixer is a mode of this tree
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
 /** The tree's shape: boxes (a solo zone, or a linked set sharing one queue), the unassigned speakers and the header counts. */
@@ -66,7 +67,8 @@ export function treeEl(S, ctl, kit, st) {
   const { capBar, onPill, ro, tagEls3, cardTags3, zoneTags3, zoneMembers, zoneMuted, zoneOn, zoneLevel, zoneCap, canControl, isAdmin, promptName, confirmRemoveZone, canTune, dotClass, orderedGroups, openCalibration, forget, phoneMaxBars = false } = kit;   // F250-P8 phoneMaxBars: max/scaleTo; desktop kit omits it → average
   const groups = orderedGroups(S.groups || []), model = treeModel(S.zones, groups), cur = Z.current(), can = canControl(S), admin = isAdmin(S);
   const done = () => { ctl.refreshAll?.(); window.dispatchEvent(new CustomEvent('wavwiz:zones-changed')); };
-  const root = h('div', { class: 'tree42', 'data-tree': '1' });
+  const mx = isMixerOpen();   // 0.7.2: Volume Mixer mode - same tree and order; one-line speaker rows with volume + a Max volume / Delay drawer
+  const root = h('div', { class: 'tree42' + (mx ? ' mx-on' : ''), 'data-tree': '1' });
   // 0.4.9 F69: a tap / click on a speaker row opens the speaker settings (every Devices panel), with a Back.
   // t1948u / t1954u: a tap / click on the zone NAME opens zone settings; a tap / click on the rest of the zone box / card selects that zone for Now Playing and the Queue.
   const phone = typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
@@ -161,9 +163,14 @@ export function treeEl(S, ctl, kit, st) {
       ro((() => { const mb = h('button', { type: 'button', class: 'mutebtn sp42-mute' + (z.muted ? ' on' : ''), 'aria-pressed': String(!!z.muted), 'aria-label': (z.muted ? 'Unmute ' : 'Mute ') + z.name, title: z.muted ? 'Unmute' : 'Mute', 'data-icon': z.muted ? 'mute' : 'volume',
         onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH');
           mb.classList.toggle('on', next); mb.setAttribute('aria-pressed', String(next)); mb.setAttribute('aria-label', (next ? 'Unmute ' : 'Mute ') + z.name); mb.title = next ? 'Unmute' : 'Mute'; setIcon(mb, next ? 'mute' : 'volume'); mb.dataset.icon = next ? 'mute' : 'volume'; } }, icon(z.muted ? 'mute' : 'volume')); return mb; })(), canControl(S), 'Your access is view-only.'));
+    if (mx) {   // 0.7.2 Volume Mixer: [grip] dot name | volume bar % | mute | chevron - tags and the plain % step aside; the drawer follows the row
+      row.classList.add('mx-sp'); row.querySelector('.sp42-tags')?.remove(); row.querySelector('.sp42-v')?.remove();
+      const dr = mixDrawer(S, ctl, z); row.querySelector('.sp42-mute')?.before(mixVol(S, z)); row.append(mixChev(z, dr)); row._mxDr = dr;
+    }
     speakerCtx(z, row, gid != null);
     return row;
   };
+  const spRows = (z, gid) => { const r = spRow(z, gid); return r._mxDr ? [r, r._mxDr] : [r]; };   // 0.7.2: a speaker row + (mixer mode) its drawer
   // ---- a zone card + its speakers
   const zoneWrap = (g, box, leaderOf) => {
     const ms = zoneMembers(S.zones, g), sel = isControlling(g, cur), linked = (g.linked || []).length > 0, on = zoneOn(S.zones, g), connected = ms.filter(z => z.connected).length;
@@ -183,7 +190,7 @@ export function treeEl(S, ctl, kit, st) {
       h('div', { class: 'zc42-body' },
         h('div', { class: 'zc42-1' }, h('span', { class: 'dot ' + (connected ? 'ok' : 'off'), title: `${connected} of ${ms.length} online` }), name, badge, h('span', { class: 'zacts' }, linked ? null : lb, pill)),
         h('div', { class: 'dtagrow ztagrow zc42-2' }, sel ? Z.controllingTag() : null, S.cast?.active && (S.cast.zones || []).includes(g.id) ? h('span', { class: 'dtag zcast', title: `Playing what a phone sends to ${S.cast.name}` }, S.cast.kind === 'spotify' ? 'SPOTIFY' : 'AIRPLAY') : null, leaderOf ? h('span', { class: 'small dim zc42-q' }, `Queue from ${leaderOf.name}`) : null, tagEls3(tags), lb && linked ? h('span', { class: 'zacts zc42-lb' }, lb) : null)));
-    const list = h('div', { class: 'zsp42', role: 'list', 'aria-label': `Speakers in ${g.name}` }, ms.length ? ms.map(z => spRow(z, g.id)) : h('div', { class: 'drop42' }, 'Drop speakers here'));
+    const list = h('div', { class: 'zsp42', role: 'list', 'aria-label': `Speakers in ${g.name}` }, ms.length ? ms.flatMap(z => spRows(z, g.id)) : h('div', { class: 'drop42' }, 'Drop speakers here'));
     if (box && box._collapsed) { list.hidden = true; list.classList.add('zsp42-collapsed'); }
     // 0.6.8-#15: quiet note about the zone's reference. 0.7.1: when the reference left, nothing is picked for the user - the note names the
     // recommended replacement with a one-tap Use (admin); the switch re-bases the saved delays as before.
@@ -252,7 +259,7 @@ export function treeEl(S, ctl, kit, st) {
     const collapsed = false; box._collapsed = false;   // F266: speakers always listed while the box is open (old idle auto-fold removed)
     if (isFolded(box)) return foldedBox(box, { lead, linked, sel, ms, now });
     const expand = foldBtn(box, false, linked ? 'the linked zones' : lead.name);
-    const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : '') + (lead.now?.state === 'playing' ? ' playing' : '') + (collapsed ? ' qb42-folded' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
+    const el = h('section', { class: 'qb42' + (linked ? ' linked' : ' solo') + (sel && !linked ? ' ctl' : '') + (idle ? ' idle' : '') + (lead.now?.state === 'playing' ? ' playing' : '') + (collapsed ? ' qb42-folded' : '') + (mx && mixerCtlKey() === String(lead.id) ? ' mx-ctl' : ''), 'data-box': linked ? 'linked' : 'solo', 'data-leader-id': lead.id, 'aria-label': boxTitle(box, now) },
       h('div', { class: 'qb42-head' }, h('div', { class: 'qb42-trow' }, title, expand), Z.wireNowMenu(Z.nowLine(now, { at: S._groupsAt || Date.now(), onSelect: selectLead, selected: sel }), S, ctl, lead, { can }), h('div', { class: 'dvol qb42-vol' }, bar.wrap, bar.pct, mute)),
       ...all.map(g => zoneWrap(g, box, linked && g.id !== lead.id ? lead : null)));
     el.addEventListener('click', ev => { if (ev.defaultPrevented || ev.target.closest(BOXSKIP)) return; controlZone(lead.id); });
@@ -284,7 +291,7 @@ export function treeEl(S, ctl, kit, st) {
   // 0.4.9 F69: a zone with no speakers is one compact row (name, "No speakers" / "Offline") - still a drop target (its hint opens while dragging)
   // 0.5.2 F160: an OFFLINE zone (speakers, none online) keeps the compact Offline header but lists its real speakers as dimmed .gone rows (Move / Remove still work)
   const emptyBox = (g, off = false, box = null) => {
-    const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).map(z => spRow(z, zg.id))) : [];
+    const sel = isControlling(g, cur), gone = off ? (box ? box.zones : [g]).flatMap(zg => zoneMembers(S.zones, zg).flatMap(z => spRows(z, zg.id))) : [];
     const wrap = h('section', { class: 'qb42 empty42 zpick42' + (off ? ' solo off42' : '') + (sel ? ' ctl' : ''), 'data-leader-id': g.id, 'aria-label': `${g.name} (${off ? 'offline' : 'no speakers'})` },
       h('div', { class: 'zwrap42 zempty42' + (st.zone === g.id ? ' picked' : ''), 'data-group-id': g.id, 'data-drop': g.id, 'data-zone': g.name },
         h('div', { class: 'ze42-row' }, off ? null : emptyDot(g.now), zoneName(g.id, g.name),
@@ -395,7 +402,7 @@ export function treeEl(S, ctl, kit, st) {
     const jbIdle = !now, jbBoxObj = { leader: { id: JB } };
     if (!jbIdle) openBoxes.delete(boxKey(jbBoxObj));
     const jbCollapsed = jbIdle && !isOpen(jbBoxObj, jbIdle);
-    const jbList = h('div', { class: 'zsp42', role: 'list', 'aria-label': 'Speakers in the Jukebox' }, jbMs.map(z => spRow(z, JB)));
+    const jbList = h('div', { class: 'zsp42', role: 'list', 'aria-label': 'Speakers in the Jukebox' }, jbMs.flatMap(z => spRows(z, JB)));
     if (jbCollapsed) { jbList.hidden = true; jbList.classList.add('zsp42-collapsed'); }
     const jbExpand = jbIdle ? (() => { const b = h('button', { type: 'button', class: 'plus chv qb42-exp' + (jbCollapsed ? '' : ' open'), 'aria-expanded': String(!jbCollapsed), 'aria-label': jbCollapsed ? `Show ${jbMs.length} speakers` : 'Hide speakers', title: jbCollapsed ? `Show speakers (${jbMs.length})` : 'Hide speakers',
       onclick: ev => { ev.stopPropagation(); setOpen(jbBoxObj, jbCollapsed); window.dispatchEvent(new CustomEvent('wavwiz:devredraw')); } }); setChev(b, jbCollapsed ? 'r' : 'd'); return b; })() : null;

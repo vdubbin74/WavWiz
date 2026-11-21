@@ -6484,3 +6484,35 @@ html.handset .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px
 .zc .zc-pick .dlbl{font-size:11px}
 .zc .zc-actions{display:flex;justify-content:flex-end;gap:8px}
 html.handset .zt42 .zt42-check{margin-left:0;flex-basis:100%}
+
+/* ===== 0.7.2 (t2145u / t2148u): the Volume Mixer is a mode of the Devices panel (replaces the separate F49 mixer window) =====
+   Same tree, same order. A Volume Mixer bar (Done / Esc) stays at the top: sticky in the PC Devices column, pinned under the app header on the
+   phone page. Tags, now-playing lines and zone switches step aside; a speaker is one line: dot + name | volume bar % | mute | chevron (the zone
+   card's chevron size) that opens Max volume + Delay / sync offset under the row. */
+.mx-bar{display:flex;align-items:center;gap:10px;padding:8px 10px;margin:4px 0 10px;border:1px solid var(--accent);border-radius:3px;background:color-mix(in srgb,var(--accent) 12%,var(--panel));position:sticky;top:0;z-index:5;box-shadow:0 6px 10px -6px rgba(0,0,0,.45);min-width:0}
+.mx-bar .mx-bar-t{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-text,var(--accent));white-space:nowrap}
+.mx-bar .mx-bar-hint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mx-bar .mx-done{flex:none}
+.mx-bar.mx-bar-pin{position:fixed;left:12px;right:12px;margin:0;top:calc(var(--mxtop,0px) + 6px);z-index:30;background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+html.pd42-open .mx-bar.mx-bar-pin{display:none}
+.tree42.mx-on .dtag,.tree42.mx-on .dtagrow:empty{display:none!important}
+.tree42.mx-on .zl-now,.tree42.mx-on .zc42-2,.tree42.mx-on .zc42-1 .zacts{display:none!important}
+.tree42.mx-on .zc42-1{min-height:26px}
+.tree42.mx-on .zcard42{padding-top:4px;padding-bottom:2px}
+.tree42.mx-on .sp42.mx-sp{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-height:34px}
+.tree42.mx-on .sp42.mx-sp>.sp42-nt{flex:0 0 auto;min-width:0;max-width:46%;display:flex;align-items:center}
+.tree42.mx-on .sp42.mx-sp>.sp42-nt .sp42-n{max-width:none}
+.tree42.mx-on .sp42.mx-sp>.sp42-nt .sp42-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree42.mx-on .mx-vol{flex:1 1 auto;display:flex;align-items:center;gap:6px;min-width:60px}
+.tree42.mx-on .mx-vol input{flex:1;min-width:40px;width:100%;margin:0}
+.tree42.mx-on .mx-pct{min-width:2.8em;text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--dim)}
+.tree42.mx-on .mx-chev{flex:none;position:static!important;margin:0}
+.tree42.mx-on .mx-chev.open{border-color:var(--accent);color:var(--accent-text,var(--accent))}
+.tree42.mx-on .mx-drawer{margin:0 0 6px 22px}
+.tree42.mx-on .mx-drawer[hidden]{display:none}
+.tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,9em) minmax(0,1fr) 3.2em;gap:10px}
+.tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{text-align:right}
+.tree42.mx-on section.qb42.mx-ctl{outline:1px dashed color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px}
+html.handset .tree42.mx-on .mx-drawer{margin-left:8px}
+html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:4px}
+html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.n{grid-area:n} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>input{grid-area:s} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
