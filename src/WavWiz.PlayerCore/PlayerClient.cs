@@ -73,6 +73,7 @@ public sealed class PlayerClient : IAsyncDisposable
         LoadCache();
         _mic = new MicResponder(o.Mics ?? new NoMicProvider(), _clock, SendCalAsync, Say);
         _in = new InputResponder(o.Inputs ?? new NoInputProvider(), _clock, o.Clock, SendRawAsync, why => SendOutputsAsync(why), Say);
+        _in.SelfMute = on => { if (_dsp.SelfMuted == on) return; _dsp.SetSelfMuted(on); Say(on ? "this PC's own sound plays in this zone in Real time: not played again here" : "own-sound mute off"); };   // 0.7.2 t2183u
     }
     private readonly InputResponder _in;
     /// <summary>0.7.2 t2175u: the input side (the Player hooks LocalSync on it).</summary>

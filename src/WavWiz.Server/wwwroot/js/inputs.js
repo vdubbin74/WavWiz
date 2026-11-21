@@ -134,11 +134,16 @@ export function inputsView(S) {
 
 /** 0.7.2 t2175u, pure: the "Playback on this PC" choices of the loopback input - the speakers the synced copy plays on (chosen, else WavWiz's
  *  own active output), the spare outputs (switched on, not those speakers) and whether there is none. */
+/** 0.7.2 t2186u: spare rank from the server (0 optical, 1 HDMI, 2 other, 3 empty headphone jack, 9 headset in use = never by itself). */
+export const outRank = o => o.rank ?? (o.headset ? 9 : 2);
 export function syncView(i) {
-  const outs = i.outputs || [];
-  const speakers = outs.some(o => o.id === i.syncSpeakers) ? i.syncSpeakers : (outs.find(o => o.active) || outs[0])?.id ?? null;
-  const spares = outs.filter(o => o.id !== speakers);
-  const spare = spares.some(o => o.id === i.spareOutput) ? i.spareOutput : spares[0]?.id ?? null;
+  // 0.7.2 t2183u: defaults never pick a headset (the server sends its own defaults; this is the same rule for older data). Spare order: optical /
+  // S/PDIF, then HDMI / monitor, then other outputs, headsets last (still pickable by hand).
+  const outs = i.outputs || [], ok = o => !o.headset, rank = outRank;
+  const has = id => outs.some(o => o.id === id);
+  const speakers = has(i.syncSpeakers) ? i.syncSpeakers : (outs.find(o => o.winDefault && ok(o)) || outs.find(o => ok(o) && /speaker/i.test(o.name || '')) || outs.find(o => ok(o) && outRank(o) === 2) || outs.find(ok))?.id ?? null;   // as the server: Windows default, Speakers, line out
+  const spares = outs.filter(o => o.id !== speakers).sort((a, b) => rank(a) - rank(b));
+  const spare = has(i.spareOutput) && i.spareOutput !== speakers ? i.spareOutput : spares.find(o => rank(o) < 9 && !o.winDefault)?.id ?? null;
   return { sync: i.localMode === 'sync', speakers, spare, spares, outs, none: spares.length === 0 };
 }
 export const SYNC_NOTE = 'Windows sends this PC\u2019s sound to the spare output; WavWiz plays it on your speakers in sync with the house (about 1.4 s later). Turning it off, or WavWiz closing, puts Windows back on your speakers.';
@@ -152,7 +157,9 @@ function syncBox(i, admin, put) {
   const seg = (mode, label, sub, dis) => h('button', { type: 'button', role: 'radio', class: (mode === 'sync') === v.sync ? 'on' : '', 'aria-checked': String((mode === 'sync') === v.sync),
     disabled: !admin || dis, onclick: () => put(i.id, mode === 'sync' ? { localMode: 'sync', spareOutput: v.spare, syncSpeakers: v.speakers } : { localMode: 'realtime' }) }, label, h('small', null, sub));
   const pick = (label, list, val, key) => [h('span', { class: 'small' }, label),
-    h('select', { 'aria-label': label, disabled: !admin, onchange: ev => put(i.id, { [key]: ev.target.value }) }, ...list.map(o => h('option', { value: o.id, selected: o.id === val }, o.name)))];
+    h('select', { 'aria-label': label, disabled: !admin, onchange: ev => ev.target.value && put(i.id, { [key]: ev.target.value }) },
+      val ? null : h('option', { value: '', selected: true }, 'Choose\u2026'),   // 0.7.2 t2183u: nothing safe to pick by itself (only headsets)
+      ...list.map(o => h('option', { value: o.id, selected: o.id === val }, o.name + (o.headset ? (outRank(o) < 9 ? ' (headset, nothing plugged in)' : ' (headset)') : ''))))];
   return h('div', { class: 'lsx' }, h('h4', null, 'Playback on this PC'),
     h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Playback on this PC' },
       seg('realtime', 'Real time', 'this PC plays live, zones follow'), seg('sync', 'Sync with WavWiz', 'this PC plays in step with every zone', v.none && !v.sync)),

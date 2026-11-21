@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const src = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/inputs.js', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/app.css', import.meta.url), 'utf8');
-const syncView = new Function(src.match(/export function syncView\(i\) \{[\s\S]*?\n\}\n/)[0].replace('export ', '') + 'return syncView;')();
+const syncView = new Function(src.match(/export const outRank = [^\n]+/)[0].replace('export ', '') + '\n' + src.match(/export function syncView\(i\) \{[\s\S]*?\n\}\n/)[0].replace('export ', '') + 'return syncView;')();
 
 test('t2175u syncView: speakers = chosen or the active output; spares exclude them; none when only one output', () => {
   const outs = [{ id: 'spk', name: 'Speakers', active: true }, { id: 'hdmi', name: 'LG Monitor', active: false }];
@@ -20,4 +20,14 @@ test('t2175u: the Settings row has the two choices, both pickers, the note, and 
   assert.match(src, /h\('p', \{ class: 'small warnc lsx-warn' \}, NO_SPARE\)/); assert.match(src, /VB-Cable/);
   assert.match(src, /syncBox\(i, admin, put\),/);
   assert.match(css, /\.lsx \.lsx-warn\{color:var\(--amber\)\}/);
+});
+
+test('t2183u/t2186u syncView: optical first, a headset in use never picked by itself (still listed), an empty headphone jack is ok', () => {
+  const outs = [{ id: 'hx', name: 'HyperX', headset: true, rank: 9, winDefault: true }, { id: 'hdmi', name: 'LG', rank: 1 }, { id: 'spk', name: 'Speakers', rank: 2 }, { id: 'opt', name: 'Optical', rank: 0 }];
+  const v = syncView({ localMode: 'realtime', outputs: outs });
+  assert.equal(v.speakers, 'spk'); assert.equal(v.spare, 'opt'); assert.deepEqual(v.spares.map(o => o.id), ['opt', 'hdmi', 'hx']);
+  assert.equal(syncView({ outputs: [outs[0], outs[2]] }).spare, null);                                   // only the headset: "Choose…"
+  assert.equal(syncView({ outputs: [outs[2], { id: 'hp', name: 'Headphones', headset: true, rank: 3 }] }).spare, 'hp');
+  assert.equal(syncView({ outputs: [outs[0]] }).speakers, null);
+  assert.match(src, /'Choose\\u2026'/); assert.match(src, /' \(headset, nothing plugged in\)' : ' \(headset\)'/);
 });

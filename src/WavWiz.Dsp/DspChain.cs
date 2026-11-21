@@ -19,7 +19,7 @@ public sealed class DspChain : IAudioProcessor
     // control state (volatile reads on the audio thread)
     private DspPreset _preset = DspPreset.Flat;
     private double _volumePercent = 100;
-    private volatile bool _muted;
+    private volatile bool _muted, _selfMuted;   // 0.7.2 t2183u: _selfMuted = "this PC is the source of what plays" (Real time loopback), apart from the zone mute
     private double _gainTarget = 1, _gainNow = 1;
     private double _balL = 1, _balR = 1;
 
@@ -57,11 +57,15 @@ public sealed class DspChain : IAudioProcessor
     public void SetVolume(double percent)
     {
         _volumePercent = Math.Clamp(double.IsFinite(percent) ? percent : 0, 0, 100);
-        _gainTarget = _muted ? 0 : VolumeToGain(_volumePercent);
+        _gainTarget = _muted || _selfMuted ? 0 : VolumeToGain(_volumePercent);
         if (_preset.Loudness.Enabled && !_preset.Bypass) _pending = new DspProgram(_preset, _fs, _volumePercent);
     }
 
-    public void SetMuted(bool muted) { _muted = muted; _gainTarget = muted ? 0 : VolumeToGain(_volumePercent); }
+    public void SetMuted(bool muted) { _muted = muted; _gainTarget = muted || _selfMuted ? 0 : VolumeToGain(_volumePercent); }
+    /// <summary>0.7.2 t2183u: silence this PC's copy while its own sound (loopback, Real time) is what the zone plays: Windows already plays it live,
+    /// a second copy 1.4 s later is an echo and twice as loud. Separate from the zone mute (which the user sees and the calibration guard saves).</summary>
+    public void SetSelfMuted(bool on) { _selfMuted = on; _gainTarget = _muted || on ? 0 : VolumeToGain(_volumePercent); }
+    public bool SelfMuted => _selfMuted;
 
     /// <summary>Log taper: 100 = 0 dB, each 10 points = 5 dB down, 0 = silence.</summary>
     public static double VolumeToGain(double percent) => percent <= 0 ? 0 : Math.Pow(10, -(100 - percent) * 0.5 / 20);

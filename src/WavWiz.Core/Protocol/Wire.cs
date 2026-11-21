@@ -229,7 +229,7 @@ public sealed record PlayerStatus(double BufferMs, double ClockOffsetUs, double 
     string? ActiveOutputId, double LatencyMs, string LinkType, double DspLatencyUs, double LimiterReductionDb, int ClipCount, bool Playing = false, int UnderrunEvents = 0, int Reconnects = 0, string? Note = null);
 public sealed record Bye(string Reason);
 /// <summary>kind = hdmi|spdif|bluetooth|analog|usb|other.</summary>
-public sealed record OutputInfo(string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active, double? WinLatencyMs = null, string? Codec = null, string? ContainerId = null);
+public sealed record OutputInfo(string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active, double? WinLatencyMs = null, string? Codec = null, string? ContainerId = null, int? FormFactor = null, bool? WinDefault = null, bool? JackEmpty = null);   // 0.7.2 t2183u: Windows form factor + "is the Windows default output" + t2186u "nothing is plugged into its jack" (true only when Windows says so; null = unknown) (null from older players)
 /// <summary>0.2.5: Mics = this PC's capture endpoints (null from 0.2.4 and older players).</summary>
 /// <summary>0.7.2: Inputs = this PC's audio inputs (Aux in, S/PDIF in, mics / headsets, "what this PC is playing"); null from 0.7.1-and-older players.</summary>
 public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null, MicInfo[]? Mics = null, InputInfo[]? Inputs = null);

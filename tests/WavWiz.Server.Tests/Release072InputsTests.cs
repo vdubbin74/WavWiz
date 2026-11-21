@@ -420,4 +420,68 @@ public class Release072InputsTests
         var mono = InputRules.ToStereoOrMono(new[] { 0.5f, 0.4f }, 1, out var ch); Assert.Equal(1, ch); Assert.Equal(new[] { 0.5f, 0.4f }, mono);   // no averaging
         var st = InputRules.ToStereoOrMono(new[] { 0.5f, 0f }, 2, out ch); Assert.Equal(2, ch); Assert.Equal(0.5f, st[0]);                       // a silent 2nd channel does not halve it
     }
+
+    // ---------------- 0.7.2 t2183u / t2186u: sync defaults (optical first, never a headset in use) and no echo in Real time ----------------
+    private static OutputInfo O(string id, string name, string kind, int ff, bool win = false, bool connected = true, bool? jackEmpty = null) =>
+        new(id, name, kind, null, connected, false, null, null, null, ff, win, jackEmpty);
+
+    [Fact]
+    public void Sync_defaults_pick_optical_then_hdmi_never_a_headset_in_use_and_speakers_are_the_windows_default_unless_a_headset()
+    {
+        var spk = O("spk", "Speakers (Realtek(R) Audio)", "analog", 1, win: true); var hx = O("hx", "Speakers (HyperX Cloud II Wireless)", "usb", 1);
+        var opt = O("opt", "Realtek Digital Output (Optical)", "other", 10); var hdmi = O("hdmi", "LG Monitor (NVIDIA High Definition Audio)", "hdmi", 9);
+        var all = new[] { hx, hdmi, spk, opt };
+        Assert.True(LocalSyncRules.IsHeadset(hx));                                               // the HyperX by name, even with a "Speakers" form factor
+        Assert.Equal("spk", LocalSyncRules.DefaultSpeakers(all)); Assert.Equal("opt", LocalSyncRules.DefaultSpare(all, "spk"));
+        Assert.Equal("hdmi", LocalSyncRules.DefaultSpare(new[] { hx, hdmi, spk }, "spk"));
+        Assert.Null(LocalSyncRules.DefaultSpare(new[] { hx, spk }, "spk"));                      // only a headset in use left: nothing picked by itself
+        Assert.Equal(new[] { "opt", "hdmi", "hx" }, LocalSyncRules.SpareCandidates(all, "spk").Select(o => o.EndpointId));   // still pickable by hand, last
+        // the headset is the Windows default: the speakers are the real speakers, and the Windows default is never the spare
+        var hxWin = hx with { WinDefault = true }; var spk2 = spk with { WinDefault = false };
+        Assert.Equal("spk", LocalSyncRules.DefaultSpeakers(new[] { hxWin, spk2, opt })); Assert.Equal("opt", LocalSyncRules.DefaultSpare(new[] { hxWin, spk2, opt }, "spk"));
+        Assert.Null(LocalSyncRules.DefaultSpeakers(new[] { hxWin }));                             // never auto-pick a headset as the speakers
+        // t2186u: a headphone jack with nothing plugged in is fine (after everything else); unknown / plugged in / switched off is skipped
+        var hpEmpty = O("hp", "Headphones (Realtek(R) Audio)", "analog", 3, jackEmpty: true);
+        Assert.Equal(3, LocalSyncRules.SpareRank(hpEmpty)); Assert.Equal("hp", LocalSyncRules.DefaultSpare(new[] { spk, hx, hpEmpty }, "spk"));
+        Assert.Equal("opt", LocalSyncRules.DefaultSpare(new[] { spk, hpEmpty, opt }, "spk"));                                  // optical stays first
+        Assert.Null(LocalSyncRules.DefaultSpare(new[] { spk, hpEmpty with { JackEmpty = false } }, "spk"));                    // something plugged in
+        Assert.Null(LocalSyncRules.DefaultSpare(new[] { spk, hpEmpty with { JackEmpty = null } }, "spk"));                     // can't tell = in use
+        Assert.Null(LocalSyncRules.DefaultSpare(new[] { spk, hpEmpty with { Connected = false } }, "spk"));                    // unplugged endpoint: Windows can't play there
+        Assert.Null(LocalSyncRules.DefaultSpare(new[] { spk, O("hs", "Headset Earphone (USB Audio)", "usb", 5, jackEmpty: null) }, "spk"));
+    }
+
+    [Fact]
+    public void Own_sound_mute_silences_the_copy_without_touching_the_zone_mute()
+    {
+        var d = new WavWiz.Dsp.DspChain(48000); var buf = new float[960]; Array.Fill(buf, 0.5f);
+        d.SetSelfMuted(true); for (int k = 0; k < 20; k++) { Array.Fill(buf, 0.5f); d.Process(buf, 480); }
+        Assert.False(d.Muted); Assert.True(d.SelfMuted); Assert.True(buf.Max(Math.Abs) < 1e-3, $"peak {buf.Max(Math.Abs)}");
+        d.SetVolume(80); Assert.True(d.SelfMuted);                                                // a volume change does not undo it
+        d.SetSelfMuted(false); for (int k = 0; k < 40; k++) { Array.Fill(buf, 0.5f); d.Process(buf, 480); } Assert.True(buf.Max(Math.Abs) > 0.1);
+    }
+
+    [Fact]
+    public async Task Real_time_loopback_in_the_source_pcs_own_zone_is_not_played_back_there_and_sync_plays_it()
+    {
+        var (f, admin, control, pc, _) = await Setup(); await using var _f = f; await using var _p = pc;
+        var id = (await Input(admin, "loopback")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true });
+        Assert.False(pc.Client.Dsp.SelfMuted);
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Task.Delay(1500); Assert.False(pc.Client.Dsp.SelfMuted);                              // this PC is in no zone: it does not hear the stream, nothing to mute
+        f.Server.S.Registry.Assign(pc.Client.PlayerId, Conductor.DefaultGroupId);                    // now it is in the zone the loopback plays in
+        await Until(() => Task.FromResult(pc.Client.Dsp.SelfMuted), "Real time: the source PC still plays its own sound back (echo / double level)");
+        Assert.False(pc.Client.Dsp.Muted);                                                        // the zone mute the user sees is untouched
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/stop", new { })).StatusCode);
+        await Until(() => Task.FromResult(!pc.Client.Dsp.SelfMuted), "Stop did not give the PC its sound back");
+        // Sync with WavWiz: the Player is how this PC hears it, so it plays
+        pc.Client.InputSide.LocalSync = _ => { };
+        pc.Outputs.Outputs.Add(new OutputInfo("ep-opt", "Digital Output (Optical)", "spdif", null, true, false)); await pc.Client.SendOutputsAsync("devices");
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("outputs").GetArrayLength() == 2, "outputs");
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { localMode = "sync" })).StatusCode);
+        Assert.Equal("ep-opt", (await Input(admin, "loopback")).GetProperty("spareOutput").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("synced").GetBoolean(), "sync did not start");
+        await Task.Delay(1500); Assert.False(pc.Client.Dsp.SelfMuted);
+    }
 }

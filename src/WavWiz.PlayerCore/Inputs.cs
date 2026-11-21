@@ -100,7 +100,8 @@ public sealed class InputResponder : IDisposable
             case "start" when c.InputId is { Length: > 0 } id: Start(id); break;
             case "stop" when c.InputId is { Length: > 0 } id: Stop(id); break;
             case "stop-all": StopAll(); break;
-            case LocalSyncRules.On or LocalSyncRules.Off: LocalSync?.Invoke(c); break;   // 0.7.2 t2175u: the Windows side (Player LocalSync)
+            case LocalSyncRules.On or LocalSyncRules.Off: LocalSync?.Invoke(c); break;
+            case LocalSyncRules.SelfMuteOn or LocalSyncRules.SelfMuteOff: SelfMute?.Invoke(c.Action == LocalSyncRules.SelfMuteOn); break;   // 0.7.2 t2183u   // 0.7.2 t2175u: the Windows side (Player LocalSync)
         }
     }
 
@@ -117,7 +118,9 @@ public sealed class InputResponder : IDisposable
     private void Stop(string id) { IDisposable? d; lock (_l) { if (!_running.Remove(id, out d)) return; } try { d.Dispose(); } catch { } _log("input stopped: " + id); }
 
     /// <summary>Stop every running capture (connection lost, app closing).</summary>
-    public void StopAll() { try { LocalSync?.Invoke(new InputCmd(LocalSyncRules.Off)); } catch { } List<IDisposable> all;   // 0.7.2 t2175u: link lost / closing = Windows back on the speakers
+    /// <summary>0.7.2 t2183u: the server says this PC's own sound is playing in this PC's zone in Real time: don't play the copy here.</summary>
+    public Action<bool>? SelfMute;
+    public void StopAll() { try { LocalSync?.Invoke(new InputCmd(LocalSyncRules.Off)); } catch { } try { SelfMute?.Invoke(false); } catch { } List<IDisposable> all;   // 0.7.2 t2175u: link lost / closing = Windows back on the speakers
          lock (_l) { all = _running.Values.ToList(); _running.Clear(); } foreach (var d in all) try { d.Dispose(); } catch { } while (_q.Reader.TryRead(out _)) { } }
 
     private void OnBlock(string id, float[] interleaved, int rate, int ch)
