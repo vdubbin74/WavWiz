@@ -6528,3 +6528,10 @@ html.handset .tree42.mx-on .mx-drawer .mv-numw{gap:4px;min-width:0;align-items:c
 html.handset .tree42.mx-on .mx-drawer .spk-fine{width:30px;min-width:30px;height:28px;min-height:0;padding:0}
 html.handset .tree42.mx-on .mx-drawer .mv-dnum{width:60px!important;min-width:0!important;max-width:60px;height:28px!important;min-height:0!important;box-sizing:border-box;padding:0 6px!important;line-height:normal;font-size:14px!important;text-align:right;align-self:center}
 html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 0.7.2 t2161u: normal Devices speaker rows - % + mute move down onto the tag line, right-aligned (always line 2, even with no tags); mixer mode untouched */
+.tree42:not(.mx-on) .sp42-l2{display:flex;align-items:center;gap:6px;width:100%;min-width:0}
+.tree42:not(.mx-on) .sp42-l2>.sp42-tags{flex:1 1 auto;width:auto;min-width:0;display:flex}
+.tree42:not(.mx-on) .sp42-l2>.sp42-tags:empty{display:block}
+.tree42:not(.mx-on) .sp42-l2>.sp42-v{margin-left:auto}
+.tree42:not(.mx-on) .sp42-l2>.sp42-mute{margin-left:0}
+.tree42:not(.mx-on) .sp42-nt{flex:1 1 auto;align-self:stretch}

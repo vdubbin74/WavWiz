@@ -169,6 +169,9 @@ export function treeEl(S, ctl, kit, st) {
       row.classList.add('mx-sp'); row.querySelector('.sp42-tags')?.remove(); row.querySelector('.sp42-v')?.remove();
       const dr = mixDrawer(S, ctl, z), mb = row.querySelector('.sp42-mute'), l2 = h('div', { class: 'mx-l2' }, mixVol(S, z), mb);
       row.append(mixChev(z, dr), l2); row._mxDr = dr;
+    } else {   // 0.7.2 t2161u: normal view - line 1 = dot + name; line 2 = tags ... % mute (right-aligned), on every row so all rows share one shape
+      const nt = row.querySelector('.sp42-nt'), l2 = h('div', { class: 'sp42-l2' }, row.querySelector('.sp42-tags'), row.querySelector(':scope>.sp42-v'), row.querySelector(':scope>.sp42-mute'));
+      nt.append(l2);
     }
     speakerCtx(z, row, gid != null);
     return row;
