@@ -44,9 +44,16 @@ const savePref = v => { try { localStorage.setItem(TO_KEY, v); } catch { /* priv
 let busyBy = null;
 if (typeof window !== 'undefined') window.addEventListener('wavwiz:announce', e => { const d = e.detail || {}; busyBy = d.active ? d.by || 'Someone' : null; document.querySelectorAll('.annbtn').forEach(b => { b.classList.toggle('busy', !!busyBy && !b.classList.contains('talking')); b.title = buttonTitle(busyBy, announceTarget(loadPref(), getApiZone()), Z.current?.()?.name); }); });
 
+/** 0.7.2 t2166u: inside the desktop Player's window (the same test as viz.js inDesktopPlayer, kept here so this module stays light). */
+export const inDesktopPlayer = (ua = globalThis.navigator?.userAgent || '') => /WavWizPlayer\//.test(ua);
 export function insecureSheet(title = INSECURE_TITLE, again = 'then hold Announce again') {   // 0.7.2 D: also the zone timing check's
   const box = h('div', { class: 'ann-sheet', role: 'dialog', 'aria-label': title },
     h('b', null, title), h('p', { class: 'small' }, `Browsers only let a page use the microphone over https://. Open WavWiz from its secure address on this device, ${again}.`));
+  if (inDesktopPlayer()) {   // 0.7.2 t2166u: no links that strand the desktop Player on the phone set-up page; the 0.7.2 Player allows the mic itself
+    box.querySelector('p').textContent = 'This WavWiz Player cannot use the microphone yet. Update the Player to 0.7.2 or later, or use a phone or a browser.';
+    box.append(h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn sm', onclick: () => box.remove() }, 'Close')));
+    document.body.append(box); return;
+  }
   const go = h('a', { class: 'btn sm primary', href: '#', hidden: true }, 'Open the secure address');
   const close = h('button', { type: 'button', class: 'btn sm', onclick: () => box.remove() }, 'Close');
   box.append(h('div', { class: 'row' }, go, h('a', { class: 'btn sm', href: '/tls/check' }, 'Check this device'), close));
