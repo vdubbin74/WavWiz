@@ -206,6 +206,24 @@ public sealed class WebUiForm : Form
         return u.Length == 0 ? u : UiUrl.WithRemote(u, false);   // 0.3.2 F3: Remote mode is gone; ?remote=0 also clears a remembered 0.3.x choice in the page
     }
 
+    /// <summary>0.7.2 t2167u: ONE environment recipe for every WebView2 on the shared "webview" folder (main window and mini player must match, or the
+    /// second one fails to start): the plain-http server origin counts as secure, so the page may ask for the microphone (Announce).</summary>
+    internal static Task<CoreWebView2Environment> CreateEnv(PlayerSettings s)
+    {
+        var args = UiUrl.SecureOriginArgs(UiAddress(s));
+        var opts = new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = args ?? "" };
+        return CoreWebView2Environment.CreateAsync(null, Path.Combine(PlayerSettings.Dir, "webview"), opts);
+    }
+    /// <summary>0.7.2 t2167u: the microphone is allowed without a prompt for our own server origin only; every other request keeps WebView2's default.</summary>
+    internal static void AllowMic(CoreWebView2 cw, string baseUrl) =>
+        cw.PermissionRequested += (_, e) => { try { if (e.PermissionKind == CoreWebView2PermissionKind.Microphone && UiUrl.MicAllowed(baseUrl, e.Uri)) e.State = CoreWebView2PermissionState.Allow; } catch { } };
+    /// <summary>0.7.2 t2166u: Alt+Left goes back when the window is somehow off the app page (app pages keep their own keys, e.g. the Jukebox kiosk lock).</summary>
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        var cw = _web.CoreWebView2;
+        if (keyData == (Keys.Alt | Keys.Left) && cw != null && !UiUrl.IsAppPage(_url, cw.Source)) { try { if (cw.CanGoBack) cw.GoBack(); else cw.Navigate(_url); } catch { } return true; }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
     public static void OpenInBrowser(string url) { try { if (url.Length > 0) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch { } }
 
     private void FitToScreen()
@@ -271,9 +289,10 @@ public sealed class WebUiForm : Form
         try
         {
             var folder = Path.Combine(PlayerSettings.Dir, "webview");
-            var env = await CoreWebView2Environment.CreateAsync(null, folder);
+            var env = await CreateEnv(_set);
             await _web.EnsureCoreWebView2Async(env);
             var cw = _web.CoreWebView2;
+            AllowMic(cw, _url);
             cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version + (_chrome ? " " + TitleBar.UaToken : "");      // the server never redirects this app to https (0.0.1 bug)
             cw.Settings.IsNonClientRegionSupportEnabled = _chrome;   // 0.6.8-#16: app-region: drag on the page's title bar = a real caption (WebView2 1.0.2420+)
             cw.Settings.IsStatusBarEnabled = false;
@@ -281,10 +300,11 @@ public sealed class WebUiForm : Form
             cw.NavigationStarting += (_, e) =>
             {
                 if (e.Uri.StartsWith("wavwiz-browser:", StringComparison.OrdinalIgnoreCase)) { e.Cancel = true; OpenInBrowser(_url); return; }
-                if (!UiUrl.IsInternal(_url, e.Uri, WavWizInfo.DefaultHttpsPort)) { e.Cancel = true; OpenInBrowser(e.Uri); }
+                if (!UiUrl.IsAppPage(_url, e.Uri)) { e.Cancel = true; OpenInBrowser(e.Uri); }   // 0.7.2 t2166u: /tls/... and the https port open in the system browser
             };
             cw.NavigationCompleted += (_, e) =>
             {
+                if (e.IsSuccess && !UiUrl.IsAppPage(_url, cw.Source)) { BeginInvoke(() => { try { cw.Navigate(_url); } catch { } }); return; }   // 0.7.2 t2166u: never stranded off the app
                 if (e.IsSuccess) { if (!_waiting) { _loadedOnce = true; _retries = 0; _waitTry = 0; _watch.Stop(); } _waiting = false; return; }
                 if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) return;           // our own cancel / a reload
                 _watch.Stop();
@@ -508,9 +528,10 @@ public sealed class MiniPlayerForm : Form
     {
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(PlayerSettings.Dir, "webview"));
+            var env = await WebUiForm.CreateEnv(_set);   // 0.7.2 t2167u: the same options as the main window (shared folder)
             await _web.EnsureCoreWebView2Async(env);
             var cw = _web.CoreWebView2;
+            WebUiForm.AllowMic(cw, WebUiForm.UiAddress(_set));
             cw.Settings.UserAgent = cw.Settings.UserAgent + " WavWizPlayer/" + WavWizInfo.Version + " WavWizMini";
             cw.Settings.AreDefaultContextMenusEnabled = false; cw.Settings.IsStatusBarEnabled = false;
             cw.WebMessageReceived += (_, e) => OnMessage(e.WebMessageAsJson);

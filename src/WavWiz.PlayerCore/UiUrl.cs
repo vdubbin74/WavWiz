@@ -41,6 +41,32 @@ public static class UiUrl
         if (t.Scheme is not ("http" or "https") || !t.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase)) return false;
         return t.Port == b.Port || httpsPort > 0 && t.Scheme == "https" && t.Port == httpsPort;
     }
+    /// <summary>0.7.2 t2167u: scheme://host:port of the app address (no path), or "" when it is not an http(s) address.</summary>
+    public static string Origin(string? baseUrl) =>
+        Uri.TryCreate(baseUrl, UriKind.Absolute, out var b) && b.Scheme is "http" or "https" && b.Host.Length > 0 ? $"{b.Scheme}://{b.Authority}" : "";
+    /// <summary>0.7.2 t2167u: the WebView2 browser argument that lets the plain-http app address use the microphone (Announce): Chromium's
+    /// --unsafely-treat-insecure-origin-as-secure for exactly the server origin. Null for an https or empty address (nothing to add).</summary>
+    public static string? SecureOriginArgs(string? baseUrl)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var b) || b.Scheme != "http" || b.Host.Length == 0) return null;
+        return "--unsafely-treat-insecure-origin-as-secure=" + Origin(baseUrl);
+    }
+    /// <summary>0.7.2 t2167u: a microphone request may be allowed only for a page on the app's own origin (same scheme, host and port).</summary>
+    public static bool MicAllowed(string? baseUrl, string? requestUri)
+    {
+        var o = Origin(baseUrl); return o.Length > 0 && Origin(requestUri).Equals(o, StringComparison.OrdinalIgnoreCase);
+    }
+    /// <summary>0.7.2 t2166u: may the desktop window SHOW this page? The app's own origin only (calibration, phone mic page and other app pages stay
+    /// inside), minus the certificate / phone set-up pages (/tls/...) and the https port, which open in the system browser instead (no way back in the app).
+    /// about: and data: (error / waiting pages) stay inside.</summary>
+    public static bool IsAppPage(string baseUrl, string? target)
+    {
+        if (string.IsNullOrEmpty(target)) return false;
+        if (target.StartsWith("about:", StringComparison.OrdinalIgnoreCase) || target.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return true;
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var b) || !Uri.TryCreate(target, UriKind.Absolute, out var t)) return false;
+        if (t.Scheme != b.Scheme || !t.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase) || t.Port != b.Port) return false;
+        return !(t.AbsolutePath.Equals("/tls", StringComparison.OrdinalIgnoreCase) || t.AbsolutePath.StartsWith("/tls/", StringComparison.OrdinalIgnoreCase));
+    }
     /// <summary>0.2.5: the page address with a screen to open (#calibrate). Only known screen names; anything else returns the address unchanged.</summary>
     public static string WithScreen(string baseUrl, string screen)
     {
