@@ -12,7 +12,7 @@ public static class SystemApi
         ["bt.defaultLatencyMs"] = (0, 1000), ["wired.defaultLatencyMs"] = (0, 1000), ["calibration.recheckDays"] = (1, 365), ["calibration.winLatencyChangeMs"] = (1, 500), ["library.rescanHours"] = (0, 168),
         ["airplay.levelDb"] = (0, 6), ["spotify.levelDb"] = (0, 6), ["playback.crossfadeSec"] = (0, 12), ["calibration.testLevelDb"] = (-40, -6),
     };
-    private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt", Media.LiveLimiter.SettingKey };   // 0.7.2: live.limiter
+    private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt", Media.LiveLimiter.SettingKey, Announce.AnnounceService.ChimeKey };   // 0.7.2: live.limiter, announce.chime
     private static readonly HashSet<string> StringSettings = new() { "server.name", "acoustid.apiKey" };
     private static readonly Dictionary<string, string[]> ChoiceSettings = new() { ["playback.replayGain"] = Media.Loudness.Modes, ["calibration.micDefault"] = new[] { "pc", "phone", "ear" }, ["playback.streamRate"] = new[] { "48000", "96000" } };     // 0.4.9 F77     // 0.1.3
 

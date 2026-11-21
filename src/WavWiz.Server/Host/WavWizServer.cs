@@ -80,6 +80,7 @@ public sealed class WavWizServer : IAsyncDisposable
         s.AirPlay = new Receivers.AirPlayReceiver(s, u._log.Write); s.Spotify = new Receivers.SpotifyReceiver(s, u._log.Write);
         s.ZoneRecv = new Receivers.ZoneReceivers(s, u._log.Write); s.Links.Applied += () => s.ZoneRecv.Sync();
         s.Inputs = new Inputs.InputService(s);   // 0.7.2 audio inputs (Aux in / Turntable, S/PDIF in, mics, this PC's sound) from the Player on the server PC
+        s.Announce = new Announce.AnnounceService(s);   // 0.7.2 hold-to-talk announcements (duck the music, chime, voice, fade back)
         s.Links.Applied += () => s.Zones.RepushDelays();   // 0.7.1: a speaker that changed zone gets its new zone's "vs house" offset
         s.Zones.ExternalDelayChanged = pid => _ = pid.StartsWith("cast:", StringComparison.Ordinal) ? Cast.CastSpeakers.Push(s, pid) : AirPlay.AirPlaySpeakers.Push(s, pid);
         s.ZoneRecv.ActiveZones = () => Receivers.ZoneReceivers.ActiveZoneIds(s.Zones.Zones()); s.ZoneRecv.AnyActive = () => Receivers.ZoneReceivers.AnyActiveSpeaker(s.Zones.Zones());   // AirPlay names show only with a live speaker (house: one in a zone)
@@ -157,7 +158,7 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); InputsApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); CastApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
+        AuthApi.Map(api, s); InputsApi.Map(api, s); AnnounceApi.Map(api, app, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); CastApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();
@@ -206,7 +207,7 @@ public sealed class WavWizServer : IAsyncDisposable
         _tick?.Dispose(); _rescan?.Dispose(); S.Stop.Cancel();
         try { S.CdRip?.Shutdown(); } catch (Exception ex) { try { _log.Write("rip shutdown: " + ex.Message); } catch { } }
         if (S.LocalAudio != null) { try { await S.LocalAudio.DisposeAsync(); } catch { } }
-        S.Inputs?.Dispose(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync(); S.CastBrowse?.Dispose(); if (S.CastOut != null) await S.CastOut.DisposeAsync();
+        S.Announce?.Dispose(); S.Inputs?.Dispose(); S.Discovery?.Dispose(); S.AirPlay?.Dispose(); S.Spotify?.Dispose(); S.ZoneRecv?.Dispose(); S.AirPlayBrowse?.Dispose(); if (S.AirPlayOut != null) await S.AirPlayOut.DisposeAsync(); S.CastBrowse?.Dispose(); if (S.CastOut != null) await S.CastOut.DisposeAsync();
         try { await App.StopAsync(TimeSpan.FromSeconds(3)); } catch { }
         await S.Audio.DisposeAsync(); S.Clock.Dispose(); S.Registry.Dispose(); S.Art.Online?.Dispose();
         await App.DisposeAsync(); _log.Dispose();

@@ -19,6 +19,7 @@ import { canPickNative, pickFolder } from './folderpick.js';   // 0.6.9 #6
 import { phoneRole } from './calmic-core.js';
 import { historyCard, lastFmCard } from './history.js';
 import { inputsCard } from './inputs.js';   // 0.7.2 audio inputs
+import { announceSettingsRow } from './announce.js';   // 0.7.2 Announce: the chime switch
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -186,6 +187,7 @@ export async function openSettings(S, refresh, nav, section) {
     panes.library.push(admin ? remoteCard() : h('div', { class: 'card', id: 'sec-remote-libs' }, h('h3', null, 'Remote libraries ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can add remote libraries.')));   // F164
     panes.library.push(onlineArtCard(settings, admin));
     panes.playback.push(crossfadeCard(settings, admin), replayGainCard(settings), streamQualityCard(settings, admin));
+    panes.playback.push(h('div', { class: 'card', id: 'sec-announce' }, h('h3', null, 'Announcements'), announceSettingsRow(settings, admin, putSettings)));   // 0.7.2 hold-to-talk
     panes.library.push(acoustIdCard(settings));
     panes.library.push(historyCard(S), lastFmCard(admin));
 

@@ -750,6 +750,7 @@ function connectWs() {
       else if (m.type === 'calrun' || m.type === 'miclevel' || m.type === 'calmics') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.2.5 PC-mic run, live mic level, calibration-mic list
       else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b
       else if (m.type === 'rip') window.dispatchEvent(new CustomEvent('wavwiz:rip', { detail: m.data }));
+      else if (m.type === 'announce') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.7.2 Announce: someone started / stopped talking
       else if (m.type === 'inputs' || m.type === 'inputlevel') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.7.2 audio inputs: list changed / live meter   // 0.6.8 CD ripper: disc insert/eject + live job progress
     },
   });

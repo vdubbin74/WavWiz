@@ -31,10 +31,19 @@ public interface IStreamSubscriber
 /// </summary>
 public delegate void FrameTapHandler(long playAtUs, ReadOnlySpan<float> interleavedStereo);
 
+/// <summary>0.7.2 Announce: changes each produced 20 ms frame in place (ducks the music and adds the voice) before it is encoded and sent.
+/// Runs on the pump thread under the caller's lock, at production time (up to the deepest buffer ahead of "now"), so every zone hears it together.</summary>
+public interface IFrameMixer
+{
+    void Mix(Span<float> interleavedStereo, int frames, int rate);
+}
+
 public sealed class StreamEngine
 {
     /// <summary>Optional listener for each produced 20 ms frame (the visualizer feed). Runs on the pump thread: keep it tiny.</summary>
     public FrameTapHandler? FrameTap;
+    /// <summary>0.7.2: set while an announcement plays (null otherwise). Survives <see cref="Play"/> (a new song keeps the announcement going).</summary>
+    public IFrameMixer? Mixer;
     public const long FrameUs = 20_000;
     private sealed class Sent { public long Index; public byte[] Message = null!; public byte[]? Message48; }   // F77: Message48 = the 48 kHz copy (same bytes at 48 kHz; filled one frame late at 96 kHz)
 
@@ -179,6 +188,7 @@ public sealed class StreamEngine
         long idx = _produced++;
         long playAt = EpochStartUs + idx * FrameUs;
         var buf = _buf.AsSpan(0, FrameSamples * 2);
+        Mixer?.Mix(buf, FrameSamples, Rate);
         var msg = Wire.EncodeAudio((uint)idx, playAt, Epoch, buf);
         if (_dec == null) { _ring.Add(new Sent { Index = idx, Message = msg, Message48 = msg }); FrameTap?.Invoke(playAt, buf); return; }
         var low = _dec.Push(buf);                    // the 48 kHz copy of the PREVIOUS frame (zero-delay filter, one frame look-ahead)

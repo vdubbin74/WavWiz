@@ -81,6 +81,37 @@ public sealed class Conductor : IDisposable
         }
     }
 
+    // ---------------- 0.7.2 Announce: a voice over this group's stream; the music ducks (never pauses), then fades back ----------------
+    private Announce.AnnounceMixer? _announce; private bool _announceOnly;
+    /// <summary>Silence for an announcement while nothing plays: frames are only made when voice is waiting (low delay), and it ends with the mixer.</summary>
+    private sealed class AnnounceCarrier(Announce.AnnounceMixer m) : ISampleSource
+    {
+        public bool Ended => m.Done;
+        public int Read(Span<float> dst, int frames) { if (m.Done || m.Queued == 0 && !m.Ended) return 0; dst[..(frames * 2)].Clear(); return frames; }
+    }
+    /// <summary>True while an announcement is playing (or fading back) on this group.</summary>
+    public bool Announcing { get { lock (_l) return _announce != null; } }
+    /// <summary>Starts an announcement here. Playing music keeps playing (ducked); when stopped or paused a short voice-only stream starts and the
+    /// queue, position and state are left exactly as they were. A newer announcement replaces an older one.</summary>
+    public void BeginAnnounce(Announce.AnnounceMixer m)
+    {
+        lock (_l)
+        {
+            _announce?.End(); _announce = m; Engine.Mixer = m;
+            if (!(_state == PlayState.Playing && Engine.Playing)) StartAnnounceOnlyNoLock();
+            Arm();
+        }
+    }
+    private void StartAnnounceOnlyNoLock() { if (_announce == null) return; Engine.Play(new AnnounceCarrier(_announce), LeadMs * 1000L); _announceOnly = true; }
+    /// <summary>Tick: the mixer finished (music back at full level) - take it off the stream.</summary>
+    private void AnnounceTickNoLock()
+    {
+        if (_announce == null) return;
+        if (_announce.Done) { if (ReferenceEquals(Engine.Mixer, _announce)) Engine.Mixer = null; _announce = null; return; }
+        // paused / stopped / queue ended mid-announcement: keep talking on a voice-only stream
+        if (!Engine.Playing && _state != PlayState.Playing) StartAnnounceOnlyNoLock();
+    }
+
     private bool LiveActiveNoLock(QueueItem? it) => it != null && IsReceiver(it.Kind) && TryFeed(it, out var f) && f.Active;
 
     /// <summary>0.4.0: the playback group this Conductor belongs to ("default" = the house group, today's behavior). Events it publishes carry it as zoneId.</summary>
@@ -172,15 +203,16 @@ public sealed class Conductor : IDisposable
         {
             lock (_l)
             {
-                if (_state == PlayState.Playing && Engine.Playing) Engine.Pump();
+                if ((_state == PlayState.Playing || _announceOnly) && Engine.Playing) Engine.Pump();
                 long now = Clock.NowUs;
                 if (Engine.Playing && Engine.StopAtUs != long.MaxValue && now > Engine.StopAtUs + 200_000)
                 {
                     // the stop time has passed (pause, stop or natural end of queue)
                     bool natural = _state == PlayState.Playing;
-                    Engine.Halt();
+                    Engine.Halt(); _announceOnly = false;
                     if (natural) { _state = PlayState.Stopped; _index = Math.Max(0, Math.Min(_index, _queue.Count - 1)); _pausedMs = 0; DisposeSource(); }
                 }
+                AnnounceTickNoLock();
                 if (_state == PlayState.Playing && _source != null)
                 {
                     int idx = CurrentIndexNoLock();
@@ -195,7 +227,7 @@ public sealed class Conductor : IDisposable
                     Pub("now");
                 }
                 // 0.4.0: nothing to pump or report -> stop the timer (an idle group costs no wakeups, no decoder, no pump)
-                if (_state != PlayState.Playing && !Engine.Playing && !(curItem != null && IsReceiver(curItem.Kind)) && _index == _lastIndexReported && _state == _lastStateReported) DisarmNoLock();
+                if (_state != PlayState.Playing && !Engine.Playing && _announce == null && !(curItem != null && IsReceiver(curItem.Kind)) && _index == _lastIndexReported && _state == _lastStateReported) DisarmNoLock();
             }
         }
         catch (Exception e) { Console.Error.WriteLine("conductor tick: " + e.Message); }
@@ -258,7 +290,7 @@ public sealed class Conductor : IDisposable
         _index = index; _liveTitle = null; _notice = null;
         _openRate = EpochRate(_queue); _source = new QueueSource(_queue, index, startMs, _repeat, Open) { CrossfadeMs = CrossfadeMsSetting, Rate = _openRate }; NoteCurrent(); _source.Picker = _shuffle ? PickNext : null;
         _source.ItemFailed += (it, err) => { _notice = $"Skipped \"{it.Title}\": {err}"; _events.Publish("notice", new { message = _notice, zoneId = GroupId }); };
-        Engine.Play(_source, LeadMs * 1000L);
+        Engine.Play(_source, LeadMs * 1000L); _announceOnly = false;   // 0.7.2: an announcement keeps going over the new music (Engine.Mixer survives Play)
         _state = PlayState.Playing; _pausedMs = startMs;
         Bump(); Pub("now");
     }

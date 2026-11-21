@@ -7,6 +7,7 @@ export const WHATS_NEW_VERSION = '0.7.2';
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
   // 0.7.2
+  ['Announce to the house', 'Hold Announce in Devices on a PC or a phone and talk: a chime plays, the music turns down 12 dB (it never pauses) and every speaker in the zone - or Everywhere - hears you, then the music fades back when you let go. On a phone, open WavWiz from its https:// address so the browser allows the microphone. The chime can be turned off in Settings > Playback.'],
   ['Play your record player, TV and PC sound', 'Aux in, S/PDIF in, microphones and what the server PC is playing show up under Library > Inputs once WavWiz Player runs on the server PC. Play one in a zone or Everywhere like a radio station; Stop brings your queue back paused. Turntable mode starts when the needle drops and stops after the side ends. An administrator turns inputs on in Settings > Devices > Audio inputs.'],
   ['No crackle on boosted AirPlay and Spotify', 'A limiter now catches loud peaks after the AirPlay / Spotify Connect boost, so a song that is already loud stays clean at +6 dB. It adds no delay and is on by default (Settings > Network).'],
   // 0.7.1

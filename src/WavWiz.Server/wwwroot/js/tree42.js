@@ -12,6 +12,7 @@ import { flagNote, useRef, zoneRefBlock, zoneTimingRow } from './refrec.js';   /
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
 import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
+import { announceButton } from './announce.js';   // 0.7.2 hold-to-talk
 
 // ---------------------------------------------------------------- pure parts (unit-tested)
 /** The tree's shape: boxes (a solo zone, or a linked set sharing one queue), the unassigned speakers and the header counts. */
@@ -101,7 +102,7 @@ export function treeEl(S, ctl, kit, st) {
   const addSpkBtn = ro(h('button', { type: 'button', class: 'btn sm zadd-spk', 'aria-label': 'Add speaker', title: 'Add speaker',
     onclick: ev => { ev.stopPropagation(); import('./addspeaker.js').then(m => m.openAddSpeaker(S, ctl)).catch(e => toast(e.message, true)); } }, icon('volume')), admin);
   root.append(h('div', { class: 'pane-h dsec-h tree42-h' }, h('span', { class: 'tree42-n' }, ...countsText(model).split(/(\d+)/).map(x => /^\d+$/.test(x) ? h('span', { class: 'tree42-num' }, x) : x)), h('span', { class: 'grow' }),
-    addZoneBtn, addSpkBtn));
+    announceButton(S), addZoneBtn, addSpkBtn));
 
   const move = async (z, toId) => {
     // F269: optimistic - the speaker lands in its new zone at once (S.groups updated locally, tree redrawn); the server answer then confirms, a failure re-reads.

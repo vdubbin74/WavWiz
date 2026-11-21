@@ -6428,3 +6428,39 @@ html.handset .inp-sw > .small{flex-basis:100%;padding-left:28px}
 .lib .libsrc-tabs.xtabs:has(> button[data-src=inputs]){flex-wrap:nowrap;gap:0;overflow-x:auto;scrollbar-width:none}
 .lib .libsrc-tabs.xtabs:has(> button[data-src=inputs])::-webkit-scrollbar{display:none}
 .lib .libsrc-tabs.xtabs:has(> button[data-src=inputs]) > button{flex:none;padding-left:7px;padding-right:7px}
+
+/* 0.7.2 Announce: hold-to-talk in the Devices header (PC and phone), the live "Talking to..." pill, the To menu and the https sheet */
+.tree42-h .annwrap{display:inline-flex;align-items:center;flex:none;margin-right:2px}
+.tree42-h .annwrap .annbtn{display:inline-flex;align-items:center;gap:5px;min-height:26px;height:26px;padding:0 8px;border-radius:3px 0 0 3px;font-size:12px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.tree42-h .annwrap .annbtn .ic{width:15px;height:15px}
+.tree42-h .annwrap .annbtn .ic svg{width:15px;height:15px}
+.tree42-h .annwrap .anntobtn{min-height:26px;height:26px;width:20px;padding:0;border-left:0;border-radius:0 3px 3px 0;display:inline-flex;align-items:center;justify-content:center}
+.tree42-h .annwrap .anntobtn .ic,.tree42-h .annwrap .anntobtn svg{width:12px;height:12px}
+.tree42-h .annwrap .annbtn.ro{opacity:.55;cursor:not-allowed}
+.annbtn.talking{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.annbtn.busy{border-color:var(--accent2);color:var(--accent2)}
+.ann-live{position:fixed;left:50%;top:58px;transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--accent);box-shadow:0 8px 28px rgba(0,0,0,.45);color:var(--ink);max-width:calc(calc(100vw / var(--z,1)) - 24px);transition:opacity .6s}
+.ann-live.done{opacity:0}
+.ann-live b{white-space:nowrap}
+.ann-live .ann-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none;animation:ww-ann-pulse 1s ease-in-out infinite}
+.ann-live .ann-meter{width:70px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;flex:none}
+.ann-live .ann-lvl{display:block;height:100%;width:0;background:var(--accent2);transition:width .08s linear}
+@keyframes ww-ann-pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.ann-live .ann-dot{animation:none}}
+.ann-menu{position:fixed;z-index:9001;display:flex;flex-direction:column;gap:2px;min-width:220px;max-width:280px;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.ann-menu button{text-align:left;border:0;background:none;padding:8px 10px;border-radius:3px;cursor:pointer}
+.ann-menu button:hover{background:var(--panel)}
+.ann-menu button[aria-checked=true]::before{content:'✓ ';color:var(--accent)}
+.ann-menu p{margin:4px 10px 4px}
+.ann-sheet{position:fixed;z-index:9002;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(calc(100vw / var(--z,1)) - 24px));padding:16px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.ann-sheet .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+html.handset .ann-live{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+html.handset .tree42-h .annwrap .annbtn{height:32px;min-height:32px;padding:0 10px}
+html.handset .tree42-h .annwrap .annlbl{display:none}   /* the phone header keeps one line: mic icon + To arrow */
+html.handset .ann-live .small{display:none}
+html.handset .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px}
+#sec-announce .setrow{display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box}
+#sec-announce .setrow .small{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:68ch}
+#sec-announce .setrow > .grow{flex:1 1 auto;min-width:0}
+#sec-announce>.setrow{grid-column:1/-1}

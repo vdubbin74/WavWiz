@@ -33,7 +33,8 @@ public sealed class Services
     public Features.TagFixService TagFix = null!;
     public Features.CdRipService CdRip = null!;
     public Receivers.AirPlayReceiver? AirPlay; public Receivers.SpotifyReceiver? Spotify; public Receivers.ZoneReceivers? ZoneRecv; public AirPlay.AirPlayBrowser? AirPlayBrowse; public AirPlay.AirPlayOutputs? AirPlayOut;      // 0.5.0 AirPlay sender stage 1 (started on demand by the admin dev card)      // 0.4.0 Stage 4: one name per zone
-    public Inputs.InputService? Inputs;      // 0.7.2 audio inputs of the WavWiz Player on the server PC
+    public Inputs.InputService? Inputs;
+    public Announce.AnnounceService? Announce;   // 0.7.2 hold-to-talk announcements      // 0.7.2 audio inputs of the WavWiz Player on the server PC
     public Host.LocalAudioHost? LocalAudio;      // 0.7.0 Linux/Pi: this machine's ALSA outputs as a speaker
     public Cast.CastBrowser? CastBrowse; public Cast.CastOutputs? CastOut; public Action<string>? Log;      // 0.7.0 F169 Google Cast speakers (browser started on demand); 0.6.9 #22b: also the AirPlay browse started on demand
     /// <summary>0.7.0 item 5b: Cast devices typed in by IP address on the Cast card (not seen by mDNS), until added or the server restarts.</summary>
