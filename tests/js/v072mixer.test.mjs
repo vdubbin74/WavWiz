@@ -56,3 +56,9 @@ test('t2155u: normal Devices speaker rows stay as they were (no slider; % + mute
   assert.match(css, /\.tree42 \.sp42>\.dot\{align-self:flex-start;margin-top:7px\}/);
   assert.match(css, /\.tree42\.mx-on \.sp42\.mx-sp>\.dot\{align-self:center;margin-top:0\}/);
 });
+
+test('t2156u / t2159u: phone Delay row fits - 60 px ms box, as tall as the 28 px −/+ buttons, phone only', () => {
+  assert.match(css, /html\.handset \.tree42\.mx-on \.mx-drawer \.spk-fine\{width:30px;min-width:30px;height:28px;/);
+  assert.match(css, /html\.handset \.tree42\.mx-on \.mx-drawer \.mv-dnum\{width:60px!important;[^}]*height:28px!important;/);
+  assert.match(css, /html\.handset \.tree42\.mx-on \.mx-drawer \.mv-drow\.mv-delayrow\{grid-template-columns:minmax\(0,1fr\) auto;/);
+});

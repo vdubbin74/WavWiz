@@ -6522,3 +6522,9 @@ html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.n{grid-area:n} html.ha
 .tree42 .sp42>.dot{align-self:flex-start;margin-top:7px}
 html.handset .tree42 .sp42>.dot{margin-top:9px}
 .tree42.mx-on .sp42.mx-sp>.dot{align-self:center;margin-top:0}
+/* 0.7.2 t2156u / t2159u: phone Volume mixer drawer - the Delay row (label, −, ms box, ms, +) fits at 360-390 px: a 60 px box as tall as the 28 px −/+ buttons */
+html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-delayrow{grid-template-columns:minmax(0,1fr) auto;column-gap:6px}
+html.handset .tree42.mx-on .mx-drawer .mv-numw{gap:4px;min-width:0;align-items:center}
+html.handset .tree42.mx-on .mx-drawer .spk-fine{width:30px;min-width:30px;height:28px;min-height:0;padding:0}
+html.handset .tree42.mx-on .mx-drawer .mv-dnum{width:60px!important;min-width:0!important;max-width:60px;height:28px!important;min-height:0!important;box-sizing:border-box;padding:0 6px!important;line-height:normal;font-size:14px!important;text-align:right;align-self:center}
+html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
