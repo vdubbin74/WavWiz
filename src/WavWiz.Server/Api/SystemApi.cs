@@ -12,7 +12,7 @@ public static class SystemApi
         ["bt.defaultLatencyMs"] = (0, 1000), ["wired.defaultLatencyMs"] = (0, 1000), ["calibration.recheckDays"] = (1, 365), ["calibration.winLatencyChangeMs"] = (1, 500), ["library.rescanHours"] = (0, 168),
         ["airplay.levelDb"] = (0, 6), ["spotify.levelDb"] = (0, 6), ["playback.crossfadeSec"] = (0, 12), ["calibration.testLevelDb"] = (-40, -6),
     };
-    private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt" };
+    private static readonly HashSet<string> BoolSettings = new() { "tls.redirect", "ui.checklistDismissed", "spotify.enabled", "library.onlineArt", Media.LiveLimiter.SettingKey };   // 0.7.2: live.limiter
     private static readonly HashSet<string> StringSettings = new() { "server.name", "acoustid.apiKey" };
     private static readonly Dictionary<string, string[]> ChoiceSettings = new() { ["playback.replayGain"] = Media.Loudness.Modes, ["calibration.micDefault"] = new[] { "pc", "phone", "ear" }, ["playback.streamRate"] = new[] { "48000", "96000" } };     // 0.4.9 F77     // 0.1.3
 
@@ -88,6 +88,7 @@ public static class SystemApi
             if (b.TryGetProperty("airplay.levelDb", out var apLv) && apLv.ValueKind == JsonValueKind.Number) s.AirPlay?.SetLevelDb(apLv.GetDouble());
             if (b.TryGetProperty("spotify.levelDb", out var spLv) && spLv.ValueKind == JsonValueKind.Number) s.Spotify?.SetLevelDb(spLv.GetDouble());
             if (b.TryGetProperty("airplay.levelDb", out _) || b.TryGetProperty("spotify.levelDb", out _)) s.ZoneRecv?.ApplyLevels();   // 0.7.1 t2075: each zone's own name too, live
+            if (b.TryGetProperty(Media.LiveLimiter.SettingKey, out _)) { s.AirPlay?.ApplyLevelGain(); s.Spotify?.ApplyLevelGain(); s.ZoneRecv?.ApplyLevels(); }   // 0.7.2: limiter on/off, live
             s.Events.Publish("settings"); foreach (var z in s.Zones.Zones()) if (s.Audio.Get(z.PlayerId) is { } ps) s.Zones.PushZone(ps);
             return Results.Json(new { ok = true });
         }).Req(Role.Admin);

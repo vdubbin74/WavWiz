@@ -23,10 +23,10 @@ public sealed class DspChain : IAudioProcessor
     private double _gainTarget = 1, _gainNow = 1;
     private double _balL = 1, _balR = 1;
 
-    // limiter state
-    private double _limGain = 1;
-    public double LimiterReductionDb { get; private set; }          // current
-    public double MaxLimiterReductionDb { get; private set; }
+    // limiter state (0.7.2: the limiter is its own component, shared with the server's live inputs)
+    private readonly PeakLimiter _limiter;
+    public double LimiterReductionDb => _limiter.ReductionDb;          // current
+    public double MaxLimiterReductionDb => _limiter.MaxReductionDb;
     public int ClipCount { get; private set; }                       // input samples above 0 dBFS (before the limiter)
     public int NonFiniteResets { get; private set; }
     public bool LimiterActive => LimiterReductionDb > 0.05;
@@ -34,6 +34,7 @@ public sealed class DspChain : IAudioProcessor
     public DspChain(int sampleRate = 48000)
     {
         _fs = sampleRate;
+        _limiter = new PeakLimiter(sampleRate);
         _cur = new DspProgram(DspPreset.Flat, sampleRate, 100);
         _pending = _cur;
     }
@@ -135,29 +136,8 @@ public sealed class DspChain : IAudioProcessor
         Limit(buf, n, cur.Preset.Limiter);
     }
 
-    /// <summary>Zero-lookahead peak limiter: instant attack, smooth release (50..200 ms). Adds no latency.</summary>
-    private void Limit(Span<float> buf, int n, LimiterSettings s)
-    {
-        double ceil = Math.Pow(10, s.CeilingDb / 20);
-        double rel = Math.Exp(-1.0 / (s.ReleaseMs * 0.001 * _fs));
-        double maxRed = 0;
-        for (int i = 0; i < n; i++)
-        {
-            double l = buf[i * 2], r = buf[i * 2 + 1];
-            double peak = Math.Max(Math.Abs(l), Math.Abs(r));
-            double need = s.Enabled && peak > ceil ? ceil / peak : 1;
-            if (need < _limGain) _limGain = need; else _limGain = 1 - (1 - _limGain) * rel;
-            double ol = l * _limGain, orr = r * _limGain;
-            // final safety: nothing may pass the ceiling (or the NaN guard) even with limiting disabled
-            double hard = s.Enabled ? ceil : 1.0;
-            if (ol > hard) ol = hard; else if (ol < -hard) ol = -hard;
-            if (orr > hard) orr = hard; else if (orr < -hard) orr = -hard;
-            buf[i * 2] = (float)ol; buf[i * 2 + 1] = (float)orr;
-            if (_limGain < 0.9999) { double red = -20 * Math.Log10(_limGain); if (red > maxRed) maxRed = red; }
-        }
-        LimiterReductionDb = maxRed;
-        if (maxRed > MaxLimiterReductionDb) MaxLimiterReductionDb = maxRed;
-    }
+    /// <summary>Zero-lookahead peak limiter: instant attack, smooth release (50..200 ms). Adds no latency. 0.7.2: see <see cref="PeakLimiter"/>.</summary>
+    private void Limit(Span<float> buf, int n, LimiterSettings s) => _limiter.Process(buf, n, s);
 
     /// <summary>Magnitude response of a preset for the EQ graph (same code path as the player).</summary>
     public static double[] Response(DspPreset p, int sampleRate, double[] hz)

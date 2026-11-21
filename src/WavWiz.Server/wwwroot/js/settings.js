@@ -31,6 +31,17 @@ function masonry(sections) {
 }
 /** 0.7.1 t2075: what the AirPlay / Spotify Connect boost rows do (they were read as an AirPlay-out volume). */
 export const BOOST_HINT = 'Makes music sent from a phone up to 6 dB louder, on top of the phone\'s volume. Applies to every WavWiz AirPlay / Spotify name a phone can pick. Not used when WavWiz plays to AirPlay speakers.';
+// 0.7.2: one switch for the shared live limiter (setting live.limiter, default on). It sits under the AirPlay / Spotify boost rows and,
+// later, on the Audio inputs card: both show the same setting.
+export const LIMITER_LABEL = 'Limiter on AirPlay, Spotify and inputs';
+export const LIMITER_HINT = 'Catches loud peaks after the boost so a song that is already loud does not crackle. Adds no delay.';
+export function liveLimiterRow(settings, admin, put) {
+  const on = settings['live.limiter'] !== false;
+  return h('div', { class: 'setrow live-limiter' },
+    h('div', { class: 'grow' }, h('div', null, LIMITER_LABEL), h('div', { class: 'small dim live-limiter-hint' }, LIMITER_HINT)),
+    h('label', { class: 'switch' }, h('input', { type: 'checkbox', role: 'switch', checked: on, disabled: !admin, 'aria-label': LIMITER_LABEL, 'data-setting': 'live.limiter',
+      onchange: async ev => { try { await put({ 'live.limiter': ev.target.checked }); } catch (e) { ev.target.checked = !ev.target.checked; toast(e.message, true); } } }), h('span', { 'aria-hidden': 'true' })));
+}
 
 export const GROUPS = [
   ['general', 'General'],
@@ -209,7 +220,8 @@ export async function openSettings(S, refresh, nav, section) {
         ? h('label', { class: 'row', style: 'margin-top:12px' }, h('input', { type: 'checkbox', id: 'spotify-enabled', checked: settings['spotify.enabled'] === true, onchange: ev => putSettings({ 'spotify.enabled': ev.target.checked }) }), h('b', null, 'Spotify Connect'), h('span', { class: 'dim small' }, 'Requires Spotify Premium.'))
         : h('p', { style: 'margin-top:12px' }, h('b', null, 'Spotify Connect: '), settings['spotify.enabled'] === true ? 'On' : 'Off', ' ', h('span', { class: 'dim small' }, 'Requires Spotify Premium.')),
       levelRow('spotify.levelDb', 'Spotify Connect boost', spLv),
-      h('p', { class: 'small dim boost-hint' }, BOOST_HINT)));
+      h('p', { class: 'small dim boost-hint' }, BOOST_HINT),
+      liveLimiterRow(settings, admin, putSettings)));   // 0.7.2: shared live limiter after the boost
     panes.network.push(airplayOutCard(admin));
     if (admin) {
       const curPw = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Current password' });

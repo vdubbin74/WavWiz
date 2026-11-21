@@ -14,6 +14,13 @@ public sealed class LiveFeed
     private readonly object _wl = new();
     public int TargetMs { get; init; } = 1800;
     public volatile float Gain = 1f;
+    /// <summary>0.7.2: run the shared live limiter (<see cref="LiveLimiter"/>) after <see cref="Gain"/>, so a boosted loud track (AirPlay / Spotify
+    /// boost up to +6 dB, or an audio input's gain) is caught at the ceiling instead of clipping. Off = only the 0 dBFS safety clamp.
+    /// Setting <c>live.limiter</c> (default on); the receivers copy it here whenever they apply their level.</summary>
+    public volatile bool Limit = true;
+    private double _limRedDb;
+    /// <summary>0.7.2: gain reduction the live limiter applied to the last block read (dB, 0 = not limiting). For Diagnostics and the input meters.</summary>
+    public double LimiterReductionDb => Volatile.Read(ref _limRedDb);
     public long FramesIn => Interlocked.Read(ref _framesIn);
     public int BufferedMs => _ring.Count / 48;
     /// <summary>Audio arrived within the last 1.5 s (the sender is playing, not paused).</summary>
@@ -89,6 +96,7 @@ public sealed class LiveFeed
     private sealed class Decoder : IPcmDecoder
     {
         private readonly LiveFeed _f; private bool _buffering = true; private int _gen;
+        private readonly WavWiz.Dsp.PeakLimiter _lim = new(48000);     // 0.7.2: one limiter per reader (the house stream's audio thread)
         public Decoder(LiveFeed f) { _f = f; _gen = f.FlushGen; }
         public bool Finished => false;
         public string? Error => null;
@@ -103,6 +111,10 @@ public sealed class LiveFeed
             int n = _f._ring.Read(dst, frames);
             if (n == 0) { _buffering = true; if (_f.Active) _f.NoteUnderrun(); return 0; }                                                  // dry (paused / network gap): the house stream pads silence
             float g = _f.Gain; if (g != 1f) for (int i = 0; i < n * 2; i++) dst[i] *= g;
+            // 0.7.2: the shared live limiter, AFTER the gain (boost / input gain) and before the house mix. The per-speaker limiter in each
+            // player's DspChain stays where it is as the backstop. Disabled = the same 0 dBFS hard clamp DspChain uses.
+            _lim.Process(dst, n, _f.Limit ? LiveLimiter.Settings : LiveLimiter.Off);
+            Volatile.Write(ref _f._limRedDb, _lim.ReductionDb);
             return n;
         }
     }

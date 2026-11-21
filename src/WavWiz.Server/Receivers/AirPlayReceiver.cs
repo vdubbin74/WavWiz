@@ -70,7 +70,7 @@ public sealed class AirPlayReceiver : IDisposable
     private float LevelGain() => (float)Math.Pow(10, LevelDb / 20.0);
     private void SetGainFromPhone(float phoneGain) { _phoneGain = phoneGain; ApplyLevelGain(); }
     /// <summary>0.7.1 t2075: phone volume x the saved boost, now - also for a session already playing (ZoneReceivers.ApplyLevels for each zone's own name).</summary>
-    public void ApplyLevelGain() => Feed.Gain = _phoneGain * LevelGain();
+    public void ApplyLevelGain() { Feed.Gain = _phoneGain * LevelGain(); Feed.Limit = Media.LiveLimiter.Enabled(_s.Db); }   // 0.7.2: + the shared live limiter switch
     public void SetLevelDb(double db)
     {
         db = Math.Clamp(Math.Round(db), 0, 6);

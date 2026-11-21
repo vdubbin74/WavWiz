@@ -72,7 +72,7 @@ public sealed class SpotifyReceiver : IDisposable
         }
     }
     private float LevelGain() => (float)Math.Pow(10, LevelDb / 20.0);
-    public void ApplyLevelGain() => Feed.Gain = LevelGain();
+    public void ApplyLevelGain() { Feed.Gain = LevelGain(); Feed.Limit = Media.LiveLimiter.Enabled(_s.Db); }   // 0.7.2: + the shared live limiter switch
     public void SetLevelDb(double db)
     {
         db = Math.Clamp(Math.Round(db), 0, 6);

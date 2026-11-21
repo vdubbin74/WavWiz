@@ -14,7 +14,7 @@ test('t2075: the rows are "AirPlay boost" / "Spotify Connect boost" with the hin
   assert.match(set, /levelRow\('spotify\.levelDb', 'Spotify Connect boost', spLv\)/);
   assert.doesNotMatch(set, /'AirPlay level'|'Spotify Connect level'/);
   assert.ok(set.includes(`export const BOOST_HINT = '${HINT}';`), 'hint wording');
-  assert.match(set, /h\('p', \{ class: 'small dim boost-hint' \}, BOOST_HINT\)\)\);/);
+  assert.match(set, /h\('p', \{ class: 'small dim boost-hint' \}, BOOST_HINT\),\n\s+liveLimiterRow\(settings, admin, putSettings\)\)\);/);   // 0.7.2: the live limiter switch follows the hint
   assert.doesNotMatch(set, /\(after phone volume\)/);
 });
 

@@ -2,10 +2,12 @@ import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 import { LOGO, emblem } from './logo.js';   // 0.7.0 item 4
 
-export const WHATS_NEW_VERSION = '0.7.1';
+export const WHATS_NEW_VERSION = '0.7.2';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.7.2
+  ['No crackle on boosted AirPlay and Spotify', 'A limiter now catches loud peaks after the AirPlay / Spotify Connect boost, so a song that is already loud stays clean at +6 dB. It adds no delay and is on by default (Settings > Network).'],
   // 0.7.1
   ['Add speaker', 'AirPlay and Cast are no longer separate cards on Devices. The speaker button next to New zone opens one sheet to add WavWiz players, browsers, AirPlay and Cast to a zone. Already-added devices stay hidden until you turn on Show added.'],
   // 0.7.0

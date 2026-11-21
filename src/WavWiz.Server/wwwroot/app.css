@@ -6348,6 +6348,8 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 /* 0.7.1 t2075u: Settings > Network > AirPlay & Spotify Connect: the boost hint and the row ranges wrap - never cut off with "..." */
 #sec-airplay .boost-hint,#sec-airplay .boost-range{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
 #sec-airplay .boost-hint{margin:12px 0 0;max-width:68ch}
+/* 0.7.2 live limiter switch (AirPlay / Spotify card, Audio inputs card): the hint wraps, never "..." */
+.live-limiter{margin-top:12px}.live-limiter .live-limiter-hint{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:68ch}
 
 /* 0.7.1 t2078u: Devices with no zone yet (a fresh setup makes none) - one clear "Add zone" prompt */
 .tree42 .first42{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:8px 0;padding:12px 14px;border:1px dashed var(--line);border-radius:4px;border-left:3px solid var(--accent)}

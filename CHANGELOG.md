@@ -10,6 +10,11 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.7.2] - in progress (beta)
+
+### Added
+- AirPlay and Spotify Connect: a limiter after the 0 to +6 dB boost (setting `live.limiter`, on by default) so boosted loud tracks do not clip. It is the same zero-lookahead limiter each speaker's DSP already ends with, now a shared component that audio inputs will also use.
+
 ## [0.7.1] - 2026-11-14 (beta)
 
 ### Changed
