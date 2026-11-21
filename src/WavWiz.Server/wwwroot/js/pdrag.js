@@ -25,7 +25,10 @@ export function dragStarts({ dx, dy, heldMs, pointerType, holdMs = 180 }) {
 }
 
 const targets = new Set();
-export const PD = { active: null };   // { payload, x, y, target } while a pointer drag runs (tests read it)
+export const PD = { active: null };
+let pendingStop = null;   // 0.7.2 t2191u: the press that may still become a drag (not started yet)
+/** 0.7.2 t2191u: a long-press menu opened (the finger held still): that press is a menu, not a drag. A drag that already started is not touched. */
+export function cancelPendingDrag() { const f = pendingStop; pendingStop = null; f?.(); }   // { payload, x, y, target } while a pointer drag runs (tests read it)
 /** Registers a drop target. t = { accept(payload) -> bool, over?(payload, x, y), leave?(), drop(payload, x, y) }. Returns an unregister function. */
 export function pointerDropTarget(el, t) { const e = { el, ...t }; targets.add(e); el.dataset.pdrop = '1'; return () => targets.delete(e); }
 function findTarget(x, y, payload) {
@@ -65,7 +68,7 @@ export function startPointerDrag(ev, el, payload, { mode = dndMode(), ghost = nu
     if (!started) {
       const s = dragStarts({ dx: x - sx, dy: y - sy, heldMs: performance.now() - t0, pointerType: type });
       if (s === 'scroll') return stop(); if (s === 'wait') return;
-      started = true; p = payload(); PD.active = { payload: p, x, y, target: null, pointerType: type };
+      started = true; p = payload(); PD.active = { payload: p, x, y, target: null, pointerType: type }; pendingStop = null;
       try { el.setPointerCapture(pid); } catch { /* synthetic */ }
       el.classList.add('dragging'); document.body.classList.add('pdragging'); zoom = pageZoom();
       if (pin && pin.isConnected) {   // F26: a copy of the row, held where it was grabbed (sx, sy relative to the row's on-screen box)
@@ -94,4 +97,5 @@ export function startPointerDrag(ev, el, payload, { mode = dndMode(), ghost = nu
   }
   document.addEventListener('pointermove', move, true); document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', cancel, true);
   document.addEventListener('keydown', esc, true); document.addEventListener('touchmove', blockTouch, { capture: true, passive: false });
+  const mine = () => { if (!started) stop(); }; pendingStop = mine;
 }

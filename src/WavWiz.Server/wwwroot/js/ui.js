@@ -1,4 +1,4 @@
-import { dndMode, pointerDragSource, pointerDropTarget } from './pdrag.js';
+import { dndMode, pointerDragSource, pointerDropTarget, PD, cancelPendingDrag } from './pdrag.js';
 import { openSongSheet } from './songsheet.js';
 import { openCtx } from './ctxmenu.js';
 import { h, api, toast, dialog, getApiZone } from './util.js';
@@ -147,8 +147,8 @@ export function attachItem(S, el, ref, title, { menu = [], more = true, count = 
     el.classList.add('ldrag');   // 0.4.5: grab cursor on every draggable Library row / tile (songs and categories)
     const mode = dndMode(), mkGhost = () => { const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); return h('div', { class: 'dragghost' }, h('div', { class: 'dg-t' }, h('b', { class: 'ell' }, title), h('span', { class: 'small dim' }, [kind, n != null ? songsLabel(n) : null].filter(Boolean).join(' · '))), n != null ? h('span', { class: 'dgbadge' }, String(n)) : null); };
     pointerDragSource(el, () => ({ lib: true, ref, title }), { mode, ghost: mkGhost,
-      onStart: () => { dragInfo.count = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.title = title; dragInfo.kind = kind; dragInfo.ref = ref; },
-      onEnd: () => { dragInfo.count = null; dragInfo.title = ''; dragInfo.kind = ''; dragInfo.ref = null; } });
+      onStart: () => { dragInfo.count = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.title = title; dragInfo.kind = kind; dragInfo.ref = ref; phoneNowDrops(); },
+      onEnd: () => { dragInfo.count = null; dragInfo.title = ''; dragInfo.kind = ''; dragInfo.ref = null; phoneNowDropsOff(); } });
     if (mode === 'pointer') return el; }
   if (canControl(S)) { el.draggable = true; el.addEventListener('dragstart', ev => { ev.dataTransfer.setData(MIME, JSON.stringify(ref)); ev.dataTransfer.setData('text/plain', title); ev.dataTransfer.effectAllowed = 'copy'; el.classList.add('dragging');
     const n = count ?? (ref?.kind === 'tracks' ? ref.ids.length : null); dragInfo.count = n; dragInfo.title = title; dragInfo.kind = kind; dragInfo.ref = ref;
@@ -159,10 +159,29 @@ export function attachItem(S, el, ref, title, { menu = [], more = true, count = 
   return el;
 }
 
+/** 0.7.2 t2191u (phone only): while a Library item is dragged, the mini player bar and the full Now Playing view are drop targets that
+ *  play it at once in the current zone, replacing what plays - the same as the item's "Play now". The queue / playlist targets are unchanged.
+ *  The desktop has no drop-to-play on Now Playing, so nothing changes there. */
+export const PHONE_NOW_DROP = 'section.mini, .np-phone-full:not([hidden])';
+let nowDropOffs = [];
+function phoneNowDrops() {
+  phoneNowDropsOff();
+  if (typeof document === 'undefined' || !document.documentElement.classList.contains('handset')) return;
+  for (const el of document.querySelectorAll(PHONE_NOW_DROP)) {
+    if (!el.getClientRects().length) continue;
+    el.classList.add('npdrop-ok');
+    nowDropOffs.push(pointerDropTarget(el, { accept: p => !!p?.lib, over: () => el.classList.add('npdrop-over'), leave: () => el.classList.remove('npdrop-over'),
+      drop: async p => { el.classList.remove('npdrop-over'); if (await playNow(p.ref)) toast('Playing ' + (p.title || 'it') + ' now'); } }));
+    nowDropOffs.push(() => el.classList.remove('npdrop-ok', 'npdrop-over'));
+  }
+}
+function phoneNowDropsOff() { const o = nowDropOffs; nowDropOffs = []; o.forEach(f => f()); }
+
 export function longPress(el, fn, ms = 520) {
   let t = null, sx = 0, sy = 0, fired = false;
   const cancel = () => { clearTimeout(t); t = null; };
-  el.addEventListener('touchstart', ev => { fired = false; const p = ev.touches[0]; sx = p.clientX; sy = p.clientY; t = setTimeout(() => { fired = true; try { navigator.vibrate?.(15); } catch { /* optional */ } fn({ clientX: sx, clientY: sy, type: 'touchstart', currentTarget: el }); }, ms); }, { passive: true });
+  // 0.7.2 t2191u: never while a drag runs (moving = drag); holding still = the menu, and that press can no longer turn into a drag
+  el.addEventListener('touchstart', ev => { fired = false; const p = ev.touches[0]; sx = p.clientX; sy = p.clientY; t = setTimeout(() => { if (PD.active) { t = null; return; } fired = true; cancelPendingDrag(); try { navigator.vibrate?.(15); } catch { /* optional */ } fn({ clientX: sx, clientY: sy, type: 'touchstart', currentTarget: el }); }, ms); }, { passive: true });
   el.addEventListener('touchmove', ev => { const p = ev.touches[0]; if (Math.abs(p.clientX - sx) > 9 || Math.abs(p.clientY - sy) > 9) cancel(); }, { passive: true });
   el.addEventListener('touchend', ev => { cancel(); if (fired) { ev.preventDefault(); } });
   el.addEventListener('touchcancel', cancel);

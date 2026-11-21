@@ -6553,3 +6553,10 @@ html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;te
 html.handset .lsx .pk{grid-template-columns:1fr}
 /* 0.7.2 t2190u (phone): holding a speaker / zone row to drag it never selects text or shows the iOS Copy / Look Up callout */
 html.handset .tree42 .sp42,html.handset .tree42 .sp42 *,html.handset .tree42 .zcard42,html.handset .tree42 .zcard42 *,html.handset .tree42 .zgut42,html.handset .tree42 .cgrip69,html.handset .tree42 .dgrip42,html.handset .tree42 .un42-row,html.handset .tree42 .un42-row *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* 0.7.2 t2191u (phone): Library tiles / rows (albums, artists, songs, stations, genres, years, playlists, lists) never select text or show the iOS callout when held */
+html.handset .ldrag,html.handset .ldrag *,html.handset .tile,html.handset .tile *,html.handset .item,html.handset .item *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* drag a Library item onto the mini player / Now Playing = Play now */
+html.handset section.mini.npdrop-ok,html.handset .np-phone-full.npdrop-ok{position:relative}
+html.handset .npdrop-ok{outline:2px dashed color-mix(in srgb,var(--accent) 70%,transparent);outline-offset:-3px}
+html.handset .npdrop-over{outline:3px solid var(--accent);outline-offset:-3px;box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--accent) 16%,transparent)}
+html.handset .npdrop-over::after{content:'Drop to play now';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;pointer-events:none;z-index:5}
