@@ -25,6 +25,11 @@ public sealed record InputCfg
     public bool LiveSource { get; init; }
     /// <summary>Where it played last ("g:&lt;zone id&gt;", "everywhere" or null = the house group): where a needle drop starts it.</summary>
     public string? LastZone { get; init; }
+    /// <summary>0.7.2 t2175u, loopback only: "sync" = Sync with WavWiz (Windows plays to <see cref="SpareOutput"/>, the Player plays the synced copy on
+    /// <see cref="SyncSpeakers"/>); null = Real time (the PC plays its own sound live, as before).</summary>
+    public string? LocalMode { get; init; }
+    public string? SpareOutput { get; init; }
+    public string? SyncSpeakers { get; init; }
 }
 
 /// <summary>
@@ -61,6 +66,7 @@ public sealed class InputService : IDisposable
         public readonly LiveFeed Feed = new() { TargetMs = InputService.TargetMs };
         public InputSignalDetector Detector = new();
         public bool Capturing; public long ErrorAtMs = long.MinValue / 2; public double PeakDb = -120; public long LastLevelPubMs; public string? Error;
+        public bool SyncOn; public string? SyncNote;   // 0.7.2 t2175u: localsync-on was sent (Windows switched to the spare output on the Player PC)
         public bool GotAudio; public bool Privacy;   // 0.7.2 t2170u: audio arrived since the last start; Windows' mic privacy refused it (no auto-retry)
         public Conductor? Cond; public string? Zone; public bool LinkedEverywhere; public bool AutoStarted;
         public string Key => "input:" + Id;
@@ -124,11 +130,19 @@ public sealed class InputService : IDisposable
         lock (_l)
         {
             var l = _live.Values.FirstOrDefault(x => x.Sess.Id == sess.Id && x.Info.Id == ep); if (l == null) return;
+            if (why.StartsWith(WavWiz.PlayerCore.LocalSyncRules.FallbackTag, StringComparison.Ordinal))
+            {   // 0.7.2 t2175u: the Player went back to Real time by itself (spare gone, tray Restore, switch refused): save Real time, show why, keep playing
+                var all = LoadCfg(); all[l.Id] = CfgOf(all, l) with { LocalMode = null }; SaveCfg(all);
+                l.SyncOn = false; l.SyncNote = why[WavWiz.PlayerCore.LocalSyncRules.FallbackTag.Length..];   // a note, not a Problem: the input still plays
+            }
+            else {
             l.Privacy = why.StartsWith(WavWiz.PlayerCore.InputRules.PrivacyTag, StringComparison.Ordinal);
             l.Error = l.Privacy ? why[WavWiz.PlayerCore.InputRules.PrivacyTag.Length..] : why; l.ErrorAtMs = NowMs(); l.Capturing = false;
             // 0.7.2 t2170u: it never delivered (could not open): stop like Stop, so the zone gets its queue back instead of "Playing" silence; the error stays.
             // A mid-stream loss (unplugged, driver reset) keeps playing and retries as before.
             if (l.Cond != null && !l.GotAudio) { StopNoLock(l, "could not open: " + l.Error); stopped = true; }
+            }
+            ReconcileNoLock();
         }
         _s.Events.Publish("inputs"); if (stopped) _s.Events.Publish("zones");
     }
@@ -206,7 +220,19 @@ public sealed class InputService : IDisposable
             l.Capturing = want; if (!want) { l.PeakDb = -120; l.Detector.Reset(); }
             try { l.Sess.SendJson(MsgType.InputCmd, new InputCmd(want ? "start" : "stop", l.Info.Id)); } catch { }
         }
+        // 0.7.2 t2175u: Sync with WavWiz - Windows on the spare output only while the loopback plays in Sync mode (and the devices are there)
+        foreach (var l in _live.Values)
+        {
+            var c = CfgOf(cfg, l);
+            bool sync = SyncWantedNoLock(l, c);
+            if (sync == l.SyncOn) continue;
+            l.SyncOn = sync;
+            try { l.Sess.SendJson(MsgType.InputCmd, sync ? new InputCmd(WavWiz.PlayerCore.LocalSyncRules.On, l.Info.Id, c.SpareOutput, c.SyncSpeakers) : new InputCmd(WavWiz.PlayerCore.LocalSyncRules.Off, l.Info.Id)); } catch { }
+        }
     }
+    private static bool SyncWantedNoLock(Live l, InputCfg c) =>
+        c.Kind == "loopback" && c.LocalMode == "sync" && c.Enabled && l.Cond != null && !l.Sess.Dead
+        && WavWiz.PlayerCore.LocalSyncRules.Problem(l.Sess.Outputs, c.SpareOutput, c.SyncSpeakers) == null;
     private void ApplyGainsNoLock()
     {
         var cfg = LoadCfg(); bool lim = LiveLimiter.Enabled(_s.Db);
@@ -246,6 +272,23 @@ public sealed class InputService : IDisposable
             if (b.TryGetProperty("gainDb", out var g)) { if (g.ValueKind != JsonValueKind.Number || g.GetDouble() < MinGainDb || g.GetDouble() > MaxGainDb) return $"gainDb must be between {MinGainDb} and +{MaxGainDb}"; c = c with { GainDb = Math.Round(g.GetDouble(), 1) }; }
             if (b.TryGetProperty("turntable", out var t)) { if (t.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "turntable must be true or false"; if (t.GetBoolean() && c.Kind != "aux") return "Turntable mode is only for Aux in"; c = c with { Turntable = t.GetBoolean() }; }
             if (b.TryGetProperty("autoStart", out var a)) { if (a.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "autoStart must be true or false"; if (a.GetBoolean() && !(c.Kind == "aux" && c.Turntable)) return "auto-start needs Turntable mode on Aux in"; c = c with { AutoStart = a.GetBoolean() }; }
+            // 0.7.2 t2175u: Real time / Sync with WavWiz (loopback only) and its two outputs (from the Player's own output list)
+            if (b.TryGetProperty("spareOutput", out var so)) { if (so.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "spareOutput must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SpareOutput = so.ValueKind == JsonValueKind.Null ? null : so.GetString() }; }
+            if (b.TryGetProperty("syncSpeakers", out var sk)) { if (sk.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "syncSpeakers must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SyncSpeakers = sk.ValueKind == JsonValueKind.Null ? null : sk.GetString() }; }
+            if (b.TryGetProperty("localMode", out var lm))
+            {
+                if (lm.ValueKind != JsonValueKind.String || lm.GetString() is not ("realtime" or "sync")) return "localMode must be realtime or sync";
+                if (c.Kind != "loopback") return "only for This PC · Speakers";
+                if (lm.GetString() == "sync")
+                {
+                    var outs = l.Sess.Outputs;
+                    c = c with { SyncSpeakers = c.SyncSpeakers ?? outs.FirstOrDefault(o => o.Active && o.Connected)?.EndpointId };
+                    c = c with { SpareOutput = c.SpareOutput ?? WavWiz.PlayerCore.LocalSyncRules.SpareCandidates(outs, c.SyncSpeakers).FirstOrDefault()?.EndpointId };
+                    if (WavWiz.PlayerCore.LocalSyncRules.Problem(outs, c.SpareOutput, c.SyncSpeakers) is { } p) return p;
+                }
+                c = c with { LocalMode = lm.GetString() == "sync" ? "sync" : null };
+                l.SyncNote = null;
+            }
             if (b.TryGetProperty("liveSource", out var ls)) { if (ls.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "liveSource must be true or false"; if (c.Kind != "mic") return "only a microphone has a live-source switch"; c = c with { LiveSource = ls.GetBoolean() }; }
             all[id] = c; SaveCfg(all);
             if ((!c.Enabled || c.Kind == "mic" && !c.LiveSource) && l.Cond != null) StopNoLock(l, "turned off");
@@ -324,6 +367,8 @@ public sealed class InputService : IDisposable
                     enabled = c.Enabled, gainDb = c.GainDb, turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
                     bluetooth = l.Info.Bluetooth, note = l.Info.Note, playing = l.Cond != null, zone = l.Cond != null ? (l.Zone ?? "default") : null, groupId = l.Cond?.GroupId,
                     capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error, privacy = l.Error != null && l.Privacy,
+                    localMode = l.Info.Kind == "loopback" ? (c.LocalMode ?? "realtime") : null, spareOutput = c.SpareOutput, syncSpeakers = c.SyncSpeakers, synced = l.SyncOn, syncNote = l.SyncNote,
+                    outputs = l.Info.Kind == "loopback" ? l.Sess.Outputs.Where(o => o.Connected).Select(o => new { id = o.EndpointId, name = o.Name, active = o.Active }).ToArray() : null,
                 };
             }).ToList();
             return new { available = PlayerReady, note = PlayerReady ? null : NoPlayerNote, limiter = LiveLimiter.Enabled(_s.Db), inputs = list };

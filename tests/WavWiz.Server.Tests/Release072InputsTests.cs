@@ -319,4 +319,51 @@ public class Release072InputsTests
         Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);   // Play is the retry
         await Until(() => Task.FromResult(den.Tries == 2), "Play did not try again");
     }
+
+    // ---------------- 0.7.2 t2175u: Real time / Sync with WavWiz ----------------
+    [Fact]
+    public void Local_sync_rules_pick_spares_check_the_pair_and_round_trip_the_restore_file()
+    {
+        var outs = new[] { new OutputInfo("spk", "Speakers", "analog", null, true, true), new OutputInfo("hdmi", "LG Monitor", "hdmi", null, true, false), new OutputInfo("hp", "Headphones", "analog", null, false, false) };
+        Assert.Equal(new[] { "hdmi" }, LocalSyncRules.SpareCandidates(outs, "spk").Select(o => o.EndpointId));   // switched on, not the speakers
+        Assert.Null(LocalSyncRules.Problem(outs, "hdmi", "spk"));
+        Assert.NotNull(LocalSyncRules.Problem(outs, "spk", "spk"));
+        Assert.NotNull(LocalSyncRules.Problem(outs, "hp", "spk"));                                              // unplugged spare
+        Assert.NotNull(LocalSyncRules.Problem(outs, null, "spk"));
+        var st = new LocalSyncState("loopback:process", "hdmi", "spk", "spk", "spk", "headset");
+        Assert.Equal(st, LocalSyncRules.Parse(LocalSyncRules.Serialize(st)));
+        Assert.Null(LocalSyncRules.Parse("")); Assert.Null(LocalSyncRules.Parse("{broken"));
+    }
+
+    [Fact]
+    public async Task Sync_with_wavwiz_switches_only_while_the_loopback_plays_and_a_player_fallback_saves_real_time()
+    {
+        var (f, admin, control, pc, _) = await Setup(); await using var _f = f; await using var _p = pc;
+        var got = new System.Collections.Concurrent.ConcurrentQueue<InputCmd>();
+        pc.Client.InputSide.LocalSync = c => got.Enqueue(c);
+        var id = (await Input(admin, "loopback")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true });
+        Assert.Equal("realtime", (await Input(admin, "loopback")).GetProperty("localMode").GetString());
+        // one output only: no spare, Sync is refused with the reason
+        var r = await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { localMode = "sync" });
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        pc.Outputs.Outputs.Add(new OutputInfo("ep-hdmi", "LG Monitor", "hdmi", null, true, false)); await pc.Client.SendOutputsAsync("devices");
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("outputs").GetArrayLength() == 2, "the spare output was not listed");
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/v1/inputs/{(await Input(admin, "aux")).GetProperty("id").GetString()}", new { localMode = "sync" })).StatusCode);   // loopback only
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { localMode = "sync" })).StatusCode);
+        var lb = await Input(admin, "loopback");
+        Assert.Equal("sync", lb.GetProperty("localMode").GetString()); Assert.Equal("ep-hdmi", lb.GetProperty("spareOutput").GetString()); Assert.Equal("ep-pc-server", lb.GetProperty("syncSpeakers").GetString());
+        await Task.Delay(300); Assert.Empty(got);                                                        // not playing: Windows is left alone
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(() => Task.FromResult(got.Any(c => c.Action == LocalSyncRules.On)), "localsync-on was not sent");
+        var on = got.First(c => c.Action == LocalSyncRules.On); Assert.Equal("ep-hdmi", on.Spare); Assert.Equal("ep-pc-server", on.Speakers);
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/stop", new { })).StatusCode);
+        await Until(() => Task.FromResult(got.Any(c => c.Action == LocalSyncRules.Off)), "localsync-off was not sent on Stop");
+        // the Player went back to Real time by itself (spare gone / tray Restore): saved as Real time, a note, still not a Problem
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await pc.Client.InputSide.ReportLocalSyncFallback("loopback:process", "The spare output or the speakers went away. Back to Real time.");
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("localMode").GetString() == "realtime", "the fallback did not save Real time");
+        lb = await Input(admin, "loopback");
+        Assert.Contains("went away", lb.GetProperty("syncNote").GetString()); Assert.True(lb.GetProperty("playing").GetBoolean()); Assert.Equal(JsonValueKind.Null, lb.GetProperty("error").ValueKind);
+    }
 }

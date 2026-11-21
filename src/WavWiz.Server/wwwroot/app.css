@@ -6538,3 +6538,16 @@ html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;te
 .tree42:not(.mx-on) .sp42-l2>.sp42-v{margin-left:auto}
 .tree42:not(.mx-on) .sp42-l2>.sp42-mute{margin-left:0}
 .tree42:not(.mx-on) .sp42-nt{flex:1 1 auto;align-self:stretch}
+/* 0.7.2 t2175u: This PC · Speakers - Real time / Sync with WavWiz (Settings > Devices > Audio inputs) */
+.lsx{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--text) 4%,var(--panel));display:grid;gap:8px}
+.lsx h4{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.lsx p{margin:0}
+.lsx .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;width:max-content;max-width:100%}
+.lsx .seg button{border:0;border-radius:0;min-height:0;padding:6px 14px;background:transparent;color:var(--text);font:inherit;font-weight:600}
+.lsx .seg button.on{background:var(--accent);color:#fff}
+.lsx .seg button:disabled{opacity:.45}
+.lsx .seg button small{display:block;font-weight:400;opacity:.8;font-size:11px}
+.lsx .pk{display:grid;grid-template-columns:130px minmax(0,440px);align-items:center;gap:6px 10px}
+.lsx .pk select{width:100%}
+.lsx .lsx-warn{color:var(--amber)}
+html.handset .lsx .pk{grid-template-columns:1fr}

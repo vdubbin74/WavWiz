@@ -87,6 +87,10 @@ public sealed class InputResponder : IDisposable
     public InputInfo[] SafeList() { try { return _inputs.List().ToArray(); } catch (Exception e) { _log("input list failed: " + e.Message); return Array.Empty<InputInfo>(); } }
     /// <summary>The Outputs "reason" that tells the server an input could not start: "input-error:&lt;id&gt;" newline "&lt;why&gt;" (ids may contain ':').</summary>
     public static string ErrorReason(string id, string why) => "input-error:" + id + "\n" + why;
+    /// <summary>0.7.2 t2175u: "Sync with WavWiz" commands go to the Player's LocalSync (null in tests / headless = ignored).</summary>
+    public Action<InputCmd>? LocalSync { get; set; }
+    /// <summary>0.7.2 t2175u: the Player went back to Real time by itself: tell the server (it shows why and saves Real time).</summary>
+    public Task ReportLocalSyncFallback(string inputId, string why) => _report(ErrorReason(inputId, LocalSyncRules.FallbackTag + why));
     public IReadOnlyCollection<string> Running { get { lock (_l) return _running.Keys.ToList(); } }
 
     public void Handle(InputCmd c)
@@ -96,6 +100,7 @@ public sealed class InputResponder : IDisposable
             case "start" when c.InputId is { Length: > 0 } id: Start(id); break;
             case "stop" when c.InputId is { Length: > 0 } id: Stop(id); break;
             case "stop-all": StopAll(); break;
+            case LocalSyncRules.On or LocalSyncRules.Off: LocalSync?.Invoke(c); break;   // 0.7.2 t2175u: the Windows side (Player LocalSync)
         }
     }
 
@@ -112,7 +117,8 @@ public sealed class InputResponder : IDisposable
     private void Stop(string id) { IDisposable? d; lock (_l) { if (!_running.Remove(id, out d)) return; } try { d.Dispose(); } catch { } _log("input stopped: " + id); }
 
     /// <summary>Stop every running capture (connection lost, app closing).</summary>
-    public void StopAll() { List<IDisposable> all; lock (_l) { all = _running.Values.ToList(); _running.Clear(); } foreach (var d in all) try { d.Dispose(); } catch { } while (_q.Reader.TryRead(out _)) { } }
+    public void StopAll() { try { LocalSync?.Invoke(new InputCmd(LocalSyncRules.Off)); } catch { } List<IDisposable> all;   // 0.7.2 t2175u: link lost / closing = Windows back on the speakers
+         lock (_l) { all = _running.Values.ToList(); _running.Clear(); } foreach (var d in all) try { d.Dispose(); } catch { } while (_q.Reader.TryRead(out _)) { } }
 
     private void OnBlock(string id, float[] interleaved, int rate, int ch)
     {

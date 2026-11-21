@@ -238,7 +238,8 @@ public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null, Mic
 public sealed record InputInfo(string Id, string Name, string Kind, bool Bluetooth = false, bool Default = false, string? Note = null);
 /// <summary>0.7.2: start / stop capturing an input. Action = start|stop|stop-all. The player sends the audio back as INPUT_AUDIO; a start that fails
 /// comes back as an Outputs message whose Reason starts with "input-error:".</summary>
-public sealed record InputCmd(string Action, string? InputId = null);
+/// 0.7.2 t2175u: localsync-on (Spare, Speakers) / localsync-off = "Sync with WavWiz" for the loopback input (LocalSyncRules).
+public sealed record InputCmd(string Action, string? InputId = null, string? Spare = null, string? Speakers = null);
 /// <summary>0.2.5: a microphone (WASAPI capture endpoint) on a Player PC. kind = usb|analog|builtin|interface|bluetooth|other; Bluetooth mics are allowed but flagged
 /// (Windows switches a Bluetooth headset to its hands-free mode, which adds its own unknown delay).</summary>
 public sealed record MicInfo(string Id, string Name, string Kind, bool Bluetooth, bool Default = false);

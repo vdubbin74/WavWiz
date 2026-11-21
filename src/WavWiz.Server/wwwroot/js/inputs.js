@@ -132,6 +132,37 @@ export function inputsView(S) {
   return { el, reload, get count() { return (data.inputs || []).length; } };
 }
 
+/** 0.7.2 t2175u, pure: the "Playback on this PC" choices of the loopback input - the speakers the synced copy plays on (chosen, else WavWiz's
+ *  own active output), the spare outputs (switched on, not those speakers) and whether there is none. */
+export function syncView(i) {
+  const outs = i.outputs || [];
+  const speakers = outs.some(o => o.id === i.syncSpeakers) ? i.syncSpeakers : (outs.find(o => o.active) || outs[0])?.id ?? null;
+  const spares = outs.filter(o => o.id !== speakers);
+  const spare = spares.some(o => o.id === i.spareOutput) ? i.spareOutput : spares[0]?.id ?? null;
+  return { sync: i.localMode === 'sync', speakers, spare, spares, outs, none: spares.length === 0 };
+}
+export const SYNC_NOTE = 'Windows sends this PC\u2019s sound to the spare output; WavWiz plays it on your speakers in sync with the house (about 1.4 s later). Turning it off, or WavWiz closing, puts Windows back on your speakers.';
+export const NO_SPARE = 'No spare output found. Sync needs a second, unused sound output that is switched on (for example monitor or HDMI audio).';
+export const VB_CABLE = 'Optional: install VB-Cable (a free virtual sound output), then pick it here. Until then this input plays in Real time.';
+
+/** 0.7.2 t2175u: Real time / Sync with WavWiz for This PC · Speakers (Settings row). */
+function syncBox(i, admin, put) {
+  if (i.kind !== 'loopback' || !i.localMode) return null;
+  const v = syncView(i);
+  const seg = (mode, label, sub, dis) => h('button', { type: 'button', role: 'radio', class: (mode === 'sync') === v.sync ? 'on' : '', 'aria-checked': String((mode === 'sync') === v.sync),
+    disabled: !admin || dis, onclick: () => put(i.id, mode === 'sync' ? { localMode: 'sync', spareOutput: v.spare, syncSpeakers: v.speakers } : { localMode: 'realtime' }) }, label, h('small', null, sub));
+  const pick = (label, list, val, key) => [h('span', { class: 'small' }, label),
+    h('select', { 'aria-label': label, disabled: !admin, onchange: ev => put(i.id, { [key]: ev.target.value }) }, ...list.map(o => h('option', { value: o.id, selected: o.id === val }, o.name)))];
+  return h('div', { class: 'lsx' }, h('h4', null, 'Playback on this PC'),
+    h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Playback on this PC' },
+      seg('realtime', 'Real time', 'this PC plays live, zones follow'), seg('sync', 'Sync with WavWiz', 'this PC plays in step with every zone', v.none && !v.sync)),
+    v.none
+      ? [h('p', { class: 'small warnc lsx-warn' }, NO_SPARE), h('p', { class: 'small dim' }, VB_CABLE)]
+      : [h('div', { class: 'pk' }, ...pick('Spare output', v.spares, v.spare, 'spareOutput'), ...pick('Play synced on', v.outs, v.speakers, 'syncSpeakers')),
+         h('p', { class: 'small dim' }, SYNC_NOTE)],
+    i.syncNote ? h('p', { class: 'small warnc lsx-warn' }, i.syncNote) : null);
+}
+
 /** Settings > Devices > Audio inputs (admins change things; everyone else sees them). */
 export function inputsCard(S, { admin }) {
   const list = h('div', { class: 'inp-setlist' }), note = h('p', { class: 'dim small' });
@@ -157,6 +188,7 @@ export function inputsCard(S, { admin }) {
         i.kind === 'aux' && i.turntable ? sw('Start when the needle drops', i.autoStart, v => put(i.id, { autoStart: v }), false, 'stops 25 s after the side ends') : null,
         i.kind === 'mic' ? sw('Live source', i.liveSource, v => put(i.id, { liveSource: v }), false, 'off = Announce only (starts muted)') : null),
       i.turntable ? h('p', { class: 'small warn-t inp-phono', 'data-in': i.id, hidden: !i.phonoLow }, PHONO_WARN) : null,
+      syncBox(i, admin, put),
       i.bluetooth ? h('p', { class: 'small dim' }, 'Bluetooth headset mics switch the headset to call quality while they are open.') : null,
       ...problemEls(i));
   };

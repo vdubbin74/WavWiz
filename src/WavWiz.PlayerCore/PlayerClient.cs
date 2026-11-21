@@ -75,6 +75,8 @@ public sealed class PlayerClient : IAsyncDisposable
         _in = new InputResponder(o.Inputs ?? new NoInputProvider(), _clock, o.Clock, SendRawAsync, why => SendOutputsAsync(why), Say);
     }
     private readonly InputResponder _in;
+    /// <summary>0.7.2 t2175u: the input side (the Player hooks LocalSync on it).</summary>
+    public InputResponder InputSide => _in;
     /// <summary>0.7.2: the server said it speaks audio inputs (Welcome Caps). Only then are inputs listed and INPUT_AUDIO sent.</summary>
     private volatile bool _serverInputs;
     /// <summary>0.7.2: this PC's audio inputs (sent to a 0.7.2+ server with the outputs).</summary>
