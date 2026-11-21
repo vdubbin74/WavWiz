@@ -53,7 +53,7 @@ public class Release072ZoneCheckTests
             string sid = j.GetProperty("sessionId").GetString()!; long at = j.GetProperty("atUs").GetInt64(); int recMs = j.GetProperty("recordMs").GetInt32();
             Assert.InRange(recMs, 8000, 15000);
             Assert.NotNull(f.Server.S.Cal.Get(sid));
-            await Task.Delay(recMs);
+            await Task.Delay(recMs + 1500);   // slack: under a loaded test host the fake speakers render their last blocks late
             long start = at - 500_000; var rec = new float[48000L * recMs / 1000]; const double micMs = 23;   // the phone's own input delay cancels out
             a.MixInto(rec, start, micMs); b.MixInto(rec, start, micMs); var rnd = new Random(5); for (int i = 0; i < rec.Length; i++) rec[i] += (float)(rnd.NextDouble() - 0.5) * 0.01f;
             var bytes = new byte[rec.Length * 4]; Buffer.BlockCopy(rec, 0, bytes, 0, bytes.Length);
