@@ -31,3 +31,9 @@ test('t2183u/t2186u syncView: optical first, a headset in use never picked by it
   assert.equal(syncView({ outputs: [outs[0]] }).speakers, null);
   assert.match(src, /'Choose\\u2026'/); assert.match(src, /' \(headset, nothing plugged in\)' : ' \(headset\)'/);
 });
+
+test('t2189u: choosing Sync sends only the mode (the server picks safe defaults); a picker change saves the hand choice', () => {
+  assert.match(src, /onclick: \(\) => put\(i\.id, \{ localMode: mode \}\)/);
+  assert.doesNotMatch(src, /localMode: 'sync', spareOutput: v\.spare/);
+  assert.match(src, /onchange: ev => ev\.target\.value && put\(i\.id, \{ \[key\]: ev\.target\.value \}\)/);
+});

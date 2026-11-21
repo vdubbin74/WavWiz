@@ -30,6 +30,10 @@ public sealed record InputCfg
     public string? LocalMode { get; init; }
     public string? SpareOutput { get; init; }
     public string? SyncSpeakers { get; init; }
+    /// <summary>0.7.2 t2189u: true = picked by hand in the pickers (kept even if it is a headset); null/false = a default (an older build saved the
+    /// first output, the HyperX headset on PCBOXV2, and it was never re-checked).</summary>
+    public bool? SpareChosen { get; init; }
+    public bool? SpeakersChosen { get; init; }
 }
 
 /// <summary>
@@ -232,7 +236,7 @@ public sealed class InputService : IDisposable
             bool sync = SyncWantedNoLock(l, c);
             if (sync == l.SyncOn) continue;
             l.SyncOn = sync;
-            try { l.Sess.SendJson(MsgType.InputCmd, sync ? new InputCmd(WavWiz.PlayerCore.LocalSyncRules.On, l.Info.Id, c.SpareOutput, c.SyncSpeakers) : new InputCmd(WavWiz.PlayerCore.LocalSyncRules.Off, l.Info.Id)); } catch { }
+            try { l.Sess.SendJson(MsgType.InputCmd, sync ? new InputCmd(WavWiz.PlayerCore.LocalSyncRules.On, l.Info.Id, SyncPair(c, l.Sess.Outputs).Spare, SyncPair(c, l.Sess.Outputs).Speakers) : new InputCmd(WavWiz.PlayerCore.LocalSyncRules.Off, l.Info.Id)); } catch { }
         }
         // 0.7.2 t2183u: Real time = Windows already plays the PC's sound live on that PC; its own Player in the same zone must not play the house copy
         // too (an echo 1.4 s later, and twice as loud - "blaring"). In Sync the Player IS the way this PC hears it, so it plays.
@@ -250,9 +254,15 @@ public sealed class InputService : IDisposable
         if (l.Cond == null || l.SyncOn || l.Sess.Dead || !l.Sess.SpeaksInputs) return false;
         try { return l.Cond.Subscribers().Any(x => x.Id == l.Sess.Id) || _s.Registry.GroupOf(l.Sess.Id) == l.Cond.GroupId; } catch { return false; }   // this Player hears the stream that plays it
     }
+    /// <summary>0.7.2 t2189u: the spare + speakers really used (saved hand picks, else the safe defaults), the same everywhere (switch, check, view).</summary>
+    private static (string? Spare, string? Speakers) SyncPair(InputCfg c, IReadOnlyList<OutputInfo> outs)
+    {
+        var speakers = WavWiz.PlayerCore.LocalSyncRules.EffectiveSpeakers(outs, c.SyncSpeakers, c.SpeakersChosen == true);
+        return (WavWiz.PlayerCore.LocalSyncRules.EffectiveSpare(outs, c.SpareOutput, c.SpareChosen == true, speakers), speakers);
+    }
     private static bool SyncWantedNoLock(Live l, InputCfg c) =>
         c.Kind == "loopback" && c.LocalMode == "sync" && c.Enabled && l.Cond != null && !l.Sess.Dead
-        && WavWiz.PlayerCore.LocalSyncRules.Problem(l.Sess.Outputs, c.SpareOutput, c.SyncSpeakers) == null;
+        && SyncPair(c, l.Sess.Outputs) is var sp && WavWiz.PlayerCore.LocalSyncRules.Problem(l.Sess.Outputs, sp.Spare, sp.Speakers) == null;
     private void ApplyGainsNoLock()
     {
         var cfg = LoadCfg(); bool lim = LiveLimiter.Enabled(_s.Db);
@@ -293,8 +303,8 @@ public sealed class InputService : IDisposable
             if (b.TryGetProperty("turntable", out var t)) { if (t.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "turntable must be true or false"; if (t.GetBoolean() && c.Kind != "aux") return "Turntable mode is only for Aux in"; c = c with { Turntable = t.GetBoolean() }; }
             if (b.TryGetProperty("autoStart", out var a)) { if (a.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "autoStart must be true or false"; if (a.GetBoolean() && !(c.Kind == "aux" && c.Turntable)) return "auto-start needs Turntable mode on Aux in"; c = c with { AutoStart = a.GetBoolean() }; }
             // 0.7.2 t2175u: Real time / Sync with WavWiz (loopback only) and its two outputs (from the Player's own output list)
-            if (b.TryGetProperty("spareOutput", out var so)) { if (so.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "spareOutput must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SpareOutput = so.ValueKind == JsonValueKind.Null ? null : so.GetString() }; }
-            if (b.TryGetProperty("syncSpeakers", out var sk)) { if (sk.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "syncSpeakers must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SyncSpeakers = sk.ValueKind == JsonValueKind.Null ? null : sk.GetString() }; }
+            if (b.TryGetProperty("spareOutput", out var so)) { if (so.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "spareOutput must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SpareOutput = so.ValueKind == JsonValueKind.Null ? null : so.GetString(), SpareChosen = so.ValueKind == JsonValueKind.String }; }
+            if (b.TryGetProperty("syncSpeakers", out var sk)) { if (sk.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return "syncSpeakers must be an output id"; if (c.Kind != "loopback") return "only for This PC · Speakers"; c = c with { SyncSpeakers = sk.ValueKind == JsonValueKind.Null ? null : sk.GetString(), SpeakersChosen = sk.ValueKind == JsonValueKind.String }; }
             if (b.TryGetProperty("localMode", out var lm))
             {
                 if (lm.ValueKind != JsonValueKind.String || lm.GetString() is not ("realtime" or "sync")) return "localMode must be realtime or sync";
@@ -302,9 +312,9 @@ public sealed class InputService : IDisposable
                 if (lm.GetString() == "sync")
                 {
                     var outs = l.Sess.Outputs;
-                    c = c with { SyncSpeakers = c.SyncSpeakers ?? WavWiz.PlayerCore.LocalSyncRules.DefaultSpeakers(outs) };   // 0.7.2 t2183u: never a headset
-                    c = c with { SpareOutput = c.SpareOutput ?? WavWiz.PlayerCore.LocalSyncRules.DefaultSpare(outs, c.SyncSpeakers) };   // optical first, never a headset
-                    if (WavWiz.PlayerCore.LocalSyncRules.Problem(outs, c.SpareOutput, c.SyncSpeakers) is { } p) return p;
+                    // 0.7.2 t2183u/t2189u: defaults never a headset in use; a headset an older build saved by itself is replaced (not a hand pick)
+                    var (spare, speakers) = SyncPair(c, outs);
+                    if (WavWiz.PlayerCore.LocalSyncRules.Problem(outs, spare, speakers) is { } p) return p;
                 }
                 c = c with { LocalMode = lm.GetString() == "sync" ? "sync" : null };
                 l.SyncNote = null;
@@ -387,7 +397,7 @@ public sealed class InputService : IDisposable
                     enabled = c.Enabled, gainDb = c.GainDb, maxGainDb = MaxGainFor(l.Info.Kind), turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
                     bluetooth = l.Info.Bluetooth, note = l.Info.Note, playing = l.Cond != null, zone = l.Cond != null ? (l.Zone ?? "default") : null, groupId = l.Cond?.GroupId,
                     capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error, privacy = l.Error != null && l.Privacy,
-                    localMode = l.Info.Kind == "loopback" ? (c.LocalMode ?? "realtime") : null, spareOutput = l.Info.Kind == "loopback" ? c.SpareOutput ?? WavWiz.PlayerCore.LocalSyncRules.DefaultSpare(l.Sess.Outputs, c.SyncSpeakers ?? WavWiz.PlayerCore.LocalSyncRules.DefaultSpeakers(l.Sess.Outputs)) : null, syncSpeakers = l.Info.Kind == "loopback" ? c.SyncSpeakers ?? WavWiz.PlayerCore.LocalSyncRules.DefaultSpeakers(l.Sess.Outputs) : null, synced = l.SyncOn, syncNote = l.SyncNote,
+                    localMode = l.Info.Kind == "loopback" ? (c.LocalMode ?? "realtime") : null, spareOutput = l.Info.Kind == "loopback" ? SyncPair(c, l.Sess.Outputs).Spare : null, syncSpeakers = l.Info.Kind == "loopback" ? SyncPair(c, l.Sess.Outputs).Speakers : null, synced = l.SyncOn, syncNote = l.SyncNote,
                     outputs = l.Info.Kind == "loopback" ? l.Sess.Outputs.Where(o => o.Connected).Select(o => new { id = o.EndpointId, name = o.Name, active = o.Active, winDefault = o.WinDefault == true, headset = WavWiz.PlayerCore.LocalSyncRules.IsHeadset(o), rank = WavWiz.PlayerCore.LocalSyncRules.SpareRank(o) }).ToArray() : null,
                 };
             }).ToList();

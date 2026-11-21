@@ -484,4 +484,48 @@ public class Release072InputsTests
         await Until(async () => (await Input(admin, "loopback")).GetProperty("synced").GetBoolean(), "sync did not start");
         await Task.Delay(1500); Assert.False(pc.Client.Dsp.SelfMuted);
     }
+
+    // ---------------- 0.7.2 t2189u: PCBOXV2 - the HyperX saved by the older build's "first output" default ----------------
+    private static OutputInfo[] Pcboxv2() => new[]
+    {
+        O("{0.0.0.00000000}.{8d16f658-3226-4253-895b-1fe6bb280c2f}", "Headset Earphone (HyperX 7.1 Audio)", "analog", 5),   // USB headset: no jack report
+        O("{0.0.0.00000000}.{3de5a164-64d5-4b6c-b7dc-18925ca8008e}", "Speakers (Realtek(R) Audio)", "analog", 1, win: true),
+        O("{0.0.0.00000000}.{cfdead61-21b8-41b0-a10c-303b3baa6596}", "Realtek Digital Output (Realtek(R) Audio)", "spdif", 8),
+        O("{0.0.0.00000000}.{c07a73df-9da9-4eb8-9992-15c203117c7c}", "Realtek HD Audio 2nd output (Realtek(R) Audio)", "analog", 3, connected: false, jackEmpty: true),
+    };
+
+    [Fact]
+    public void A_headset_saved_by_an_older_default_is_replaced_by_optical_but_a_hand_pick_stays()
+    {
+        var outs = Pcboxv2(); string hx = outs[0].EndpointId, spk = outs[1].EndpointId, opt = outs[2].EndpointId;
+        Assert.True(LocalSyncRules.IsHeadset(outs[0])); Assert.Equal(9, LocalSyncRules.SpareRank(outs[0]));
+        Assert.Equal(spk, LocalSyncRules.EffectiveSpeakers(outs, spk, false));
+        Assert.Equal(opt, LocalSyncRules.EffectiveSpare(outs, hx, chosen: false, spk));              // the saved HyperX from the old build: migrated
+        Assert.Equal(hx, LocalSyncRules.EffectiveSpare(outs, hx, chosen: true, spk));                // picked by hand in the new UI: kept
+        Assert.Equal(opt, LocalSyncRules.EffectiveSpare(outs, null, false, spk));
+        Assert.Equal(spk, LocalSyncRules.EffectiveSpeakers(outs, hx, false));                        // a headset saved as the speakers: replaced
+        Assert.Equal(hx, LocalSyncRules.EffectiveSpeakers(outs, hx, true));
+        Assert.Equal("gone", LocalSyncRules.EffectiveSpare(outs, "gone", false, spk));               // not listed: kept, Problem() reports it
+        // the old config (no *Chosen fields) reads as "not picked by hand"
+        var old = System.Text.Json.JsonSerializer.Deserialize<InputCfg>("{\"kind\":\"loopback\",\"localMode\":\"sync\",\"spareOutput\":\"x\"}", new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        Assert.Null(old.SpareChosen);
+        // Communications moves only when calls went to the speakers too (PCBOXV2: the HyperX is the chat device)
+        Assert.False(LocalSyncRules.MoveCommunications(new LocalSyncState("l", opt, spk, spk, spk, hx)));
+        Assert.True(LocalSyncRules.MoveCommunications(new LocalSyncState("l", opt, spk, spk, spk, spk)));
+    }
+
+    [Fact]
+    public async Task Choosing_sync_uses_the_safe_defaults_and_only_the_pickers_save_a_hand_choice()
+    {
+        var (f, admin, _, pc, _) = await Setup(); await using var _f = f; await using var _p = pc;
+        var id = (await Input(admin, "loopback")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true });
+        pc.Outputs.Outputs.Insert(0, new OutputInfo("ep-hx", "Headset Earphone (HyperX 7.1 Audio)", "analog", null, true, false, null, null, null, 5));
+        pc.Outputs.Outputs.Add(new OutputInfo("ep-opt", "Realtek Digital Output", "spdif", null, true, false, null, null, null, 8)); await pc.Client.SendOutputsAsync("devices");
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("outputs").GetArrayLength() == 3, "outputs");
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { localMode = "sync" })).StatusCode);
+        var lb = await Input(admin, "loopback"); Assert.Equal("ep-opt", lb.GetProperty("spareOutput").GetString()); Assert.Equal("ep-pc-server", lb.GetProperty("syncSpeakers").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { spareOutput = "ep-hx" })).StatusCode);   // by hand: allowed
+        Assert.Equal("ep-hx", (await Input(admin, "loopback")).GetProperty("spareOutput").GetString());
+    }
 }

@@ -155,7 +155,7 @@ function syncBox(i, admin, put) {
   if (i.kind !== 'loopback' || !i.localMode) return null;
   const v = syncView(i);
   const seg = (mode, label, sub, dis) => h('button', { type: 'button', role: 'radio', class: (mode === 'sync') === v.sync ? 'on' : '', 'aria-checked': String((mode === 'sync') === v.sync),
-    disabled: !admin || dis, onclick: () => put(i.id, mode === 'sync' ? { localMode: 'sync', spareOutput: v.spare, syncSpeakers: v.speakers } : { localMode: 'realtime' }) }, label, h('small', null, sub));
+    disabled: !admin || dis, onclick: () => put(i.id, { localMode: mode }) /* 0.7.2 t2189u: the server picks safe defaults; only the pickers save a hand choice */ }, label, h('small', null, sub));
   const pick = (label, list, val, key) => [h('span', { class: 'small' }, label),
     h('select', { 'aria-label': label, disabled: !admin, onchange: ev => ev.target.value && put(i.id, { [key]: ev.target.value }) },
       val ? null : h('option', { value: '', selected: true }, 'Choose\u2026'),   // 0.7.2 t2183u: nothing safe to pick by itself (only headsets)

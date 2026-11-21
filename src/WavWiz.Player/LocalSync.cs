@@ -56,7 +56,7 @@ public sealed class LocalSync : IDisposable
             try { Directory.CreateDirectory(PlayerSettings.Dir); File.WriteAllText(_file, LocalSyncRules.Serialize(st)); }
             catch (Exception e) { return "Could not save the restore file (" + e.Message + "). Playing in Real time."; }
             try { _pinOutput(speakers); } catch (Exception e) { _log("localsync: pin output failed: " + e.Message); }
-            try { SetDefaultAll(spare); }
+            try { SetDefaultAll(spare, st); }
             catch (Exception e) { RestoreNoLock("switch failed"); return "Windows did not switch to the spare output (" + e.Message + "). Playing in Real time."; }
             _on = st; _log($"localsync: on (spare {spare}, speakers {speakers})");
             _watch = new System.Threading.Timer(_ => Check(), null, 3000, 3000);
@@ -94,7 +94,13 @@ public sealed class LocalSync : IDisposable
         _log($"localsync: restored ({why}){(allOk ? "" : " - partly; will retry at the next start")}");
     }
 
-    private static void SetDefaultAll(string id) { var p = Policy(); p.SetDefaultEndpoint(id, ERole.Console); p.SetDefaultEndpoint(id, ERole.Multimedia); p.SetDefaultEndpoint(id, ERole.Communications); }
+    /// <summary>Console + Multimedia always; Communications only when calls were going to the speakers too (0.7.2 t2189u: on PCBOXV2 the HyperX is the
+    /// communications device for chat; moving it to the spare would silence calls, and it never played through the speakers anyway).</summary>
+    private static void SetDefaultAll(string id, LocalSyncState st)
+    {
+        var p = Policy(); p.SetDefaultEndpoint(id, ERole.Console); p.SetDefaultEndpoint(id, ERole.Multimedia);
+        if (LocalSyncRules.MoveCommunications(st)) p.SetDefaultEndpoint(id, ERole.Communications);
+    }
     private static IPolicyConfig Policy() => (IPolicyConfig)new PolicyConfigClient();
 
     public void Dispose() { Restore("closing"); }

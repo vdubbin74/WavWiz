@@ -45,6 +45,22 @@ public static class LocalSyncRules
         return ok.OrderBy(o => System.Text.RegularExpressions.Regex.IsMatch(o.Name ?? "", "speaker", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? 0 : 1)
                  .ThenBy(o => IsDigital(o) ? 2 : IsHdmi(o) ? 1 : 0).ThenBy(o => o.Active ? 0 : 1).FirstOrDefault()?.EndpointId;
     }
+    /// <summary>0.7.2 t2189u: the speakers actually used. A saved choice stands when the user picked it in the 0.7.2 UI (<paramref name="chosen"/>) or it is
+    /// not a headset; a headset saved by an older build's "first output" default (PCBOXV2: the HyperX) is replaced by the default.</summary>
+    public static string? EffectiveSpeakers(IEnumerable<OutputInfo> outputs, string? saved, bool chosen)
+    {
+        var list = outputs.ToList(); var o = saved == null ? null : list.FirstOrDefault(x => x.EndpointId == saved);
+        if (saved != null && (o == null || chosen || !IsHeadset(o))) return saved;     // not listed (yet): kept, Problem() decides
+        return DefaultSpeakers(list);
+    }
+    /// <summary>0.7.2 t2189u: the spare actually used: a saved one stands when picked by hand or it is not a headset in use; else the default.</summary>
+    public static string? EffectiveSpare(IEnumerable<OutputInfo> outputs, string? saved, bool chosen, string? speakers)
+    {
+        var list = outputs.ToList(); var o = saved == null ? null : list.FirstOrDefault(x => x.EndpointId == saved);
+        if (saved != null && saved != speakers && (o == null || chosen || SpareRank(o) < 9)) return saved;
+        return DefaultSpare(list, speakers);
+    }
+
     /// <summary>Spare default: best-ranked connected output that is not the speakers, not the Windows default, and never a headset in use
     /// (an empty headphone jack is allowed, after everything else). Null = none.</summary>
     public static string? DefaultSpare(IEnumerable<OutputInfo> outputs, string? speakers) =>
@@ -60,6 +76,10 @@ public static class LocalSyncRules
         if (!list.Any(o => o.EndpointId == spare && o.Connected)) return "The spare output is not available (is the monitor or device switched on?).";
         return null;
     }
+
+    /// <summary>0.7.2 t2189u: the Communications default moves to the spare only when it was the speakers (or unknown with the speakers the default).</summary>
+    public static bool MoveCommunications(LocalSyncState st) =>
+        st.PrevCommunications == st.Speakers || (st.PrevCommunications == null && st.PrevMultimedia == st.Speakers);
 
     public static string Serialize(LocalSyncState s) => JsonSerializer.Serialize(s);
     public static LocalSyncState? Parse(string? text)
