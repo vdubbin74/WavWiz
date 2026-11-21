@@ -139,7 +139,7 @@ public static class PhoneApi
          .Append($"<header><img src='/assets/logo-64.png' width=40 height=40 alt=''><div><h1>WavWiz</h1><small>BETA {WavWizInfo.Version} - phone set-up</small></div></header>");
         if (!s.Ca.Enabled)
         {
-            h.Append("<section class='card warn'><h2>HTTPS is not switched on yet</h2><p>Phones only allow the microphone (for speaker calibration) and background audio controls on a secure page. Ask the person who runs WavWiz to open <b>Settings &rsaquo; Phone &amp; HTTPS</b> on the PC and press <b>Set up HTTPS</b>. Then come back to this page.</p>")
+            h.Append("<section class='card warn'><h2>HTTPS is not switched on yet</h2><p>Phones only allow the microphone (for speaker calibration) and background audio controls on a secure page. Ask the person who runs WavWiz to open <b>Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS</b> on the PC and press <b>Set up HTTPS</b>. Then come back to this page.</p>")
              .Append($"<p><a class=btn href='{E(http)}/tls/setup'>Reload this page</a></p></section>");
         }
         else

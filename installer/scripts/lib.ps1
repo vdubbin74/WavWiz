@@ -836,14 +836,14 @@ function Get-ServerConfigPlan {
         if ($isAll -or ($prevBind -eq '0.0.0.0')) { $bindAction = 'preserved' }
         elseif ($prevBindOk) {
             $bindAction = 'changed'
-            $notes.Add("The server now listens on the home network + Tailscale/VPN (all networks) instead of only $prevBind. If you had created the phone certificate (Settings > Phone & HTTPS), create it again - it is tied to the address.")
+            $notes.Add("The server now listens on the home network + Tailscale/VPN (all networks) instead of only $prevBind. If you had created the phone certificate (Settings > Devices > Phone & HTTPS), create it again - it is tied to the address.")
         } else { $bindAction = 'set' }
     } elseif ($LanIp) {
         if ($LanIp -eq '0.0.0.0' -or -not (Test-IPv4 $LanIp)) { throw "The address '$LanIp' is not a usable single IPv4 address (0.0.0.0 'all interfaces' is never set by the installer)." }
         if ($prevBindOk -and $prevBind -eq $LanIp) {
             $bindAction = 'preserved'
         } elseif ($prevBindOk -and $prevBind -ne $LanIp) {
-            $notes.Add("The listening address changed from $prevBind to $LanIp. If you had created the phone certificate (Settings > Phone & HTTPS), create it again - it is tied to the address.")
+            $notes.Add("The listening address changed from $prevBind to $LanIp. If you had created the phone certificate (Settings > Devices > Phone & HTTPS), create it again - it is tied to the address.")
             $cfg['bindAddress'] = $LanIp; $changed = $true; $bindAction = 'changed'
         } else {
             $cfg['bindAddress'] = $LanIp; $changed = $true; $bindAction = 'set'

@@ -19,9 +19,18 @@ public class Release071PhoneHttpsWordingTests
         var all = Strings(await admin.GetJson("/api/v1/status")).Concat(Strings(await admin.GetJson("/api/v1/diagnostics"))).ToList();
         Assert.DoesNotContain(all, x => x.Contains("Settings > Phone & HTTPS"));
         if (!f.Server.S.Ca.Enabled) Assert.Contains(all, x => x.Contains("Settings > Devices > Phone & HTTPS"));
-        var src = string.Join("\n", new[] { "DiagnosticsApi.cs", "SystemApi.cs" }.Select(n => File.ReadAllText(Path.Combine(RepoRoot(), "src", "WavWiz.Server", "Api", n))));
+        var page = await f.Http.GetStringAsync("/tls/setup");
+        if (!f.Server.S.Ca.Enabled)
+        {
+            Assert.Contains("HTTPS is not switched on yet", page);
+            Assert.Contains("Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS", page);
+            Assert.DoesNotContain("Settings &rsaquo; Phone &amp; HTTPS", page);
+        }
+        var src = string.Join("\n", new[] { "DiagnosticsApi.cs", "SystemApi.cs", "PhoneApi.cs" }.Select(n => File.ReadAllText(Path.Combine(RepoRoot(), "src", "WavWiz.Server", "Api", n))));
         Assert.DoesNotContain("Settings > Phone & HTTPS", src);
         Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(src, "Settings > Devices > Phone & HTTPS").Count);
+        Assert.DoesNotContain("Settings &rsaquo; Phone &amp; HTTPS", src);
+        Assert.Contains("Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS", src);
     }
     private static string RepoRoot() { var d = new DirectoryInfo(AppContext.BaseDirectory); while (d != null && !Directory.Exists(Path.Combine(d.FullName, "src", "WavWiz.Server"))) d = d.Parent; return d!.FullName; }
 }

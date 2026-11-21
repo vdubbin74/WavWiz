@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { installDom, ev } from './minidom.mjs';
 
 const js = process.env.JS_DIR || new URL('../../src/WavWiz.Server/wwwroot/js', import.meta.url).pathname;
@@ -42,4 +42,22 @@ test('t2042u: the phrase is a link; it opens Settings > Devices > Calibration at
   assert.match(st, /function showSec\(id\) \{ const el = body\.querySelector\('#' \+ id\); if \(!el\) return; (?:el\._reveal\?\.\(\); )?el\.scrollIntoView\(\{ block: 'start' \}\); pulse\(el\); \}/, 'scrolled to and highlighted');
   assert.match(st, /d\.el\._goSec = sec => \{ active = sectionFor\(sec\); if \(sec === 'phone' \|\| sec === 'calibration'\) devSub = 'calibration'; paint\(\);/);
   assert.match(dg, /'What to do: ', linkSettings\(c\.fix\)/); assert.match(dg, /linkSettings\(w\)/); assert.match(dg, /linkSettings\(i\.detail\)/);
+});
+
+test('t2129u: installer, PhoneApi and docs use Settings > Devices > Phone & HTTPS (not the old path)', () => {
+  const root = fileURLToPath(new URL('../..', import.meta.url));
+  const read = rel => readFileSync(join(root, rel), 'utf8');
+  const iss = read('installer/WavWiz.iss'), lib = read('installer/scripts/lib.ps1'), phone = read('src/WavWiz.Server/Api/PhoneApi.cs');
+  const stale = /Settings (>|›|&rsaquo;) Phone/;
+  for (const [name, src] of [['WavWiz.iss', iss], ['lib.ps1', lib], ['PhoneApi.cs', phone], ['FIRST-RUN.md', read('docs/FIRST-RUN.md')]]) {
+    assert.doesNotMatch(src, stale, `${name}: stale Settings > Phone path`);
+  }
+  assert.match(iss, /see WavWiz Settings > Devices > Phone & HTTPS for the exact link/);
+  assert.match(iss, /Connect link: see WavWiz Settings > Devices > Phone & HTTPS/);
+  assert.match(iss, /4\. For a phone: Settings > Devices > Phone & HTTPS/);
+  assert.match(iss, /Devices > Phone role…/);
+  assert.doesNotMatch(iss, /Menu > This phone as a device/);
+  assert.equal((lib.match(/Settings > Devices > Phone & HTTPS/g) || []).length, 2);
+  assert.match(phone, /Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS/);
+  assert.doesNotMatch(phone, /Settings &rsaquo; Phone &amp; HTTPS/);
 });

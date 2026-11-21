@@ -391,7 +391,7 @@ begin
   if ConnUrl(U) <> '' then
     ConnUrlLabel.Caption := 'Phones on your home network connect at:  ' + ConnUrl(U) + '   (read-only, for information)'
   else if KeepAllInterfaces then
-    ConnUrlLabel.Caption := 'Phones connect at this PC''s home-network address (see WavWiz Settings > Phone & HTTPS for the exact link). This does not change what the server listens on.'
+    ConnUrlLabel.Caption := 'Phones connect at this PC''s home-network address (see WavWiz Settings > Devices > Phone & HTTPS for the exact link). This does not change what the server listens on.'
   else
     ConnUrlLabel.Caption := '';
 end;
@@ -574,7 +574,7 @@ end;
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   Result := 'WavWiz (BETA) {#AppVersion}' + NewLine + NewLine + MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine;
-  if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
+  if WantServer and KeepAllInterfaces then Result := Result + 'Network access: Home network + Tailscale/VPN (all networks)' + NewLine + Space + IfThenStr(ConnUrl(DetectedLanIp) = '', 'Connect link: see WavWiz Settings > Devices > Phone & HTTPS', 'Connect at ' + ConnUrl(DetectedLanIp)) + NewLine + NewLine
   else if WantServer then Result := Result + 'Network access: ' + IfThenStr(LanOnlyRadio.Checked, 'Home network only (' + ChosenLanAddress + ')', IfThenStr(ChosenLanAddress = '', '127.0.0.1 (this PC only)', ChosenLanAddress)) + NewLine + Space + 'Windows service "WavWiz Server (BETA)" + a private-network-only firewall rule' + NewLine + NewLine;
   if WantServer then Result := Result + 'Firewall: AirPlay 2 timing (UDP 319-320) on the home network' + IfThenStr(AirPlayOutCheck.Checked, ' + extra AirPlay audio UDP ports', '') + NewLine + NewLine;   { 0.6.8-#14g / 0.7.0 t1930 }
   if WantServer and ServiceRunsAsLocalSystem then Result := Result + 'Service account: ' + IfThenStr(LimitedSvcCheck.Checked, 'switch from LocalSystem to Local Service', 'keep LocalSystem') + NewLine + NewLine;   { 0.7.0 item 3 }
@@ -589,7 +589,7 @@ begin
     '2. In Settings > Music folders add your music folder (a local drive or a network share the Windows service can read).' + #13#10 +
     '3. On each PC with speakers, start WavWiz Player. It finds this server by itself (it is listed as "WavWiz on <this PC>"). Press Connect: a card appears on any screen signed in as administrator - check that it shows the same 4-digit code and press Approve. Or type the 6-digit code from Settings > Devices > Pair a phone or a PC player. (The Player on this server PC needs neither.) You never type an address, a scheme or a port. (If it is not listed, use "My server isn''t listed" and type only the address, like 192.168.1.20.)' + #13#10 +
     '   Each device has a Test sound button, and a Dropped / Buffering / Reconnecting indicator. Menu > Diagnostics explains problems in plain English.' + #13#10 +
-    '4. For a phone: Settings > Phone & HTTPS, scan the QR code with the phone camera and follow the steps (about two minutes; the page checks that it worked). After that the phone can calibrate speakers and can also be a device itself (Menu > This phone as a device; on iPhone the sound stops when the screen locks).' + #13#10#13#10 +
+    '4. For a phone: Settings > Devices > Phone & HTTPS, scan the QR code with the phone camera and follow the steps (about two minutes; the page checks that it worked). After that the phone can calibrate speakers and can also play as a speaker itself (Devices > Phone role…; on iPhone the sound stops when the screen locks).' + #13#10#13#10 +
     'New in 0.1.3: Graphic EQ visualizer replaces Lightning (a saved Lightning choice becomes Graphic EQ); every visualizer setting is a 0 to 100 slider (50 is the default) with a Quality setting (Auto/Low/High/Ultra), GPU particles and glow/streak/fringe/depth effects; reworked VU meters and Terrain; ReplayGain volume leveling and iTunes gapless; saved NAS logins (encrypted by Windows); receiver health and a network helper in Diagnostics. Upgrades 0.1.2 in place (library, admin password, paired players and settings are kept).' + #13#10 +
     'Logs and settings: C:\ProgramData\WavWiz (install.log, server.json, logs\).' + #13#10 +
     'This is a BETA. If something fails, install.log says what and where.' + #13#10;
