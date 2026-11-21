@@ -158,7 +158,7 @@ public sealed class WavWizServer : IAsyncDisposable
         });
         app.UseEndpoints(_ => { });
         var api = app.MapGroup("/api/v1");
-        AuthApi.Map(api, s); InputsApi.Map(api, s); AnnounceApi.Map(api, app, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); CastApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
+        AuthApi.Map(api, s); InputsApi.Map(api, s); AnnounceApi.Map(api, app, s); ZoneCheckApi.Map(api, s); PlaybackApi.Map(api, s); ZoneApi.Map(api, s); CalPhoneApi.Map(api, app, s); SystemApi.Map(api, app, s); LibraryApi.Map(api, s); DiagnosticsApi.Map(api, s); AirPlaySenderApi.Map(api, s); CastApi.Map(api, s); FeaturesApi.Map(api, s); JukeboxApi.Map(api, s); HealthApi.Map(api, s); RemoteLibraryApi.Map(api, s); HomeAssistantApi.Map(api, s);
         if (Directory.Exists(web)) app.MapFallback(async c => { c.Response.StatusCode = 404; await c.Response.WriteAsync("Not found"); }).Anon();
 
         await app.StartAsync();

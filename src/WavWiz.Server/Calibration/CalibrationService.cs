@@ -396,6 +396,35 @@ public sealed class CalibrationService
         return (at, PairGapSec, null);
     }
 
+    // ---------------- 0.7.2 D: acoustic zone-to-zone timing check ----------------
+    public const string ZoneCheckKind = "zonecheck";
+    /// <summary>The "against" zone's speaker plays the pattern at T, the checked zone's speaker at T + gap - each scheduled exactly like music
+    /// (T minus the delay the speaker plays music with, so its saved delay and its zone's "vs house" offset are included). One recording where
+    /// both are heard then tells how much later the checked zone sounds than the other one at that spot.</summary>
+    public (long AtUs, double GapSec, string? Error) PlayZoneCheck(CalSession s, long againstSpeaker, double againstDelayMs, long zoneSpeaker, double zoneDelayMs, double levelDb = -20)
+    {
+        var rp = SessionOfZone(againstSpeaker, out var e1); if (rp == null) return (0, 0, "the other zone's speaker: " + e1);
+        var dp = SessionOfZone(zoneSpeaker, out var e2); if (dp == null) return (0, 0, e2);
+        long at = _clock.NowUs + LeadUs;
+        s.Pending[$"{zoneSpeaker}:{ZoneCheckKind}"] = (zoneSpeaker, at, 0, ZoneCheckKind, Interlocked.Increment(ref s.RunSeq));
+        Quiet(s);      // after Pending: both zones' music pauses (the session's reference is the other zone's speaker)
+        rp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at - (long)Math.Round(againstDelayMs * 1000), levelDb, "reference", TestVolume: EffectiveTestVolume(s, againstSpeaker)));
+        dp.SendJson(MsgType.CalCmd, new CalCmd("play-pattern", s.Id, at + (long)(PairGapSec * 1e6) - (long)Math.Round(zoneDelayMs * 1000), levelDb, "device", TestVolume: EffectiveTestVolume(s, zoneSpeaker)));
+        return (at, PairGapSec, null);
+    }
+
+    /// <summary>Finds both patterns in the recording. Returns how many ms LATER the checked zone sounds than the other one (negative = earlier).
+    /// Never adds to the calibration runs (nothing is saved as a speaker delay).</summary>
+    public (double? LaterMs, double Quality, string? Error) CaptureZoneCheck(CalSession s, long zoneSpeaker, float[] mono48k)
+    {
+        if (!s.Pending.TryRemove($"{zoneSpeaker}:{ZoneCheckKind}", out _)) return (null, 0, "no test sound is pending - start the check again");
+        if (mono48k.Length < 48000) return (null, 0, "the recording is too short");
+        var (a, b) = _det.FindTwo(mono48k, PairGapSec);
+        if (!a.Found) return (null, 0, $"could not hear the other zone ({a.ChirpsFound}/8 chirps) - stand where you hear both zones, or turn it up");
+        if (!b.Found) return (null, 0, $"heard the other zone but not this one ({b.ChirpsFound}/8 chirps) - stand where you hear both zones, or turn it up");
+        return (LatencyMath.SameRecordingOffsetMs(a.StartSec, b.StartSec, PairGapSec), Math.Min(a.Quality, b.Quality), null);
+    }
+
     /// <summary>By-ear helper: the device's pattern is played <paramref name="candidateMs"/> EARLIER than the reference's, so when the candidate equals the real extra delay they sound together.</summary>
     public (long AtUs, string? Error) PlayEar(long referenceZoneId, long deviceZoneId, double candidateMs, double levelDb = -20, CalSession? session = null)
     {

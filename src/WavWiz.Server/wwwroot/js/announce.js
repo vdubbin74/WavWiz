@@ -44,9 +44,9 @@ const savePref = v => { try { localStorage.setItem(TO_KEY, v); } catch { /* priv
 let busyBy = null;
 if (typeof window !== 'undefined') window.addEventListener('wavwiz:announce', e => { const d = e.detail || {}; busyBy = d.active ? d.by || 'Someone' : null; document.querySelectorAll('.annbtn').forEach(b => { b.classList.toggle('busy', !!busyBy && !b.classList.contains('talking')); b.title = buttonTitle(busyBy, announceTarget(loadPref(), getApiZone()), Z.current?.()?.name); }); });
 
-function insecureSheet() {
-  const box = h('div', { class: 'ann-sheet', role: 'dialog', 'aria-label': INSECURE_TITLE },
-    h('b', null, INSECURE_TITLE), h('p', { class: 'small' }, 'Browsers only let a page use the microphone over https://. Open WavWiz from its secure address on this device, then hold Announce again.'));
+export function insecureSheet(title = INSECURE_TITLE, again = 'then hold Announce again') {   // 0.7.2 D: also the zone timing check's
+  const box = h('div', { class: 'ann-sheet', role: 'dialog', 'aria-label': title },
+    h('b', null, title), h('p', { class: 'small' }, `Browsers only let a page use the microphone over https://. Open WavWiz from its secure address on this device, ${again}.`));
   const go = h('a', { class: 'btn sm primary', href: '#', hidden: true }, 'Open the secure address');
   const close = h('button', { type: 'button', class: 'btn sm', onclick: () => box.remove() }, 'Close');
   box.append(h('div', { class: 'row' }, go, h('a', { class: 'btn sm', href: '/tls/check' }, 'Check this device'), close));

@@ -577,7 +577,7 @@ export function zonePane(S, ctl, kit, g, st) {
         ro(h('button', { type: 'button', class: 'btn sm', 'data-act': 'zone-remove-speaker', 'aria-label': `Remove ${z.name} from ${g.name}`, onclick: async () => { try { await api(`/groups/${g.id}`, { method: 'PATCH', body: { name: g.name, deviceIds: (g.deviceIds || []).filter(x => x !== z.id) } }); toast(`${z.name} is now unassigned`); done(); } catch (e) { toast(e.message, true); } } }, 'Remove'), admin, 'Only an administrator can change zones.'))))
         : h('p', { class: 'small dim' }, 'No speakers yet. Drag a speaker here, or use Add to zone.')),
     ms.length ? h('div', { class: 'zp42-row zp42-refrow' }, zoneRefBlock(S, g, admin, done)) : null,   // 0.7.1: reference + recommendation
-    ms.length ? h('div', { class: 'zp42-row zp42-timing' }, zoneTimingRow(S, g, admin, done)) : null,   // 0.7.1: zone vs house fine-tune
+    ms.length ? h('div', { class: 'zp42-row zp42-timing' }, zoneTimingRow(S, g, admin, done, can)) : null,   // 0.7.1: zone vs house fine-tune
     kit.receiverBlock ? h('div', { class: 'zp42-row zp42-recv' }, kit.receiverBlock(g, admin)) : null,
     h('div', { class: 'zp42-row zp42-acts' },
       others.length ? ro(h('button', { type: 'button', class: 'btn', 'data-act': 'zone-link', onclick: ev => Z.linkMenu(ev.currentTarget, S, g, done) }, icon('link'), ' Link to…'), can, 'Your access is view-only.') : null,

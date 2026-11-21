@@ -47,7 +47,7 @@ test('the control: − / + / Reset, saved after a pause; a viewer sees it read-o
 });
 
 test('wiring: zone settings show the timing row; the reference card mentions it; the tree rebuilds on a change', () => {
-  assert.match(src('tree42.js'), /zoneTimingRow\(S, g, admin, done\)/);
+  assert.match(src('tree42.js'), /zoneTimingRow\(S, g, admin, done, can\)/);
   assert.match(src('refrec.js'), /timing vs house: \$\{offText\(g\.houseOffsetMs\)\} \(zone settings\)/);
   assert.match(src('devices.js'), /g\.refFlag\?\.kind, g\.houseOffsetMs\]/);
 });

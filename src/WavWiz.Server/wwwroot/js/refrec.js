@@ -4,6 +4,7 @@
 // every switch is one tap by the user (PUT /groups/{id}/reference, which re-bases the saved delays as before).
 import { h, api, toast } from './util.js';
 import { wsel } from './wwselect.js';
+import { checkButton } from './zonecheck.js';   // 0.7.2 D: acoustic zone-to-zone timing check
 
 const byId = (S, id) => (S.zones || []).find(z => z.id === id) || null;
 export const groupOfSpeaker = (S, id) => (S.groups || []).find(g => (g.deviceIds || []).includes(id)) || null;
@@ -111,7 +112,8 @@ export const offText = ms => { const v = Math.round((+ms || 0) * 10) / 10; retur
 /** The next fine-tune value after a step, clamped (pure). */
 export const stepOff = (ms, d) => Math.max(-HOUSE_OFF_MAX, Math.min(HOUSE_OFF_MAX, Math.round(((+ms || 0) + d) * 10) / 10));
 /** Zone settings: TIMING vs house with − / + (1 ms; Shift = 10 ms) and Reset. Saved after a short pause. */
-export function zoneTimingRow(S, g, admin, done) {
+export const CHECK_HINT = 'Check with phone measures it for you.';
+export function zoneTimingRow(S, g, admin, done, control = admin) {
   let v = +(g.houseOffsetMs || 0), t = 0;
   const ro = 'Only an administrator can change the zone timing.';
   const out = h('output', { class: 'mono zt42-v', 'aria-live': 'polite' }, offText(v));
@@ -120,6 +122,6 @@ export function zoneTimingRow(S, g, admin, done) {
   const btn = (txt, d, label) => h('button', { type: 'button', class: 'btn sm zt42-b', 'aria-label': label, 'data-act': d < 0 ? 'zt-minus' : 'zt-plus', disabled: !admin, title: admin ? `${label} (Shift: 10 ms)` : ro, onclick: ev => set(stepOff(v, d * (ev.shiftKey ? 10 : 1))) }, txt);
   const reset = h('button', { type: 'button', class: 'btn sm', 'data-act': 'zt-reset', disabled: !admin || v === 0, title: admin ? 'Back to 0 ms (as calibrated)' : ro, onclick: () => set(0) }, 'Reset');
   return h('div', { class: 'zt42', 'data-act': 'zone-timing' },
-    h('div', { class: 'row' }, h('span', { class: 'dlbl' }, 'TIMING VS HOUSE'), btn('−', -1, `${g.name} earlier`), out, btn('+', 1, `${g.name} later`), reset),
-    h('p', { class: 'small dim' }, `Fine-tune ${g.name} against the other zones when you can hear two zones at once. + plays it later, − earlier. Each speaker's own delay stays as calibrated.`));
+    h('div', { class: 'row' }, h('span', { class: 'dlbl' }, 'TIMING VS HOUSE'), btn('−', -1, `${g.name} earlier`), out, btn('+', 1, `${g.name} later`), reset, checkButton(S, g, admin, control, done)),
+    h('p', { class: 'small dim' }, `Fine-tune ${g.name} against the other zones when you can hear two zones at once. + plays it later, − earlier. Each speaker's own delay stays as calibrated. ${CHECK_HINT}`));
 }

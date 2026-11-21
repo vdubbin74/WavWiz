@@ -6464,3 +6464,21 @@ html.handset .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px
 #sec-announce .setrow .small{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:68ch}
 #sec-announce .setrow > .grow{flex:1 1 auto;min-width:0}
 #sec-announce>.setrow{grid-column:1/-1}
+/* 0.7.2 D: zone-to-zone timing check ("Check with phone" on Timing vs house) */
+.zt42 .zt42-check{margin-left:auto}
+.zc-dlg{width:min(460px,calc(calc(100vw / var(--z,1)) - 24px))}
+.zc{display:flex;flex-direction:column;gap:10px}
+.zc p{margin:0}
+.zc .zc-pick{display:flex;align-items:center;gap:8px}
+.zc .zc-pick select{flex:1;min-width:0}
+.zc .zc-meter{display:block;height:6px;border-radius:3px;background:var(--line,rgba(127,127,127,.25));overflow:hidden}
+.zc .zc-lvl{display:block;height:100%;width:0;background:var(--accent);transition:width .08s linear}
+.zc .zc-runs{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.zc .zc-runs:empty{display:none}
+.zc .zc-runs .warn,.zc .warn{color:var(--warn,#e0a030)}
+.zc .zc-result{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;border:1px solid var(--line,rgba(127,127,127,.25))}
+.zc .zc-result[hidden]{display:none}
+.zc .zc-result .btn{align-self:flex-start}
+.zc .zc-pick .dlbl{font-size:11px}
+.zc .zc-actions{display:flex;justify-content:flex-end;gap:8px}
+html.handset .zt42 .zt42-check{margin-left:0;flex-basis:100%}

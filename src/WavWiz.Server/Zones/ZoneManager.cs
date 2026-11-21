@@ -240,6 +240,16 @@ public sealed class ZoneManager
     public void PushZone(PlayerSession s, string? forceEndpoint = null)
     {
         var z = ZoneRow(s.Id); if (z == null) return;
+        var d = DelayOf(s, z.Id, forceEndpoint, record: true);
+        s.SendJson(MsgType.ZoneUpdate, new ZoneUpdate(z.Volume, z.Muted, z.Enabled, d.EpId, d.Lat, d.Src, d.Rev, d.NotCal, d.Recheck));
+    }
+
+    /// <summary>0.7.2 D: the delay a speaker plays music with right now (ms, the engine plays that much early): its saved / estimated delay minus its
+    /// zone's "vs house" offset - exactly what <see cref="PushZone"/> sends. Null when the speaker is not in the zone table.</summary>
+    public double? PlaybackDelayMs(PlayerSession s) { var z = ZoneRow(s.Id); return z == null ? null : DelayOf(s, z.Id, null, record: false).Lat; }
+
+    private (string? EpId, double Lat, string Src, bool NotCal, bool Recheck, long? Rev) DelayOf(PlayerSession s, long zoneId, string? forceEndpoint, bool record)
+    {
         string? epId = forceEndpoint ?? s.Outputs.FirstOrDefault(o => o.Active)?.EndpointId;
         double lat = 0; string src = "none"; bool notCal = false, recheck = false; long? rev = null;
         if (epId != null)
@@ -254,10 +264,10 @@ public sealed class ZoneManager
                 rev = _dsp.Effective(key).Revision;
                 // 0.7.1: its zone's "vs house" offset (0 = exactly the saved delay, so an upgrade plays as before). The delay is how late the output
                 // is (the engine plays that much EARLY), so a zone that should sound N ms later gets N ms less.
-                var off = HouseOffsetOfSpeaker(z.Id); _pushedOff[s.Id] = off; if (off != 0) lat -= off;
+                var off = HouseOffsetOfSpeaker(zoneId); if (record) _pushedOff[s.Id] = off; if (off != 0) lat -= off;
             }
         }
-        s.SendJson(MsgType.ZoneUpdate, new ZoneUpdate(z.Volume, z.Muted, z.Enabled, epId, lat, src, rev, notCal, recheck));
+        return (epId, lat, src, notCal, recheck, rev);
     }
 
     // ---------------- 0.7.1: each zone's always-on "vs house" offset (ms, + = the zone sounds later). Added to every speaker of the zone at playback; the saved
