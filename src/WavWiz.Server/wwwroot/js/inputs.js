@@ -174,7 +174,7 @@ export function inputsCard(S, { admin }) {
   const sw = (label, on, change, dis = false, hint = null) => h('label', { class: 'row inp-sw' }, h('input', { type: 'checkbox', checked: !!on, disabled: !admin || dis, onchange: ev => change(ev.target.checked) }), h('span', null, label), hint ? h('span', { class: 'small dim' }, hint) : null);
   const row = i => {
     const name = h('input', { type: 'text', value: i.name, maxlength: 40, 'aria-label': `Name for ${i.device}`, disabled: !admin, onchange: ev => put(i.id, { name: ev.target.value.trim() || null }) });
-    const gain = h('input', { type: 'range', min: -12, max: 6, step: 0.5, value: i.gainDb, 'aria-label': `${i.name} gain`, disabled: !admin });
+    const gain = h('input', { type: 'range', min: -12, max: gainMax(i), step: 0.5, value: i.gainDb, 'aria-label': `${i.name} gain`, disabled: !admin });
     const gv = h('span', { class: 'mono small inp-gv' }, fmtGain(i.gainDb));
     gain.oninput = () => { gv.textContent = fmtGain(+gain.value); }; gain.onchange = () => put(i.id, { gainDb: +gain.value });
     return h('div', { class: 'inp-setrow', 'data-kind': i.kind, 'data-id': i.id },
@@ -203,4 +203,6 @@ export function inputsCard(S, { admin }) {
   liveOn(card, 'wavwiz:inputlevel', ev => paintLevel(card, ev.detail || {}));
   return card;
 }
+/** 0.7.2 t2182u: the slider's top: mics +24 dB (quiet USB / headset mics), the other inputs +6 dB; the server sends it per input. */
+export const gainMax = i => Number.isFinite(+i?.maxGainDb) && +i.maxGainDb > 0 ? +i.maxGainDb : (i?.kind === 'mic' ? 24 : 6);
 export const fmtGain = db => (db > 0 ? '+' : db < 0 ? '−' : '') + Math.abs(Number(db) || 0).toFixed(1) + ' dB';

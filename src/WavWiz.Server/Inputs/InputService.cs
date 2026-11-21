@@ -44,6 +44,10 @@ public sealed class InputService : IDisposable
     public const string ConfigKey = "inputs.config";
     public const string Everywhere = "everywhere";
     public const double MinGainDb = -12, MaxGainDb = 6;
+    /// <summary>0.7.2 t2182u: a quiet USB / headset mic (HyperX at 100 % in Windows) needs more than +6 dB: mics go to +24 dB. The live limiter
+    /// after the gain (<see cref="WavWiz.Server.Media.LiveLimiter"/>, plus the 0 dBFS clamp when it is off) keeps a boosted mic from clipping.</summary>
+    public const double MicMaxGainDb = 24;
+    public static double MaxGainFor(string? kind) => kind == "mic" ? MicMaxGainDb : MaxGainDb;
     /// <summary>Approved input buffer for Synced mode (with the 600 ms house lead the sound is about 1.4 s behind the source).</summary>
     public const int TargetMs = 800;
     public static readonly TimeSpan MeterLease = TimeSpan.FromSeconds(30);
@@ -88,7 +92,7 @@ public sealed class InputService : IDisposable
     public static string DefaultName(InputInfo i) => i.Kind switch { "aux" => "Aux in", "spdif" => "S/PDIF in", "loopback" => "This PC · Speakers", _ => string.IsNullOrWhiteSpace(i.Name) ? "Microphone" : i.Name };
     /// <summary>The effective auto-start switch: as set, else on in Turntable mode (Aux in only) and off for everything else. Never on for mics or loopback.</summary>
     public static bool AutoStartOn(InputCfg c) => c.Kind == "aux" && c.Turntable && (c.AutoStart ?? true);
-    public static float GainOf(double db) => (float)Math.Pow(10, Math.Clamp(double.IsFinite(db) ? db : 0, MinGainDb, MaxGainDb) / 20.0);
+    public static float GainOf(double db) => (float)Math.Pow(10, Math.Clamp(double.IsFinite(db) ? db : 0, MinGainDb, MicMaxGainDb) / 20.0);
 
     // ---------------- config ----------------
     private Dictionary<string, InputCfg> LoadCfg()
@@ -269,7 +273,7 @@ public sealed class InputService : IDisposable
             var all = LoadCfg(); var c = CfgOf(all, l);
             if (b.TryGetProperty("name", out var n)) { if (n.ValueKind == JsonValueKind.Null) c = c with { Name = null }; else if (n.ValueKind != JsonValueKind.String || n.GetString()!.Trim().Length is 0 or > 40) return "name must be 1 to 40 characters"; else c = c with { Name = n.GetString()!.Trim() }; }
             if (b.TryGetProperty("enabled", out var e)) { if (e.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "enabled must be true or false"; c = c with { Enabled = e.GetBoolean() }; }
-            if (b.TryGetProperty("gainDb", out var g)) { if (g.ValueKind != JsonValueKind.Number || g.GetDouble() < MinGainDb || g.GetDouble() > MaxGainDb) return $"gainDb must be between {MinGainDb} and +{MaxGainDb}"; c = c with { GainDb = Math.Round(g.GetDouble(), 1) }; }
+            if (b.TryGetProperty("gainDb", out var g)) { var max = MaxGainFor(c.Kind); if (g.ValueKind != JsonValueKind.Number || g.GetDouble() < MinGainDb || g.GetDouble() > max) return $"gainDb must be between {MinGainDb} and +{max}"; c = c with { GainDb = Math.Round(g.GetDouble(), 1) }; }
             if (b.TryGetProperty("turntable", out var t)) { if (t.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "turntable must be true or false"; if (t.GetBoolean() && c.Kind != "aux") return "Turntable mode is only for Aux in"; c = c with { Turntable = t.GetBoolean() }; }
             if (b.TryGetProperty("autoStart", out var a)) { if (a.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "autoStart must be true or false"; if (a.GetBoolean() && !(c.Kind == "aux" && c.Turntable)) return "auto-start needs Turntable mode on Aux in"; c = c with { AutoStart = a.GetBoolean() }; }
             // 0.7.2 t2175u: Real time / Sync with WavWiz (loopback only) and its two outputs (from the Player's own output list)
@@ -364,7 +368,7 @@ public sealed class InputService : IDisposable
                 return new
                 {
                     id = l.Id, name = c.Name ?? DefaultName(l.Info), defaultName = DefaultName(l.Info), kind = l.Info.Kind, source = "This PC · " + KindLabel(l.Info.Kind), device = l.Info.Name,
-                    enabled = c.Enabled, gainDb = c.GainDb, turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
+                    enabled = c.Enabled, gainDb = c.GainDb, maxGainDb = MaxGainFor(l.Info.Kind), turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
                     bluetooth = l.Info.Bluetooth, note = l.Info.Note, playing = l.Cond != null, zone = l.Cond != null ? (l.Zone ?? "default") : null, groupId = l.Cond?.GroupId,
                     capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error, privacy = l.Error != null && l.Privacy,
                     localMode = l.Info.Kind == "loopback" ? (c.LocalMode ?? "realtime") : null, spareOutput = c.SpareOutput, syncSpeakers = c.SyncSpeakers, synced = l.SyncOn, syncNote = l.SyncNote,

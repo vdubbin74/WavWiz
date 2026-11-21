@@ -383,4 +383,41 @@ public class Release072InputsTests
         lb = await Input(admin, "loopback");
         Assert.Contains("went away", lb.GetProperty("syncNote").GetString()); Assert.True(lb.GetProperty("playing").GetBoolean()); Assert.Equal(JsonValueKind.Null, lb.GetProperty("error").ValueKind);
     }
+
+    // ---------------- 0.7.2 t2182u: mics go to +24 dB, the limiter keeps it from clipping ----------------
+    [Fact]
+    public async Task A_mic_takes_up_to_24_dB_other_inputs_stay_at_6_and_the_view_says_each_top()
+    {
+        var (f, admin, _, pc, _) = await Setup(); await using var _f = f; await using var _p = pc;
+        var mic = await Input(admin, "mic"); var aux = await Input(admin, "aux");
+        Assert.Equal(24, mic.GetProperty("maxGainDb").GetDouble()); Assert.Equal(6, aux.GetProperty("maxGainDb").GetDouble());
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{mic.GetProperty("id").GetString()}", new { gainDb = 24 })).StatusCode);
+        Assert.Equal(24, (await Input(admin, "mic")).GetProperty("gainDb").GetDouble());
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/v1/inputs/{mic.GetProperty("id").GetString()}", new { gainDb = 24.5 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/v1/inputs/{aux.GetProperty("id").GetString()}", new { gainDb = 7 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/v1/inputs/{mic.GetProperty("id").GetString()}", new { gainDb = -12.5 })).StatusCode);
+        Assert.Equal(Math.Pow(10, 24 / 20.0), InputService.GainOf(24), 3); Assert.Equal(Math.Pow(10, 24 / 20.0), InputService.GainOf(40), 3);
+    }
+
+    [Fact]
+    public void A_quiet_mic_at_plus_24_dB_is_held_by_the_live_limiter_and_never_clips()
+    {
+        var feed = new LiveFeed { TargetMs = 100 }; var b = new float[48000 * 2];
+        for (int i = 0; i < 48000; i++) b[i * 2] = b[i * 2 + 1] = (float)(0.5 * Math.Sin(2 * Math.PI * 300 * i / 48000));   // a loud word: -6 dBFS, +24 dB = +18 dBFS
+        feed.WriteFloat(b, 48000); feed.Gain = InputService.GainOf(24);
+        using var d = feed.OpenDecoder(); var o = new float[24000 * 2]; int got = 0;
+        while (got < 24000) { int n = d.Read(o.AsSpan(got * 2), Math.Min(4800, 24000 - got)); if (n == 0) break; got += n; }
+        Assert.True(got > 0); Assert.True(o.Take(got * 2).Max(Math.Abs) <= 1f, $"peak {o.Take(got * 2).Max(Math.Abs)}"); Assert.True(feed.LimiterReductionDb > 10);
+    }
+
+    [Fact]
+    public void Capture_conversion_keeps_full_level_for_float_24_in_32_and_mono()
+    {
+        var fl = new byte[8]; BitConverter.GetBytes(0.5f).CopyTo(fl, 0); BitConverter.GetBytes(-0.25f).CopyTo(fl, 4);
+        Assert.Equal(new[] { 0.5f, -0.25f }, InputRules.ToFloat(fl, 32, true));                                    // float is not read as int
+        var i32 = BitConverter.GetBytes(0x40000000);                                                               // 24-bit valid in a 32-bit container, left-justified
+        Assert.Equal(0.5f, InputRules.ToFloat(i32, 32, false)[0], 5);
+        var mono = InputRules.ToStereoOrMono(new[] { 0.5f, 0.4f }, 1, out var ch); Assert.Equal(1, ch); Assert.Equal(new[] { 0.5f, 0.4f }, mono);   // no averaging
+        var st = InputRules.ToStereoOrMono(new[] { 0.5f, 0f }, 2, out ch); Assert.Equal(2, ch); Assert.Equal(0.5f, st[0]);                       // a silent 2nd channel does not halve it
+    }
 }

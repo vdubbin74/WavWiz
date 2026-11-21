@@ -71,7 +71,7 @@ test('0.7.2: inputs / inputlevel server events reach the page', () => {
 test('0.7.2: Settings > Devices > Audio inputs - admin switches, gain -12..+6, Turntable / auto-start (Aux), live source (mic), searchable', () => {
   assert.match(set, /players\.push\(inputsCard\(S, \{ admin \}\)\);/);
   assert.match(inp, /id: 'sec-inputs' \}, h\('h3', null, INPUTS_TITLE\)/);
-  assert.match(inp, /type: 'range', min: -12, max: 6, step: 0\.5/);
+  assert.match(inp, /type: 'range', min: -12, max: gainMax\(i\), step: 0\.5/);   // 0.7.2 t2182u: mics +24, others +6
   assert.match(inp, /i\.kind === 'aux' \? sw\('Turntable mode'/);
   assert.match(inp, /i\.kind === 'mic' \? sw\('Live source'/);
   assert.match(inp, /disabled: !admin \|\| dis/);
