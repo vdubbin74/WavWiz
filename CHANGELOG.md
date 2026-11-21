@@ -14,6 +14,8 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 General fixes.
 
+Open issues in this release are listed in [KNOWN-ISSUES.md](KNOWN-ISSUES.md).
+
 ### Changed
 - Volume mixer: the Master volume button (player bar, Devices MASTER row, mini player), Alt+V, Menu > Master volume and its pin now open the Devices panel straight into a Volume Mixer mode instead of a separate window. Zones and speakers keep the Devices order; tags, now-playing lines and zone switches step aside; each speaker is one line (dot + name, volume bar + %, mute, and the zone card's chevron for Max volume and Delay / sync offset). A Volume Mixer bar with Done stays at the top (Esc also leaves). Max volume (admin), Delay (own speaker or admin) and the wheel only moving sliders in the zone you touched last work as before.
 - Settings > Appearance > Zone edge light: three new styles replace Clean comet, Pulse and Dual streak. Heartbeat is a subtle lub-dub (two quick swells of the edge glow, the second softer, then rest; 72 bpm), Heartthrob a slow gentle throb like breathing (3.2 s, never fully dark) and Gradient lets the theme's main, second and highlight colors flow smoothly down the edge. A saved choice moves over by itself: Clean comet becomes Heartbeat, Pulse becomes Heartthrob and Dual streak becomes Gradient. As before they only move on playing zones, animate opacity / transform only, and stand still with reduced motion.

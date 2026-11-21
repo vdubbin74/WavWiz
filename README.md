@@ -14,7 +14,7 @@ WavWiz is a free, MIT-licensed multi-zone music system. Run the server on an alw
 
 > **Public beta.** Expect rough edges and frequent updates. The Windows installer is not code-signed yet (SmartScreen may warn; SHA-256 checksums are on the release). Phone-mic calibration on an iPhone is still in testing; calibrating with the PC's microphone is recommended. Please report bugs via [GitHub Issues](https://github.com/vdubbin74/WavWiz/issues).
 
-**Download:** [latest Windows release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Docker (amd64 and arm64 server):** [`vdubbin74/wavwiz-server`](https://hub.docker.com/r/vdubbin74/wavwiz-server) · **Website:** [wavwiz.com](https://wavwiz.com) · **Docs:** [First run](docs/FIRST-RUN.md) · [Docker](docs/DOCKER.md) · [Raspberry Pi](docs/RASPBERRY-PI.md) · [Home Assistant](docs/HOME-ASSISTANT.md)
+**Download:** [latest Windows release](https://github.com/vdubbin74/WavWiz/releases/latest) · **Docker (amd64 and arm64 server):** [`vdubbin74/wavwiz-server`](https://hub.docker.com/r/vdubbin74/wavwiz-server) · **Website:** [wavwiz.com](https://wavwiz.com) · **Docs:** [First run](docs/FIRST-RUN.md) · [Known issues](KNOWN-ISSUES.md) · [Docker](docs/DOCKER.md) · [Raspberry Pi](docs/RASPBERRY-PI.md) · [Home Assistant](docs/HOME-ASSISTANT.md)
 
 ---
 
@@ -136,6 +136,7 @@ The installer is **not Authenticode-signed yet**, so Windows SmartScreen may war
    - On each PC with speakers: install **WavWiz Player**; it discovers the server—approve it on an admin screen when the approval box appears, or type the 6-digit code from **Settings → Devices → Pair a phone or a PC player**.
    - On phones and tablets: open the server's web page in the browser on your home Wi-Fi.
 4. Read [docs/FIRST-RUN.md](docs/FIRST-RUN.md) for Private network, devices and calibration, the menus and Settings, AirPlay, and optional Spotify Connect tips.
+5. Check [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for open issues in this release.
 
 Upgrading? Run the new installer over the old one, even while WavWiz is running; it closes WavWiz first and keeps your library, settings, and pairings.
 
