@@ -61,6 +61,7 @@ public sealed class InputService : IDisposable
         public readonly LiveFeed Feed = new() { TargetMs = InputService.TargetMs };
         public InputSignalDetector Detector = new();
         public bool Capturing; public long ErrorAtMs = long.MinValue / 2; public double PeakDb = -120; public long LastLevelPubMs; public string? Error;
+        public bool GotAudio; public bool Privacy;   // 0.7.2 t2170u: audio arrived since the last start; Windows' mic privacy refused it (no auto-retry)
         public Conductor? Cond; public string? Zone; public bool LinkedEverywhere; public bool AutoStarted;
         public string Key => "input:" + Id;
     }
@@ -119,8 +120,17 @@ public sealed class InputService : IDisposable
         if (!reason.StartsWith("input-error:", StringComparison.Ordinal)) return;
         var rest = reason["input-error:".Length..]; int c = rest.IndexOf('\n'); if (c <= 0) return;   // "input-error:<id>\n<why>" (InputResponder.ErrorReason)
         var ep = rest[..c]; var why = rest[(c + 1)..];
-        lock (_l) { var l = _live.Values.FirstOrDefault(x => x.Sess.Id == sess.Id && x.Info.Id == ep); if (l == null) return; l.Error = why; l.ErrorAtMs = NowMs(); l.Capturing = false; }
-        _s.Events.Publish("inputs");
+        bool stopped = false;
+        lock (_l)
+        {
+            var l = _live.Values.FirstOrDefault(x => x.Sess.Id == sess.Id && x.Info.Id == ep); if (l == null) return;
+            l.Privacy = why.StartsWith(WavWiz.PlayerCore.InputRules.PrivacyTag, StringComparison.Ordinal);
+            l.Error = l.Privacy ? why[WavWiz.PlayerCore.InputRules.PrivacyTag.Length..] : why; l.ErrorAtMs = NowMs(); l.Capturing = false;
+            // 0.7.2 t2170u: it never delivered (could not open): stop like Stop, so the zone gets its queue back instead of "Playing" silence; the error stays.
+            // A mid-stream loss (unplugged, driver reset) keeps playing and retries as before.
+            if (l.Cond != null && !l.GotAudio) { StopNoLock(l, "could not open: " + l.Error); stopped = true; }
+        }
+        _s.Events.Publish("inputs"); if (stopped) _s.Events.Publish("zones");
     }
 
     private void OnGone(PlayerSession sess)
@@ -141,7 +151,7 @@ public sealed class InputService : IDisposable
         {
             l = _live.Values.FirstOrDefault(x => ReferenceEquals(x.Sess, sess) && x.Info.Id == endpointId);
             if (l == null || !l.Capturing) return;
-            l.Error = null;                                              // it is delivering: any earlier open error is over
+            l.Error = null; l.Privacy = false; l.GotAudio = true;        // it is delivering: any earlier open error is over
             float g = l.Feed.Gain; float peak = 0;
             foreach (var v in pcm) { var a = Math.Abs(v); if (a > peak) peak = a; }
             l.PeakDb = db = peak > 0 ? 20 * Math.Log10(peak * g) : -120;     // the meter shows the level after the input's gain (before the limiter)
@@ -191,6 +201,8 @@ public sealed class InputService : IDisposable
             bool want = WantedNoLock(l, CfgOf(cfg, l)) && l.Sess.SpeaksInputs && !l.Sess.Dead;
             if (want == l.Capturing) continue;
             if (want && NowMs() - l.ErrorAtMs < RetryAfterErrorMs) continue;   // it just failed to open: try again in a while, not every second
+            if (want && l.Privacy) continue;                               // 0.7.2 t2170u: Windows' mic privacy said no: wait for the user to press Play again
+            if (want) l.GotAudio = false;
             l.Capturing = want; if (!want) { l.PeakDb = -120; l.Detector.Reset(); }
             try { l.Sess.SendJson(MsgType.InputCmd, new InputCmd(want ? "start" : "stop", l.Info.Id)); } catch { }
         }
@@ -261,6 +273,7 @@ public sealed class InputService : IDisposable
             if (_s.Jukebox != null && ReferenceEquals(_s.Jukebox.Owns, cond)) return "Audio inputs can't play in the Jukebox zone";
             if (l.Cond != null) StopNoLock(l, "moved");                    // already playing somewhere: move it
             if (everywhere) { try { _s.Links.EverywhereBegin(); } catch (Exception e) { _s.Log?.Invoke("inputs: link all zones failed: " + e.Message); } }
+            l.Privacy = false; l.Error = null; l.ErrorAtMs = long.MinValue / 2;   // 0.7.2 t2170u: Play is the user's retry (also after a privacy refusal)
             l.Feed.Flush(); l.Feed.Gain = GainOf(c.GainDb); l.Feed.Limit = LiveLimiter.Enabled(_s.Db);
             cond.RegisterFeed("input", l.Feed, l.Key);
             cond.BeginLive("input", c.Name ?? DefaultName(l.Info), "This PC · " + KindLabel(l.Info.Kind), "Audio input", null, l.Key);
@@ -310,7 +323,7 @@ public sealed class InputService : IDisposable
                     id = l.Id, name = c.Name ?? DefaultName(l.Info), defaultName = DefaultName(l.Info), kind = l.Info.Kind, source = "This PC · " + KindLabel(l.Info.Kind), device = l.Info.Name,
                     enabled = c.Enabled, gainDb = c.GainDb, turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
                     bluetooth = l.Info.Bluetooth, note = l.Info.Note, playing = l.Cond != null, zone = l.Cond != null ? (l.Zone ?? "default") : null, groupId = l.Cond?.GroupId,
-                    capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error,
+                    capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error, privacy = l.Error != null && l.Privacy,
                 };
             }).ToList();
             return new { available = PlayerReady, note = PlayerReady ? null : NoPlayerNote, limiter = LiveLimiter.Enabled(_s.Db), inputs = list };

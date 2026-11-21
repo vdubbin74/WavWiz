@@ -272,4 +272,51 @@ public class Release072InputsTests
         await Until(() => Task.FromResult(f.Server.S.Conductor.Now().Item?.Kind != "input"), "the input kept playing after its player closed");
         await Until(async () => (await admin.GetJson("/api/v1/inputs")).GetProperty("inputs").GetArrayLength() == 0, "the closed player's inputs stayed listed");
     }
+
+    // ---------------- 0.7.2 t2170u: Windows' microphone privacy ----------------
+    private sealed class DeniedMic(SynthInputProvider inner) : IInputProvider
+    {
+        public int Tries;
+        public IReadOnlyList<InputInfo> List() => inner.List();
+        public IDisposable Start(string id, Action<float[], int, int> onBlock, Action<string> onError)
+        {
+            if (inner.List().First(x => x.Id == id).Kind != "mic") return inner.Start(id, onBlock, onError);
+            Interlocked.Increment(ref Tries); throw new System.Runtime.InteropServices.COMException("Core Audio error 0x80070005", unchecked((int)0x80070005));
+        }
+    }
+
+    [Fact]
+    public void Access_denied_becomes_the_plain_privacy_reason_and_other_errors_keep_their_text()
+    {
+        var r = InputRules.FailReason(new System.Runtime.InteropServices.COMException("x", unchecked((int)0x80070005)));
+        Assert.StartsWith(InputRules.PrivacyTag, r); Assert.Contains("Let desktop apps access your microphone", r);
+        Assert.StartsWith(InputRules.PrivacyTag, InputRules.FailReason(new Exception("Core Audio error 0x80070005")));
+        Assert.Equal("device unplugged", InputRules.FailReason(new Exception("device unplugged")));
+        Assert.True(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-microphone\"}"));
+        Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-webcam\"}"));
+        Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-microphone\",\"x\":1}"));
+        Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage(null));
+    }
+
+    [Fact]
+    public async Task A_mic_windows_refuses_stops_like_stop_keeps_the_reason_and_waits_for_play()
+    {
+        var den = new DeniedMic(new SynthInputProvider());
+        var (f, admin, control, pc, _) = await Setup(den); await using var _f = f; await using var _p = pc;
+        var c = f.Server.S.Conductor;
+        c.Add(new[] { new QueueItem(0, "track", "/nope/a.flac", "Song A", "X", "Y", 1000, 1) }, false);
+        var id = (await Input(admin, "mic")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true, liveSource = true });
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "mic")).GetProperty("error").ValueKind == JsonValueKind.String, "the refusal did not reach the server");
+        var mic = await Input(admin, "mic");
+        Assert.False(mic.GetProperty("playing").GetBoolean());                       // stopped like Stop: no "Playing" silence
+        Assert.True(mic.GetProperty("privacy").GetBoolean());
+        Assert.StartsWith("Windows is blocking the microphone", mic.GetProperty("error").GetString());
+        Assert.Equal(new[] { "Song A" }, c.Queue().Select(q => q.Title)); Assert.NotEqual("input", c.Now().Item?.Kind);   // the zone's queue is back
+        f.Server.S.Inputs!.NowMs = () => Environment.TickCount64 + 120_000;          // long past the retry pause: still no new attempt by itself
+        await Task.Delay(1500); Assert.Equal(1, den.Tries);
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);   // Play is the retry
+        await Until(() => Task.FromResult(den.Tries == 2), "Play did not try again");
+    }
 }

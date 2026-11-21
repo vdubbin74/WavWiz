@@ -137,7 +137,7 @@ public sealed class WasapiInputProvider : IInputProvider, IDisposable
                     }
                 }
             }
-            catch (Exception e) { if (!cts.IsCancellationRequested) onError(e.Message); }     // unplugged / driver reset
+            catch (Exception e) { if (!cts.IsCancellationRequested) onError(InputRules.FailReason(e)); }     // unplugged / driver reset; 0.7.2 t2170u: 0x80070005 = the privacy switch
             finally { try { client.Stop(); } catch { } try { client.Dispose(); } catch { } try { dev.Dispose(); } catch { } }
         }) { IsBackground = true, Name = "wavwiz-input", Priority = ThreadPriority.AboveNormal };
         thread.Start();

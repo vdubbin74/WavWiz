@@ -12,10 +12,24 @@ export const INPUT_TERMS = 'audio inputs aux in line in turntable record player 
 /** Meters re-ask the server every 20 s while shown (its lease is 30 s, so a closed page stops capture by itself). */
 export const METER_RENEW_MS = 20000;
 
+/** 0.7.2 t2170u: Windows' microphone privacy page. The Player opens it on this exact message only (Forms.cs); a browser shows the path. */
+export const MIC_SETTINGS_MSG = { open: 'ms-settings:privacy-microphone' };
+export const MIC_SETTINGS_PATH = 'Windows Settings > Privacy & security > Microphone';
+const inPlayer = () => !!globalThis.chrome?.webview;
+/** The problem line of an input: the reason, plus (privacy refusal) the way to the Windows setting. */
+export function problemEls(i) {
+  if (!i.error) return [];
+  const els = [h('p', { class: 'small err' }, i.error)];
+  if (i.privacy) els.push(inPlayer()
+    ? h('div', { class: 'row inp-privacy' }, h('button', { type: 'button', class: 'btn sm', onclick: () => { try { globalThis.chrome.webview.postMessage(MIC_SETTINGS_MSG); } catch { /* not the Player */ } } }, 'Open microphone settings'))
+    : h('p', { class: 'small dim inp-privacy' }, 'On the server PC: ' + MIC_SETTINGS_PATH + '.'));
+  return els;
+}
+
 /** Pure: the badges a tile shows, in order. */
 export function inputBadges(i) {
   const b = [];
-  if (i.playing) b.push(['Playing', 'ok']);
+  if (i.playing && !i.error) b.push(['Playing', 'ok']);   // 0.7.2 t2170u: an input with a problem never also says Playing
   if (!i.enabled) b.push(['Off', 'idle']);
   else if (i.muted) b.push(['Muted', 'idle']);
   if (i.turntable) b.push(['Turntable', '']);
@@ -94,7 +108,7 @@ export function inputsView(S) {
       i.playing ? h('p', { class: 'small inp-where' }, whereText(i, S.zones)) : null,
       i.muted && i.enabled ? h('p', { class: 'small dim' }, MIC_MUTED) : null,
       i.turntable ? h('p', { class: 'small warn-t inp-phono', 'data-in': i.id, hidden: !i.phonoLow }, PHONO_WARN) : null,
-      i.error ? h('p', { class: 'small err' }, i.error) : null,
+      ...problemEls(i),
       !i.enabled ? h('p', { class: 'small dim' }, isAdmin(S) ? 'Turn it on in Settings > Devices > Audio inputs.' : 'An administrator can turn it on in Settings > Devices > Audio inputs.') : null,
       act ? h('div', { class: 'row inp-acts' },
         act === 'stop'
@@ -144,7 +158,7 @@ export function inputsCard(S, { admin }) {
         i.kind === 'mic' ? sw('Live source', i.liveSource, v => put(i.id, { liveSource: v }), false, 'off = Announce only (starts muted)') : null),
       i.turntable ? h('p', { class: 'small warn-t inp-phono', 'data-in': i.id, hidden: !i.phonoLow }, PHONO_WARN) : null,
       i.bluetooth ? h('p', { class: 'small dim' }, 'Bluetooth headset mics switch the headset to call quality while they are open.') : null,
-      i.error ? h('p', { class: 'small err' }, i.error) : null);
+      ...problemEls(i));
   };
   function draw() {
     const l = data.inputs || [];

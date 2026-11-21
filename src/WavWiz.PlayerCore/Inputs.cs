@@ -105,7 +105,7 @@ public sealed class InputResponder : IDisposable
         {
             if (_running.ContainsKey(id)) return;
             try { _running[id] = _inputs.Start(id, (b, rate, ch) => OnBlock(id, b, rate, ch), why => { Stop(id); _ = _report(ErrorReason(id, why)); }); _log("input started: " + id); }
-            catch (Exception e) { _log($"input {id} failed to start: {e.Message}"); _ = _report(ErrorReason(id, e.Message)); }
+            catch (Exception e) { _log($"input {id} failed to start: {e.Message}"); _ = _report(ErrorReason(id, InputRules.FailReason(e))); }   // 0.7.2 t2170u: privacy refusal in plain words
         }
     }
 
@@ -137,6 +137,14 @@ public sealed class InputResponder : IDisposable
 /// </summary>
 public static class InputRules
 {
+    /// <summary>0.7.2 t2170u: the reason starts with this when Windows' microphone privacy setting refused capture (E_ACCESSDENIED).</summary>
+    public const string PrivacyTag = "privacy:";
+    public const string PrivacyText = "Windows is blocking the microphone. Turn on 'Microphone access' and 'Let desktop apps access your microphone' in Windows Settings > Privacy & security > Microphone, then press Play again.";
+    /// <summary>0.7.2 t2170u: E_ACCESSDENIED (0x80070005) from Core Audio = the privacy switch; anything else keeps its own message.</summary>
+    public static string FailReason(Exception e) =>
+        e.HResult == unchecked((int)0x80070005) || e.Message.Contains("0x80070005", StringComparison.OrdinalIgnoreCase) || e is UnauthorizedAccessException
+            ? PrivacyTag + PrivacyText : e.Message;
+
     public const string DeviceLoopback = "loopback:device";
     /// <summary>Windows 10 version 2004 (build 19041): process loopback (capture everything except one process tree).</summary>
     public const int ProcessLoopbackBuild = 19041;

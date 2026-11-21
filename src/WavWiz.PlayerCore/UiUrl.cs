@@ -67,6 +67,10 @@ public static class UiUrl
         if (t.Scheme != b.Scheme || !t.Host.Equals(b.Host, StringComparison.OrdinalIgnoreCase) || t.Port != b.Port) return false;
         return !(t.AbsolutePath.Equals("/tls", StringComparison.OrdinalIgnoreCase) || t.AbsolutePath.StartsWith("/tls/", StringComparison.OrdinalIgnoreCase));
     }
+    /// <summary>0.7.2 t2170u: the one Windows Settings page the page may ask the Player to open (Inputs: the microphone privacy switch).</summary>
+    public const string MicSettingsUri = "ms-settings:privacy-microphone";
+    /// <summary>0.7.2 t2170u: exactly {"open":"ms-settings:privacy-microphone"} (what inputs.js posts) - nothing else opens anything.</summary>
+    public static bool IsMicSettingsMessage(string? json) => json == "{\"open\":\"" + MicSettingsUri + "\"}";
     /// <summary>0.2.5: the page address with a screen to open (#calibrate). Only known screen names; anything else returns the address unchanged.</summary>
     public static string WithScreen(string baseUrl, string screen)
     {
