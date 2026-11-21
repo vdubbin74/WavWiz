@@ -10,7 +10,7 @@ import * as Z from './zones40.js';
 import { swapQuestion, offerSwap, dismissNote } from './zoneref.js';   // 0.6.8-#15
 import { flagNote, useRef, zoneRefBlock, zoneTimingRow } from './refrec.js';   // 0.7.1: recommended reference + flags (never switched by itself)
 import { arrangeCards, moveCard, stepCard, saveCardOrder, getCardOrder, cardDropMode } from './devorder.js';   // 0.6.9 #12: one server-side card order
-import { attachCtx, openCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
+import { attachCtx, openCtx, closeCtx, zoneMenu42, speakerMenu42, unassignedMenu42 } from './ctxmenu.js';
 import { jbSaved, EMPTY_ZONE_TIP } from './jbcfg.js';   // 0.6.9 #19
 import { announceButton } from './announce.js';   // 0.7.2 hold-to-talk
 import { isMixerOpen, mixerCtlKey, mixVol, mixChev, mixDrawer } from './mixer.js';   // 0.7.2 t2148u: the Volume Mixer is a mode of this tree
@@ -471,14 +471,20 @@ export function treeEl(S, ctl, kit, st) {
 // 0.4.4 F9 behavior (lifted source, every valid target outlined, the one under the pointer solid + an insertion line, own zone not a target, Esc cancels)
 // 0.4.5 F26: runs on the shared pointer engine (pdrag.js) - mouse 5 px, touch / pen a short hold (a swipe still scrolls); the ghost is a copy of the
 // speaker row pinned at the exact point it was grabbed at any Display size / Windows scaling; zones that are not targets dim.
+const PHONE_ROW_SKIP = 'input,select,textarea,a[href],[role="slider"],.sp42-mute,.mutebtn,.tagact,.ctxmenu,button:not(.dname)';
 function attachDrag(root, S, move) {
   root.addEventListener('pointerdown', ev => {
-    const grip = ev.target.closest('.dgrip42'); if (!grip || !root.contains(grip) || grip.classList.contains('ro') || grip.hasAttribute('aria-disabled') || ev.button > 0) return;
+    // 0.7.2 t2190u (phone only): the thin edge trim is hard to hit with a finger, so a touch hold on the speaker row itself (its name or empty
+    // space, not the mute / % / tag buttons) starts the same drag; the approved engine decides (short hold + move = drag, a swipe scrolls)
+    const phoneRow = ev.pointerType === 'touch' && document.documentElement.classList.contains('handset') && !ev.target.closest(PHONE_ROW_SKIP)
+      ? ev.target.closest('.sp42[data-device-id]')?.querySelector(':scope > .dgrip42') : null;
+    const grip = ev.target.closest('.dgrip42') || phoneRow; if (!grip || !root.contains(grip) || grip.classList.contains('ro') || grip.hasAttribute('aria-disabled') || ev.button > 0) return;
     const id = +grip.dataset.dragDevice, z = (S.zones || []).find(x => x.id === id); if (!z) return;
     const src = grip.closest('.sp42, .un42-row, [data-device-id]');
     let offs = [], from = null, fromKey = 'none';
     const onStart = () => {
       ({ from, fromKey } = dragFromKey(S.groups, id));   // F269: read when the drag starts (after any optimistic / polled move), not at render
+      closeCtx();   // 0.7.2 t2190u: a menu that opened from the hold goes away when the finger moves (drag wins)
       root.classList.add('dragging'); src?.classList.add('drag42-src');
       for (const t of root.querySelectorAll('[data-drop]')) {
         if (t.dataset.drop === fromKey) { t.classList.add('dropno'); continue; }

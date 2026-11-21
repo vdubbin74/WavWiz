@@ -6551,3 +6551,5 @@ html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;te
 .lsx .pk select{width:100%}
 .lsx .lsx-warn{color:var(--amber)}
 html.handset .lsx .pk{grid-template-columns:1fr}
+/* 0.7.2 t2190u (phone): holding a speaker / zone row to drag it never selects text or shows the iOS Copy / Look Up callout */
+html.handset .tree42 .sp42,html.handset .tree42 .sp42 *,html.handset .tree42 .zcard42,html.handset .tree42 .zcard42 *,html.handset .tree42 .zgut42,html.handset .tree42 .cgrip69,html.handset .tree42 .dgrip42,html.handset .tree42 .un42-row,html.handset .tree42 .un42-row *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

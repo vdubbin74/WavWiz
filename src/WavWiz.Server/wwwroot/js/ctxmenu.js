@@ -1,6 +1,7 @@
 // WavWiz 0.4.1: right-click (and long-press / Menu key / Shift+F10) context menus for speaker and zone cards.
 // Pure part first (what each menu holds), then the small DOM menu. Items are { label, icon?, onclick, danger?, disabled?, hint?, sep? }.
 import { h } from './util.js';
+import { PD } from './pdrag.js';   // 0.7.2 t2190u: no long-press menu while a drag runs
 
 /** Pure: the items of a speaker card's menu, in the approved order. `a` = { admin, can, muted, on, calibrate, canCalibrate }. */
 export function speakerMenuItems(a) {
@@ -183,6 +184,7 @@ export function openCtx(x, y, items, { label = 'Actions', from = null } = {}) {
   open = { el, off, key, from, subs }; document.addEventListener('pointerdown', off, true); document.addEventListener('keydown', key, true); window.addEventListener('blur', closeCtx);
   el.querySelector('.ctx-item:not([disabled])')?.focus(); return el;
 }
+const ROW_PHONE = () => typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');
 /** Wire a card: contextmenu (right-click), Shift+F10 / the Menu key, and a long press on touch. `build()` returns the items. */
 export function attachCtx(card, build, label) {
   const show = (x, y) => {
@@ -194,7 +196,10 @@ export function attachCtx(card, build, label) {
   card.addEventListener('click', ev => { if (card.dataset.justmenu) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
   let t = 0, sx = 0, sy = 0;
   // 0.7.1: a press on the edge-trim drag handle starts a drag, not a menu
-  card.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'touch' || ev.target.closest('button,input,.dgrip,.dgrip42,.zgut42,.cgrip69,.vbar')) return; if (ev._ctxDone) return; ev._ctxDone = true; sx = ev.clientX; sy = ev.clientY; t = setTimeout(() => { t = 0; show(sx, sy); }, 550); });
+  // 0.7.2 t2190u (phone): the speaker name is the biggest part of the row, so a still hold on it opens the menu too (a tap still opens settings);
+  // the menu never opens once a drag has started (moving the finger is a drag, holding still is the menu)
+  const skip = () => ROW_PHONE() ? 'button:not(.dname),input,.dgrip,.dgrip42,.zgut42,.cgrip69,.vbar' : 'button,input,.dgrip,.dgrip42,.zgut42,.cgrip69,.vbar';
+  card.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'touch' || ev.target.closest(skip())) return; if (ev._ctxDone) return; ev._ctxDone = true; sx = ev.clientX; sy = ev.clientY; t = setTimeout(() => { t = 0; if (!PD.active) show(sx, sy); }, 550); });
   const stop = () => { if (t) { clearTimeout(t); t = 0; } };
   card.addEventListener('pointerup', stop); card.addEventListener('pointercancel', stop); card.addEventListener('pointermove', ev => { if (t && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) stop(); });
 }
