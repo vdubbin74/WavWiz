@@ -124,6 +124,25 @@ An admin can give any device a **max volume** in its Settings and lock it. While
 
 **File → Back up now** saves a backup on the server (the last 10 are kept); **File → Restore backup…** picks one, shows a summary of what will change, then restores it, and an **Undo restore** button is offered right after. **File → Export settings** downloads a .wavwizbackup file and **File → Import settings…** reads one, with the same summary first. **Settings → General → Backup** (admin) exports and imports a file with a preview. Passwords, certificates and private keys are never included. Pairings are not in the backup either: after a restore onto a fresh install, pair each player again. Zones, names, EQ and delays reconnect by computer name (or the same speaker output) when that player is paired.
 
+### Audio inputs (server PC)
+
+The WavWiz Player on the server PC can play its own inputs to the house: Aux in (Turntable mode for a record player), S/PDIF in, microphones and **This PC · Speakers** (everything this PC plays). An administrator turns each one on in Settings → Devices → Audio inputs (rename, gain, Turntable). Then play it from Library → Inputs in the zone you control, or Everywhere.
+
+- **Gain:** -12 to +6 dB; microphones go up to +24 dB for quiet headset mics. A limiter keeps a boosted input from clipping.
+- **Microphone privacy:** if Windows' microphone privacy setting is set to Deny, the input says so. In the WavWiz Player, **Open microphone settings** opens the Windows page; turn on "Let desktop apps access your microphone". Any other problem shows the real error.
+- **Announce:** hold Announce in the Devices header (PC, phone, or the WavWiz Player window) and talk. The zone hears a chime and your voice; the music is ducked, never stopped.
+
+**This PC · Speakers: Real time or Sync with WavWiz**
+
+- **Real time:** the house hears this PC's sound as it plays. This PC keeps playing it on its own speakers at the Windows volume, so WavWiz does not play it a second time here.
+- **Sync with WavWiz:** while the input plays, Windows' default output moves to a spare output nobody listens to, and this PC hears its apps through WavWiz, in time with the other rooms. The spare defaults to **optical / S/PDIF**, then HDMI or DisplayPort, then another unused output (a headphone jack only if nothing is plugged in). A headset in use is never picked; you can choose any output yourself. Calls stay on your headset.
+- **Getting your speakers back:** Stop, closing the Player, signing out, and the next start after a crash put Windows' outputs back. If anything looks wrong, right-click the WavWiz Player tray icon → **Restore my speakers**. When Sync hands back, the speakers' Windows volume is turned down to the level you heard through WavWiz (never up).
+- **Stopping:** Stop asks first: **Pause PC audio & stop** presses Play/Pause on that PC (only if something is playing there) so YouTube or Spotify stop before the sound returns to the PC speakers; **Stop** just stops; tick **Don't show again** to keep your choice.
+
+### Dragging on a phone
+
+Hold a speaker row in Devices, or an album, song, station or other Library item, then move your finger to drag it. Holding still opens its menu instead. Drop a Library item on the mini player or Now Playing to play it now in the zone you control; drop it on the queue or a playlist to add it.
+
 ## 8. AirPlay tip (VPN / isolation)
 
 AirPlay discovery uses your **local** network (multicast / mDNS). Many **VPN** clients, “kill switches,” or “network isolation” modes hide LAN devices.
