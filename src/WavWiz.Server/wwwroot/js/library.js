@@ -16,8 +16,12 @@ let ripOk = false;
 export function setRipAllowed(auth, ua = navigator.userAgent) { ripOk = !!auth?.thisMachine && (auth?.serverOs ?? 'windows') === 'windows' && !/iPhone|iPad|iPod|Android|Mobile/i.test(ua); document.documentElement.dataset.rip = ripOk ? '1' : '0'; TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip' || ripOk); return ripOk; }
 export const ripAllowed = () => ripOk;
 export let TOOL_TABS = ALL_TOOL_TABS.filter(t => t[0] !== 'rip');
-export const EXTRA_TABS = new Set(['playlists', 'radio', 'rip', 'tags', 'cleanup']);
-export const LIB_SOURCES = ['local', 'remote', 'radio', 'playlists'];
+export const EXTRA_TABS = new Set(['playlists', 'radio', 'inputs', 'rip', 'tags', 'cleanup']);
+export const LIB_SOURCES = ['local', 'remote', 'radio', 'playlists', 'inputs'];
+/** 0.7.2: sources that are one page of their own (no categories, sort or tiles switch): Radio, Playlists and the server PC's audio inputs. */
+export const PAGE_SOURCES = new Set(['radio', 'playlists', 'inputs']);
+/** 0.7.2: the Inputs source tab shows only when the server PC's Player has inputs (most homes never see it). */
+export const showInputsTab = n => Number(n) > 0;
 export const LIB_SOURCE_KEY = 'wavwiz.libSource';
 export const LIB_RSID_KEY = 'wavwiz.libRsid';
 const LOCAL_CATS = new Set(['artists', 'albums', 'genres', 'years', 'recent', 'folders', 'favorites']);
@@ -206,10 +210,13 @@ export function libraryView(S, opts = {}) {
     if (had) { search.focus({ preventScroll: true }); try { search.setSelectionRange(a, b); } catch { /* type=search */ } }
   };
   const srcTabs = () => h('div', { class: 'tabs xtabs libsrc-tabs', role: 'tablist', 'aria-label': 'Library source' },
-    ...[['local', 'Local'], ['remote', 'Remote'], ['radio', 'Radio'], ['playlists', 'Playlists']].map(([k, l]) =>
+    ...[['local', 'Local'], ['remote', 'Remote'], ['radio', 'Radio'], ['playlists', 'Playlists'], ...(showInputsTab(inputsN) || st.source === 'inputs' ? [['inputs', 'Inputs']] : [])].map(([k, l]) =>
       h('button', { type: 'button', role: 'tab', 'data-src': k, class: st.source === k ? 'on' : '', 'aria-selected': String(st.source === k), onclick: () => setSource(k) }, l)));
 
   const extras = opts.extras || {};
+  // 0.7.2: how many audio inputs the server PC has (the Inputs source tab appears only then); refreshed when the list changes
+  let inputsN = 0;
+  const loadInputsN = async () => { try { const r = await api('/inputs'), n = (r?.inputs || []).length, ch = n !== inputsN; inputsN = n; return ch; } catch { return false; } };
   let RS = [];      // F174/F235/F239: /remote/servers rows — server chip on tools row when Remote + 2+ servers (never source tabs)
   const rsById = id => RS.find(x => x.id === id) || null;
   const loadRS = async () => { try { const r = await api('/remote/servers'), nx = r?.servers || [], sig = l => JSON.stringify(l.map(x => [x.id, x.label, !!x.lastError])), ch = sig(nx) !== sig(RS); RS = nx; return ch; } catch { return false; } };
@@ -225,6 +232,7 @@ export function libraryView(S, opts = {}) {
   else if (seedTab === 'remote') { seedSource = 'remote'; st.tab = 'artists'; }
   else if (seedTab === 'radio') { seedSource = 'radio'; st.tab = compact ? 'artists' : 'albums'; }
   else if (seedTab === 'playlists') { seedSource = 'playlists'; st.tab = compact ? 'artists' : 'albums'; }
+  else if (seedTab === 'inputs') { seedSource = 'inputs'; st.tab = compact ? 'artists' : 'albums'; }
   else if (!localStorage.getItem(LIB_SOURCE_KEY) && seedSource === 'local') { /* keep */ }
   st.source = seedSource; st.rsid = seedRsid; st.rmode = tabToRmode(st.tab);
   if (st.source === 'remote' && !REMOTE_CATS.has(st.tab)) { st.tab = 'artists'; st.rmode = 'artists'; }
@@ -245,7 +253,7 @@ export function libraryView(S, opts = {}) {
       st.rmode = tabToRmode(st.tab); saveTab();
     } else if (s === 'local') {
       if (!LOCAL_CATS.has(st.tab) && !TOOL_TABS.some(t => t[0] === st.tab)) { st.tab = compact ? 'artists' : 'albums'; saveTab(); }
-    } else { /* radio / playlists: leave last Local/Remote category prefs alone */ void prev; }
+    } else { /* radio / playlists / inputs: leave last Local/Remote category prefs alone */ void prev; }
     draw();
   };
   const tname = k => (TABS.find(t => t[0] === k) || TOOL_TABS.find(t => t[0] === k) || [k, k])[1];
@@ -293,7 +301,7 @@ export function libraryView(S, opts = {}) {
     return wrap;
   };
   const tabs = () => {
-    if (st.source === 'radio' || st.source === 'playlists') return h('div', { class: 'tabs libsrc-only', hidden: true });
+    if (PAGE_SOURCES.has(st.source)) return h('div', { class: 'tabs libsrc-only', hidden: true });
     const T = libTabs(expanded, st.source);
     if (compact && !expanded) return ctabRow(T);
     return h('div', { class: 'tabs' + (expanded ? ' xtabs' : ''), role: 'tablist' }, [...T.main, ...(T.row2 || [])].map(k => tabBtn(k)),
@@ -572,6 +580,7 @@ export function libraryView(S, opts = {}) {
     if (st.stack.length) return st.stack[st.stack.length - 1].kind;
     if (st.source === 'radio') return 'radio';
     if (st.source === 'playlists') return 'playlists';
+    if (st.source === 'inputs') return null;
     if (st.source === 'remote') return 'remote';
     if (EXTRA_TABS.has(st.tab)) return null;
     return st.tab;
@@ -581,7 +590,7 @@ export function libraryView(S, opts = {}) {
   function drawTools(kind) {
     // Phone adapters expose their own supported controls. Do not advertise
     // a Library sort/view/filter that cannot operate their station/playlist DOM.
-    if (phone && (st.source === 'radio' || st.source === 'playlists')) { tools.replaceChildren(); return; }
+    if ((phone && (st.source === 'radio' || st.source === 'playlists')) || st.source === 'inputs') { tools.replaceChildren(); return; }
     const kids = [];
     if (st.source === 'remote' && RS.length >= 2) {
       const cur = rsById(st.rsid) || RS[0];
@@ -617,9 +626,9 @@ export function libraryView(S, opts = {}) {
     root.classList.toggle('expanded', expanded); root.classList.toggle('compact', compact && !expanded); root.dataset.tiles = P.tileSize;
     root.dataset.source = st.source;
     srcSlot.replaceChildren(srcTabs());
-    const hideCats = st.source === 'radio' || st.source === 'playlists';
+    const hideCats = PAGE_SOURCES.has(st.source);
     head.hidden = phone && hideCats;
-    searchField.hidden = phone && hideCats;  // Radio keeps its real finder; Playlists its create/open tools
+    searchField.hidden = (phone && hideCats) || st.source === 'inputs';  // Radio keeps its real finder; Playlists its create/open tools; Inputs has nothing to search
     tabsSlot.hidden = hideCats; if (!hideCats) tabsSlot.replaceChildren(tabs()); else tabsSlot.replaceChildren();
     placeSearch();
     search.placeholder = searchPlaceholder(st.source);   // 0.6.9 #4: one wording per source, the same in the side panel and the Expanded view
@@ -629,7 +638,7 @@ export function libraryView(S, opts = {}) {
     content.replaceChildren(h('p', { class: 'dim' }, 'Loading…')); drawTools(pageKind());
     try {
       root.dataset.tab = st.tab;
-      const onExtra = (((st.source === 'radio' || st.source === 'playlists') && !st.stack.length) || (st.source === 'local' && EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length));
+      const onExtra = ((PAGE_SOURCES.has(st.source) && !st.stack.length) || (st.source === 'local' && EXTRA_TABS.has(st.tab) && !st.q && !st.stack.length));
       root.classList.toggle('extratab', onExtra);
       let nodes;
       if (st.q && !onResult()) {
@@ -637,6 +646,7 @@ export function libraryView(S, opts = {}) {
       } else if (st.stack.length) nodes = await st.stack[st.stack.length - 1].load();
       else if (st.source === 'radio') nodes = await extraPage('radio');
       else if (st.source === 'playlists') nodes = await extraPage('playlists');
+      else if (st.source === 'inputs') nodes = await extraPage('inputs');
       else if (st.source === 'remote') nodes = await remoteSourcePage();
       else nodes = await (rootPage[st.tab] || rootPage.artists)();
       if (my !== drawing) return;
@@ -652,12 +662,14 @@ export function libraryView(S, opts = {}) {
   window.addEventListener('wavwiz:libprefs', () => { const e = P.expanded; P = loadLibPrefs(); P.expanded = e; for (const k of Object.keys(session)) delete session[k]; draw(); });   // Settings > Library view
   window.addEventListener('wavwiz:favs', () => { if (st.tab === 'favorites' && !st.stack.length && !st.q && visible()) { clearTimeout(draw._f); draw._f = setTimeout(draw, 300); } });
   let rzT = 0; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (st.dirty && visible()) draw(); }, 150); });   // 0.6.8e: a pending redraw waits until the drag ends (150 ms after the last resize), never mid-drag
-  loadFavs(); draw(); loadRS().then(ch => { if (ch) draw(); });
+  // 0.7.2: an input plugged in / the server PC's Player opening or closing shows or hides the Inputs tab (and leaves it if it was open and is now empty)
+  window.addEventListener('wavwiz:inputs', () => { loadInputsN().then(ch => { if (!ch) return; if (st.source === 'inputs' && !showInputsTab(inputsN)) setSource('local'); else draw(); }); });
+  loadFavs(); draw(); loadRS().then(ch => { if (ch) draw(); }); loadInputsN().then(ch => { if (st.source === 'inputs' && !showInputsTab(inputsN)) setSource('local'); else if (ch) draw(); });   // saved on Inputs but they are gone
   return { el: root, reload: draw, get dirty() { return st.dirty; }, get expanded() { return expanded; },
     setExpanded(on) { expanded = !!on; P.expanded = expanded; if (!expanded && TOOL_TABS.some(t => t[0] === st.tab)) st.tab = 'artists'; save(); draw(); },
     /** 0.3.5 J9 / F235: open a category or source from a menu (Library > Playlists / Radio / tools). */
     showTab(k) {
-      if (k === 'radio' || k === 'playlists') { setSource(k); return; }
+      if (k === 'radio' || k === 'playlists' || k === 'inputs') { setSource(k); return; }
       if (k === 'remote') { setSource('remote'); return; }
       if (isRsTab(k)) { st.rsid = k.slice(3); saveRsid(); st.tab = 'artists'; st.rmode = 'artists'; saveTab(); if (st.source !== 'remote') setSource('remote'); else draw(); return; }
       if (TOOL_TABS.some(t => t[0] === k) || LOCAL_CATS.has(k)) { if (st.source !== 'local') { st.source = 'local'; saveSource(); } pick(k); return; }

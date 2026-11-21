@@ -6387,3 +6387,44 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .zt42 .zt42-v{min-width:64px;text-align:center}
 .zt42 .zt42-b{min-width:32px}
 .zt42 p{margin:0}
+
+/* 0.7.2 audio inputs: Library > Inputs tiles and Settings > Devices > Audio inputs */
+.inputsview{padding:4px 2px 12px}
+.inp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.inp-tile{display:flex;flex-direction:column;gap:8px;margin:0;min-width:0}
+.inp-tile.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.inp-tile.off{opacity:.78}
+.inp-top,.inp-sethead{display:flex;align-items:center;gap:10px;min-width:0}
+.inp-txt{display:flex;flex-direction:column;min-width:0}
+.inp-ic{flex:none;display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:50%;background:var(--panel2);color:var(--accent-text,var(--accent));border:1px solid var(--line)}
+.inp-ic svg{width:22px;height:22px}
+.inp-tile.playing .inp-ic[data-ic=vinyl] svg{animation:inp-spin 1.8s linear infinite}
+@keyframes inp-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.inp-tile.playing .inp-ic[data-ic=vinyl] svg{animation:none}}
+.inp-badges{display:flex;flex-wrap:wrap;gap:4px;min-height:0}
+.inp-badges:empty{display:none}
+.inp-badges .pill.ok,.inp-sethead .pill.ok{color:var(--accent-text,var(--accent));border-color:var(--accent)}
+.inp-meter{height:6px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.inp-fill{display:block;height:100%;width:0;background:var(--accent);transition:width .12s linear}
+.inp-acts{gap:8px;margin-top:auto;flex-wrap:wrap}
+.inp-tile p{margin:0}
+.inp-setlist{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.inp-setrow{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.inp-setrow:first-child{border-top:0}
+.inp-sethead input[type=text]{width:100%;max-width:280px}
+.inp-setctl{gap:8px 18px;align-items:center}
+.inp-sw{gap:6px;align-items:center}
+.inp-gain{gap:8px;align-items:center}
+.inp-gain input[type=range]{width:140px}
+.inp-gv{min-width:4.5em}
+.inp-setrow p{margin:0}
+html.handset .inp-grid{grid-template-columns:1fr;gap:10px}
+html.handset .inp-gain input[type=range]{width:100%;min-width:120px;flex:1}
+html.handset .inp-gain{flex:1 1 100%}
+html.handset .inp-sw{flex-wrap:wrap}
+html.handset .inp-sw > .small{flex-basis:100%;padding-left:28px}
+/* 0.7.2: with the fifth source tab (Inputs, only when the server PC has inputs) the side panel's source row stays one line: tighter tabs, and it
+   scrolls sideways rather than wrapping if the panel is narrower still. Homes without inputs keep the 0.7.1 row unchanged. */
+.lib .libsrc-tabs.xtabs:has(> button[data-src=inputs]){flex-wrap:nowrap;gap:0;overflow-x:auto;scrollbar-width:none}
+.lib .libsrc-tabs.xtabs:has(> button[data-src=inputs])::-webkit-scrollbar{display:none}
+.lib .libsrc-tabs.xtabs:has(> button[data-src=inputs]) > button{flex:none;padding-left:7px;padding-right:7px}

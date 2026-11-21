@@ -9,7 +9,7 @@ namespace WavWiz.Player;
 internal sealed class PlayerApp : ApplicationContext
 {
     private readonly PlayerSettings _s; private readonly DpapiSecretStore _secrets = new(); private readonly StopwatchClock _clock = new();
-    private readonly WasapiOutputProvider _outputs; private readonly WasapiMicProvider _mics; private PlayerClient? _client; private readonly NotifyIcon _tray; private readonly ContextMenuStrip _menu = new();
+    private readonly WasapiOutputProvider _outputs; private readonly WasapiMicProvider _mics; private readonly WasapiInputProvider _inputs; private System.Threading.Timer? _inputPoll; private string _inputSig = ""; private PlayerClient? _client; private readonly NotifyIcon _tray; private readonly ContextMenuStrip _menu = new();
     private readonly CancellationTokenSource _cts = new(); private WebUiForm? _web; private readonly SynchronizationContext _ui = SynchronizationContext.Current ?? new SynchronizationContext();
     private readonly string _logPath = Path.Combine(PlayerSettings.Dir, "logs", "player.log");
 
@@ -28,6 +28,7 @@ internal sealed class PlayerApp : ApplicationContext
         if (_s.UiScale != UiScale.Auto) { Log($"tray Display size {_s.UiScale}% retired -> Auto (Settings > Appearance has the size now)"); _s.UiScale = UiScale.Auto; _s.Save(); }
         _outputs = new WasapiOutputProvider(_clock);
         _mics = new WasapiMicProvider(_clock);        // 0.2.5 PC-mic calibration (native WASAPI capture)
+        _inputs = new WasapiInputProvider(Log);       // 0.7.2 audio inputs (Aux / S/PDIF in, mics, this PC's sound) - captured only when the server asks
         _tray = new NotifyIcon { Icon = MakeIcon(), Text = Tip("Starting"), ContextMenuStrip = _menu, Visible = true };
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) OpenUi(); };
         _menu.Opening += (_, _) => BuildMenu();
@@ -116,12 +117,18 @@ internal sealed class PlayerApp : ApplicationContext
             _client = new PlayerClient(new PlayerClientOptions
             {
                 Host = _s.ServerHost, HostProvider = () => _s.ServerHost, AudioPort = _s.AudioPort, PlayerId = _s.PlayerId, Name = _s.Name, LinkType = _s.ResolveLinkType(), Token = () => _secrets.Load("token"),
-                Clock = _clock, Outputs = _outputs, Mics = _mics, CacheFile = Path.Combine(PlayerSettings.Dir, "zone-cache.json"),
+                Clock = _clock, Outputs = _outputs, Mics = _mics, Inputs = _inputs, CacheFile = Path.Combine(PlayerSettings.Dir, "zone-cache.json"),
             });
             _client.Log += Log;
             _client.StateChanged += st => _ui.Post(_ => OnState(st), null);
             _client.ServerUnreachable += n => { Log($"server unreachable ({n} attempts); looking for it on the network"); _ = RefindAsync(); };
             _outputs.DevicesChanged += () => { try { _ = _client?.SendOutputsAsync("devices"); } catch { } };
+            // 0.7.2: the echo guard needs WavWiz's own active output; plugging in / removing a capture device re-sends the list (checked every 5 s)
+            _inputs.ActiveOutput = () => _client?.ListOutputs().FirstOrDefault(o => o.Active)?.EndpointId;
+            _inputPoll = new System.Threading.Timer(_ =>
+            {
+                try { var sig = string.Join("|", _inputs.List().Select(i => i.Id + "=" + i.Name)); if (sig != _inputSig) { bool first = _inputSig.Length == 0; _inputSig = sig; if (!first) _ = _client?.SendOutputsAsync("devices"); } } catch { }
+            }, null, 5000, 5000);
             _ = Task.Run(() => _client.RunAsync(_cts.Token));
             if (_showWindow) _ui.Post(_ => OpenUi(), null);       // 0.2.2 T7: a Start menu / desktop launch opens the window
         }
@@ -249,7 +256,7 @@ internal sealed class PlayerApp : ApplicationContext
     }
 
     private bool _exiting;
-    private void ExitApp() { if (_exiting) return; _exiting = true; try { _media?.Dispose(); } catch { } try { _mini?.Close(); } catch { } try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); ExitThread(); }
+    private void ExitApp() { if (_exiting) return; _exiting = true; try { _media?.Dispose(); } catch { } try { _mini?.Close(); } catch { } try { _web?.Close(); } catch { } _cts.Cancel(); _tray.Visible = false; try { _client?.DisposeAsync().AsTask().Wait(1500); } catch { } _outputs.Dispose(); try { _inputPoll?.Dispose(); _inputs.Dispose(); } catch { } ExitThread(); }
 
     /// <summary>The final WavWiz logo (embedded multi-size .ico); Windows picks the size that fits the tray.</summary>
     private static Icon MakeIcon()

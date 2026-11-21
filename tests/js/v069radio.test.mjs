@@ -29,7 +29,8 @@ test('#20 every station tile / row (My stations + finder) uses the clamped name 
 });
 test('#20 CSS: name 2 lines, subtitle 1 line with …, even tile rows, one compact list-row height (playing too); Radio only', () => {
   const c = css(), at = c.indexOf('0.6.9 #20'); assert.ok(at > c.indexOf('0.6.9 Library (#1'), 'comes after the 0.6.9 #2 no-truncation rule so it wins');
-  const r = c.slice(at);
+  // the #20 block runs until the next release block comment ("/* ---- …" or "/* 0.x …"); later releases' own rules are not Radio rules (0.7.2)
+  const tail = c.slice(at + 10), nxt = tail.search(/\n\/\* (?:----|\d+\.\d+)/), r = c.slice(at, nxt < 0 ? undefined : at + 10 + nxt);
   assert.match(r, /\.radiotab2 \.tile \.t1\.ell\.rad-t1[^{]*\{\s*display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;[^}]*overflow:hidden;[^}]*text-overflow:ellipsis/);
   assert.match(r, /\.radiotab2 \.tile \.t2\.ell\.rad-t2[^{]*\{\s*display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis/);
   assert.match(r, /\.radiotab2 \.tile \.t1\.ell\.rad-t1\{min-height:2\.5em\}/, 'every tile reserves 2 name lines, so rows line up');

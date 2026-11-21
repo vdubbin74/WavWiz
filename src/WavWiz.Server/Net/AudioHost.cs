@@ -23,6 +23,10 @@ public sealed class PlayerSession : IStreamSubscriber
     public volatile OutputInfo[] Outputs = Array.Empty<OutputInfo>();
     /// <summary>0.2.5: this player's microphones (PC-mic calibration); empty for web speakers and 0.2.4-and-older players.</summary>
     public volatile MicInfo[] Mics = Array.Empty<MicInfo>();
+    /// <summary>0.7.2: this player's audio inputs (Aux in, S/PDIF in, mics, loopback); empty for web speakers and 0.7.1-and-older players.</summary>
+    public volatile InputInfo[] Inputs = Array.Empty<InputInfo>();
+    /// <summary>0.7.2: the player listed "inputs" in its Hello, so it understands INPUT_CMD (never sent to older players: they would drop the link).</summary>
+    public bool SpeaksInputs => !IsWeb && Hello.Caps?.Contains(Wire.CapInputs) == true;
     public volatile bool Dead;
     public bool IsWeb { get; init; }
     /// <summary>0.2.0: the browser session (api_token id) that opened this web speaker; null for Windows players.</summary>
@@ -59,6 +63,9 @@ public sealed class AudioHost : IAsyncDisposable
     private readonly ConcurrentDictionary<string, PlayerSession> _sessions = new();
     public Func<PlayerSession, Task>? OnConnected; public Action<PlayerSession>? OnDisconnected;
     public Action<PlayerSession, OutputsMsg>? OnOutputs; public Action<PlayerSession, CalResult>? OnCalResult; public Action<PlayerSession, PlayerStatus>? OnStatus;
+    /// <summary>0.7.2 audio inputs: a player's input list changed (it came with an Outputs message), captured audio arrived, a player went away.
+    /// Separate from OnOutputs / OnDisconnected (owned by ZoneManager) so the input service can listen without touching zones.</summary>
+    public Action<PlayerSession, string?>? OnInputsListed; public Action<PlayerSession, string, int, int, float[]>? OnInputAudio; public Action<PlayerSession>? OnInputsGone;
     public Action<string>? Log;
     /// <summary>0.4.9 F77: Settings > Playback > Streaming quality (48000 or 96000).</summary>
     public Func<int> StreamRate { get; set; } = () => Wire.SampleRate;
@@ -123,7 +130,7 @@ public sealed class AudioHost : IAsyncDisposable
                 Log?.Invoke($"player {hello.PlayerId} from {remote} refused (bad token)"); return;
             }
             sess = new PlayerSession(hello, remote) { IsWeb = webUser != null, OwnerTokenId = webUser?.TokenId };
-            if (_sessions.TryRemove(sess.Id, out var old)) { old.EndReason = "replaced by a newer connection from the same player (the old one had silently died)"; old.Close(); try { OnDisconnected?.Invoke(old); } catch { } }           // a reconnect replaces the stale session
+            if (_sessions.TryRemove(sess.Id, out var old)) { old.EndReason = "replaced by a newer connection from the same player (the old one had silently died)"; old.Close(); try { OnDisconnected?.Invoke(old); } catch { } try { OnInputsGone?.Invoke(old); } catch { } }           // a reconnect replaces the stale session
             _sessions[sess.Id] = sess;
             string clockKey = "";
             if (webUser == null)
@@ -132,7 +139,8 @@ public sealed class AudioHost : IAsyncDisposable
                 _clockHost.Register(clockSession, key); clockKey = Convert.ToBase64String(key);
             }
             var welcome = new Welcome(Guid.NewGuid().ToString("N")[..12], "pcm24", Math.Min(sess.MaxRate, SafeRate()), Wire.Channels, 24, Wire.FrameSamplesAt(Math.Min(sess.MaxRate, SafeRate())), _clock.NowUs, sess.BufferDepthMs,
-                WavWizInfo.Version, WavWizInfo.Channel, clockSession, clockKey, webUser != null ? 0 : (_clockHost.Port != 0 ? _clockHost.Port : _cfg.ClockPort));
+                WavWizInfo.Version, WavWizInfo.Channel, clockSession, clockKey, webUser != null ? 0 : (_clockHost.Port != 0 ? _clockHost.Port : _cfg.ClockPort),
+                webUser != null ? null : new[] { Wire.CapInputs });   // 0.7.2: a Windows Player may offer its audio inputs
             await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Welcome, 0, welcome), CancellationToken.None);
             Log?.Invoke($"player {sess.Id} ({hello.Name}) connected from {remote}, link {hello.LinkType}{(sess.IsWeb ? ", web page" : "")}");
             if (OnConnected != null) await OnConnected(sess);
@@ -157,7 +165,11 @@ public sealed class AudioHost : IAsyncDisposable
                     switch (mh.Type)
                     {
                         case MsgType.PlayerStatus: { var st = Wire.DecodeJson<PlayerStatus>(mp); if (st != null) { sess.Status = st; sess.StatusAt = DateTime.UtcNow; OnStatus?.Invoke(sess, st); } break; }
-                        case MsgType.Outputs: { var o = Wire.DecodeJson<OutputsMsg>(mp); if (o != null) { sess.Outputs = o.Outputs; if (o.Mics != null) sess.Mics = o.Mics; OnOutputs?.Invoke(sess, o); } break; }
+                        case MsgType.Outputs: { var o = Wire.DecodeJson<OutputsMsg>(mp); if (o != null) { sess.Outputs = o.Outputs; if (o.Mics != null) sess.Mics = o.Mics; OnOutputs?.Invoke(sess, o);
+                                if (o.Inputs != null && !sess.IsWeb) { sess.Inputs = o.Inputs; try { OnInputsListed?.Invoke(sess, o.Reason); } catch (Exception ie) { Log?.Invoke("inputs: " + ie.Message); } } } break; }
+                        case MsgType.InputAudio:   // 0.7.2: only a player that asked to speak inputs; anything malformed is dropped (never ends the link)
+                            if (sess.SpeaksInputs && Wire.TryDecodeInputAudio(mp, out var inId, out var inRate, out var inCh, out _, out var inPcm, out _)) { try { OnInputAudio?.Invoke(sess, inId, inRate, inCh, inPcm); } catch { } }
+                            break;
                         case MsgType.CalResult: { var r = Wire.DecodeJson<CalResult>(mp); if (r != null) OnCalResult?.Invoke(sess, r); break; }
                         case MsgType.Bye: endReason = "the player said goodbye (closed or switched off)"; return;
                     }
@@ -176,7 +188,7 @@ public sealed class AudioHost : IAsyncDisposable
             if (sess != null)
             {
                 sess.EndReason ??= endReason;
-                if (_sessions.TryGetValue(sess.Id, out var cur) && ReferenceEquals(cur, sess)) { _sessions.TryRemove(sess.Id, out _); OnDisconnected?.Invoke(sess); Log?.Invoke($"player {sess.Id} disconnected: {sess.EndReason}"); }
+                if (_sessions.TryGetValue(sess.Id, out var cur) && ReferenceEquals(cur, sess)) { _sessions.TryRemove(sess.Id, out _); OnDisconnected?.Invoke(sess); try { OnInputsGone?.Invoke(sess); } catch { } Log?.Invoke($"player {sess.Id} disconnected: {sess.EndReason}"); }
             }
         }
     }

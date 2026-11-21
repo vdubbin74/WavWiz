@@ -26,7 +26,7 @@ public static class HealthApi
             if (live == null || !ReferenceEquals(live, sub) || live.Dead) list.Add(new("stream", sub.Id, sub is Net.PlayerSession ps ? Name(ps) : sub.Id, "the house stream is still sending to a player that has gone"));
         }
         if (s.AirPlay is { StaleSession: true }) list.Add(new("airplay", "airplay", "AirPlay", "a phone's AirPlay session is still open but no audio for over a minute"));
-        if (s.Conductor.StaleLiveKind() is { } k && !(k == "airplay" && s.AirPlay is { StaleSession: true })) list.Add(new("live", k, k == "airplay" ? "AirPlay" : "Spotify", "Now Playing still shows the phone, but it stopped sending over a minute ago"));
+        if (s.Conductor.StaleLiveKind() is { } k && !(k == "airplay" && s.AirPlay is { StaleSession: true })) list.Add(new("live", k, k == "airplay" ? "AirPlay" : k == "input" ? "Audio input" : "Spotify", "Now Playing still shows the phone, but it stopped sending over a minute ago"));
         return list;
     }
 

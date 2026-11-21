@@ -18,6 +18,7 @@ import { isPhoneUa } from './phonejoin.js';
 import { canPickNative, pickFolder } from './folderpick.js';   // 0.6.9 #6
 import { phoneRole } from './calmic-core.js';
 import { historyCard, lastFmCard } from './history.js';
+import { inputsCard } from './inputs.js';   // 0.7.2 audio inputs
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -163,6 +164,7 @@ export async function openSettings(S, refresh, nav, section) {
         num('bt.defaultLatencyMs', 'Bluetooth speaker (typical)', 200), num('wired.defaultLatencyMs', 'Wired / HDMI / built-in', 0)));
     }
 
+    players.push(inputsCard(S, { admin }));   // 0.7.2: Devices > Players & access > Audio inputs (the server PC's Aux / S/PDIF in, mics, this PC's sound)
     panes.general.push(backupCard(S, { admin, done: () => draw() }));
     panes.jukebox.push(jukeboxPane(S, settings, { admin, put: putSettings }));
     panes.devices.push(h('nav', { class: 'appnav subtabs devsub', role: 'tablist', 'aria-label': 'Devices sections' }, [['players', 'Players & access'], ['calibration', 'Calibration']].map(([k, t]) => h('button', { type: 'button', role: 'tab', 'data-sub': k, 'aria-selected': String(devSub === k), class: devSub === k ? 'on' : '', onclick: () => { devSub = k; paint(); } }, t))),

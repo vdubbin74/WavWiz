@@ -6,6 +6,10 @@ public enum MsgType : byte
 {
     Hello = 1, Welcome = 2, Audio = 3, Epoch = 4, StopAt = 5, ZoneUpdate = 6, PlayerStatus = 7,
     CalCmd = 8, CalResult = 9, Bye = 10, Outputs = 11, DspConfig = 12,
+    // 0.7.2 audio inputs. Only ever sent to a peer that listed "inputs" in its Hello / Welcome Caps: a 0.7.1-or-older peer would refuse an
+    // unknown type and drop the connection, so they never see these.
+    InputAudio = 13,   // player -> server: captured PCM of one input (binary, see EncodeInputAudio)
+    InputCmd = 14,     // server -> player: start / stop capturing an input (JSON InputCmd)
 }
 
 public readonly record struct Header(byte Version, MsgType Type, ushort Flags, uint Seq, uint PayloadLen);
@@ -23,6 +27,10 @@ public static class Wire
     public const uint Magic = 0x5A57_5657; // bytes 'W','V','W','Z' little-endian
     public const byte ProtocolVersion = 1;
     public const int HeaderSize = 16;
+    /// <summary>Highest message type this build understands (0.7.2: 14).</summary>
+    public const byte MaxType = (byte)MsgType.InputCmd;
+    /// <summary>0.7.2: the capability a player and the server list in Hello / Welcome Caps when they speak the audio-input messages.</summary>
+    public const string CapInputs = "inputs";
     public const uint MaxPayload = 1 << 20; // 1 MiB: refuse absurd lengths from a confused or hostile peer
     /// <summary>The base rate: calibration, test sounds and every pre-0.4.9 player. 0.4.9 F77: the house stream may run at <see cref="MaxStreamRate"/>
     /// instead (Settings > Playback > Streaming quality); frames stay 20 ms long, so a frame has <see cref="FrameSamplesAt"/> samples.</summary>
@@ -52,7 +60,7 @@ public static class Wire
         byte ver = src[4];
         if (ver != ProtocolVersion) { error = $"unsupported protocol version {ver}"; return false; }
         byte type = src[5];
-        if (type is < 1 or > 12) { error = $"unknown message type {type}"; return false; }
+        if (type is < 1 or > MaxType) { error = $"unknown message type {type}"; return false; }
         uint len = BinaryPrimitives.ReadUInt32LittleEndian(src[12..]);
         if (len > MaxPayload) { error = $"payload too large ({len})"; return false; }
         header = new Header(ver, (MsgType)type, BinaryPrimitives.ReadUInt16LittleEndian(src[6..]), BinaryPrimitives.ReadUInt32LittleEndian(src[8..]), len);
@@ -156,6 +164,44 @@ public static class Wire
     public static bool TryDecodeStopAt(ReadOnlySpan<byte> p, out uint epoch, out long atUs)
         => TryDecodeEpoch(p, out epoch, out atUs);
 
+    // ---- 0.7.2 INPUT_AUDIO: u8 idLen | id (UTF-8) | u32 rate | u8 channels (1 or 2) | i64 serverUs of the first frame (0 = unknown) | pcm24 interleaved ----
+    public const int MaxInputIdLength = 200;
+    public static byte[] EncodeInputAudio(uint seq, string inputId, int rate, int channels, long serverUs, ReadOnlySpan<float> interleaved)
+    {
+        var id = System.Text.Encoding.UTF8.GetBytes(inputId);
+        if (id.Length is 0 or > MaxInputIdLength) throw new ArgumentException("input id must be 1-200 bytes", nameof(inputId));
+        if (channels is not (1 or 2)) throw new ArgumentException("1 or 2 channels", nameof(channels));
+        int payload = 1 + id.Length + 4 + 1 + 8 + interleaved.Length * 3;
+        var buf = new byte[HeaderSize + payload];
+        WriteHeader(buf, MsgType.InputAudio, seq, (uint)payload);
+        int o = HeaderSize; buf[o++] = (byte)id.Length; id.CopyTo(buf.AsSpan(o)); o += id.Length;
+        BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(o), (uint)rate); o += 4;
+        buf[o++] = (byte)channels;
+        BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(o), serverUs); o += 8;
+        FloatToPcm24(interleaved, buf.AsSpan(o));
+        return buf;
+    }
+
+    /// <summary>Decodes an INPUT_AUDIO payload. Rejects a bad id, a rate outside 8-192 kHz, other channel counts and a torn sample.</summary>
+    public static bool TryDecodeInputAudio(ReadOnlySpan<byte> p, out string inputId, out int rate, out int channels, out long serverUs, out float[] samples, out string? error)
+    {
+        inputId = ""; rate = 0; channels = 0; serverUs = 0; samples = Array.Empty<float>(); error = null;
+        if (p.Length < 1) { error = "short INPUT_AUDIO payload"; return false; }
+        int idLen = p[0];
+        if (idLen == 0 || p.Length < 1 + idLen + 13) { error = "short INPUT_AUDIO payload"; return false; }
+        inputId = System.Text.Encoding.UTF8.GetString(p.Slice(1, idLen)); int o = 1 + idLen;
+        rate = (int)BinaryPrimitives.ReadUInt32LittleEndian(p[o..]); o += 4;
+        channels = p[o++];
+        serverUs = BinaryPrimitives.ReadInt64LittleEndian(p[o..]); o += 8;
+        if (rate is < 8000 or > 192000) { error = "INPUT_AUDIO rate out of range"; return false; }
+        if (channels is not (1 or 2)) { error = "INPUT_AUDIO channels must be 1 or 2"; return false; }
+        int bytes = p.Length - o;
+        if (bytes % (3 * channels) != 0) { error = "INPUT_AUDIO length is not whole frames"; return false; }
+        samples = new float[bytes / 3];
+        Pcm24ToFloat(p[o..], samples);
+        return true;
+    }
+
     // ---- JSON control messages ----
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -172,9 +218,11 @@ public static class Wire
 }
 
 // ---- JSON message bodies (shape is the contract; fields only get added, never repurposed) ----
-public sealed record Hello(string PlayerId, string? DeviceToken, string AppVersion, string[] Codecs, int MaxRate, string LinkType /* ethernet|wifi|unknown */, string Name = "", string MachineName = "");
+public sealed record Hello(string PlayerId, string? DeviceToken, string AppVersion, string[] Codecs, int MaxRate, string LinkType /* ethernet|wifi|unknown */, string Name = "", string MachineName = "",
+    string[]? Caps = null /* 0.7.2: optional features this player speaks, e.g. "inputs" (null from older players) */);
 public sealed record Welcome(string StreamId, string Codec, int SampleRate, int Channels, int BitDepth, int FrameSamples, long ServerTimeUs, int BufferMs,
-    string ServerVersion, string Channel, uint ClockSessionId = 0, string ClockKey = "", int ClockPort = 47802);
+    string ServerVersion, string Channel, uint ClockSessionId = 0, string ClockKey = "", int ClockPort = 47802,
+    string[]? Caps = null /* 0.7.2: optional features this server speaks, e.g. "inputs" (null from older servers) */);
 public sealed record ZoneUpdate(double Volume, bool Muted, bool Enabled, string? ActiveOutputId, double LatencyMs, string LatencySource /* measured|estimated|manual|default-guess|none */,
     long? DspRevision, bool NotCalibrated = false, bool RecheckDue = false);
 public sealed record PlayerStatus(double BufferMs, double ClockOffsetUs, double ClockSkewPpm, long RttUs, double SyncErrorMs, double RatioPpm, int Underruns, int HardResyncs,
@@ -183,7 +231,14 @@ public sealed record Bye(string Reason);
 /// <summary>kind = hdmi|spdif|bluetooth|analog|usb|other.</summary>
 public sealed record OutputInfo(string EndpointId, string Name, string Kind, string? BtAddress, bool Connected, bool Active, double? WinLatencyMs = null, string? Codec = null, string? ContainerId = null);
 /// <summary>0.2.5: Mics = this PC's capture endpoints (null from 0.2.4 and older players).</summary>
-public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null, MicInfo[]? Mics = null);
+/// <summary>0.7.2: Inputs = this PC's audio inputs (Aux in, S/PDIF in, mics / headsets, "what this PC is playing"); null from 0.7.1-and-older players.</summary>
+public sealed record OutputsMsg(OutputInfo[] Outputs, string? Reason = null, MicInfo[]? Mics = null, InputInfo[]? Inputs = null);
+/// <summary>0.7.2: one audio input on a Player PC. Kind = aux|spdif|mic|loopback. Id is stable across restarts (the WASAPI endpoint id; "loopback:process"
+/// for "everything this PC plays except WavWiz"). Loopback Note says how the echo guard works on this PC (process exclude, or not available).</summary>
+public sealed record InputInfo(string Id, string Name, string Kind, bool Bluetooth = false, bool Default = false, string? Note = null);
+/// <summary>0.7.2: start / stop capturing an input. Action = start|stop|stop-all. The player sends the audio back as INPUT_AUDIO; a start that fails
+/// comes back as an Outputs message whose Reason starts with "input-error:".</summary>
+public sealed record InputCmd(string Action, string? InputId = null);
 /// <summary>0.2.5: a microphone (WASAPI capture endpoint) on a Player PC. kind = usb|analog|builtin|interface|bluetooth|other; Bluetooth mics are allowed but flagged
 /// (Windows switches a Bluetooth headset to its hands-free mode, which adds its own unknown delay).</summary>
 public sealed record MicInfo(string Id, string Name, string Kind, bool Bluetooth, bool Default = false);

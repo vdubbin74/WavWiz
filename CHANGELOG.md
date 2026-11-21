@@ -14,6 +14,7 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ### Added
 - AirPlay and Spotify Connect: a limiter after the 0 to +6 dB boost (setting `live.limiter`, on by default) so boosted loud tracks do not clip. It is the same zero-lookahead limiter each speaker's DSP already ends with, now a shared component that audio inputs will also use.
+- Audio inputs (M1, server PC): WavWiz Player on the server PC offers its Aux in, S/PDIF in, microphones / headset mics and "This PC · Speakers" (Windows 10 2004+ process loopback that excludes WavWiz's own sound; on older Windows a whole-device loopback that is refused when WavWiz plays through the same speakers). Library > Inputs shows a tile per input with a live meter and Playing / Muted / Turntable badges (the tab appears only when there are inputs); Settings > Devices > Audio inputs lets an administrator turn each one on, rename it, set gain (-12 to +6 dB), turn on Turntable mode with needle-drop auto-start (stops 25 s after the side ends) and a phono-preamp warning, and let a microphone be a live source (otherwise it is Announce only and starts muted). Playing an input works like AirPlay: the zone's queue is set aside and comes back paused on Stop. Inputs go through the same live limiter. New audio-link messages (INPUT_AUDIO 13, INPUT_CMD 14) are only used when both sides announce the `inputs` capability, so older players and servers are unaffected. The Windows capture is compiled against NAudio.Wasapi 3.1.0 and not yet tried on a real PC.
 
 ## [0.7.1] - 2026-11-14 (beta)
 

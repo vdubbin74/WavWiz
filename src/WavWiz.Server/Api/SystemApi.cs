@@ -88,7 +88,7 @@ public static class SystemApi
             if (b.TryGetProperty("airplay.levelDb", out var apLv) && apLv.ValueKind == JsonValueKind.Number) s.AirPlay?.SetLevelDb(apLv.GetDouble());
             if (b.TryGetProperty("spotify.levelDb", out var spLv) && spLv.ValueKind == JsonValueKind.Number) s.Spotify?.SetLevelDb(spLv.GetDouble());
             if (b.TryGetProperty("airplay.levelDb", out _) || b.TryGetProperty("spotify.levelDb", out _)) s.ZoneRecv?.ApplyLevels();   // 0.7.1 t2075: each zone's own name too, live
-            if (b.TryGetProperty(Media.LiveLimiter.SettingKey, out _)) { s.AirPlay?.ApplyLevelGain(); s.Spotify?.ApplyLevelGain(); s.ZoneRecv?.ApplyLevels(); }   // 0.7.2: limiter on/off, live
+            if (b.TryGetProperty(Media.LiveLimiter.SettingKey, out _)) { s.AirPlay?.ApplyLevelGain(); s.Spotify?.ApplyLevelGain(); s.ZoneRecv?.ApplyLevels(); s.Inputs?.ApplyLevels(); }   // 0.7.2: limiter on/off, live
             s.Events.Publish("settings"); foreach (var z in s.Zones.Zones()) if (s.Audio.Get(z.PlayerId) is { } ps) s.Zones.PushZone(ps);
             return Results.Json(new { ok = true });
         }).Req(Role.Admin);

@@ -21,6 +21,8 @@ public sealed class PlayerClientOptions
     public required IOutputProvider Outputs { get; init; }
     /// <summary>0.2.5: this PC's microphones for PC-mic calibration (none when null).</summary>
     public IMicProvider? Mics { get; init; }
+    /// <summary>0.7.2: this PC's audio inputs (Aux in, S/PDIF in, mics, loopback). Null = none, and the player does not offer the "inputs" capability.</summary>
+    public IInputProvider? Inputs { get; init; }
     public string? CacheFile { get; init; }
     /// <summary>When set, asked for the server address before every connection attempt (so a changed address found by discovery is used at once).</summary>
     public Func<string>? HostProvider { get; init; }
@@ -70,7 +72,16 @@ public sealed class PlayerClient : IAsyncDisposable
         _state = new PlayerState(false, "Starting", null, 0, "none", false, false, 100, false, true, "", null);
         LoadCache();
         _mic = new MicResponder(o.Mics ?? new NoMicProvider(), _clock, SendCalAsync, Say);
+        _in = new InputResponder(o.Inputs ?? new NoInputProvider(), _clock, o.Clock, SendRawAsync, why => SendOutputsAsync(why), Say);
     }
+    private readonly InputResponder _in;
+    /// <summary>0.7.2: the server said it speaks audio inputs (Welcome Caps). Only then are inputs listed and INPUT_AUDIO sent.</summary>
+    private volatile bool _serverInputs;
+    /// <summary>0.7.2: this PC's audio inputs (sent to a 0.7.2+ server with the outputs).</summary>
+    public IReadOnlyList<InputInfo> ListInputs() => _in.SafeList();
+    /// <summary>0.7.2: inputs being captured right now (tests, Diagnostics).</summary>
+    public IReadOnlyCollection<string> RunningInputs => _in.Running;
+    private Task SendRawAsync(byte[] msg) { var tcp = _tcp; if (tcp == null || !tcp.Connected || !_serverInputs) return Task.CompletedTask; return SafeSend(tcp, msg); }
     private readonly MicResponder _mic;
     /// <summary>0.2.5: this PC's microphones (sent to the server with the outputs).</summary>
     public IReadOnlyList<MicInfo> ListMics() => _mic.SafeList();
@@ -184,12 +195,14 @@ public sealed class PlayerClient : IAsyncDisposable
         try { tcp.Client.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.KeepAlive, true); } catch { }
         _tcp = tcp;
         var net = tcp.GetStream();
-        await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Hello, 0, new Hello(_o.PlayerId, _o.Token(), WavWizInfo.Version, new[] { "pcm24" }, _helloRate = OfferedRate(_engine.OutputRate), _o.LinkType, _o.Name, Environment.MachineName)), ct);
+        await FrameIO.WriteAsync(net, Wire.EncodeJson(MsgType.Hello, 0, new Hello(_o.PlayerId, _o.Token(), WavWizInfo.Version, new[] { "pcm24" }, _helloRate = OfferedRate(_engine.OutputRate), _o.LinkType, _o.Name, Environment.MachineName,
+            _o.Inputs != null ? new[] { Wire.CapInputs } : null)), ct);
         using var hsCts = CancellationTokenSource.CreateLinkedTokenSource(ct); hsCts.CancelAfter(_o.ConnectTimeoutMs);
         var (h, p) = await FrameIO.ReadAsync(net, hsCts.Token);
         if (h.Type == MsgType.Bye) throw new InvalidOperationException("server refused: " + Wire.DecodeJson<Bye>(p)?.Reason);
         if (h.Type != MsgType.Welcome) throw new InvalidDataException("expected WELCOME");
         var w = Wire.DecodeJson<Welcome>(p)!;
+        _serverInputs = _o.Inputs != null && w.Caps?.Contains(Wire.CapInputs) == true;   // 0.7.2: an older server never hears about inputs
         var key = Convert.FromBase64String(w.ClockKey);
         _clock.Reset(keepSkew: true);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -207,7 +220,7 @@ public sealed class PlayerClient : IAsyncDisposable
         var done = await Task.WhenAny(tasks);
         cts.Cancel();
         try { await done; } catch (OperationCanceledException) { }
-        _tcp = null;
+        _tcp = null; _serverInputs = false; _in.StopAll();   // 0.7.2: no capture keeps running without a server to send it to
         if (done.IsFaulted) throw done.Exception!.GetBaseException();
         throw new IOException("server closed the connection");
     }
@@ -243,6 +256,7 @@ public sealed class PlayerClient : IAsyncDisposable
                 case MsgType.ZoneUpdate: ApplyZone(Wire.DecodeJson<ZoneUpdate>(p)!, fromCache: false); break;
                 case MsgType.DspConfig: ApplyDsp(Wire.DecodeJson<DspConfig>(p)!); break;
                 case MsgType.CalCmd: HandleCal(Wire.DecodeJson<CalCmd>(p)!); break;
+                case MsgType.InputCmd: if (_serverInputs && Wire.DecodeJson<InputCmd>(p) is { } ic) _in.Handle(ic); break;   // 0.7.2 audio inputs
                 case MsgType.Bye: throw new IOException("server said bye: " + Wire.DecodeJson<Bye>(p)?.Reason);
             }
         }
@@ -310,7 +324,7 @@ public sealed class PlayerClient : IAsyncDisposable
     public Task SendOutputsAsync(string reason)
     {
         var tcp = _tcp; if (tcp == null || !tcp.Connected) return Task.CompletedTask;
-        var msg = Wire.EncodeJson(MsgType.Outputs, 0, new OutputsMsg(ListOutputs().ToArray(), reason, _mic.SafeList()));
+        var msg = Wire.EncodeJson(MsgType.Outputs, 0, new OutputsMsg(ListOutputs().ToArray(), reason, _mic.SafeList(), _serverInputs ? _in.SafeList() : null));
         return SafeSend(tcp, msg);
     }
 
@@ -392,7 +406,7 @@ public sealed class PlayerClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _calRestore?.Cancel(); _mic.Dispose();
+        _calRestore?.Cancel(); _mic.Dispose(); _in.Dispose();   // 0.7.2: inputs too
         lock (_gate) { _sink?.Dispose(); _sink = null; }
         await Task.CompletedTask;
     }

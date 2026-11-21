@@ -27,7 +27,9 @@ public sealed class Conductor : IDisposable
 
     // ---------------- 0.1.1: live receivers (AirPlay, Spotify Connect) ----------------
     private readonly Dictionary<string, LiveFeed> _feeds = new(); private (List<QueueItem> Queue, int Index)? _beforeLive; private bool _lastLiveActive;
-    public static bool IsReceiver(string? kind) => kind is "airplay" or "spotify";
+    /// <summary>Live items fed by a <see cref="LiveFeed"/>: AirPlay, Spotify Connect, and (0.7.2) audio inputs - they replace the queue while they play and
+    /// EndLive puts it back. Kind "input" items carry the feed key "input:&lt;id&gt;" in Location.</summary>
+    public static bool IsReceiver(string? kind) => kind is "airplay" or "spotify" or "input";
     public static bool IsLive(string? kind) => kind == "radio" || IsReceiver(kind);
     /// <summary>0.6.9 #27 (t1877): true for the conductor the running Jukebox plays on - live items (radio / receivers: no end) are never queued there
     /// (a stream that never ends stalls the Jukebox). Set by the server host; evaluated OUTSIDE the queue lock. The API answers with a clear message first;

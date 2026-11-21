@@ -50,6 +50,7 @@ import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
 import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning, DISPLAY as JB_DISPLAY } from './jukebox-kiosk.js';
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
+import { inputsView } from './inputs.js';   // 0.7.2 Library > Inputs
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
@@ -236,9 +237,10 @@ function openPhoneSettings(from) {
 // F250-P2: full-page phone Library only. Lazily own separate adapters so a
 // direct route or the desktop panel can never steal its mounted DOM/state.
 function createPhoneLibrary() {
-  let radio, playlists;
+  let radio, playlists, inputs;
   const lib = libraryView(S, { phone: true, extras: {
     get radio() { return radio ||= radioTab(S, act); },
+    get inputs() { return inputs ||= inputsView(S); },   // 0.7.2: its own adapter, like Radio (never shares the desktop panel's DOM)
     get playlists() {
       if (!playlists) {
         const view = playlistsView(S, { deferInitial: true });
@@ -277,7 +279,7 @@ async function startMain() {
   views.finder = radioFinderView(S, act); views.tags = tagsView(S); views.rip = ripView(S); views.remote = remoteView(S);
   views.devices = { el: devv.el, reload: () => devv.draw(), hide: () => devv.hide() }; views.about = { el: h('div', { id: 'p-about' }), reload: () => openAboutInto(views.about.el) };
   // 0.3.5 J9: the desktop Library panel hosts Playlists, Radio and (expanded) the tools as tabs
-  libC = libraryView(S, { compact: true, extras: { playlists: playlistsView(S), radio: radioTab(S, act), rip: ripView(S), tags: tagsView(S), cleanup: cleanupView(S) } });
+  libC = libraryView(S, { compact: true, extras: { playlists: playlistsView(S), radio: radioTab(S, act), inputs: inputsView(S), rip: ripView(S), tags: tagsView(S), cleanup: cleanupView(S) } });
   content = h('main', { class: 'view', id: 'view', tabindex: -1 });
   S.view = wide() ? 'library' : 'now';
 
@@ -747,7 +749,8 @@ function connectWs() {
       else if (m.type === 'calphone') window.dispatchEvent(new CustomEvent('wavwiz:calphone', { detail: m.data }));   // 0.2.2 T9
       else if (m.type === 'calrun' || m.type === 'miclevel' || m.type === 'calmics') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.2.5 PC-mic run, live mic level, calibration-mic list
       else if (m.type === 'art') { artPushed(m.data); window.dispatchEvent(new CustomEvent('wavwiz:art', { detail: m.data })); }   // 0.2.2 T4b
-      else if (m.type === 'rip') window.dispatchEvent(new CustomEvent('wavwiz:rip', { detail: m.data }));   // 0.6.8 CD ripper: disc insert/eject + live job progress
+      else if (m.type === 'rip') window.dispatchEvent(new CustomEvent('wavwiz:rip', { detail: m.data }));
+      else if (m.type === 'inputs' || m.type === 'inputlevel') window.dispatchEvent(new CustomEvent('wavwiz:' + m.type, { detail: m.data }));   // 0.7.2 audio inputs: list changed / live meter   // 0.6.8 CD ripper: disc insert/eject + live job progress
     },
   });
 }
