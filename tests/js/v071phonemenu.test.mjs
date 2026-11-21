@@ -129,3 +129,74 @@ test('Admin chip is tappable on html.handset only when elevated, and offers Leav
   assert.match(elevate, /if \(ok\) await leaveAdmin\(S\)/);
   assert.match(css, /html\.handset \.adminchip\.adminchip-tap\{cursor:pointer/);
 });
+
+test('phone (html.handset) hides Import/Restore, Tag & cover fix, Tidy up library, and Keyboard shortcuts; Export settings and Back up now stay', () => {
+  const file = menu.slice(menu.indexOf('file: ['), menu.indexOf('library: ['));
+  const library = menu.slice(menu.indexOf('library: ['), menu.indexOf('playback: ['));
+  const help = menu.slice(menu.indexOf('help: ['), menu.indexOf('\n  };'));
+  assert.match(file, /\['Import settings…', \(\) => importSettings\(S, refreshAll\), \(\) => !admin\(\), \(\) => htmlHandset\(\)\]/);
+  assert.match(file, /\['Restore backup…', \(\) => restoreBackup\(S, refreshAll\), \(\) => !admin\(\), \(\) => htmlHandset\(\)\]/);
+  // Export settings / Back up now have no handset hide (still admin-disabled only)
+  assert.match(file, /\['Export settings', \(\) => exportSettings\(S\), \(\) => !admin\(\)\]/);
+  assert.match(file, /\['Back up now', \(\) => backUpNow\(S\), \(\) => !admin\(\)\]/);
+  assert.doesNotMatch(file, /\['Export settings'[^|\n]*, \(\) => htmlHandset\(\)/);
+  assert.doesNotMatch(file, /\['Back up now'[^|\n]*, \(\) => htmlHandset\(\)/);
+  assert.match(library, /\['Tag & cover fix', \(\) => go\('tags'\), \(\) => !admin\(\), \(\) => htmlHandset\(\)\]/);
+  assert.match(library, /\['Tidy up library', \(\) => go\('cleanup'\), \(\) => !admin\(\), \(\) => htmlHandset\(\)\]/);
+  assert.match(help, /\['Keyboard shortcuts', \(\) => dialog\('Keyboard shortcuts', shortcutsBody\(h\), \[\{ text: 'Close', cls: 'primary' \}\]\), null, \(\) => htmlHandset\(\)\]/);
+  // other Help rows are not hidden on a phone
+  for (const row of ['Getting started', "What's new", 'Diagnostics', 'About WavWiz']) {
+    assert.match(help, new RegExp('\\[' + (row.includes("'") ? `"${row}"` : `'${row}'`)));
+    const line = help.split('\n').find(l => l.includes(row === "What's new" ? '"What\\\'s new"' : `'${row}'`) || l.includes(row));
+    assert.ok(line, `Help row present: ${row}`);
+    if (row !== 'Keyboard shortcuts') assert.doesNotMatch(line, /htmlHandset/);
+  }
+  // gated on html.handset, never window width, and not on the Player app UA
+  assert.doesNotMatch(file + library + help, /isPlayerUa\(\)|isPhoneUa\(\)|max-width/);
+});
+
+test('visibleSpec drops hidden rows and dangling or doubled hr separators; a non-handset spec is unchanged', () => {
+  const i = menu.indexOf('function visibleSpec(spec)');
+  const j = menu.indexOf('\nfunction adorn', i);
+  const src = menu.slice(i, j);
+  const visibleSpec = new Function(src + '; return visibleSpec;')();
+  const keep = ['Export settings', () => {}, () => false];
+  const hide = ['Import settings…', () => {}, () => false, () => true];
+  const show = ['Restore backup…', () => {}, () => false, () => false];
+  assert.deepEqual(visibleSpec(['hr', hide, keep, 'hr']).map(s => s === 'hr' ? 'hr' : s[0]), ['Export settings']);
+  assert.deepEqual(visibleSpec([keep, 'hr', hide, 'hr']).map(s => s === 'hr' ? 'hr' : s[0]), ['Export settings']);
+  assert.deepEqual(visibleSpec([keep, 'hr', 'hr', show]).map(s => s === 'hr' ? 'hr' : s[0]), ['Export settings', 'hr', 'Restore backup…']);
+  // narrow PC / Player (hide predicates false): File-like group keeps Import, Restore, and both separators
+  const fileLike = [
+    ['New', () => {}],
+    'hr',
+    ['Import settings…', () => {}, () => false, () => false],
+    ['Restore backup…', () => {}, () => false, () => false],
+    ['Export settings', () => {}, () => false],
+    ['Back up now', () => {}, () => false],
+    'hr',
+    ['Sign out', () => {}],
+  ];
+  assert.deepEqual(visibleSpec(fileLike).map(s => s === 'hr' ? 'hr' : s[0]),
+    ['New', 'hr', 'Import settings…', 'Restore backup…', 'Export settings', 'Back up now', 'hr', 'Sign out']);
+  const phoneFile = fileLike.map(s => Array.isArray(s) && (s[0] === 'Import settings…' || s[0] === 'Restore backup…')
+    ? [s[0], s[1], s[2], () => true] : s);
+  assert.deepEqual(visibleSpec(phoneFile).map(s => s === 'hr' ? 'hr' : s[0]),
+    ['New', 'hr', 'Export settings', 'Back up now', 'hr', 'Sign out']);
+  // Help: only Keyboard shortcuts is hidden; no leftover hr (Help has none)
+  const help = [
+    ['Getting started', () => {}],
+    ["What's new", () => {}],
+    ['Keyboard shortcuts', () => {}, null, () => true],
+    ['Diagnostics', () => {}],
+    ['About WavWiz', () => {}],
+  ];
+  assert.deepEqual(visibleSpec(help).map(s => s[0]), ['Getting started', "What's new", 'Diagnostics', 'About WavWiz']);
+});
+
+test('both the menubar and the compact drawer walk visibleSpec, so leftover hrs cannot linger after a hide', () => {
+  assert.equal((menu.match(/return visibleSpec\(spec\)\.map\(s => \{/g) || []).length, 2);
+  const bar = menu.slice(menu.indexOf('export function createMenuBar'), menu.indexOf('export function createPhoneDrawerNav'));
+  assert.match(bar, /return visibleSpec\(spec\)\.map/);
+  assert.match(compact, /return visibleSpec\(spec\)\.map/);
+});

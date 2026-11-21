@@ -39,6 +39,17 @@ export function drawerOutsideClick(drawer, target) {
 const mlbl = t => h('span', { class: 'mlbl' }, t);
 /** Real phone chrome (html.handset). Never keyed off window width, so a narrow PC window stays desktop. */
 const htmlHandset = () => typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');
+/** Drop hidden rows and any leftover leading / trailing / doubled separators. */
+function visibleSpec(spec) {
+  const out = [];
+  for (const s of spec) {
+    if (s === 'hr') { if (out.length && out[out.length - 1] !== 'hr') out.push(s); continue; }
+    if (s?.[3]?.()) continue;
+    out.push(s);
+  }
+  if (out[out.length - 1] === 'hr') out.pop();
+  return out;
+}
 function adorn(btn, o, pins = true, kbds = true) {
   if (o?.pin && pins) btn.append(pinSpan(o.pin));
   if (o?.kbd && kbds) btn.append(h('span', { class: 'kbd' }, o.kbd));
@@ -71,8 +82,9 @@ function menuActions(S, ctl, desktop = false) {
       ['Run', null, () => !control(), null, { sub: () => runSpec(S, ctl) }],
       'hr',
       // 0.3.6 K20
-      ['Import settings…', () => importSettings(S, refreshAll), () => !admin()],
-      ['Restore backup…', () => restoreBackup(S, refreshAll), () => !admin()],
+      // 0.7.1 t2121u: Import settings / Restore backup need a PC file picker — hidden on html.handset only (narrow PC and the Player app keep them). Export settings and Back up now stay.
+      ['Import settings…', () => importSettings(S, refreshAll), () => !admin(), () => htmlHandset()],
+      ['Restore backup…', () => restoreBackup(S, refreshAll), () => !admin(), () => htmlHandset()],
       ['Export settings', () => exportSettings(S), () => !admin()],
       ['Back up now', () => backUpNow(S), () => !admin()],
       'hr',
@@ -88,8 +100,9 @@ function menuActions(S, ctl, desktop = false) {
       'hr',
       ['Rescan folders', async () => { try { await api('/library/rescan', { method: 'POST' }); toast('Scanning…'); } catch (e) { toast(e.message, true); } }],
       ...(ripAllowed() ? [['CD ripper', () => go('rip'), () => !admin()]] : []),   // 0.4.8 F57: PC app only
-      ['Tag & cover fix', () => go('tags'), () => !admin()],
-      ['Tidy up library', () => go('cleanup'), () => !admin()],
+      // 0.7.1 t2121u: Tag & cover fix and Tidy up library are hidden on a real phone (html.handset), not on a narrow PC window.
+      ['Tag & cover fix', () => go('tags'), () => !admin(), () => htmlHandset()],
+      ['Tidy up library', () => go('cleanup'), () => !admin(), () => htmlHandset()],
     ],
     playback: [
       ['Now Playing', () => go('now')],   // 0.6.8: reachable from standard menus (narrow PC drops the views half)
@@ -121,7 +134,8 @@ function menuActions(S, ctl, desktop = false) {
     help: [
       ['Getting started', () => (ctl.openSetup ? ctl.openSetup(true) : go('diag'))],
       ["What's new", () => openWhatsNew()],
-      ['Keyboard shortcuts', () => dialog('Keyboard shortcuts', shortcutsBody(h), [{ text: 'Close', cls: 'primary' }])],
+      // 0.7.1 t2121u: the Keyboard shortcuts list is a desktop Help item; other Help rows stay on the phone.
+      ['Keyboard shortcuts', () => dialog('Keyboard shortcuts', shortcutsBody(h), [{ text: 'Close', cls: 'primary' }]), null, () => htmlHandset()],
       ['Diagnostics', () => go('diag')],
       ['About WavWiz', () => go('about')],
     ],
@@ -223,7 +237,7 @@ export function createMenuBar(S, ctl) {
     return panel;
   }
   function fromSpec(spec) {
-    return spec.map(s => {
+    return visibleSpec(spec).map(s => {
       if (s === 'hr') return h('hr');
       const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
@@ -435,7 +449,7 @@ function createCompactPcNav(S, ctl, { onClose, desktop = true } = {}) {
   }
   function fromSpec(spec) {
     const pins = !htmlHandset(), kbds = !htmlHandset();   // 0.7.1 t2117u: no pin icons / shortcut hints on a real phone
-    return spec.map(s => {
+    return visibleSpec(spec).map(s => {
       if (s === 'hr') return h('hr');
       const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
