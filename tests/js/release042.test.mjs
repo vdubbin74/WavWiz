@@ -18,7 +18,7 @@ test('treeModel: boxes, unassigned, counts', async () => {
 });
 test('boxTitle', async () => {
   const { treeModel, boxTitle } = await imp('tree42'); const m = treeModel(zones, groups);
-  assert.equal(boxTitle(m.boxes[0], null), 'Queue: Patio · IN SYNC'); assert.equal(boxTitle(m.boxes[1], { state: 'playing' }), 'Queue: Garage · PLAYING'); assert.equal(boxTitle(m.boxes[1], null), 'Queue: Garage · IDLE');
+  assert.equal(boxTitle(m.boxes[0], null), 'Queue: Patio + Kitchen · IN SYNC');   /* 0.7.2 t2149u: linked boxes name every zone */ assert.equal(boxTitle(m.boxes[1], { state: 'playing' }), 'Queue: Garage · PLAYING'); assert.equal(boxTitle(m.boxes[1], null), 'Queue: Garage · IDLE');
 });
 test('movePlan: a speaker belongs to exactly one zone', async () => {
   const { movePlan } = await imp('tree42');

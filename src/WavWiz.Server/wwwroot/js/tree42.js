@@ -36,7 +36,8 @@ export const countsText = m => `ZONES ${m.counts.zones} · SPEAKERS ${m.counts.s
 export const FOLD_KEY = 'wavwiz.zfold';
 export function loadZoneFolds(store = globalThis.localStorage) { try { const a = JSON.parse(store.getItem(FOLD_KEY) || '[]'); return new Set(Array.isArray(a) ? a.map(String) : []); } catch { return new Set(); } }
 export function saveZoneFolds(set, store = globalThis.localStorage) { try { store.setItem(FOLD_KEY, JSON.stringify([...set])); } catch { /* private mode */ } }
-export const boxTitle = (box, now) => `Queue: ${box.leader.name} · ${box.kind === 'linked' ? 'IN SYNC' : (now?.state === 'playing' ? 'PLAYING' : now?.state === 'paused' ? 'PAUSED' : 'IDLE')}`;
+// 0.7.2 t2149u: a linked box names every zone in it ("Queue: Living Room + Kitchen · IN SYNC"), as the folded / empty linked rows and the 0.4.1 shared box did
+export const boxTitle = (box, now) => `Queue: ${box.kind === 'linked' ? box.zones.map(g => g.name).join(' + ') : box.leader.name} · ${box.kind === 'linked' ? 'IN SYNC' : (now?.state === 'playing' ? 'PLAYING' : now?.state === 'paused' ? 'PAUSED' : 'IDLE')}`;
 /** The PATCH calls that move speaker `devId` into zone `toId` (null = Unassigned). The server also takes it out of its old zone; the source is sent too so it never depends on that. */
 export function movePlan(groups, devId, toId) {
   const ops = [], from = (groups || []).find(g => (g.deviceIds || []).includes(devId));
