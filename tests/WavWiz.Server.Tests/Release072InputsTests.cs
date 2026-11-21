@@ -528,4 +528,45 @@ public class Release072InputsTests
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { spareOutput = "ep-hx" })).StatusCode);   // by hand: allowed
         Assert.Equal("ep-hx", (await Input(admin, "loopback")).GetProperty("spareOutput").GetString());
     }
+
+    [Fact]
+    public void Handing_the_speakers_back_keeps_the_wavwiz_level_and_never_raises_it()
+    {   // 0.7.2 t2192u: synced at WavWiz 75% on speakers at 0 dB (Windows 100%): the apps were heard 12.5 dB down; handed back they stay there
+        Assert.Equal(-12.5f, LocalSyncRules.HandBackDb(0f, 0f, 75, -65.25f, 0f)!.Value, 2);
+        Assert.Equal(-22.5f, LocalSyncRules.HandBackDb(-10f, -10f, 75, -65.25f, 0f)!.Value, 2);
+        Assert.Equal(-30f, LocalSyncRules.HandBackDb(-10f, -30f, 75, -65.25f, 0f)!.Value, 2);   // lower saved level wins (never above the start)
+        Assert.Null(LocalSyncRules.HandBackDb(-10f, null, 100, -65.25f, 0f));                   // WavWiz at 100%: nothing to change
+        Assert.Null(LocalSyncRules.HandBackDb(-60f, null, 10, -60f, 0f));                       // already at the bottom: never raised
+        Assert.Equal(-40f, LocalSyncRules.HandBackDb(0f, null, 0, -65.25f, 0f)!.Value, 2);      // 0% / muted: at most 40 dB down, never silent
+        Assert.Equal(-50f, LocalSyncRules.HandBackDb(-20f, null, 30, -50f, 0f)!.Value, 2);      // clamped to the endpoint range
+        Assert.Null(LocalSyncRules.HandBackDb(0f, 0f, null, -65.25f, 0f));                       // level unknown: leave it alone
+        foreach (var w in new[] { "off", "tray", "exit", "closing", "sign-out", "device gone" }) Assert.True(LocalSyncRules.MatchesLevel(w), w);
+        foreach (var w in new[] { "changed", "switch failed", "left over", "start (left over from a crash?)" }) Assert.False(LocalSyncRules.MatchesLevel(w), w);
+    }
+
+    [Fact]
+    public async Task Pause_pc_audio_and_stop_presses_play_pause_only_when_the_pc_is_making_sound()
+    {   // 0.7.2 t2193u: the toggle key must never START a paused app, so a quiet PC gets no key; a plain Stop never sends it
+        var (f, admin, control, pc, syn) = await Setup(); await using var _f = f; await using var _p = pc;
+        int presses = 0; pc.Client.InputSide.MediaPause = () => Interlocked.Increment(ref presses);
+        var id = (await Input(admin, "loopback")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true });
+        async Task<JsonElement> Stop(object body) { var r = await control.PostAsJsonAsync($"/api/v1/inputs/{id}/stop", body); Assert.Equal(HttpStatusCode.OK, r.StatusCode); return JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement; }
+        syn.Level[InputIds.ProcessLoopback] = 0.0005f;   // -66 dBFS: nothing playing
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("capturing").GetBoolean(), "capture");
+        await Task.Delay(800);
+        var q = await Stop(new { pausePc = true }); Assert.False(q.GetProperty("pausedPc").GetBoolean()); Assert.True(q.GetProperty("inputs").GetArrayLength() > 0);
+        syn.Level[InputIds.ProcessLoopback] = 0.3f;      // YouTube playing
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("peakDb").ValueKind == JsonValueKind.Number && (await Input(admin, "loopback")).GetProperty("peakDb").GetDouble() > -30, "level");
+        Assert.False((await Stop(new { })).GetProperty("pausedPc").GetBoolean());   // plain Stop: no key
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "loopback")).GetProperty("playing").GetBoolean(), "playing");
+        await Task.Delay(500);
+        Assert.True((await Stop(new { pausePc = true })).GetProperty("pausedPc").GetBoolean());
+        await Until(() => Task.FromResult(Volatile.Read(ref presses) == 1), "the Player did not get the Play/Pause press");
+        await Task.Delay(300); Assert.Equal(1, presses);
+        Assert.True(LocalSyncRules.SoundingNow(1000, 5000)); Assert.False(LocalSyncRules.SoundingNow(1000, 5001));
+    }
 }

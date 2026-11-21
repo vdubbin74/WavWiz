@@ -101,6 +101,7 @@ public sealed class InputResponder : IDisposable
             case "stop" when c.InputId is { Length: > 0 } id: Stop(id); break;
             case "stop-all": StopAll(); break;
             case LocalSyncRules.On or LocalSyncRules.Off: LocalSync?.Invoke(c); break;
+            case LocalSyncRules.MediaPause: MediaPause?.Invoke(); break;   // 0.7.2 t2193u
             case LocalSyncRules.SelfMuteOn or LocalSyncRules.SelfMuteOff: SelfMute?.Invoke(c.Action == LocalSyncRules.SelfMuteOn); break;   // 0.7.2 t2183u   // 0.7.2 t2175u: the Windows side (Player LocalSync)
         }
     }
@@ -120,6 +121,8 @@ public sealed class InputResponder : IDisposable
     /// <summary>Stop every running capture (connection lost, app closing).</summary>
     /// <summary>0.7.2 t2183u: the server says this PC's own sound is playing in this PC's zone in Real time: don't play the copy here.</summary>
     public Action<bool>? SelfMute;
+    /// <summary>0.7.2 t2193u: press the media Play/Pause key on this PC (the Player wires it; Windows only).</summary>
+    public Action? MediaPause;
     public void StopAll() { try { LocalSync?.Invoke(new InputCmd(LocalSyncRules.Off)); } catch { } try { SelfMute?.Invoke(false); } catch { } List<IDisposable> all;   // 0.7.2 t2175u: link lost / closing = Windows back on the speakers
          lock (_l) { all = _running.Values.ToList(); _running.Clear(); } foreach (var d in all) try { d.Dispose(); } catch { } while (_q.Reader.TryRead(out _)) { } }
 

@@ -74,6 +74,7 @@ public sealed class InputService : IDisposable
         public readonly LiveFeed Feed = new() { TargetMs = InputService.TargetMs };
         public InputSignalDetector Detector = new();
         public bool Capturing; public long ErrorAtMs = long.MinValue / 2; public double PeakDb = -120; public long LastLevelPubMs; public string? Error;
+        public long LoudAtMs = long.MinValue / 2;   // 0.7.2 t2193u: the last time the raw level was above LocalSyncRules.SoundDb
         public bool SelfMuteOn;   // 0.7.2 t2183u: selfmute-on was sent (Real time loopback playing in the source PC's own zone)
         public bool SyncOn; public string? SyncNote;   // 0.7.2 t2175u: localsync-on was sent (Windows switched to the spare output on the Player PC)
         public bool GotAudio; public bool Privacy;   // 0.7.2 t2170u: audio arrived since the last start; Windows' mic privacy refused it (no auto-retry)
@@ -178,7 +179,8 @@ public sealed class InputService : IDisposable
             float g = l.Feed.Gain; float peak = 0;
             foreach (var v in pcm) { var a = Math.Abs(v); if (a > peak) peak = a; }
             l.PeakDb = db = peak > 0 ? 20 * Math.Log10(peak * g) : -120;     // the meter shows the level after the input's gain (before the limiter)
-            (started, ended) = l.Detector.Update(20 * Math.Log10(Math.Max(peak, 1e-6f)), NowMs());   // needle drop / phono check use the raw input level
+            var rawDb = 20 * Math.Log10(Math.Max(peak, 1e-6f)); if (rawDb > WavWiz.PlayerCore.LocalSyncRules.SoundDb) l.LoudAtMs = NowMs();
+            (started, ended) = l.Detector.Update(rawDb, NowMs());   // needle drop / phono check use the raw input level
             phono = l.Detector.PhonoLow;
             if (l.Cond != null)
             {
@@ -358,9 +360,19 @@ public sealed class InputService : IDisposable
     }
 
     /// <summary>Control: stop an input. The zone's previous queue comes back paused (not playing), the same as when AirPlay ends.</summary>
-    public string? Stop(string id)
+    public string? Stop(string id) => Stop(id, false, out _);
+    /// <param name="pausePc">0.7.2 t2193u: "Pause PC audio & stop" (this PC's sound only): when the PC is making sound now, its Player presses the
+    /// media Play/Pause key first, so the apps are paused before Windows hands them back to the speakers. <paramref name="pausedPc"/> = the key was sent.</param>
+    public string? Stop(string id, bool pausePc, out bool pausedPc)
     {
-        lock (_l) { if (!_live.TryGetValue(id, out var l)) return "input not found"; StopNoLock(l, "stopped"); ReconcileNoLock(); }
+        pausedPc = false;
+        lock (_l)
+        {
+            if (!_live.TryGetValue(id, out var l)) return "input not found";
+            if (pausePc && l.Info.Kind == "loopback" && WavWiz.PlayerCore.LocalSyncRules.SoundingNow(l.LoudAtMs, NowMs()))
+            { try { l.Sess.SendJson(MsgType.InputCmd, new InputCmd(WavWiz.PlayerCore.LocalSyncRules.MediaPause, l.Info.Id)); pausedPc = true; _s.Log?.Invoke($"inputs: {l.Info.Name}: pause key sent to the PC"); } catch { } }
+            StopNoLock(l, "stopped"); ReconcileNoLock();
+        }
         _s.Events.Publish("inputs"); _s.Events.Publish("zones"); return null;
     }
 

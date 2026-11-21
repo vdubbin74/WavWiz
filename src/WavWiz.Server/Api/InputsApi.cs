@@ -22,10 +22,13 @@ public static class InputsApi
             var err = s.Inputs.Play(id, b.ValueKind == JsonValueKind.Object ? b.Str("zoneId") : null);
             return err == null ? Results.Json(s.Inputs.View()) : Ext.Bad(err, err == "input not found" || err == "no such zone" ? 404 : 409);
         }).Req(Role.Control);
-        g.MapPost("/inputs/{id}/stop", (string id) =>
+        g.MapPost("/inputs/{id}/stop", async (string id, HttpContext c) =>
         {
             if (s.Inputs == null) return Ext.Bad("audio inputs are not available", 409);
-            var err = s.Inputs.Stop(id); return err == null ? Results.Json(s.Inputs.View()) : Ext.Bad(err, 404);
+            var b = await c.Request.Body(); bool pause = b.ValueKind == JsonValueKind.Object && b.Bool("pausePc") == true;   // 0.7.2 t2193u
+            var err = s.Inputs.Stop(id, pause, out var paused); if (err != null) return Ext.Bad(err, 404);
+            var n = JsonSerializer.SerializeToNode(s.Inputs.View(), JsonSerializerOptions.Web)!.AsObject(); n["pausedPc"] = paused;
+            return Results.Json(n);
         }).Req(Role.Control);
         // Settings > Devices > Audio inputs is open: show live meters for enabled Aux / S/PDIF inputs for 30 s (the card renews it)
         g.MapPost("/inputs/meter", async (HttpContext c) => { var b = await c.Request.Body(); s.Inputs?.Meter(b.ValueKind != JsonValueKind.Object || b.Bool("on") != false); return Results.Json(new { ok = true }); }).Req(Role.View);

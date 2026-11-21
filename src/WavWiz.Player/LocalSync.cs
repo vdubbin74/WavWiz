@@ -15,13 +15,14 @@ namespace WavWiz.Player;
 /// </summary>
 public sealed class LocalSync : IDisposable
 {
-    private readonly Action<string> _log; private readonly Action<string> _pinOutput; private readonly Func<string, string, Task> _fallback;
+    private readonly Action<string> _log; private readonly Action<string> _pinOutput; private readonly Func<string, string, Task> _fallback; private readonly Func<double?> _level; private float? _savedDb;
     private readonly string _file = Path.Combine(PlayerSettings.Dir, "localsync-restore.json");
     private readonly object _l = new(); private System.Threading.Timer? _watch; private LocalSyncState? _on;
 
     /// <param name="pinOutput">switch the Player's own output to these speakers (PlayerClient.SwitchOutput).</param>
     /// <param name="fallback">(inputId, why): tell the server the Player went back to Real time by itself.</param>
-    public LocalSync(Action<string> log, Action<string> pinOutput, Func<string, string, Task> fallback) { _log = log; _pinOutput = pinOutput; _fallback = fallback; }
+    /// <param name="level">the WavWiz volume (percent) this PC plays at now, null when unknown (0.7.2 t2192u: the hand-back level match).</param>
+    public LocalSync(Action<string> log, Action<string> pinOutput, Func<string, string, Task> fallback, Func<double?>? level = null) { _log = log; _pinOutput = pinOutput; _fallback = fallback; _level = level ?? (() => null); }
 
     public bool Active { get { lock (_l) return _on != null; } }
     /// <summary>The loopback input that is synced now (null when not synced).</summary>
@@ -58,7 +59,8 @@ public sealed class LocalSync : IDisposable
             try { _pinOutput(speakers); } catch (Exception e) { _log("localsync: pin output failed: " + e.Message); }
             try { SetDefaultAll(spare, st); }
             catch (Exception e) { RestoreNoLock("switch failed"); return "Windows did not switch to the spare output (" + e.Message + "). Playing in Real time."; }
-            _on = st; _log($"localsync: on (spare {spare}, speakers {speakers})");
+            _savedDb = null; try { using var sp = en.GetDevice(speakers); _savedDb = sp.AudioEndpointVolume.MasterVolumeLevel; } catch { }   // t2192u: the level when Sync started
+            _on = st; _log($"localsync: on (spare {spare}, speakers {speakers}{(_savedDb is { } sd ? $", speakers at {sd:0.0} dB" : "")})");
             _watch = new System.Threading.Timer(_ => Check(), null, 3000, 3000);
             return null;
         }
@@ -82,8 +84,9 @@ public sealed class LocalSync : IDisposable
     {
         _watch?.Dispose(); _watch = null;
         string? text = null; try { if (File.Exists(_file)) text = File.ReadAllText(_file); } catch { }
-        var st = LocalSyncRules.Parse(text) ?? _on; _on = null;
+        var live = _on; var st = LocalSyncRules.Parse(text) ?? _on; _on = null;
         if (st == null) { try { File.Delete(_file); } catch { } return; }
+        if (live != null && LocalSyncRules.MatchesLevel(why)) MatchLevel(live.Speakers);   // first, so the apps never come back loud
         bool allOk = true;
         foreach (var (prev, role) in new[] { (st.PrevConsole, ERole.Console), (st.PrevMultimedia, ERole.Multimedia), (st.PrevCommunications, ERole.Communications) })
         {
@@ -92,6 +95,22 @@ public sealed class LocalSync : IDisposable
         }
         if (allOk) { try { File.Delete(_file); } catch { } }    // keep the file when something failed: the next start tries again
         _log($"localsync: restored ({why}){(allOk ? "" : " - partly; will retry at the next start")}");
+    }
+
+    /// <summary>0.7.2 t2192u: lower (never raise) the speakers' Windows volume so the apps keep the level heard through WavWiz.</summary>
+    private void MatchLevel(string speakers)
+    {
+        try
+        {
+            double? pct = null; try { pct = _level(); } catch { }
+            using var en = new MMDeviceEnumerator(); using var d = en.GetDevice(speakers);
+            var ev = d.AudioEndpointVolume; var cur = ev.MasterVolumeLevel;
+            if (LocalSyncRules.HandBackDb(cur, _savedDb, pct, ev.VolumeRange.MinDecibels, ev.VolumeRange.MaxDecibels) is not { } t) return;
+            ev.MasterVolumeLevel = t;
+            _log($"localsync: speakers {cur:0.0} -> {t:0.0} dB to keep the WavWiz level ({pct:0}%)");
+        }
+        catch (Exception e) { _log("localsync: level match skipped: " + e.Message); }
+        finally { _savedDb = null; }
     }
 
     /// <summary>Console + Multimedia always; Communications only when calls were going to the speakers too (0.7.2 t2189u: on PCBOXV2 the HyperX is the

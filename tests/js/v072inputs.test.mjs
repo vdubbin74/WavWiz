@@ -48,7 +48,7 @@ test('0.7.2: the main button - play an enabled input, stop a playing one, nothin
 test('0.7.2: tiles play in this page\'s zone or Everywhere, and keep the server\'s meter lease while shown', () => {
   assert.match(inp, /go\(`\/inputs\/\$\{i\.id\}\/play`, \{ zoneId: getApiZone\(\) \}\)/);
   assert.match(inp, /go\(`\/inputs\/\$\{i\.id\}\/play`, \{ zoneId: 'everywhere' \}\)/);
-  assert.match(inp, /go\(`\/inputs\/\$\{i\.id\}\/stop`\)/);
+  assert.match(inp, /go\(`\/inputs\/\$\{i\.id\}\/stop`, pause \? \{ pausePc: true \} : \{\}\)/);   // t2193u: after the Stop notice
   assert.match(inp, /export const METER_RENEW_MS = 20000;/);          // the server's lease is 30 s
   assert.match(inp, /api\('\/inputs\/meter', \{ method: 'POST', body: \{ on: v \} \}\)/);
   assert.match(inp, /i\.turntable \? 'vinyl'/);                       // vinyl icon in Turntable mode

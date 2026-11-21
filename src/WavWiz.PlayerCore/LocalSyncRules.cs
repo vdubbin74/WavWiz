@@ -14,6 +14,12 @@ public static class LocalSyncRules
     public const string On = "localsync-on", Off = "localsync-off";
     /// <summary>0.7.2 t2183u: Real time: the source PC's Player does not play its own sound back (no echo, no double level).</summary>
     public const string SelfMuteOn = "selfmute-on", SelfMuteOff = "selfmute-off";
+    /// <summary>0.7.2 t2193u: "Pause PC audio & stop": the Player presses the media Play/Pause key on its PC (only sent while the PC is making sound).</summary>
+    public const string MediaPause = "media-pause";
+    /// <summary>0.7.2 t2193u: this PC's sound counts as playing when its loopback was above -50 dBFS within the last 4 s (a toggle key must never
+    /// START a paused player, so a quiet PC gets no key).</summary>
+    public const double SoundDb = -50; public const long SoundRecentMs = 4000;
+    public static bool SoundingNow(long loudAtMs, long nowMs) => nowMs - loudAtMs <= SoundRecentMs;
     /// <summary>The input-error reason prefix the Player uses when it went back to Real time by itself (spare gone, tray Restore, switch failed).</summary>
     public const string FallbackTag = "localsync:";
 
@@ -80,6 +86,25 @@ public static class LocalSyncRules
     /// <summary>0.7.2 t2189u: the Communications default moves to the spare only when it was the speakers (or unknown with the speakers the default).</summary>
     public static bool MoveCommunications(LocalSyncState st) =>
         st.PrevCommunications == st.Speakers || (st.PrevCommunications == null && st.PrevMultimedia == st.Speakers);
+
+    /// <summary>0.7.2 t2192u: while synced the user hears this PC's apps at (speakers' Windows volume) x (WavWiz volume on this PC); handed back
+    /// they play at the Windows volume alone, often 100%, so they blare. Before handing back, the speakers' endpoint level (dB) is lowered by the
+    /// WavWiz gain so the level stays where it was (WavWiz volume: -0.5 dB a percent, <see cref="WavWiz.Dsp.DspChain.VolumeToGain"/>), and never above the
+    /// level saved when Sync started. Never raised; never more than 40 dB down; clamped to the endpoint's range. Null = leave it alone.</summary>
+    public const double MaxHandBackCutDb = 40;
+    public static float? HandBackDb(float currentDb, float? savedDb, double? wavwizPercent, float minDb, float maxDb)
+    {
+        if (wavwizPercent is not { } pct || !double.IsFinite(pct) || !float.IsFinite(currentDb)) return null;
+        var g = WavWiz.Dsp.DspChain.VolumeToGain(Math.Clamp(pct, 0, 100));
+        var cut = g <= 0 ? MaxHandBackCutDb : Math.Min(MaxHandBackCutDb, -20 * Math.Log10(g));
+        double t = currentDb - cut;
+        if (savedDb is { } s && float.IsFinite(s)) t = Math.Min(t, s);
+        t = Math.Clamp(t, Math.Min(minDb, maxDb), maxDb);
+        return t < currentDb - 0.05 ? (float)t : null;
+    }
+    /// <summary>0.7.2 t2192u: which restores hand the sound back to the speakers for real (and so match the level). "changed" re-syncs at once,
+    /// "switch failed" never switched, a start-up restore of a crash file has no WavWiz level.</summary>
+    public static bool MatchesLevel(string why) => why is not ("changed" or "switch failed") && !why.StartsWith("start", StringComparison.Ordinal) && why != "left over";
 
     public static string Serialize(LocalSyncState s) => JsonSerializer.Serialize(s);
     public static LocalSyncState? Parse(string? text)

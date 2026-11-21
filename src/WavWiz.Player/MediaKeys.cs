@@ -26,6 +26,24 @@ internal sealed class MediaKeys : NativeWindow, IDisposable
         base.WndProc(ref m);
     }
     public void Dispose() { foreach (var k in Keys) { try { UnregisterHotKey(Handle, k.Id); } catch { } } try { DestroyHandle(); } catch { } }
+
+    [DllImport("user32.dll")] private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    private const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2; private const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
+    /// <summary>0.7.2 t2193u ("Pause PC audio & stop"): press the media Play/Pause key for the other apps on this PC (Windows hands it to the app that
+    /// owns the system media controls: YouTube in a browser, Spotify...). The Player owns that key itself (RegisterHotKey above), so a plain press would
+    /// only pause WavWiz: the hotkey is let go for the press and taken back half a second later. Call on the UI thread.
+    /// Pressing the key when no WavWiz hotkey exists (<paramref name="keys"/> null, or another app owns it) works the same.</summary>
+    public static void PressPlayPause(MediaKeys? keys)
+    {
+        bool had = keys != null && !keys.Failed.Contains("playpause");
+        if (had) UnregisterHotKey(keys!.Handle, 1);
+        keybd_event(VK_MEDIA_PLAY_PAUSE, 0, KEYEVENTF_EXTENDEDKEY, UIntPtr.Zero);
+        keybd_event(VK_MEDIA_PLAY_PAUSE, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, UIntPtr.Zero);
+        if (!had) return;
+        var t = new System.Windows.Forms.Timer { Interval = 500 };
+        t.Tick += (_, _) => { t.Stop(); t.Dispose(); try { if (keys!.Handle != IntPtr.Zero && !RegisterHotKey(keys.Handle, 1, 0, VK_MEDIA_PLAY_PAUSE)) keys.Failed.Add("playpause"); } catch { } };
+        t.Start();
+    }
 }
 
 /// <summary>A small themed on-screen indicator ("Volume 45%") shown for a moment at the bottom center of the screen. Colors come from the web page's theme.</summary>

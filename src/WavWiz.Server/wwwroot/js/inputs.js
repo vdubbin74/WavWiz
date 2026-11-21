@@ -1,7 +1,7 @@
 // 0.7.2 M1: audio inputs of the WavWiz Player on the server PC - Library > Inputs tiles (live meters, play here / Everywhere / stop) and the
 // Settings > Devices > Audio inputs card (admin: turn on, rename, gain, Turntable mode, auto-start, microphone as a live source).
 // Server: /api/v1/inputs (InputsApi). Events: 'inputs' (list changed) and 'inputlevel' ({ id, peakDb, phonoLow }) arrive as wavwiz:inputs / wavwiz:inputlevel.
-import { h, api, toast, getApiZone } from './util.js';
+import { h, api, toast, getApiZone, dialog } from './util.js';
 import { canControl, isAdmin } from './ui.js';
 
 export const INPUTS_TITLE = 'Audio inputs';
@@ -41,6 +41,28 @@ export function inputBadges(i) {
 export const meterPct = db => db == null || !isFinite(db) ? 0 : Math.max(0, Math.min(100, Math.round((db + 60) / 60 * 100)));
 /** Pure: a meter only where there is a level to show - Aux / S/PDIF in while on (Settings / Library keep them listening), anything while it plays. */
 export const showMeter = i => !!i.enabled && (!!i.playing || i.kind === 'aux' || i.kind === 'spdif');
+/** 0.7.2 t2193u: stopping this PC's sound hands the apps back to the PC's own speakers. Ask first (Pause PC audio & stop / Stop / Cancel);
+ *  "Don't show again" remembers the choice ('pause' or 'stop') on this browser. */
+export const STOP_PC_KEY = 'wavwiz.inputs.stopPc';
+export const STOP_PC_TEXT = "PC audio will go back to this PC's own speakers.";
+export const stopPcSaved = () => { try { const v = localStorage.getItem(STOP_PC_KEY); return v === 'pause' || v === 'stop' ? v : null; } catch { return null; } };
+/** Pure: null = ask; 'pause' / 'stop' = do that without asking. Only this PC's sound asks. */
+export const stopPcChoice = (i, saved) => i?.kind !== 'loopback' ? 'stop' : saved === 'pause' || saved === 'stop' ? saved : null;
+export function askStopPc(i, run) {
+  const now = stopPcChoice(i, stopPcSaved()); if (now) return run(now === 'pause');
+  const keep = h('input', { type: 'checkbox', class: 'stoppc-keep' });
+  const pick = pause => { if (keep.checked) { try { localStorage.setItem(STOP_PC_KEY, pause ? 'pause' : 'stop'); } catch { /* private mode */ } } return run(pause); };
+  dialog('Stop ' + (i.name || "this PC's sound") + '?', [
+    h('p', null, STOP_PC_TEXT),
+    h('p', { class: 'small dim' }, 'Pause PC audio presses Play/Pause on that PC (only if something is playing there), so YouTube, Spotify and the like stop first.'),
+    h('label', { class: 'row stoppc-keeprow' }, keep, h('span', null, "Don't show again")),
+  ], [
+    { text: 'Pause PC audio & stop', cls: 'primary', onclick: () => pick(true) },
+    { text: 'Stop', onclick: () => pick(false) },
+    { text: 'Cancel', cls: 'quiet' },
+  ], { cls: 'stoppc' });
+}
+
 /** Pure: what a tile's main button does: 'play', 'stop' or null (can't play: off, muted mic, view-only user). */
 export function mainAction(i, control) {
   if (!control) return null;
@@ -112,7 +134,7 @@ export function inputsView(S) {
       !i.enabled ? h('p', { class: 'small dim' }, isAdmin(S) ? 'Turn it on in Settings > Devices > Audio inputs.' : 'An administrator can turn it on in Settings > Devices > Audio inputs.') : null,
       act ? h('div', { class: 'row inp-acts' },
         act === 'stop'
-          ? h('button', { class: 'btn', onclick: () => go(`/inputs/${i.id}/stop`) }, '■ Stop')
+          ? h('button', { class: 'btn', onclick: () => askStopPc(i, async pause => { await go(`/inputs/${i.id}/stop`, pause ? { pausePc: true } : {}); if (pause) toast(data.pausedPc ? 'Paused the PC audio and stopped' : 'Stopped (nothing was playing on the PC)'); }) }, '■ Stop')
           : [h('button', { class: 'btn primary', onclick: () => go(`/inputs/${i.id}/play`, { zoneId: getApiZone() }) }, '▶ Play'),
              h('button', { class: 'btn quiet', title: 'Play in every zone', onclick: () => go(`/inputs/${i.id}/play`, { zoneId: 'everywhere' }) }, 'Everywhere')]) : null,
     ];

@@ -29,7 +29,8 @@ internal sealed class PlayerApp : ApplicationContext
         _outputs = new WasapiOutputProvider(_clock);
         _mics = new WasapiMicProvider(_clock);        // 0.2.5 PC-mic calibration (native WASAPI capture)
         _inputs = new WasapiInputProvider(Log);
-        _sync = new LocalSync(Log, id => _client?.SwitchOutput(id), (inputId, why) => _client?.InputSide.ReportLocalSyncFallback(inputId, why) ?? Task.CompletedTask);   // 0.7.2 t2175u
+        _sync = new LocalSync(Log, id => _client?.SwitchOutput(id), (inputId, why) => _client?.InputSide.ReportLocalSyncFallback(inputId, why) ?? Task.CompletedTask,
+            () => _client?.Dsp.VolumePercent);   // 0.7.2 t2175u; t2192u: the WavWiz level for the hand-back
         try { _sync.Restore("start (left over from a crash?)"); } catch (Exception e) { Log("localsync: " + e.Message); }        // a crash or power cut while synced: speakers back first
         SystemEvents.SessionEnding += (_, _) => { try { _sync.Restore("sign-out"); } catch { } };       // 0.7.2 audio inputs (Aux / S/PDIF in, mics, this PC's sound) - captured only when the server asks
         _tray = new NotifyIcon { Icon = MakeIcon(), Text = Tip("Starting"), ContextMenuStrip = _menu, Visible = true };
@@ -128,6 +129,7 @@ internal sealed class PlayerApp : ApplicationContext
             _client.ServerUnreachable += n => { Log($"server unreachable ({n} attempts); looking for it on the network"); _ = RefindAsync(); };
             _outputs.DevicesChanged += () => { try { _ = _client?.SendOutputsAsync("devices"); } catch { } };
             // 0.7.2: the echo guard needs WavWiz's own active output; plugging in / removing a capture device re-sends the list (checked every 5 s)
+            _client.InputSide.MediaPause = () => _ui.Post(_ => { try { MediaKeys.PressPlayPause(_media); Log("inputs: media Play/Pause pressed (Pause PC audio & stop)"); } catch (Exception e) { Log("inputs: media key failed: " + e.Message); } }, null);   // 0.7.2 t2193u
             _client.InputSide.LocalSync = c => { try { _sync.Handle(c); } catch (Exception e) { Log("localsync: " + e.Message); } };   // 0.7.2 t2175u
             _inputs.ActiveOutput = () => _client?.ListOutputs().FirstOrDefault(o => o.Active)?.EndpointId;
             _inputPoll = new System.Threading.Timer(_ =>
