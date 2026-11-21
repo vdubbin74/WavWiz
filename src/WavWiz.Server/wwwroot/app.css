@@ -5962,15 +5962,17 @@ html[data-edgelight="heartthrob"] .tree42 .qb42.playing > .cgrip69::after {
   box-shadow: 0 0 12px 3px color-mix(in srgb, var(--accent) 80%, transparent), 0 0 22px 4px color-mix(in srgb, var(--accent2) 30%, transparent);
   animation: ww-lp-throb 3.2s ease-in-out infinite;
 }
-/* Gradient: the theme colors (main -> second -> highlight -> main) flow smoothly down the edge. One layer 3 cards tall slides by one
-   repeat (translate only), so the colors blend into each other with no seam. */
-html[data-edgelight="gradient"] .tree42 .qb42.playing > .cgrip69 { opacity: 1; box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Gradient (t2167u): the WHOLE edge cross-fades uniformly through the theme colors (main -> second -> highlight -> main), no sliding band.
+   The edge itself is the main color; ::before (second color) and ::after (highlight) lie over all of it and only fade in and out (opacity,
+   composited). One 6s cycle: second fades in, highlight fades in over it, then both fade back to the main color. */
+html[data-edgelight="gradient"] .tree42 .qb42.playing > .cgrip69 { opacity: 1; background: var(--accent) !important; box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 45%, transparent); }
+html[data-edgelight="gradient"] .tree42 .qb42.playing > .cgrip69::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; right: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: var(--accent2); animation: ww-lp-fade2 6s ease-in-out infinite;
+}
 html[data-edgelight="gradient"] .tree42 .qb42.playing > .cgrip69::after {
-  top: -200%; bottom: auto; left: 0; right: 0; height: 300%; min-height: 0; opacity: 1;
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent2) 16.67%, var(--hl, var(--accent)) 25%, var(--accent) 33.33%,
-                                       var(--accent2) 50%, var(--hl, var(--accent)) 58.33%, var(--accent) 66.67%,
-                                       var(--accent2) 83.33%, var(--hl, var(--accent)) 91.67%, var(--accent) 100%);
-  animation: ww-lp-flow 4.5s linear infinite;
+  top: 0; bottom: 0; left: 0; right: 0; height: auto; min-height: 0; opacity: 0;
+  background: var(--hl, var(--accent2)); animation: ww-lp-fade3 6s ease-in-out infinite;
 }
 /* Waveform (default, t2057u/t2058u/t2060u): two interwoven glowing wave lines - the theme's main color and its second color, half a
    wave apart - on PLAYING zones only. They take turns: one swells (wider swing) and brightens while the other shrinks and dims, crossfading
@@ -6000,7 +6002,8 @@ html[data-edgelight="off"] .tree42 .qb42.playing > .cgrip69::after { opacity: 0;
 @keyframes ww-lp-drift { 0% { translate: 0 0; } 100% { translate: 0 40px; } }
 @keyframes ww-lp-lubdub { 0% { opacity: 0; transform: scaleX(1); } 9% { opacity: .85; transform: scaleX(1.35); } 20% { opacity: .2; transform: scaleX(1.05); } 30% { opacity: .6; transform: scaleX(1.2); } 52% { opacity: 0; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
 @keyframes ww-lp-throb { 0%, 100% { opacity: .12; transform: scaleX(1); } 50% { opacity: .8; transform: scaleX(1.25); } }
-@keyframes ww-lp-flow { 0% { transform: translateY(0); } 100% { transform: translateY(33.333%); } }
+@keyframes ww-lp-fade2 { 0%, 100% { opacity: 0; } 33%, 66% { opacity: 1; } }
+@keyframes ww-lp-fade3 { 0%, 33%, 100% { opacity: 0; } 66% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   html .tree42 .qb42.playing > .cgrip69, html .tree42 .qb42.playing > .cgrip69::after, html .tree42 .qb42.playing > .cgrip69::before { animation: none !important; }
   html .tree42 .qb42.playing > .cgrip69::after, html .tree42 .qb42.playing > .cgrip69::before { opacity: 0 !important; }

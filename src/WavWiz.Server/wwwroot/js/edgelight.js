@@ -7,7 +7,7 @@ export const EDGE_STYLES = [
   ['pipe', 'Light pipe', 'One light travels down the edge'],
   ['heartbeat', 'Heartbeat', 'A subtle lub-dub: two quick swells of the glow, then rest'],
   ['heartthrob', 'Heartthrob', 'A slow, gentle throb, like breathing'],
-  ['gradient', 'Gradient', 'Your theme colors flow smoothly down the edge'],
+  ['gradient', 'Gradient', 'The whole edge fades smoothly through your theme colors'],
   ['off', 'Off', 'A lit edge, no motion'],
 ];
 export const DEFAULT_EDGE = 'wave';

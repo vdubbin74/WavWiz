@@ -36,13 +36,15 @@ test('0.7.2 edge light CSS: one rule per new style, composited keyframes, still 
   }
   for (const old of ['comet', 'pulse', 'dual']) { assert.doesNotMatch(css, new RegExp(`data-edgelight="${old}"`), old); assert.doesNotMatch(css, new RegExp(`\\.edsw\\.${old}\\{`), old + ' swatch'); }
   assert.doesNotMatch(css, /@keyframes ww-lp-(dual|shim|beat)\b/);
-  for (const k of ['lubdub', 'throb', 'flow']) {
+  for (const k of ['lubdub', 'throb', 'fade2', 'fade3']) {
     const m = css.match(new RegExp(`@keyframes ww-lp-${k} \\{([^\\n]*)\\}`)); assert.ok(m, k);
     assert.doesNotMatch(m[1], /\b(top|height|left|box-shadow|filter|background)\s*:/, k + ': transform / opacity only');
   }
   assert.match(css, /animation: ww-lp-lubdub var\(--el-beat, \.83s\)/, 'Heartbeat 72 bpm');
   assert.match(css, /animation: ww-lp-throb 3\.2s ease-in-out infinite/);
-  assert.match(css, /animation: ww-lp-flow 4\.5s linear infinite/);
+  assert.match(css, /animation: ww-lp-fade2 6s ease-in-out infinite/); assert.match(css, /animation: ww-lp-fade3 6s ease-in-out infinite/);
+  assert.doesNotMatch(css, /ww-lp-flow/, 't2167u: no sliding band any more');
+  const g = css.slice(css.indexOf('html[data-edgelight="gradient"] .tree42 .qb42.playing > .cgrip69::after {')); assert.match(g.slice(0, g.indexOf('}')), /top: 0; bottom: 0;[^}]*opacity: 0;/, 't2167u: the overlay covers the whole edge');
   const i = css.indexOf('@media (prefers-reduced-motion: reduce) {\n  html .tree42 .qb42.playing > .cgrip69'); const b = css.slice(i, css.indexOf('\n}\n', i));
   assert.match(b, /html\[data-edgelight="heartbeat"\][^{]*::after, html\[data-edgelight="heartthrob"\][^{]*::after \{ opacity: \.35 !important; \}/);
   assert.match(b, /html\[data-edgelight="gradient"\][^{]*::after \{ opacity: 1 !important; \}/);
