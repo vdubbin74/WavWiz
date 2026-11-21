@@ -109,8 +109,8 @@ public sealed class InputResponder : IDisposable
         lock (_l)
         {
             if (_running.ContainsKey(id)) return;
-            try { _running[id] = _inputs.Start(id, (b, rate, ch) => OnBlock(id, b, rate, ch), why => { Stop(id); _ = _report(ErrorReason(id, why)); }); _log("input started: " + id); }
-            catch (Exception e) { _log($"input {id} failed to start: {e.Message}"); _ = _report(ErrorReason(id, InputRules.FailReason(e))); }   // 0.7.2 t2170u: privacy refusal in plain words
+            try { _running[id] = _inputs.Start(id, (b, rate, ch) => OnBlock(id, b, rate, ch), why => { _log($"input {id} failed: {why}"); Stop(id); _ = _report(ErrorReason(id, why)); }); _log("input started: " + id); }
+            catch (Exception e) { _log($"input {id} failed to start: {InputRules.Describe(e)}"); _ = _report(ErrorReason(id, InputRules.FailReason(e))); }   // 0.7.2 t2170u: privacy refusal in plain words
         }
     }
 
@@ -141,15 +141,31 @@ public sealed class InputResponder : IDisposable
 /// 0.7.2: pure rules the Windows input provider uses (kept here so they are tested on Linux): which capture endpoints are Aux / S/PDIF / mic,
 /// when process loopback is available, and the echo guard for the older "whole device" loopback.
 /// </summary>
+/// <summary>0.7.2 t2176u: thrown by an input provider only after Windows' microphone consent store was read and says Deny.</summary>
+public sealed class MicPrivacyException(Exception inner) : UnauthorizedAccessException("Windows microphone privacy is set to Deny", inner);
+
 public static class InputRules
 {
     /// <summary>0.7.2 t2170u: the reason starts with this when Windows' microphone privacy setting refused capture (E_ACCESSDENIED).</summary>
     public const string PrivacyTag = "privacy:";
     public const string PrivacyText = "Windows is blocking the microphone. Turn on 'Microphone access' and 'Let desktop apps access your microphone' in Windows Settings > Privacy & security > Microphone, then press Play again.";
-    /// <summary>0.7.2 t2170u: E_ACCESSDENIED (0x80070005) from Core Audio = the privacy switch; anything else keeps its own message.</summary>
-    public static string FailReason(Exception e) =>
-        e.HResult == unchecked((int)0x80070005) || e.Message.Contains("0x80070005", StringComparison.OrdinalIgnoreCase) || e is UnauthorizedAccessException
-            ? PrivacyTag + PrivacyText : e.Message;
+    public static bool IsAccessDenied(Exception e) =>
+        e.HResult == unchecked((int)0x80070005) || e.Message.Contains("0x80070005", StringComparison.OrdinalIgnoreCase) || e is UnauthorizedAccessException;
+    /// <summary>0.7.2 t2176u: E_ACCESSDENIED is the privacy switch ONLY when the provider checked Windows' consent store and it says Deny
+    /// (<see cref="MicPrivacyException"/>); any other access denied shows the real error plainly (HRESULT + message), never a privacy claim
+    /// that sends the user to a setting that is already on.</summary>
+    public static string FailReason(Exception e)
+    {
+        if (e is MicPrivacyException) return PrivacyTag + PrivacyText;
+        if (IsAccessDenied(e)) return $"Windows refused to open this input (access denied, 0x{e.HResult:X8}); microphone access is allowed, so this is not the privacy setting: {e.Message}";
+        return e.Message;
+    }
+    /// <summary>0.7.2 t2176u: one log line with the HRESULT, type and the failing call (top stack frame).</summary>
+    public static string Describe(Exception e)
+    {
+        var top = e.StackTrace?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "";
+        return $"0x{e.HResult:X8} {e.GetType().Name}: {e.Message} {top}".TrimEnd();
+    }
 
     public const string DeviceLoopback = "loopback:device";
     /// <summary>Windows 10 version 2004 (build 19041): process loopback (capture everything except one process tree).</summary>

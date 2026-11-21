@@ -274,28 +274,45 @@ public class Release072InputsTests
     }
 
     // ---------------- 0.7.2 t2170u: Windows' microphone privacy ----------------
-    private sealed class DeniedMic(SynthInputProvider inner) : IInputProvider
+    private sealed class DeniedMic(SynthInputProvider inner, bool consentDeny = true) : IInputProvider
     {
         public int Tries;
         public IReadOnlyList<InputInfo> List() => inner.List();
         public IDisposable Start(string id, Action<float[], int, int> onBlock, Action<string> onError)
         {
             if (inner.List().First(x => x.Id == id).Kind != "mic") return inner.Start(id, onBlock, onError);
-            Interlocked.Increment(ref Tries); throw new System.Runtime.InteropServices.COMException("Core Audio error 0x80070005", unchecked((int)0x80070005));
+            Interlocked.Increment(ref Tries); var e = new System.Runtime.InteropServices.COMException("Core Audio error 0x80070005", unchecked((int)0x80070005));
+            throw consentDeny ? new MicPrivacyException(e) : e;
         }
     }
 
     [Fact]
     public void Access_denied_becomes_the_plain_privacy_reason_and_other_errors_keep_their_text()
     {
-        var r = InputRules.FailReason(new System.Runtime.InteropServices.COMException("x", unchecked((int)0x80070005)));
+        var denied = new System.Runtime.InteropServices.COMException("x", unchecked((int)0x80070005));
+        var r = InputRules.FailReason(new MicPrivacyException(denied));                                   // consent store said Deny
         Assert.StartsWith(InputRules.PrivacyTag, r); Assert.Contains("Let desktop apps access your microphone", r);
-        Assert.StartsWith(InputRules.PrivacyTag, InputRules.FailReason(new Exception("Core Audio error 0x80070005")));
+        // 0.7.2 t2176u: access denied with privacy Allowed is NOT called privacy: the real error, plainly
+        var plain = InputRules.FailReason(denied); Assert.False(plain.StartsWith(InputRules.PrivacyTag)); Assert.Contains("0x80070005", plain); Assert.Contains("not the privacy setting", plain);
+        Assert.False(InputRules.FailReason(new Exception("Core Audio error 0x80070005")).StartsWith(InputRules.PrivacyTag));
+        Assert.Contains("0x80070005", InputRules.Describe(denied));
         Assert.Equal("device unplugged", InputRules.FailReason(new Exception("device unplugged")));
         Assert.True(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-microphone\"}"));
         Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-webcam\"}"));
         Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage("{\"open\":\"ms-settings:privacy-microphone\",\"x\":1}"));
         Assert.False(WavWiz.PlayerCore.UiUrl.IsMicSettingsMessage(null));
+    }
+
+    [Fact]
+    public async Task Access_denied_with_privacy_allowed_shows_the_real_error_not_the_privacy_message()
+    {
+        var (f, admin, control, pc, _) = await Setup(new DeniedMic(new SynthInputProvider(), consentDeny: false)); await using var _f = f; await using var _p = pc;
+        var id = (await Input(admin, "mic")).GetProperty("id").GetString();
+        await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true, liveSource = true });
+        Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);
+        await Until(async () => (await Input(admin, "mic")).GetProperty("error").ValueKind == JsonValueKind.String, "the refusal did not reach the server");
+        var mic = await Input(admin, "mic");
+        Assert.False(mic.GetProperty("privacy").GetBoolean()); Assert.Contains("0x80070005", mic.GetProperty("error").GetString()); Assert.DoesNotContain("Windows is blocking", mic.GetProperty("error").GetString());
     }
 
     [Fact]

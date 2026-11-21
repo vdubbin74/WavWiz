@@ -60,7 +60,8 @@ public sealed class WasapiInputProvider : IInputProvider, IDisposable
     {
         if (inputId == InputIds.ProcessLoopback) return StartRecorder(inputId, ProcessRecorder(), onBlock, onError);
         if (inputId == InputRules.DeviceLoopback) return StartRecorder(inputId, DeviceLoopbackRecorder(), onBlock, onError);
-        return StartEndpoint(inputId, onBlock, onError);
+        try { return StartEndpoint(inputId, onBlock, onError); }
+        catch (Exception e) when (InputRules.IsAccessDenied(e) && MicConsent.Denied()) { throw new MicPrivacyException(e); }
     }
 
     // ---------------- loopback (NAudio WasapiRecorder) ----------------
@@ -137,7 +138,7 @@ public sealed class WasapiInputProvider : IInputProvider, IDisposable
                     }
                 }
             }
-            catch (Exception e) { if (!cts.IsCancellationRequested) onError(InputRules.FailReason(e)); }     // unplugged / driver reset; 0.7.2 t2170u: 0x80070005 = the privacy switch
+            catch (Exception e) { if (!cts.IsCancellationRequested) { _log($"input {id} capture failed: {InputRules.Describe(e)}"); onError(InputRules.FailReason(InputRules.IsAccessDenied(e) && MicConsent.Denied() ? new MicPrivacyException(e) : e)); } }     // unplugged / driver reset; 0.7.2 t2170u: 0x80070005 = the privacy switch
             finally { try { client.Stop(); } catch { } try { client.Dispose(); } catch { } try { dev.Dispose(); } catch { } }
         }) { IsBackground = true, Name = "wavwiz-input", Priority = ThreadPriority.AboveNormal };
         thread.Start();
@@ -148,4 +149,24 @@ public sealed class WasapiInputProvider : IInputProvider, IDisposable
     private static string? Safe(Func<string> f) { try { return f(); } catch { return null; } }
     private static string? Prop(MMDevice d, PropertyKey k) { try { return d.Properties.Contains(k) ? d.Properties[k].Value?.ToString() : null; } catch { return null; } }
     public void Dispose() => _enum.Dispose();
+}
+
+/// <summary>0.7.2 t2176u: Windows' microphone consent store (Settings > Privacy & security > Microphone), read only. Deny anywhere that applies
+/// to a desktop app (the machine switch, the user switch, "Let desktop apps access", or the AppPrivacy policy forcing deny) = privacy.</summary>
+internal static class MicConsent
+{
+    private const string Store = @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+    public static bool Denied()
+    {
+        try
+        {
+            static string? V(Microsoft.Win32.RegistryKey root, string path) { using var k = root.OpenSubKey(path); return k?.GetValue("Value") as string; }
+            bool deny(string? v) => string.Equals(v, "Deny", StringComparison.OrdinalIgnoreCase);
+            var lm = Microsoft.Win32.Registry.LocalMachine; var cu = Microsoft.Win32.Registry.CurrentUser;
+            if (deny(V(lm, Store)) || deny(V(cu, Store)) || deny(V(cu, Store + @"\NonPackaged"))) return true;
+            using var pol = lm.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy");
+            return pol?.GetValue("LetAppsAccessMicrophone") is int p && p == 2;
+        }
+        catch { return false; }   // can't read = unknown = not claimed as privacy
+    }
 }
