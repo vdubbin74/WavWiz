@@ -6499,14 +6499,16 @@ html.pd42-open .mx-bar.mx-bar-pin{display:none}
 .tree42.mx-on .zl-now,.tree42.mx-on .zc42-2,.tree42.mx-on .zc42-1 .zacts{display:none!important}
 .tree42.mx-on .zc42-1{min-height:26px}
 .tree42.mx-on .zcard42{padding-top:4px;padding-bottom:2px}
-.tree42.mx-on .sp42.mx-sp{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-height:34px}
-.tree42.mx-on .sp42.mx-sp>.sp42-nt{flex:0 0 auto;min-width:0;max-width:46%;display:flex;align-items:center}
-.tree42.mx-on .sp42.mx-sp>.sp42-nt .sp42-n{max-width:none}
+.tree42.mx-on .sp42.mx-sp{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-height:34px;padding-bottom:4px}
+.tree42.mx-on .sp42.mx-sp>.sp42-nt{flex:1 1 auto!important;min-width:0;max-width:none!important;display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start!important}
+.tree42.mx-on .sp42.mx-sp>.sp42-nt .sp42-n{flex:0 1 auto!important;width:auto!important;max-width:100%;text-align:left!important}
 .tree42.mx-on .sp42.mx-sp>.sp42-nt .sp42-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tree42.mx-on .mx-vol{flex:1 1 auto;display:flex;align-items:center;gap:6px;min-width:60px}
+.tree42.mx-on .mx-l2{flex:1 0 100%;display:flex;align-items:center;gap:8px;min-width:0;padding-left:14px;box-sizing:border-box}
+.tree42.mx-on section.qb42.linked .mx-l2{margin-left:-7px;margin-right:-7px;width:calc(100% + 14px)}   /* linked boxes nest their zone cards 7 px further in: same slider edges as a solo zone */
+.tree42.mx-on .mx-vol{flex:1 1 auto;display:flex;align-items:center;gap:6px;min-width:0}
 .tree42.mx-on .mx-vol input{flex:1;min-width:40px;width:100%;margin:0}
 .tree42.mx-on .mx-pct{min-width:2.8em;text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--dim)}
-.tree42.mx-on .mx-chev{flex:none;position:static!important;margin:0}
+.tree42.mx-on .mx-chev{flex:none;position:static!important;margin:0 0 0 auto}
 .tree42.mx-on .mx-chev.open{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 .tree42.mx-on .mx-drawer{margin:0 0 6px 22px}
 .tree42.mx-on .mx-drawer[hidden]{display:none}
@@ -6516,3 +6518,7 @@ html.pd42-open .mx-bar.mx-bar-pin{display:none}
 html.handset .tree42.mx-on .mx-drawer{margin-left:8px}
 html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:4px}
 html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.n{grid-area:n} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>input{grid-area:s} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
+/* 0.7.2 t2152u: a speaker row's status dot sits beside the name's text line (not centered between the name and its tag line); mixer rows center it on line 1 */
+.tree42 .sp42>.dot{align-self:flex-start;margin-top:7px}
+html.handset .tree42 .sp42>.dot{margin-top:9px}
+.tree42.mx-on .sp42.mx-sp>.dot{align-self:center;margin-top:0}

@@ -29,8 +29,10 @@ test('mode state: Done and Esc leave it; the tree and the bar redraw from it', (
 
 test('one-line speaker rows in the same tree order: no tags, volume + %, mute, chevron, drawer after the row', () => {
   assert.match(tree, /class: 'tree42' \+ \(mx \? ' mx-on' : ''\)/);
-  assert.match(tree, /if \(mx\) \{[^\n]*\n\s*row\.classList\.add\('mx-sp'\); row\.querySelector\('\.sp42-tags'\)\?\.remove\(\); row\.querySelector\('\.sp42-v'\)\?\.remove\(\);/);
-  assert.match(tree, /row\.querySelector\('\.sp42-mute'\)\?\.before\(mixVol\(S, z\)\); row\.append\(mixChev\(z, dr\)\)/);
+  assert.match(tree, /if \(mx\) \{[^\n]*\n(?:\s*\/\/[^\n]*\n)?\s*row\.classList\.add\('mx-sp'\); row\.querySelector\('\.sp42-tags'\)\?\.remove\(\); row\.querySelector\('\.sp42-v'\)\?\.remove\(\);/);
+  assert.match(tree, /l2 = h\('div', \{ class: 'mx-l2' \}, mixVol\(S, z\), mb\);\n\s*row\.append\(mixChev\(z, dr\), l2\)/, 'line 1 = dot + name + chevron; line 2 = slider, %, mute');
+  assert.match(css, /\.tree42\.mx-on \.mx-l2\{flex:1 0 100%;/, 'line 2 is full width');
+  assert.match(css, /\.tree42\.mx-on section\.qb42\.linked \.mx-l2\{margin-left:-7px;margin-right:-7px;width:calc\(100% \+ 14px\)\}/, 'same slider edges in linked and solo zones');
   assert.match(tree, /ms\.flatMap\(z => spRows\(z, g\.id\)\)/);
   assert.match(mixer, /class: 'plus chv zfold42-t mx-chev'/, 'the zone card chevron (same classes / size)');
   assert.match(css, /\.tree42\.mx-on \.dtag,\.tree42\.mx-on \.dtagrow:empty\{display:none!important\}/);
@@ -44,4 +46,13 @@ test('kept behaviours: Max before Delay, admin cap / canTune delay, wheel gate',
   assert.match(d, /\/outputs\/\$\{encodeURIComponent\(c\.deviceId\)\}\/latency`, \{ method: 'PUT', body: \{ latencyMs: v, playerId: z\.playerId, live: true, method: 'manual' \} \}/);
   assert.match(d, /clamp\(v, 0, 600\)/);
   assert.match(slider, /const inMixer = r\.closest\?\.\('\.tree42\.mx-on'\);\n\s*if \(inMixer && !r\.closest\?\.\('section\.qb42\.mx-ctl'\)\) return;/);
+});
+
+test('t2155u: normal Devices speaker rows stay as they were (no slider; % + mute + tags); only the dot moves beside the name', () => {
+  const row = tree.slice(tree.indexOf('const spRow = (z, gid) => {'), tree.indexOf('if (mx) {   // 0.7.2 Volume Mixer'));
+  assert.doesNotMatch(row, /type: 'range'|mixVol|mx-l2/, 'no slider outside the mixer');
+  assert.match(row, /h\('span', \{ class: 'sp42-v small', title: 'Volume' \}, `\$\{Math\.round\(z\.volume\)\}%`\)/);
+  assert.match(row, /h\('span', \{ class: 'dtagrow sp42-tags' \}, tagEls3\(tags\)\)/);
+  assert.match(css, /\.tree42 \.sp42>\.dot\{align-self:flex-start;margin-top:7px\}/);
+  assert.match(css, /\.tree42\.mx-on \.sp42\.mx-sp>\.dot\{align-self:center;margin-top:0\}/);
 });

@@ -164,9 +164,11 @@ export function treeEl(S, ctl, kit, st) {
       ro((() => { const mb = h('button', { type: 'button', class: 'mutebtn sp42-mute' + (z.muted ? ' on' : ''), 'aria-pressed': String(!!z.muted), 'aria-label': (z.muted ? 'Unmute ' : 'Mute ') + z.name, title: z.muted ? 'Unmute' : 'Mute', 'data-icon': z.muted ? 'mute' : 'volume',
         onclick: ev => { ev.stopPropagation(); const cur = (S.zones || []).find(x => x.id === z.id) || z; const next = !cur.muted; cur.muted = next; z.muted = next; ctl.act(`/zones/${z.id}`, { muted: next }, 'PATCH');
           mb.classList.toggle('on', next); mb.setAttribute('aria-pressed', String(next)); mb.setAttribute('aria-label', (next ? 'Unmute ' : 'Mute ') + z.name); mb.title = next ? 'Unmute' : 'Mute'; setIcon(mb, next ? 'mute' : 'volume'); mb.dataset.icon = next ? 'mute' : 'volume'; } }, icon(z.muted ? 'mute' : 'volume')); return mb; })(), canControl(S), 'Your access is view-only.'));
-    if (mx) {   // 0.7.2 Volume Mixer: [grip] dot name | volume bar % | mute | chevron - tags and the plain % step aside; the drawer follows the row
+    if (mx) {   // 0.7.2 Volume Mixer (t2153u / t2155u): line 1 = [grip] dot name ... chevron; line 2 = a full-width volume bar, %, mute (every slider the same length).
+      // Tags and the plain % step aside; the Max volume / Delay drawer follows the row. Normal Devices rows are unchanged.
       row.classList.add('mx-sp'); row.querySelector('.sp42-tags')?.remove(); row.querySelector('.sp42-v')?.remove();
-      const dr = mixDrawer(S, ctl, z); row.querySelector('.sp42-mute')?.before(mixVol(S, z)); row.append(mixChev(z, dr)); row._mxDr = dr;
+      const dr = mixDrawer(S, ctl, z), mb = row.querySelector('.sp42-mute'), l2 = h('div', { class: 'mx-l2' }, mixVol(S, z), mb);
+      row.append(mixChev(z, dr), l2); row._mxDr = dr;
     }
     speakerCtx(z, row, gid != null);
     return row;
