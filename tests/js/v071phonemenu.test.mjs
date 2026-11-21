@@ -31,12 +31,30 @@ test('phone drawer reuses createCompactPcNav and keeps the WavWiz BETA + Done he
   assert.match(phoneFn, /createCompactPcNav\(S, ctl, \{ onClose, desktop: !phone \}\)/);
   assert.match(phoneFn, /if \(!phone\) return nav/);
   assert.match(phoneFn, /class: 'row drawer-head'/);
-  assert.match(phoneFn, /h\('b', null, 'WavWiz'\)/);
+  assert.match(menu, /import \{ brandMark \} from '\.\/brand\.js'/);
+  assert.match(phoneFn, /brandMark\(\)/);
+  assert.doesNotMatch(phoneFn, /h\('b', null, 'WavWiz'\)/);
   assert.match(phoneFn, /class: 'beta'/);
   assert.match(phoneFn, /versionLabel \|\| 'BETA'/);
   assert.match(phoneFn, /class: 'drawer-close'/);
   assert.match(phoneFn, /'Done'/);
   assert.doesNotMatch(phoneFn, /max-width/);
+});
+
+test('drawer header wordmark is the shared brandMark (theme colors, not a plain white WavWiz)', () => {
+  assert.match(js('main.js'), /titlebarLogo\(\(\) => brandMark\(\)\)/, 'title bar already uses brandMark');
+  assert.match(js('brand.js'), /wav\.className = 'wm-wav'/);
+  assert.match(js('brand.js'), /wiz\.className = 'wm-wiz'/);
+  assert.match(js('brand.js'), /if \(LOGO\.header && opts\.emblem !== false\) wrap\.append\(emblem\('pf-emblem brand-emblem'\)\)/);
+  // colors come from the existing wordmark / emblem CSS variables — the drawer adds no hex colors
+  const tag = '0.7.1 t2117u: the phone drawer reuses';
+  const block = css.slice(css.indexOf(tag), css.indexOf('A–Z letter finder'));
+  assert.match(block, /html\.handset \.drawer nav\.desk-menus \.drawer-head \.wordmark/);
+  assert.match(block, /html\.handset \.drawer nav\.desk-menus \.drawer-head \.brand-emblem/);
+  assert.doesNotMatch(block, /#[0-9A-Fa-f]{3,8}/);
+  assert.match(css, /\.wordmark \.wm-wav\{color:var\(--accent-text,var\(--accent\)\)/);
+  assert.match(css, /\.wordmark \.wm-wiz\{color:var\(--accent2-text,var\(--accent2\)\)/);
+  assert.doesNotMatch(block, /@media\s*\(max-width/);
 });
 
 test('handset File group is the same spec as the PC menu, with the same admin rows and hide predicates', () => {
@@ -64,6 +82,7 @@ test('Phone role… stays in Devices (phones only, not Player WebView); no pins 
 
 test('narrow non-handset compact menu is unchanged: pins, shortcuts, flyout-when-it-fits, no header', () => {
   assert.doesNotMatch(compact, /class: 'row drawer-head'/);
+  assert.doesNotMatch(compact, /brandMark\(\)/);
   assert.doesNotMatch(compact, /h\('b', null, 'WavWiz'\)/);
   assert.doesNotMatch(compact, /'Done'/);
   assert.match(compact, /FLYOUT_MIN_W = 220/);

@@ -16,6 +16,7 @@ import { shouldOffer, a2hsCard, rememberedNote, boot as a2hsBoot } from './a2hs.
 import { keysFor, shortcutsBody } from './hotkeys.js';
 import { pinToggle, loadPins, pinInfo, MAX_PINS } from './shortcuts.js';
 import { importSettings, restoreBackup, exportSettings, backUpNow } from './backupflow.js';
+import { brandMark } from './brand.js';   // 0.7.1 t2119u: drawer header uses the same themed wordmark (+ emblem) as the app title bar
 
 
 /** 0.3.7 L8: a small pin on a menu row pins / unpins that destination as a shortcut (max 3; Home + pins live in the Now Playing bar and the mini player). */
@@ -258,8 +259,9 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
   const nav = createCompactPcNav(S, ctl, { onClose, desktop: !phone });
   if (!phone) return nav;
   a2hsBoot();
+  // Same brand as the title bar (brandMark = Parallel Flow emblem + Wav/Wiz wordmark in the theme colors).
   nav.prepend(h('div', { class: 'row drawer-head', style: 'padding:4px 8px 10px;gap:8px' },
-    h('b', null, 'WavWiz'), h('span', { class: 'beta', 'data-wwv': 'BETA {v}' }, versionLabel || 'BETA'), h('span', { class: 'grow' }),
+    brandMark(), h('span', { class: 'beta', 'data-wwv': 'BETA {v}' }, versionLabel || 'BETA'), h('span', { class: 'grow' }),
     h('button', { type: 'button', class: 'drawer-close', 'data-act': 'drawer-close', 'aria-label': 'Close the menu', onclick: () => onClose?.() }, 'Done')));
   if (shouldOffer({})) nav.insertBefore(
     h('button', { type: 'button', class: 'a2hs-entry', onclick: () => { onClose?.(); dialog('Add to Home Screen', a2hsCard(), [{ text: 'Close', cls: 'primary' }]); } }, 'Add to Home Screen'),
