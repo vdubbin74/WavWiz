@@ -6,7 +6,7 @@ const www = new URL('../../src/WavWiz.Server/wwwroot/', import.meta.url);
 const js = f => readFileSync(new URL('js/' + f, www), 'utf8'), css = () => readFileSync(new URL('app.css', www), 'utf8');
 test('0.6.8 narrow PC drawer: standard File/Library/Playback/Devices/Help (no views half / All menus)', () => {
   const m = js('menu.js'), s = css();
-  assert.match(m, /if \(!isPhoneUa\(\)\) return createCompactPcNav/);
+  assert.match(m, /createCompactPcNav\(S, ctl, \{ onClose, desktop: !phone \}\)/);
   assert.match(m, /function createCompactPcNav/);
   assert.match(m, /class: 'desk-menus desk-fly'/);
   assert.doesNotMatch(m, /'All menus'/);
@@ -46,14 +46,17 @@ test('0.6.8 menu pins use themed SVG icon (no emoji pushpin)', () => {
   assert.match(s, /\.drawer nav\.desk-menus \.mpin/);
   assert.match(s, /\.drawer nav\.desk-menus \.mpin \.ic svg\{width:14px/);
 });
-test('0.6.8-#5 phone drawer: short F67 list only (no desktop All menus tree)', () => {
+test('0.7.1 t2117u phone drawer reuses the narrow-PC compact menu (no short F67 list / All menus)', () => {
   const m = js('menu.js');
   const i = m.indexOf('export function createPhoneDrawerNav');
   const j = m.indexOf('\nfunction createCompactPcNav', i);
   const phone = m.slice(i, j > 0 ? j : undefined);
-  assert.match(phone, /leaf\('Now Playing'/);
-  assert.match(phone, /leaf\('Settings'/);
-  assert.doesNotMatch(phone, /accordion\('File'/);
+  assert.match(phone, /htmlHandset\(\)/);
+  assert.match(phone, /createCompactPcNav\(S, ctl, \{ onClose, desktop: !phone \}\)/);
+  assert.match(phone, /drawer-head/);
+  assert.match(phone, /drawer-close/);
+  assert.doesNotMatch(phone, /leaf\('Now Playing'/);
+  assert.doesNotMatch(phone, /leaf\('Settings'/);
   assert.doesNotMatch(phone, /'All menus'/);
 });
 test('0.6.8-#5 phone-only restrictions use the device (isRealPhone), not the viewport width', () => {

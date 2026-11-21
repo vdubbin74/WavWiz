@@ -67,8 +67,8 @@ test('menu rows: label | pin | shortcut | arrow grid; adorn pins before kbd; lab
   const menu = js('menu.js');
   const s = css();
   assert.match(menu, /const mlbl = t => h\('span', \{ class: 'mlbl' \}, t\)/);
-  assert.match(menu, /function adorn\(btn, o, pins = true\) \{/);
-  assert.match(menu, /if \(o\?\.pin && pins\) btn\.append\(pinSpan\(o\.pin\)\);\s*if \(o\?\.kbd\) btn\.append\(h\('span', \{ class: 'kbd' \}, o\.kbd\)\)/);
+  assert.match(menu, /function adorn\(btn, o, pins = true, kbds = true\) \{/);
+  assert.match(menu, /if \(o\?\.pin && pins\) btn\.append\(pinSpan\(o\.pin\)\);\s*if \(o\?\.kbd && kbds\) btn\.append\(h\('span', \{ class: 'kbd' \}, o\.kbd\)\)/);
   assert.match(s, /grid-template-columns:6px minmax\(max-content,1fr\) var\(--col-pin\) var\(--col-kbd\) var\(--col-arr\) 6px/);
   assert.match(s, /\.mpanel button>\.mpin[\s\S]*?grid-column:3/);
   assert.match(s, /\.mpanel button>\.kbd[\s\S]*?grid-column:4/);

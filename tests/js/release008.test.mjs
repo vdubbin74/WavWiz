@@ -150,7 +150,7 @@ test('0.0.8 items 3-6: Devices panel collapse arrow saved per device; desktop me
   assert.match(css, /\.desk\{transition:grid-template-columns/); assert.match(d, /devcol/);
   assert.match(menu, /menuActions\(S, ctl, true\)/, 'desktop menu bar asks for panel toggles');
   assert.match(menu, /\['Browse library', browseLib[^\]]*\]/); assert.match(menu, /\['Devices & zones', devPanel[^\]]*\]/);
-  assert.match(menu, /createPhoneDrawerNav[\s\S]*menuActions\(S, ctl\)\;/, 'phone drawer keeps the full-screen pages');
+  assert.match(menu, /createCompactPcNav\(S, ctl, \{ onClose, desktop: !phone \}\)/, 'phone drawer keeps the full-screen pages');
 });
 
 // ---- item 7: delay slider

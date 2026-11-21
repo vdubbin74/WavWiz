@@ -9,7 +9,7 @@ import { openCalibration } from './calibrate.js';
 import { canControl, ADMIN_HINT } from './ui.js';
 import { signInAsAdmin, leaveAdmin } from './elevate.js';
 import { changePhoneRole } from './room.js';
-import { isPhoneUa, isPlayerUa, isHandset } from './phonejoin.js';
+import { isPhoneUa, isPlayerUa } from './phonejoin.js';
 import { NEW_KEYS, sleepSpec, eqSpec, playlistsSpec, zonesSpec, scenesSpec, deviceListSpec, runSpec } from './menusub.js';
 import { icon } from './icons.js';
 import { shouldOffer, a2hsCard, rememberedNote, boot as a2hsBoot } from './a2hs.js';
@@ -36,9 +36,11 @@ export function drawerOutsideClick(drawer, target) {
   return true;
 }
 const mlbl = t => h('span', { class: 'mlbl' }, t);
-function adorn(btn, o, pins = true) {
+/** Real phone chrome (html.handset). Never keyed off window width, so a narrow PC window stays desktop. */
+const htmlHandset = () => typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');
+function adorn(btn, o, pins = true, kbds = true) {
   if (o?.pin && pins) btn.append(pinSpan(o.pin));
-  if (o?.kbd) btn.append(h('span', { class: 'kbd' }, o.kbd));
+  if (o?.kbd && kbds) btn.append(h('span', { class: 'kbd' }, o.kbd));
   if (o?.heading) btn.classList.add('mheading');
 }
 function menuActions(S, ctl, desktop = false) {
@@ -246,76 +248,22 @@ export function createMenuBar(S, ctl) {
   return bar;
 }
 
-/** Phone hamburger: same top-level items as the PC menu bar, accordion submenus, large tap targets. */
+/** Phone / compact hamburger. A narrow PC window gets the standard File / Library / Playback / Devices / Help
+ *  compact menu (flyout when there is room, accordion when not). A real phone (html.handset) reuses that same
+ *  menu — same groups, items, order, and accordion expand — plus the WavWiz BETA + Done header. Phone-only
+ *  differences (header, larger rows, no shortcut hints / pin icons, forced accordion) are gated on html.handset,
+ *  never on window width. Phone role… stays in Devices (phones only, not the Player WebView). */
 export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
-  // 0.6.8: a narrow PC / desktop Player window gets the standard File / Library / Playback / Devices / Help
-  // menus (flyout when there is room, accordion when not). No views half / "All menus" / Done. Real phones keep the short F67 list.
-  if (!isPhoneUa()) return createCompactPcNav(S, ctl, { onClose, versionLabel });
-  const A = menuActions(S, ctl);
-  const nav = h('nav', { 'aria-label': 'Menu' });
-  nav.append(h('div', { class: 'row', style: 'padding:4px 8px 10px;gap:8px' },
-    h('b', null, 'WavWiz'), h('span', { class: 'beta', 'data-wwv': 'BETA {v}' }, versionLabel || 'BETA'), h('span', { class: 'grow' }),
-    h('button', { type: 'button', class: 'drawer-close', 'data-act': 'drawer-close', 'aria-label': 'Close the menu', onclick: () => onClose?.() }, 'Done')));   // 0.4.6 F43: a clear way out
-
-  function close() { onClose?.(); }
-  function leaf(label, run, opts = {}) {
-    return h('button', {
-      type: 'button',
-      class: opts.check ? 'check' : (opts.nocheck ? 'nocheck' : ''),
-      disabled: opts.disabled || undefined,
-      onclick: () => { close(); run?.(); },
-    }, mlbl(label));
-  }
-  function fromSpec(spec) {
-    return spec.map(s => {
-      if (s === 'hr') return h('hr');
-      const [label, fn, dis, hide, o] = s;
-      if (hide?.()) return null;
-      if (o?.sub) { const n = nestedAsync(label, o.sub); adorn(n.querySelector(':scope > button'), o, !isPhoneUa()); return n; }   // 0.6.8-#5
-      const b = leaf(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;
-      adorn(b, o, !isPhoneUa());   // 0.6.8-#5: pins are a desktop feature - kept in a narrow PC window
-      return b;
-    }).filter(Boolean);
-  }
-  function accordion(label, kidsBuilder) {
-    const box = h('div', { class: 'macc' });
-    const panel = h('div', { class: 'mpanel' });
-    const btn = h('button', { type: 'button', onclick: () => {
-      const open = box.classList.toggle('open');
-      if (open) { panel.replaceChildren(...kidsBuilder()); nav.querySelectorAll('.macc.open').forEach(x => { if (x !== box) x.classList.remove('open'); }); }
-    } }, label);
-    box.append(btn, panel);
-    return box;
-  }
-  /** 0.3.6: the same choice lists as the PC flyouts, as tap-to-open accordions on the phone. */
-  function nestedAsync(label, subFn) {
-    const sub = h('div', { class: 'msub' }), panel = h('div', { class: 'mpanel' });
-    const btn = h('button', { type: 'button', onclick: async ev => { ev.stopPropagation(); const open = sub.classList.toggle('open'); if (!open) return; panel.replaceChildren(h('div', { class: 'mloading' }, 'Loading…')); let spec = []; try { spec = await subFn(); } catch { spec = []; } panel.replaceChildren(...fromSpec(spec)); } }, mlbl(label));
-    sub.append(btn, panel); return sub;
-  }
-  function nested(label, kids) {
-    const sub = h('div', { class: 'msub' });
-    const panel = h('div', { class: 'mpanel' }, ...kids);
-    const btn = h('button', { type: 'button', onclick: ev => { ev.stopPropagation(); sub.classList.toggle('open'); } }, mlbl(label));
-    sub.append(btn, panel);
-    return sub;
-  }
-
+  const phone = htmlHandset();
+  const nav = createCompactPcNav(S, ctl, { onClose, desktop: !phone });
+  if (!phone) return nav;
   a2hsBoot();
-  if (shouldOffer({})) nav.append(h('button', { type: 'button', class: 'a2hs-entry', onclick: () => { close(); dialog('Add to Home Screen', a2hsCard(), [{ text: 'Close', cls: 'primary' }]); } }, 'Add to Home Screen'), h('hr'));
-  // 0.4.9 F67: the phone menu is plain items (no submenus, no File / Playback / Mini player, no shortcut labels), each opening an existing view:
-  // Devices & Zones holds devices, zones, pairing and calibrate; Settings holds EQ / sound, away-from-home access and help / about.
-  // 0.5.0 F127: Phone role… (speaker / remote / calibration mic) has its own drawer row so phones can find it; skipped in the Player WebView.
-  nav.append(
-    leaf('Now Playing', () => ctl.go?.('now')),
-    leaf('Queue', () => (ctl.openQueue ? ctl.openQueue() : ctl.go?.('queue'))),
-    (() => { const b = leaf('Volume Mixer', () => window.dispatchEvent(new CustomEvent('wavwiz:mixer'))); if (!isHandset()) b.append(pinSpan('mixer')); return b; })(),   // F149: pinnable; 0.6.8-#11d: no pins on actual phones
-    leaf('Library', () => ctl.go?.('library')),
-    leaf('Devices & Zones', () => ctl.go?.('devices')),
-    ...(isPhoneUa() && !isPlayerUa() ? [leaf('Phone role…', () => changePhoneRole())] : []),
-    leaf('Scenes & Alarms', () => ctl.go?.('scenes')),
-    leaf('Settings', () => openSettings(S, ctl.refreshAll, ctl.go)),
-  );
+  nav.prepend(h('div', { class: 'row drawer-head', style: 'padding:4px 8px 10px;gap:8px' },
+    h('b', null, 'WavWiz'), h('span', { class: 'beta', 'data-wwv': 'BETA {v}' }, versionLabel || 'BETA'), h('span', { class: 'grow' }),
+    h('button', { type: 'button', class: 'drawer-close', 'data-act': 'drawer-close', 'aria-label': 'Close the menu', onclick: () => onClose?.() }, 'Done')));
+  if (shouldOffer({})) nav.insertBefore(
+    h('button', { type: 'button', class: 'a2hs-entry', onclick: () => { onClose?.(); dialog('Add to Home Screen', a2hsCard(), [{ text: 'Close', cls: 'primary' }]); } }, 'Add to Home Screen'),
+    nav.querySelector('.mgroup'));
   return nav;
 }
 
@@ -324,8 +272,8 @@ export function createPhoneDrawerNav(S, ctl, { onClose, versionLabel } = {}) {
  *  panel, submenus hover-fly out; otherwise they accordion (slide down inline). Views that used to sit
  *  in the top half stay reachable here (Now Playing under Playback; Queue / Library / Mixer / Devices /
  *  Scenes / Alarms / Settings already lived in these menus). Pins use the themed SVG icon (no emoji). */
-function createCompactPcNav(S, ctl, { onClose } = {}) {
-  const A = menuActions(S, ctl, true);
+function createCompactPcNav(S, ctl, { onClose, desktop = true } = {}) {
+  const A = menuActions(S, ctl, desktop);
   const nav = h('nav', { class: 'desk-menus desk-fly', 'aria-label': 'Main menu' });
   const FLYOUT_MIN_W = 220;   // submenu needs roughly this much free width to the right of the panel
   let openGroup = null;
@@ -334,6 +282,7 @@ function createCompactPcNav(S, ctl, { onClose } = {}) {
   const isAcc = () => mode === 'accordion';
   /** Prefer opening to the right of the menu panel; accordion when that would clip or leave < ~220px. */
   function flyoutFits() {
+    if (htmlHandset()) return false;   // 0.7.1 t2117u: phones always accordion (hover flyouts are a desktop behavior)
     const r = nav.getBoundingClientRect();
     if (!r.width) {
       const est = Math.min(200, Math.round(innerWidth * 0.72));
@@ -483,13 +432,14 @@ function createCompactPcNav(S, ctl, { onClose } = {}) {
     return panel;
   }
   function fromSpec(spec) {
+    const pins = !htmlHandset(), kbds = !htmlHandset();   // 0.7.1 t2117u: no pin icons / shortcut hints on a real phone
     return spec.map(s => {
       if (s === 'hr') return h('hr');
       const [label, fn, dis, hide, o] = s;
       if (hide?.()) return null;
-      if (o?.sub) { const f = flyout(label, fn, o.sub, !!dis?.()); adorn(f.querySelector(':scope > button'), o); return f; }
+      if (o?.sub) { const f = flyout(label, fn, o.sub, !!dis?.()); adorn(f.querySelector(':scope > button'), o, pins, kbds); return f; }
       const b = item(label, fn, { disabled: !!dis?.() || !fn }); if (dis?.()) b.title = ADMIN_HINT;
-      adorn(b, o);
+      adorn(b, o, pins, kbds);
       return b;
     }).filter(Boolean);
   }
@@ -509,7 +459,7 @@ function createCompactPcNav(S, ctl, { onClose } = {}) {
   // Click outside a panel (on the scrim) closes; Escape is handled by main.js toggleDrawer.
   // 0.6.8f (t1729u): the menu column's own empty space (below Help, around the rows) is "outside" too - a click there closes the menu
   // instead of doing nothing. Rows and their pins stop propagation, so only bare background reaches this.
-  nav.addEventListener('click', ev => { if (!ev.target.closest?.('button, [role=button], .mpanel')) closeDrawer(); });
+  nav.addEventListener('click', ev => { if (!ev.target.closest?.('button, [role=button], .mpanel, .drawer-head')) closeDrawer(); });
   nav.addEventListener('keydown', ev => { if (ev.key === 'Escape') { if (openGroup || nav.querySelector('.msub.open')) { closeAll(); ev.stopPropagation(); } } });
   return nav;
 }

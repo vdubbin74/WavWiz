@@ -20,8 +20,8 @@ function menuBlock(s) {
 test('menu.js still wraps labels and adorns pin before shortcut', () => {
   const src = menuJs();
   assert.match(src, /const mlbl = t => h\('span', \{ class: 'mlbl' \}, t\)/);
-  assert.match(src, /function adorn\(btn, o, pins = true\) \{/);
-  assert.match(src, /if \(o\?\.pin && pins\) btn\.append\(pinSpan\(o\.pin\)\);\s*if \(o\?\.kbd\) btn\.append\(h\('span', \{ class: 'kbd' \}, o\.kbd\)\)/);
+  assert.match(src, /function adorn\(btn, o, pins = true, kbds = true\) \{/);
+  assert.match(src, /if \(o\?\.pin && pins\) btn\.append\(pinSpan\(o\.pin\)\);\s*if \(o\?\.kbd && kbds\) btn\.append\(h\('span', \{ class: 'kbd' \}, o\.kbd\)\)/);
 });
 
 test('menu container is the shared grid; label track is max-content, not minmax(0,1fr)', () => {

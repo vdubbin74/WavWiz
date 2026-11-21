@@ -1,14 +1,12 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const src = readFileSync(new URL('../../src/WavWiz.Server/wwwroot/js/menu.js', import.meta.url), 'utf8');
-const i = src.indexOf('export function createPhoneDrawerNav'); assert.ok(i > 0);
-const fn = src.slice(i, src.indexOf('\n}\n', i));
-assert.match(fn, /leaf\('Phone role…', \(\) => changePhoneRole\(\)\)/);
-assert.match(fn, /isPhoneUa\(\) && !isPlayerUa\(\) \? \[leaf\('Phone role…'/);
-const d = fn.indexOf("leaf('Devices & Zones'"), r = fn.indexOf("leaf('Phone role…'"), s = fn.indexOf("leaf('Scenes & Alarms'");
-assert.ok(d < r && r < s, 'after Devices & Zones, before Scenes & Alarms');
+// 0.7.1 t2117u: Phone role… stays in the shared Devices spec (phones only, not the Player WebView).
+// The phone drawer reuses that same tree, so it is no longer a separate F67 leaf row.
 assert.match(src, /import \{ changePhoneRole \} from '\.\/room\.js'/);
-assert.ok(!/Settings holds[^\n]*phone role/.test(fn), 'F67 comment updated');
-// desktop Devices entry unchanged
 assert.match(src, /\['Phone role…', \(\) => changePhoneRole\(\), null, \(\) => !isPhoneUa\(\) \|\| isPlayerUa\(\)\]/);
+const i = src.indexOf("['Phone role…'");
+const file = src.lastIndexOf("file:", i), devices = src.lastIndexOf("devices:", i), help = src.lastIndexOf("help:", i);
+assert.ok(devices > file && (help === -1 || devices < help), 'Phone role… lives in the Devices group');
+assert.doesNotMatch(src, /leaf\('Phone role…'/);
 console.log('f127 ok');

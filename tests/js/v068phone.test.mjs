@@ -19,7 +19,7 @@ test('0.6.8-#11a/d phone row: moon Sleep only on handsets; pins gated', () => {
   assert.match(n, /icon\('moon'\), h\('span', \{ class: 'npsl-t' \}\)/);
   assert.match(js('scenesched.js'), /querySelector\('\.npsl-t'\)/);
   assert.match(js('main.js'), /if \(isHandset\(\)\) return;   \/\/ 0\.6\.8-#11d/);
-  assert.match(js('menu.js'), /if \(!isHandset\(\)\) b\.append\(pinSpan\('mixer'\)\)/);
+  assert.match(js('menu.js'), /const pins = !htmlHandset\(\), kbds = !htmlHandset\(\)/);
 });
 function fakeWin({ standalone = false, search = '', store = {} } = {}) {
   const st = { ...store }, calls = [];

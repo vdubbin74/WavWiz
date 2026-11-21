@@ -9,5 +9,5 @@ assert.equal(matchShortcut({ code: 'F11', repeat: true }), null);
 assert.match(rd('menu.js'), /\['Fullscreen', \(\) => toggleAppFull\(\)[^\n]*keysFor\('fullscreen'\)/);
 assert.match(rd('fullscreen.js'), /requestFullscreen\?\.\(\{ navigationUI: 'hide' \}\)/);
 assert.match(rd('main.js'), /case 'fullscreen': return toggleAppFull\(\)/);
-assert.ok(!/Fullscreen/.test(rd('menu.js').split('F67')[1] || ''), 'phone menu untouched');
+assert.match(rd('menu.js'), /\['Fullscreen', \(\) => toggleAppFull\(\), null, \(\) => isPhoneUa\(\) && !isPlayerUa\(\)/, 'Fullscreen stays in the shared Devices spec, hidden on phones');
 console.log('ok f120');

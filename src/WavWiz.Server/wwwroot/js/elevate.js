@@ -1,6 +1,6 @@
 // 0.2.0 item 31: File > Sign in as admin… elevates THIS session in place (same token, same pairing, same speaker - the music keeps playing),
 // File > Leave admin mode drops back to the paired role. No sign-out and no new pairing code either way. The header shows an "Admin" chip meanwhile.
-import { h, api, toast, dialog } from './util.js';
+import { h, api, toast, dialog, ask } from './util.js';
 
 export async function refreshAuth(S) {
   try { S.auth = await api('/auth/state'); } catch (e) { toast(e.message, true); return; }
@@ -29,10 +29,28 @@ export async function leaveAdmin(S) {
   await refreshAuth(S); toast('Admin mode is off.');
 }
 
-/** Small "Admin" chip for the header while this session is elevated (or signed in as the administrator). */
+/** Small "Admin" chip for the header while this session is elevated (or signed in as the administrator).
+ *  0.7.1 t2117u: on a real phone (html.handset) an elevated chip is tappable and offers Leave admin mode. A narrow PC window is unchanged. */
 export function adminChip(S) {
   const chip = h('span', { class: 'chip adminchip', title: 'Admin mode: administrator actions are unlocked. File > Leave admin mode switches back.', hidden: true }, 'Admin');
-  const draw = () => { chip.hidden = !(S.auth?.role === 'admin'); chip.classList.toggle('elev', !!S.auth?.elevated); };
+  const handset = () => typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset');
+  const tappable = () => handset() && !!S.auth?.elevated;
+  const draw = () => {
+    chip.hidden = !(S.auth?.role === 'admin');
+    chip.classList.toggle('elev', !!S.auth?.elevated);
+    const tap = tappable();
+    chip.classList.toggle('adminchip-tap', tap);
+    if (tap) { chip.setAttribute('role', 'button'); chip.setAttribute('tabindex', '0'); chip.title = 'Leave admin mode'; chip.setAttribute('aria-label', 'Leave admin mode'); }
+    else { chip.removeAttribute('role'); chip.removeAttribute('tabindex'); chip.removeAttribute('aria-label'); chip.title = 'Admin mode: administrator actions are unlocked. File > Leave admin mode switches back.'; }
+  };
+  const offerLeave = async ev => {
+    if (!tappable()) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const ok = await ask('Leave admin mode', 'Switch back to your usual access? This browser stays paired and keeps playing.', { ok: 'Leave admin mode', anchor: chip });
+    if (ok) await leaveAdmin(S);
+  };
+  chip.addEventListener('click', offerLeave);
+  chip.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') offerLeave(ev); });
   draw(); window.addEventListener('wavwiz:auth', draw);
   return chip;
 }

@@ -61,7 +61,7 @@ test('main.js wires the outside click in the capture phase; the menu column\'s o
   assert.match(mainJs, /import \{[^}]*drawerOutsideClick[^}]*\} from '\.\/menu\.js'/);
   assert.match(mainJs, /document\.addEventListener\('click', ev => \{ if \(drawerOutsideClick\(drawerEl, ev\.target\)\) toggleDrawer\(false\); \}, true\)/);
   assert.match(mainJs, /class: 'scrim', onclick: \(\) => toggleDrawer\(false\)/, 'scrim click still closes');
-  assert.match(menuJs, /nav\.addEventListener\('click', ev => \{ if \(!ev\.target\.closest\?\.\('button, \[role=button\], \.mpanel'\)\) closeDrawer\(\); \}\)/);
+  assert.match(menuJs, /nav\.addEventListener\('click', ev => \{ if \(!ev\.target\.closest\?\.\('button, \[role=button\], \.mpanel, \.drawer-head'\)\) closeDrawer\(\); \}\)/);
   assert.match(menuJs, /if \(ev\.key === 'Escape'\) \{ if \(openGroup \|\| nav\.querySelector\('\.msub\.open'\)\) \{ closeAll\(\);/, 'Escape still folds an open submenu first');
   assert.match(mainJs, /if \(ev\.key === 'Escape'\) toggleDrawer\(false\)/, 'Escape still closes the menu');
 });
