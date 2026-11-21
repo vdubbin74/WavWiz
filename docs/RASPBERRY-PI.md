@@ -1,7 +1,7 @@
-# WavWiz server on Raspberry Pi (0.7.1)
+# WavWiz server on Raspberry Pi (0.7.2)
 
-> **Status: published, not yet verified on real Raspberry Pi hardware.** The 0.7.1 arm64 build is on Docker Hub (`vdubbin74/wavwiz-server:0.7.1`,
-> also tagged `latest`, in a multi-arch manifest with amd64) and GitHub Releases (`wavwiz-server-0.7.1-linux-arm64.tar.gz`).
+> **Status: published, not yet verified on real Raspberry Pi hardware.** The 0.7.2 arm64 build is on Docker Hub (`vdubbin74/wavwiz-server:0.7.2`,
+> also tagged `latest`, in a multi-arch manifest with amd64) and GitHub Releases (`wavwiz-server-0.7.2-linux-arm64.tar.gz`).
 > It has been built and smoke-tested only under QEMU arm64 emulation on an x86-64 build machine (Docker image, plus the bare tarball
 > in Debian 13 and Debian 12 arm64 containers). Microsoft does not support running .NET under QEMU, so performance and timing on a
 > real Pi are still unknown. Please report what you find.
@@ -39,7 +39,7 @@ mkdir -p ~/wavwiz/wavwiz-data && cd ~/wavwiz && sudo chown 10001:10001 wavwiz-da
 ```yaml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.7.1
+    image: docker.io/vdubbin74/wavwiz-server:0.7.2
     container_name: wavwiz
     network_mode: host          # needed for discovery, mDNS (AirPlay/Cast speakers) and Players finding the server
     user: "10001:10001"
@@ -64,10 +64,10 @@ The image is Ubuntu 24.04 based (`mcr.microsoft.com/dotnet/aspnet:10.0`) and inc
 
 ## Option B: without Docker (systemd)
 
-Download `wavwiz-server-0.7.1-linux-arm64.tar.gz` (self-contained: no .NET install needed), then:
+Download `wavwiz-server-0.7.2-linux-arm64.tar.gz` (self-contained: no .NET install needed), then:
 
 ```sh
-tar -xzf wavwiz-server-0.7.1-linux-arm64.tar.gz
+tar -xzf wavwiz-server-0.7.2-linux-arm64.tar.gz
 sudo ./wavwiz-server/install.sh
 ```
 
