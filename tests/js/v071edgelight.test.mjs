@@ -11,9 +11,9 @@ const mem = () => { const m = new Map(); return { getItem: k => m.has(k) ? m.get
 
 test('styles, default and persistence', async () => {
   const e = await import(pathToFileURL(join(dir, 'edgelight.js')).href);
-  assert.deepEqual(e.EDGE_STYLES.map(([id, nm]) => nm), ['Waveform', 'Light pipe', 'Clean comet', 'Pulse', 'Dual streak', 'Off']);
+  assert.deepEqual(e.EDGE_STYLES.map(([id, nm]) => nm), ['Waveform', 'Light pipe', 'Heartbeat', 'Heartthrob', 'Gradient', 'Off']);
   const st = mem(); assert.equal(e.loadEdge(st), 'wave', 'default Waveform');
-  for (const id of ['pipe', 'comet', 'pulse', 'dual', 'off', 'wave']) { assert.equal(e.applyEdge(id, st), id); assert.equal(e.loadEdge(st), id); }
+  for (const id of ['pipe', 'heartbeat', 'heartthrob', 'gradient', 'off', 'wave']) { assert.equal(e.applyEdge(id, st), id); assert.equal(e.loadEdge(st), id); }
   assert.equal(e.applyEdge('bogus', st), 'wave'); st.setItem(e.EDGE_KEY, 'nope'); assert.equal(e.loadEdge(st), 'wave');
 });
 test('Appearance row: Zone edge light radios apply live; reset + reapply include it; main.js loads it at boot', () => {
@@ -27,7 +27,7 @@ test('Appearance row: Zone edge light radios apply live; reset + reapply include
 });
 test('CSS: one rule per style on the playing trim; Waveform is the default and uses a fixed px wavelength; no smear on short cards', () => {
   const sel = id => new RegExp(`html\\[data-edgelight="${id}"\\]\\)?[^{]*\\.qb42\\.playing > \\.cgrip69::after \\{`);
-  for (const id of ['pipe', 'comet', 'pulse', 'dual', 'wave', 'off']) assert.match(css, sel(id), id);
+  for (const id of ['pipe', 'heartbeat', 'heartthrob', 'gradient', 'wave', 'off']) assert.match(css, sel(id), id);
   assert.match(css, /:is\(html\[data-edgelight="wave"\], html:not\(\[data-edgelight\]\)\)/, 'Waveform without the attribute too');
   // t2057u / t2058u: Waveform = two interwoven wave lines (main + second theme color), only on PLAYING zones
   const W = ':is(html[data-edgelight="wave"], html:not([data-edgelight])) .tree42 .qb42.playing > .cgrip69';
