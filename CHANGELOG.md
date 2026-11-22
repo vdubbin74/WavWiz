@@ -12,6 +12,9 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [0.7.3] - in progress (beta)
 
+### Added
+- Speaker Settings: **Direct (no processing)** per speaker. It turns off the EQ, Bass / Treble, Balance, Trim, Loudness, Auto pre-gain and the limiter (on a phone, browser or TV speaker also the clip guard); those settings are kept, grayed out, and come back when it is turned off. Volume, Max volume and Delay still work. It is saved with the speaker's own sound settings; older presets start with it off. Status chips say what still changes the sound: a volume below 100% scales the samples, music is resampled to 48 kHz (96 kHz with Studio Max), and Windows (shared mode) or the browser mixes the output. It is not bit-perfect: that is planned for 0.8.0. On a PC speaker the final 0 dBFS safety clamp stays.
+
 ### Fixed
 - Turning up Bass or Treble in Speaker Settings, or picking a boosting EQ preset such as Bass Boost, made the whole track much quieter. Auto pre-gain used to turn everything down by the full height of the boost (summed over every band, the Bass / Treble shelves and Loudness, all the way out to 20 Hz and 20 kHz), so Bass +12 cost the music 12 dB and Bass Boost about 9 dB. It now looks only at the EQ and Bass / Treble between 40 Hz and 12 kHz and takes back half the peak, at most 6 dB; the peak limiter catches what is left on a PC speaker, and a phone, browser or TV speaker gets a soft clip guard that adds no delay (it only rounds off peaks above -1.9 dBFS). Bass Boost now keeps 1 kHz within 5 dB.
 - Loudness did almost nothing: Auto pre-gain turned the whole track down by exactly the bass it added. Loudness is no longer counted in the pre-gain, so below its reference volume it really adds bass and treble.

@@ -7,6 +7,7 @@ export const WHATS_NEW_VERSION = '0.7.3';
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
   // 0.7.3
+  ['Direct (no processing)', 'Speaker Settings has a Direct (no processing) switch: EQ, Bass / Treble, Balance, Trim, Loudness, pre-gain and the limiter are all off for that speaker, and your settings come back when you turn it off. Volume and Delay still work.'],
   ['Bass, Treble and EQ boosts stay loud', 'Turning up Bass or Treble, or picking an EQ preset such as Bass Boost, no longer makes the whole track quiet: Auto pre-gain now takes back only part of a boost (at most 6 dB) and the limiter catches the peaks. Loudness now really adds bass and treble when the volume is low.'],
   // 0.7.2
   ['Announce to the house', 'Hold Announce in Devices on a PC or a phone and talk: a chime plays, the music turns down 12 dB (it never pauses) and every speaker in the zone - or Everywhere - hears you, then the music fades back when you let go. On a phone, open WavWiz from its https:// address so the browser allows the microphone. The chime can be turned off in Settings > Playback.'],

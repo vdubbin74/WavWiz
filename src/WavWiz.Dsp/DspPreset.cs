@@ -17,6 +17,9 @@ public sealed record DspPreset
     public double PreampDb { get; init; }
     public bool AutoPreamp { get; init; } = true;
     public bool Bypass { get; init; }
+    /// <summary>0.7.3 "Direct (no processing)": EQ, Bass/Treble, Balance, Trim, Loudness, pre-gain and the limiter's turning-down are all off;
+    /// only the volume and the 0 dBFS safety clamp remain. The other settings are kept (they come back when Direct is off). Old presets: off.</summary>
+    public bool Direct { get; init; }
     /// <summary>0.3.6 K6: stereo balance, -100 (all left) .. 0 (center) .. +100 (all right). Applied after the EQ, before the limiter.</summary>
     public double Balance { get; init; }
     public double[] GraphicDb { get; init; } = new double[10];

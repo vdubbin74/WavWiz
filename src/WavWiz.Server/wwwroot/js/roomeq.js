@@ -19,7 +19,7 @@ export function normPreset(p) {
   p = p || {};
   const g = pick(p, 'graphicDb') || [], bass = pick(p, 'bass') || {}, treble = pick(p, 'treble') || {}, loud = pick(p, 'loudness') || {};
   return {
-    trimDb: clamp(num(pick(p, 'trimDb')), -24, 6), preampDb: clamp(num(pick(p, 'preampDb')), -24, 12), autoPreamp: pick(p, 'autoPreamp') !== false, bypass: !!pick(p, 'bypass'),
+    trimDb: clamp(num(pick(p, 'trimDb')), -24, 6), preampDb: clamp(num(pick(p, 'preampDb')), -24, 12), autoPreamp: pick(p, 'autoPreamp') !== false, bypass: !!pick(p, 'bypass'), direct: !!pick(p, 'direct'),
     balance: clamp(num(pick(p, 'balance')), -100, 100), graphicDb: BAND_HZ.map((_, i) => clamp(num(g[i]), -12, 12)),
     bass: { gainDb: clamp(num(pick(bass, 'gainDb')), -12, 12), hz: clamp(num(pick(bass, 'hz'), 100), 40, 400) },
     treble: { gainDb: clamp(num(pick(treble, 'gainDb')), -12, 12), hz: clamp(num(pick(treble, 'hz'), 10000), 3000, 16000) },
@@ -52,6 +52,7 @@ export function loudnessGains(volumePercent, refVolume) { const k = clamp((refVo
 export function eqPlan(cfg, volumePercent = 100) {
   if (!cfg || !cfg.preset) return null;
   const p = normPreset(cfg.preset), eq = !(p.bypass || cfg.bypass);
+  if (p.direct) return null;   // 0.7.3 Direct (no processing): no filters, no trim / pre-gain, no balance, no clip guard - the music goes straight to the volume
   const filters = [];
   if (eq) {
     BAND_HZ.forEach((hz, i) => filters.push({ type: 'peaking', hz, gainDb: p.graphicDb[i], q: BAND_Q }));

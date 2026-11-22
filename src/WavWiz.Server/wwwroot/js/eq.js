@@ -11,7 +11,7 @@ import { thisDevice } from './ui.js';
 import { spectrumTap } from './viz.js';
 
 /** A flat (neutral) EQ; exported for the Appearance > EQ preview (0.2.3 U10). */
-export const flatEq = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0), trimDb: 0, preampDb: 0, autoPreamp: true, bypass: false, bass: { gainDb: 0, hz: 100 }, treble: { gainDb: 0, hz: 10000 }, loudness: { enabled: false, refVolume: 80 }, limiter: { enabled: true, ceilingDb: -0.3, releaseMs: 120, lookaheadMs: 0 } });
+export const flatEq = () => ({ name: 'Custom', graphicDb: new Array(10).fill(0), trimDb: 0, preampDb: 0, autoPreamp: true, bypass: false, direct: false, bass: { gainDb: 0, hz: 100 }, treble: { gainDb: 0, hz: 10000 }, loudness: { enabled: false, refVolume: 80 }, limiter: { enabled: true, ceilingDb: -0.3, releaseMs: 120, lookaheadMs: 0 } });
 
 /** 0.3.0 §3.4: "Sound · Kitchen" */
 export const soundTitle = speaker => (speaker ? `Sound · ${speaker}` : 'Sound (EQ)');

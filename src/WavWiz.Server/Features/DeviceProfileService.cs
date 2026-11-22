@@ -73,6 +73,8 @@ public sealed class DeviceProfileService
         if ((now["volLocked"]?.GetValue<bool>() ?? false) != (then["volLocked"]?.GetValue<bool>() ?? false)) return true;
         var eqA = now["eq"]?.AsObject(); var eqB = then["eq"]?.AsObject();
         if (eqA == null || eqB == null) return (eqA == null) != (eqB == null);
+        static bool B(JsonNode? n) => n is JsonValue v && v.TryGetValue<bool>(out var on) && on;
+        if (B(eqA["direct"]) != B(eqB["direct"])) return true;   // 0.7.3 Direct (no processing)
         foreach (var k in new[] { "trimDb", "preampDb", "balance" }) if (Math.Abs(D(eqA[k]) is var x && double.IsNaN(x) ? 0 : x - (D(eqB[k]) is var y && double.IsNaN(y) ? 0 : y)) > 0.05) return true;
         for (int i = 0; i < 10; i++) if (Math.Abs((D(eqA["graphicDb"]?[i]) is var g1 && double.IsNaN(g1) ? 0 : g1) - (D(eqB["graphicDb"]?[i]) is var g2 && double.IsNaN(g2) ? 0 : g2)) > 0.05) return true;
         foreach (var k in new[] { "bass", "treble" }) if (Math.Abs(D(eqA[k]?["gainDb"]) is var a1 && double.IsNaN(a1) ? 0 : a1 - (D(eqB[k]?["gainDb"]) is var b1 && double.IsNaN(b1) ? 0 : b1)) > 0.05) return true;

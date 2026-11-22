@@ -20,7 +20,7 @@ public sealed class DspProgram
     {
         Preset = preset.Normalize(); SampleRate = sampleRate;
         double fs = sampleRate;
-        bool eq = !Preset.Bypass;                      // bypass = EQ, bass/treble, loudness off; trim + limiter stay (spec 11.3)
+        bool eq = !Preset.Bypass && !Preset.Direct;    // bypass = EQ, bass/treble, loudness off; trim + limiter stay (spec 11.3). 0.7.3: Direct = all off
         for (int i = 0; i < 10; i++)
             Filters[i] = eq ? BiquadCoeffs.Peaking(DspPreset.BandHz[i], Preset.GraphicDb[i], DspPreset.BandQ, fs) : BiquadCoeffs.Identity;
         Filters[10] = eq ? BiquadCoeffs.LowShelf(Preset.Bass.Hz, Preset.Bass.GainDb, 0.707, fs) : BiquadCoeffs.Identity;
@@ -36,7 +36,7 @@ public sealed class DspProgram
         // The rest is headroom the peak limiter after the volume catches (the browser path has its soft clip guard, roomeq.js).
         double auto = 0;
         if (eq && Preset.AutoPreamp) auto = -AutoCutDb(UserPeakDb());
-        PreGainDb = Preset.TrimDb + (eq ? Preset.PreampDb : 0) + auto;
+        PreGainDb = Preset.Direct ? 0 : Preset.TrimDb + (eq ? Preset.PreampDb : 0) + auto;   // 0.7.3: Direct has no trim either
         PreGain = Math.Pow(10, PreGainDb / 20);
     }
 

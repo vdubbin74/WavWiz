@@ -58,7 +58,7 @@ public sealed class DspChain : IAudioProcessor
     {
         _volumePercent = Math.Clamp(double.IsFinite(percent) ? percent : 0, 0, 100);
         _gainTarget = _muted || _selfMuted ? 0 : VolumeToGain(_volumePercent);
-        if (_preset.Loudness.Enabled && !_preset.Bypass) _pending = new DspProgram(_preset, _fs, _volumePercent);
+        if (_preset.Loudness.Enabled && !_preset.Bypass && !_preset.Direct) _pending = new DspProgram(_preset, _fs, _volumePercent);
     }
 
     public void SetMuted(bool muted) { _muted = muted; _gainTarget = muted || _selfMuted ? 0 : VolumeToGain(_volumePercent); }
@@ -126,7 +126,7 @@ public sealed class DspChain : IAudioProcessor
         _gainNow = g1;
         // 0.3.6 K6: balance (linear: the far side is turned down, the near side stays at full level); ramped across the block
         {
-            double b = cur.Preset.Balance / 100.0, tl = b > 0 ? 1 - b : 1, tr = b < 0 ? 1 + b : 1;
+            double b = cur.Preset.Direct ? 0 : cur.Preset.Balance / 100.0,   // 0.7.3: Direct = centered tl = b > 0 ? 1 - b : 1, tr = b < 0 ? 1 + b : 1;
             if (tl != _balL || tr != _balR || tl != 1 || tr != 1)
             {
                 for (int i = 0; i < n; i++)
@@ -137,8 +137,12 @@ public sealed class DspChain : IAudioProcessor
                 _balL = tl; _balR = tr;
             }
         }
-        Limit(buf, n, cur.Preset.Limiter);
+        Limit(buf, n, cur.Preset.Direct ? DirectLimiter : cur.Preset.Limiter);
     }
+
+    /// <summary>0.7.3 Direct (no processing): the limiter never turns anything down, but the final 0 dBFS safety clamp (and the NaN guard) stay:
+    /// a decoded over (or a ReplayGain boost) is clipped at full scale exactly as the sound card would, never sent past it.</summary>
+    public static readonly LimiterSettings DirectLimiter = new(Enabled: false);
 
     /// <summary>Zero-lookahead peak limiter: instant attack, smooth release (50..200 ms). Adds no latency. 0.7.2: see <see cref="PeakLimiter"/>.</summary>
     private void Limit(Span<float> buf, int n, LimiterSettings s) => _limiter.Process(buf, n, s);

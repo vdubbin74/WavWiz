@@ -2453,6 +2453,19 @@ body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:no
 .spk-eq{min-height:190px}
 .spk-btns{gap:8px;flex-wrap:wrap;margin-top:6px}
 @media (max-width:1400px){.spk-body{grid-template-columns:1fr}}
+/* 0.7.3 Direct (no processing): a card across the top of the speaker body; the DSP controls gray out (kept, inert) while it is on */
+.spk-direct{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:var(--radius,6px);padding:10px 12px;background:var(--panel2)}
+.spk-direct-h{display:flex;align-items:center;gap:10px}.spk-direct-h .dlbl{margin:0}.spk-direct-h .onpill{margin-left:auto}
+.spk-direct-sub{font-size:12px;color:var(--dim);line-height:1.4}
+.spk-direct-chips{display:flex;flex-wrap:wrap;gap:6px 8px}.spk-direct-chips:empty{display:none}
+.spk-chip{font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--bg);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.spk-chip.ok{color:var(--ok,#5fcf8a);border-color:color-mix(in srgb,var(--ok,#5fcf8a) 45%,var(--line))}
+.spk-chip.warn{color:var(--warn,#e8b04a);border-color:color-mix(in srgb,var(--warn,#e8b04a) 45%,var(--line))}
+.spkset.spk-direct-on .spk-direct{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.spkset.spk-direct-on .spk-dsp{opacity:.38;filter:saturate(.3);pointer-events:none}
+.spk-direct-note{display:none;margin:-2px 0 4px}.spkset.spk-direct-on .spk-direct-note{display:block}
+.spk-direct-vol{color:var(--warn,#e8b04a);font-size:11.5px;margin-top:2px}.spk-direct-vol[hidden]{display:none}
+@media (max-width:600px){.spk-chip{white-space:normal}}
 
 :root{--spkcol:clamp(250px,calc(22vw / var(--z,1)),380px)}   /* the standard Devices panel width: 380px at 1920, the Speakers column in EVERY expanded state */
 .devpanel.expanded .dexp-main.e1.spk-open>.zcol{flex:0 0 var(--spkcol)}

@@ -169,7 +169,7 @@ export function phoneSound(S, host, { refreshAll = async () => {} } = {}) {
     r.area = eqArea({ style: prefs.style, glow: prefs.glow, gains: r.cur.graphicDb, interactive: true, locked: !editable(r), onChange: (i, db) => { if (editable(r)) { r.cur.graphicDb[i] = db; changed(r); } } });
     r.area.startLive(spectrumTap);
     r.lower = soundSettings({ cur: () => r.cur, changed: () => changed(r), presets: () => r.presets, presetId: () => r.presetId,
-      pick: p => { if (!editable(r)) return; r.cur = { ...flatEq(), ...copy(p.json), bypass: r.cur.bypass }; changed(r); r.presetId = p.id; draw(r); },
+      pick: p => { if (!editable(r)) return; r.cur = { ...flatEq(), ...copy(p.json), bypass: r.cur.bypass, direct: !!r.cur.direct }; changed(r); r.presetId = p.id; draw(r); },
       saveAs: name => persist(r, name),
       flat: () => { if (!editable(r)) return; r.cur = flatEq(); changed(r); draw(r); },
       revert: () => { if (editable(r)) load(resolve()); } });

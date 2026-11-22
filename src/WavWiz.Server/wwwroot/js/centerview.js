@@ -75,7 +75,7 @@ export function centerEq(S, host, opts = {}) {
       onclick: () => { if (real?.out?.zoneId) window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: real.out.zoneId })); } }, 'All sound settings');
     // 0.3.8 L39: the active preset as a plain themed select (same look as the output picker); every EQ chooser uses this select style
     const presetSel = real ? wsel({ class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
-      onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
+      onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass, direct: !!real.cur.direct }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
       real.presetId == null ? h('option', { value: '', selected: true }, 'Custom (not saved)') : null,
       (real.presets || []).map(p => h('option', { value: String(p.id), selected: p.id === real.presetId }, p.name))) : null;
     root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Adjusting: ${o.zone}` : 'Sound'), picker, presetSel, h('span', { class: 'grow' }), note, allBtn),

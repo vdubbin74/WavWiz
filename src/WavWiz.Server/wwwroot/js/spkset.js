@@ -165,6 +165,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const treble = slider({ label: 'Treble', min: -12, max: 12, step: 0.5, value: 0, fmt: dbLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.treble = { ...c.treble, gainDb: v }; }) });
   // 0.5.0 F109b: Trim / Auto pre-gain / Limiter moved here from the old in-place All sound settings
   const trim = slider({ label: 'Trim', min: -24, max: 6, step: 0.5, value: 0, fmt: dbLabel, ok: tune, hint: 'Only this device’s own owner or an admin can change the sound.', onChange: v => edit(c => { c.trimDb = v; }) });
+  [balance, bass, treble, trim].forEach(r => r.classList.add('spk-dsp'));   // 0.7.3: grayed while Direct (no processing) is on
   const eqHost = h('div', { class: 'spk-eq' });
   async function loadReal() {
     const o = cur(); if (!o) { real = null; if (!gone) paintEq(); return; }
@@ -180,7 +181,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     } catch { if (gone || !root.isConnected) return; const now = cur(); if (!now || now.deviceId !== wantId) return; /* DIG-amend3 R3(c): stale failure must not blank newer output */ real = null; }
     if (gone || !root.isConnected) return;
     paintEq(); syncSliders(); paintPresets(); const lc = loud.querySelector('input'); if (lc) { lc.checked = !!real?.cur.loudness?.enabled; lc.disabled = !mayTune(); } const pa = preamp.querySelector('input'); if (pa) { pa.checked = !!real?.cur.autoPreamp; pa.disabled = !mayTune(); } const li = limiter.querySelector('input'); if (li) { li.checked = !!real?.cur.limiter?.enabled; li.disabled = !mayTune(); }
-    takeSnap(); paintDirty();
+    paintDirect(); takeSnap(); paintDirty();
   }
   function syncSliders() { if (!real) return; balance._set(real.cur.balance || 0); bass._set(real.cur.bass?.gainDb || 0); treble._set(real.cur.treble?.gainDb || 0); trim._set(real.cur.trimDb || 0); }
   function paintEq() {
@@ -322,7 +323,7 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const eqCtl = h('span', { class: 'spk-eqctl' }, eqOn);
   const paintEqCtl = () => { const on = real ? !real.cur.bypass : false; eqOn.classList.toggle('on', on); eqOn.setAttribute('aria-checked', String(on)); };
   // 0.4.4 F20: one themed dropdown "Preset: <name> ▾" (8 built-ins, then My presets; Custom when the bands match none), Reset + Save as preset beside it
-  const presetSel = ro(wsel({ class: 'eqall-preset spk-presel', 'aria-label': 'Preset', 'data-act': 'preset', onchange: ev => { if (!tune || !real) return; const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p) return; edit(c => { const j = structuredClone(p.json); Object.assign(c, j, { bypass: c.bypass, name: c.name }); }); paintEq(); syncSliders(); paintPresets(); } }), tune, 'Only this device’s own owner or an admin can change the sound.');
+  const presetSel = ro(wsel({ class: 'eqall-preset spk-presel', 'aria-label': 'Preset', 'data-act': 'preset', onchange: ev => { if (!tune || !real) return; const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p) return; edit(c => { const j = structuredClone(p.json); Object.assign(c, j, { bypass: c.bypass, direct: !!c.direct, name: c.name }); }); paintEq(); syncSliders(); paintPresets(); } }), tune, 'Only this device’s own owner or an admin can change the sound.');
   const presetRow = h('div', { class: 'spk-presets', 'aria-label': 'Presets' }, h('label', { class: 'dlbl spk-prelbl' }, 'Preset:'), presetSel, resetBtn, saveAsBtn);
   function paintPresets() {
     paintEqCtl(); if (!real) { presetSel.replaceChildren(h('option', { value: '' }, '—')); presetSel.disabled = true; return; }
@@ -335,15 +336,38 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   const preamp = h('label', { class: 'spk-loud spk-preamp' }, h('input', { type: 'checkbox', 'data-act': 'autopreamp', onchange: ev => edit(c => { c.autoPreamp = ev.target.checked; }) }), ' Auto pre-gain ', h('span', { class: 'small dim' }, 'Prevents clipping when boosting.'));
   const limiter = h('label', { class: 'spk-loud spk-limiter' }, h('input', { type: 'checkbox', 'data-act': 'limiter', onchange: ev => edit(c => { c.limiter = { ...c.limiter, enabled: ev.target.checked }; }) }), ' Limiter ', h('span', { class: 'small dim' }, 'Protects the speaker.'));
   const extraSw = h('div', { class: 'spk-sw' }, loud, preamp, limiter);
-  const right = h('div', { class: 'spk-right' }, h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), eqCtl), presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
-  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, refHost, h('div', { class: 'spk-body' }, left, right));
+  // ---- 0.7.3 DIRECT (NO PROCESSING): one switch per speaker, saved in the speaker's own preset (direct: true). Turns off EQ, Bass / Treble, Balance,
+  // Trim, Loudness, pre-gain, the limiter's turning-down and the browser clip guard; the settings stay and come back. Volume, Max volume and Delay stay.
+  const eqHead = h('div', { class: 'dlbl spk-eqh' }, h('span', null, 'EQUALIZER'), eqCtl);
+  const dspBits = [eqHead, presetRow, eqHost, extraSw];
+  dspBits.forEach(e => e.classList.add('spk-dsp'));
+  const directOn = h('button', { type: 'button', class: 'onpill spk-directon', role: 'switch', 'data-act': 'direct', 'aria-label': 'Direct (no processing) on or off', onclick: () => { if (!real || !tune) return; edit(c => { c.direct = !c.direct; }); paintDirect(); } }, h('span', { class: 'op-off' }, 'OFF'), h('span', { class: 'op-on' }, 'ON'));
+  ro(directOn, tune, 'Only this device’s own owner or an admin can change the sound.');
+  const directSub = h('div', { class: 'spk-direct-sub' }), directChips = h('div', { class: 'spk-direct-chips' });
+  const directCard = h('div', { class: 'spk-direct', 'data-act': 'spk-direct' }, h('div', { class: 'spk-direct-h' }, h('span', { class: 'dlbl' }, 'DIRECT (NO PROCESSING)'), directOn), directSub, directChips);
+  const directNote = h('div', { class: 'small dim spk-direct-note' }, 'EQ, Bass / Treble, Balance, Trim, Loudness, Auto pre-gain and Limiter are off while Direct is on. Your settings are kept.');
+  const volNote = h('div', { class: 'small spk-direct-vol' });
+  function paintDirect() {
+    const on = !!real?.cur?.direct;
+    directOn.classList.toggle('on', on); directOn.setAttribute('aria-checked', String(on));
+    root.classList.toggle('spk-direct-on', on);
+    [balance, bass, treble, trim, ...dspBits].forEach(e => { e.inert = on; });
+    directSub.textContent = on ? 'All sound processing is off for this speaker: EQ, Bass / Treble, Balance, Trim, Loudness, pre-gain and the limiter. Your settings are kept and come back when you turn this off.'
+      : 'Turn off all sound processing (EQ, Bass / Treble, Balance, Trim, Loudness, pre-gain, limiter) and play the music as decoded.';
+    directChips.replaceChildren(...(on ? directChipList(z) : []).map(([k, t, tip]) => h('span', { class: 'spk-chip ' + k, title: tip || '' }, t)));
+    const v = Math.round(z.volume ?? 100); volNote.hidden = !on || v >= 100; volNote.textContent = 'Volume still works. Below 100% the samples are scaled.';
+  }
+  const right = h('div', { class: 'spk-right' }, directNote, eqHead, presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
+  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, refHost, h('div', { class: 'spk-body' }, directCard, left, right));
+  vol.append(volNote);
+  vol._input?.addEventListener('input', () => queueMicrotask(paintDirect)); capRow._input?.addEventListener('change', () => queueMicrotask(paintDirect));   // 0.7.3: the volume chip follows the sliders
   capTitle();
   root.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('input[type=text],select')) { ev.stopPropagation(); if (anyDirty()) cancelAndClose(); else { root._teardownLive?.(); parts.onDone?.(); } } });
   // live values are patched in place - an open slider is never rebuilt
   root._patch = nz => {
     z = { ...z, ...nz }; paintTitle(); paintTags(); paintZoneRow(); vol._set(Math.round(z.volume)); paintMute(); capRow._set(capVal()); capTitle();
     const o = cur(); if (o && delay._input && document.activeElement !== delay._input) delay._set(Math.round(o.latencyMs ?? 0));
-    outHost?.patch?.(nz);
+    outHost?.patch?.(nz); paintDirect();
     if (real && o && real.out.deviceId !== o.deviceId) { loadReal(); paintCal(); }
   };
   // DIG-R3: session helpers for phone outer Back/Done + destroy restores claimed snapshot fields
@@ -360,6 +384,18 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
   if (typeof window !== 'undefined') window.addEventListener('wavwiz:eqchanged', e => { if (!gone && e.detail?.deviceId === real?.out?.deviceId && !root.contains(document.activeElement)) loadReal(); });
   paintProfile(); refreshProfile(true); loadReal(); paintCal(); void o0;
   return root;
+}
+
+/** 0.7.3 Direct (no processing): the honest status chips [kind, text, tooltip] for a speaker. Never claims bit-perfect (that is 0.8.0). Pure. */
+export function directChipList(z) {
+  const v = Math.round(z?.volume ?? 100), cap = Math.round(z?.volCap ?? 100);
+  return [
+    ['ok', '✓ No EQ, tone, balance, trim or limiter'],
+    v < 100 || cap < 100 ? ['warn', `⚠ Volume ${v}%${cap < 100 ? ` (Max volume ${cap}%)` : ''} - below 100% the samples are scaled`, 'WavWiz scales the samples for the volume; at 100% they pass unchanged']
+      : ['ok', '✓ Volume 100% - samples not scaled'],
+    ['warn', '⚠ Music is resampled to 48 kHz (96 kHz with Studio Max)', 'The house stream runs at one rate so every speaker stays in sync'],
+    ['warn', '⚠ Windows shared mode / browser mixer', 'Windows (or the browser) mixes the sound and may apply its own effects'],
+  ];
 }
 
 /** 0.4.3 #4: the ONE preset chip to light for the current EQ: the preset it was loaded from (cur.name) if the curve still matches it, else the first preset with the
