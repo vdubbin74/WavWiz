@@ -24,11 +24,12 @@ test('#10 eqPlan: a -12 dB cut at 1 kHz lowers 1 kHz by 12 dB and leaves 100 Hz 
   near(planResponseDb(p, 1000), -12, 0.05, '1 kHz'); near(planResponseDb(p, 100), 0, 0.2, '100 Hz'); assert.equal(p.preGainDb, 0);
 });
 
-test('#10 eqPlan: a boost gets the same auto-preamp as the PC Player (peak <= 0 dB), and PascalCase keys work too', async () => {
+test('#10 eqPlan: a boost gets the same auto-preamp as the PC Player (0.7.3: half the 40 Hz-12 kHz peak, at most 6 dB), and PascalCase keys work too', async () => {
   const { eqPlan, planResponseDb } = await imp('roomeq');
-  const p = eqPlan({ preset: { GraphicDb: [6, 0, 0, 0, 0, 0, 0, 0, 0, 0] } });
-  assert.ok(p.preGainDb < -5.5 && p.preGainDb > -6.2, 'auto-preamp ~ -6 dB: ' + p.preGainDb);
-  let max = -99; for (let f = 20; f <= 20000; f *= 1.06) max = Math.max(max, planResponseDb(p, f)); assert.ok(max <= 0.01, 'never above 0 dB: ' + max);
+  const p = eqPlan({ preset: { GraphicDb: [0, 0, 0, 0, 0, 6, 0, 0, 0, 0] } });
+  assert.ok(p.preGainDb < -2.95 && p.preGainDb > -3.05, 'auto-preamp ~ -3 dB: ' + p.preGainDb);
+  let max = -99; for (let f = 20; f <= 20000; f *= 1.06) max = Math.max(max, planResponseDb(p, f)); assert.ok(max <= 3.01, 'at most +3 dB left for the clip guard: ' + max);
+  assert.equal(p.guard, true, 'a boost runs the soft clip guard');
   const noAuto = eqPlan({ preset: { graphicDb: [6, 0, 0, 0, 0, 0, 0, 0, 0, 0], autoPreamp: false } }); assert.equal(noAuto.preGainDb, 0);
 });
 

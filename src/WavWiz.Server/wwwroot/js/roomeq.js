@@ -3,7 +3,9 @@
  * changed nothing on it. The plan below is the same math as the PC Player's DSP (WavWiz.Dsp DspProgram): ten RBJ peaking bands (Q 1.4),
  * bass / treble shelves (S = 1, i.e. Q 0.707, which is what Web Audio's lowshelf/highshelf use), the loudness shelves, trim + preamp + auto-preamp
  * and balance. Bypass turns the EQ, shelves and loudness off; the trim stays. The PC Player's peak limiter is not here (a Web Audio compressor
- * would add look-ahead delay and break the sync); auto-preamp already keeps boosts from clipping.
+ * would add look-ahead delay and break the sync). 0.7.3: auto-preamp only takes back part of a boost (see autoCutDb), so a boosted plan ends
+ * in a soft clip guard instead: a WaveShaper (no oversampling = no added delay) that is exactly linear up to -1.9 dBFS and rounds the peaks off
+ * smoothly so nothing passes the limiter's default ceiling (-0.3 dBFS).
  * Pure functions first (unit-tested); EqChain wires them into Web Audio only while a non-flat EQ is assigned, so an idle or flat speaker runs no filters.
  */
 export const BAND_HZ = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -59,12 +61,39 @@ export function eqPlan(cfg, volumePercent = 100) {
   }
   const live = filters.filter(f => Math.abs(f.gainDb) >= 1e-4);
   let auto = 0;
-  if (eq && p.autoPreamp && live.length) { const ks = live.map(f => coeffs(f.type, f.hz, f.gainDb, f.q)); let max = 0; for (let f = 20; f <= 20000; f *= 1.06) max = Math.max(max, ks.reduce((a, k) => a + magDb(k, f), 0)); auto = -Math.max(0, max); }
+  if (eq && p.autoPreamp) auto = -autoCutDb(userPeakDb(filters.slice(0, 12)));   // 0.7.3: EQ + Bass/Treble only (not the loudness shelves)
   const preGainDb = p.trimDb + (eq ? p.preampDb : 0) + auto, b = p.balance / 100;
   const left = b > 0 ? 1 - b : 1, right = b < 0 ? 1 + b : 1;
   if (!live.length && Math.abs(preGainDb) < 1e-4 && left === 1 && right === 1) return null;
-  return { filters: live, preGainDb, preGain: Math.pow(10, preGainDb / 20), left, right };
+  // 0.7.3: the soft clip guard runs whenever something can push the level up (a boost or a positive pre-gain)
+  const guard = live.some(f => f.gainDb > 0) || preGainDb > 1e-4;
+  return { filters: live, preGainDb, preGain: Math.pow(10, preGainDb / 20), left, right, guard };
 }
+/** 0.7.3: the range Auto pre-gain looks at (Hz) and the most it ever turns down (dB) - the same as DspProgram.cs. */
+export const AUTO_LO_HZ = 40, AUTO_HI_HZ = 12000, AUTO_MAX_CUT_DB = 6;
+/** Pure: Auto pre-gain cut (dB, positive = turn down) for a peak boost: half of it, never more than 6 dB (DspProgram.AutoCutDb). */
+export const autoCutDb = peakDb => (isFinite(peakDb) ? Math.min(AUTO_MAX_CUT_DB, 0.5 * Math.max(0, peakDb)) : 0);
+/** Pure: highest summed boost (dB, >= 0) of some filters between 40 Hz and 12 kHz (DspProgram.UserPeakDb). */
+export function userPeakDb(filters) {
+  const ks = filters.filter(f => Math.abs(f.gainDb) >= 1e-4).map(f => coeffs(f.type, f.hz, f.gainDb, f.q));
+  if (!ks.length) return 0;
+  let max = 0;
+  for (let f = AUTO_LO_HZ; ; f *= 1.06) { const hz = Math.min(f, AUTO_HI_HZ); max = Math.max(max, ks.reduce((a, k) => a + magDb(k, hz), 0)); if (hz >= AUTO_HI_HZ) break; }
+  return max;
+}
+
+/** 0.7.3 soft clip guard: exactly linear up to KNEE, then a smooth (tanh) bend that never passes CEIL. Input range of the curve is +-CLIP_RANGE
+ * (a pre-scale of 1/CLIP_RANGE goes in front, since a WaveShaper clamps its input to -1..1); louder input sits at the ceiling. */
+export const CLIP_KNEE = Math.pow(10, -1.9 / 20), CLIP_CEIL = Math.pow(10, -0.3 / 20), CLIP_RANGE = 4;
+/** Pure: the guard's transfer function for one sample. */
+export function softClip(x) {
+  const a = Math.abs(x); if (!(a > CLIP_KNEE)) return isFinite(x) ? x : 0;
+  const room = CLIP_CEIL - CLIP_KNEE, y = CLIP_KNEE + room * Math.tanh((Math.min(a, CLIP_RANGE) - CLIP_KNEE) / room);
+  return x < 0 ? -y : y;
+}
+/** Pure: the WaveShaper curve (odd length so 0 maps to exactly 0) over -CLIP_RANGE..+CLIP_RANGE. */
+export function softClipCurve(n = 8193) { const c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = softClip(CLIP_RANGE * (2 * i / (n - 1) - 1)); return c; }
+
 /** Pure: the plan's total response (dB) at hz, pre-gain included (for tests: what a sine through the chain would show). */
 export const planResponseDb = (plan, hz) => !plan ? 0 : plan.preGainDb + plan.filters.reduce((a, f) => a + magDb(coeffs(f.type, f.hz, f.gainDb, f.q), hz), 0);
 
@@ -84,6 +113,12 @@ export class EqChain {
     if (plan.left !== 1 || plan.right !== 1) {
       const sp = ctx.createChannelSplitter(2), mg = ctx.createChannelMerger(2), gl = ctx.createGain(), gr = ctx.createGain(); gl.gain.value = plan.left; gr.gain.value = plan.right;
       at.connect(sp); sp.connect(gl, 0); sp.connect(gr, 1); gl.connect(mg, 0, 0); gr.connect(mg, 0, 1); this.nodes.push(sp, gl, gr, mg); at = mg;
+    }
+    if (plan.guard) {   // 0.7.3 soft clip guard: scale into the curve's -1..1 input, shape, no oversampling (no added delay)
+      try {
+        const pre = ctx.createGain(), ws = ctx.createWaveShaper(); pre.gain.value = 1 / CLIP_RANGE; ws.curve = this._curve ||= softClipCurve(); ws.oversample = 'none';
+        at.connect(pre); pre.connect(ws); this.nodes.push(pre, ws); at = ws;
+      } catch { /* old browser: no guard */ }
     }
     at.connect(this.output);
   }

@@ -89,13 +89,14 @@ public class DspTests
     }
 
     [Fact]
-    public void Auto_preamp_subtracts_the_largest_boost_so_a_boosted_eq_does_not_clip()
+    public void Auto_preamp_takes_back_half_the_largest_boost_and_the_limiter_catches_the_rest()
     {
+        // 0.7.3: half the peak (at most 6 dB), not all of it - a +10 dB band costs the track 5 dB, not 10
         var p = DspPreset.Flat with { GraphicDb = new double[] { 0, 0, 0, 0, 0, 10, 0, 0, 0, 0 } };
         var prog = new DspProgram(p, Fs, 100);
-        double peak = 0; for (double f = 20; f < 20000; f *= 1.02) peak = Math.Max(peak, prog.TotalResponseDb(f));
-        Assert.InRange(peak, -0.4, 0.05);
-        Assert.True(prog.PreGainDb < -9);
+        double peak = -99; for (double f = 20; f < 20000; f *= 1.02) peak = Math.Max(peak, prog.TotalResponseDb(f));
+        Assert.InRange(peak, 4.9, 5.1);
+        Assert.InRange(prog.PreGainDb, -5.05, -4.95);
         Assert.True(new DspProgram(p with { AutoPreamp = false }, Fs, 100).PreGainDb == 0);
     }
 

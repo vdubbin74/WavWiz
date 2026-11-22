@@ -30,15 +30,33 @@ public sealed class DspProgram
         Filters[13] = BiquadCoeffs.HighShelf(10000, lt, 0.707, fs);
         for (int i = 0; i < FilterCount; i++) Active[i] = !Filters[i].IsIdentity;
 
+        // 0.7.3: Auto pre-gain only takes back part of the boost. Until 0.7.2 it subtracted the WHOLE peak of every stage summed from 20 Hz
+        // to 20 kHz, so Bass +12 (a shelf stays +12 down to 20 Hz) turned the whole track down 12 dB and Bass Boost ~9 dB, and Loudness
+        // cancelled itself. Now: the user's EQ + Bass/Treble only (not the loudness shelves), scanned 40 Hz..12 kHz, half the peak, at most 6 dB.
+        // The rest is headroom the peak limiter after the volume catches (the browser path has its soft clip guard, roomeq.js).
         double auto = 0;
-        if (eq && Preset.AutoPreamp)
-        {
-            double max = 0;
-            for (double f = 20; f <= 20000; f *= 1.06) max = Math.Max(max, ResponseDb(f));
-            auto = -Math.Max(0, max);
-        }
+        if (eq && Preset.AutoPreamp) auto = -AutoCutDb(UserPeakDb());
         PreGainDb = Preset.TrimDb + (eq ? Preset.PreampDb : 0) + auto;
         PreGain = Math.Pow(10, PreGainDb / 20);
+    }
+
+    /// <summary>0.7.3: the range Auto pre-gain looks at (Hz) and the most it ever turns down (dB).</summary>
+    public const double AutoScanLoHz = 40, AutoScanHiHz = 12000, AutoMaxCutDb = 6;
+    /// <summary>0.7.3: Auto pre-gain cut (dB, positive = turn down) for a peak boost: half of it, never more than <see cref="AutoMaxCutDb"/>.</summary>
+    public static double AutoCutDb(double peakDb) => double.IsFinite(peakDb) ? Math.Min(AutoMaxCutDb, 0.5 * Math.Max(0, peakDb)) : 0;
+
+    /// <summary>0.7.3: highest boost of the user's EQ + Bass/Treble (filters 0..11, not the loudness shelves) between 40 Hz and 12 kHz.</summary>
+    public double UserPeakDb()
+    {
+        double max = 0;
+        for (double f = AutoScanLoHz; ; f *= 1.06)
+        {
+            double hz = Math.Min(f, AutoScanHiHz), db = 0;
+            for (int i = 0; i < 12; i++) if (Active[i]) db += Filters[i].MagnitudeDb(hz, SampleRate);
+            max = Math.Max(max, db);
+            if (hz >= AutoScanHiHz) break;
+        }
+        return max;
     }
 
     /// <summary>Loudness: 0 dB at/above the reference volume, rising linearly to +10 dB bass (+3 dB treble) at volume 0 (D15: one fixed curve).</summary>
@@ -48,7 +66,7 @@ public sealed class DspProgram
         return (10 * k, 3 * k);
     }
 
-    /// <summary>Combined magnitude (dB) of the EQ stages at a frequency (graph + auto-preamp), same code as the audio path.</summary>
+    /// <summary>Combined magnitude (dB) of all the EQ stages (loudness included) at a frequency, same code as the audio path.</summary>
     public double ResponseDb(double hz)
     {
         double db = 0;

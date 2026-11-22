@@ -10,6 +10,12 @@ WavWiz is currently in **beta**. Breaking changes and rough edges are expected.
 
 ## [Unreleased]
 
+## [0.7.3] - in progress (beta)
+
+### Fixed
+- Turning up Bass or Treble in Speaker Settings, or picking a boosting EQ preset such as Bass Boost, made the whole track much quieter. Auto pre-gain used to turn everything down by the full height of the boost (summed over every band, the Bass / Treble shelves and Loudness, all the way out to 20 Hz and 20 kHz), so Bass +12 cost the music 12 dB and Bass Boost about 9 dB. It now looks only at the EQ and Bass / Treble between 40 Hz and 12 kHz and takes back half the peak, at most 6 dB; the peak limiter catches what is left on a PC speaker, and a phone, browser or TV speaker gets a soft clip guard that adds no delay (it only rounds off peaks above -1.9 dBFS). Bass Boost now keeps 1 kHz within 5 dB.
+- Loudness did almost nothing: Auto pre-gain turned the whole track down by exactly the bass it added. Loudness is no longer counted in the pre-gain, so below its reference volume it really adds bass and treble.
+
 ## [0.7.2] - 2026-11-21 (beta)
 
 General fixes.

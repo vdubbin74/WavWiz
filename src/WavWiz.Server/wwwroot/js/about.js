@@ -2,10 +2,12 @@ import { h, dialog } from './util.js';
 import { wordmark } from './brand.js';
 import { LOGO, emblem } from './logo.js';   // 0.7.0 item 4
 
-export const WHATS_NEW_VERSION = '0.7.2';
+export const WHATS_NEW_VERSION = '0.7.3';
 // 0.2.0 item 25: shown once after the update (keyed on this version per browser) so nobody thinks something broke.
 // 0.3.5 J9 #14: shown as a dismissible card at the top of the main screen (no popup).
 export const WHATS_NEW = [
+  // 0.7.3
+  ['Bass, Treble and EQ boosts stay loud', 'Turning up Bass or Treble, or picking an EQ preset such as Bass Boost, no longer makes the whole track quiet: Auto pre-gain now takes back only part of a boost (at most 6 dB) and the limiter catches the peaks. Loudness now really adds bass and treble when the volume is low.'],
   // 0.7.2
   ['Announce to the house', 'Hold Announce in Devices on a PC or a phone and talk: a chime plays, the music turns down 12 dB (it never pauses) and every speaker in the zone - or Everywhere - hears you, then the music fades back when you let go. On a phone, open WavWiz from its https:// address so the browser allows the microphone. The chime can be turned off in Settings > Playback.'],
   ['Volume mixer in Devices', 'The mixer button and Alt+V now turn the Devices panel into a volume mixer: every zone and speaker in the same order, one line each with volume, mute and a chevron for Max volume and Delay. Done or Esc goes back.'],
