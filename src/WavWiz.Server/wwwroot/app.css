@@ -2465,6 +2465,9 @@ body.qrow-dragging,body.qrow-dragging *{cursor:grabbing!important;user-select:no
 .spkset.spk-direct-on .spk-dsp{opacity:.38;filter:saturate(.3);pointer-events:none}
 .spk-direct-note{display:none;margin:-2px 0 4px}.spkset.spk-direct-on .spk-direct-note{display:block}
 .spk-direct-vol{color:var(--warn,#e8b04a);font-size:11.5px;margin-top:2px}.spk-direct-vol[hidden]{display:none}
+/* 0.7.3: the same card as a notice over the center EQ / phone Sound sheet while Direct is on; the controls under it gray out */
+.direct-banner{margin:6px 0 8px}.direct-banner .spk-direct-h{flex-wrap:wrap;row-gap:6px}.direct-banner .spk-direct-h .btn{flex:none}
+.direct-dim{opacity:.38;filter:saturate(.3);pointer-events:none}
 @media (max-width:600px){.spk-chip{white-space:normal}}
 
 :root{--spkcol:clamp(250px,calc(22vw / var(--z,1)),380px)}   /* the standard Devices panel width: 380px at 1920, the Speakers column in EVERY expanded state */

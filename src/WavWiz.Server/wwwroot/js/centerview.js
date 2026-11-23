@@ -9,6 +9,7 @@ import { thisDevice, canTune, isAdmin } from './ui.js';
 import { spectrumTap } from './viz.js';
 import { flag } from './flags.js';
 import { icon, setIcon } from './icons.js';
+import { directBanner } from './directnote.js';   // 0.7.3
 
 export const CENTER_KEY = 'wavwiz.center.v1';
 export const CENTER_MIGRATED = 'wavwiz.center.migrated030';
@@ -58,10 +59,11 @@ export function centerEq(S, host, opts = {}) {
   }, 700);
   function draw() {
     if (gone) return;
-    const p = loadEqPrefs(), o = real?.out, ok = can(o), locked = loadEqLock();
+    const p = loadEqPrefs(), o = real?.out, ok = can(o), locked = loadEqLock(), direct = !!real?.cur?.direct;   // 0.7.3: Direct on = EQ shown grayed, not editable
     area?.destroy();
-    area = eqArea({ style: p.style, gains: real ? [...real.cur.graphicDb] : new Array(10).fill(0), glow: p.glow, interactive: true, locked: locked || !ok || !real,
-      onChange: (i, db) => { if (!real || loadEqLock() || !ok) return; real.cur.graphicDb[i] = db; previewNow(); saveSoon(); } });
+    area = eqArea({ style: p.style, gains: real ? [...real.cur.graphicDb] : new Array(10).fill(0), glow: p.glow, interactive: true, locked: locked || !ok || !real || direct,
+      onChange: (i, db) => { if (!real || loadEqLock() || !ok || real.cur.direct) return; real.cur.graphicDb[i] = db; previewNow(); saveSoon(); } });
+    area.el.classList.toggle('direct-dim', direct);
     if (real?.resp) area.setResponse(real.resp);
     area.startLive?.(spectrumTap);   // 0.5.1: always live, Glow 0 = no halo only
     // 0.3.1 B17: Lock EQ moved into the center panel's overlay button group (now.js); this header keeps a read-only note for non-tuners
@@ -74,12 +76,14 @@ export function centerEq(S, host, opts = {}) {
     const allBtn = opts.deviceId ? null : h('button', { type: 'button', class: 'btn sm eqallbtn', 'data-act': 'allsound', title: o ? `Open ${o.zone} settings` : 'Open speaker settings', disabled: !real || undefined,
       onclick: () => { if (real?.out?.zoneId) window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: real.out.zoneId })); } }, 'All sound settings');
     // 0.3.8 L39: the active preset as a plain themed select (same look as the output picker); every EQ chooser uses this select style
-    const presetSel = real ? wsel({ class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock()) || undefined,
-      onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock()) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass, direct: !!real.cur.direct }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
+    const presetSel = real ? wsel({ class: 'np-eqpick eqpreset', 'data-act': 'eqpreset', 'aria-label': 'EQ preset', title: 'The active EQ preset', disabled: (!ok || loadEqLock() || direct) || undefined,
+      onchange: ev => { const p = real.presets.find(x => String(x.id) === ev.target.value); if (!p || !ok || loadEqLock() || real.cur.direct) return; real.cur = { ...flatEq(), ...structuredClone(p.json), bypass: real.cur.bypass, direct: !!real.cur.direct }; real.presetId = p.id; previewNow(); saveSoon(); draw(); } },
       real.presetId == null ? h('option', { value: '', selected: true }, 'Custom (not saved)') : null,
       (real.presets || []).map(p => h('option', { value: String(p.id), selected: p.id === real.presetId }, p.name))) : null;
+    const banner = direct ? directBanner({ speaker: o?.zone, canOff: ok && !locked, onOff: () => { if (!real || !can(real.out) || loadEqLock()) return; real.cur.direct = false; previewNow(); saveSoon(); draw(); },
+      onOpen: o?.zoneId ? () => window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: o.zoneId })) : null }) : null;
     root.replaceChildren(h('div', { class: 'np-eqhead' }, h('b', { class: 'np-eqname' }, o ? `Adjusting: ${o.zone}` : 'Sound'), picker, presetSel, h('span', { class: 'grow' }), note, allBtn),
-      real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'));
+      banner, real ? area.el : h('p', { class: 'small dim np-eqnone' }, 'Connect a speaker to adjust its EQ here.'));
   }
   async function reload() { try { real = await fetchReal(); } catch { real = null; } draw(); }
   const onLock = () => { area?.setLocked(loadEqLock() || !can(real?.out)); const l = loadEqLock(), b = root.querySelector('.eqpadlock'); if (b) { b.classList.toggle('on', l); b.setAttribute('aria-pressed', String(l)); setIcon(b.querySelector('.ic'), l ? 'lock' : 'unlock'); b.title = l ? 'Sound locked (click to unlock)' : 'Lock the sound (EQ and all settings)'; b.setAttribute('aria-label', b.title); } };

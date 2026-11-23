@@ -12,6 +12,7 @@ import { canTune, thisDevice, isAdmin } from './ui.js';
 import { flag } from './flags.js';
 import { spectrumTap } from './viz.js';
 import * as Z from './zones40.js';
+import { directBanner, DIRECT_NOTE } from './directnote.js';   // 0.7.3
 
 // A late preview/revert from a closed sheet must precede a reopened editor's
 // writes, even for A -> B -> A. Never look up a mutable target inside a timer.
@@ -23,7 +24,7 @@ function onDevice(id, task) {
   return next;
 }
 const copy = v => structuredClone(v);
-export function phoneSound(S, host, { refreshAll = async () => {} } = {}) {
+export function phoneSound(S, host, { refreshAll = async () => {}, onOpenSpeaker = null } = {}) {
   let gone = false, chosen = null, session = null, epoch = 0, holding = null;
   const speaker = id => (S.zones || []).find(z => z.id === id);
   const controlling = () => controllingTarget(S.zones, S.groups, Z.current());
@@ -49,10 +50,11 @@ export function phoneSound(S, host, { refreshAll = async () => {} } = {}) {
     return onDevice(r.out.deviceId, async () => { if (r.previewed) { await api('/dsp/revert', { method: 'POST', body: { deviceId: r.out.deviceId } }); r.previewed = false; } }).catch(e => say('Could not discard preview: ' + e.message, true));
   };
   function policy() {
-    const r = session, ok = editable(r);
+    const r = session, ok = editable(r), direct = !!r?.cur?.direct;   // 0.7.3: Direct on = EQ and sound settings grayed, not editable
     const targetPicker = pickHost.querySelector('.wwsel'); if (targetPicker) targetPicker.disabled = !!r?.busy;
-    lock.set(loadEqLock()); r?.area?.setLocked(!ok); r?.lower?.setLocked(!ok);
-    const note = r?.lower?.el.querySelector('.eqall-lock'); if (note) note.textContent = permitted(r) ? LOCK_HINT : 'Read-only — only this speaker’s owner or an admin can change sound.';
+    lock.set(loadEqLock()); r?.area?.setLocked(!ok || direct); r?.lower?.setLocked(!ok || direct);
+    const note = r?.lower?.el.querySelector('.eqall-lock'); if (note) note.textContent = direct ? `${DIRECT_NOTE}. Turn it off above to edit.` : permitted(r) ? LOCK_HINT : 'Read-only — only this speaker’s owner or an admin can change sound.';
+    const banner = editor.querySelector('[data-act=direct-off]'); if (banner) banner.disabled = !ok;
     save.disabled = !ok || !r?.dirty; reload.disabled = !!r?.busy;
     root.classList.toggle('sound-readonly', !!r && !permitted(r));
     if (r && !permitted(r)) say('Read-only: only this speaker’s owner or an admin can tune it.');
@@ -166,14 +168,18 @@ export function phoneSound(S, host, { refreshAll = async () => {} } = {}) {
   function draw(r) {
     if (!live(r)) return;
     const prefs = loadEqPrefs(); r.area?.destroy();
-    r.area = eqArea({ style: prefs.style, glow: prefs.glow, gains: r.cur.graphicDb, interactive: true, locked: !editable(r), onChange: (i, db) => { if (editable(r)) { r.cur.graphicDb[i] = db; changed(r); } } });
+    const direct = !!r.cur.direct;
+    r.area = eqArea({ style: prefs.style, glow: prefs.glow, gains: r.cur.graphicDb, interactive: true, locked: !editable(r) || direct, onChange: (i, db) => { if (editable(r) && !r.cur.direct) { r.cur.graphicDb[i] = db; changed(r); } } });
     r.area.startLive(spectrumTap);
     r.lower = soundSettings({ cur: () => r.cur, changed: () => changed(r), presets: () => r.presets, presetId: () => r.presetId,
-      pick: p => { if (!editable(r)) return; r.cur = { ...flatEq(), ...copy(p.json), bypass: r.cur.bypass, direct: !!r.cur.direct }; changed(r); r.presetId = p.id; draw(r); },
+      pick: p => { if (!editable(r) || r.cur.direct) return; r.cur = { ...flatEq(), ...copy(p.json), bypass: r.cur.bypass, direct: !!r.cur.direct }; changed(r); r.presetId = p.id; draw(r); },
       saveAs: name => persist(r, name),
-      flat: () => { if (!editable(r)) return; r.cur = flatEq(); changed(r); draw(r); },
+      flat: () => { if (!editable(r) || r.cur.direct) return; r.cur = flatEq(); changed(r); draw(r); },
       revert: () => { if (editable(r)) load(resolve()); } });
-    editor.replaceChildren(r.area.el, r.lower.el); policy();
+    r.area.el.classList.toggle('direct-dim', direct); r.lower.el.classList.toggle('direct-dim', direct);
+    const banner = direct ? directBanner({ speaker: r.out.zone, canOff: editable(r), onOff: () => { if (!editable(r)) return; r.cur.direct = false; changed(r); draw(r); say('Direct off — previewing live, Save & use to keep it.'); },
+      onOpen: onOpenSpeaker && r.out.zoneId ? () => onOpenSpeaker(r.out.zoneId) : null }) : null;
+    editor.replaceChildren(...(banner ? [banner] : []), r.area.el, r.lower.el); policy();
     const rev = r.rev;
     api('/dsp/response', { method: 'POST', body: { preset: copy(r.cur) } }).then(resp => { if (live(r) && r.rev === rev) r.area.setResponse(resp); }).catch(() => {});
   }
@@ -268,7 +274,7 @@ export function openPhoneSound(S, { from = document.activeElement, refreshAll, m
   el.addEventListener('click', e => { const r = el.getBoundingClientRect(); if (e.target === el && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) close(); });
   const observer = new MutationObserver(check);
   mount(el); locks.forEach(s => s.el.style.overflow = 'hidden'); document.documentElement.classList.add('eqsheet-lock');
-  viewport(); el.showModal(); const eq = phoneSound(S, body, { refreshAll }); x.focus({ preventScroll: true });
+  viewport(); el.showModal(); const eq = phoneSound(S, body, { refreshAll, onOpenSpeaker: id => { close(); window.dispatchEvent(new CustomEvent('wavwiz:openspk', { detail: id })); } }); x.focus({ preventScroll: true });
   document.addEventListener('keydown', key, true); window.addEventListener('resize', check);
   window.visualViewport?.addEventListener('resize', viewport); window.visualViewport?.addEventListener('scroll', viewport);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-view'] });

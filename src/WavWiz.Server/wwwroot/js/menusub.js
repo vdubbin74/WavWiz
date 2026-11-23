@@ -3,7 +3,7 @@
 import { groupPresets } from './eqsettings.js';   // 0.4.4 F6
 import { api, toast } from './util.js';
 import { SLEEP, sleepChip } from './scenesched.js';
-import { eqTarget } from './eqstyle.js';
+import { eqTarget, ownEqName } from './eqstyle.js';
 import { thisDevice } from './ui.js';
 
 /** File > New shortcuts (K17). Checked against the browser and the app: Ctrl+Shift+Z is redo in a text field (ignored while typing), Ctrl+Shift+J is the Jukebox exit chord (untouched). */
@@ -36,12 +36,34 @@ export async function eqSpec(S, ctl) {
   const groups = groupPresets(presets);   // 0.4.4 F6: same list as every picker - 8 built-ins, a rule, then My presets
   const one = p => [cap(p.name) + (p.source === 'builtin' ? '' : ' ★'), async () => {
     if (!o) { ctl.go('eq'); return; }
-    try { await api(`/dsp/assignments/${encodeURIComponent(o.deviceId)}`, { method: 'PUT', body: { presetId: p.id, enabled: true, bypass: false } });
-      window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: o.deviceId } })); toast(`Sound: ${p.name}`); ctl.go('eq'); } catch (e) { toast(e.message, true); }
+    try { const kept = await assignPreset(o, p, presets);
+      window.dispatchEvent(new CustomEvent('wavwiz:eqchanged', { detail: { deviceId: o.deviceId } })); toast(`Sound: ${p.name}${kept ? ' (Direct stays on)' : ''}`); ctl.go('eq'); } catch (e) { toast(e.message, true); }
   }];
   const builtin = groups.filter(g => !g.label).flatMap(g => g.items).map(one), mine = groups.filter(g => g.label).flatMap(g => g.items).map(one);
   const items = [...builtin, ...(builtin.length && mine.length ? ['hr'] : []), ...mine];
   return [...items, ...(items.length ? ['hr'] : []), ['Open the EQ', () => ctl.go('eq')]];
+}
+
+/** 0.7.3: Direct (no processing) lives in the speaker's own preset (direct: true). Picking another preset for a speaker that has Direct on
+ * copies that preset into the speaker's own preset with direct kept, so the pick never turns Direct off. Pure: the {name, preset} to save, or null. */
+export function directKeepBody(picked, current, speaker) {
+  if (!current?.json?.direct || !picked) return null;
+  const name = ownEqName(speaker);
+  return { name, preset: { ...(picked.json || {}), name, direct: true } };
+}
+/** 0.7.3: assign a preset to an output, keeping Direct on when it was on. Returns true when Direct was kept. apiFn is injectable for tests. */
+export async function assignPreset(o, p, presets, apiFn = api) {
+  const dev = encodeURIComponent(o.deviceId);
+  const a = await apiFn(`/dsp/assignments/${dev}`).catch(() => null);
+  const current = a?.presetId != null ? (presets || []).find(x => x.id === a.presetId) : null;
+  const keep = directKeepBody(p, current, o.zone);
+  let id = p.id;
+  if (keep) {
+    const mine = (presets || []).find(x => x.source !== 'builtin' && x.name === keep.name);
+    if (mine) { await apiFn(`/dsp/presets/${mine.id}`, { method: 'PUT', body: keep }); id = mine.id; } else id = (await apiFn('/dsp/presets', { method: 'POST', body: keep })).id;
+  }
+  await apiFn(`/dsp/assignments/${dev}`, { method: 'PUT', body: { presetId: id, enabled: true, bypass: false } });
+  return !!keep;
 }
 
 /** Library > Playlists… (K16): the saved playlists (click opens it in the Library) and "All playlists…". */
