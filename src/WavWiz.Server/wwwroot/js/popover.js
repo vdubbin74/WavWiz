@@ -113,8 +113,9 @@ export function inlineName(labelEl, { value = labelEl?.textContent?.trim() || ''
   const box = h('span', { class: 'wwinl', role: 'group', 'aria-label': label }, inp, okB, noB);
   for (const t of ['click', 'pointerdown', 'dblclick', 'contextmenu']) box.addEventListener(t, ev => ev.stopPropagation());   // typing here never selects / drags / opens the card
   labelEl.hidden = true; labelEl.parentNode.insertBefore(box, labelEl.nextSibling);
+  const host = labelEl.parentNode; host.classList?.add('wwinl-host');   // 0.7.3 t2231u: the row knows a name is being typed (CSS hides its other buttons on the phone look)
   let done = false, busy = false;
-  const end = () => { if (done) return; done = true; box.remove(); labelEl.hidden = false; labelEl._editing = null; if (labelEl.isConnected) labelEl.focus?.({ preventScroll: true }); onEnd?.(); redrawSoon(); };
+  const end = () => { if (done) return; done = true; box.remove(); host.classList?.remove('wwinl-host'); labelEl.hidden = false; labelEl._editing = null; if (labelEl.isConnected) labelEl.focus?.({ preventScroll: true }); onEnd?.(); redrawSoon(); };
   const commit = async () => { if (done || busy) return; const v = inp.value.trim(); if (!v || v === value) return end();
     busy = true; box.classList.add('busy'); try { await save(v); if (setText) labelEl.textContent = v; end(); } catch (e) { busy = false; box.classList.remove('busy'); box.classList.add('bad'); inp.setAttribute('title', e?.message || 'That did not work.'); inp.focus(); } };
   inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') { ev.preventDefault(); commit(); } else if (ev.key === 'Escape') { ev.preventDefault(); end(); } });

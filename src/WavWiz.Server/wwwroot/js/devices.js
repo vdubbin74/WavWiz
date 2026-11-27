@@ -1048,8 +1048,15 @@ function pinMxBar(root, off = false) {
   if (off || !isMixerOpen()) { sp?.remove(); if (mxPinned) { mxPinned.remove(); mxPinned = null; window.removeEventListener('scroll', mxPlace, true); } return; }
   if (!mxPinned) { mxPinned = mixerBar(); mxPinned.classList.add('mx-bar-pin'); document.body.append(mxPinned); window.addEventListener('scroll', mxPlace, { capture: true, passive: true }); }
   const space = sp || h('div', { class: 'mx-bar-space', 'aria-hidden': 'true' }); if (!sp) root.querySelector(':scope > .pagetitle')?.after(space);
-  mxPlace(); space.style.height = (mxPinned.offsetHeight + 10) + 'px';
+  mxPlace();
+  // 0.7.3 t2231u: the pinned bar already sits over the page title, so the spacer only adds what is still missing under the bar
+  // (was the bar's full height on top of the title: a ~90 px empty gap above MASTER VOLUME). Measured once, when the spacer is made, so a
+  // redraw while scrolled never shifts the page; opened while scrolled down it is the old full height.
+  if (!space.dataset.h && mxPinned.offsetHeight > 0) { space.style.height = mixerSpace(space.getBoundingClientRect().top, mxPinned.getBoundingClientRect().bottom, mxPinned.offsetHeight) + 'px'; space.dataset.h = '1'; }   // bar hidden (a sheet is open): measured later
 }
+/** 0.7.3 t2231u, pure: spacer height so the page continues 10 px under the pinned Volume Mixer bar. top = where the spacer starts (viewport
+ *  px, without its own height), barBottom = the bar's bottom, barH = its height. Never below 0, never more than barH + 10. */
+export const mixerSpace = (top, barBottom, barH) => Math.round(Math.max(0, Math.min(barH + 10, barBottom + 10 - top)));
 export { setMixer };
 /** Right-hand panel of the desktop layout in three sizes. ctl.setDevSize(size, highlightZoneId) switches size. */
 export function devicesPanel(S, ctl) {

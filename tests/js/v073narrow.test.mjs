@@ -50,7 +50,7 @@ test('phone-only restrictions and touch behavior stay on html.handset (a narrow 
   // no phone-look rule hides a desktop feature
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, ''), look = [...bare.matchAll(/([^{}]*html\.phonelook[^{}]*)\{([^}]*)\}/g)];
   assert.ok(look.length >= 30, String(look.length));
-  for (const [, sel, body] of look) if (/display:none/.test(body)) assert.match(sel.trim(), /\.annlbl|\.np-phone-actions|\.ann-live \.small/, 'only duplicates / labels are hidden: ' + sel.trim());
+  for (const [, sel, body] of look) if (/display:none/.test(body)) assert.match(sel.trim(), /\.annlbl|\.np-phone-actions|\.ann-live \.small|\.spk-head\.wwinl-host>:not\(\.wwinl\)|\.toktbl thead/, 'only duplicates / labels are hidden (t2231u: rename-row buttons while the inline field is open, token header replaced by inline labels): ' + sel.trim());
   for (const [, sel] of look) assert.doesNotMatch(sel, /\.mpin|\.kbd|\.np-xpins|desk-menus|\.home/, sel.trim());
   // JS that decides what is available still asks for a real phone
   assert.match(src('menu.js'), /const htmlHandset = \(\) => [^\n]*classList\?\.contains\('handset'\)/);

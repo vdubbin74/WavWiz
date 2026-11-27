@@ -137,11 +137,11 @@ export async function openSettings(S, refresh, nav, section) {
       st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'Secure connection for phones is on.'),
         st.tls.renewalError && admin ? h('div', { class: 'small amber', role: 'note', id: 'sec-phone-again' }, 'Your PC\'s address changed, so phones need the secure connection set up again. ',
           h('button', { class: 'btn sm', onclick: async () => { if (!(await ask('Set up phones again?', 'WavWiz makes a new certificate. Each phone must repeat the steps, and remove the old WavWiz profile (iPhone: Settings > General > VPN & Device Management).', { ok: 'Set up again' }))) return; try { const r = await api('/tls/enable', { method: 'POST', body: { recreate: true } }); toast('New certificate made. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up secure connection again')) : null,
-        h('div', { class: 'row wrap', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: SECURE_QR, alt: 'QR code for the secure-connection set-up page', width: 200, height: 200 })),
+        h('div', { class: 'row wrap tls-qrrow', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: SECURE_QR, alt: 'QR code for the secure-connection set-up page', width: 200, height: 200 })),
           h('div', { class: 'grow' }, h('p', null, h('b', null, 'On the phone: '), 'point the camera at the code and tap the link. It shows the steps for that phone (about two minutes) and checks they worked.'),
             h('p', { class: 'small' }, 'No camera? Open ', h('a', { href: SECURE_SETUP_PATH, target: '_blank', rel: 'noopener' }, 'the set-up page'), ' on the phone by typing its address.'),
             h('p', { class: 'small', id: 'sec-phone-list' }, h('b', null, 'Phones with a secure connection: '), (st.tls.trustedDevices || []).length ? trustedLabel(st.tls.trustedDevices) : 'none yet.'),
-            h('p', { class: 'small mono dim' }, 'Certificate fingerprint (SHA-256): ' + st.tls.rootSha256))),
+            h('p', { class: 'small dim' }, 'Certificate fingerprint (SHA-256): ', h('span', { class: 'mono' }, st.tls.rootSha256 || '')))),   // 0.7.3 t2231u: only the hash may break anywhere
         admin ? h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Certificate refreshed. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Refresh certificate (after an address change)')) : null)
         : h('div', null, h('p', { class: 'small' + (st.tls.state === 'error' ? ' amber' : '') }, st.tls.state === 'error' ? `Secure connection for phones couldn't be set up: ${st.tls.error}. Music works normally.` : 'Off. Music works. Phones need it only for the microphone.'),
           h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Secure connection is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up secure connection')), admin ? null : adminTag())),
@@ -164,11 +164,11 @@ export async function openSettings(S, refresh, nav, section) {
         learn('Show a code, then type it on the phone or in WavWiz Player on another PC.', 'The player finds this server by itself - the code is all it needs. The code works once and expires in a few minutes.'),
         adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/pairing/code', { method: 'POST' }); out.textContent = r.code; qr.src = `/tls/qr.svg?to=pair&code=${encodeURIComponent(r.code)}&t=${Date.now()}`; qr.hidden = false; qrNote.hidden = false; fetch('/tls/info').then(r => r.json()).then(i => { qrAddr.textContent = `Server address: http://${i.host}:${i.httpPort}`; qrAddr.hidden = false; }).catch(() => {}); } catch (e) { toast(e.message, true); } } }, 'Show a pairing code')), pairBox, qrAddr, qrNote));
       players.push(!admin ? h('div', { class: 'card', id: 'sec-tokens' }, h('h3', null, 'Paired devices & tokens ', adminTag()), h('p', { class: 'dim small' }, 'Only an administrator can see and revoke paired devices.'), h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn' }, 'Create API token…')))) : h('div', { class: 'card', id: 'sec-tokens' }, h('h3', null, 'Paired devices & tokens'),
-        tokens.filter(t => !t.revoked).length ? h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['Name', 'Role', 'Last used', ''].map(x => h('th', null, x)))), h('tbody', null, tokens.filter(t => !t.revoked).map(t =>
-          h('tr', null, h('td', null, t.name), h('td', null, t.role), h('td', null, t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : 'never'),
-            h('td', null, h('button', { class: 'btn danger', onclick: () => revokeToken(t) }, 'Revoke')))))) : h('p', { class: 'dim' }, 'None.'),
+        tokens.filter(t => !t.revoked).length ? h('table', { class: 'tbl toktbl' }, h('thead', null, h('tr', null, ['Name', 'Role', 'Last used', ''].map(x => h('th', null, x)))), h('tbody', null, tokens.filter(t => !t.revoked).map(t =>
+          h('tr', null, h('td', { class: 'tok-name' }, t.name), h('td', { class: 'tok-role' }, t.role), h('td', { class: 'tok-used', 'data-l': 'Last used' }, t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : 'never'),   // 0.7.3 t2231u: classes = phone card layout
+            h('td', { class: 'tok-act' }, h('button', { class: 'btn danger', onclick: () => revokeToken(t) }, 'Revoke')))))) : h('p', { class: 'dim' }, 'None.'),
         h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn', onclick: makeToken }, 'Create API token…'), h('button', { class: 'btn', onclick: makeHaToken, title: 'A Control token for Home Assistant (play, pause, volume, now playing). Revoke it here any time.' }, 'Home Assistant token…'))));
-      const num = (key, label, def) => { const i = adminOnly(S, h('input', { type: 'number', min: 0, max: 1000, value: settings[key] ?? def, style: 'width:90px', onchange: () => putSettings({ [key]: +i.value }, i) })); return h('label', { class: 'row' }, h('span', { style: 'min-width:260px' }, label), i, 'ms'); };
+      const num = (key, label, def) => { const i = adminOnly(S, h('input', { type: 'number', min: 0, max: 1000, value: settings[key] ?? def, style: 'width:90px', onchange: () => putSettings({ [key]: +i.value }, i) })); return h('label', { class: 'row numrow' }, h('span', { class: 'numrow-l', style: 'min-width:260px' }, label), i, 'ms'); };   // 0.7.3 t2231u: numrow = wraps on the phone look
       cal.push(h('div', { class: 'card', id: 'sec-delaydefaults' }, h('h3', null, 'Delay defaults ', admin ? null : adminTag()),
         h('p', { class: 'dim small' }, 'Used until a speaker is calibrated (shown as “not calibrated”).'),
         num('bt.defaultLatencyMs', 'Bluetooth speaker (typical)', 200), num('wired.defaultLatencyMs', 'Wired / HDMI / built-in', 0)));
@@ -217,8 +217,8 @@ export async function openSettings(S, refresh, nav, section) {
         if (v === val) return;
         try { await putSettings({ [key]: v }); val = v; shown.textContent = `+${v} dB`; } catch (e) { toast(e.message, true); }
       };
-      return h('div', { class: 'row', style: 'margin-top:8px;gap:8px;align-items:center' },
-        h('span', { style: 'min-width:170px' }, label),
+      return h('div', { class: 'row boostrow', style: 'margin-top:8px;gap:8px;align-items:center' },   // 0.7.3 t2231u: boostrow = wraps on the phone look
+        h('span', { class: 'boostrow-l', style: 'min-width:170px' }, label),
         h('button', { class: 'btn', 'aria-label': `${label} down 1 dB`, disabled: !admin, onclick: () => set(val - 1) }, '▼'),
         shown,
         h('button', { class: 'btn', 'aria-label': `${label} up 1 dB`, disabled: !admin, onclick: () => set(val + 1) }, '▲'),

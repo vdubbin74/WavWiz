@@ -6607,3 +6607,58 @@ html.handset .npdrop-over::after{content:'Drop to play now';position:absolute;le
 .gs-secure{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
 .gs-secure.done>b{color:var(--ok,#5fd38a)}
 .gs-secure-list{margin-top:2px}
+/* 0.7.3 t2231u: phone polish (iPhone screenshots). Look only - every rule is html.phonelook (a phone or a narrow PC window) or the phone sheet.
+   1 Rename in Speaker Settings: while a name is typed the field fills the row with ✓ / ✕ beside it; the row's Cancel / Done step aside
+     (the sheet header has them). Tags sit under the name (spkset.js order). */
+:is(.pd42-sheet,html.phonelook) .spk-head.wwinl-host>:not(.wwinl){display:none!important}
+:is(.pd42-sheet,html.phonelook) .spk-head.wwinl-host>.wwinl{flex:1 1 100%;min-width:0;display:flex}
+:is(.pd42-sheet,html.phonelook) .spk-head.wwinl-host .wwinl-in{font-size:16px;min-height:40px;box-sizing:border-box}
+.pd42-sheet .spk-tags{margin:0 0 4px}
+/* 2 Profile row: PROFILE + the select on one line (the select takes the rest), Save / + New / delete as a row of buttons under it;
+     no text wraps inside a button */
+.pd42-sheet .spk-profrow,html.phonelook .spk-profrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.pd42-sheet .spk-profrow>.dlbl,html.phonelook .spk-profrow>.dlbl{flex:0 0 auto;margin:0}
+.pd42-sheet .spk-profrow .spk-pwrap,html.phonelook .spk-profrow .spk-pwrap{flex:1 1 calc(100% - 96px);min-width:0;display:flex;align-items:center}
+.pd42-sheet .spk-profrow .spk-prof,html.phonelook .spk-profrow .spk-prof{flex:1 1 auto;width:100%;min-width:0}
+.pd42-sheet .spk-profrow .btn,html.phonelook .spk-profrow .btn{flex:0 0 auto;white-space:nowrap;min-height:32px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.pd42-sheet .spk-profrow .spk-pname,html.phonelook .spk-profrow .spk-pname{flex:1 1 100%;min-width:0}
+/* 3 Paired devices & tokens: one card-like row per device (name; role · last used; Revoke on the right). Words never break mid-letter. */
+html.phonelook .toktbl,html.phonelook .toktbl tbody{display:block;width:100%}
+html.phonelook .toktbl thead{display:none}
+html.phonelook .toktbl tr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"n n a" "r u a";column-gap:6px;row-gap:2px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+html.phonelook .toktbl td{display:block;padding:0;border:0;word-break:normal;overflow-wrap:break-word}
+html.phonelook .toktbl .tok-name{grid-area:n;font-weight:600;font-size:14px}
+html.phonelook .toktbl .tok-role,html.phonelook .toktbl .tok-used{color:var(--dim);font-size:12px}
+html.phonelook .toktbl .tok-role{grid-area:r}
+html.phonelook .toktbl .tok-used{grid-area:u;min-width:0}
+html.phonelook .toktbl .tok-used::before{content:'· Last used ';white-space:pre}
+html.phonelook .toktbl .tok-act{grid-area:a;margin-left:8px}
+html.phonelook .toktbl .tok-act .btn{white-space:nowrap;min-height:36px}
+/* tables elsewhere in Settings / dialogs on the phone look: break between words, not inside them */
+html.phonelook .tbl td,html.phonelook .tbl th{word-break:normal;overflow-wrap:break-word}
+html.phonelook .tbl .btn{white-space:nowrap}
+/* 4 Audio inputs > Playback on this PC: the box never grows past the card; the two choices share the width and wrap their text */
+.lsx{grid-template-columns:minmax(0,1fr)}
+.lsx .seg button{white-space:normal;min-width:0}
+html.phonelook .lsx .seg{display:flex;width:100%}
+html.phonelook .lsx .seg button{flex:1 1 0;padding:6px 8px;text-align:center}
+html.phonelook .lsx .lsx-warn,html.phonelook .lsx p{overflow-wrap:break-word}
+/* 6 Devices: the ZONES · SPEAKERS toolbar and each zone row use one control height (32 px, the phone tap size) and 16 px icons */
+html.phonelook .tree42-h{align-items:center}
+html.phonelook .tree42-h :is(.annwrap .annbtn,.annwrap .anntobtn,.zadd-new,.zadd-spk){height:32px!important;min-height:32px!important;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;padding-top:0!important;padding-bottom:0!important;vertical-align:middle}
+html.phonelook .tree42-h :is(.zadd-new,.zadd-spk){width:32px!important;min-width:32px!important;padding:0!important;font-size:16px}
+html.phonelook .tree42-h :is(.annbtn,.zadd-spk) :is(svg,.ic,.ic svg){width:16px!important;height:16px!important}
+html.phonelook .tree42-h .anntobtn :is(svg,.ic svg){width:12px!important;height:12px!important}
+html.phonelook .tree42 .zc42-1{align-items:center}
+html.phonelook .tree42 .zc42-1 :is(.zlinkbtn.zlinkic,.onpill){height:32px!important;min-height:32px;box-sizing:border-box}
+html.phonelook .tree42 .zc42-1 .zlinkbtn.zlinkic{width:32px!important;min-width:32px!important}
+html.phonelook .tree42 .zc42-1 .zlinkbtn.zlinkic :is(svg,.ic){width:16px!important;height:16px!important}
+html.phonelook .tree42 .zc42-1 .onpill{min-width:64px}
+html.phonelook .tree42 .zc42-1 .onpill span{font-size:10px}
+/* audit siblings (Settings at 320-390 px): label + control rows wrap instead of pushing the control off the card; the phone QR card puts its
+   text under the code when there is no room beside it */
+html.phonelook .numrow,html.phonelook .boostrow{flex-wrap:wrap;row-gap:4px}
+html.phonelook :is(.numrow-l,.boostrow-l){min-width:0!important;flex:1 1 100%}
+html.phonelook .boostrow .boost-range{flex:1 1 auto;min-width:0}
+html.phonelook .tls-qrrow>.grow{flex:1 1 220px;min-width:0}
+/* end 0.7.3 t2231u */

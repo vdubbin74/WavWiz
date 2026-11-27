@@ -358,7 +358,8 @@ export function speakerSettings(S, ctl, z0, parts = {}) {
     const v = Math.round(z.volume ?? 100); volNote.hidden = !on || v >= 100; volNote.textContent = 'Volume still works. Below 100% the samples are scaled.';
   }
   const right = h('div', { class: 'spk-right' }, directNote, eqHead, presetRow, eqHost, extraSw, h('div', { class: 'dlbl' }, 'OUTPUT DEVICE'), outHost?.el || h('p', { class: 'small dim' }, 'No output yet.'), calLine, btns, parts.extra ? parts.extra(z) : null);
-  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), zoneHost, tagRow, profRow, refHost, h('div', { class: 'spk-body' }, directCard, left, right));
+  root.append(h('div', { class: 'spk-head' }, title, parts.onRename ? ro(h('button', { type: 'button', class: 'btn sm spk-rename', 'data-act': 'spk-rename', onclick: ev => parts.onRename(z, ev.currentTarget) }, 'Rename'), admin, 'Only an administrator can rename a device.') : null, status, liveTag, h('span', { class: 'grow' }), cancel, done), tagRow, zoneHost, profRow, refHost,   // 0.7.3 t2231u: tags sit under the name (were alone under the Zone row)
+     h('div', { class: 'spk-body' }, directCard, left, right));
   vol.append(volNote);
   vol._input?.addEventListener('input', () => queueMicrotask(paintDirect)); capRow._input?.addEventListener('change', () => queueMicrotask(paintDirect));   // 0.7.3: the volume chip follows the sliders
   capTitle();
