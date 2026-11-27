@@ -69,6 +69,7 @@ import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
 import { installPhoneLook } from './phonelook.js';   // 0.7.3 t2225u
+import { finishSignIn, lostSignInMessage, signInMarked, withoutMark } from './signin.js';   // 0.7.3 t2248u: no sign-in reload loop on iPhone
 import { startPairRequests, playerApprovalScreen, serverPcSignIn } from './pairreq.js';   // 0.6.9 #15, 0.7.1 t2072
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
@@ -96,8 +97,10 @@ async function boot() {
   setRipAllowed(S.auth);   // 0.4.8 F57: the CD ripper is a PC-only tool (never on the phone / remote clients)
   setArtCv(S.auth.artCv);   // 0.3.2 F10
   document.title = `WavWiz BETA ${S.auth.appVersion}`;
+  const lost = lostSignInMessage(location, S.auth.authenticated);
+  if (signInMarked(location)) { try { history.replaceState(history.state, '', withoutMark(location)); } catch { /* old browser: the marker just stays */ } }
   if (S.auth.setupRequired) return renderSetup();
-  if (!S.auth.authenticated) return renderLogin();
+  if (!S.auth.authenticated) return renderLogin(undefined, lost);
   try { await startMain(); }
   catch (e) {     // 0.0.8: a failure while drawing the main page must never leave a blank window; offer the sign-in chooser again
     console.error(e);
@@ -138,7 +141,7 @@ function renderSetup() {
   const form = h('form', { class: 'card auth', onsubmit: async ev => {
     ev.preventDefault(); msg.textContent = '';
     if (pw.value !== pw2.value) { msg.textContent = 'The two passwords are different.'; return; }
-    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value, claimCode: code?.value || undefined } }); setupDone(); location.reload(); } catch (e) { msg.textContent = e.message; }
+    try { await api('/auth/setup', { method: 'POST', body: { password: pw.value, claimCode: code?.value || undefined } }); setupDone(); finishSignIn(); /* t2248u: Docker first run from a phone too */ } catch (e) { msg.textContent = e.message; }
   } },
     h('h2', null, 'Welcome to WavWiz'), h('p', { class: 'dim' }, 'Choose an administrator password for this WavWiz server (at least 8 characters). It never leaves your home network. Nothing was generated or shown by the installer.'),
     banner,
@@ -150,16 +153,16 @@ function renderSetup() {
   app.replaceChildren(topbar(), form);
 }
 
-function renderLogin(start) {
+function renderLogin(start, lost = '') {
   // 0.7.1 t2072: on the PC that runs the server (window or browser) the administrator password comes first; approval / a code are secondary links
   const local = !!S.auth?.thisMachine;
-  if (local && (!start || start === 'admin')) { const w = serverPcSignIn({ player: isPlayerUa(), other: m => renderLogin(m), login: async password => { await api('/auth/login', { method: 'POST', body: { password } }); location.reload(); } }); app.replaceChildren(topbar(), w.el); w.focus(); return; }
+  if (local && (!start || start === 'admin')) { const w = serverPcSignIn({ player: isPlayerUa(), other: m => renderLogin(m), login: async password => { await api('/auth/login', { method: 'POST', body: { password } }); finishSignIn(); } }); app.replaceChildren(topbar(), w.el); w.focus(); return; }
   // 0.6.9 #15: the WavWiz Player window on another PC never opens on the sign-in tabs - it asks the administrator for approval and waits
   if ((!start || start === 'approve') && isPlayerUa()) { const w = playerApprovalScreen({ name: deviceName(), local, other: m => renderLogin(m) }); app.replaceChildren(topbar(), w.el); return; }
   const mode = { v: start === 'admin' ? 'admin' : 'pair' };
   const root = h('div', { class: 'card auth' });
   const draw = () => {
-    const msg = h('p', { class: 'err', role: 'alert' });
+    const msg = h('p', { class: 'err', role: 'alert' }, lost); lost = '';   // t2248u: shown once, on the first draw
     const code = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '6-digit code', id: 'code', value: PAIR_PREFILL });
     const name = h('input', { type: 'text', maxlength: 40, placeholder: 'e.g. Sam\'s phone', id: 'devname', value: deviceName() });
     const pw = h('input', { type: 'password', autocomplete: 'current-password', id: 'pw' });
@@ -167,10 +170,10 @@ function renderLogin(start) {
       h('h2', null, 'Sign in'),
       h('div', { class: 'tabs', role: 'tablist' }, h('button', { class: mode.v === 'pair' ? 'on' : '', onclick: () => { mode.v = 'pair'; draw(); } }, 'Pair with code'), h('button', { class: mode.v === 'admin' ? 'on' : '', onclick: () => { mode.v = 'admin'; draw(); } }, 'Administrator')),
       mode.v === 'pair'
-        ? h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/pair', { method: 'POST', body: { code: code.value, name: name.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
+        ? h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/pair', { method: 'POST', body: { code: code.value, name: name.value } }); finishSignIn(); } catch (e) { msg.textContent = e.message; } } },
             h('p', { class: 'dim' }, 'On a screen signed in as administrator open Settings > Devices > Pair a phone or a PC player, and type the 6-digit code here.'),
             h('div', { class: 'field' }, h('label', { for: 'code' }, 'Code'), code), h('div', { class: 'field' }, h('label', { for: 'devname' }, 'This device\'s name'), name), msg, h('button', { class: 'btn primary' }, 'Pair'))
-        : h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/login', { method: 'POST', body: { password: pw.value } }); location.reload(); } catch (e) { msg.textContent = e.message; } } },
+        : h('form', { onsubmit: async ev => { ev.preventDefault(); try { await api('/auth/login', { method: 'POST', body: { password: pw.value } }); finishSignIn(); } catch (e) { msg.textContent = e.message; } } },
             h('div', { class: 'field' }, h('label', { for: 'pw' }, 'Administrator password'), pw), msg, h('button', { class: 'btn primary' }, 'Sign in')));
   };
   draw(); app.replaceChildren(topbar(), root);

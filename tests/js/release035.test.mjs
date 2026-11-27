@@ -21,7 +21,7 @@ test('J3 caps: only locked caps limit; zone cap = average of member limits; clam
 test('J4 tag rows: order + zone count wording', async () => {
   const d = await imp('devices');
   const t = d.cardTags3({ id: 'a', enabled: false, connected: false, muted: true, volLocked: true, volCap: 60, outputs: [] }).map(x => x.text);
-  assert.deepEqual(t.slice(0, 3), ['OFF', 'OFFLINE', 'MUTED']); assert.ok(t.includes('CAPPED 60%'));
+  assert.deepEqual(t.slice(0, 3), ['OFF', 'OFFLINE', 'MUTED']); assert.ok(t.includes('CAP 60%'), '0.7.3 t2249u: short CAP tag');
   const zt = d.zoneTags3([{ id: 'a', name: 'A', volume: 10, outputs: [] }], { deviceIds: ['a'], active: true }).map(x => x.text);
   assert.deepEqual(zt.slice(0, 2), ['1 DEVICE', 'PLAYING']);
   assert.match(d.zoneTags3([{ id: 'a', outputs: [] }, { id: 'b', outputs: [] }], { deviceIds: ['a', 'b'] })[0].text, /^2 DEVICES$/);

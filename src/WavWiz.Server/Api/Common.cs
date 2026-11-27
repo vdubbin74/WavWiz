@@ -79,6 +79,11 @@ public static class Ext
         try { using var d = await JsonDocument.ParseAsync(r.Body); return d.RootElement.Clone(); } catch { return default; }
     }
 
+    /// <summary>0.7.3 t2248u: SameSite=Lax, not Strict. iPhone Safari withholds a Strict cookie from a page that was opened by a cross-site
+    /// navigation (the Camera's QR code, a link in Messages or Mail, a Home Screen icon) - also on that page's own fetches and on location.reload() -
+    /// so Pair / Administrator succeeded and the reload came back signed out, again and again (seen first on Docker, where phones open the plain-http
+    /// QR link directly). Cross-site protection does not rest on SameSite: every cookie-authenticated write and WebSocket must carry a same-host
+    /// Origin (WavWizServer pipeline), and Lax still never sends the cookie on cross-site POST / fetch / iframe requests.</summary>
     public static void SetSession(this HttpContext c, string token, int days = 30)
-        => c.Response.Cookies.Append("wavwiz_session", token, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/", Secure = c.Request.IsHttps, MaxAge = TimeSpan.FromDays(days) });
+        => c.Response.Cookies.Append("wavwiz_session", token, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Lax, Path = "/", Secure = c.Request.IsHttps, MaxAge = TimeSpan.FromDays(days) });
 }

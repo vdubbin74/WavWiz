@@ -49,7 +49,7 @@ for (const [tag, opt] of (ONLYSHOTS ? [] : VPS)) {
       await home(p, NORMAL); await shot('devices-standard');
       const r = await p.evaluate(() => { const cards = [...document.querySelectorAll('.devpanel .zwrap42 .sp42')].filter(c => c.offsetParent);
         const hs = cards.map(c => Math.round(c.getBoundingClientRect().height)); const pills = cards;
-        const capped = [...document.querySelectorAll('.devpanel .sp42 .dtag')].filter(c => c.offsetParent && /CAPPED 40%/.test(c.textContent));
+        const capped = [...document.querySelectorAll('.devpanel .sp42 .dtag')].filter(c => c.offsetParent && /CAP 40%/.test(c.textContent));
         return { n: cards.length, hs: [...new Set(hs)], pills: pills.length, pillTxt: pills[0]?.textContent, capped: capped.length, tags: cards.slice(0, 3).map(c => c.querySelector('.dtag')?.textContent.trim()), mutes: cards.filter(c => c.querySelector('.sp42-v')).length,
           r: cards[0] ? getComputedStyle(cards[0]).borderTopLeftRadius : '' }; });
       ok(`[${tag}] J4 (0.4.2) speaker rows nested in the zone tree, each with its volume %`, r.n > 0 && r.mutes === r.n, JSON.stringify(r));

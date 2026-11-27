@@ -142,7 +142,9 @@ public static class CalPhoneApi
         {
             var l = Valid(token, DateTimeOffset.UtcNow); if (l == null) return Results.NotFound();
             c.Response.Headers.CacheControl = "no-store";
-            return Results.Content(SystemApi.QrSvg($"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/c/{l.Token}"), "image/svg+xml");
+            // 0.7.3 t2248u (F274 W5 gap): the same http-first secure set-up link as every other phone QR (to=secure), carrying the calibration hand-off:
+            // the phone sets up / proves the secure connection, then continues to the https mic page by itself. The typed short link /c/CODE goes there too.
+            return Results.Content(SystemApi.QrSvg($"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}{PhoneApi.SecurePath("cal", l.Token)}"), "image/svg+xml");
         }).Req(Role.Control);
 
         // the phone: "I am here" (state opened / measuring / done / left), every few seconds while the wizard is open
@@ -223,7 +225,8 @@ public static class CalPhoneApi
             // 0.2.5: no pairing code any more - the mic-only page needs no sign-in. With HTTPS: the certificate check first (it continues to the secure
             // mic page by itself once the phone trusts WavWiz); without HTTPS: the mic page explains that the microphone needs HTTPS.
             var q = $"cal={l.Token}";
-            return Results.Redirect(s.Ca.Enabled ? $"http://{host}:{s.Cfg.HttpPort}/tls/check?{q}" : $"http://{host}:{s.Cfg.HttpPort}{MicPage}?{q}");
+            // 0.7.3 t2248u: with HTTPS the F274 secure set-up page (was the older /tls/check page)
+            return Results.Redirect(s.Ca.Enabled ? $"http://{host}:{s.Cfg.HttpPort}{PhoneApi.SecurePath("cal", l.Token)}" : $"http://{host}:{s.Cfg.HttpPort}{MicPage}?{q}");
         }).Anon();
     }
     static string PhoneHost(HttpContext c, Services s) => PhoneApi.PhoneHost(c, s);

@@ -179,6 +179,23 @@ Ports:
 
 Other env: `WAVWIZ_ADVERTISE_ADDRESS` (bridge mode, above), `WAVWIZ_SERVER_NAME`, `WAVWIZ_DISCOVERY=0`, `WAVWIZ_AIRPLAY=0`, `WAVWIZ_BIND` (default `0.0.0.0` in the image), `WAVWIZ_FFMPEG`.
 
+## iPhone: Pair / Administrator only reloads the sign-in page (fixed in 0.7.3)
+
+Up to 0.7.2 an iPhone that opened WavWiz from the **Camera's QR code** (or a link in Messages / Mail, or a Home Screen icon) could not
+sign in: Pair or Administrator was accepted, the page reloaded, and the sign-in page came back. The session cookie was `SameSite=Strict`, and
+iPhone Safari does not use a Strict cookie on a page that was opened from outside the site, not even on that page's own requests or its
+reload. Docker showed it first because there the phones open the plain-http QR link directly. 0.7.3 uses `SameSite=Lax` (cross-site writes
+are still refused: every signed-in write must come from the WavWiz page itself), continues after sign-in without a reload, and if a browser
+still does not keep the sign-in it says so instead of showing the form again. Nothing to change in your compose file.
+
+It was **not** the Docker network: WavWiz accepts only home-network sources (10.x, 172.16–31.x, 192.168.x, link-local, loopback), and a Docker
+bridge or NAT address is one of them. It never reads `X-Forwarded-For`, so a proxy header cannot make a request look local. In bridge mode with Docker's userland proxy every
+phone can appear as the bridge gateway (for example `172.17.0.1`): sign-in still works, but devices then share one sign-in attempt limit
+(5 wrong tries a minute) and new sign-ins are named after that address. Host networking (`network_mode: host`) keeps each phone's own address.
+
+If an iPhone still says *"You were signed in, but this browser did not keep the sign-in"*: open the address in Safari itself (not inside
+another app), turn off Private Browsing, and check Settings > Apps > Safari > Block All Cookies is off.
+
 ## Side-by-side test (keep a live server untouched)
 
 Host networking shares ports with the host, so on a machine already running WavWiz use other ports, another data folder and no discovery:

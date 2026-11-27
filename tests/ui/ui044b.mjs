@@ -61,7 +61,7 @@ if (want('F18')) for (const [z, dpr] of [['100', 1], ['200', 2]]) for (const pn 
   const { ctx, p } = await open(dpr, pn);
   const t = await p.evaluate(() => [...document.querySelectorAll('.devpanel .dtag')].filter(e => e.offsetParent).map(e => { const cs = getComputedStyle(e), sv = e.querySelector('svg'); return { k: e.textContent.trim().replace(/\d+/g, 'n'), h: Math.round(e.getBoundingClientRect().height), f: cs.fontSize, p: cs.paddingLeft + cs.paddingTop, r: cs.borderTopLeftRadius, s: sv ? sv.getBoundingClientRect().height : 0 }; }));
   const sig = new Set(t.map(x => [x.h, x.f, x.p, x.r].join('|')));
-  ok(t.some(x => /CAPPED/.test(x.k)), `F18 ${z}% ${pn.dev}: a CAPPED tag is shown`);
+  ok(t.some(x => /\bCAP \d+%/.test(x.k)), `F18 ${z}% ${pn.dev}: a CAP n% tag is shown`);
   ok(sig.size === 1, `F18 ${z}% ${pn.dev}: one tag size for ${[...new Set(t.map(x => x.k))].join(',')} -> ${[...sig].join(' ; ')}`);
   ok(t.every(x => x.s <= 10) && t.every(x => x.r === '3px'), `F18 ${z}% ${pn.dev}: lock glyph <=10px, 3px corners`);
   await ctx.close();
@@ -119,7 +119,7 @@ if (want('F19')) for (const [z, dpr] of [['100', 1], ['200', 2]]) for (const pn 
   const where = pn.dev;
   if (await p.evaluate(() => document.querySelector('.desk')?.classList.contains('tight'))) { await p.locator('.devtab').click(); await p.waitForTimeout(500); }   // 0.4.5 T1b: 1920 at dpr 2 is tight - Devices in the slide-over
   const info = await p.evaluate(() => { const t = document.querySelector('.sp42[data-device="Sub"] .dtag.capped'); const ro = document.querySelector('.dtag.count, .dtag.role'); return { cur: t && getComputedStyle(t).cursor, tip: t?.title, ro: ro && getComputedStyle(ro).cursor, roAct: ro?.classList.contains('tagact') }; });
-  ok(info.cur === 'pointer' && info.tip === 'Change max volume', `F19 ${z}% ${where}: CAPPED pointer + tooltip "${info.tip}"`);
+  ok(info.cur === 'pointer' && /Volume capped at \d+% - Change max volume$/.test(info.tip || ''), `F19 ${z}% ${where}: CAPPED pointer + tooltip "${info.tip}"`);
   ok(info.ro !== 'pointer' && !info.roAct, `F19 ${z}% ${where}: read-only tag not clickable`);
   await p.locator('.sp42[data-device="Sub"] .dtag.capped').first().click(); await p.waitForTimeout(1800);
   const a = await p.evaluate(() => { const ae = document.activeElement; const sp = ae?.closest('.spkset'); return { page: sp?.getAttribute('aria-label'), range: ae?.type, lbl: ae?.closest('.spk-row, label, div')?.textContent?.slice(0, 40) }; });

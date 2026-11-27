@@ -1484,7 +1484,7 @@ export function zoneCap(zones, g) {
 }
 /** A slider value clamped to the cap (pure). */
 export const clampToCap = (v, cap) => (cap != null && v > cap ? cap : v);
-/** J4: the one tag row of a speaker card - OFF, OFFLINE, REF, MUTED, NO DELAY, BT, CAPPED n%, a phone's SPEAKER role (pure, all of them, in this order). */
+/** J4: the one tag row of a speaker card - OFF, OFFLINE, REF, MUTED, NO DELAY, BT, CAP n% (0.7.3: was CAPPED n%), a phone's SPEAKER role (pure, all of them, in this order). */
 export function cardTags3(z) {
   const t = [], o = chosenOutput(z), cap = capOf(z), ot = outputTag(z);
   if (ot) t.push(ot);
@@ -1493,22 +1493,23 @@ export function cardTags3(z) {
   if (z.reference) t.push({ k: 'ref', text: 'REF', title: 'Reference speaker - other delays are measured against this one' });
   if (z.muted) t.push({ k: 'muted', text: 'MUTED', title: 'Muted - press the mute button to unmute' });
   if (z.connected && !z.reference && o && o.notCalibrated) t.push({ k: 'nodelay', text: 'NO DELAY', title: 'The delay is not set yet: Settings › Delay › Calibrate' });
-  if (cap != null) t.push({ k: 'capped', text: `CAPPED ${Math.round(cap)}%`, title: `Max volume locked at ${Math.round(cap)}%`, lock: true });
+  if (cap != null) t.push({ k: 'capped', text: `CAP ${Math.round(cap)}%`, label: `Volume capped at ${Math.round(cap)}%`, title: `Max volume locked at ${Math.round(cap)}%`, lock: true });   // 0.7.3 t2249u: short tag, full words in the tooltip / aria-label
   if (isPhoneZone(z)) t.push({ k: 'role', text: 'SPEAKER', title: 'This phone plays music.' });
   return t;
 }
-/** J4: a zone card's tags - N DEVICES, PLAYING, MUTED, BT (a member is Bluetooth), CAPPED n% (pure). */
+/** J4: a zone card's tags - N DEVICES, PLAYING, MUTED, BT (a member is Bluetooth), CAP n% (pure). */
 export function zoneTags3(zones, g) {
   const ms = zoneMembers(zones, g), cap = zoneCap(zones, g), t = [{ k: 'count', text: `${ms.length} DEVICE${ms.length === 1 ? '' : 'S'}`, title: ms.map(z => z.name).join(' · ') || 'No devices yet' }];
   if (g.active) t.push({ k: 'zplaying', text: 'PLAYING', title: 'Playing in this zone only' });
   if (zoneMuted(zones, g)) t.push({ k: 'muted', text: 'MUTED', title: 'Every speaker in this zone is muted' });
   if (ms.some(isBluetooth)) t.push({ k: 'bt', text: 'BT', title: 'A speaker in this zone uses Bluetooth' });
-  if (cap != null) t.push({ k: 'capped', text: `CAPPED ${cap}%`, title: `The locked speakers keep this zone at or below ${cap}%`, lock: true });
+  if (cap != null) t.push({ k: 'capped', text: `CAP ${cap}%`, label: `Volume capped at ${cap}%`, title: `The locked speakers keep this zone at or below ${cap}%`, lock: true });
   return t;
 }
 /** 0.4.4 F19: tags that jump to the setting that controls them (read-only ones - SPEAKER, N DEVICES, PLAYING, OFF, MUTED - stay plain). Pure map, unit-tested. */
 export const TAG_ACTIONS = { capped: 'Change max volume', nodelay: 'Set the delay or calibrate', ref: 'Change the reference speaker (Calibrate)', offline: 'Choose the output device', bt: 'Output device and calibration', zctl: 'Control this zone', muted: 'Unmute' };   // 0.4.4 F25: the amber MUTED tag unmutes
-const tagEls3 = list => list.map(t => { const tip = TAG_ACTIONS[t.k]; return h('span', tip ? { class: 'dtag tagact ' + t.k, title: tip, 'data-tag-act': t.k, role: 'button', tabindex: 0, 'aria-label': `${t.text}: ${tip}` } : { class: 'dtag ' + t.k, title: t.title }, t.lock ? icon('lock') : null, t.text); });
+// 0.7.3 t2249u: a tag with a `label` (CAP 50%) says it in full in the tooltip and to screen readers ("Volume capped at 50%")
+const tagEls3 = list => list.map(t => { const tip = TAG_ACTIONS[t.k]; return h('span', tip ? { class: 'dtag tagact ' + t.k, title: t.label ? `${t.label} - ${tip}` : tip, 'data-tag-act': t.k, role: 'button', tabindex: 0, 'aria-label': `${t.label || t.text}: ${tip}` } : { class: 'dtag ' + t.k, title: t.label || t.title, 'aria-label': t.label || undefined }, t.lock ? icon('lock') : null, t.text); });
 /** 0.4.4 F19: where a tag leads, inside an open speaker page / zone page. */
 export function tagFocusTarget(kind, pane) {
   if (!pane) return null;

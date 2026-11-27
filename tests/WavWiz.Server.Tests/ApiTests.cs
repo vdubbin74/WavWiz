@@ -42,11 +42,11 @@ public class ApiTests
     }
 
     [Fact]
-    public async Task Session_cookie_is_httponly_samesite_strict_and_cross_site_writes_are_refused()
+    public async Task Session_cookie_is_httponly_samesite_lax_and_cross_site_writes_are_refused()
     {
         await using var f = await ServerFixture.StartAsync();
         var r = await f.Http.PostAsJsonAsync("/api/v1/auth/setup", new { password = "a long enough password" });
-        var sc = r.Headers.GetValues("Set-Cookie").First(); Assert.Contains("httponly", sc, StringComparison.OrdinalIgnoreCase); Assert.Contains("samesite=strict", sc, StringComparison.OrdinalIgnoreCase);
+        var sc = r.Headers.GetValues("Set-Cookie").First(); Assert.Contains("httponly", sc, StringComparison.OrdinalIgnoreCase); Assert.Contains("samesite=lax", sc, StringComparison.OrdinalIgnoreCase);   // 0.7.3 t2248u: Lax (iPhone sign-in loop); the Origin check below is the CSRF guard
         var cookie = sc.Split(';')[0];
         HttpRequestMessage Post(string origin) { var q = new HttpRequestMessage(HttpMethod.Post, "/api/v1/stream/pause"); q.Headers.Add("Cookie", cookie); if (origin != "") q.Headers.Add("Origin", origin); return q; }
         Assert.Equal(HttpStatusCode.Forbidden, (await f.Http.SendAsync(Post("http://evil.example"))).StatusCode);
