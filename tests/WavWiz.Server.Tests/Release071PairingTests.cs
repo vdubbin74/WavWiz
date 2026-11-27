@@ -108,7 +108,7 @@ public class Release071PairingTests
             Assert.DoesNotContain("Settings > Players", t); Assert.DoesNotContain("Settings > Pair a PC", t); Assert.DoesNotContain("> Pair a PC)", t);
         }
         var iss = File.ReadAllText(Path.Combine(root, "installer/WavWiz.iss"));
-        var step3 = iss[iss.IndexOf("'3. On each PC with speakers", StringComparison.Ordinal)..]; step3 = step3[..step3.IndexOf("#13#10", StringComparison.Ordinal)];
+        var step3 = iss[iss.IndexOf("On each PC with speakers, start WavWiz Player", StringComparison.Ordinal)..];   // 0.7.3 F273: now step 4 (network first) step3 = step3[..step3.IndexOf("#13#10", StringComparison.Ordinal)];
         Assert.Contains("approve", step3, StringComparison.OrdinalIgnoreCase); Assert.Contains(P, step3);
         var doc = File.ReadAllText(Path.Combine(root, "docs/FIRST-RUN.md"));
         var s5 = doc[doc.IndexOf("## 5.", StringComparison.Ordinal)..]; s5 = s5[..s5.IndexOf("\n## ", 5, StringComparison.Ordinal)];

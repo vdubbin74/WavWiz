@@ -58,7 +58,7 @@ public static class PhoneTrust
         }
         catch { return Array.Empty<Device>(); }
     }
-    public static void Record(Db db, string name)
+    public static void Record(Db db, string? name)
     {
         name = CleanName(name);
         lock (L)

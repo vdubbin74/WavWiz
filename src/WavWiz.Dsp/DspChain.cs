@@ -126,7 +126,7 @@ public sealed class DspChain : IAudioProcessor
         _gainNow = g1;
         // 0.3.6 K6: balance (linear: the far side is turned down, the near side stays at full level); ramped across the block
         {
-            double b = cur.Preset.Direct ? 0 : cur.Preset.Balance / 100.0,   // 0.7.3: Direct = centered tl = b > 0 ? 1 - b : 1, tr = b < 0 ? 1 + b : 1;
+            double b = cur.Preset.Direct ? 0 : cur.Preset.Balance / 100.0, tl = b > 0 ? 1 - b : 1, tr = b < 0 ? 1 + b : 1;   // 0.7.3: Direct = centered
             if (tl != _balL || tr != _balR || tl != 1 || tr != 1)
             {
                 for (int i = 0; i < n; i++)
