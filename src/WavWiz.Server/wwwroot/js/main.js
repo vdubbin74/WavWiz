@@ -945,24 +945,26 @@ function drawQueue() {
       h('button', { type: 'button', class: 'iconbtn qsummary-play', disabled: !can, 'aria-label': state === 'playing' ? 'Pause' : 'Resume', onclick: () => canControl(S) && zoneKey() === renderedZone && act(S.now?.state === 'playing' ? '/stream/pause' : '/stream/resume') }, icon(state === 'playing' ? 'pause' : 'play'))) : h('p', { class: 'small dim' }, 'Choose a song from the queue or Library.'));
   // 0.6.8: compact Queue head — same icon row as the desktop header (∞ / recent / save / clear / lock) beside the track count; Up next on one ellipsis line.
   const nTracks = S.queue.length;
-  const trackLabel = `${nTracks} track${nTracks === 1 ? '' : 's'}${total ? ' • ' + fmtDur(total) : ''}`;
+  // 0.7.3 t2245u: count and total time are two no-wrap pieces (stacked beside the tools; one line above them when the Queue is too narrow, ~320 px)
+  const trackLabel = [h('span', { class: 'qc-n' }, `${nTracks} track${nTracks === 1 ? '' : 's'}`), total ? h('span', { class: 'qc-d' }, h('span', { class: 'qc-sep', 'aria-hidden': 'true' }, '• '), fmtDur(total)) : null];
   const lockTip = locked ? 'Queue locked - click to unlock' : 'Lock the queue (no reordering or sorting)';
   const lockBtn = h('button', { type: 'button', class: 'plus pllock' + (locked ? ' on' : ''), 'data-act': 'phonelock', 'aria-pressed': String(locked), title: lockTip, 'aria-label': lockTip, onclick: () => { saveLayout(setLocked(loadLayout(true), !locked), true); drawQueue(); } }, icon(locked ? 'lock' : 'unlock'));
   const recentBtn = h('button', { type: 'button', class: 'plus', 'data-act': 'recentqueues', 'aria-label': 'Recent queues', title: 'Recent queues…', onclick: () => openRecentQueues({ can: canControl(S) }) }, icon('history'));
   const saveBtn = can && nTracks ? h('button', { type: 'button', class: 'plus', 'data-act': 'savequeue', 'aria-label': 'Save queue as a playlist', title: 'Save queue as a playlist', onclick: saveQueue }, icon('save')) : null;
   const clearBtn = can && nTracks ? h('button', { type: 'button', class: 'plus', 'data-act': 'clearqueue', 'aria-label': 'Clear the queue', title: locked ? CLEAR_LOCK_HINT : 'Clear the queue', disabled: locked || busy || undefined, onclick: () => { if (!locked && !qEdit.pending()) clearQueueFlow(S, { act, refreshAll }); } }, icon('trash')) : null;
   const tools = h('span', { class: 'row plbtns pq-tools', 'aria-label': 'Queue tools' }, phoneKeep(), recentBtn, saveBtn, clearBtn, can && nTracks ? lockBtn : null);
-  const nextIdx = queueNextIndex(S.now, S.queue), nxt = nextIdx >= 0 ? S.queue[nextIdx] : null;
+  // 0.7.3 t2245u: nothing playing but tracks queued -> Up next is the first track (Play starts there), not "Nothing queued after this"
+  const nextIdx0 = queueNextIndex(S.now, S.queue), nextIdx = nextIdx0 < 0 && !hasNow && nTracks ? 0 : nextIdx0, nxt = nextIdx >= 0 ? S.queue[nextIdx] : null;
   const upNext = h('div', { class: 'plnext pq-upnext' + (nxt ? '' : ' none'), 'aria-label': 'Up next', title: nxt ? ['Up next', nxt.title, nxt.artist].filter(Boolean).join(' · ') : 'Nothing queued after this' },
     h('span', { class: 'pln-lbl' }, 'UP NEXT'),
     h('span', { class: 'pln-t1 ell' }, nxt ? (nxt.title || 'Untitled') : 'Nothing queued after this'),
     nxt?.artist ? h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·') : null,
     nxt?.artist ? h('span', { class: 'pln-t2 ell' }, nxt.artist) : null);
   root.classList.toggle('pq-handset', !!isRealPhone());
-  root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line' }, h('h1', {}, 'Queue'), phonePick() || h('span', { class: 'qzone small dim' }, zone?.name || 'No zone selected')),
+  root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line qtitle-zone' }, h('div', { class: 'qtitle-stack' }, h('span', { class: 'qeyebrow' }, 'Queue'), phonePick() || h('h1', { class: 'qzone-title' }, zone?.name || 'No zone selected'))),   // 0.7.3 t2245u: small "Queue" label, the zone is the title
     h('div', { class: 'qcount-line' }, h('span', { class: 'dim small qcount' }, trackLabel), tools),
     upNext),
-    summary, h('h2', { class: 'qrows-heading' }, 'Queue', h('span', { class: 'small dim' }, ' · all tracks')),
+    summary, h('h2', { class: 'qrows-heading' }, 'Tracks', h('span', { class: 'small dim' }, ' · ' + nTracks)),
     nTracks ? h('div', { class: 'list qlist' }, rows) : h('p', { class: 'dim' }, 'The queue is empty. Open the Library and tap a song, or use ⋯ > Add to queue.'));
   const list = root.querySelector('.qlist');
   qResume = () => {

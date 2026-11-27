@@ -51,7 +51,8 @@ export const emptyNote = c => !c?.empty ? '' : c.kind === 'jukebox' ? 'No speake
  *  no speakers stays grey even while its stream plays (the text says "Playing · no speakers" instead). `now` is unused, kept for callers. */
 export const zoneDot = (ms, now) => (ms || []).some(z => z.connected) ? 'ok' : 'off';
 /** Pure: the zone name in a zone list: "Upstairs · no speakers" for an empty zone ("· playing" while its stream plays). */
-export const choiceLabel = (c, cur) => c.name + (c.empty ? ' · no speakers' + (c.now?.state === 'playing' ? ' · playing' : '') : '') + (cur && c.key === cur.key ? ' (playing)' : '');
+// 0.7.3 t2245u: the zone's REAL state (· playing / · paused), not "is the selected zone" (the old " (playing)" marked whichever zone was picked)
+export const choiceLabel = (c, cur) => c.name + (c.empty ? ' · no speakers' : '') + (c.now?.state === 'playing' ? ' · playing' : c.now?.state === 'paused' ? ' · paused' : '');
 /** Pure: "▶ Song" while playing, the dim title while paused, or a plain sentence. */
 export function nowLabel(now) {
   if (!now || !now.title) return 'Nothing playing';

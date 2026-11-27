@@ -6691,7 +6691,7 @@ html.phonelook .tok-btns .btn{width:100%;justify-content:center;text-align:cente
 .tree42.mx-on .sp42.mx-sp:has(+.mx-drawer:not([hidden]))>.dgrip42{bottom:0;border-radius:1px 1px 0 0}
 .tree42.mx-on .sp42.mx-sp+.mx-drawer{position:relative;--mxdl:22px}
 html.phonelook .tree42.mx-on .sp42.mx-sp+.mx-drawer{--mxdl:8px}
-.tree42.mx-on .sp42.mx-sp+.mx-drawer::before{content:"";position:absolute;left:calc(-1 * var(--mxdl));top:-4px;bottom:2px;width:3px;border-radius:0 0 1px 1px;background:color-mix(in srgb,var(--dim) 40%,transparent);pointer-events:none}
+.tree42.mx-on .sp42.mx-sp+.mx-drawer::before{content:"";position:absolute;left:calc(-1 * var(--mxdl));top:-5px;bottom:2px;width:3px;border-radius:0 0 1px 1px;background:color-mix(in srgb,var(--dim) 40%,transparent);pointer-events:none}
 .tree42.mx-on .mx-drawer input.mv-s::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px}
 .tree42.mx-on .mx-drawer input.mv-s::-moz-range-thumb{width:18px;height:18px}
 /* end 0.7.3 t2235u */
@@ -6722,3 +6722,30 @@ html.phonelook .nettbl .net-act{grid-area:act;justify-self:end;text-align:right}
 html.phonelook .nettbl .net-act .btn{min-height:32px;padding:0 14px}
 html.phonelook .nettbl .use-ip{display:none}
 /* end 0.7.3 t2244u */
+/* 0.7.3 t2245u: ONE line beside each speaker. The old thin tree guide (.zsp42>.sp42::after, from before the speaker grip strip) drew a second
+   line next to the grip strip - in Devices, and in the Volume Mixer where it also stopped at the open Max volume / Delay settings. The grip strip
+   (full speaker block, continued down an open mixer drawer) is the one line now. */
+.tree42 .zsp42>.sp42::after{content:none!important;display:none!important}
+/* end 0.7.3 t2245u */
+/* 0.7.3 t2245u: Queue header - a small "Queue" label over the zone picker, which is the page title (a zone shows "· playing" / "· paused" only when it really is) */
+.phone-queue .qtitle-line.qtitle-zone{align-items:flex-end}
+.qtitle-stack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1 1 auto}
+.qeyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:800;line-height:1.2}
+.qtitle-stack .qzone-title{margin:0;font-size:28px;line-height:1.15}
+.phone-queue .qtitle-stack .pqwrap{display:block;min-width:0;max-width:100%!important;margin:0!important;flex:none!important}
+.phone-queue .qtitle-stack .qzpick.wwdd{font-size:28px!important;font-weight:800!important;line-height:1.15!important;height:auto!important;min-height:0!important;padding:0 2px!important;margin:0!important;border:0!important;background:none!important;box-shadow:none!important;color:var(--text,var(--ink))!important;max-width:100%;width:auto!important;gap:8px;display:inline-flex;align-items:center;justify-content:flex-start!important;min-width:0!important}
+.phone-queue .qtitle-stack .qzpick.wwdd .wwdd-t{flex:0 1 auto!important;font:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.phone-queue .qtitle-stack .qzpick.wwdd .wwdd-c{font-size:16px;color:var(--accent-text,var(--accent))}
+.phone-queue .qtitle-stack .qzpick.wwdd:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Track count + time: never broken mid-phrase. Stacked (count / time) beside the tools; when the header is too narrow for that (~320 px phone)
+   the count + time take one line and the tools sit under it, right-aligned. */
+.phone-queue .qpage-heading{container:qhead/inline-size}
+.phone-queue .qcount-line .qcount{display:flex;flex-direction:column;flex:0 0 auto;min-width:0;white-space:nowrap;line-height:1.3}
+.phone-queue .qcount-line .qcount .qc-sep{display:none}
+@container qhead (max-width:330px){
+  .phone-queue .qcount-line{flex-wrap:wrap;row-gap:6px}
+  .phone-queue .qcount-line .qcount{flex:1 0 100%;flex-direction:row;gap:0 .35em}
+  .phone-queue .qcount-line .qcount .qc-sep{display:inline}
+  .phone-queue .qcount-line .pq-tools{margin-left:auto}
+}
+/* end 0.7.3 t2245u queue */

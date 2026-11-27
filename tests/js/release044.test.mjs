@@ -33,7 +33,8 @@ test('F10 UI: Editing: picker, no (controlling) on queue options', () => {
   // 0.6.9 #21: the label is Z.choiceLabel (empty zones add " · no speakers"), still with no "(controlling)"
   assert.match(s, /cs\.map\(c => h\('option', \{ value: c\.key \}, Z\.choiceLabel\(c, cur\)\)\)/);
   assert.doesNotMatch(s, /c\.name \+ .*controlling/);
-  const z = src('zones40'); assert.match(z, /export const choiceLabel = \(c, cur\) => c\.name \+ [^\n]*\(cur && c\.key === cur\.key \? ' \(playing\)' : ''\);/); assert.doesNotMatch(z.match(/export const choiceLabel[^\n]*/)[0], /controlling/);
+  // 0.7.3 t2245u: the mark is the zone's real state (" · playing" / " · paused"), no longer " (playing)" on whichever zone is selected
+  const z = src('zones40'); assert.match(z, /export const choiceLabel = \(c, cur\) => c\.name \+ [^\n]*c\.now\?\.state === 'playing' \? ' · playing' : c\.now\?\.state === 'paused' \? ' · paused' : ''\);/); assert.doesNotMatch(z.match(/export const choiceLabel[^\n]*/)[0], /controlling/);
 });
 
 test('F8 dragInfo.ref stashed for WebKit drop; listtable accepts lib drag without MIME in types', () => {

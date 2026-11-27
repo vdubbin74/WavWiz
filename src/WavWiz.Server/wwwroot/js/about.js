@@ -101,7 +101,7 @@ export const WHATS_NEW = [
   ['Devices in your order', 'Active zones come first in an order you set, with a Move menu and compact rows for offline or empty zones.'],
   ['Smoother layout', 'Nothing jumps when panels slide, expand or collapse, the mixer sliders line up, and the mini player is no longer cut off.'],
   // 0.4.8 (only what shipped)
-  ['Queue picker', 'Pick which zone\'s queue you see from the "Queue:" dropdown. The playing zone is marked "(playing)".'],
+  ['Queue picker', 'Pick which zone\'s queue you see from the zone picker at the top of the Queue. A zone that is playing or paused says so ("· playing", "· paused").'],
   ['Volume mixer', 'The Devices panel turns into a volume mixer: every zone and speaker in the same order, one line per speaker with its volume, mute and a chevron for Delay and Max volume. Open it with the mixer button in the player bar or Alt+V; Done or Esc goes back.'],
   ['Scrolling song titles', 'Long titles and artists scroll so you can read them, everywhere, including the phone and the mini player.'],
   ['Live now playing', 'Zone and speaker cards show the current song right away.'],

@@ -33,7 +33,7 @@ test('#21 empty zones and an empty Jukebox are zone choices, marked empty, with 
   assert.deepEqual(cs.map(c => !!c.empty), [false, true, true, true]);
   assert.equal(Z.emptyNote(cs[1]), 'No speakers in this zone'); assert.equal(Z.emptyNote(cs[0]), '');
   assert.match(Z.emptyNote(cs[3]), /Jukebox.*main zone/);
-  assert.equal(Z.choiceLabel(cs[1], cs[0]), 'Upstairs · no speakers'); assert.equal(Z.choiceLabel(cs[0], cs[0]), 'Basement (playing)');
+  assert.equal(Z.choiceLabel(cs[1], cs[0]), 'Upstairs · no speakers'); assert.equal(Z.choiceLabel(cs[0], cs[0]), 'Basement', '0.7.3 t2245u: the selected zone is not marked "(playing)"');
   assert.equal(Z.zoneIdFor(cs[1]), 'zg:2', 'an empty zone uses its own stream, not the house one');
   assert.ok(!Z.choices(groups, { own: false, showInDevices: false }).some(c => c.kind === 'jukebox'), 'hidden from Devices = not a choice');
   assert.ok(!Z.targetKeys(groups, { own: false }).some(([k]) => k === 'jukebox'), 'alarms still wait for Jukebox speakers');
