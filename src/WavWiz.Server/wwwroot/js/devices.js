@@ -725,9 +725,23 @@ async function delayHistory(S, ctl, z, o, host) {
   if (host) host.replaceChildren(el); else toast('Open the speaker card to see its delay history');
 }
 /** 0.3.5 J9 #3: rename in place - the card's name becomes a text field (Enter saves, Esc cancels). */
+/** 0.7.3 t2225u: where More ▾ > Rename types the name. The old card's .dname when that card is on screen; else the speaker page's title
+ *  (desktop pane and phone sheet - that page has no .dname, so Rename used to do nothing there); null = use the one-field window. Pure on the DOM. */
+export function renameTarget(from, id, doc = typeof document !== 'undefined' ? document : null) {
+  const card = from?.closest?.('[data-zone-id]') || doc?.querySelector?.(`.dc3[data-zone-id="${id}"]`), nm = card?.querySelector?.('.dname');
+  if (nm) return { kind: 'card', el: nm };
+  const page = from?.closest?.('.spkset') || doc?.querySelector?.(`.spkset[data-zone-id="${id}"]`), t = page?.querySelector?.('.spk-title');
+  return t ? { kind: 'page', el: t } : null;
+}
 function rename(S, ctl, z, from) {
-  const card = from?.closest?.('[data-zone-id]') || document.querySelector(`.dc3[data-zone-id="${z.id}"]`); const nm = card?.querySelector('.dname');
-  if (!nm) return;
+  const tg = renameTarget(from, z.id);
+  if (tg?.kind !== 'card') {   // t2225u: the speaker page (phone sheet + desktop pane) - same in-place field as its Rename button, never a silent no-op
+    const save = async v => { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); toast('Renamed'); ctl.refreshAll?.(); };
+    const ed = tg ? inlineName(tg.el, { value: z.name, label: `Speaker name (was ${z.name})`, setText: false, opener: from?.querySelector?.('.dmorebtn') || null, save }) : promptName(`Rename ${z.name}`, z.name, save);
+    try { ed?.el?.scrollIntoView?.({ block: 'nearest' }); } catch { /* old engines */ }   // More ▾ sits at the bottom of a long page; the title is at the top
+    return ed;
+  }
+  const nm = tg.el;
   const input = h('input', { type: 'text', class: 'drename', value: z.name, maxlength: 40, 'aria-label': 'Device name' });
   const done = () => { box.replaceWith(nm); flushSoon(); };
   const save = async () => { const v = input.value.trim(); if (!v || v === z.name) return done(); try { await api(`/zones/${z.id}`, { method: 'PATCH', body: { name: v } }); toast('Renamed'); done(); ctl.refreshAll(); } catch (e) { toast(e.message, true); } };

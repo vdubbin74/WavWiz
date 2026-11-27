@@ -6264,6 +6264,7 @@ html:not(.handset) .wwpop-grab{display:none}
 .wwinl-b:hover{border-color:var(--accent);color:var(--accent-text,var(--accent))}
 html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-size ✓ / ✕ */
 .wwinl ~ span,.wwinl ~ .small{display:none}   /* "No speakers" etc. step aside while the name is typed */
+.dname[hidden],.sp42-n[hidden],.spk-title[hidden]{display:none!important}   /* 0.7.3 t2225u: the name being typed is not shown twice (.sp42-nt .sp42-n is display:block) */
 /* new item in place: a draft card in its list - flat single border like the zone cards, accent edge on the left */
 .wwdraft{position:relative;border:1px solid var(--accent);border-radius:3px;background:var(--panel);padding:8px 10px 8px 14px;display:flex;flex-direction:column;gap:4px;box-shadow:0 0 0 3px var(--accent-soft);animation:wwpopIn .14s ease-out;min-width:0}
 .wwdraft::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);border-radius:3px 0 0 3px}
