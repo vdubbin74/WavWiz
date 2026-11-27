@@ -6576,3 +6576,29 @@ html.handset section.mini.npdrop-ok,html.handset .np-phone-full.npdrop-ok{positi
 html.handset .npdrop-ok{outline:2px dashed color-mix(in srgb,var(--accent) 70%,transparent);outline-offset:-3px}
 html.handset .npdrop-over{outline:3px solid var(--accent);outline-offset:-3px;box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--accent) 16%,transparent)}
 html.handset .npdrop-over::after{content:'Drop to play now';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;pointer-events:none;z-index:5}
+/* F273 (0.7.3): "Check your network" (Getting started step 1) + the Public banner on the server PC. Fixed high-contrast fills
+   (not theme colors) so the AA ratio holds in every theme; netstep.js NET_COLORS holds the same values (tested >= 4.5:1). */
+.netcard{border-radius:6px;padding:12px 14px;margin:6px 0 4px;line-height:1.45;font-size:14px}
+.netcard.pub{background:#ffb020!important;color:#1a1000!important;border:2px solid #1a1000}
+.netcard.dom{background:#cfe3ff!important;color:#0a1830!important;border:2px solid #0a1830}
+.netcard .netcard-t{display:block;font-size:15px;line-height:1.35}
+.netcard p{margin:6px 0}.netcard .small{font-size:12.5px}
+.netcard ol.netcard-steps{margin:4px 0 6px 22px;padding:0}.netcard ol.netcard-steps li{margin:2px 0}
+.netcard .netcard-acts{gap:8px;margin-top:8px}
+.netcard .btn{background:transparent!important;color:#1a1000!important;border:1px solid #1a1000!important;font-weight:600}
+.netcard .btn.primary{background:#1a1000!important;color:#ffd27a!important;border-color:#1a1000!important}
+.netcard .btn:disabled{opacity:.6}
+.netrow{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:4px;margin:4px 0;font-size:13.5px;border:1px solid var(--line)}
+.netrow.ok{background:#cdeccf!important;color:#06290b!important;border-color:#06290b}
+.netrow.bad{background:#ffd2cc!important;color:#4a0800!important;border-color:#4a0800;font-weight:600}
+.netrow.bad .btn{background:#4a0800!important;color:#ffe9e5!important;border-color:#4a0800!important}
+.net-wait-note{margin:10px 0 2px;color:var(--ink)}
+.net-wait-note .linkbtn{font-size:inherit}
+.net-later{opacity:.45;pointer-events:none;filter:saturate(.4)}
+.gs-phone{margin-top:8px}
+.netbanner-host:empty{display:none}
+.netbanner{display:flex;align-items:center;gap:8px;padding:4px 12px;background:#ffb020;color:#1a1000;font-size:13px;font-weight:600;line-height:1.3;flex:none}
+.netbanner .btn{background:#1a1000!important;color:#ffd27a!important;border-color:#1a1000!important;min-height:0;padding:2px 10px}
+.netbanner .btn.quiet{background:transparent!important;color:#1a1000!important;font-size:16px;padding:0 6px}
+.gs-phone .addspk-url{overflow-wrap:anywhere;word-break:break-all}
+.statusbar .sb-netbad{color:#ff6b5a!important;font-weight:700}

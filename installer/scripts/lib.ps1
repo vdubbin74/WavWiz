@@ -805,6 +805,76 @@ function Get-LanIPv4([int]$TimeoutSec = 10) {
     } catch { Write-InstallLog "LAN address detection failed: $($_.Exception.Message)"; return '' }
 }
 
+# ---- F273: the network type of the CONNECTED networks (NetworkListManager COM: not WMI/CIM, LESSONS-INSTALLER.md:8). Replaces the old registry
+# NetworkList\Profiles scan, which also listed every network the PC ever joined (old cafe Wi-Fi, Hyper-V/WSL vEthernet) and gave false warnings.
+$script:NetProfileScript = {
+    $nets = New-Object System.Collections.Generic.List[object]
+    $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B'))
+    foreach ($n in $nlm.GetNetworks(1)) {   # 1 = NLM_ENUM_NETWORK_CONNECTED
+        $cat = [int]$n.GetCategory(); $name = [string]$n.GetName()
+        foreach ($c in $n.GetNetworkConnections()) { $nets.Add([pscustomobject]@{ Category = $cat; Name = $name; AdapterId = $c.GetAdapterId().ToString() }) }
+    }
+    $nics = New-Object System.Collections.Generic.List[object]
+    foreach ($ni in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
+        $p = $ni.GetIPProperties(); $idx = -1; try { $idx = $p.GetIPv4Properties().Index } catch { }
+        $gw = (@($p.GatewayAddresses | Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.Address.ToString() -ne '0.0.0.0' })).Count -gt 0
+        $ip = @($p.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } | ForEach-Object { $_.Address.ToString() })
+        $nics.Add([pscustomobject]@{ Id = "$($ni.Id)"; Name = "$($ni.Name)"; Description = "$($ni.Description)"; Type = "$($ni.NetworkInterfaceType)"; Status = "$($ni.OperationalStatus)"; HasGateway = $gw; Ip = $(if ($ip.Count) { $ip[0] } else { '' }); Index = $idx })
+    }
+    [pscustomobject]@{ Networks = $nets.ToArray(); Nics = $nics.ToArray() }
+}
+$script:NetVirtualPattern = 'Hyper-V|vEthernet|VirtualBox|VMware|Virtual|TAP-|Npcap|Loopback|WSL|Bluetooth|VPN|Tailscale|ZeroTier|Docker|TeamViewer|Wintun|WireGuard|Miniport|Pseudo'
+# Pure: one row per connected network connection: category (public|private|domain), name, kind (Wi-Fi|Ethernet|Virtual|Other), ifIndex, ipv4, and
+# isWavWizAdapter = the adapter that decides: the one whose IPv4 is the bind; for a wildcard / loopback / unknown bind the best LAN adapter
+# (default gateway first, Ethernet before Wi-Fi). Tailscale/VPN, Hyper-V/WSL/Docker virtual adapters and loopback never decide.
+function Get-FirstOrNull([object[]]$Items) { if ($Items -and $Items.Count -gt 0) { return $Items[0] } return $null }   # StrictMode: @()[0] throws
+function Select-NetProfileRows([object[]]$Networks, [object[]]$Nics, [string]$Bind = '') {
+    $norm = { param($g) ("$g").Trim('{', '}').ToLowerInvariant() }
+    $rows = @()
+    foreach ($n in @($Networks)) {
+        if (-not $n) { continue }
+        $nic = Get-FirstOrNull @($Nics | Where-Object { $_ -and (& $norm $_.Id) -eq (& $norm $n.AdapterId) })
+        $cat = switch ([int]$n.Category) { 0 { 'public' } 1 { 'private' } 2 { 'domain' } default { 'unknown' } }
+        $kind = 'Other'; $ip = ''; $idx = -1; $gw = $false
+        if ($nic) {
+            $ip = "$($nic.Ip)"; $idx = [int]$nic.Index; $gw = [bool]$nic.HasGateway
+            $kind = if ("$($nic.Name) $($nic.Description)" -match $script:NetVirtualPattern -or "$($nic.Type)" -in 'Loopback', 'Tunnel', 'Ppp') { 'Virtual' } elseif ("$($nic.Type)" -eq 'Wireless80211') { 'Wi-Fi' } elseif ("$($nic.Type)" -in 'Ethernet', 'GigabitEthernet') { 'Ethernet' } else { 'Other' }
+            if ($ip -match '^(100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)') { $kind = 'Virtual' }   # Tailscale CGNAT range
+        }
+        $rows += [pscustomobject]@{ Category = $cat; Name = ("$($n.Name)" -replace '[|\r\n]', ' '); Kind = $kind; IfIndex = $idx; Ip = $ip; Gateway = $gw; Mine = $false }
+    }
+    $real = @($rows | Where-Object { $_.Kind -ne 'Virtual' -and $_.Ip -and $_.Ip -notmatch '^(127\.|169\.254\.)' })
+    $pick = $null
+    if ($Bind -and $Bind -notin '0.0.0.0', '::', '127.0.0.1', '::1') { $pick = Get-FirstOrNull @($real | Where-Object { $_.Ip -eq $Bind }) }
+    if (-not $pick) { $pick = @($real | Sort-Object -Property @{ Expression = { [int][bool]$_.Gateway }; Descending = $true }, @{ Expression = { [int]($_.Kind -eq 'Wi-Fi') }; Descending = $false }) ; $pick = Get-FirstOrNull $pick }
+    if ($pick) { $pick.Mine = $true }
+    return ,$rows
+}
+function Format-NetProfileRows([object[]]$Rows) { return (@($Rows | ForEach-Object { '{0}|{1}|{2}|{3}|{4}|{5}' -f $_.Category, $_.Name, $_.Kind, $_.IfIndex, $_.Ip, $(if ($_.Mine) { 1 } else { 0 }) }) -join "`r`n") }
+# Writes network-status.txt (one line per connected network: category|name|kind|ifIndex|ipv4|isWavWizAdapter). The old file is deleted first;
+# on a failure or timeout (10 s) no file is written - the wizard then shows no card. Never throws: install never fails because of it.
+function Write-NetworkStatus([string]$Bind = '', [string]$Path = '', [int]$TimeoutSec = 10) {
+    if (-not $Path) { $Path = Join-Path (Get-WavWizDataRoot) 'network-status.txt' }
+    try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch { }
+    try {
+        $v = $null
+        if ((Test-TestHost) -and $env:WAVWIZ_TEST_NLM) {
+            if ($env:WAVWIZ_TEST_NLM -eq 'timeout') { Write-InstallLog "TIMEOUT: [network type (NetworkListManager)] did not finish within $TimeoutSec s; abandoned and skipped."; Write-InstallLog 'network type: unknown (no network-status.txt)'; return $false }
+            $v = Get-Content -Raw -LiteralPath $env:WAVWIZ_TEST_NLM | ConvertFrom-Json
+        } else {
+            $r = Invoke-WithTimeout -ScriptBlock $script:NetProfileScript -TimeoutSec $TimeoutSec -Name 'network type (NetworkListManager)'
+            if ($r.TimedOut -or $r.Failed -or -not $r.Value.Count) { Write-InstallLog "network type: unknown (no network-status.txt) $($r.Error)"; return $false }
+            $v = $r.Value[0]
+        }
+        $rows = Select-NetProfileRows @($v.Networks) @($v.Nics) $Bind
+        if (-not @($rows).Count) { Write-InstallLog 'network type: no connected network (no network-status.txt)'; return $false }
+        $dir = Split-Path -Parent $Path; if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        Write-Utf8NoBom $Path ((Format-NetProfileRows $rows) + "`r`n")
+        foreach ($x in @($rows)) { Write-InstallLog ("network type: {0} '{1}' ({2}, {3}){4}" -f $x.Category, $x.Name, $x.Kind, $(if ($x.Ip) { $x.Ip } else { 'no IPv4' }), $(if ($x.Mine) { ' <- WavWiz' } else { '' })) }
+        return $true
+    } catch { Write-InstallLog "network type check failed: $($_.Exception.Message) (no network-status.txt)"; try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch { }; return $false }
+}
+
 # ---- server.json (merge, never clobber). Keys the user or the app changed are kept; the installer only fills what is missing or what it was explicitly told.
 function ConvertTo-HashtableDeep($o) {
     if ($null -eq $o) { return $null }

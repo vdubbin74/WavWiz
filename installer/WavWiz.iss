@@ -79,6 +79,7 @@ Source: "{#RepoDir}\assets\logo\wavwiz.ico"; DestDir: "{app}"; Flags: ignorevers
 ; wizard-time LAN address detection: extracted to the Setup temp folder
 Source: "{#RepoDir}\installer\scripts\lib.ps1"; Flags: dontcopy
 Source: "{#RepoDir}\installer\scripts\detect-lan.ps1"; Flags: dontcopy
+Source: "{#RepoDir}\installer\scripts\netprofile.ps1"; Flags: dontcopy
 ; 0.2.2 T11: closes a running WavWiz (service, Player, receivers) before the files are replaced
 Source: "{#RepoDir}\installer\scripts\close-wavwiz.ps1"; Flags: dontcopy
 
@@ -138,7 +139,11 @@ var
   UninstNeedsReboot: Boolean; { F173 }
   { 0.2.2 T11: what was running before setup closed it (started again after the install) }
   PrivTip: TNewStaticText;
-  PubNet: String;
+  { F273: network type of the connected networks (netprofile.ps1 -> network-status.txt). NetCat '' = unknown (no answer: no card). }
+  NetCat, NetName, NetKind: String;
+  NetWarn: TPanel; NetWarnText: TNewStaticText; NetWarnBtn: TNewButton;   { Network page: short red bar }
+  FinBuilt, FinSkipped: Boolean;   { Finish page: Skip for now lasts for that page }
+  FinCard: TPanel; FinTitle, FinSteps, FinRow, FinLater, FinWait, FinSkip: TNewStaticText; FinOpenBtn, FinCheckBtn, FinFixBtn: TNewButton;
   ServiceWasRunning, PlayerWasRunning, PlayerRestartedFlag: Boolean;
   CloseFailure: String;
 
@@ -260,28 +265,6 @@ begin
   if Result then if RegQueryStringValue(HKCU, K, 'pv', Pv) then if (Pv <> '') and (Pv <> '0.0.0.0') then Result := False;
 end;
 
-{ F122: Private-network warning. Registry only (NetworkList Profiles Category: 0=Public 1=Private 2=Domain) - no CIM/WMI. Never changes the profile. }
-function PublicNetworkName: String;
-var Names: TArrayOfString; I: Integer; Cat: Cardinal; K, N: String;
-begin
-  Result := '';
-  K := 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles';
-  try
-    if RegGetSubkeyNames(HKLM64, K, Names) or RegGetSubkeyNames(HKLM, K, Names) then
-      for I := 0 to GetArrayLength(Names) - 1 do
-        if RegQueryDWordValue(HKLM64, K + '\' + Names[I], 'Category', Cat) or RegQueryDWordValue(HKLM, K + '\' + Names[I], 'Category', Cat) then
-          if Cat = 0 then
-          begin
-            N := '';
-            if not RegQueryStringValue(HKLM64, K + '\' + Names[I], 'ProfileName', N) then RegQueryStringValue(HKLM, K + '\' + Names[I], 'ProfileName', N);
-            if N = '' then N := '(unnamed network)';
-            Result := N; Exit;
-          end;
-  except
-    Result := '';
-  end;
-end;
-
 function FirstRunUrl(Param: String): String;
 var A: AnsiString;
 begin
@@ -289,6 +272,74 @@ begin
   if LoadStringFromFile(ExpandConstant('{commonappdata}\WavWiz\first-run-url.txt'), A) then Result := Trim(String(A));
 end;
 function HasFirstRun: Boolean; begin Result := FirstRunUrl('') <> ''; end;
+
+{ ---------------- F273: network type (replaces the old registry profile scan, which listed every network the PC ever joined) ---------------- }
+function NetField(const Line: String; N: Integer): String;
+var S: String; I, P: Integer;
+begin
+  S := Line; Result := '';
+  for I := 0 to N do
+  begin
+    P := Pos('|', S);
+    if P = 0 then begin if I = N then Result := S else Result := ''; Exit; end;
+    if I = N then begin Result := Copy(S, 1, P - 1); Exit; end;
+    S := Copy(S, P + 1, Length(S));
+  end;
+end;
+
+{ network-status.txt: one line per connected network, category|name|kind|ifIndex|ipv4|isWavWizAdapter. The isWavWizAdapter=1 line decides. }
+procedure ReadNetStatus;
+var Lines: TArrayOfString; I: Integer;
+begin
+  NetCat := ''; NetName := ''; NetKind := '';
+  if not LoadStringsFromFile(ExpandConstant('{commonappdata}\WavWiz\network-status.txt'), Lines) then Exit;
+  for I := 0 to GetArrayLength(Lines) - 1 do
+    if Trim(NetField(Lines[I], 5)) = '1' then
+    begin
+      NetCat := Lowercase(Trim(NetField(Lines[I], 0))); NetName := Trim(NetField(Lines[I], 1)); NetKind := Trim(NetField(Lines[I], 2));
+      if (NetCat <> 'public') and (NetCat <> 'private') and (NetCat <> 'domain') then NetCat := '';
+      if NetName = '' then NetName := 'your network';
+      Exit;
+    end;
+end;
+
+{ Runs netprofile.ps1 hidden, bounded (10 s inside the script, 12 s here), then reads the result. Failure = unknown (no card). Never blocks setup. }
+function RunNetProfile(const Bind: String): Boolean;
+var Exe, DoneFile: String; Code, N: Integer;
+begin
+  Result := False;
+  try
+    ExtractTemporaryFile('lib.ps1'); ExtractTemporaryFile('netprofile.ps1');
+    ForceDirectories(ExpandConstant('{commonappdata}\WavWiz'));
+    DoneFile := ExpandConstant('{tmp}\wavwiz-netprofile.done'); DeleteFile(DoneFile);
+    Exe := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    if Exec(Exe, '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\netprofile.ps1')) + IfThenStr(Bind <> '', ' -Bind ' + Bind, '') + ' -DoneFile ' + QuoteArg(DoneFile), '', SW_HIDE, ewNoWait, Code) then
+    begin
+      N := 0;
+      while (N < 24) and (not FileExists(DoneFile)) do begin Sleep(500); N := N + 1; end;
+    end;
+  except
+    Log('F273: network type check could not run: ' + GetExceptionMessage);
+  end;
+  ReadNetStatus;
+  Result := NetCat <> '';
+  Log('F273: network type = ' + IfThenStr(NetCat = '', 'unknown', NetCat + ' "' + NetName + '" (' + NetKind + ')'));
+end;
+
+{ The only Windows Settings pages Setup opens (the same allowlist as the app). }
+function NetSettingsUri: String;
+begin
+  if NetKind = 'Wi-Fi' then Result := 'ms-settings:network-wifi'
+  else if NetKind = 'Ethernet' then Result := 'ms-settings:network-ethernet'
+  else Result := 'ms-settings:network-status';
+end;
+
+{ Opens in the signed-in user's own session, not the elevated one. }
+procedure OpenNetSettingsClick(Sender: TObject);
+var Code: Integer;
+begin
+  if not ShellExecAsOriginalUser('open', NetSettingsUri, '', '', SW_SHOWNORMAL, ewNoWait, Code) then Log('F273: could not open ' + NetSettingsUri + ': ' + SysErrorMessage(Code));
+end;
 
 { Starts a PowerShell script WITHOUT waiting for the process and polls two files instead: DoneFile (the script writes its exit code there as its last act) and current-step.txt.
   The wizard shows the step and can never wait forever: it gives up when the script has not started within StartLimitMs or has not finished within TotalLimitMs. }
@@ -463,6 +514,13 @@ begin
   ApNote.Caption := 'AirPlay 2 timing (UDP 319-320) is always allowed on the home network. Tick this for extra AirPlay audio UDP ports.'; ApNote.FocusControl := AirPlayOutCheck; ApNote.AdjustHeight; Y := ApNote.Top + ApNote.Height + ScaleY(8);
   PrivTip := TNewStaticText.Create(NetPage); PrivTip.Parent := NetPage.Surface; PrivTip.WordWrap := True; PrivTip.AutoSize := False; PrivTip.SetBounds(0, Y, W, NetPage.SurfaceHeight - Y); { F257-A R1: fills the rest of the page at any DPI }
   PrivTip.Caption := 'Tip: Windows should list this Wi-Fi/Ethernet as Private (not Public), or phones and discovery may fail.';
+  { F273: short red bar instead of the tip when the network WavWiz uses is Public (the full 3 steps are on the Finish page) }
+  NetWarn := TPanel.Create(NetPage); NetWarn.Parent := NetPage.Surface; NetWarn.BevelOuter := bvNone; NetWarn.ParentBackground := False; NetWarn.Color := $1C1CB8; { BGR: dark red }
+  NetWarn.SetBounds(0, Y, W, ScaleY(62)); NetWarn.Visible := False;
+  NetWarnText := TNewStaticText.Create(NetPage); NetWarnText.Parent := NetWarn; NetWarnText.WordWrap := True; NetWarnText.AutoSize := False;
+  NetWarnText.SetBounds(ScaleX(8), ScaleY(5), W - ScaleX(168), ScaleY(52)); NetWarnText.Font.Color := clWhite; NetWarnText.Font.Style := [fsBold];
+  NetWarnBtn := TNewButton.Create(NetPage); NetWarnBtn.Parent := NetWarn; NetWarnBtn.SetBounds(W - ScaleX(152), ScaleY(17), ScaleX(144), ScaleY(26));
+  NetWarnBtn.Caption := 'Open network settings'; NetWarnBtn.OnClick := @OpenNetSettingsClick;
   { 0.7.0 item 3: an upgrade keeps the service account; a LocalSystem service may switch to Local Service (default off, /LIMITEDSERVICE=1) }
   SvcPage := CreateCustomPage(NetPage.ID, 'Service account (BETA)', 'WavWiz Server currently runs as LocalSystem (full control of this PC).');
   L := TNewStaticText.Create(SvcPage); L.Parent := SvcPage.Surface; L.WordWrap := True; L.AutoSize := False; L.SetBounds(0, 0, SvcPage.SurfaceWidth, ScaleY(84));
@@ -503,6 +561,127 @@ begin
   if PageID = HostPage.ID then Result := WantServer or (not WantPlayer);
 end;
 
+{ ---------------- F273: Finish page = the what-next checklist, "Check your network" first ----------------
+  1 Check your network (Private = green row; Public = high-contrast card with the 3 steps, Open network settings, Check again; Domain = info card;
+  unknown = plain row). 2-4 Open WavWiz on this PC / on your phone / add speakers - dimmed while Public under "Fix your network first - Skip for now".
+  The Run check boxes keep their state and Finish always works: Setup never blocks on the network. }
+procedure LayoutFinish; forward;
+
+procedure FinCheckClick(Sender: TObject);
+begin
+  FinCheckBtn.Caption := 'Checking...'; FinCheckBtn.Enabled := False; WizardForm.Update;
+  RunNetProfile(ExistingBindAddress);
+  FinCheckBtn.Caption := 'Check again'; FinCheckBtn.Enabled := True;
+  LayoutFinish;
+end;
+
+procedure FinSkipClick(Sender: TObject);
+begin
+  FinSkipped := True; LayoutFinish;
+end;
+
+procedure FinFixClick(Sender: TObject);
+begin
+  FinSkipped := False; LayoutFinish;
+end;
+
+function FinLabel(Parent: TWinControl; Bold: Boolean): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(WizardForm); Result.Parent := Parent; Result.WordWrap := True; Result.AutoSize := False;
+  if Bold then Result.Font.Style := [fsBold];
+end;
+
+function FinButton(Parent: TWinControl; const Caption: String; Click: TNotifyEvent): TNewButton;
+begin
+  Result := TNewButton.Create(WizardForm); Result.Parent := Parent; Result.Caption := Caption; Result.OnClick := Click;
+end;
+
+procedure LayoutFinish;
+var Y, W, CY, CW, I: Integer; Pub, Wait, Upgrade: Boolean; Addr: String; Lbl: TNewStaticText;
+begin
+  Lbl := WizardForm.FinishedLabel; W := Lbl.Width;
+  if not FinBuilt then
+  begin
+    FinBuilt := True;
+    FinCard := TPanel.Create(WizardForm); FinCard.Parent := Lbl.Parent; FinCard.BevelOuter := bvNone; FinCard.ParentBackground := False;
+    FinTitle := FinLabel(FinCard, True); FinSteps := FinLabel(FinCard, False);
+    FinOpenBtn := FinButton(FinCard, 'Open network settings', @OpenNetSettingsClick);
+    FinCheckBtn := FinButton(FinCard, 'Check again', @FinCheckClick);
+    FinFixBtn := FinButton(FinCard, 'Fix', @FinFixClick);
+    FinRow := FinLabel(Lbl.Parent, True); FinLater := FinLabel(Lbl.Parent, False); FinWait := FinLabel(Lbl.Parent, False);
+    FinSkip := FinLabel(Lbl.Parent, False); FinSkip.WordWrap := False; FinSkip.AutoSize := True; FinSkip.Caption := 'Skip for now';
+    FinSkip.Font.Style := [fsUnderline]; FinSkip.Font.Color := $CC6600; { BGR: link blue } FinSkip.Cursor := crHand; FinSkip.OnClick := @FinSkipClick;
+  end;
+  Pub := NetCat = 'public'; Wait := Pub and (not FinSkipped); Upgrade := ExistingBindSeeded <> '';
+  Lbl.Caption := 'WavWiz is installed. What next:'; Lbl.AdjustHeight;
+  Y := Lbl.Top + Lbl.Height + ScaleY(6);
+  CW := W - ScaleX(16);
+  FinCard.Visible := False; FinRow.Visible := False; FinOpenBtn.Visible := False; FinCheckBtn.Visible := False; FinFixBtn.Visible := False; FinSteps.Visible := False;
+  if Pub and (not FinSkipped) then
+  begin
+    { high contrast: amber fill, near-black text (AA well above 4.5:1), the same look as the app's card }
+    FinCard.Color := $20B0FF; FinCard.Visible := True; FinCard.SetBounds(Lbl.Left, Y, W, ScaleY(40));
+    FinTitle.Font.Color := $00101A; FinSteps.Font.Color := $00101A;
+    FinTitle.SetBounds(ScaleX(8), ScaleY(6), CW, ScaleY(30));
+    FinTitle.Caption := '1. ' + #$26A0 + ' Your network "' + NetName + '" is set to Public, so phones and other devices can''t find WavWiz.'; FinTitle.AdjustHeight;
+    CY := FinTitle.Top + FinTitle.Height + ScaleY(3);
+    FinSteps.Visible := True; FinSteps.SetBounds(ScaleX(8), CY, CW, ScaleY(60));
+    FinSteps.Caption := 'Switch it to Private (only on your own home network):' + #13#10 +
+      '   1. Click Open network settings.' + #13#10 +
+      IfThenStr(NetKind = 'Ethernet', '   2. Click Ethernet.', '   2. Click your network ("' + NetName + '").') + #13#10 +
+      '   3. Under Network profile type, choose Private.' + #13#10 +
+      'If Windows asks for an administrator, sign in with one.';
+    FinSteps.AdjustHeight; CY := FinSteps.Top + FinSteps.Height + ScaleY(5);
+    FinOpenBtn.Visible := True; FinOpenBtn.SetBounds(ScaleX(8), CY, ScaleX(150), ScaleY(24)); FinOpenBtn.Default := False;
+    FinCheckBtn.Visible := True; FinCheckBtn.SetBounds(ScaleX(166), CY, ScaleX(96), ScaleY(24));
+    FinCard.Height := CY + ScaleY(30);
+    Y := FinCard.Top + FinCard.Height + ScaleY(6);
+  end
+  else if Pub then
+  begin
+    { Skip for now: one red row, never hidden }
+    FinCard.Color := $CCD2FF; FinCard.Visible := True; FinCard.SetBounds(Lbl.Left, Y, W, ScaleY(30));
+    FinTitle.Font.Color := $00084A; FinTitle.SetBounds(ScaleX(8), ScaleY(7), CW - ScaleX(60), ScaleY(18));
+    FinTitle.Caption := '1. ' + #$26A0 + ' Network is Public: phones won''t connect.';
+    FinFixBtn.Visible := True; FinFixBtn.SetBounds(W - ScaleX(58), ScaleY(3), ScaleX(50), ScaleY(24));
+    Y := FinCard.Top + FinCard.Height + ScaleY(6);
+  end
+  else if NetCat = 'domain' then
+  begin
+    FinCard.Color := $FFE3CF; FinCard.Visible := True; FinCard.SetBounds(Lbl.Left, Y, W, ScaleY(40));
+    FinTitle.Font.Color := $30180A; FinTitle.SetBounds(ScaleX(8), ScaleY(6), CW, ScaleY(30));
+    FinTitle.Caption := '1. This PC is on a work (domain) network, so phones may not find WavWiz. Ask whoever manages this PC.'; FinTitle.AdjustHeight;
+    FinCard.Height := FinTitle.Height + ScaleY(12);
+    Y := FinCard.Top + FinCard.Height + ScaleY(6);
+  end
+  else
+  begin
+    FinRow.Visible := True; FinRow.SetBounds(Lbl.Left, Y, W, ScaleY(30));
+    if NetCat = 'private' then begin FinRow.Font.Color := $1E7A1E; FinRow.Font.Style := [fsBold]; FinRow.Caption := '1. ' + #$2713 + ' Your network "' + NetName + '" is Private. Phones can connect.'; end
+    else begin FinRow.Font.Color := clWindowText; FinRow.Font.Style := []; FinRow.Caption := '1. Couldn''t check your network type. If your phone can''t connect, make sure Windows has it set to Private.'; end;
+    FinRow.AdjustHeight; Y := FinRow.Top + FinRow.Height + ScaleY(6);
+  end;
+  { steps 2-4 (an upgrade on a Private network: the compact green row only) }
+  Addr := FirstRunUrl(''); if Addr = '' then Addr := 'http://' + IfThenStr(DetectedLanIp <> '', DetectedLanIp, '<this PC>') + ':47800';
+  FinLater.Visible := not (Upgrade and (NetCat = 'private'));
+  FinLater.Caption := '2. Open WavWiz on this PC and choose your admin password.' + #13#10 + '3. Open it on your phone: ' + Addr + #13#10 + '4. Add your speakers in Devices.';
+  FinLater.SetBounds(Lbl.Left, Y, W, ScaleY(48)); FinLater.AdjustHeight; FinLater.Enabled := not Wait;
+  if FinLater.Visible then Y := FinLater.Top + FinLater.Height + ScaleY(4);
+  FinWait.Visible := Wait; FinSkip.Visible := Wait;
+  if Wait then
+  begin
+    FinWait.Caption := 'Fix your network first  ' + #$00B7 + ' '; FinWait.WordWrap := False; FinWait.AutoSize := True; FinWait.Left := Lbl.Left; FinWait.Top := Y; FinWait.Font.Style := [fsBold];
+    FinSkip.Left := FinWait.Left + FinWait.Width + ScaleX(2); FinSkip.Top := Y;
+    Y := Y + FinWait.Height + ScaleY(6);
+  end;
+  { the Run check boxes: grayed while Public (they keep their checked state; Finish still runs them) }
+  WizardForm.RunList.Top := Y; WizardForm.RunList.Height := WizardForm.RunList.Parent.ClientHeight - Y - ScaleY(4);
+  WizardForm.RunList.Enabled := not Wait;
+  if Pub then
+    for I := 0 to WizardForm.RunList.Items.Count - 1 do
+      if Pos('what next', Lowercase(WizardForm.RunList.ItemCaption[I])) > 0 then WizardForm.RunList.Checked[I] := True;
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = NetPage.ID then
@@ -510,18 +689,20 @@ begin
     WizardForm.NextButton.Enabled := False;
     WizardForm.Update;
     DetectLan;
-    PubNet := PublicNetworkName;
-    if PubNet <> '' then
+    { F273: the CONNECTED network that WavWiz will use (netprofile.ps1), not every saved profile. Setup never changes it; Next always works. }
+    RunNetProfile(DetectedLanIp);
+    NetWarn.Visible := NetCat = 'public'; PrivTip.Visible := not NetWarn.Visible;
+    if NetWarn.Visible then
     begin
-      Log('NOTE: Windows lists the network "' + PubNet + '" as Public. WavWiz needs Private for phones and discovery. Setup does not change it.');
-      PrivTip.Font.Color := $0060C0;
-      PrivTip.Caption := 'Warning: Windows lists the network "' + PubNet + '" as Public. Phones and discovery may fail. Open Windows Settings > Network & internet > your Wi-Fi/Ethernet and set the network profile to Private. (Setup will not change this for you; you can continue.)';
+      Log('NOTE: the network "' + NetName + '" is Public. WavWiz needs Private for phones and discovery. Setup does not change it.');
+      NetWarnText.Caption := #$26A0 + ' Your network "' + NetName + '" is set to Public, so phones and other devices can''t find WavWiz. The last page of Setup shows how to switch it to Private.';
     end;
     WizardForm.NextButton.Enabled := True;
   end;
   if CurPageID = wpFinished then
   begin
-    if SetupFailed then WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 + 'Setup did not finish cleanly. The log is C:\ProgramData\WavWiz\install.log';
+    if SetupFailed then WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 + 'Setup did not finish cleanly. The log is C:\ProgramData\WavWiz\install.log'
+    else if WantServer and (not WizardSilent) then begin ReadNetStatus; LayoutFinish; end;   { F273: the what-next checklist, network first }
   end;
 end;
 
@@ -584,14 +765,18 @@ end;
 
 function FirstRunText: String;
 begin
+  { F273: the same four steps as the Finish page and the app's Getting started; step 1 = Check your network }
   Result := 'WavWiz (BETA) {#AppVersion} - what next' + #13#10#13#10 +
-    '1. On the PC that runs WavWiz Server, open WavWiz Player (or the web page; the last installer page offered both). Choose the administrator password there. Nothing was generated for you.' + #13#10 +
-    '2. In Settings > Music folders add your music folder (a local drive or a network share the Windows service can read).' + #13#10 +
-    '3. On each PC with speakers, start WavWiz Player. It finds this server by itself (it is listed as "WavWiz on <this PC>"). Press Connect: a card appears on any screen signed in as administrator - check that it shows the same 4-digit code and press Approve. Or type the 6-digit code from Settings > Devices > Pair a phone or a PC player. (The Player on this server PC needs neither.) You never type an address, a scheme or a port. (If it is not listed, use "My server isn''t listed" and type only the address, like 192.168.1.20.)' + #13#10 +
-    '   Each device has a Test sound button, and a Dropped / Buffering / Reconnecting indicator. Menu > Diagnostics explains problems in plain English.' + #13#10 +
-    '4. For a phone: Settings > Devices > Phone & HTTPS, scan the QR code with the phone camera and follow the steps (about two minutes; the page checks that it worked). After that the phone can calibrate speakers and can also play as a speaker itself (Devices > Phone role…; on iPhone the sound stops when the screen locks).' + #13#10#13#10 +
-    'New in 0.1.3: Graphic EQ visualizer replaces Lightning (a saved Lightning choice becomes Graphic EQ); every visualizer setting is a 0 to 100 slider (50 is the default) with a Quality setting (Auto/Low/High/Ultra), GPU particles and glow/streak/fringe/depth effects; reworked VU meters and Terrain; ReplayGain volume leveling and iTunes gapless; saved NAS logins (encrypted by Windows); receiver health and a network helper in Diagnostics. Upgrades 0.1.2 in place (library, admin password, paired players and settings are kept).' + #13#10 +
-    'Logs and settings: C:\ProgramData\WavWiz (install.log, server.json, logs\).' + #13#10 +
+    '1. Check your network. Windows must have your home network set to Private, or phones and other PCs cannot find WavWiz (its firewall rules only open on Private networks). To switch it (only on your own home network):' + #13#10 +
+    '   a. Open Windows Settings > Network & internet.' + #13#10 +
+    '   b. Click your Wi-Fi network (or Ethernet).' + #13#10 +
+    '   c. Under "Network profile type", choose Private. If Windows asks for an administrator, sign in with one.' + #13#10 +
+    '   On a work (domain) PC you usually cannot change this: ask whoever manages the PC.' + #13#10 +
+    '2. Open WavWiz on this PC (WavWiz Player, or the web page the last installer page offered) and choose the administrator password. Nothing was generated for you. Getting started then walks you through the rest: your music folder, a speaker, a test sound.' + #13#10 +
+    '3. Open it on your phone: scan the QR code in Getting started, or type this PC''s address (like http://192.168.1.20:47800) in the phone''s browser. For calibrating with the phone microphone, also follow Settings > Devices > Phone & HTTPS. A phone can also play as a speaker itself (Devices > Phone role…).' + #13#10 +
+    '4. Add your speakers in Devices. On each PC with speakers, start WavWiz Player: it finds this server by itself. Press Connect and approve it on any screen signed in as administrator (check the 4-digit code), or type the 6-digit code from Settings > Devices > Pair a phone or a PC player.' + #13#10#13#10 +
+    'Each device has a Test sound button, and Menu > Diagnostics explains problems in plain English.' + #13#10 +
+    'Logs and settings: C:\ProgramData\WavWiz (install.log, server.json, network-status.txt, logs\).' + #13#10 +
     'This is a BETA. If something fails, install.log says what and where.' + #13#10;
 end;
 
@@ -678,12 +863,7 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  { F122: silent installs get no dialog - log a NOTE only }
-  if WizardSilent and WantServer then
-  begin
-    PubNet := PublicNetworkName;
-    if PubNet <> '' then Log('NOTE: Windows lists the network "' + PubNet + '" as Public; set it to Private for phones and discovery. Setup does not change it.');
-  end;
+  { F273: silent installs get no dialog; setup.ps1 writes network-status.txt and logs the network type to install.log }
   Result := '';
   { 0.2.2 T11: always close a running WavWiz first (not only the service): an open Player or receiver locks its files. /NOCLOSE skips it (tests). }
   if (not BoolParam('NOCLOSE', False)) and (DirExists(ExpandConstant('{app}')) or RegKeyExists(HKLM64, 'SYSTEM\CurrentControlSet\Services\WavWizServer')) then

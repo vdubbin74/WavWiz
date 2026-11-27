@@ -71,6 +71,16 @@ public static class UiUrl
     public const string MicSettingsUri = "ms-settings:privacy-microphone";
     /// <summary>0.7.2 t2170u: exactly {"open":"ms-settings:privacy-microphone"} (what inputs.js posts) - nothing else opens anything.</summary>
     public static bool IsMicSettingsMessage(string? json) => json == "{\"open\":\"" + MicSettingsUri + "\"}";
+    /// <summary>F273: the three Windows network pages the Getting started card may open (Wi-Fi, Ethernet, Network status) - switch the network to Private.</summary>
+    public static readonly string[] NetSettingsUris = { "ms-settings:network-wifi", "ms-settings:network-ethernet", "ms-settings:network-status" };
+    /// <summary>F273: exactly {"open":"ms-settings:network-wifi|network-ethernet|network-status"} (what netstep.js posts) gives that URI; anything else
+    /// (other ms-settings pages, http URLs, extra keys, whitespace) gives null and opens nothing.</summary>
+    public static string? NetSettingsUriOf(string? json)
+    {
+        foreach (var u in NetSettingsUris) if (json == "{\"open\":\"" + u + "\"}") return u;
+        return null;
+    }
+    public static bool IsNetSettingsMessage(string? json) => NetSettingsUriOf(json) != null;
     /// <summary>0.2.5: the page address with a screen to open (#calibrate). Only known screen names; anything else returns the address unchanged.</summary>
     public static string WithScreen(string baseUrl, string screen)
     {

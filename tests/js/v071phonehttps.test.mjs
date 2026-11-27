@@ -54,7 +54,7 @@ test('t2129u: installer, PhoneApi and docs use Settings > Devices > Phone & HTTP
   }
   assert.match(iss, /see WavWiz Settings > Devices > Phone & HTTPS for the exact link/);
   assert.match(iss, /Connect link: see WavWiz Settings > Devices > Phone & HTTPS/);
-  assert.match(iss, /4\. For a phone: Settings > Devices > Phone & HTTPS/);
+  assert.match(iss, /For calibrating with the phone microphone, also follow Settings > Devices > Phone & HTTPS\./);   // F273: the what-next steps were reordered (network first)
   assert.match(iss, /Devices > Phone role…/);
   assert.doesNotMatch(iss, /Menu > This phone as a device/);
   assert.equal((lib.match(/Settings > Devices > Phone & HTTPS/g) || []).length, 2);

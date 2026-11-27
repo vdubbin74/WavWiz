@@ -18,10 +18,43 @@ public static class DiagnosticsApi
     public static void Map(RouteGroupBuilder g, Services s)
     {
         g.MapGet("/diagnostics", async () => Results.Json(await Run(s))).Req(Role.Control);
-        g.MapGet("/checklist", () => Results.Json(Checklist(s))).Req(Role.View);
+        g.MapGet("/checklist", (bool? fresh) => Results.Json(Checklist(s, fresh == true))).Req(Role.View);   // F273: ?fresh=true = Check again (re-reads the network type)
     }
 
-    public static object Checklist(Services s)
+    /// <summary>F273: the "phone-open" step is done once any other device on the home network has opened WavWiz (setting, stored once).</summary>
+    public const string LanClientSeenKey = "ui.lanClientSeen";
+    /// <summary>F273, pure: does this request prove another LAN device reached the server? Not loopback, not this PC's own address.</summary>
+    public static bool IsOtherLanClient(System.Net.IPAddress? ip, Func<System.Net.IPAddress, bool> isThisMachine)
+    {
+        if (ip == null) return false;
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+        return !System.Net.IPAddress.IsLoopback(ip) && !ip.Equals(System.Net.IPAddress.Any) && !isThisMachine(ip);
+    }
+    /// <summary>F273: the request middleware calls this; one DB write the first time, then a cached flag (no per-request work).</summary>
+    public static void NoteClient(Services s, System.Net.IPAddress? ip)
+    {
+        if (s.LanClientSeen ??= s.Db.Setting(LanClientSeenKey) == "true") return;
+        if (!IsOtherLanClient(ip, AuthService.IsThisMachine)) return;
+        s.LanClientSeen = true; try { s.Db.SetSetting(LanClientSeenKey, "true"); } catch { s.LanClientSeen = null; }
+    }
+    /// <summary>F273 3.4: the "Check your network" step (Windows only; Linux/Docker: null = no step). done = the deciding adapter is Private.</summary>
+    public static object? NetworkItem(Services s, bool fresh)
+    {
+        if (!Net.NetworkHelper.IsWindows) return null;
+        Net.NetworkHelper.NetState n; try { n = Net.NetworkHelper.Check(s.Cfg, fresh).Net ?? Net.NetworkHelper.StateOf(null); } catch { n = Net.NetworkHelper.StateOf(null); }
+        string detail = n.State switch
+        {
+            "private" => $"Your network \"{n.Network}\" is Private. Phones can connect.",
+            "public" => $"Your network \"{n.Network}\" is set to Public, so phones and other devices can't find WavWiz.",
+            "domain" => "This PC is on a work (domain) network, so phones may not find WavWiz. Ask whoever manages this PC.",
+            _ => "Couldn't check your network type. If your phone can't connect, make sure Windows has it set to Private.",
+        };
+        // required only when the person can act on it (Public -> Private); Domain / unknown never count as "to go"
+        return new { id = "network", title = "Check your network", done = n.State == "private", detail, action = (string?)null, required = n.State is "private" or "public",
+            state = n.State, network = n.Network, kind = n.Kind, settingsUri = n.SettingsUri };
+    }
+
+    public static object Checklist(Services s, bool fresh = false)
     {
         int roots = Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM library_root WHERE enabled=1"));
         int tracks = s.Library.TrackCount();
@@ -30,8 +63,10 @@ public static class DiagnosticsApi
         bool dismissed = s.Db.Setting("ui.checklistDismissed") == "true";
         int speakers = s.Zones.Zones().Count(z => z.Connected);
         bool firstSound = s.Db.Setting("ui.firstSound") == "true";
+        bool lanSeen = s.LanClientSeen ??= s.Db.Setting(LanClientSeenKey) == "true";
         var items = new List<object>
         {
+            new { id = "phone-open", title = "Open it on your phone", done = lanSeen, detail = lanSeen ? "A phone or another device has opened WavWiz." : "Scan the QR code with your phone's camera, or type the address in its browser.", action = (string?)null, required = false },   // F273
             new { id = "server", title = "WavWiz server is running", done = true, detail = $"Version {WavWizInfo.Version}, listening on {s.Cfg.BindAddress}.", action = (string?)null, required = true },
             new { id = "library", title = "Add your music folder", done = roots > 0 && tracks > 0, detail = roots == 0 ? "No folder yet. Open Settings > Library and add the folder that holds your music." : tracks == 0 ? (s.Scanning ? "Scanning now - this can take a few minutes the first time." : "The folder has no songs WavWiz can read yet. Run a rescan in Settings > Library.") : $"{tracks:N0} songs found.", action = "settings:library", required = true },
             // 0.2.0 item 24: "a speaker shows up in Devices" - any connected Player OR browser speaker (every browser now joins by itself)
@@ -40,6 +75,7 @@ public static class DiagnosticsApi
             new { id = "calibrate", title = "Calibrate your speakers (optional)", done = cals > 0, detail = cals > 0 ? "At least one speaker has a measured delay." : "Open Devices, pick a speaker and choose Calibrate. Until then the delay is shown as unknown, never zero.", action = "devices", required = false },
             new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Devices > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone, and for reliable sound when a phone plays as a speaker.", action = "settings:phone", required = false },
         };
+        if (NetworkItem(s, fresh) is { } net) items.Insert(0, net);   // F273: step 1 everywhere
         var req = items.Cast<dynamic>().Where(i => i.required).ToList();
         return new { items, done = req.All(i => (bool)i.done), dismissed, remaining = req.Count(i => !(bool)i.done) };
     }

@@ -16,6 +16,6 @@ What it never does
 What gets installed
   * WavWiz Server (a Windows service, "WavWiz Server (BETA)") - on the PC that holds your music.
   * WavWiz Player - on every PC with speakers (can be the same PC).
-  * A private-network-only Windows Firewall rule for the server. Windows should list your home network as Private.
+  * A private-network-only Windows Firewall rule for the server. Your home network must be set to Private in Windows, or phones can't connect. The last page of Setup checks this for you.
 
 This installer is not code-signed yet, so Windows SmartScreen may warn you. That is expected for a beta.

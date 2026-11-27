@@ -20,6 +20,14 @@ On the server PC (and ideally player PCs), Windows should treat your home Wi-Fi/
 - Private: discovery, firewall rules, and AirPlay / Spotify Connect visibility work as designed.
 - Public: Windows may block the ports WavWiz needs; devices may not find each other.
 
+**0.7.3 (F273): "Check your network" is step 1 everywhere.** The installer's last page, the "What next" text and the app's **Getting started** all start with it:
+
+- **Private:** a green row, `✓ Your network "Home-WiFi" is Private. Phones can connect.`
+- **Public:** a high-contrast warning card naming the network, with three steps (Open network settings → click your network, or **Ethernet** → under **Network profile type** choose **Private**; only on your own home network), an **Open network settings** button and **Check again**. The app re-checks every 10 s while the card is open. The later steps are dimmed until it is fixed, or until you click **Skip for now** (the warning then stays as one red row). On the server PC a slim banner, `⚠ Phones and other PCs can't reach WavWiz: Windows has this network set to Public`, stays at the top until the network is Private (× hides it for 7 days), and Getting started opens by itself once per app start.
+- **Open network settings** opens `ms-settings:network-wifi` (Wi-Fi), `ms-settings:network-ethernet` (Ethernet) or `ms-settings:network-status`. It is only offered on the server PC itself; a phone or another PC is told to fix it on the PC that runs WavWiz (Settings > Network & internet > your network > Private).
+- **Work (domain) networks:** usually you can't change the type yourself. WavWiz explains it ("Ask whoever manages this PC") and doesn't hold back the other steps.
+- WavWiz only looks at the network it actually uses (the bound adapter, or the best home-network adapter). Old saved networks, Hyper-V/WSL "vEthernet" and Tailscale/VPN adapters never trigger the warning. Setup and WavWiz never change a firewall rule or the network type for you.
+
 In the installer, keep the suggested **home-network address**. Do **not** bind the server to “all interfaces” unless you know exactly why you need that (unsupported for typical home use).
 
 If the PC’s address changes later (new router, new adapter), open **Settings → Network → Home network**: it shows whether Windows sees the network as Private or Public, can re-detect the address, and switches WavWiz to the new one.

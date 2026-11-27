@@ -2,6 +2,7 @@ import { h, api, toast, ask, linkSettings } from './util.js';
 import { vizStats, webgl2Ok, vizPrefs, vizName } from './viz.js';
 import { loadReact } from './vizcore.js';
 import { airplayDevCard } from './airplaydev.js';
+import { netCard, netWait, netWaits, netSkipped, setNetSkipped, phoneOpenBox, RECHECK_MS } from './netstep.js';   // F273
 
 const ICON = { ok: '✓', warn: '!', fail: '✕', unknown: '?' };
 export const roomPillClass = s => ({ ok: 'ok', idle: 'idle', buffering: 'warn', dropped: 'bad', reconnecting: 'bad', offline: 'offline' }[s] || 'idle');
@@ -197,8 +198,8 @@ export async function checklistCard(S, go, force = false) {
 /** 0.2.0 items 11 + 24: the ONE Getting started dialog. Opens by itself on first run (until done or dismissed) and ALWAYS from
  * Help > Getting started, even after it was dismissed. Three guided steps on top (music folder, a speaker in Devices, a test sound), the rest of
  * the checklist below. Steps an administrator must do stay visible and read-only for everyone else. */
-export async function gettingStartedBody(S, go, { close } = {}) {
-  let c; try { c = await api('/checklist'); } catch (e) { return h('p', { class: 'err' }, e.message); }
+export async function gettingStartedBody(S, go, { close, fresh = false } = {}) {
+  let c; try { c = await api('/checklist' + (fresh ? '?fresh=true' : '')); } catch (e) { return h('p', { class: 'err' }, e.message); }
   const { isAdmin, canControl, thisDevice, ADMIN_HINT } = await import('./ui.js');
   const item = id => c.items.find(i => i.id === id) || { done: false, detail: '' };
   const admin = isAdmin(S), control = canControl(S), me = thisDevice(S);
@@ -214,22 +215,49 @@ export async function gettingStartedBody(S, go, { close } = {}) {
     try { await api(`/zones/${me.id}/test-sound`, { method: 'POST' }); toast('Test sound sent to ' + me.name); } catch (e) { toast(e.message, true); }
     testBtn.disabled = false; refresh();
   } }, me ? `Play a test sound on ${me.name}` : 'Play a test sound');
-  const steps = [
-    step(1, item('library'), 'Pick a music folder', [folderBtn], admin ? null : 'An administrator adds music folders (File > Sign in as admin…).'),
-    step(2, item('speaker'), 'Check that a speaker shows up in Devices', [h('button', { class: 'btn', onclick: () => goClose('devices') }, 'Open Devices')]),
-    step(3, item('test'), 'Play a test song or a test sound', [testBtn, h('button', { class: 'btn', disabled: !control, onclick: () => goClose('library') }, 'Pick a song')], control ? null : 'Your access is view-only, so you can browse but not play.'),
+  // F273: 1 Check your network (Windows server only), 2 Open it on your phone, 3 music folder, 4 speaker, 5 test sound, 6 calibrate
+  const net = c.items.find(i => i.id === 'network') || null, here = !!S?.auth?.thisMachine, wait = netWaits(net);
+  let n = 0; const next = () => ++n;
+  let lanUrl = (typeof location !== 'undefined' ? location.origin : '') + '/';
+  try { const i = await (await fetch('/tls/info')).json(); if (i && i.host) lanUrl = `http://${i.host}:${i.httpPort}/`; } catch { /* the page's own address */ }
+  const netStep = net ? h('div', { class: 'gs-step chk gs-net ' + (net.done ? 'done' : ''), 'data-step': 'network' },
+    h('span', { class: 'mark', 'aria-hidden': 'true' }, net.done ? '✓' : String(next())),
+    h('div', { class: 'grow' }, h('b', null, 'Check your network'),
+      netCard(net, { thisMachine: here, skipped: netSkipped(), onCheck: () => refresh(true), onFix: () => { setNetSkipped(false); refresh(true); } }))) : null;
+  if (net?.done) n++;
+  const later = [
+    step(next(), item('phone-open'), 'Open it on your phone', null),
+    step(next(), item('library'), 'Pick a music folder', [folderBtn], admin ? null : 'An administrator adds music folders (File > Sign in as admin…).'),
+    step(next(), item('speaker'), 'Check that a speaker shows up in Devices', [h('button', { class: 'btn', onclick: () => goClose('devices') }, 'Open Devices')]),
+    step(next(), item('test'), 'Play a test song or a test sound', [testBtn, h('button', { class: 'btn', disabled: !control, onclick: () => goClose('library') }, 'Pick a song')], control ? null : 'Your access is view-only, so you can browse but not play.'),
     // 0.3.0 §7.9: calibrate (the PC microphone first; a phone works too)
-    step(4, item('calibrate'), 'Calibrate your speakers', [h('button', { class: 'btn', disabled: !control, onclick: () => goClose('calibrate') }, 'Calibrate (PC microphone first)')], control ? 'Lines up the delay of every speaker. A USB or built-in PC microphone works best.' : 'Your access is view-only, so you can browse but not calibrate.'),
+    step(next(), item('calibrate'), 'Calibrate your speakers', [h('button', { class: 'btn', disabled: !control, onclick: () => goClose('calibrate') }, 'Calibrate (PC microphone first)')], control ? 'Lines up the delay of every speaker. A USB or built-in PC microphone works best.' : 'Your access is view-only, so you can browse but not calibrate.'),
   ];
-  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test', 'calibrate'].includes(i.id));
+  later[0].querySelector('.grow')?.append(phoneOpenBox(lanUrl));
+  const steps = [netStep, ...(wait ? [netWait(later, { onSkip: () => refresh(false) })] : later)];
+  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test', 'calibrate', 'network', 'phone-open'].includes(i.id));
   const body = h('div', { class: 'gs' },
     h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'A few quick steps and WavWiz is playing in sync on your speakers.'),
     steps,
     rest.length ? h('details', { open: c.done }, h('summary', { class: 'small' }, 'More (optional)'), rest.map(i => h('div', { class: 'chk ' + (i.done ? 'done' : '') }, h('span', { class: 'mark' }, i.done ? '✓' : ''),
       h('div', { class: 'grow' }, h('b', null, i.title), h('div', { class: 'small dim' }, linkSettings(i.detail)), !i.done && i.action ? h('button', { class: 'btn', style: 'margin-top:6px', onclick: () => goClose(i.action) }, 'Do this') : null)))) : null,
     h('label', { class: 'row small', style: 'gap:6px;margin-top:10px' }, h('input', { type: 'checkbox', checked: c.dismissed || checklistDismissedLocal(), onchange: ev => dismissChecklist(S, ev.target.checked) }), "Don't open this by itself again (Help > Getting started always opens it)"));
-  const holder = h('div', null, body);
-  async function refresh() { const nb = await gettingStartedBody(S, go, { close }); holder.replaceChildren(nb); }
+  const holder = h('div', null, body); let timer = 0;
+  async function refresh(fresh = false) {
+    if (timer) { clearInterval(timer); timer = 0; }   // the new body runs its own re-check
+    if (fresh) holder.querySelectorAll('[data-act="net-check"]').forEach(b => { b.disabled = true; b.textContent = 'Checking…'; });
+    const nb = await gettingStartedBody(S, go, { close, fresh }); holder.replaceChildren(nb);
+  }
+  // F273: while the Public card is on screen, re-check every 10 s (switching to Private turns step 1 green and un-dims the rest)
+  if (net?.state === 'public' && typeof setInterval === 'function') {
+    let ticks = 0;
+    timer = setInterval(async () => {
+      if (!holder.isConnected) { if (holder._seen || ++ticks > 3) { clearInterval(timer); timer = 0; } return; } holder._seen = true;   // the dialog closed (or never opened)
+      let c2; try { c2 = await api('/checklist?fresh=true'); } catch { return; }
+      const n2 = c2?.items?.find(i => i.id === 'network');
+      if (timer && (!n2 || n2.state !== net.state)) refresh(false);
+    }, RECHECK_MS);
+  }
   return holder;
 }
 

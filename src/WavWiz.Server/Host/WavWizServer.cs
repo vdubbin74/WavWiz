@@ -115,6 +115,7 @@ public sealed class WavWizServer : IAsyncDisposable
         {
             // spec 13: only LAN sources, even if a port were reachable some other way
             if (!AuthService.IsPrivateSource(c.Connection.RemoteIpAddress, cfg.ExtraAllowedSubnets)) { c.Response.StatusCode = 403; return; }
+            if (s.LanClientSeen != true) DiagnosticsApi.NoteClient(s, c.Connection.RemoteIpAddress);   // F273: Getting started "Open it on your phone"
             var h = c.Response.Headers;
             h["X-Content-Type-Options"] = "nosniff"; h["X-Frame-Options"] = "DENY"; h["Referrer-Policy"] = "no-referrer"; h["Cache-Control"] = c.Request.Path.StartsWithSegments("/api") ? "no-store" : h["Cache-Control"];
             // 0.0.7: no 'unsafe-eval' any more (it was only needed by the MilkDrop/butterchurn preset compiler, which was removed). Inline scripts stay blocked; LAN-only.

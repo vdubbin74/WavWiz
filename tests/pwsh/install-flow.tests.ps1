@@ -1035,6 +1035,60 @@ Test 'a service that will not stop: its process is ended; still running = exit 3
     Eq $r.Done '3' 'done'; Has (Get-Calls $sb) 'taskkill.exe /PID 4000'; Has (Get-Log $sb 'close-error.txt') 'service did not stop'
 }
 
+Write-Host 'F273: network type (netprofile.ps1, NetworkListManager, connected networks only)'
+$nlmHome = @{ Networks = @(
+        @{ Category = 0; Name = 'Home-WiFi'; AdapterId = '{AAAA0001-0000-0000-0000-000000000001}' },
+        @{ Category = 0; Name = 'Unidentified network'; AdapterId = '{AAAA0002-0000-0000-0000-000000000002}' },
+        @{ Category = 0; Name = 'Tailscale'; AdapterId = '{AAAA0003-0000-0000-0000-000000000003}' })
+    Nics = @(
+        @{ Id = '{aaaa0001-0000-0000-0000-000000000001}'; Name = 'Wi-Fi'; Description = 'Intel AX211'; Type = 'Wireless80211'; Status = 'Up'; HasGateway = $true; Ip = $lanIp; Index = 12 },
+        @{ Id = '{AAAA0002-0000-0000-0000-000000000002}'; Name = 'vEthernet (WSL)'; Description = 'Hyper-V Virtual Ethernet Adapter'; Type = 'Ethernet'; Status = 'Up'; HasGateway = $false; Ip = '172.20.0.1'; Index = 40 },
+        @{ Id = '{AAAA0003-0000-0000-0000-000000000003}'; Name = 'Tailscale'; Description = 'Tailscale Tunnel'; Type = 'Unknown'; Status = 'Up'; HasGateway = $false; Ip = '100.101.1.2'; Index = 41 }) }
+function New-NlmFile($sb, $obj) { $f = Join-Path $sb.State 'nlm.json'; Set-Content -LiteralPath $f ($obj | ConvertTo-Json -Depth 6); return $f }
+Test 'Select-NetProfileRows: the bound adapter decides; vEthernet / Tailscale never do; wildcard = the gateway LAN adapter; Ethernet name kept' {
+    $rows = Select-NetProfileRows @($nlmHome.Networks | ForEach-Object { [pscustomobject]$_ }) @($nlmHome.Nics | ForEach-Object { [pscustomobject]$_ }) $lanIp
+    Eq (Format-NetProfileRows $rows) ("public|Home-WiFi|Wi-Fi|12|$lanIp|1`r`npublic|Unidentified network|Virtual|40|172.20.0.1|0`r`npublic|Tailscale|Virtual|41|100.101.1.2|0")
+    $priv = @(@{ Category = 1; Name = 'Home'; AdapterId = 'e1' }, @{ Category = 0; Name = 'Unidentified network'; AdapterId = 'v1' }) | ForEach-Object { [pscustomobject]$_ }
+    $nics = @(@{ Id = 'e1'; Name = 'Ethernet'; Description = 'Realtek'; Type = 'Ethernet'; HasGateway = $true; Ip = '192.168.1.20'; Index = 5 }, @{ Id = 'v1'; Name = 'vEthernet (Default Switch)'; Description = 'Hyper-V'; Type = 'Ethernet'; HasGateway = $false; Ip = '172.17.0.1'; Index = 9 }) | ForEach-Object { [pscustomobject]$_ }
+    $r2 = Select-NetProfileRows $priv $nics '0.0.0.0'
+    Eq (@($r2 | Where-Object Mine)[0].Name) 'Home' 'wildcard bind: the gateway Ethernet decides'; Eq (@($r2 | Where-Object Mine)[0].Category) 'private'
+    Eq (@($r2 | Where-Object Mine).Count) 1
+    $r3 = Select-NetProfileRows $priv $nics '172.17.0.1'
+    Eq (@($r3 | Where-Object Mine)[0].Name) 'Home' 'a bind on a virtual adapter never decides'
+    Eq (Select-NetProfileRows @() @() '').Count 0 'no networks: an empty list'
+}
+Test 'netprofile.ps1 writes network-status.txt (category|name|kind|ifIndex|ipv4|isWavWizAdapter) from a mocked NLM result, logs it and writes the done file' {
+    $sb = New-Sandbox; $f = New-NlmFile $sb $nlmHome; $done = Join-Path $sb.State 'np.done'
+    $r = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'netprofile.ps1'), '-Bind', $lanIp, '-DoneFile', $done) @{ WAVWIZ_TEST_NLM = $f }
+    Eq $r.ExitCode 0 'exit'; Eq (Get-Content $done -Raw).Trim() '0' 'done file'
+    $st = Join-Path $sb.Data 'network-status.txt'; if (-not (Test-NoBom $st)) { throw 'BOM in network-status.txt' }
+    $lines = @(Get-Content -LiteralPath $st); Eq $lines.Count 3; Eq $lines[0] "public|Home-WiFi|Wi-Fi|12|$lanIp|1"
+    Has (Get-Log $sb) "network type: public 'Home-WiFi' (Wi-Fi, $lanIp) <- WavWiz"
+}
+Test 'netprofile.ps1 on a timeout: no network-status.txt (an old one is removed), logged, exit 0' {
+    $sb = New-Sandbox; $st = Join-Path $sb.Data 'network-status.txt'; New-Item -ItemType Directory -Force -Path $sb.Data | Out-Null; Set-Content $st 'public|Old cafe|Wi-Fi|3|10.0.0.5|1'
+    $r = Invoke-Direct $sb @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scripts 'netprofile.ps1')) @{ WAVWIZ_TEST_NLM = 'timeout' }
+    Eq $r.ExitCode 0; if (Test-Path -LiteralPath $st) { throw 'network-status.txt left behind after a timeout' }
+    Has (Get-Log $sb) 'TIMEOUT: [network type (NetworkListManager)]'
+}
+Test 'setup.ps1 writes network-status.txt once the bind is final; firewall rules unchanged (profile=private, remoteip=localsubnet, nothing public)' {
+    $sb = New-Sandbox; $f = New-NlmFile $sb $nlmHome; $r = Invoke-Setup $sb @{} @{ WAVWIZ_TEST_NLM = $f }; Fail-IfNotOk $r $sb
+    Eq (@(Get-Content -LiteralPath (Join-Path $sb.Data 'network-status.txt'))[0]) "public|Home-WiFi|Wi-Fi|12|$lanIp|1"
+    $rules = Get-Rules $sb; Has $rules 'profile=private'; Has $rules 'remoteip=localsubnet'; HasNot $rules 'profile=public'; HasNot $rules 'profile=domain'
+    Has (Get-Log $sb) 'STEP> setup: network type (10 s limit)'
+}
+Test 'setup.ps1 with the network check timing out still succeeds and writes no network-status.txt' {
+    $sb = New-Sandbox; $r = Invoke-Setup $sb @{} @{ WAVWIZ_TEST_NLM = 'timeout' }; Fail-IfNotOk $r $sb
+    if (Test-Path -LiteralPath (Join-Path $sb.Data 'network-status.txt')) { throw 'network-status.txt written after a timeout' }
+    Has (Get-Log $sb) 'WavWiz setup finished.'
+}
+Test 'F273: the wizard no longer reads the registry NetworkList profiles (PublicNetworkName is gone; netprofile.ps1 is used instead)' {
+    $iss = Get-Content -Raw (Join-Path $repo 'installer/WavWiz.iss')
+    HasNot $iss 'PublicNetworkName'; HasNot $iss 'NetworkList\Profiles'; Has $iss 'netprofile.ps1'; Has $iss 'ShellExecAsOriginalUser'
+    foreach ($u in 'ms-settings:network-wifi', 'ms-settings:network-ethernet', 'ms-settings:network-status') { Has $iss $u }
+    HasNot (Get-Content -Raw (Join-Path $scripts 'netprofile.ps1')) 'Get-NetConnectionProfile'; HasNot (Get-Content -Raw (Join-Path $scripts 'netprofile.ps1')) 'Get-CimInstance'
+}
+
 $listener.Stop(); foreach ($s in $sandboxes) { try { Remove-Item -Recurse -Force $s -ErrorAction SilentlyContinue } catch { } }
 Write-Host ("`n{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail -gt 0) { exit 1 } else { exit 0 }

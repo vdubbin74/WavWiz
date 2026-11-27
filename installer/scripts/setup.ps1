@@ -83,6 +83,7 @@ try {
         Set-Step 'setup: player install finished'
     }
     if ($bind) { $ch = Get-ConnectHost $bind; try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'first-run-url.txt') ("http://${ch}:$port/") } catch { } }   # F268b: never the wildcard listen address
+    if ($Role -in 'server', 'both') { Set-Step 'setup: network type (10 s limit)'; try { [void](Write-NetworkStatus -Bind $bind -TimeoutSec 10) } catch { } }   # F273: network-status.txt now that the bind is final (no file = unknown)
     if ($notices.Count -gt 0) {
         # shown by the installer wizard itself (a window from this hidden process is not reliable); no secrets in it
         try { Write-Utf8NoBom (Join-Path (Get-WavWizDataRoot) 'setup-notices.txt') (($notices | ForEach-Object { '- ' + $_ }) -join "`r`n`r`n") } catch { }

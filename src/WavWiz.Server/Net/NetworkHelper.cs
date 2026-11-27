@@ -13,7 +13,7 @@ namespace WavWiz.Server.Net;
 /// </summary>
 public static class NetworkHelper
 {
-    public sealed record Adapter(string Name, string Description, string Address, int Prefix, bool Gateway, string Kind, string Profile, bool IsBind);
+    public sealed record Adapter(string Name, string Description, string Address, int Prefix, bool Gateway, string Kind, string Profile, bool IsBind, string Network = "");   // F273: Network = the Windows network name ("Home-WiFi")
 
     private static (DateTime At, Dictionary<int, (string Profile, string Network)> Map)? _profiles;
     private static readonly object _pl = new();
@@ -39,7 +39,7 @@ public static class NetworkHelper
             try
             {
                 var psi = new ProcessStartInfo("powershell.exe") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-                foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-Command", "Get-NetConnectionProfile | ForEach-Object { '{0}|{1}|{2}' -f $_.InterfaceIndex, $_.NetworkCategory, $_.Name }" }) psi.ArgumentList.Add(a);
+                foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-Command", ProfileScript }) psi.ArgumentList.Add(a);
                 using var p = Process.Start(psi)!;
                 var outTask = p.StandardOutput.ReadToEndAsync();
                 if (!p.WaitForExit(6000)) { try { p.Kill(true); } catch { } }
@@ -52,6 +52,14 @@ public static class NetworkHelper
             _profiles = (DateTime.UtcNow, map); return map;
         }
     }
+
+    /// <summary>F273 3.3 / D4: Get-NetConnectionProfile (connected adapters only); when it answers nothing (e.g. blocked for Local Service) the same
+    /// NetworkListManager COM query as the installer's netprofile.ps1 (connected networks only, no WMI/CIM). Prints "ifIndex|Private|Name" lines.</summary>
+    public const string ProfileScript =
+        "$o = @(); try { $o = @(Get-NetConnectionProfile -ErrorAction Stop | ForEach-Object { '{0}|{1}|{2}' -f $_.InterfaceIndex, $_.NetworkCategory, $_.Name }) } catch { }; " +
+        "if ($o.Count -eq 0) { try { $ix = @{}; foreach ($n in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) { try { $ix[$n.Id.Trim('{','}').ToLowerInvariant()] = $n.GetIPProperties().GetIPv4Properties().Index } catch { } }; " +
+        "$m = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')); foreach ($w in $m.GetNetworks(1)) { $c = @('Public','Private','DomainAuthenticated')[[int]$w.GetCategory()]; " +
+        "foreach ($k in $w.GetNetworkConnections()) { $g = $k.GetAdapterId().ToString().ToLowerInvariant(); if ($ix.ContainsKey($g)) { $o += ('{0}|{1}|{2}' -f $ix[$g], $c, $w.GetName()) } } } } catch { } }; $o";
 
     public static List<Adapter> Adapters(string bind, bool fresh = false)
     {
@@ -70,7 +78,7 @@ public static class NetworkHelper
                 {
                     if (!IsHomeAddress(u.Address)) continue;
                     var addr = u.Address.ToString();
-                    list.Add(new Adapter(ni.Name, ni.Description, addr, u.PrefixLength, gw, kind, prof.TryGetValue(idx, out var p) ? p.Profile : "Unknown", addr == bind));
+                    list.Add(new Adapter(ni.Name, ni.Description, addr, u.PrefixLength, gw, kind, prof.TryGetValue(idx, out var p) ? p.Profile : "Unknown", addr == bind, prof.TryGetValue(idx, out var p2) ? p2.Network : ""));
                 }
             }
             catch { /* adapter vanished mid-scan */ }
@@ -80,7 +88,23 @@ public static class NetworkHelper
 
     private static bool Virtual(string s) => new[] { "Hyper-V", "vEthernet", "VirtualBox", "VMware", "WSL", "Docker", "TAP-", "Tailscale", "ZeroTier", "WireGuard", "Loopback" }.Any(v => s.Contains(v, StringComparison.OrdinalIgnoreCase));
 
-    public sealed record Report(string Bind, bool Loopback, bool AllInterfaces, bool BindPresent, string? Suggested, List<Adapter> Adapters, List<string> Problems, List<string> Fixes, string Status, bool CanRebind, ListenInfo? Listen = null);
+    public sealed record Report(string Bind, bool Loopback, bool AllInterfaces, bool BindPresent, string? Suggested, List<Adapter> Adapters, List<string> Problems, List<string> Fixes, string Status, bool CanRebind, ListenInfo? Listen = null, NetState? Net = null);
+    /// <summary>F273: the network that decides whether phones can reach WavWiz (the bound adapter; for a wildcard / loopback bind the best LAN
+    /// adapter - gateway first, never Tailscale/VPN or Hyper-V/WSL/Docker). State: private | public | domain | unknown. Uri: the Windows Settings
+    /// page for that adapter (one of <see cref="SettingsUris"/>).</summary>
+    public sealed record NetState(string State, string Network, string Kind, string Adapter, string Address, string SettingsUri);
+    public static readonly string[] SettingsUris = { "ms-settings:network-wifi", "ms-settings:network-ethernet", "ms-settings:network-status" };
+    public static string SettingsUriFor(string kind) => kind == "Wi-Fi" ? SettingsUris[0] : kind == "Ethernet" ? SettingsUris[1] : SettingsUris[2];
+    /// <summary>Tests: pretend to be (or not be) Windows for the F273 network step (Linux/Docker: no network step, no banner).</summary>
+    public static Func<bool>? WindowsOverride;
+    public static bool IsWindows => WindowsOverride?.Invoke() ?? OperatingSystem.IsWindows();
+    /// <summary>F273, pure: the deciding adapter's state. Unknown profile (blocked, slow, not Windows) = "unknown" - never warn on a guess.</summary>
+    public static NetState StateOf(Adapter? a)
+    {
+        if (a == null) return new("unknown", "", "", "", "", SettingsUris[2]);
+        var st = a.Profile switch { "Private" => "private", "Public" => "public", "Domain" => "domain", _ => "unknown" };
+        return new(st, a.Network is { Length: > 0 } n ? n : a.Name, a.Kind, a.Name, a.Address, SettingsUriFor(a.Kind));
+    }
     // ---- 0.6.8-#9: what "listening on" means in words + the addresses people can actually type ----
     public sealed record ListenAddr(string Address, string Kind);   // Kind: lan | tailscale | vpn
     public sealed record ListenInfo(string Label, List<ListenAddr> Addresses);
@@ -233,16 +257,18 @@ public static class NetworkHelper
             if (best != null) fixes.Add(canRebind ? $"{Use(best.Address)}. WavWiz restarts by itself and your players find it again within a minute." : Use(best.Address) + ".");
             fixes.Add("To stop this happening again, reserve this PC's address in your router (look for \"DHCP reservation\" or \"static lease\").");
         }
-        var pub = (mine ?? (loop || all ? best : null)) is { Profile: "Public" } m ? m : null;
+        var deciding = mine is { Kind: not "Virtual" } ? mine : (loop || all || mine != null ? best : null);   // F273: Tailscale/VPN, Hyper-V/WSL never decide
+        var pub = deciding is { Profile: "Public" } m ? m : null;
         if (pub != null)
         {
             problems.Add($"Windows treats the network on \"{pub.Name}\" as Public, so it blocks other devices from reaching WavWiz.");
             fixes.Add($"Open Windows Settings > Network & internet > {(pub.Kind == "Wi-Fi" ? "Wi-Fi > (your network)" : "Ethernet")} and set \"Network profile type\" to Private. Only do this on your own home network.");
         }
+        if (deciding is { Profile: "Domain" }) problems.Add("This PC is on a work (domain) network, so phones may not find WavWiz. Ask whoever manages this PC.");   // F273
         if (mine is { Kind: "Virtual" }) { problems.Add($"{bind} belongs to a virtual adapter ({mine.Name}), not your home network."); if (best != null && best.Address != bind) fixes.Add($"Use {best.Address} instead."); }
         if (ads.Count == 0 && !loop) problems.Add("This PC has no home-network (private) address right now. Is it connected to your router?");
         string status = problems.Count == 0 ? "ok" : (!present || loop || pub != null) ? "fail" : "warn";
-        return new Report(bind, loop, all, present, best?.Address != bind ? best?.Address : null, ads, problems, fixes, status, canRebind, Listening(cfg));
+        return new Report(bind, loop, all, present, best?.Address != bind ? best?.Address : null, ads, problems, fixes, status, canRebind, Listening(cfg), StateOf(deciding));
     }
 
     /// <summary>Write bindAddress into server.json (other keys untouched). Returns the path written.</summary>

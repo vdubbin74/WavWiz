@@ -44,6 +44,7 @@ import { artPushed, setArtCv, artCv, reconcileSmoothPosition, npCover } from './
 import { playlistsView } from './playlists.js';
 import { cleanupView } from './cleanup.js';
 import { diagnosticsView, roomPill, checklistDismissedLocal } from './diag.js';
+import { netBanner, showBanner, fetchNet, shouldAutoOpenPublic, markAutoOpened, setNetSkipped, BANNER_POLL_MS } from './netstep.js';   // F273: Public network banner + Getting started
 import { canControl, thisDevice, isAdmin } from './ui.js';
 import { isPlayerUa, isHandset } from './phonejoin.js';
 import { openScenesSchedules, showAlarm, sleepChip } from './scenesched.js';
@@ -181,7 +182,7 @@ const NAV = [
 const PAGE_TITLES = { playlists: 'Playlists', radio: 'Internet radio', devices: 'Devices & zones', cleanup: 'Tidy up library', diag: 'Diagnostics', about: 'About WavWiz', scenes: 'Scenes & Schedules', finder: 'Radio finder', tags: 'Tag & cover fix', rip: 'CD ripper', remote: 'Away-from-home access' };
 const views = {};
 let pairReqs = null;   // 0.6.9 #15
-let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
+let desk, drawerEl, tabs, nowc, devv, devp, listt, libC, libpanel, statusbar, netHost = null, content, navButtons = [], pageDlg = null, minicol = null, miniInst = null;
 /** 0.3.6 K14 / K22: the real mini player lives in the right-hand column while the Library or the Playlist is expanded (and is not running otherwise). */
 function syncMini() { holdPage();
   if (!desk || !minicol) return;
@@ -314,7 +315,8 @@ async function startMain() {
   wireNextBlock();
   tabs = createPhoneTabs();
   drawerEl = buildDrawer();
-  app.replaceChildren(bar, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
+  netHost = h('div', { class: 'netbanner-host' });   // F273: the slim Public-network strip (server PC only)
+  app.replaceChildren(bar, netHost, desk, statusbar, nowc.mini, tabs); document.body.append(drawerEl);
   const applyMode = () => {   // 0.3.9 L52: keep the view state valid on both sides of the breakpoint (idle or playing)
     const m = viewForMode({ wide: wide(), view: S.view, hasContent: !!content.firstChild });
     if (m.clearContent) { views[S.view]?.hide?.(); content.replaceChildren(); S.view = m.view; desk.dataset.view = m.view; tabs.querySelectorAll('button').forEach(b => { b.classList.remove('on'); b.removeAttribute('aria-current'); }); }
@@ -406,6 +408,15 @@ async function startMain() {
   await retireRemote();      // 0.3.2 F3: Remote mode is gone - a remembered choice is cleared once and the speaker card comes back
   if (!JB_DISPLAY) installAutoJoin(S, refreshAll);           // 0.6.9 #18: a ?jukebox=tv display never joins as a speaker (the Jukebox plays on its own speakers) // 0.2.0 item 1: every browser (not the Player window) joins as a speaker (F2: exactly one stream)
   setTimeout(() => maybeAutoSetup(), 900);   // 0.2.0 item 24: first run opens Getting started by itself
+  if (S.auth?.thisMachine) { drawNetBanner(); setInterval(drawNetBanner, BANNER_POLL_MS); window.addEventListener('focus', () => drawNetBanner()); }   // F273
+}
+// ---------------------------------------------------------------- F273: Public network
+/** The slim strip on the server PC while Windows has its network set to Public. [Fix it] = Getting started on step 1; [×] = hidden 7 days. */
+async function drawNetBanner() {
+  if (!netHost) return;
+  const net = await fetchNet(false); S.net = net;
+  netHost.replaceChildren(...(showBanner(S.auth, net) ? [netBanner({ onFix: () => { setNetSkipped(false); openSetup(); }, onHide: () => netHost.replaceChildren() })] : []));
+  drawStatus();
 }
 /** 0.3.0 §6: the menu / tray API keeps its names; everything goes through one state (P6) and one applyPanels(). */
 function toggleLib(force) { if (force === true) return setPanels({ ...P6, lib: 'rail', exp: P6.exp === 'lib' ? null : P6.exp }, 'lib'); if (force === false) return setPanels(railClick(P6, 'lib'), 'lib'); setPanels(chevron(P6, 'lib'), 'lib'); }
@@ -729,7 +740,7 @@ async function refreshNow() { try { const responseZone = globalThis.__wavwizZone
     whenIdle(() => { nowc.draw(); listt.draw(); }, 'now'); drawStatus(); if (S.view === 'queue') drawQueue(); } catch (e) { handleErr(e); } }
 async function refreshZones() { const t0 = Date.now(); try { let [z, g, jb, cast, ord] = await Promise.all([api('/zones'), api('/groups').catch(() => S.groups), api('/jukebox/zone').catch(() => S.jb), api('/cast').catch(() => S.cast), api('/zones/order').catch(() => undefined)]); S.jb = jb; S.cast = cast; if (ord !== undefined && t0 >= cardOrderChangedAt()) setCardOrder(ord?.order);   /* 0.6.9 #12: the shared Devices card order */   /* 0.4.9 F78 */ if ((S._optAt || 0) >= t0) g = S.groups;   /* F269: a read that started before an optimistic move must not put the speaker back */ S._groupsAt = Date.now(); const idsChanged = (S.zones || []).map(x => x.id).join() !== z.map(x => x.id).join(); S.zones = z; S.groups = g; Z.sync(); window.dispatchEvent(new CustomEvent('wavwiz:zonesdata'));   /* 0.4.8 F49: the mixer repaints live */ if (isDevDragging()) { /* redrawn when the drop lands */ } else if (idsChanged) { devv.draw(); devp.draw(); } else whenIdle(() => { devv.draw(); devp.draw(); }, 'zones');   // 0.3.0 §9: never re-render under a dragged slider (a removed device still redraws at once)
   nowc.drawStrip(); drawStatus(); } catch (e) { handleErr(e); } }
-async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; } catch { S.setupLeft = 0; } drawStatus(); }
+async function refreshStatus() { try { S.status = await api('/status'); } catch (e) { handleErr(e); } try { const c = await api('/checklist'); S.setupLeft = c.dismissed || checklistDismissedLocal() ? 0 : c.remaining; S.netPublic = c.items?.some(i => i.id === 'network' && i.state === 'public'); } catch { S.setupLeft = 0; } drawStatus(); }
 async function refreshRadio() { try { S.radio = await api('/radio'); } catch (e) { handleErr(e); } }
 function handleErr(e) { if (e instanceof ApiError && e.status === 401) location.reload(); else if (e.status !== 0) toast(e.message, true); }
 async function act(path, body, method = 'POST') { try { await api(path, { method, body }); } catch (e) { toast(e.message, true); } }
@@ -789,7 +800,8 @@ function drawStatus() {
     h('span', { class: 'sb' }, playing ? `Playing on ${act_ ? 'zone “' + act_.name + '”' : on.length + ' device' + (on.length === 1 ? '' : 's')}` : (S.now?.state === 'paused' ? 'Paused' : 'Stopped')),
     bad.length ? h('span', { class: 'sb warn', title: bad.map(z => `${z.name}: ${z.room.text}`).join('\n') }, '⚠ ' + bad.map(z => `${z.name} ${z.room.state}`).join(', ')) : null,
     h('span', { class: 'grow' }), tracks != null ? h('span', { class: 'sb' }, `${tracks} song${tracks === 1 ? '' : 's'} in the library`) : null,
-    S.setupLeft ? h('button', { class: 'sb link', onclick: () => openSetup() }, `Getting started: ${S.setupLeft} to go`) : null,
+    S.netPublic ? h('button', { class: 'sb link sb-netbad', onclick: () => openSetup() }, '⚠ Network is Public')   // F273
+      : S.setupLeft ? h('button', { class: 'sb link', onclick: () => openSetup() }, `Getting started: ${S.setupLeft} to go`) : null,
     h('button', { class: 'sb link', onclick: () => go('about'), title: 'About, credits and licenses', 'data-wwv': 'WavWiz BETA {v}' }, `WavWiz BETA ${S.auth?.appVersion ?? ''}`));
 }
 /** 0.2.0 items 11 + 24: the one Getting started dialog (Help > Getting started, the status-bar link, and first run). */
@@ -806,6 +818,7 @@ async function maybeAutoSetup(tries = 0) {
   const { shouldAutoOpenSetup } = await import('./diag.js');
   let c = null; try { c = await api('/checklist'); } catch { return; }
   let shown = false; try { shown = localStorage.getItem('wavwiz.gettingStarted.shown') === '1'; } catch { /* ignore */ }
+  if (shouldAutoOpenPublic(c, S.auth, checklistDismissedLocal())) { markAutoOpened(); openSetup(); return; }   // F273 D1: once per app start while Public (server PC)
   if (!shouldAutoOpenSetup(c, checklistDismissedLocal(), shown)) return;
   try { localStorage.setItem('wavwiz.gettingStarted.shown', '1'); } catch { /* ignore */ }
   openSetup();
