@@ -12,11 +12,11 @@ test('html.handset follows the device (isRealPhone), set once at start-up', () =
   assert.match(readFileSync(join(js, 'viz.js'), 'utf8'), /export const isRealPhone = \(\) => \{[^\n]*iPhone\|iPad\|iPod\|Android/);
 });
 
-test('every phone header size rule is for a real phone in the phone layout, never the PC title bar', () => {
+test('every phone header size rule is for the phone look (0.7.3 t2225u: phone + narrow PC) in the phone layout, never the PC title bar', () => {
   assert.ok(css.includes('/* 0.7.0 (t1892)') && block.length > 100, 'the t1892 block exists');
   const rules = [...block.matchAll(/^\s*([^@\/{}\n][^{]*)\{/gm)].map(m => m[1].trim());
   assert.ok(rules.length >= 7, rules.join(' | '));
-  for (const r of rules) { assert.match(r, /^html\.handset \.topbar:not\(\.wtitlebar\)/, r); }
+  for (const r of rules) { assert.match(r, /^html\.phonelook \.topbar:not\(\.wtitlebar\)/, r); }
   for (const q of block.match(/@media[^{]*/g)) assert.match(q, /^@media \(max-width:(900|400|380)px\)\s*$/, q);
 });
 

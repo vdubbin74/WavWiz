@@ -7,11 +7,12 @@ const dir = process.env.JS_DIR || new URL('../../src/WavWiz.Server/wwwroot/js', 
 const main = readFileSync(dir + '/main.js', 'utf8'), css = readFileSync(dir + '/../app.css', 'utf8');
 const fnSrc = name => { const i = main.indexOf(`function ${name}(`); assert.ok(i >= 0, name + ' exists'); let d = 0, j = main.indexOf('{', i); for (let k = j; k < main.length; k++) { if (main[k] === '{') d++; else if (main[k] === '}' && --d === 0) return main.slice(i, k + 1); } };
 
-test('CSS: the tab bar shows on Now Playing for html.handset only; the narrow-PC rule that hides it is kept', () => {
-  assert.match(css, /#app>\.desk\[data-view=now\]~:is\(\.mini,\.tabbar\)\{display:none\}/, 'narrow PC unchanged');
+test('CSS: the tab bar shows on Now Playing for html.phonelook (phone + narrow PC, 0.7.3 t2225u); the base rule that hides it is kept', () => {
+  assert.match(css, /#app>\.desk\[data-view=now\]~:is\(\.mini,\.tabbar\)\{display:none\}/, 'base rule (no phone look) unchanged');
   const i = css.indexOf('0.7.1 t2050u'); assert.ok(i > css.indexOf('#app>.desk[data-view=now]~:is(.mini,.tabbar){display:none}'), 'comes later (wins)');
   const block = css.slice(i);
-  assert.match(block, /html\.handset #app>\.desk\[data-view=now\]~\.tabbar\{display:flex\}/);
+  // 0.7.3 t2225u: a narrow PC window looks like the phone - look rules moved from html.handset to html.phonelook (handset implies phonelook)
+  assert.match(block, /html\.phonelook #app>\.desk\[data-view=now\]~\.tabbar\{display:flex\}/);
   assert.doesNotMatch(block.split('}\n}')[0], /(^|[^.])\.mini\{display/, 'the mini player stays hidden on Now Playing');
   assert.match(css, /#app>\.tabbar\{[^}]*padding:[^}]*var\(--safe-b\)/, 'the tab bar owns the bottom safe area');
 });

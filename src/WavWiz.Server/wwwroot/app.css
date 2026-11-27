@@ -5752,20 +5752,20 @@ html.wtb.wtb-maxed .wtb-ctl{align-self:stretch;height:auto}
 .tree42 .qb42.zfold42 .ze42-row>.zfold42-n{flex:none}
 
 /* 0.7.0 (t1892): the phone header fits at 360-390 px with the Jukebox on or off. The Parallel Flow emblem + WavWiz wordmark are the same logo
-   (shape, theme colors, font), only scaled down; the gaps around it are tightened a little. Real phones only (html.handset = isRealPhone()):
-   the PC title bar and a narrow PC window keep their sizes. */
+   (shape, theme colors, font), only scaled down; the gaps around it are tightened a little. 0.7.3 t2225u: html.phonelook (a phone or a narrow PC window, phonelook.js);
+   the PC title bar keeps its sizes. */
 @media (max-width:900px){
-  html.handset .topbar:not(.wtitlebar){gap:var(--hdr-gap,8px)}
-  html.handset .topbar:not(.wtitlebar) .logo{gap:var(--logo-gap,6px)}
-  html.handset .topbar:not(.wtitlebar) .logo .brand-emblem{height:var(--logo-em,24px);margin:0 -1px 0 -3px}
-  html.handset .topbar:not(.wtitlebar) .wordmark{font-size:var(--logo-wm,18px)}
-  html.handset .topbar:not(.wtitlebar) .adminchip{margin:0 2px}
+  html.phonelook .topbar:not(.wtitlebar){gap:var(--hdr-gap,8px)}
+  html.phonelook .topbar:not(.wtitlebar) .logo{gap:var(--logo-gap,6px)}
+  html.phonelook .topbar:not(.wtitlebar) .logo .brand-emblem{height:var(--logo-em,24px);margin:0 -1px 0 -3px}
+  html.phonelook .topbar:not(.wtitlebar) .wordmark{font-size:var(--logo-wm,18px)}
+  html.phonelook .topbar:not(.wtitlebar) .adminchip{margin:0 2px}
 }
 @media (max-width:400px){
-  html.handset .topbar:not(.wtitlebar){--hdr-gap:6px;--logo-gap:4px;--logo-em:20px;--logo-wm:16px}
+  html.phonelook .topbar:not(.wtitlebar){--hdr-gap:6px;--logo-gap:4px;--logo-em:20px;--logo-wm:16px}
 }
 @media (max-width:380px){
-  html.handset .topbar:not(.wtitlebar){--hdr-gap:4px;--logo-gap:3px;--logo-em:18px;--logo-wm:15px}
+  html.phonelook .topbar:not(.wtitlebar){--hdr-gap:4px;--logo-gap:3px;--logo-em:18px;--logo-wm:15px}
 }
 /* end 0.7.0 (t1892) */
 
@@ -6212,18 +6212,18 @@ dialog.addspk-dlg>.body{padding:0;display:flex;flex-direction:column;min-height:
 .addspk-url{display:block;max-width:100%;overflow:auto;padding:6px 8px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);font-size:12px}
 .addspk-dlg .apsetup-list{max-height:none}
 .addspk-dlg .apsetup-testbtn{width:auto}
-/* Phone-only (html.handset = isRealPhone): sit in the viewport above the in-flow mini player + tab bar.
-   Uses --safe-t / --safe-b and --addspk-dock (measured from those bars). A narrow PC window is not a handset. */
-html.handset dialog.addspk-dlg{
+/* html.phonelook (a phone, or a narrow PC window - 0.7.3 t2225u: same bars): sit in the viewport above the in-flow mini player + tab bar.
+   Uses --safe-t / --safe-b and --addspk-dock (measured from those bars). */
+html.phonelook dialog.addspk-dlg{
   width:calc(100vw / var(--z,1));max-width:calc(100vw / var(--z,1));
   height:auto;margin:var(--safe-t,0px) 0 calc(8px + var(--safe-b,0px) + var(--addspk-dock,0px));
   max-height:calc(100vh / var(--z,1) - 8px - var(--safe-t,0px) - var(--safe-b,0px) - var(--addspk-dock,0px));
   max-height:calc(100dvh / var(--z,1) - 8px - var(--safe-t,0px) - var(--safe-b,0px) - var(--addspk-dock,0px));
   border-radius:0;border-left:0;border-right:0;box-sizing:border-box;
 }
-html.handset dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
-html.handset dialog.addspk-dlg .addspk-panel{min-height:0;padding-bottom:18px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:18px}
-html.handset .addspk-connect-row{justify-content:center}
+html.phonelook dialog.addspk-dlg .addspk-tab{min-height:44px;padding:10px 12px}
+html.phonelook dialog.addspk-dlg .addspk-panel{min-height:0;padding-bottom:18px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:18px}
+html.phonelook .addspk-connect-row{justify-content:center}
 
 /* ===== 0.7.1 t2033u / t2035u: names typed in place + small confirms next to their button (popover.js) - no centered pop-ups for these ===== */
 /* Daylight / any light theme: the danger button text was pale pink on cream - use a deep red that reads on light backgrounds */
@@ -6279,21 +6279,21 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .switch>span{pointer-events:none}
 /* 0.7.1 t2049u: phone Library search - spacer the height of the open keyboard (set by library.js only on html.handset) */
 .lib-kbpad{flex:none;pointer-events:none}
-/* 0.7.1 t2050u: the phone's full-screen Now Playing keeps the bottom tab bar (F250-P5 hid it). Real phones only (html.handset): a narrow
-   PC window keeps its full-height Now Playing. The tab bar owns the bottom safe-area inset; the REMOTE / mic strip docks above it in flow,
+/* 0.7.1 t2050u: the phone's full-screen Now Playing keeps the bottom tab bar (F250-P5 hid it). 0.7.3 t2225u: html.phonelook - a narrow
+   PC window looks the same (it has the same tab bar). The tab bar owns the bottom safe-area inset; the REMOTE / mic strip docks above it in flow,
    and Now Playing's grid shrinks the art (minmax(0,1fr) row) so volume, Queue / Sound and More playback controls stay above both. */
 @media(max-width:900px){
-  html.handset #app>.desk[data-view=now]~.tabbar{display:flex}
-  html.handset #app>.desk[data-view=now]~.tabbar>button.on{background:none;font-weight:600}
-  html.handset #app>.desk[data-view=now]~.tabbar>button.on::before{opacity:.55}
+  html.phonelook #app>.desk[data-view=now]~.tabbar{display:flex}
+  html.phonelook #app>.desk[data-view=now]~.tabbar>button.on{background:none;font-weight:600}
+  html.phonelook #app>.desk[data-view=now]~.tabbar>button.on::before{opacity:.55}
 }
 /* 0.7.1 t2051u: phone Now Playing - the tab bar already has Queue, so the Queue / Sound pair is hidden and Sound sits in More playback
-   controls next to Sleep. html.handset only: a narrow PC window (no tab bar on Now Playing) keeps the pair and has no extra Sound button. */
+   controls next to Sleep. 0.7.3 t2225u: html.phonelook - a narrow PC window too (its tab bar now shows on Now Playing). */
 .np-phone-xsound{display:none}
 @media(max-width:900px){
-  html.handset .np-phone-full .np-phone-actions{display:none}
-  html.handset .np-phone-full .np-phone-xsound{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
-  html.handset .np-phone-full .np-phone-xsound .ic svg{width:18px;height:18px}
+  html.phonelook .np-phone-full .np-phone-actions{display:none}
+  html.phonelook .np-phone-full .np-phone-xsound{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+  html.phonelook .np-phone-full .np-phone-xsound .ic svg{width:18px;height:18px}
 }
 /* 0.7.1 t2055u: Settings > Appearance > Zone edge light - six choices wrap; each has a tiny static picture of the trim */
 .setrow.edgelight{flex-wrap:wrap}
@@ -6440,11 +6440,11 @@ html.handset .wwinl-b{width:40px;height:40px;font-size:16px}   /* phone: finger-
 .inp-gain input[type=range]{width:140px}
 .inp-gv{min-width:4.5em}
 .inp-setrow p{margin:0}
-html.handset .inp-grid{grid-template-columns:1fr;gap:10px}
-html.handset .inp-gain input[type=range]{width:100%;min-width:120px;flex:1}
-html.handset .inp-gain{flex:1 1 100%}
-html.handset .inp-sw{flex-wrap:wrap}
-html.handset .inp-sw > .small{flex-basis:100%;padding-left:28px}
+html.phonelook .inp-grid{grid-template-columns:1fr;gap:10px}
+html.phonelook .inp-gain input[type=range]{width:100%;min-width:120px;flex:1}
+html.phonelook .inp-gain{flex:1 1 100%}
+html.phonelook .inp-sw{flex-wrap:wrap}
+html.phonelook .inp-sw > .small{flex-basis:100%;padding-left:28px}
 /* 0.7.2: with the fifth source tab (Inputs, only when the server PC has inputs) the side panel's source row stays one line: tighter tabs, and it
    scrolls sideways rather than wrapping if the panel is narrower still. Homes without inputs keep the 0.7.1 row unchanged. */
 .lib .libsrc-tabs.xtabs:has(> button[data-src=inputs]){flex-wrap:nowrap;gap:0;overflow-x:auto;scrollbar-width:none}
@@ -6477,11 +6477,11 @@ html.handset .inp-sw > .small{flex-basis:100%;padding-left:28px}
 .ann-menu p{margin:4px 10px 4px}
 .ann-sheet{position:fixed;z-index:9002;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(calc(100vw / var(--z,1)) - 24px));padding:16px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
 .ann-sheet .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-html.handset .ann-live{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px))}
-html.handset .tree42-h .annwrap .annbtn{height:32px;min-height:32px;padding:0 10px}
-html.handset .tree42-h .annwrap .annlbl{display:none}   /* the phone header keeps one line: mic icon + To arrow */
-html.handset .ann-live .small{display:none}
-html.handset .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px}
+html.phonelook .ann-live{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+html.phonelook .tree42-h .annwrap .annbtn{height:32px;min-height:32px;padding:0 10px}
+html.phonelook .tree42-h .annwrap .annlbl{display:none}   /* the phone header keeps one line: mic icon + To arrow */
+html.phonelook .ann-live .small{display:none}
+html.phonelook .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px}
 #sec-announce .setrow{display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box}
 #sec-announce .setrow .small{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;max-width:68ch}
 #sec-announce .setrow > .grow{flex:1 1 auto;min-width:0}
@@ -6503,7 +6503,7 @@ html.handset .tree42-h .annwrap .anntobtn{height:32px;min-height:32px;width:26px
 .zc .zc-result .btn{align-self:flex-start}
 .zc .zc-pick .dlbl{font-size:11px}
 .zc .zc-actions{display:flex;justify-content:flex-end;gap:8px}
-html.handset .zt42 .zt42-check{margin-left:0;flex-basis:100%}
+html.phonelook .zt42 .zt42-check{margin-left:0;flex-basis:100%}
 
 /* ===== 0.7.2 (t2145u / t2148u): the Volume Mixer is a mode of the Devices panel (replaces the separate F49 mixer window) =====
    Same tree, same order. A Volume Mixer bar (Done / Esc) stays at the top: sticky in the PC Devices column, pinned under the app header on the
@@ -6535,19 +6535,19 @@ html.pd42-open .mx-bar.mx-bar-pin{display:none}
 .tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,9em) minmax(0,1fr) 3.2em;gap:10px}
 .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{text-align:right}
 .tree42.mx-on section.qb42.mx-ctl{outline:1px dashed color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:1px}
-html.handset .tree42.mx-on .mx-drawer{margin-left:8px}
-html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:4px}
-html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.n{grid-area:n} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>input{grid-area:s} html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
+html.phonelook .tree42.mx-on .mx-drawer{margin-left:8px}
+html.phonelook .tree42.mx-on .mx-drawer .mv-drow.mv-caprow{grid-template-columns:minmax(0,1fr) 3.2em;grid-template-areas:"n p" "s s";row-gap:4px}
+html.phonelook .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.n{grid-area:n} html.phonelook .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>input{grid-area:s} html.phonelook .tree42.mx-on .mx-drawer .mv-drow.mv-caprow>.mv-pct{grid-area:p}
 /* 0.7.2 t2152u: a speaker row's status dot sits beside the name's text line (not centered between the name and its tag line); mixer rows center it on line 1 */
 .tree42 .sp42>.dot{align-self:flex-start;margin-top:7px}
-html.handset .tree42 .sp42>.dot{margin-top:9px}
+html.phonelook .tree42 .sp42>.dot{margin-top:9px}
 .tree42.mx-on .sp42.mx-sp>.dot{align-self:center;margin-top:0}
 /* 0.7.2 t2156u / t2159u: phone Volume mixer drawer - the Delay row (label, −, ms box, ms, +) fits at 360-390 px: a 60 px box as tall as the 28 px −/+ buttons */
-html.handset .tree42.mx-on .mx-drawer .mv-drow.mv-delayrow{grid-template-columns:minmax(0,1fr) auto;column-gap:6px}
-html.handset .tree42.mx-on .mx-drawer .mv-numw{gap:4px;min-width:0;align-items:center}
-html.handset .tree42.mx-on .mx-drawer .spk-fine{width:30px;min-width:30px;height:28px;min-height:0;padding:0}
-html.handset .tree42.mx-on .mx-drawer .mv-dnum{width:60px!important;min-width:0!important;max-width:60px;height:28px!important;min-height:0!important;box-sizing:border-box;padding:0 6px!important;line-height:normal;font-size:14px!important;text-align:right;align-self:center}
-html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.phonelook .tree42.mx-on .mx-drawer .mv-drow.mv-delayrow{grid-template-columns:minmax(0,1fr) auto;column-gap:6px}
+html.phonelook .tree42.mx-on .mx-drawer .mv-numw{gap:4px;min-width:0;align-items:center}
+html.phonelook .tree42.mx-on .mx-drawer .spk-fine{width:30px;min-width:30px;height:28px;min-height:0;padding:0}
+html.phonelook .tree42.mx-on .mx-drawer .mv-dnum{width:60px!important;min-width:0!important;max-width:60px;height:28px!important;min-height:0!important;box-sizing:border-box;padding:0 6px!important;line-height:normal;font-size:14px!important;text-align:right;align-self:center}
+html.phonelook .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 0.7.2 t2161u: normal Devices speaker rows - % + mute move down onto the tag line, right-aligned (always line 2, even with no tags); mixer mode untouched */
 .tree42:not(.mx-on) .sp42-l2{display:flex;align-items:center;gap:6px;width:100%;min-width:0}
 .tree42:not(.mx-on) .sp42-l2>.sp42-tags{flex:1 1 auto;width:auto;min-width:0;display:flex}
@@ -6567,7 +6567,7 @@ html.handset .tree42.mx-on .mx-drawer .mv-drow>.n{min-width:0;overflow:hidden;te
 .lsx .pk{display:grid;grid-template-columns:130px minmax(0,440px);align-items:center;gap:6px 10px}
 .lsx .pk select{width:100%}
 .lsx .lsx-warn{color:var(--amber)}
-html.handset .lsx .pk{grid-template-columns:1fr}
+html.phonelook .lsx .pk{grid-template-columns:1fr}
 /* 0.7.2 t2190u (phone): holding a speaker / zone row to drag it never selects text or shows the iOS Copy / Look Up callout */
 html.handset .tree42 .sp42,html.handset .tree42 .sp42 *,html.handset .tree42 .zcard42,html.handset .tree42 .zcard42 *,html.handset .tree42 .zgut42,html.handset .tree42 .cgrip69,html.handset .tree42 .dgrip42,html.handset .tree42 .un42-row,html.handset .tree42 .un42-row *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* 0.7.2 t2191u (phone): Library tiles / rows (albums, artists, songs, stations, genres, years, playlists, lists) never select text or show the iOS callout when held */

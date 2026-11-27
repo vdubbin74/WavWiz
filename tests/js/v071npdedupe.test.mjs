@@ -6,13 +6,14 @@ import { readFileSync } from 'node:fs';
 const dir = process.env.JS_DIR || new URL('../../src/WavWiz.Server/wwwroot/js', import.meta.url).pathname;
 const now = readFileSync(dir + '/now.js', 'utf8'), main = readFileSync(dir + '/main.js', 'utf8'), css = readFileSync(dir + '/../app.css', 'utf8');
 
-test('phone Now Playing: the in-screen Queue / Sound pair is hidden on html.handset only', () => {
+test('phone Now Playing: the in-screen Queue / Sound pair is hidden on html.phonelook (phone + narrow PC with its tab bar, 0.7.3 t2225u)', () => {
   const i = css.indexOf('0.7.1 t2051u'); assert.ok(i > 0); const block = css.slice(i);
-  assert.match(block, /html\.handset \.np-phone-full \.np-phone-actions\{display:none\}/);
-  assert.match(block, /^\.np-phone-xsound\{display:none\}/m, 'no extra Sound button outside a phone (narrow PC keeps the pair)');
-  assert.match(block, /html\.handset \.np-phone-full \.np-phone-xsound\{display:inline-flex/);
-  assert.doesNotMatch(block, /(^|\n)\s*\.np-phone-actions\{display:none/, 'never hidden without html.handset');
-  assert.match(now, /class: 'np-phone-queue', onclick: \(\) => ctl\.go\('queue'\)/, 'the pair still exists for the narrow PC window');
+  // 0.7.3 t2225u: a narrow PC window looks like the phone - look rules moved from html.handset to html.phonelook (handset implies phonelook)
+  assert.match(block, /html\.phonelook \.np-phone-full \.np-phone-actions\{display:none\}/);
+  assert.match(block, /^\.np-phone-xsound\{display:none\}/m, 'no extra Sound button outside the phone look');
+  assert.match(block, /html\.phonelook \.np-phone-full \.np-phone-xsound\{display:inline-flex/);
+  assert.doesNotMatch(block, /(^|\n)\s*\.np-phone-actions\{display:none/, 'never hidden without html.phonelook');
+  assert.match(now, /class: 'np-phone-queue', onclick: \(\) => ctl\.go\('queue'\)/, 'the pair still exists (wide windows)');
 });
 test('Sound sits in More playback controls (phone row, next to Sleep) and opens the same Sound sheet', () => {
   assert.match(now, /isHandset\(\) \? \[mkSleepIc\(\), mkSoundX\(\)\]/);

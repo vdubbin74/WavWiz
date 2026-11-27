@@ -68,10 +68,12 @@ import { attachQueueMenu } from './queuemenu.js';
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
+import { installPhoneLook } from './phonelook.js';   // 0.7.3 t2225u
 import { startPairRequests, playerApprovalScreen, serverPcSignIn } from './pairreq.js';   // 0.6.9 #15, 0.7.1 t2072
 
 applyTheme(loadTheme());          // the "Default" theme unless this device picked something else
-document.documentElement.classList.toggle('handset', isRealPhone());   // 0.7.0 (t1892): phone-only header sizes follow the device, never a narrow PC window
+document.documentElement.classList.toggle('handset', isRealPhone());   // 0.7.0 (t1892): phone-only restrictions follow the device, never a narrow PC window
+installPhoneLook(isRealPhone());   // 0.7.3 t2225u: html.phonelook - a narrow PC window looks like the phone (phonelook.js), features stay desktop
 installTvMode();                  // 0.2.0 item 1: TVs and ?lite get the lightweight, remote-friendly Now Playing
 
 export const S = { auth: null, now: null, queue: [], zones: [], groups: [], radio: [], status: null, view: null, ws: null, localPos: 0, localAt: 0 };

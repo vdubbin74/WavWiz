@@ -79,10 +79,11 @@ test('0.7.2: Settings > Devices > Audio inputs - admin switches, gain -12..+6, T
   assert.match(inp, /export const INPUT_TERMS = '[^']*turntable[^']*s\/pdif[^']*headset[^']*';/);
 });
 
-test('0.7.2: inputs CSS - phone layout only on html.handset; vinyl spin honors reduced motion', () => {
+test('0.7.2: inputs CSS - phone layout on html.phonelook (0.7.3 t2225u: phone + narrow PC); vinyl spin honors reduced motion', () => {
   const block = css.slice(css.indexOf('/* 0.7.2 audio inputs'));
   assert.ok(block.length > 100);
   assert.doesNotMatch(block, /@media[^{]*max-width/);
-  assert.match(block, /html\.handset \.inp-grid\{grid-template-columns:1fr/);
+  // 0.7.3 t2225u: a narrow PC window looks like the phone - look rules moved from html.handset to html.phonelook (handset implies phonelook)
+  assert.match(block, /html\.phonelook \.inp-grid\{grid-template-columns:1fr/);
   assert.match(block, /@media \(prefers-reduced-motion:reduce\)\{\.inp-tile\.playing \.inp-ic\[data-ic=vinyl\] svg\{animation:none\}\}/);
 });

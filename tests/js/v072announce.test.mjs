@@ -70,10 +70,11 @@ test('0.7.2 C: wiring - Devices header button, announce events, Settings > Playb
   assert.match(ann, /'data-setting': 'announce\.chime'/);
 });
 
-test('0.7.2 C: phone-only Announce CSS is gated on html.handset', () => {
+test('0.7.2 C: phone-look Announce CSS is gated on html.phonelook (0.7.3 t2225u: phone + narrow PC), never a width query here', () => {
   const block = css.slice(css.indexOf('/* 0.7.2 Announce'));
   assert.ok(block.length > 100);
-  assert.match(block, /html\.handset \.tree42-h \.annwrap \.annlbl\{display:none\}/);
+  // 0.7.3 t2225u: a narrow PC window looks like the phone - look rules moved from html.handset to html.phonelook (handset implies phonelook)
+  assert.match(block, /html\.phonelook \.tree42-h \.annwrap \.annlbl\{display:none\}/);
   assert.doesNotMatch(block, /@media \(max-width/);
   assert.match(block, /@media \(prefers-reduced-motion:reduce\)\{\.ann-live \.ann-dot\{animation:none\}\}/);
 });

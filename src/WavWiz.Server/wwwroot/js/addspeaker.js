@@ -81,10 +81,10 @@ function snapshots() {
 }
 
 
-/** Room taken by the in-flow phone mini player + tab bar, for html.handset only (never a narrow PC window). */
+/** Room taken by the in-flow phone mini player + tab bar: html.phonelook (a phone, or a narrow PC window - 0.7.3 t2225u: it has the same bars). */
 function sheetDockPx() {
   try {
-    if (typeof document === 'undefined' || !document.documentElement.classList.contains('handset')) return 0;
+    if (typeof document === 'undefined' || !document.documentElement.classList.contains('phonelook')) return 0;
     const vis = el => {
       if (!el) return false;
       const st = getComputedStyle(el), r = el.getBoundingClientRect();

@@ -16,9 +16,9 @@ test('0.6.9 #8: rowOrder without Home = pins left to right, no separator; shownP
   assert.deepEqual(s.rowOrder(['eq', 'queue'], false), [{ kind: 'pin', id: 'eq' }, { kind: 'pin', id: 'queue' }]);
   assert.deepEqual(s.shownPins(['eq', 'sleep', 'queue', 'mixer'], ['sleep', 'mixer']), ['eq', 'queue']);
 });
-test('0.6.9 #8: the narrow PC row - Sleep, Master volume, pins without Home / Sleep / Master volume, fit to the line', () => {
+test('0.6.9 #8 + 0.7.3 t2225u: the narrow PC row - Sleep, Sound (the Queue / Sound pair is hidden on the phone look), Master volume, pins without Home / Sleep / Master volume, fit to the line', () => {
   assert.match(now, /isRealPhone\(\) \? h\('div', \{ class: 'row wrap np-phone-xrow' \}/);
-  assert.match(now, /h\('div', \{ class: 'row np-phone-xrow np-xrow-pc' \}, mkSleepIc\(\), mkMix\(\), shortcutsRow\(\{ run: [^}]*\}?[^)]*home: false, cls: 'np-phone-shortcuts np-xpins', exclude: \['sleep', 'mixer'\], fit: 'siblings', btnW: 52 \}\)\.el\)/);
+  assert.match(now, /h\('div', \{ class: 'row np-phone-xrow np-xrow-pc' \}, mkSleepIc\(\), mkSoundX\(\), mkMix\(\), shortcutsRow\(\{ run: [^}]*\}?[^)]*home: false, cls: 'np-phone-shortcuts np-xpins', exclude: \['sleep', 'mixer'\], fit: 'siblings', btnW: 52 \}\)\.el\)/);
 });
 test('0.6.9 #8: the PC row CSS is no-wrap, rounded squares, outside any media query', () => {
   const at = css.indexOf('---- 0.6.9 #8'); assert.ok(at > 0);

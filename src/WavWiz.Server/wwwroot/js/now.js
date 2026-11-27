@@ -65,8 +65,9 @@ export function createNow(S, ctl) {
   // 0.3.5 J8: the Sleep timer's permanent home - a Sleep button in Now Playing (small menu of times; shows the countdown while it runs)
   // 0.6.8-#11a: icon form (moon) for the phone row; the countdown shows beside the moon while it runs (scenesched.js paints .npsl-t)
   function mkSleepIc() { const b = h('button', { class: 'tbtn npsleep npsleep-ic', type: 'button', 'aria-haspopup': 'menu', 'aria-label': 'Sleep timer', title: 'Sleep timer', onclick: () => { if (!canControl(S)) return toast('Your access is view-only.'); openSleep(S, null, b); } }, icon('moon'), h('span', { class: 'npsl-t' })); return b; }
-  // 0.7.1 t2051u: a phone's Now Playing keeps the tab bar (its Queue tab), so the Queue / Sound pair under the volume is gone there (CSS,
-  // html.handset) and Sound opens from More playback controls. A narrow PC window (no tab bar) keeps the pair.
+  // 0.7.1 t2051u: a phone's Now Playing keeps the tab bar (its Queue tab), so the Queue / Sound pair under the volume is gone there (CSS)
+  // and Sound opens from More playback controls. 0.7.3 t2225u: a narrow PC window looks the same (html.phonelook: tab bar + Sound there),
+  // and its row keeps the desktop extras (Master volume + pins).
   function mkSoundX() { return h('button', { class: 'btn sm np-phone-sound np-phone-xsound', type: 'button', 'aria-haspopup': 'dialog', 'aria-label': 'Sound settings', title: 'Sound settings', onclick: () => ctl.openEq?.() }, icon('eq'), h('span', null, 'Sound')); }
   function mkSleep() { const b = h('button', { class: 'btn sm npsleep', type: 'button', 'aria-haspopup': 'menu', title: 'Sleep timer', onclick: () => { if (!canControl(S)) return toast('Your access is view-only.'); openSleep(S, null, b); } }, 'Sleep'); return b; }
   const vol = mkVol(), muteBtn = mkMute();
@@ -277,7 +278,7 @@ export function createNow(S, ctl) {
     h('details', { class: 'np-phone-extras' }, h('summary', {}, 'More playback controls'), (isRealPhone() ? h('div', { class: 'row wrap np-phone-xrow' }, ...(isHandset() ? [mkSleepIc(), mkSoundX()] : [mkMix(), mkSleepIc(), mkSc('np-phone-shortcuts')]))
       // 0.6.9 #8: a narrow PC window (not a phone or tablet): ONE no-wrap row - Sleep, Master volume, then the pins in the same rounded-square
       // buttons; no Home, and a Sleep / Master volume pin is not drawn again (the row already has them). Phones keep their 0.6.8 row.
-      : h('div', { class: 'row np-phone-xrow np-xrow-pc' }, mkSleepIc(), mkMix(), shortcutsRow({ run: id => ctl.runShortcut?.(id), home: false, cls: 'np-phone-shortcuts np-xpins', exclude: ['sleep', 'mixer'], fit: 'siblings', btnW: 52 }).el))));   // 0.6.8-#11a/d: phones drop the extra mixer (Sound + the volume row cover it), Home and pins
+      : h('div', { class: 'row np-phone-xrow np-xrow-pc' }, mkSleepIc(), mkSoundX(), mkMix(), shortcutsRow({ run: id => ctl.runShortcut?.(id), home: false, cls: 'np-phone-shortcuts np-xpins', exclude: ['sleep', 'mixer'], fit: 'siblings', btnW: 52 }).el))));   // 0.6.8-#11a/d: phones drop the extra mixer (Sound + the volume row cover it), Home and pins
   el.prepend(phoneFull);
   phoneMedia.addEventListener('change', () => { phoneFull.hidden = !phoneMedia.matches; if (!phoneMedia.matches) closePhone(); });
   // 0.6.8-#4: zonesync fires on every zones refresh (poll / ws); close the song menu only when its song/zone context really changed

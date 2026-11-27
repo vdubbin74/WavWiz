@@ -293,17 +293,18 @@ test('t1955u sheet: a refresh tick while the Add-to select is focused does not r
   add._addSpkReset(); ap._apReset(); cs._csReset();
 });
 
-test('CSS: phone sheet docks above mini/tabbar on html.handset only; Search again stays with Show added', () => {
+test('CSS: phone sheet docks above mini/tabbar on html.phonelook (phone + narrow PC, 0.7.3 t2225u); Search again stays with Show added', () => {
   const css = rd('app.css');
   const at = css.indexOf('0.7.1 Add speaker sheet');
   assert.ok(at >= 0);
   const block = css.slice(at);
-  assert.match(block, /html\.handset dialog\.addspk-dlg/);
+  // 0.7.3 t2225u: a narrow PC window looks like the phone - look rules moved from html.handset to html.phonelook (handset implies phonelook)
+  assert.match(block, /html\.phonelook dialog\.addspk-dlg/);
   assert.match(block, /var\(--safe-b/);
   assert.match(block, /var\(--addspk-dock/);
   assert.match(block, /\.addspk-bar-acts/);
-  assert.doesNotMatch(block, /@media \(max-width:700px\)/, 'phone sheet rules are not width-based (narrow PC is not a phone)');
+  assert.doesNotMatch(block, /@media \(max-width:700px\)/, 'no width query of its own (html.phonelook is set by phonelook.js)');
   const src = rd('js/addspeaker.js');
   assert.match(src, /ui\.heard === 'yes'/);
-  assert.match(src, /document\.documentElement\.classList\.contains\('handset'\)/);
+  assert.match(src, /document\.documentElement\.classList\.contains\('phonelook'\)/);
 });
