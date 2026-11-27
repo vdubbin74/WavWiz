@@ -38,7 +38,7 @@ test('choiceLabel: the real playing / paused state, never "(playing)" for the se
 
 test('Queue header: "Queue" label + zone picker title; rows heading "Tracks · N"; About text matches', () => {
   const m = src('main.js');
-  assert.match(m, /h\('div', \{ class: 'qtitle-line qtitle-zone' \}, h\('div', \{ class: 'qtitle-stack' \}, h\('span', \{ class: 'qeyebrow' \}, 'Queue'\), phonePick\(\) \|\| h\('h1', \{ class: 'qzone-title' \}, zone\?\.name \|\| 'No zone selected'\)\)\)/);
+  assert.match(m, /h\('div', \{ class: 'qtitle-line qtitle-zone' \}, h\('div', \{ class: 'qtitle-stack qtitle-row' \}, h\('h1', \{ class: 'qeyebrow' \}, 'Queue'\), phonePick\(\) \|\| h\('span', \{ class: 'qzone-none dim' \}, 'No zone selected'\)\)\)/);   // 0.7.3 fix073d: "QUEUE" + zone pill on one line
   assert.match(m, /h\('h2', \{ class: 'qrows-heading' \}, 'Tracks', h\('span', \{ class: 'small dim' \}, ' · ' \+ nTracks\)\)/);
   assert.doesNotMatch(m, /' · all tracks'|h\('h1', \{\}, 'Queue'\)/);
   const a = src('about.js');

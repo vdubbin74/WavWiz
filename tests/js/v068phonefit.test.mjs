@@ -16,7 +16,7 @@ assert.match(blk, /#app>\.desk\[data-view=now\]\{overflow:hidden!important/);
 assert.match(blk, /padding:0!important/);
 assert.match(blk, /#app>\.desk\[data-view=now\]>#p-now\{[^}]*padding:6px 12px 14px!important/);
 assert.ok(!/calc\(8px \+ var\(--safe-b\)\)/.test(blk), 'now-view art stack does not reserve a second safe-area gap above the banner');
-assert.match(blk, /grid-template-rows:auto auto minmax\(0,1fr\)/);
+assert.match(blk, /grid-template-rows:auto minmax\(0,1fr\)/);   // 0.7.3 fix073d: the zone pill moved onto the header row, so the art is row 2
 assert.match(blk, /\.np-phone-art\{[^}]*height:100%;[^}]*aspect-ratio:1/);
 assert.match(blk, /max-height:min\(100%,var\(--np-phone-art\)\)/);
 assert.match(blk, /aspect-ratio:1/);

@@ -12,7 +12,8 @@ const main = () => readFileSync(join(js, 'main.js'), 'utf8');
 test('F252 drawQueue skips teardown when render signature unchanged', () => {
   const s = main();
   assert.match(s, /qPaintSig = null/);
-  assert.match(s, /if \(sig === qPaintSig && root\.firstChild && !document\.querySelector\('dialog\.songsheet\[open\], \.qmenu'\)\) return;/);
+  // 0.7.3 fix073d: the skip rule moved to the pure queuePaintSkip() (an open menu only blocks the skip when something changed since it opened)
+  assert.match(s, /if \(queuePaintSkip\(\{ sig, painted: qPaintSig, hasRows: !!root\.firstChild, menuUp: !!document\.querySelector\('dialog\.songsheet\[open\], \.qmenu'\), menuSig: qMenuSig \}\)\) return;/);
   assert.match(s, /qPaintSig = sig/);
   assert.match(s, /S\.queue\.map\(qRowSig\)/);
   assert.match(s, /artCv\(\)/);

@@ -269,8 +269,9 @@ export function createNow(S, ctl) {
   const phoneZone = h('span', { class: 'np-phone-zone-name' });
   const phoneMedia = matchMedia('(max-width:900px)');
   const phoneFull = h('section', { class: 'np-phone-full', hidden: !phoneMedia.matches, 'aria-label': 'Full Now Playing' },
-    h('header', { class: 'np-phone-head' }, phoneCollapse, h('b', {}, 'Now Playing'), phoneMore),
-    h('div', { class: 'np-phone-zone' }, phoneZone, zoneLink('zl-fullphone')),
+    // 0.7.3 fix073d (t2266u): the "on <zone> ▾" pill sits on the title line, right after "Now Playing" (like the Queue's "QUEUE" + pill);
+    // its old row goes to the album art
+    h('header', { class: 'np-phone-head' }, phoneCollapse, h('div', { class: 'np-phone-htitle' }, h('b', {}, 'Now Playing'), h('div', { class: 'np-phone-zone' }, phoneZone, zoneLink('zl-fullphone'))), phoneMore),
     phoneArt, h('div', { class: 'np-phone-titles' }, h('div', {}, phoneTitle, phoneArtist), phoneHeart),
     h('div', { class: 'np-phone-progress' }, phoneSeek, h('div', { class: 'np-phone-times' }, phoneElapsed, phoneDuration)),
     h('div', { class: 'np-phone-transport', role: 'group', 'aria-label': 'Transport' }, phoneShuffle, phonePrev, phonePlay, phoneNext, phoneRepeat), phoneZoneVol,
@@ -282,7 +283,7 @@ export function createNow(S, ctl) {
   el.prepend(phoneFull);
   phoneMedia.addEventListener('change', () => { phoneFull.hidden = !phoneMedia.matches; if (!phoneMedia.matches) closePhone(); });
   // 0.6.8-#4: zonesync fires on every zones refresh (poll / ws); close the song menu only when its song/zone context really changed
-  window.addEventListener('wavwiz:zonesync', () => { if (songMenu && !songMenu.valid?.()) { songMenu.close(); songMenu = null; } phoneMore.disabled = !currentSongContext(S); });
+  window.addEventListener('wavwiz:zonesync', () => { if (songMenu && !songMenu.valid?.()) { songMenu.close(); songMenu = null; } phoneMore.disabled = !currentSongContext(S); const zc = currentZone(); phoneZone.textContent = zc?.name || 'No zone selected'; phoneZone.hidden = !!zc; });   // fix073d: the title-line pill and "No zone selected" never show together
   window.addEventListener('resize', () => { if (!matchMedia('(max-width:900px)').matches) closePhone(); });
   E.ovTitles = ovTitles;
 

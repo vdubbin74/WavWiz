@@ -43,7 +43,7 @@ async function fixture({width=390,height=844,n=6,role='admin',zoom=1}={}){
       return new Response(JSON.stringify(value),{status:200});
     };
     const {h,api,toast,fmtDur}=await import('/js/util.js'),{icon}=await import('/js/icons.js'),{npCover,artCv}=await import('/js/art.js'),{canControl}=await import('/js/ui.js');
-    const {attachReorder,canDragRows}=await import('/js/qreorder.js'),{attachQueueMenu}=await import('/js/queuemenu.js'),{srcPill}=await import('/js/listtable.js');
+    const {attachReorder,canDragRows}=await import('/js/qreorder.js'),{attachQueueMenu}=await import('/js/queuemenu.js'),{srcPill}=await import('/js/listtable.js'),{queuePaintSkip}=await import('/js/qpaint.js');
     const {loadLayout,saveLayout,setLocked}=await import('/js/plcols.js'),{keepControl,openRecentQueues}=await import('/js/queuetools.js'),{clearQueueFlow}=await import('/js/queueclear.js'),{wsel}=await import('/js/wwselect.js');
     const Z=window.Z=await import('/js/zones40.js'),{createNow}=await import('/js/now.js');
     window.S={auth:{role},view:'queue',queue:structuredClone(wireQ),now:{item:wireQ[0]||null,index:0,state:n?'playing':'stopped',positionMs:45000,durationMs:180000,version:1},localPos:45000,localAt:performance.now(),groups:[{id:1,name:'Fixture Den',playbackId:'den',online:true,deviceIds:[]},{id:2,name:'Fixture Patio',playbackId:'patio',online:true,deviceIds:[]}],zones:[],status:{}};
@@ -61,7 +61,7 @@ async function fixture({width=390,height=844,n=6,role='admin',zoom=1}={}){
     // Exercise the verbatim stream ingest and its transaction read fence too.
     const {reconcileSmoothPosition}=await import('/js/art.js');
     refreshNow=window.refreshQueue=new Function('S','api','reconcileSmoothPosition','whenIdle','nowc','listt','drawStatus','drawQueue','handleErr',refreshSource+';return refreshNow;')(S,api,reconcileSmoothPosition,fn=>fn(),nowc,{draw(){}},()=>{},()=>window.drawQueue(),e=>{window.refreshError=e.message;});
-    const bindings={h,api,toast,fmtDur,icon,npCover,artCv,canControl,canDragRows,attachReorder,attachQueueMenu,srcPill,loadLayout,saveLayout,setLocked,keepControl,openRecentQueues,clearQueueFlow,wsel,Z,S,views,wide,act,refreshNow,refreshAll,showInLibrary};
+    const bindings={h,api,toast,fmtDur,icon,npCover,artCv,canControl,canDragRows,attachReorder,attachQueueMenu,queuePaintSkip,srcPill,loadLayout,saveLayout,setLocked,keepControl,openRecentQueues,clearQueueFlow,wsel,Z,S,views,wide,act,refreshNow,refreshAll,showInLibrary};
     window.q=new Function(...Object.keys(bindings),'let pKeep=null;'+queueSource+';return {drawQueue,hidePhoneQueue,showPhoneQueue,get engine(){return qReorder;}};')(...Object.values(bindings));
     window.drawQueue=q.drawQueue;views.queue.reload=q.drawQueue;views.queue.hide=q.hidePhoneQueue;views.queue.show=q.showPhoneQueue;
     window.go=new Function('S','views','wide','desk','content','tabs','navButtons','nowc',goSource+';return go;')(S,views,wide,desk,content,tabs,[],nowc);
@@ -886,10 +886,10 @@ test('F252-amend2: retained Now return refreshes selected-zone name and choices 
    Z.sync();await refreshQueue();
   });
   await p.evaluate(()=>go('now:collapse'));
-  const state=await p.evaluate(()=>({view:S.view,choiceNames:Z.choicesNow().map(c=>c.name),options:[...document.querySelector('.qzpick').options].map(o=>({key:o.value,text:o.textContent})),caption:document.querySelector('.qsummary').textContent,audioStarts}));
+  const state=await p.evaluate(()=>({view:S.view,choiceNames:Z.choicesNow().map(c=>c.name),pill:document.querySelector('.zl-queue')?.textContent||'',caption:document.querySelector('.qsummary').textContent,audioStarts}));
   assert.equal(state.view,'queue');
   assert.match(state.caption,/On Renamed Den/);
-  assert.ok(state.options.some(o=>o.key==='g:3'&&o.text.includes('New Kitchen')),JSON.stringify(state.options));
+  assert.match(state.pill,/Renamed Den/,'fix073d: the zone pill names the renamed zone');assert.ok(state.choiceNames.includes('New Kitchen'),JSON.stringify(state.choiceNames));
   assert.equal(state.audioStarts,0);
  }finally{await clean(p);}
 });

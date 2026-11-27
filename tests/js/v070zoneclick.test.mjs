@@ -42,8 +42,8 @@ test('t1954u wiring: the zone name opens settings (stopPropagation); the rest of
   assert.match(t, /settings: \(\) => st\.onZone\(g\.id\)/, '⋮ Zone settings still opens the pane');
   assert.match(z, /onclick: \(\) => \{ const edit = !!menu\?._for\?._link; select\(c\.key\);/);
   assert.match(z, /export function select\(key\) \{ markPicked\(\); saveSel\(key\); closeMenu\(\); sync\(\);/);
-  assert.match(m, /Z\.select\(sel\.value\)/, 'the Queue zone list calls Z.select');
-  assert.match(m, /window\.addEventListener\('wavwiz:zone', \(\) => \{ devv\.draw\(\); devp\.draw\(\); nowc\.draw\(\); listt\.draw\(\); \}\);/);
+  assert.match(m, /Z\.zoneLink\('zl-queue'\)/, 'the Queue zone pill is the zones40 link (its panel calls Z.select)');
+  assert.match(m, /window\.addEventListener\('wavwiz:zone', \(\) => \{ devv\.draw\(\); devp\.draw\(\); nowc\.draw\(\); listt\.draw\(\); if \(S\.view === 'queue' && !wide\(\)\) setTimeout\(\(\) => Promise\.resolve\(refreshAll\(\)\)\.then\(\(\) => drawQueue\(\)\), 150\); \}\);/);
 });
 
 test('t1948u wiring: a finished zone-card drag is not also a click (flag is on the tree, set when the drag starts)', () => {

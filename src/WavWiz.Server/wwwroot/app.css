@@ -4092,7 +4092,7 @@ body.minibody .mp:not(.slim) .mp-artbox{--npa:44px}
   .view .lib .libhead .tabs,.view .lib .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:8px;margin:0 0 12px;padding:0 0 2px;-webkit-overflow-scrolling:touch}
   .view .lib .tabs::-webkit-scrollbar{display:none}
   .view .lib .tabs:not(.libsrc-tabs) button{flex:none;min-height:40px;padding:0 16px;font-size:14px;font-weight:600;border-color:transparent;background:color-mix(in srgb,var(--panel2) 75%,transparent)}
-  .view .lib .tabs:not(.libsrc-tabs) button.on{background:color-mix(in srgb,var(--accent) 88%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .view .lib .tabs:not(.libsrc-tabs) button.on{background:color-mix(in srgb,var(--accent) 88%,transparent);box-shadow:none}   /* 0.7.3 fix073d: no drop glow - the scrolling pill row clipped it into a square box behind the round selected pill */
   .view .lib .libsrc-tabs.xtabs button{flex:none;min-height:40px;padding:8px 14px;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none}
   .view .lib .libsrc-tabs.xtabs button.on{background:none;border-bottom-color:var(--hl,var(--accent));box-shadow:none;font-weight:700}
   .view .lib .tabs .wwdd{flex:none;border-radius:3px;min-height:40px}
@@ -4668,7 +4668,7 @@ dialog>footer{border-top:0}
   #app>.desk[data-view=now]>#p-now{display:flex!important;flex-direction:column!important;flex:1 1 auto;height:100%!important;min-height:0!important;margin:0!important;padding:6px 12px 14px!important;overflow:hidden!important;box-sizing:border-box}
   #p-now::before{display:none!important}
   #p-now>:not(.np-phone-full,.checklist){display:none!important}
-  #p-now>.np-phone-full{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto auto auto;align-content:stretch;gap:8px;flex:1 1 auto;min-height:0;height:100%;width:100%;max-width:460px;margin:0 auto;
+  #p-now>.np-phone-full{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto auto auto auto;align-content:stretch;gap:8px;flex:1 1 auto;min-height:0;height:100%;width:100%;max-width:460px;margin:0 auto;
     --np-phone-art:min(100%,88vw / var(--z,1))}
   .np-phone-full button{font:inherit;color:var(--ink);cursor:pointer;min-height:44px;min-width:44px}
   .np-phone-full button:disabled{opacity:.45;cursor:not-allowed}
@@ -5097,6 +5097,15 @@ html:not([data-uiscale=compact]) :is(.libpanel,.nowcol,.devpanel,.listpanel,.np-
 #sec-jbzone>.setrow:has(.jbspk76){align-items:flex-start}
 #sec-jbzone .jbspk76{max-height:156px;flex:0 1 340px;min-width:0}
 #sec-jbzone .setrow .small.dim{white-space:normal}
+/* 0.7.3 fix073d: phone look (a phone or a narrow PC window) - "Default speakers" stacks like the other phone settings rows: label + hint full
+   width on top, the speaker checklist full width below. Side by side, the list's 340px basis left the label 0px wide on a phone
+   (it showed "De" / "sp" and a one-word hint column behind the list). Allowed music: Folders / Playlists full width, long paths wrap. */
+html.phonelook #sec-jbzone>.setrow.jbspkrow{flex-direction:column;align-items:stretch;gap:8px}
+html.phonelook #sec-jbzone>.setrow.jbspkrow>.grow{flex:none;width:100%;min-width:0}
+html.phonelook #sec-jbzone>.setrow.jbspkrow>.jbspk76{flex:none;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+html.phonelook #sec-jbsources .jbsrcrow{flex-direction:column;align-items:stretch!important;gap:12px!important}
+html.phonelook #sec-jbsources .jbsrcrow>div{width:100%;min-width:0}
+html.phonelook #sec-jbsources .jbsrc label{min-width:0;overflow-wrap:anywhere}
 /* d: TV address chip in the top bar while the Jukebox runs (themed, one line, truncates) */
 .jbtv-chip{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:min(360px,36vw / var(--z,1));height:26px;padding:0 8px;border:1px solid var(--accent);border-radius:3px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--ink);font:600 12px/1 system-ui,sans-serif;cursor:pointer}
 .jbtv-chip[hidden]{display:none}
@@ -6749,3 +6758,25 @@ html.phonelook .nettbl .use-ip{display:none}
   .phone-queue .qcount-line .pq-tools{margin-left:auto}
 }
 /* end 0.7.3 t2245u queue */
+/* 0.7.3 fix073d (t2264u-t2267u): one zone pill everywhere on the phone look - the Now Playing "on <zone> ▾" (zones40 zoneLink + its themed
+   zone panel) sits right after the page title: "QUEUE  on Work ▾" in the Queue, "Now Playing  on Work ▾" in Now Playing. Long names end in "…". */
+.phone-queue .qtitle-stack.qtitle-row{flex-direction:row;align-items:center;gap:10px;flex-wrap:nowrap}
+.phone-queue .qtitle-row>h1.qeyebrow{margin:0;flex:none;font-size:12px}
+.phone-queue .qtitle-row .qzone-none{font-size:.85rem}
+.phone-queue .qtitle-row .zlink.zl-queue,.np-phone-head .np-phone-zone .zlink.zl-fullphone{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;max-width:100%;
+  min-height:36px;margin:0;padding:0 12px;box-sizing:border-box;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--dim);
+  font-size:.85rem;line-height:1.2;white-space:nowrap;overflow:hidden;overflow-wrap:normal}
+.phone-queue .qtitle-row .zlink.zl-queue .zl-name,.np-phone-head .np-phone-zone .zlink.zl-fullphone .zl-name{flex:0 1 auto;width:auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phone-queue .qtitle-row .zlink .zs-car,.np-phone-head .np-phone-zone .zlink .zs-car{flex:none;line-height:1;font-size:1em}
+.phone-queue .qtitle-row .zlink[hidden],.np-phone-head .np-phone-zone .zlink[hidden]{display:none}
+html.handset .phone-queue .qtitle-row .zlink.zl-queue,html.handset .np-phone-head .np-phone-zone .zlink.zl-fullphone{min-height:44px}
+.np-phone-head .np-phone-htitle{display:flex;align-items:center;justify-content:flex-start;gap:8px;min-width:0;text-align:left}
+.np-phone-head .np-phone-htitle>b{flex:none;white-space:nowrap;font-size:1.05rem}
+.np-phone-head .np-phone-zone{display:flex;flex:0 1 auto;min-width:0;min-height:0;justify-content:flex-start;gap:6px}
+.np-phone-head .np-phone-zone .np-phone-zone-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;padding:6px 10px;overflow-wrap:normal}
+/* end 0.7.3 fix073d zone pill */
+/* 0.7.3 fix073d (t2268u): Library list / grid toggle - the selected segment's tint + inset ring follow the toggle's rounded outer corners
+   (3px box, 1px border = 2px inside) instead of square corners clipped by it. */
+.lib .libtools .seg button:first-child{border-radius:2px 0 0 2px}
+.lib .libtools .seg button:last-child{border-radius:0 2px 2px 0}
+.lib .libtools .seg button:only-child{border-radius:2px}

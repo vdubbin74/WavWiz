@@ -1,4 +1,3 @@
-import { wsel } from './wwselect.js';
 import { keepControl, openRecentQueues } from './queuetools.js';
 let pKeep = null;
 import { viewForMode } from './viewmode.js';
@@ -65,6 +64,7 @@ import { installHotkeys } from './hotkeys.js';
 import { toggleAppFull, installAppFull } from './fullscreen.js';   // 0.5.0 F120
 import { isMixerOpen, setMixer } from './mixer.js';   // 0.4.8 F49; 0.7.2: the Volume Mixer is a Devices mode (the window is gone)
 import { attachQueueMenu } from './queuemenu.js';
+import { queuePaintSkip } from './qpaint.js';   // 0.7.3 fix073d
 import { installMedia } from './media.js';
 import { showPendingUndo } from './backupflow.js';
 import { liveSong } from './livemeta.js';   // 0.7.0 radio now-playing
@@ -724,7 +724,7 @@ if (typeof window !== 'undefined') window.addEventListener('wavwiz:queuechanged'
 export async function refreshAll() { await Promise.allSettled([refreshNow(), refreshZones(), refreshStatus(), refreshRadio()]); nowc?.drawChecklist(); }
 // 0.4.0: the selected zone (Now Playing bar, Queue, mini, hotkeys) - Z.init wires the API zone; a change redraws what shows a zone
 Z.init(S, { refreshNow: () => refreshNow(), manage: () => { if (wide()) setDevSize('expanded'); else go('devices'); } });
-window.addEventListener('wavwiz:zone', () => { devv.draw(); devp.draw(); nowc.draw(); listt.draw(); });
+window.addEventListener('wavwiz:zone', () => { devv.draw(); devp.draw(); nowc.draw(); listt.draw(); if (S.view === 'queue' && !wide()) setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); });   // fix073d: the phone Queue's zone pill switches the queue shown
 let zonesSoon = 0; const refreshZonesSoon = () => { clearTimeout(zonesSoon); zonesSoon = setTimeout(refreshZones, 150); };   // 0.4.8 F61: was 500 ms; device cards follow a track change in well under 1 s
 async function refreshNow() { try { const responseZone = globalThis.__wavwizZoneKey, responseRoute = S._streamRoute;
     // Phone Queue edits outlive DOM engines. Reads started before/during a write
@@ -854,6 +854,7 @@ function qPaintSignature() {
     S.now?.index ?? -1, S.now?.state ?? null, hasNow0, qNowItemSig(nowItem),
     can, locked0, busy0, artCv()]);
 }
+let qMenuSig = null;   // fix073d: qPaintSignature() when the open Queue row menu/sheet was opened
 const qEdits = new Map(), qReadGenerations = new Map();
 const qEdit = S._phoneQueueEdit = {
   pending: () => qEdits.has(qZoneKey()),
@@ -910,9 +911,11 @@ function drawQueue() {
   if (qReorder?.active && qReorder.isCurrent()) { qPendingRefresh = true; qPaintSig = null; return; }
   const root = views.queue.el; const can = canControl(S);
   const sig = qPaintSignature();
-  // Do not skip while a Queue menu/sheet is open: unlock+drawQueue after an in-menu lock
+  // Do not skip while a Queue menu/sheet is open AND something changed since it opened: unlock+drawQueue after an in-menu lock
   // must tear it down (same sig as last unlocked paint would otherwise no-op).
-  if (sig === qPaintSig && root.firstChild && !document.querySelector('dialog.songsheet[open], .qmenu')) return;
+  // 0.7.3 fix073d: but an unchanged tick (the server sends one every second while playing) must NOT tear down the sheet the
+  // user just opened with the row's ⋯ - it used to close the menu right after it appeared. The sheet re-checks lock/permission at tap time.
+  if (queuePaintSkip({ sig, painted: qPaintSig, hasRows: !!root.firstChild, menuUp: !!document.querySelector('dialog.songsheet[open], .qmenu'), menuSig: qMenuSig })) return;
   hidePhoneQueue();
   const total = S.queue.reduce((a, q) => a + (q.durationMs || 0), 0), cur = S.now?.index ?? -1;
   const lay = loadLayout(true), locked = !!lay.locked, busy = qEdit.pending(), dragOk = canDragRows({ can: can && !busy, locked });
@@ -930,7 +933,7 @@ function drawQueue() {
       h('span', { class: 'dur' }, q.durationMs ? fmtDur(q.durationMs) : ''), more);
     if (can) bindMenus.push(() => attachQueueMenu(rowEl, S, { refreshAll, showInLibrary, queueEdit: qEdit }, i, () => !!loadLayout(true).locked, {
       menuButton: more, suppressed: () => qReorder?.blocked(), valid: () => S.view === 'queue' && !wide() && zoneKey() === renderedZone && sameOcc(i, occ),
-      onOpen: () => qReorder?.cancel()
+      onOpen: () => { qReorder?.cancel(); qMenuSig = qPaintSignature(); }   // fix073d: the state the menu was opened in
     }));
     return rowEl;
   });
@@ -964,7 +967,7 @@ function drawQueue() {
     nxt?.artist ? h('span', { class: 'pln-dot', 'aria-hidden': 'true' }, '·') : null,
     nxt?.artist ? h('span', { class: 'pln-t2 ell' }, nxt.artist) : null);
   root.classList.toggle('pq-handset', !!isRealPhone());
-  root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line qtitle-zone' }, h('div', { class: 'qtitle-stack' }, h('span', { class: 'qeyebrow' }, 'Queue'), phonePick() || h('h1', { class: 'qzone-title' }, zone?.name || 'No zone selected'))),   // 0.7.3 t2245u: small "Queue" label, the zone is the title
+  root.replaceChildren(h('header', { class: 'qpage-heading' }, h('div', { class: 'qtitle-line qtitle-zone' }, h('div', { class: 'qtitle-stack qtitle-row' }, h('h1', { class: 'qeyebrow' }, 'Queue'), phonePick() || h('span', { class: 'qzone-none dim' }, 'No zone selected'))),   // 0.7.3 fix073d: "QUEUE" + the Now Playing "on <zone> ▾" pill on one line   // 0.7.3 t2245u: small "Queue" label, the zone is the title
     h('div', { class: 'qcount-line' }, h('span', { class: 'dim small qcount' }, trackLabel), tools),
     upNext),
     summary, h('h2', { class: 'qrows-heading' }, 'Tracks', h('span', { class: 'small dim' }, ' · ' + nTracks)),
@@ -1003,9 +1006,10 @@ function drawQueue() {
 window.addEventListener('wavwiz:zonesync', () => { if (qRenderedZone !== JSON.stringify([Z.current()?.key, Z.current()?.playbackId])) { qReorder?.cancel(); qMenus.forEach(m => m.close()); } });
 /** 0.4.2: the phone Queue page names its zone and lets you switch the zone it shows (same zone choices as the Now Playing chip). */
 function phonePick() {
-  const cs = Z.choicesNow(), cur = Z.current(); if (cs.length < 2) return null;
-  const sel = wsel({ class: 'qzpick pq', 'aria-label': 'Zone whose queue to show', title: 'Show another zone\'s queue', onchange: () => { Z.select(sel.value); setTimeout(() => Promise.resolve(refreshAll()).then(() => drawQueue()), 150); } }, cs.map(c => h('option', { value: c.key }, Z.choiceLabel(c, cur))));   // 0.6.9 #21
-  sel.value = cur?.key || ''; return h('span', { class: 'qzwrap pqwrap' }, sel);
+  // 0.7.3 fix073d (t2264u): the same "on <zone> ▾" pill + themed zone panel as Now Playing (zones40 zoneLink: status dot, bold name, ▶ track,
+  // accent bar on the current zone, "Manage zones in Devices"), beside the "QUEUE" label - no native dropdown. One zone: just its name.
+  // Picking a zone switches the queue shown (Z.select -> wavwiz:zone below).
+  return Z.current() ? Z.zoneLink('zl-queue') : null;
 }
 function saveQueue() {   // 0.3.5 J9 #9: inline name field (phone Queue page)
   const root = views.queue.el; root.querySelector('.qsave')?.remove();

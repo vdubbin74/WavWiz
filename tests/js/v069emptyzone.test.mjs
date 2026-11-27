@@ -48,7 +48,7 @@ test('#21 the Devices tree: empty / folded / empty-Jukebox rows control the zone
   assert.match(t, /return pickRow\(wrap, pickJb\)/, 'empty Jukebox row');
   assert.doesNotMatch(t, /'ze42-row', onclick: open/, 'the Jukebox row no longer only opens settings');
   const z = src('zones40.js'); assert.match(z, /class: 'zl-empty', hidden: true/); assert.match(z, /emptyNote\(c\)/);
-  assert.match(src('listtable.js'), /Z\.choiceLabel\(c, cur\)/); assert.match(src('main.js'), /Z\.choiceLabel\(c, cur\)/);
+  assert.match(src('listtable.js'), /Z\.choiceLabel\(c, cur\)/); assert.match(src('main.js'), /return Z\.current\(\) \? Z\.zoneLink\('zl-queue'\) : null;/);   // 0.7.3 fix073d: the phone Queue uses the zones40 pill + panel (which shows the empty note)
   assert.match(src('devices.js'), /onPill\([^)]*\{ empty/, '#19 greyed-out OFF\/ON for empty zones is kept');
 });
 
