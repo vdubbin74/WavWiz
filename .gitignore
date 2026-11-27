@@ -19,3 +19,4 @@ node_modules/
 screens/
 payload/
 out/
+BUILD-COMMIT.txt

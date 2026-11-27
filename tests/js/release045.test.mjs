@@ -48,7 +48,7 @@ test('F8 category rows (artist, album, genre/year, decade, folder) are drag sour
 test('version: badge, footer and title come from the server build version; build, installer and What\'s new all say the same version', () => {
   const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8'), iss = readFileSync(new URL('../../installer/WavWiz.iss', import.meta.url), 'utf8');
   const v = props.match(/<WavWizVersion>([\d.]+)</)[1];
-  assert.match(props, /<InformationalVersion>\$\(WavWizVersion\)-beta</); assert.match(props, /<AssemblyVersion>\$\(WavWizVersion\)\.0</);
+  assert.match(props, /<InformationalVersion>\$\(WavWizVersion\)</); assert.match(props, /<IncludeSourceRevisionInInformationalVersion>false</);   // 0.7.3: core files say 0.7.3, not 0.7.3-beta assert.match(props, /<AssemblyVersion>\$\(WavWizVersion\)\.0</);
   assert.equal(iss.match(/#define AppVersion "([\d.]+)"/)[1], v);
   assert.match(src('about'), new RegExp(`WHATS_NEW_VERSION = '${v.replace(/\./g, '\\.')}'`));
   const m = src('main');   // badge + footer + title: S.auth.appVersion (= WavWizInfo.Version, from InformationalVersion), never a literal

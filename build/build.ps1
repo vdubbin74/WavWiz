@@ -92,8 +92,16 @@ foreach ($need in 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'FFMPEG-BUILD.txt', 
 Copy-Item (Join-Path $root 'README.md') (Join-Path $dist 'README.md') -Force
 
 Write-Step 'BUILD-INFO.txt'
-$commit = ''; try { $commit = (& git -C $root rev-parse --short HEAD).Trim() } catch { }
-$dirty = ''; try { if ((& git -C $root status --porcelain) ) { $dirty = ' (uncommitted changes)' } } catch { }
+# 0.7.3: the PC builds from an exported source folder (no .git), which left "Commit   :" blank. Order: git (a real checkout),
+# then $env:WAVWIZ_COMMIT, then the BUILD-COMMIT.txt the export writes at the repo root.
+$commit = ''; $dirty = ''; $isGit = $false
+try { $isGit = Test-Path (Join-Path $root '.git') } catch { }
+if ($isGit) { try { $commit = "$(& git -C $root rev-parse --short HEAD 2>$null)".Trim() } catch { }
+  try { if ((& git -C $root status --porcelain 2>$null)) { $dirty = ' (uncommitted changes)' } } catch { } }
+if (-not $commit -and $env:WAVWIZ_COMMIT) { $commit = $env:WAVWIZ_COMMIT.Trim() }
+$bc = Join-Path $root 'BUILD-COMMIT.txt'
+if (-not $commit -and (Test-Path $bc)) { $commit = (Get-Content $bc -TotalCount 1).Trim() }
+if (-not $commit) { $commit = 'unknown (no .git, WAVWIZ_COMMIT or BUILD-COMMIT.txt)' }
 $sdk = (& dotnet --version).Trim()
 @"
 WavWiz (BETA) $ver
