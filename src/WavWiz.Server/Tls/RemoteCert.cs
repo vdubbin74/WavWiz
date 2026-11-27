@@ -291,7 +291,7 @@ public sealed class RemoteCertStore : IDisposable
             renewAt = s?.Source == "tailscale" ? RenewAtUtc(s.Cert) : (DateTime?)null,
             ctAcknowledged = CtAcknowledged, ctDisclosure = CtAcknowledged ? null : CtDisclosure, error = LastError, pfxPasswordSaved = File.Exists(PasswordPath),
             publiclyTrusted = s?.PubliclyTrusted, caveat = Mode == "tailscale" ? ServiceAccountCaveat : Mode == "pfx" ? PfxApiOnlyNote : null,
-            text = Mode == "off" ? "Remote HTTPS is off. Phones use WavWiz's own certificate."
+            text = Mode == "off" ? "Not used. Phones at home use WavWiz's own secure connection."
                  : s != null && !s.PubliclyTrusted ? $"Remote HTTPS: https://{s.Host}:{_cfg.HttpsPort} uses a certificate that is NOT publicly trusted on this PC (self-signed or a private CA). Phones will reject it unless that CA is installed and trusted on them; this is not phone-ready."
                  : s != null ? $"Remote HTTPS: https://{s.Host}:{_cfg.HttpsPort} uses a {(s.Source == "tailscale" ? "Tailscale" : "custom")} certificate that chains to a public root on this PC, valid until {s.Cert.NotAfter.ToUniversalTime():yyyy-MM-dd}. Not yet verified on a phone."
                  : "Remote HTTPS is not active yet. Phones use WavWiz's own certificate." + (LastError != null ? " " + LastError : ""),
@@ -299,7 +299,7 @@ public sealed class RemoteCertStore : IDisposable
     }
 
     /// <summary>F261-A L4: what non-admins see - no host name, no error text.</summary>
-    public object PublicStatus() => new { mode = Mode, active = _snap != null, text = Mode == "off" ? "Remote HTTPS is off." : _snap != null ? "Remote HTTPS is on." : "Remote HTTPS is not active." };
+    public object PublicStatus() => new { mode = Mode, active = _snap != null, text = Mode == "off" ? "Not used. Phones at home use WavWiz's own secure connection." : _snap != null ? "Remote HTTPS is on." : "Remote HTTPS is not active." };
 
     public void Dispose() { var s = Interlocked.Exchange(ref _snap, null); s?.Cert.Dispose(); }
 }

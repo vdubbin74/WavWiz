@@ -6602,3 +6602,7 @@ html.handset .npdrop-over::after{content:'Drop to play now';position:absolute;le
 .netbanner .btn.quiet{background:transparent!important;color:#1a1000!important;font-size:16px;padding:0 6px}
 .gs-phone .addspk-url{overflow-wrap:anywhere;word-break:break-all}
 .statusbar .sb-netbad{color:#ff6b5a!important;font-weight:700}
+/* F274: "Make your phone secure" sub-step under "Open it on your phone" */
+.gs-secure{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+.gs-secure.done>b{color:var(--ok,#5fd38a)}
+.gs-secure-list{margin-top:2px}

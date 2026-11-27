@@ -5,11 +5,16 @@ const host = B.dataset.host, http = B.dataset.http, https = B.dataset.https, ena
 const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
 const inApp = /FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\/|; wv\)|Snapchat|Twitter/.test(ua);
 const safari = ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+import { deviceName, isTailscaleHost, AUTO_CONTINUE_MS, NOT_TRUSTED_TITLE, NOT_YET_TEXT, a2hsNote } from './tls-setup-core.js';   // F274
+const nextQ = new URLSearchParams(location.search).get('next') || '';
+let trusted = false, reported = false;
 
 // 0.2.3 fix: the step sections are visible by default (tls.css) so they still show if this script cannot load; here only the OTHER phone's steps are hidden
 document.querySelectorAll('.dev-ios').forEach(e => e.classList.toggle('hide', android));
 document.querySelectorAll('.dev-android').forEach(e => e.classList.toggle('hide', ios));
 document.querySelector('.only-desktop')?.classList.toggle('show', !ios && !android);
+// F274 3.4: only this phone's steps; the other platform's sit behind "Using Android?" / "Using an iPhone?"
+document.querySelectorAll('a.other').forEach(a => { a.hidden = !ios && !android; a.addEventListener('click', ev => { ev.preventDefault(); const show = a.dataset.show; document.querySelectorAll('.dev-' + show).forEach(e => e.classList.remove('hide')); document.getElementById('steps-' + show)?.scrollIntoView({ block: 'start' }); }); });
 if (ios && !safari && enabled) {
   const w = document.createElement('div'); w.className = 'card warn';
   w.innerHTML = '<b></b><p class="small"></p>'; w.firstChild.textContent = 'Open this page in Safari';
@@ -32,34 +37,36 @@ async function ping(url, ms = 7000) {
   finally { clearTimeout(t); }
 }
 
-async function check() {
+async function check(quiet = false) {
   const btn = $('check'); btn.disabled = true; btn.textContent = 'Checking...';
-  set('', 'Checking...', 'Asking WavWiz over the secure address. This takes a few seconds.');
+  if (!quiet) set('info', 'Checking...', 'Asking WavWiz over the secure address. This takes a few seconds.');
   try {
     // 0.6.8-#11g: an https page alone proves nothing (Safari's "visit this website anyway" also lands here). A "visit anyway" exception covers only the
     // host it was granted for, so ask ANOTHER address on the server's certificate: that answers only when the phone really trusts the WavWiz CA.
     if (location.protocol === 'https:') {
-      for (const a of alts) { const r = await ping(`https://${a}:${https}/api/v1/ping?t=${Date.now()}`, 4000); if (r.ok) { good('Your phone trusts the WavWiz certificate.'); return; } }
+      for (const a of alts) { const r = await ping(`https://${a}:${https}/api/v1/ping?t=${Date.now()}`, 4000); if (r.ok) { good('Your phone trusts the WavWiz certificate.', a); return; } }
       maybe(); return;
     }
     // 1. plain network reachability (we are on http, so this one must work)
     const plain = await ping(`http://${host}:${http}/api/v1/ping?t=${Date.now()}`);
     // 2. the secure address; the browser refuses the connection if it does not trust the certificate
     const sec = await ping(`https://${host}:${https}/api/v1/ping?t=${Date.now()}`);
-    if (sec.ok) { good('Your phone trusts the WavWiz certificate.'); return; }
+    if (sec.ok) { good('Your phone trusts the WavWiz certificate.', host); return; }
+    if (quiet && plain.ok) { set('info', 'Make this phone secure', NOT_YET_TEXT + (isTailscaleHost(host) ? ' Away from home over Tailscale: the secure connection works if this phone is set up (or Tailscale HTTPS is on).' : '')); return; }   // F274: the silent check on load stays calm
     const adv = [];
     if (ios) { adv.push('Settings > General > About > Certificate Trust Settings: is "WavWiz Local CA (BETA)" switched ON? This is the step people miss.'); adv.push('Settings (top) > "Profile Downloaded": if it is still there, tap it and install it first.'); adv.push('Set this phone up before? WavWiz may have a new certificate: install the new profile below and switch it on. The old profile can be removed in Settings > General > VPN & Device Management.'); }
     else if (android) { adv.push('Settings > Security > Encryption & credentials > Install a certificate > CA certificate: choose the downloaded file.'); }
     adv.push('Make sure you are on the home Wi-Fi (not mobile data) and the same network as the WavWiz PC.');
+    adv.push('Using mobile data? Switch to your home Wi-Fi.');
     adv.push(`The PC's firewall must allow port ${https}. WavWiz's installer opens it for the home network; a "Public" network profile in Windows blocks it (WavWiz > Settings > Diagnostics tells you).`);
-    adv.push('If the server\'s address changed, press "Set up HTTPS" again on the PC.');
+    adv.push('If your PC got a new address, WavWiz may ask you to set up phones again (Settings > Devices > Phone & HTTPS on the PC).');
     adv.push('Phone date/time wrong? An out-of-date clock makes every certificate look invalid.');
     // 0.2.3 fix: not trusted -> put the download button for THIS phone right here and point at the install steps below
     const steps = [...document.querySelectorAll('.dev:not(#a2hs-ios):not(#a2hs-android)')].filter(d => !d.classList.contains('hide'));
     const dl = document.createElement('p');
     for (const d of steps) { const b = d.querySelector('a.btn[href^="/tls/root-ca"]'); if (b) { const c = b.cloneNode(true); c.style.marginRight = '8px'; dl.append(c); } }
     steps.forEach(d => d.classList.add('focus'));
-    set('bad', 'Not trusted yet', plain.ok ? 'Your phone can reach WavWiz, but the secure connection was refused. That means the certificate is not installed or not trusted yet - or port ' + https + ' is blocked.' : 'Your phone could not reach WavWiz at all (' + host + ').', [dl, ul(adv)]);
+    set(plain.ok ? 'info' : 'bad', plain.ok ? NOT_TRUSTED_TITLE : 'Not trusted yet', plain.ok ? 'Your phone can reach WavWiz, but the secure connection was refused. That means the certificate is not installed or not trusted yet - or port ' + https + ' is blocked.' : 'Your phone could not reach WavWiz at all (' + host + ').', [dl, ul(adv)]);
     if (B.dataset.mode === 'check' && steps[0]) { const n = document.createElement('p'); n.className = 'small'; n.textContent = 'Follow the install steps below, then tap Check my phone again.'; $('advice').append(n); }
   } finally { btn.disabled = false; btn.textContent = 'Check my phone'; }
 }
@@ -75,17 +82,39 @@ function maybe() {
   set('warn', 'Already installed? You\'re set', 'This page opened over HTTPS. That also happens if you tapped past a "This Connection Is Not Private" warning, so WavWiz cannot be sure yet. If you installed the certificate and switched it on (iPhone: Settings > General > About > Certificate Trust Settings), you are done. If Safari showed a warning, follow the steps below.', [p]);
   document.querySelectorAll('.dev:not(#a2hs-ios):not(#a2hs-android)').forEach(d => { if (!d.classList.contains('hide')) d.classList.add('focus'); });
 }
-function good(msg) {
-  set('ok', 'All set', msg);
+function good(msg, via) {
+  trusted = true;
+  set('ok', '\u{1F512} Secure connection \u2713', 'This phone trusts WavWiz. The microphone features work.');
+  report(via);
   if (calQ) { $('statusText').textContent = msg + ' Opening the calibration page...'; setTimeout(() => location.replace(secureHome()), 900); }
+  // F274 D3: on the plain page, continue to the secure address by itself after 2 s (the button stays for anyone faster)
+  else if (location.protocol !== 'https:' && (ios || android || nextQ)) { $('statusText').textContent += ' Opening WavWiz (secure)...'; setTimeout(() => location.replace(secureHome()), AUTO_CONTINUE_MS); }
+  document.querySelectorAll('.a2hs-note').forEach(n => { n.textContent = a2hsNote(true, location.protocol === 'https:'); });
   document.querySelectorAll('.steps li').forEach(l => l.classList.add('done'));
   document.querySelectorAll('.dev.focus').forEach(d => d.classList.remove('focus'));
   const d = $('done'); if (d) d.hidden = false;
   const a = $('advice'); const p = document.createElement('p'); const link = document.createElement('a'); link.className = 'btn'; link.href = secureHome(); link.textContent = calQ ? 'Open the calibration page' : 'Open WavWiz (secure)'; p.append(link); a.append(p);
 }
+// F274 3.5: tell the PC "this phone: Secure ✓" (only accepted over HTTPS from the home network; it grants nothing). A simple text/plain POST, no preflight.
+function report(via) {
+  if (reported || !via) return; reported = true;
+  try { fetch(`https://${via}:${https}/api/v1/tls/trusted`, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ device: deviceName(ua) }) }).catch(() => { /* informational only */ }); } catch { /* old browser */ }
+}
 if (enabled) {
-  $('check').addEventListener('click', check);
-  if (B.dataset.mode === 'check' || location.protocol === 'https:' || calQ) check();
+  $('check').addEventListener('click', () => check(false));
+  // F274 3.2: the silent trust check on load (the QR opens the http page); coming back from Settings re-checks by itself
+  if (B.dataset.mode === 'check' || location.protocol === 'https:' || calQ) check(); else check(true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !trusted) check(false); });
+  document.querySelectorAll('.a2hs-note').forEach(n => { n.textContent = a2hsNote(false, location.protocol === 'https:'); });
+} else {
+  // F274 W1: an admin on this phone can set it up here; everyone else: Check again + a 10 s poll
+  fetch('/api/v1/auth/state', { cache: 'no-store', credentials: 'same-origin' }).then(r => r.json()).then(a => {
+    const b = $('enableTls'); if (!b || !a || a.role !== 'admin') return; b.hidden = false;
+    b.addEventListener('click', async () => { b.disabled = true; const m = $('enableMsg');
+      try { const r = await fetch('/api/v1/tls/enable', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' }); if (r.ok) location.reload(); else { const j = await r.json().catch(() => ({})); if (m) m.textContent = j.error || 'Could not set it up.'; b.disabled = false; } }
+      catch { if (m) m.textContent = 'Could not reach WavWiz.'; b.disabled = false; } });
+  }).catch(() => { /* signed out: Check again */ });
+  setInterval(() => { fetch('/tls/info', { cache: 'no-store' }).then(r => r.json()).then(i => { if (i && i.enabled) location.reload(); }).catch(() => { /* try again */ }); }, 10000);
 }
 
 // 0.3.7 L28: Add to Home Screen. Chrome / Android offers a real install prompt (beforeinstallprompt) -> the "Install WavWiz" button; iPhone has only the Share steps shown above.

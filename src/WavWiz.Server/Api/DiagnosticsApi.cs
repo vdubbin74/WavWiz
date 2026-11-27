@@ -23,6 +23,8 @@ public static class DiagnosticsApi
 
     /// <summary>F273: the "phone-open" step is done once any other device on the home network has opened WavWiz (setting, stored once).</summary>
     public const string LanClientSeenKey = "ui.lanClientSeen";
+    /// <summary>F274 3.3 copy: why a phone would want the secure connection.</summary>
+    public const string SecureWhy = "Only needed to use your phone's microphone: calibrating speakers, Announce and Check with phone. Everything else already works.";
     /// <summary>F273, pure: does this request prove another LAN device reached the server? Not loopback, not this PC's own address.</summary>
     public static bool IsOtherLanClient(System.Net.IPAddress? ip, Func<System.Net.IPAddress, bool> isThisMachine)
     {
@@ -64,6 +66,7 @@ public static class DiagnosticsApi
         int speakers = s.Zones.Zones().Count(z => z.Connected);
         bool firstSound = s.Db.Setting("ui.firstSound") == "true";
         bool lanSeen = s.LanClientSeen ??= s.Db.Setting(LanClientSeenKey) == "true";
+        var trusted = Tls.PhoneTrust.List(s.Db);   // F274
         var items = new List<object>
         {
             new { id = "phone-open", title = "Open it on your phone", done = lanSeen, detail = lanSeen ? "A phone or another device has opened WavWiz." : "Scan the QR code with your phone's camera, or type the address in its browser.", action = (string?)null, required = false },   // F273
@@ -73,7 +76,7 @@ public static class DiagnosticsApi
             new { id = "speaker", title = "Check that a speaker shows up in Devices", done = speakers > 0, detail = speakers > 0 ? $"{speakers} speaker(s) online now{(players > 0 ? $", {players} PC player(s) paired" : "")}." : "This browser joins as a speaker by itself (tap once to allow sound). For a PC with speakers, open WavWiz Player there and type the 6-digit code from Settings > Devices > Pair a phone or a PC player (or press Connect and approve it here).", action = "devices", required = true },
             new { id = "test", title = "Play a test song or test sound", done = firstSound, detail = firstSound ? "Sound has gone out to your speakers." : "Pick any song in the Library, or use Test sound on a speaker in Devices.", action = "library", required = true },
             new { id = "calibrate", title = "Calibrate your speakers (optional)", done = cals > 0, detail = cals > 0 ? "At least one speaker has a measured delay." : "Open Devices, pick a speaker and choose Calibrate. Until then the delay is shown as unknown, never zero.", action = "devices", required = false },
-            new { id = "phone", title = "Set up your phone (optional)", done = s.Ca.Enabled, detail = s.Ca.Enabled ? "HTTPS is on. Use the QR code in Settings > Devices > Phone & HTTPS to trust it on the phone." : "Needed to calibrate with the phone microphone, and for reliable sound when a phone plays as a speaker.", action = "settings:phone", required = false },
+            new { id = "phone", title = "Make your phone secure (optional)", done = trusted.Count > 0, detail = trusted.Count > 0 ? Tls.PhoneTrust.Label(trusted) : SecureWhy, action = "settings:phone", required = false, devices = trusted.Select(t => new { name = t.Name, lastSeen = t.LastSeen }).ToArray() },   // F274 3.3: done only when a phone reported Secure ✓
         };
         if (NetworkItem(s, fresh) is { } net) items.Insert(0, net);   // F273: step 1 everywhere
         var req = items.Cast<dynamic>().Where(i => i.required).ToList();
@@ -130,14 +133,15 @@ public static class DiagnosticsApi
             checks.Add(await AirPlayPtpFirewall());
 
         // --- certificate ---
-        if (!s.Ca.Enabled) checks.Add(new("tls", "HTTPS certificate", "unknown", "HTTPS is not set up. That is fine for music; phones need it for the microphone (calibration) and for the phone-as-a-device page.", "Settings > Devices > Phone & HTTPS > Set up HTTPS."));
+        if (!s.Ca.Enabled) checks.Add(new("tls", "Secure connection for phones", s.TlsAutoError != null ? "warn" : "unknown", s.TlsAutoError != null ? $"Couldn't be set up: {s.TlsAutoError}. Music works. Phones need it only for the microphone." : "Off. Music works. Phones need it only for the microphone.", "Settings > Devices > Phone & HTTPS > Set up secure connection."));
         else
         {
             var exp = s.Ca.ServerCertExpires; var days = exp == null ? (double?)null : (exp.Value - DateTimeOffset.UtcNow).TotalDays;
-            checks.Add(new("tls", "HTTPS certificate", days is null ? "warn" : days < 0 ? "fail" : days < 30 ? "warn" : "ok",
-                days is null ? "The server certificate could not be read." : days < 0 ? "The server certificate has expired." : $"Valid for another {days:0} days (renews itself).",
-                days is null or < 30 ? "Settings > Devices > Phone & HTTPS > Set up HTTPS again (this keeps the phone's trusted profile)." : null));
-            checks.Add(new("tls-phone", "Phone trusts the certificate", "unknown", "WavWiz cannot see this from the PC.", "On the phone open the set-up page (QR code in Settings > Devices > Phone & HTTPS) and tap 'Check my phone'."));
+            checks.Add(new("tls", "Secure connection for phones", days is null ? "warn" : days < 0 ? "fail" : days < 30 ? "warn" : "ok",
+                days is null ? "The server certificate could not be read." : days < 0 ? "The server certificate has expired." : $"On, renews by itself (valid {days:0} more days).",
+                days is null or < 30 ? "Settings > Devices > Phone & HTTPS > Set up secure connection again (this keeps the phone's trusted profile)." : null));
+            var tr = Tls.PhoneTrust.List(s.Db);   // F274 3.5: phones report Secure ✓ themselves
+            checks.Add(new("tls-phone", "Phones with a secure connection", tr.Count > 0 ? "ok" : "unknown", tr.Count > 0 ? Tls.PhoneTrust.Label(tr) : "No phone has reported a secure connection yet.", tr.Count > 0 ? null : "On the phone scan the Make your phone secure QR code (Getting started or Settings > Devices > Phone & HTTPS)."));
         }
 
         // --- ffmpeg ---

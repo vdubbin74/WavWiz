@@ -11,7 +11,9 @@ export const ANNOUNCE_TITLE = 'Hold to announce';
 export const TO_KEY = 'wavwiz.announceTo';
 export const HOLD_MS = 250;              // a tap shorter than this is not an announcement (no chime for a mis-tap)
 export const SHORT_HINT = 'Hold the button while you talk, then let go.';
-export const INSECURE_TITLE = 'Announcing needs the secure address';
+export const INSECURE_TITLE = 'Your phone\'s microphone needs a secure connection';   // F274 W6
+export const INSECURE_BODY = 'One-time setup, about 2 minutes. Music and controls keep working without it.';
+export const SECURE_SETUP = '/tls/setup?next=app';
 export const DUCK_TEXT = 'Music turns down 12 dB while you talk (it never pauses) and fades back when you let go.';
 export const VIEW_ONLY = 'Your access is view-only.';
 
@@ -48,15 +50,15 @@ if (typeof window !== 'undefined') window.addEventListener('wavwiz:announce', e 
 export const inDesktopPlayer = (ua = globalThis.navigator?.userAgent || '') => /WavWizPlayer\//.test(ua);
 export function insecureSheet(title = INSECURE_TITLE, again = 'then hold Announce again') {   // 0.7.2 D: also the zone timing check's
   const box = h('div', { class: 'ann-sheet', role: 'dialog', 'aria-label': title },
-    h('b', null, title), h('p', { class: 'small' }, `Browsers only let a page use the microphone over https://. Open WavWiz from its secure address on this device, ${again}.`));
+    h('b', null, title), h('p', { class: 'small' }, INSECURE_BODY + (again ? ` Then ${again.replace(/^then /, '')}.` : '')));   // F274 W6: what it means, what still works, one button
   if (inDesktopPlayer()) {   // 0.7.2 t2166u: no links that strand the desktop Player on the phone set-up page; the 0.7.2 Player allows the mic itself
     box.querySelector('p').textContent = 'This WavWiz Player cannot use the microphone yet. Update the Player to 0.7.2 or later, or use a phone or a browser.';
     box.append(h('div', { class: 'row' }, h('button', { type: 'button', class: 'btn sm', onclick: () => box.remove() }, 'Close')));
     document.body.append(box); return;
   }
-  const go = h('a', { class: 'btn sm primary', href: '#', hidden: true }, 'Open the secure address');
+  const go = h('a', { class: 'btn sm', href: '#', hidden: true }, 'Switch to secure address');
   const close = h('button', { type: 'button', class: 'btn sm', onclick: () => box.remove() }, 'Close');
-  box.append(h('div', { class: 'row' }, go, h('a', { class: 'btn sm', href: '/tls/check' }, 'Check this device'), close));
+  box.append(h('div', { class: 'row wrap' }, h('a', { class: 'btn sm primary', href: SECURE_SETUP }, 'Set up secure connection'), go, close));
   document.body.append(box);
   fetch('/tls/info', { cache: 'no-store' }).then(r => r.json()).then(info => { const u = secureUrl(info, location); if (u) { go.href = u; go.hidden = false; } }).catch(() => { /* keep the check link */ });
 }

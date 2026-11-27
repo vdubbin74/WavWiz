@@ -11,7 +11,7 @@ export const SPREAD_WARN_MS = 4;
 export const MAX_MS = 200;
 export const CHECK_LABEL = 'Check with phone';
 export const CHECK_TITLE = 'Measure this zone against another one with this device\'s microphone (stand where you hear both)';
-export const INSECURE_TITLE = 'The timing check needs the secure address';
+export const INSECURE_TITLE = 'Your phone\'s microphone needs a secure connection';   // F274 W6 (same sheet as Announce)
 /** Raw microphone: no echo cancelling / noise suppression / gain riding - they shift and smear the chirps. */
 export const MIC_CONSTRAINTS = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } };
 

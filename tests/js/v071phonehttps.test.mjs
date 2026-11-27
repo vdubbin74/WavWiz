@@ -58,6 +58,6 @@ test('t2129u: installer, PhoneApi and docs use Settings > Devices > Phone & HTTP
   assert.match(iss, /Devices > Phone role…/);
   assert.doesNotMatch(iss, /Menu > This phone as a device/);
   assert.equal((lib.match(/Settings > Devices > Phone & HTTPS/g) || []).length, 2);
-  assert.match(phone, /Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS/);
+  assert.match(phone, /press <b>Set up secure connection<\/b> on the PC/);   // F274 W1: the phone page names the one button, not a menu path
   assert.doesNotMatch(phone, /Settings &rsaquo; Phone &amp; HTTPS/);
 });

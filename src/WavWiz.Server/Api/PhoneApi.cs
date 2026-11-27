@@ -44,7 +44,7 @@ public static class PhoneApi
         app.MapGet("/tls/qr.svg", (HttpContext c, string? to, string? code) =>
         {
             var host = PhoneHost(c, s);
-            string path = to switch { "check" => "/tls/check", "app" => "/", _ => "/tls/setup" };
+            string path = to switch { "check" => "/tls/check", "app" => "/", "secure" => SecurePath(c.Request.Query["next"], c.Request.Query["cal"]), _ => "/tls/setup" };
             // 0.3.7 L28: to=pair&code=123456 -> the phone setup page with the pairing code prefilled (only a 6-digit code is ever carried)
             if (to == "pair") path = "/tls/setup" + (code is not null && PairCode.IsMatch(code) ? "?pair=" + code : "");
             c.Response.Headers.CacheControl = "no-store";
@@ -100,6 +100,11 @@ public static class PhoneApi
 
     private static string E(string x) => WebUtility.HtmlEncode(x);
 
+    /// <summary>F274 3.2: the "Make your phone secure" QR. Always the plain-http set-up page (an untrusted phone would see "This Connection Is Not
+    /// Private" first on https), with next=app, or next=cal&amp;cal=CODE to keep the calibration hand-off (a bad code is dropped).</summary>
+    public static string SecurePath(string? next, string? cal) =>
+        next == "cal" && cal is not null && CalCode.IsMatch(cal) ? "/tls/setup?next=cal&cal=" + cal : "/tls/setup?next=app";
+
     private static readonly System.Text.RegularExpressions.Regex CalCode = new("^[A-Za-z0-9]{6}$"), PairCode = new("^[0-9]{6}$");
 
     /// <summary>0.2.3 fix: the secure calibration address for a set-up page opened with ?cal=CODE[&amp;pair=CODE] (from the Calibrate speakers QR / short link),
@@ -136,41 +141,46 @@ public static class PhoneApi
         h.Append("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name=theme-color content='#FF3C00'><link rel=manifest href='/manifest.webmanifest'><link rel=apple-touch-icon sizes=180x180 href='/assets/logo-180.png?v=pf070'><link rel=apple-touch-icon-precomposed sizes=180x180 href='/assets/logo-180.png?v=pf070'><meta name=apple-mobile-web-app-capable content=yes><meta name=mobile-web-app-capable content=yes><meta name=apple-mobile-web-app-title content=WavWiz>")
          .Append("<title>WavWiz - phone set-up</title><link rel=icon href='/favicon.ico'><link rel=stylesheet href='/tls.css'></head>")
          .Append($"<body data-mode='{mode}' data-enabled='{(s.Ca.Enabled ? 1 : 0)}' data-host='{E(host)}' data-http='{s.Cfg.HttpPort}' data-https='{s.Cfg.HttpsPort}' data-alt='{E(string.Join(",", s.Ca.Enabled ? AltHosts(c, s, c.Request.Host.Host) : Array.Empty<string>()))}'><main>")
-         .Append($"<header><img src='/assets/logo-64.png' width=40 height=40 alt=''><div><h1>WavWiz</h1><small>BETA {WavWizInfo.Version} - phone set-up</small></div></header>");
+         .Append($"<header><img src='/assets/logo-64.png' width=40 height=40 alt=''><div><h1>WavWiz</h1><small>BETA {WavWizInfo.Version} - phone set-up{(string.IsNullOrWhiteSpace(s.DisplayName) ? "" : " for " + E(s.DisplayName))}</small></div></header>");   // F274: several servers - say which PC
         if (!s.Ca.Enabled)
         {
-            h.Append("<section class='card warn'><h2>HTTPS is not switched on yet</h2><p>Phones only allow the microphone (for speaker calibration) and background audio controls on a secure page. Ask the person who runs WavWiz to open <b>Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS</b> on the PC and press <b>Set up HTTPS</b>. Then come back to this page.</p>")
-             .Append($"<p><a class=btn href='{E(http)}/tls/setup'>Reload this page</a></p></section>");
+            // F274 W1: what it means, what still works, one button (an admin on this phone can set it up; everyone else gets Check again + a 10 s poll)
+            h.Append("<section class='card info' id=notready><h2>Secure connection isn't ready yet</h2><p>WavWiz works on this phone already. Only the microphone features (calibrating speakers, Announce) need it. Ask whoever runs WavWiz to press <b>Set up secure connection</b> on the PC. This page updates by itself.</p>")
+             .Append($"<p><button class='btn primary' id=enableTls hidden>Set up secure connection</button> <a class=btn id=again href='{E(http)}/tls/setup'>Check again</a></p><p class=small id=enableMsg></p></section>");
         }
         else
         {
+            // F274 3.4: the status card first (filled by the silent check), then only this phone's steps (the other platform behind a link)
+            h.Append("<section class='card info' id=status><h2 id=statusTitle>Make this phone secure</h2><p id=statusText>WavWiz already works on this phone. A secure connection is only needed for the microphone (calibrating speakers, Announce, Check with phone). It takes about 2 minutes and only works for your WavWiz server.</p><p><button class=btn id=check>Check my phone</button></p><div id=advice></div></section>");
             h.Append("<section class='card only-desktop'><h2>Scan this with your phone's camera</h2><p>Point the camera at the square. Tap the link that appears.</p>")
-             .Append($"<div class=qr><img src='/tls/qr.svg?to=setup' alt='QR code for {E(http)}/tls/setup' width=220 height=220></div><p class=small>No camera? On the phone open Safari and type:<br><code>{E(http)}/tls/setup</code></p></section>");
+             .Append($"<div class=qr><img src='/tls/qr.svg?to=secure' alt='QR code for {E(http)}/tls/setup' width=220 height=220></div><p class=small>No camera? On the phone open Safari and type:<br><code>{E(http)}/tls/setup</code></p></section>");
             if (calUrl != null)
                 h.Append("<section class='card focus' id=calgo><h2>Calibrate with this phone</h2><p>Once this phone trusts WavWiz (steps below), continue to the secure calibration page. The music pauses there automatically.</p>")
                  .Append($"<p><a class=btn id=calgoLink href='{E(calUrl)}'>Continue to secure calibration</a></p>")
                  .Append("<p class=small>If Safari shows a certificate warning (&ldquo;This Connection Is Not Private&rdquo;), the certificate is not trusted yet: install it below first, and on iPhone switch it on in Settings &rsaquo; General &rsaquo; About &rsaquo; Certificate Trust Settings. Then come back and tap the button again.</p></section>");
-            h.Append("<section class=card id=status><h2 id=statusTitle>Does this phone already trust WavWiz?</h2><p id=statusText>Tap the button to find out. It takes a few seconds.</p><p><button class=btn id=check>Check my phone</button></p><div id=advice></div></section>");
-            h.Append("<section class='card dev dev-ios'><h2>iPhone / iPad - 4 steps</h2><p class=small>Use <b>Safari</b> (not a browser inside another app, and not a Private tab).</p><ol class=steps>")
-             .Append("<li data-step=1><h3>Download the profile</h3><p>Tap the button, then tap <b>Allow</b> when iPhone asks &ldquo;This website is trying to download a configuration profile&rdquo;.</p><p><a class=btn href='/tls/root-ca.mobileconfig'>Download profile</a></p><p class=small>Then tap <b>Close</b>. Nothing is installed yet.</p></li>")
-             .Append("<li data-step=2><h3>Install it</h3><p>Open the <b>Settings</b> app. At the top you see <b>Profile Downloaded</b>. Tap it, tap <b>Install</b> (top right), type your iPhone passcode, then tap <b>Install</b> twice more and <b>Done</b>.</p><p class=small>iPhone says &ldquo;Not Signed&rdquo;. That is expected for a private home certificate; it only works for this WavWiz server.</p></li>")
-             .Append("<li data-step=3><h3>Turn trust on <span class=must>(most often forgotten)</span></h3><p>Settings &rsaquo; <b>General</b> &rsaquo; <b>About</b> &rsaquo; scroll to the bottom &rsaquo; <b>Certificate Trust Settings</b>. Switch <b>WavWiz Local CA (BETA)</b> to <b>on</b>, then tap <b>Continue</b>.</p></li>")
-             .Append("<li data-step=4><h3>Check</h3><p>Come back to Safari and tap <b>Check my phone</b> above. A green tick means you are done.</p></li></ol></section>");
-            h.Append("<section class='card dev dev-android'><h2>Android - 3 steps</h2><ol class=steps>")
-             .Append("<li><h3>Download the certificate</h3><p><a class=btn href='/tls/root-ca.crt'>Download certificate</a></p></li>")
-             .Append("<li><h3>Install it</h3><p>Settings &rsaquo; Security (or Biometrics &amp; security) &rsaquo; More security settings &rsaquo; <b>Install from device storage</b> &rsaquo; <b>CA certificate</b> &rsaquo; <b>Install anyway</b>, then pick the file you just downloaded.</p></li>")
-             .Append("<li><h3>Check</h3><p>Tap <b>Check my phone</b> above. Chrome on Android trusts user-installed certificates; some apps do not, which does not matter here.</p></li></ol></section>");
-            h.Append("<section class=card><h2>Good to know</h2><ul class=small><li>The certificate is valid <b>only</b> for this server's address on your home network. Even if someone had the file they could not use it for any other website.</li>")
+            h.Append("<section class='card dev dev-ios' id=steps-ios><h2>iPhone / iPad - 4 steps</h2><p class=small>Use <b>Safari</b> (not a browser inside another app, and not a Private tab).</p><ol class='steps big'>")
+             .Append("<li data-step=1><h3>Download the profile</h3><p><a class=btn href='/tls/root-ca.mobileconfig'>Download profile</a></p><p>Tap <b>Allow</b>, then <b>Close</b>. Nothing is installed yet.</p></li>")
+             .Append("<li data-step=2><h3>Install it</h3><p>Open <b>Settings</b>, tap <b>Profile Downloaded</b> at the top, <b>Install</b>, enter your passcode, <b>Install</b>, <b>Done</b>.</p><p class=small>&ldquo;Not Signed&rdquo; is normal for a home certificate.</p></li>")
+             .Append("<li data-step=3 class=callout><h3>Turn on full trust <span class=must>(the step most people miss)</span></h3><p>Settings &rsaquo; <b>General</b> &rsaquo; <b>About</b> &rsaquo; scroll to the bottom &rsaquo; <b>Certificate Trust Settings</b> &rsaquo; switch on <b>WavWiz Local CA (BETA)</b> &rsaquo; <b>Continue</b>.</p><p class=small>Without this switch the profile is installed but the phone still says the connection is not private.</p></li>")
+             .Append("<li data-step=4><h3>Come back here</h3><p>This page checks again by itself when you return. You'll see <b>Secure connection &#10003;</b>.</p></li></ol>")
+             .Append("<p class=small><a href='#steps-android' class=other data-show=android>Using Android?</a></p></section>");
+            h.Append("<section class='card dev dev-android' id=steps-android><h2>Android - 3 steps</h2><ol class='steps big'>")
+             .Append("<li data-step=1><h3>Download the certificate</h3><p><a class=btn href='/tls/root-ca.crt'>Download certificate</a></p></li>")
+             .Append("<li data-step=2><h3>Install it</h3><p>Settings &rsaquo; <b>Security</b> (or Security &amp; privacy) &rsaquo; More security settings &rsaquo; Encryption &amp; credentials &rsaquo; <b>Install a certificate</b> &rsaquo; <b>CA certificate</b> &rsaquo; <b>Install anyway</b>, then pick the file.</p><p class=small>Menus differ by brand: search Settings for &ldquo;CA certificate&rdquo;. If your phone won't install it, use the PC's microphone for calibration instead.</p></li>")
+             .Append("<li data-step=3><h3>Come back here</h3><p>This page checks again by itself when you return. You'll see <b>Secure connection &#10003;</b>.</p></li></ol>")
+             .Append("<p class=small><a href='#steps-ios' class=other data-show=ios>Using an iPhone?</a></p></section>");
+            h.Append($"<section class=card id=done hidden><h2>&#128274; Secure connection &#10003;</h2><p>This phone trusts WavWiz. The microphone features work.</p><p><a class=btn href='{E(https)}/'>Open WavWiz (secure)</a></p></section>");
+            h.Append("<details class=card id=goodtoknow><summary><b>Good to know</b></summary><ul class=small><li>The certificate is valid <b>only</b> for this server's addresses. Even if someone had the file they could not use it for any other website.</li>")
              .Append($"<li>Fingerprint (SHA-256) to compare if you like:<br><code class=fp>{E(s.Ca.RootSha256 ?? "")}</code></li>")
-             .Append("<li>Remove it any time: Settings &rsaquo; General &rsaquo; VPN &amp; Device Management (iPhone).</li>")
-             .Append("<li>If the server's address ever changes, press <b>Set up HTTPS</b> again on the PC. You do not need to repeat these steps on the phone.</li></ul></section>");
-            h.Append($"<section class=card id=done hidden><h2>All set</h2><p>Your phone trusts WavWiz.</p><p><a class=btn href='{E(https)}/'>Open WavWiz (secure)</a></p></section>");
+             .Append("<li>The secure connection renews by itself; phones don't need to do anything.</li>")
+             .Append("<li>Remove it any time: Settings &rsaquo; General &rsaquo; VPN &amp; Device Management (iPhone), or Settings &rsaquo; Security &rsaquo; User credentials (Android).</li>")
+             .Append("<li>If your PC gets a new address, WavWiz may ask you to set up phones again. Reserving the PC's address in your router avoids this.</li></ul></details>");
         }
         // 0.3.7 L28: Add to Home Screen - the app already ships a manifest (display: standalone), icons and a service worker (0.3.4 H1); this is the phone-friendly flow
-        h.Append("<section class='card dev dev-ios' id=a2hs-ios><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (iPhone / iPad, in <b>Safari</b>).</p><ol class='steps a2hs'>")
+        h.Append("<section class='card dev dev-ios' id=a2hs-ios><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (iPhone / iPad, in <b>Safari</b>).</p><p class='small a2hs-note'></p><ol class='steps a2hs'>")
          .Append("<li><svg class=a2hs-pic viewBox=\"0 0 24 24\" width=32 height=32 fill=none stroke=currentColor stroke-width=1.8 stroke-linecap=round stroke-linejoin=round aria-hidden=true><path d=\"M12 15V3M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1\"/></svg><h3>Tap Share</h3><p>The square with an arrow, at the bottom (iPhone) or top (iPad) of Safari.</p></li>")
          .Append("<li><svg class=a2hs-pic viewBox=\"0 0 24 24\" width=32 height=32 fill=none stroke=currentColor stroke-width=1.8 stroke-linecap=round stroke-linejoin=round aria-hidden=true><rect x=3.5 y=3.5 width=17 height=17 rx=3 /><path d=\"M12 8v8M8 12h8\"/></svg><h3>Add to Home Screen</h3><p>Scroll down the list, tap <b>Add to Home Screen</b>, then <b>Add</b>.</p></li></ol></section>");
-        h.Append("<section class='card dev dev-android' id=a2hs-android><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (Android, in <b>Chrome</b>).</p>")
+        h.Append("<section class='card dev dev-android' id=a2hs-android><h2>Add WavWiz to your Home Screen</h2><p class=small>It then opens full screen, like an app (Android, in <b>Chrome</b>).</p><p class='small a2hs-note'></p>")
          .Append("<p><button class=btn id=a2hsInstall hidden>Install WavWiz</button></p><ol class='steps a2hs'>")
          .Append("<li><h3>Open the Chrome menu</h3><p>The three dots at the top right.</p></li>")
          .Append("<li><h3>Install app</h3><p>Tap <b>Install app</b> (or <b>Add to Home screen</b>), then <b>Install</b>.</p></li></ol></section>");

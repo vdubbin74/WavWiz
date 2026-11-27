@@ -43,6 +43,7 @@ public sealed class WavWizServer : IAsyncDisposable
         var s = new Services { Cfg = cfg, Db = db, Auth = auth, Events = events, Library = lib, Conductor = cond, Registry = registry, Audio = audio, Clock = clockHost, Zones = zones, Dsp = dsp, Cal = cal, Ca = ca, Art = new Library.ArtService(lib, cfg.DataDir, ffmpeg), FfmpegPath = ffmpeg, Log = u._log.Write };
         s.RemoteTls = new Tls.RemoteCertStore(cfg, Library.SecretProtectors.For(cfg.DataDir), null, u._log.Write);   // F261: default off
         if (s.RemoteTls.Active) _ = Task.Run(() => s.RemoteTls.RefreshAsync());
+        s.TlsAutoError = Tls.TlsAuto.Run(cfg, ca, u._log.Write);   // F274 D1: phones' secure connection on by default when there is a home address
         s.Claim = new HeadlessClaim(cfg.DataDir, cfg.Headless, auth.SetupRequired, u._log.Write);     // F166: claim.txt + 15-min LAN window (Linux/Docker)
         s.Art.Online = new Library.OnlineArt(cfg.DataDir, () => cfg.OnlineArt && db.Setting("library.onlineArt") != "false");      // 0.2.1 F13
         s.Art.Online.Arrived += (kind, a, b) => events.Publish("art", new { kind, artist = a, album = b });                     // 0.2.2 T4b: tiles swap live

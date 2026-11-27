@@ -11,9 +11,9 @@ test('t2166u: inDesktopPlayer reads the Player user agent', () => {
   assert.equal(f('Mozilla/5.0 (iPhone) Safari'), false);
 });
 
-test('t2166u: the Player branch returns before the secure-address / Check this device links are made', () => {
+test('t2166u: the Player branch returns before the secure-address / Set up secure connection links are made', () => {
   const body = ann.slice(ann.indexOf('export function insecureSheet('), ann.indexOf('/** Hold-to-talk.'));
-  const i = body.indexOf('if (inDesktopPlayer()) {'), j = body.indexOf("'Open the secure address'"), k = body.indexOf("'Check this device'");
+  const i = body.indexOf('if (inDesktopPlayer()) {'), j = body.indexOf("'Switch to secure address'"), k = body.indexOf("'Set up secure connection'");   // F274 W6 wording
   assert.ok(i > 0 && j > i && k > i, 'the Player check comes first');
   const branch = body.slice(i, body.indexOf('\n  }\n', i));
   assert.match(branch, /'Close'/); assert.match(branch, /return;/); assert.doesNotMatch(branch, /href/);

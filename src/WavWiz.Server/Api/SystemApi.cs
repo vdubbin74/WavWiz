@@ -22,11 +22,14 @@ public static class SystemApi
         uptimeSec = (long)(DateTime.UtcNow - s.Started).TotalSeconds, bind = s.Cfg.BindAddress, listen = Net.NetworkHelper.Listening(s.Cfg),   // 0.6.8-#9
         ports = new { http = s.Cfg.HttpPort, https = s.Cfg.HttpsPort, audio = s.Audio.Port, clock = s.Clock.Port },
         ffmpeg = new { ok = File.Exists(s.FfmpegPath) || s.FfmpegPath == "ffmpeg", path = s.FfmpegPath },
-        tls = new { enabled = s.Ca.Enabled, rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewalError = s.Ca.LastRenewalError, remote = admin ? s.RemoteTls?.Status() : s.RemoteTls?.PublicStatus() },   // F261-A L4: host name and errors for admins only
+        tls = new { enabled = s.Ca.Enabled, state = TlsState(s), error = s.Ca.Enabled ? null : s.TlsAutoError, trustedDevices = Tls.PhoneTrust.List(s.Db), rootSha256 = s.Ca.RootSha256, expires = s.Ca.ServerCertExpires, renewalError = s.Ca.LastRenewalError, remote = admin ? s.RemoteTls?.Status() : s.RemoteTls?.PublicStatus() },   // F261-A L4: host name and errors for admins only
         library = new { tracks = s.Library.TrackCount(), scanning = s.Scanning, progress = s.Library.Progress is { } p ? new { done = p.Done, total = p.Total, root = p.Root } : null },
         playersConnected = s.Audio.Sessions.Count, state = s.Conductor.State.ToString().ToLowerInvariant(),
         warnings = Warnings(s),
     };
+
+    /// <summary>F274: "on", "error" (the automatic set-up failed) or "off" (manual: loopback / Docker bridge without an advertise address).</summary>
+    public static string TlsState(Services s) => s.Ca.Enabled ? "on" : s.TlsAutoError != null ? "error" : "off";
 
     private static List<string> Warnings(Services s)
     {
@@ -34,7 +37,8 @@ public static class SystemApi
         if (!File.Exists(s.FfmpegPath) && s.FfmpegPath != "ffmpeg") w.Add("ffmpeg was not found - playback and library scanning will not work. Re-run the installer (Repair).");
         if (Convert.ToInt32(s.Db.Scalar("SELECT COUNT(*) FROM library_root")) == 0) w.Add("No music folders yet - add one in Settings > Library.");
         if (s.Audio.Sessions.Count == 0) w.Add("No player is connected - start WavWiz Player on a PC with speakers.");
-        if (!s.Ca.Enabled) w.Add("Phone calibration needs HTTPS - set up the local certificate in Settings > Devices > Phone & HTTPS.");
+        // F274 W2: not a warning any more (it is on by default); only a failed automatic set-up is shown, and it says music is fine
+        if (!s.Ca.Enabled && s.TlsAutoError != null) w.Add($"Secure connection for phones couldn't be set up: {s.TlsAutoError}. Music works normally. Settings > Devices > Phone & HTTPS > Set up secure connection.");
         return w;
     }
 
@@ -121,8 +125,23 @@ public static class SystemApi
             if (!IPAddress.TryParse(s.Cfg.BindAddress, out var ip) || IPAddress.IsLoopback(ip) && b.Bool("allowLoopback") != true)
                 return Ext.Bad("Choose the PC's LAN address first (installer or server.json 'bindAddress'); a certificate for 127.0.0.1 is useless on a phone.", 409);
             try { s.Ca.Enable(ip, b.Bool("recreate") == true); } catch (Exception e) { return Ext.Bad("Could not create the certificate: " + e.Message, 500); }
+            s.TlsAutoError = null;
+            if (b.Bool("recreate") == true) Tls.PhoneTrust.Clear(s.Db);   // F274 3.7: a new CA = every phone sets up again
             return Results.Json(new { ok = true, rootSha256 = s.Ca.RootSha256, setupUrl = $"http://{PhoneApi.PhoneHost(c, s)}:{s.Cfg.HttpPort}/tls/setup", note = "HTTPS uses the new certificate for new connections; restart the WavWiz service to apply it to the HTTPS port immediately." });
         }).Req(Role.Admin);
+
+        // F274 3.5: "Secure connection ✓" reported by a phone. Anonymous, but only over HTTPS (which proves the phone trusts the CA) from a
+        // home-network / Tailscale address, 10 a minute per address, 20 devices kept. It stores a label and a date and grants nothing.
+        g.MapPost("/tls/trusted", async (HttpContext c) =>
+        {
+            c.Response.Headers["Access-Control-Allow-Origin"] = "*";
+            var ip = c.Connection.RemoteIpAddress;
+            if (!Tls.PhoneTrust.AcceptsSource(c.Request.IsHttps, ip, s.Cfg.ExtraAllowedSubnets)) return Ext.Bad("Only a phone on the secure address can report this.", 403);
+            if (!Tls.PhoneTrust.Allow(ip!.ToString())) return Ext.Bad("Too many reports. Try again in a minute.", 429);
+            var b = await c.Request.Body();
+            Tls.PhoneTrust.Record(s.Db, b.ValueKind == System.Text.Json.JsonValueKind.Object && b.TryGetProperty("device", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String ? d.GetString() : null);
+            return Results.Json(new { ok = true });
+        }).Anon();
 
         // F261: remote HTTPS identity (default off). Tailscale needs the one-time Certificate Transparency acknowledgement; the PFX password is DPAPI-protected, never in server.json or logs.
         g.MapPost("/tls/remote", async (HttpContext c) =>

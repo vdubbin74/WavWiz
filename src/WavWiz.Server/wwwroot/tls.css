@@ -25,3 +25,13 @@ header img{border-radius:9px} h1{font-size:22px;margin:0} h2{font-size:19px;marg
 /* 0.6.8-#11g: copyable set-up address in the Home Screen app */
 #openInBrowser p:last-child{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .copyurl{flex:1 1 220px;min-width:0;font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid #444;background:#0b0f1a;color:inherit}
+/* F274: calm "make this phone secure" card (blue, never red), a big green Secure ✓, numbered big steps and the iPhone trust-switch callout */
+.card.info{border-color:#2f6fb5;background:#0f1d2e}
+.card.ok{background:#0e2416} .card.ok #statusTitle{color:#7be39a;font-size:22px}
+.steps.big>li h3{font-size:17px}
+.steps li.callout{border:2px solid #ffb300;border-radius:10px;padding:10px 12px 12px 54px;background:#2a2000;margin:8px 0}
+.steps li.callout::before{left:10px;top:10px}
+.steps li.callout h3{color:#ffd27a}
+details.card>summary{cursor:pointer;list-style:revert}
+a.other{color:var(--accent)}
+[hidden]{display:none!important}   /* F274: .btn sets display, so a hidden button must still hide */

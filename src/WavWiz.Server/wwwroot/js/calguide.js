@@ -33,7 +33,7 @@ export function calFix(msg, ctx = {}) {
   if (has(/too quiet|weak|low confidence|not confident/i)) return `${m.replace(/[.!]?$/, '.')} Move the mic closer, turn the test volume up, keep the room quiet, and retry. Still low? Use By ear.`;
   if (has(/permission|denied|not allowed|NotAllowedError/i)) return 'The microphone is blocked: allow microphone access for WavWiz in the browser or system settings, then retry.';
   if (has(/no (microphone|mic)|mic(rophone)? (not found|missing|unplugged)/i)) return 'No microphone found: plug one in or pick another mic (this PC, a phone, or a USB mic), then retry.';
-  if (has(/https|secure context/i)) return 'The phone mic needs HTTPS: set up HTTPS in Settings > Network (or use this PC\'s mic), then retry.';
+  if (has(/https|secure context/i)) return 'The phone\'s microphone needs a secure connection: set it up once on the phone (Settings > Devices > Phone & HTTPS > Make your phone secure), or use this PC\'s mic, then retry.';   // F274
   if (has(/offline|not connected|disconnected|unreachable/i)) return `${m.replace(/[.!]?$/, '.')} Turn ${who} on and wait until it shows as connected, then retry.`;
   if (has(/bluetooth/i)) return `${m.replace(/[.!]?$/, '.')} Bluetooth lag can drift: reconnect it, calibrate again, or set the delay by hand.`;
   if (has(/busy|already running|in progress/i)) return 'Another calibration is running: finish or cancel it, then retry.';

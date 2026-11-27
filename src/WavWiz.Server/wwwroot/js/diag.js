@@ -3,6 +3,7 @@ import { vizStats, webgl2Ok, vizPrefs, vizName } from './viz.js';
 import { loadReact } from './vizcore.js';
 import { airplayDevCard } from './airplaydev.js';
 import { netCard, netWait, netWaits, netSkipped, setNetSkipped, phoneOpenBox, RECHECK_MS } from './netstep.js';   // F273
+import { secureStep } from './securestep.js';   // F274
 
 const ICON = { ok: '✓', warn: '!', fail: '✕', unknown: '?' };
 export const roomPillClass = s => ({ ok: 'ok', idle: 'idle', buffering: 'warn', dropped: 'bad', reconnecting: 'bad', offline: 'offline' }[s] || 'idle');
@@ -234,8 +235,10 @@ export async function gettingStartedBody(S, go, { close, fresh = false } = {}) {
     step(next(), item('calibrate'), 'Calibrate your speakers', [h('button', { class: 'btn', disabled: !control, onclick: () => goClose('calibrate') }, 'Calibrate (PC microphone first)')], control ? 'Lines up the delay of every speaker. A USB or built-in PC microphone works best.' : 'Your access is view-only, so you can browse but not calibrate.'),
   ];
   later[0].querySelector('.grow')?.append(phoneOpenBox(lanUrl));
+  // F274 3.3: once a phone has opened WavWiz, the optional "Make your phone secure" sub-step (done only when a phone reported Secure ✓)
+  if (item('phone-open').done || item('phone').done) later[0].querySelector('.grow')?.append(secureStep(item('phone'), { onPhone: typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset') }));
   const steps = [netStep, ...(wait ? [netWait(later, { onSkip: () => refresh(false) })] : later)];
-  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test', 'calibrate', 'network', 'phone-open'].includes(i.id));
+  const rest = c.items.filter(i => !['server', 'library', 'speaker', 'test', 'calibrate', 'network', 'phone-open', 'phone'].includes(i.id));   // F274: phone = the sub-step above
   const body = h('div', { class: 'gs' },
     h('p', { class: 'dim' }, c.done ? 'Everything essential is set up. The optional steps below can wait.' : 'A few quick steps and WavWiz is playing in sync on your speakers.'),
     steps,

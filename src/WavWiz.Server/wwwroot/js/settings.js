@@ -20,6 +20,7 @@ import { phoneRole } from './calmic-core.js';
 import { historyCard, lastFmCard } from './history.js';
 import { inputsCard } from './inputs.js';   // 0.7.2 audio inputs
 import { announceSettingsRow } from './announce.js';   // 0.7.2 Announce: the chime switch
+import { trustedLabel, SECURE_QR, SECURE_SETUP_PATH } from './securestep.js';   // F274
 
 // 0.2.1 F8: four tabs - Appearance, Devices, Library, Network. The About tab is gone (Help > About); the Status card moved to Help > Diagnostics.
 // 0.3.0 §7: General (Backup) · Appearance · Playback (crossfade, leveling) · Devices (sub-tabs Players & access | Calibration) · Library · Network · Jukebox
@@ -122,25 +123,33 @@ export async function openSettings(S, refresh, nav, section) {
       h('p', { class: 'small' }, 'This phone is: ', h('b', null, { speaker: 'Playing music here', remote: 'Remote (silent)', mic: 'Calibration mic' }[cur] || 'Not chosen yet')),
       h('p', { class: 'small dim' }, 'Speaker, remote or calibration mic.'),
       h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { d.close(); changePhoneRole(); } }, 'Change…')))); }
+    // F261: remote HTTPS (Tailscale / own certificate) - status text; enabling Tailscale shows the Certificate Transparency disclosure once
+    const remoteTls = r => h('div', { id: 'sec-remote-tls' }, h('p', { class: 'small' + (r.error ? ' warn-t' : '') }, r.text),
+      r.caveat ? h('p', { class: 'small dim' }, r.caveat) : null,
+      admin ? h('div', { class: 'row wrap' }, r.mode === 'off'
+        ? h('button', { class: 'btn', onclick: async () => {
+            if (!r.ctAcknowledged && !(await ask('Turn on remote HTTPS with Tailscale?', r.ctDisclosure, { ok: 'Turn on' }))) return;   // 0.7.0 item 5c: the app's own dialog (0.3.0 §7.10 - no native confirm())
+            try { await api('/tls/remote', { method: 'POST', body: { mode: 'tailscale', acknowledgeCt: !r.ctAcknowledged } }); toast('Remote HTTPS turned on.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Use Tailscale HTTPS for remote access…')
+        : h('button', { class: 'btn ghost', onclick: async () => { try { await api('/tls/remote', { method: 'POST', body: { mode: 'off' } }); toast('Remote HTTPS turned off.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Turn off remote HTTPS')) : null);
     cal.push(h('div', { class: 'card', id: 'sec-phone' }, h('h3', null, 'Phone & HTTPS'),
-      learn('A phone only allows its microphone on a trusted HTTPS page. Install the WavWiz certificate once on each phone.', 'WavWiz makes its own small certificate that is valid only for this PC\'s address. A phone that plays as a speaker also gets more reliable sound on HTTPS.'),
-      st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'HTTPS is on.'),
-        h('div', { class: 'row wrap', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: '/tls/qr.svg?to=setup', alt: 'QR code for the phone set-up page', width: 200, height: 200 })),
-          h('div', { class: 'grow' }, h('p', null, h('b', null, 'On the phone: '), 'point the camera at the code and tap the link. It shows the steps (about two minutes) and checks they worked.'),
-            h('p', { class: 'small' }, 'No camera? Open ', h('a', { href: '/tls/setup', target: '_blank', rel: 'noopener' }, 'the set-up page'), ' on the phone by typing its address.'),
+      learn('Everything works on a phone already. A secure connection is only needed for the phone\'s microphone: calibrating speakers, Announce and Check with phone. Set it up once on each phone (about 2 minutes).', 'WavWiz makes its own small certificate that is valid only for this PC\'s addresses, so it cannot be used for any other website.'),
+      // F274: the secure connection is on by default (D1); "off" or "error" always says what still works and has one button
+      st.tls.enabled ? h('div', null, h('p', { class: 'okc' }, 'Secure connection for phones is on.'),
+        st.tls.renewalError && admin ? h('div', { class: 'small amber', role: 'note', id: 'sec-phone-again' }, 'Your PC\'s address changed, so phones need the secure connection set up again. ',
+          h('button', { class: 'btn sm', onclick: async () => { if (!(await ask('Set up phones again?', 'WavWiz makes a new certificate. Each phone must repeat the steps, and remove the old WavWiz profile (iPhone: Settings > General > VPN & Device Management).', { ok: 'Set up again' }))) return; try { const r = await api('/tls/enable', { method: 'POST', body: { recreate: true } }); toast('New certificate made. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up secure connection again')) : null,
+        h('div', { class: 'row wrap', style: 'align-items:flex-start' }, h('div', { class: 'qr' }, h('img', { src: SECURE_QR, alt: 'QR code for the secure-connection set-up page', width: 200, height: 200 })),
+          h('div', { class: 'grow' }, h('p', null, h('b', null, 'On the phone: '), 'point the camera at the code and tap the link. It shows the steps for that phone (about two minutes) and checks they worked.'),
+            h('p', { class: 'small' }, 'No camera? Open ', h('a', { href: SECURE_SETUP_PATH, target: '_blank', rel: 'noopener' }, 'the set-up page'), ' on the phone by typing its address.'),
+            h('p', { class: 'small', id: 'sec-phone-list' }, h('b', null, 'Phones with a secure connection: '), (st.tls.trustedDevices || []).length ? trustedLabel(st.tls.trustedDevices) : 'none yet.'),
             h('p', { class: 'small mono dim' }, 'Certificate fingerprint (SHA-256): ' + st.tls.rootSha256))),
         admin ? h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Certificate refreshed. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Refresh certificate (after an address change)')) : null)
-        : h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up HTTPS')), admin ? null : adminTag()),
-      // F261: remote HTTPS (Tailscale / own certificate) - status text; enabling Tailscale shows the Certificate Transparency disclosure once
-      st.tls.remote ? h('div', { id: 'sec-remote-tls' }, h('p', { class: 'small' + (st.tls.remote.error ? ' warn-t' : '') }, st.tls.remote.text),
-        st.tls.remote.caveat ? h('p', { class: 'small dim' }, st.tls.remote.caveat) : null,
-        admin ? h('div', { class: 'row wrap' }, st.tls.remote.mode === 'off'
-          ? h('button', { class: 'btn', onclick: async () => {
-              const r = st.tls.remote; if (!r.ctAcknowledged && !(await ask('Turn on remote HTTPS with Tailscale?', r.ctDisclosure, { ok: 'Turn on' }))) return;   // 0.7.0 item 5c: the app's own dialog (0.3.0 §7.10 - no native confirm())
-              try { await api('/tls/remote', { method: 'POST', body: { mode: 'tailscale', acknowledgeCt: !r.ctAcknowledged } }); toast('Remote HTTPS turned on.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Use Tailscale HTTPS for remote access…')
-          : h('button', { class: 'btn ghost', onclick: async () => { try { await api('/tls/remote', { method: 'POST', body: { mode: 'off' } }); toast('Remote HTTPS turned off.'); draw(); } catch (e) { toast(e.message, true); } } }, 'Turn off remote HTTPS')) : null) : null,
+        : h('div', null, h('p', { class: 'small' + (st.tls.state === 'error' ? ' amber' : '') }, st.tls.state === 'error' ? `Secure connection for phones couldn't be set up: ${st.tls.error}. Music works normally.` : 'Off. Music works. Phones need it only for the microphone.'),
+          h('div', { class: 'row' }, adminOnly(S, h('button', { class: 'btn primary', onclick: async () => { try { const r = await api('/tls/enable', { method: 'POST', body: {} }); toast('Secure connection is set up. ' + r.note); draw(); } catch (e) { toast(e.message, true); } } }, 'Set up secure connection')), admin ? null : adminTag())),
+      // F274 W3: remote HTTPS (F261) is shown only when it is in use; otherwise it sits under Advanced > Secure remote access (Tailscale)
+      st.tls.remote && st.tls.remote.mode !== 'off' ? remoteTls(st.tls.remote) : null,
       // 0.3.0 §7.2: the redirect option lives under Advanced, with a warning. Default stays off.
       h('details', { class: 'advanced', id: 'sec-redirect' }, h('summary', { class: 'small' }, 'Advanced'),
+        st.tls.remote && st.tls.remote.mode === 'off' ? h('div', { class: 'small' }, h('b', null, 'Secure remote access (Tailscale)'), remoteTls(st.tls.remote)) : null,
         h('p', { class: 'warn-t small', role: 'note' }, 'Turning this on can stop phones and calibration from loading. Leave off unless you know you need it.'),
         h('label', { class: 'row', style: 'margin-top:8px' }, adminOnly(S, h('input', { type: 'checkbox', checked: settings['tls.redirect'] === true, onchange: ev => putSettings({ 'tls.redirect': ev.target.checked }) })), 'Send web browsers on other devices to the secure (HTTPS) address. (WavWiz Player on your PCs is never redirected.)', admin ? null : adminTag()))));
 

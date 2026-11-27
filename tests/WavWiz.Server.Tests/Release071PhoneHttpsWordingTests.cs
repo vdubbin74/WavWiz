@@ -22,15 +22,15 @@ public class Release071PhoneHttpsWordingTests
         var page = await f.Http.GetStringAsync("/tls/setup");
         if (!f.Server.S.Ca.Enabled)
         {
-            Assert.Contains("HTTPS is not switched on yet", page);
-            Assert.Contains("Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS", page);
+            Assert.Contains("Secure connection isn't ready yet", page);            // F274 W1: what it means, what still works, one button
+            Assert.Contains("<b>Set up secure connection</b> on the PC", page); Assert.DoesNotContain("HTTPS is not switched on yet", page);
             Assert.DoesNotContain("Settings &rsaquo; Phone &amp; HTTPS", page);
         }
         var src = string.Join("\n", new[] { "DiagnosticsApi.cs", "SystemApi.cs", "PhoneApi.cs" }.Select(n => File.ReadAllText(Path.Combine(RepoRoot(), "src", "WavWiz.Server", "Api", n))));
         Assert.DoesNotContain("Settings > Phone & HTTPS", src);
-        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(src, "Settings > Devices > Phone & HTTPS").Count);
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(src, "Settings > Devices > Phone & HTTPS").Count);   // F274: the phone page names the button instead
         Assert.DoesNotContain("Settings &rsaquo; Phone &amp; HTTPS", src);
-        Assert.Contains("Settings &rsaquo; Devices &rsaquo; Phone &amp; HTTPS", src);
+        Assert.DoesNotContain("HTTPS is not switched on", src);
     }
     private static string RepoRoot() { var d = new DirectoryInfo(AppContext.BaseDirectory); while (d != null && !Directory.Exists(Path.Combine(d.FullName, "src", "WavWiz.Server"))) d = d.Parent; return d!.FullName; }
 }

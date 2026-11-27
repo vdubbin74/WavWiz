@@ -386,9 +386,9 @@ function phoneMicCard(S, admin, { onSession, scope } = {}) {
     qr.replaceChildren(h('img', { src: `/api/v1/calibration/phone-link/${link.token}/qr.svg`, alt: 'QR code that opens the calibration mic page on your phone', width: 168, height: 168 }));
     short.textContent = link.shortUrl.replace(/^http:\/\//, '');
     notes.replaceChildren(
-      !link.https ? h('p', { class: 'small amber' }, 'HTTPS is not set up on this PC yet, so the phone cannot use its microphone. ',
-        admin ? h('button', { class: 'btn sm', onclick: async () => { try { await api('/tls/enable', { method: 'POST', body: {} }); toast('HTTPS is set up'); make(); } catch (e) { toast(calFix(e.message), true); } } }, 'Set up HTTPS')
-          : 'Ask the administrator to set it up (Settings > Devices > Phone & HTTPS).') : null,
+      !link.https ? h('p', { class: 'small amber' }, 'Your phone needs a secure connection to use its microphone (one-time, about 2 minutes). ',   // F274 W5
+        admin ? h('button', { class: 'btn sm', onclick: async () => { try { await api('/tls/enable', { method: 'POST', body: {} }); toast('Secure connection is set up'); make(); } catch (e) { toast(calFix(e.message), true); } } }, 'Set up secure connection')
+          : 'Ask the administrator to press Set up secure connection (Settings > Devices > Phone & HTTPS).') : null,
       !link.allSpeakers ? h('p', { class: 'small dim' }, 'With your QR code the phone calibrates only your own speaker. An administrator’s QR code calibrates every speaker.') : null);
     paint(null); poll();
   }
