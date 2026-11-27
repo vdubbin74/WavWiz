@@ -35,7 +35,7 @@ server PC also runs a player and talks to the server exactly like every other pl
 9. **Server runs as `LocalService`** (least privilege); library folders must be readable by it. The first-run page checks and says which account needs read access. Local paths/UNC only, never `Y:\`.
 10. **Binding**: server binds only to the chosen LAN IP (installer proposes the detected private IPv4; loopback until chosen); `0.0.0.0` needs an explicit opt-in. Non-private source addresses refused. Firewall: Private profile, local subnet, ports 47800/47443/47801/47802/UDP.
 11. **Auth**: first-run admin password (PBKDF2), 6-digit player pairing code (5 min) -> device token (DPAPI on the player), roles admin/control/view, HttpOnly SameSite=Lax cookie (0.7.3; was Strict, which iPhone Safari withheld from pages opened from a QR code) + Bearer; every cookie-authenticated write / WebSocket needs a same-host Origin. Login rate-limited.
-12. **HTTPS**: per-install root CA on server PC with name constraints, server cert for LAN IP + hostnames, `/tls/setup` page + QR, Android `.crt`, iPhone `.mobileconfig`. Needed for phone-mic calibration; wizard detects `isSecureContext === false` and links to setup.
+12. **HTTPS**: per-install root CA on server PC with name constraints, server cert for LAN IP + hostnames, `/tls/setup` page + QR, Android `.crt`, iPhone `.mobileconfig`. Needed for phone-mic calibration; wizard detects `isSecureContext === false` and links to setup. 0.7.3 (F274): `Tls/TlsAuto` turns it on at start when it is off and the server has a home address (not loopback, not a Docker bridge without `WAVWIZ_ADVERTISE_ADDRESS`); a failure is the tls state `error`. Phone QR codes (calibration too, `PhoneApi.SecurePath`) open the plain-http set-up page, which continues to the secure address once the phone trusts the CA; `PhoneTrust` lists phones that reported Secure ✓.
 13. **Installer**: Inno Setup under Wine, earlier installer lessons applied (see `docs/INSTALLER.md`): PS 5.1 rules, scan tool, no hidden-window UI, every step logged with a watchdog, failure messages with file:line, idempotent re-runs, BOM-less config, wizard error box shows install.log.
 14. **Parked (spec 0.5)**: sleep timer, party mode, announce/duck, follow-me, smart library, radio favorites/recording, scrobbling, panic stop/volume cap, active crossover, iPhone app, visualizer (static placeholder), skins loading, crossfade, Opus/FLAC transport, advanced DSP.
 
@@ -70,3 +70,17 @@ server PC also runs a player and talks to the server exactly like every other pl
 * **Phone role**: `localStorage['wavwiz.phoneRole']` = `speaker|mic`; `?role=` overrides; asked once with a modal dialog before any auto-join.
 * **Settings**: `.appnav.subtabs` row under the main tabs (`.appstack`), `dialog.settings-dlg` up to 1200 px.
 
+## 0.7.2 / 0.7.3 additions: audio inputs
+User guide: [AUDIO-INPUTS.md](AUDIO-INPUTS.md).
+* **Capture** (Player, Windows only): `WasapiInputProvider` lists the inputs.
+  * `loopback:process` = WASAPI process loopback of the Player's own PID with `ExcludeTargetProcessTree`, 48 kHz float stereo, on build 19041+. Older builds get `loopback:device` = the default multimedia render endpoint, refused when it is the Player's active output (`InputRules.EchoRefused`).
+  * Capture endpoints are classified by form factor and name as spdif / aux / mic. Stereo Mix-style devices are hidden.
+  * `NoInputProvider` is used elsewhere.
+* **Link**: on the Player's existing audio TCP connection, only when both Hellos carry the `inputs` capability.
+  * `INPUT_CMD` (14, JSON `InputCmd`) runs server -> Player: start / stop / stop-all, localsync-on/off, selfmute-on/off, media-pause.
+  * `INPUT_AUDIO` (13) runs Player -> server: u8 idLen | id | u32 rate | u8 channels | i64 serverUs | pcm24, at most rate/10 frames.
+  * `PlayerCore/InputResponder` sends from one sender thread through a 100-message drop-oldest queue, stamps serverUs from the ClockModel, and stops everything on disconnect.
+* **Server**: `Inputs/InputService` accepts only a server-PC Player (`IsServerPc`: loopback remote or same machine name).
+  * Each input has a `LiveFeed` (TargetMs 800): resample to 48 kHz, drift trim, gain, `LiveLimiter`. Playing it is `Conductor.BeginLive("input", …)` and Stop is `EndLive`, as with AirPlay.
+  * serverUs is decoded but not used yet.
+  * Loopback Real time sends `selfmute-on` when the source PC's own Player hears that stream. Sync (`LocalSyncRules` + `Player/LocalSync`, IPolicyConfig) moves Windows' default output to a spare output and pins the Player's output to the speakers, with a restore file written before the switch.

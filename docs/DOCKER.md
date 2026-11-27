@@ -1,10 +1,10 @@
-# WavWiz server in Docker (0.7.2, F166/F167)
+# WavWiz server in Docker (0.7.3, F166/F167)
 
 Headless WavWiz **server** (not the Windows Player) for a home server, NAS, mini PC, or Raspberry Pi 4/5, on **64-bit Intel/AMD (`linux/amd64`)** and **64-bit ARM (`linux/arm64`)**. Same web UI, zones, scenes, schedules, alarms, Jukebox and Remote as on Windows.
 Audio plays on WavWiz Players (Windows PCs), phones/browsers, Cast and AirPlay 1 speakers, and (0.7.0) the host's own sound card when you
 pass `/dev/snd` through, see [Local speakers](#local-speakers-070).
 
-**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.7.2`, `latest`) is a **multi-arch** image (`linux/amd64` and `linux/arm64`). Docker picks the right platform automatically. The amd64 image runs on x86-64 Linux hosts (including many NAS boxes and mini PCs). The arm64 image is for Raspberry Pi 4/5 on 64-bit Raspberry Pi OS; it has been built and smoke-tested under QEMU emulation only and is **not yet verified on real Pi hardware**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
+**Published image:** `docker.io/vdubbin74/wavwiz-server` (tags `0.7.3`, `latest`) is a **multi-arch** image (`linux/amd64` and `linux/arm64`). Docker picks the right platform automatically. The amd64 image runs on x86-64 Linux hosts (including many NAS boxes and mini PCs). The arm64 image is for Raspberry Pi 4/5 on 64-bit Raspberry Pi OS; it has been built and smoke-tested under QEMU emulation only and is **not yet verified on real Pi hardware**. See [RASPBERRY-PI.md](RASPBERRY-PI.md).
 
 ## Limits vs the Windows app
 
@@ -12,6 +12,7 @@ Docker is a **server only** build. It does not do everything the full Windows ap
 
 - **Headless:** no microphone on the Docker host (use a WavWiz Player PC's mic or a phone for calibration). Local speakers need `/dev/snd` (0.7.0).
 - **No CD ripping**, **no Windows share logins**.
+- **No audio inputs** (This PC · Speakers, Aux in, S/PDIF in, microphones as sources): they come only from the WavWiz Player on a Windows server PC, see [AUDIO-INPUTS.md](AUDIO-INPUTS.md). Announce from a phone or PC browser works.
 - **No AirPlay 2 / Sonos / HomePod output.**
 - **Windows Docker Desktop:** no real `network_mode: host`, so discovery (mDNS, AirPlay, Players finding the server) is weaker. Use published ports, see [Windows Docker Desktop (step-by-step)](#windows-docker-desktop-step-by-step).
 - **Want PC speakers or richer output?** Pair a Windows Player (or run the full Windows app).
@@ -24,7 +25,7 @@ Docker is a **server only** build. It does not do everything the full Windows ap
 # docker-compose.yml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.7.2
+    image: docker.io/vdubbin74/wavwiz-server:0.7.3
     container_name: wavwiz
     network_mode: host          # recommended: discovery (UDP) + mDNS need it
     user: "10001:10001"
@@ -58,7 +59,7 @@ Docker Desktop on Windows does **not** give real `network_mode: host` to the bro
 ```yaml
 services:
   wavwiz:
-    image: docker.io/vdubbin74/wavwiz-server:0.7.2
+    image: docker.io/vdubbin74/wavwiz-server:0.7.3
     container_name: wavwiz
     user: "10001:10001"
     restart: unless-stopped
@@ -146,6 +147,11 @@ server sees it is in a bridge-mode container without it, the log says so at star
 Players (0.7.1) also skip a Docker-internal address when the answer came from a reachable one (the host, through the published discovery
 port), and never "move" a working connection to one — but setting the address is the reliable fix.
 
+**Phones' secure connection (0.7.3).** When HTTPS for phones is not on yet, the server turns it on by itself at start if it has a home-network
+address: with host networking, or in bridge mode with `WAVWIZ_ADVERTISE_ADDRESS` set. In bridge mode without it (and on loopback) it stays
+manual: Settings > Devices > Phone & HTTPS. HTTPS that is already on is left as it is. If it fails, Settings shows the error and the reason.
+Phone QR codes open the plain-http set-up page, which walks the phone through trusting the certificate and then continues to the secure address.
+
 **Server name.** Docker names a container after its id (`3f2a9c1b7d4e`), so Players listed "WavWiz on 3f2a9c1b7d4e". A container whose
 host name is only its id now shows as **WavWiz (Docker)**. Set `WAVWIZ_SERVER_NAME` (or `hostname:` in compose) for your own name; the
 server name an admin sets in Settings always wins.
@@ -203,7 +209,7 @@ Host networking shares ports with the host, so on a machine already running WavW
 ```yaml
 services:
   wavwiz-sbs:
-    image: docker.io/vdubbin74/wavwiz-server:0.7.2
+    image: docker.io/vdubbin74/wavwiz-server:0.7.3
     network_mode: host
     user: "10001:10001"
     environment:
@@ -226,7 +232,7 @@ Auto-update is off. `docker compose pull && docker compose up -d`. (Watchtower w
 
 ## Not on Linux
 
-Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, AirPlay 2 / Sonos / HomePod **output**, the server's microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins; local speakers need `/dev/snd` (0.7.0). These are hidden or labelled in the UI.
+Summary of [Limits vs the Windows app](#limits-vs-the-windows-app): CD ripping, audio inputs, AirPlay 2 / Sonos / HomePod **output**, the server's microphone (use a WavWiz Player PC's mic or a phone for calibration), Windows share logins; local speakers need `/dev/snd` (0.7.0). These are hidden or labelled in the UI.
 
 ## Building the image (local / experimental)
 
@@ -236,8 +242,8 @@ The Dockerfile cross-builds `linux/amd64` and `linux/arm64` (the .NET build runs
 docker build -t wavwiz-server:dev .
 # 0.7.0 multi-arch build into the local image store (no push). On an x86-64 machine register QEMU for arm64 once:
 docker run --privileged --rm tonistiigi/binfmt --install arm64
-docker buildx build --platform linux/amd64,linux/arm64 -t wavwiz-server:0.7.2-dev --load .
+docker buildx build --platform linux/amd64,linux/arm64 -t wavwiz-server:0.7.3-dev --load .
 # needs Docker's containerd image store for a multi-platform --load; add --network host if the build can't reach the internet,
 # and --build-arg APT_HTTPS=1 if your proxy blocks plain-http apt mirrors.
-docker run --rm --platform linux/arm64 --network host wavwiz-server:0.7.2-dev    # try the arm64 image under QEMU (slow)
+docker run --rm --platform linux/arm64 --network host wavwiz-server:0.7.3-dev    # try the arm64 image under QEMU (slow)
 ```

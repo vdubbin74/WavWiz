@@ -11,6 +11,10 @@ export const PHONO_WARN = 'Very quiet - is the turntable plugged in without a ph
 export const MIC_MUTED = 'Muted - for Announce. An administrator can make it a live source.';
 export const INPUT_TERMS = 'audio inputs aux in line in turntable record player vinyl phono s/pdif spdif optical coaxial microphone mic headset announce this pc speakers what you hear loopback';
 /** Meters re-ask the server every 20 s while shown (its lease is 30 s, so a closed page stops capture by itself). */
+/** 0.7.3 t2251u: the guide (docs/AUDIO-INPUTS.md): what This PC · Speakers is, requirements, Real time vs Sync, how it works, troubleshooting.
+ *  Opens in the system browser from the WavWiz Player (NewWindowRequested). */
+export const INPUTS_GUIDE_URL = 'https://github.com/vdubbin74/WavWiz/blob/main/docs/AUDIO-INPUTS.md';
+export const INPUTS_GUIDE_TEXT = 'How audio inputs work: This PC \u00b7 Speakers, Real time and Sync, troubleshooting';
 export const METER_RENEW_MS = 20000;
 
 /** 0.7.2 t2170u: Windows' microphone privacy page. The Player opens it on this exact message only (Forms.cs); a browser shows the path. */
@@ -198,6 +202,7 @@ export function inputsCard(S, { admin }) {
   const list = h('div', { class: 'inp-setlist' }), note = h('p', { class: 'dim small' });
   const card = h('div', { class: 'card', id: 'sec-inputs' }, h('h3', null, INPUTS_TITLE),
     h('p', { class: 'small dim' }, 'Sound plugged into the server PC: Aux in (with Turntable mode for a record player), S/PDIF in, microphones and headsets, and anything else this PC plays. Each one plays like a radio station in a zone; Stop brings back what was there, paused.'),
+    h('p', { class: 'small inp-guide' }, h('a', { href: INPUTS_GUIDE_URL, target: '_blank', rel: 'noopener' }, INPUTS_GUIDE_TEXT)),
     note, list, h('span', { class: 'setterms', hidden: true }, INPUT_TERMS));
   let data = { inputs: [] };
   const put = async (id, body) => { try { data = await api(`/inputs/${id}`, { method: 'PUT', body }); draw(); } catch (e) { toast(e.message, true); draw(); } };
