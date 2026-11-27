@@ -37,7 +37,7 @@ test('pcInput / pcNow / pcQueue: only audio inputs are renamed', async () => {
 
 test('wired where the labels are shown: Library > Inputs, Settings, Now Playing / Queue (main) and the mini player', () => {
   const inp = src('inputs'), main = src('main'), mini = src('mini');
-  assert.match(inp, /import \{ pcInput \} from '\.\/pcname\.js'/);
+  assert.match(inp, /import \{ pcInput, sourceLine \} from '\.\/pcname\.js'/);   // 0.7.3 t2234u: + the Source line
   assert.match(inp, /list\.map\(i => tile\(pcInput\(i, S\.auth\)\)\)/);
   assert.match(inp, /l\.map\(i => row\(pcInput\(i, S\.auth\)\)\)/);
   assert.match(main, /S\.now = pcNow\(r\.now, S\.auth\); S\.queue = pcQueue\(r\.queue\.items, S\.auth\)/);

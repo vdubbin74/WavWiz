@@ -105,7 +105,7 @@ export function mountMini(root, { embedded = false, run = null, home = null, rep
   if (!embedded) document.addEventListener('contextmenu', ev => { ev.preventDefault(); if (!send('menu', { opacity: opac / 100, pinned })) setOpMode(true); });   // 0.6.9 #9: the in-app player has no window menu
   const ctl = h('div', { class: 'mp-ctl' }, h('div', { class: 'mp-tr' }, prev, play, next, mute));   // F85: the embedded player adds its mixer button here (below)
   // 0.4.8 F54: the condensed (embedded) player has no volume slider - the Master volume mixer button sits in its place; the standalone mini keeps it
-  const mixB = !solo ? h('button', { type: 'button', class: 'mutebtn mixbtn mp-mix', 'data-act': 'mixer', 'aria-label': 'Volume mixer', title: 'Volume mixer in Devices (Alt+V)', onclick: ev => { ev.stopPropagation(); window.dispatchEvent(new CustomEvent('wavwiz:mixer')); } }, icon('mixer')) : null;
+  const mixB = !solo ? h('button', { type: 'button', class: 'mutebtn mixbtn mp-mix', 'data-act': 'mixer', 'aria-pressed': String(document.documentElement.classList.contains('mx-open')), 'aria-label': 'Volume mixer', title: 'Volume mixer in Devices (Alt+V)', onclick: ev => { ev.stopPropagation(); window.dispatchEvent(new CustomEvent('wavwiz:mixer')); } }, icon('mixer')) : null;
   // 0.4.9 F85: window transparency only means something in the standalone Player window; the embedded player has no window of its own, so the
   // "Transparency" chip is gone there. The mixer button joins the transport row and the freed row shows the active visualizer (small, preview quality).
   if (mixB) ctl.firstChild.append(mixB);

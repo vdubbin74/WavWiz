@@ -3385,7 +3385,7 @@ html.pd42-open .pd42-sheet{pointer-events:auto}
 @media (max-width:1100px){ .listpanel .qzwrap .qediting{display:none} .listpanel .qzwrap{gap:4px;margin:0 4px} }
 /* 0.4.8 F49: Master volume mixer button (player bars, Devices MASTER row) */
 .mixbtn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)}
-.mixbtn:hover:not([disabled]){border-color:var(--accent);color:var(--accent-text,var(--accent))}
+@media (hover:hover){.mixbtn:hover:not([disabled]){border-color:var(--accent);color:var(--accent-text,var(--accent))}}   /* 0.7.3 t2237u: no sticky tap hover that looks like "on" */
 .mixbtn:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
 .mixbtn .ic svg{width:16px;height:16px}
 .np-volrow .mixbtn,.ns-vol .mixbtn,.npb-vol .mixbtn,.mp-vol .mixbtn{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--panel2)}
@@ -6662,3 +6662,42 @@ html.phonelook :is(.numrow-l,.boostrow-l){min-width:0!important;flex:1 1 100%}
 html.phonelook .boostrow .boost-range{flex:1 1 auto;min-width:0}
 html.phonelook .tls-qrrow>.grow{flex:1 1 220px;min-width:0}
 /* end 0.7.3 t2231u */
+
+/* 0.7.3 t2234u: Audio inputs name box gets a label + Source line; token buttons stack on narrow screens; Spotify Connect label on one line */
+.inp-namebox{display:flex;flex-direction:column;gap:3px;min-width:0}
+.inp-namef{display:flex;flex-direction:column;gap:2px;min-width:0}
+.inp-namel{font-weight:600;color:var(--dim);letter-spacing:.01em}
+.inp-src{white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.35}
+.tok-btns{flex-wrap:wrap;gap:8px}
+.tok-btns .btn{white-space:nowrap}
+html.phonelook .tok-btns{flex-direction:column;align-items:stretch}
+html.phonelook .tok-btns .btn{width:100%;justify-content:center;text-align:center}
+.spot-row>b{white-space:nowrap}
+.spot-row.wrap{column-gap:10px;row-gap:2px}
+.spot-row.wrap>.dim{flex:1 1 140px;min-width:0}
+/* end 0.7.3 t2234u */
+/* 0.7.3 t2235u / t2236u: zone box + Volume Mixer polish.
+   (a) the gap under a zone box's volume slider (Devices and the mixer alike): an idle box's header kept the 8 px bottom margin of its old
+   divider line (the line itself was removed), and the header's 8 px bottom padding stacked on the zone card's own top padding (+4 px more in
+   the mixer). Now about 10 px from the slider to the first zone row, idle or playing.
+   (b) mixer: the speaker's grip strip spans the whole speaker block (both lines and, when open, its Max volume / Delay drawer).
+   (c) mixer drawer sliders use the standard thumb (as the speaker volume rows), not the 30 px phone thumb of the old mixer window. */
+.qb42.idle .qb42-head{margin-bottom:0}
+.tree42 .qb42-head:has(+.zwrap42){padding-bottom:2px}   /* the zone card under it brings its own top padding */
+.tree42.mx-on .qb42-head+.zwrap42>.zcard42:first-child{padding-top:0}
+.tree42.mx-on .sp42.mx-sp{position:relative}
+.tree42 .sp42.mx-sp>.dgrip42{position:absolute;left:0;top:8px;bottom:4px;height:auto;margin:0!important}
+.tree42.mx-on .sp42.mx-sp>.dgrip42+.dot{margin-left:19px}   /* the grip (3 px + 8 px) and the row gap (8 px) it used to take in the line */
+.tree42.mx-on .sp42.mx-sp:has(+.mx-drawer:not([hidden]))>.dgrip42{bottom:0;border-radius:1px 1px 0 0}
+.tree42.mx-on .sp42.mx-sp+.mx-drawer{position:relative;--mxdl:22px}
+html.phonelook .tree42.mx-on .sp42.mx-sp+.mx-drawer{--mxdl:8px}
+.tree42.mx-on .sp42.mx-sp+.mx-drawer::before{content:"";position:absolute;left:calc(-1 * var(--mxdl));top:-4px;bottom:2px;width:3px;border-radius:0 0 1px 1px;background:color-mix(in srgb,var(--dim) 40%,transparent);pointer-events:none}
+.tree42.mx-on .mx-drawer input.mv-s::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px}
+.tree42.mx-on .mx-drawer input.mv-s::-moz-range-thumb{width:18px;height:18px}
+/* end 0.7.3 t2235u */
+/* 0.7.3 t2237u: the Volume mixer button shows the mode itself (aria-pressed, set by mixer.js), never focus or a tap's hover:
+   a filled accent button with a white icon in every theme; keyboard focus keeps its outline. */
+.mixbtn[aria-pressed=true],.mixbtn[aria-pressed=true]:hover:not([disabled]){background:var(--accent)!important;border-color:var(--accent)!important;color:#fff!important}
+.mixbtn[aria-pressed=true] .ic svg{color:#fff}
+.mixbtn[aria-pressed=true]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+/* end 0.7.3 t2237u */

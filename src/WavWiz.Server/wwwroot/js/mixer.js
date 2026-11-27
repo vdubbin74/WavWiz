@@ -22,11 +22,16 @@ export function setMixer(v) {
   v = !!v; if (v === on) return on; on = v;
   if (!on) { openDr.clear(); ctlKey = null; }
   try { document.documentElement.classList.toggle('mx-open', on); } catch { /* node */ }
+  paintMixerButtons();
   fire('wavwiz:mixermode', { on }); fire('wavwiz:devredraw');
   return on;
 }
+/** 0.7.3 t2237u: every Volume mixer button shows the real mode (aria-pressed), not focus or a touch's sticky hover. */
+export function paintMixerButtons(root = typeof document !== 'undefined' ? document : null) {
+  root?.querySelectorAll?.('button.mixbtn[data-act="mixer"]').forEach(b => b.setAttribute('aria-pressed', String(on)));
+}
 export function mixerButton(cls = '') {
-  return h('button', { type: 'button', class: 'mixbtn ' + cls, 'data-act': 'mixer', 'aria-label': 'Volume mixer', title: 'Volume mixer: every zone and speaker in Devices (Alt+V)', onclick: ev => { ev.stopPropagation(); fire('wavwiz:mixer'); } }, icon('mixer'));
+  return h('button', { type: 'button', class: 'mixbtn ' + cls, 'data-act': 'mixer', 'aria-pressed': String(on), 'aria-label': 'Volume mixer', title: 'Volume mixer: every zone and speaker in Devices (Alt+V)', onclick: ev => { ev.stopPropagation(); fire('wavwiz:mixer'); } }, icon('mixer'));
 }
 /** The Volume Mixer bar at the top of the Devices panel (sticky on PC, pinned under the header on the phone). */
 export function mixerBar() {

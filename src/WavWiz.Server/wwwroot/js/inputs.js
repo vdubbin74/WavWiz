@@ -3,7 +3,7 @@
 // Server: /api/v1/inputs (InputsApi). Events: 'inputs' (list changed) and 'inputlevel' ({ id, peakDb, phonoLow }) arrive as wavwiz:inputs / wavwiz:inputlevel.
 import { h, api, toast, getApiZone, dialog } from './util.js';
 import { canControl, isAdmin } from './ui.js';
-import { pcInput } from './pcname.js';   // 0.7.3: "PCBOXV2 · Speakers" on phones, "This PC · Speakers" on that PC
+import { pcInput, sourceLine } from './pcname.js';   // 0.7.3: "PCBOXV2 · Speakers" on phones, "This PC · Speakers" on that PC
 
 export const INPUTS_TITLE = 'Audio inputs';
 export const NO_INPUTS = 'No audio inputs found on the server PC.';
@@ -125,7 +125,7 @@ export function inputsView(S) {
   const tile = i => {
     const act = mainAction(i, canControl(S));
     const kids = [
-      h('div', { class: 'inp-top' }, glyph(i), h('div', { class: 'inp-txt' }, h('b', { class: 'ell' }, i.name), h('span', { class: 'small dim ell' }, i.source))),
+      h('div', { class: 'inp-top' }, glyph(i), h('div', { class: 'inp-txt' }, h('b', { class: 'ell' }, i.name), h('span', { class: 'small dim inp-src' }, sourceLine(i)))),
       h('div', { class: 'inp-badges' }, ...inputBadges(i).map(([t, c]) => h('span', { class: 'pill ' + c }, t))),
       showMeter(i) ? meter(i) : null,
       i.playing ? h('p', { class: 'small inp-where' }, whereText(i, S.zones)) : null,
@@ -203,12 +203,12 @@ export function inputsCard(S, { admin }) {
   const put = async (id, body) => { try { data = await api(`/inputs/${id}`, { method: 'PUT', body }); draw(); } catch (e) { toast(e.message, true); draw(); } };
   const sw = (label, on, change, dis = false, hint = null) => h('label', { class: 'row inp-sw' }, h('input', { type: 'checkbox', checked: !!on, disabled: !admin || dis, onchange: ev => change(ev.target.checked) }), h('span', null, label), hint ? h('span', { class: 'small dim' }, hint) : null);
   const row = i => {
-    const name = h('input', { type: 'text', value: i.name, maxlength: 40, 'aria-label': `Name for ${i.device}`, disabled: !admin, onchange: ev => put(i.id, { name: ev.target.value.trim() || null }) });
+    const name = h('input', { type: 'text', value: i.name, maxlength: 40, placeholder: i.defaultName || '', 'aria-label': `Display name for ${i.device}`, title: 'Shown in the Library, Now Playing and the queue. Leave it empty to go back to ' + (i.defaultName || 'the default name') + '.', disabled: !admin, onchange: ev => put(i.id, { name: ev.target.value.trim() || null }) });
     const gain = h('input', { type: 'range', min: -12, max: gainMax(i), step: 0.5, value: i.gainDb, 'aria-label': `${i.name} gain`, disabled: !admin });
     const gv = h('span', { class: 'mono small inp-gv' }, fmtGain(i.gainDb));
     gain.oninput = () => { gv.textContent = fmtGain(+gain.value); }; gain.onchange = () => put(i.id, { gainDb: +gain.value });
     return h('div', { class: 'inp-setrow', 'data-kind': i.kind, 'data-id': i.id },
-      h('div', { class: 'row inp-sethead' }, glyph(i), h('div', { class: 'grow' }, name, h('div', { class: 'small dim ell' }, i.source + (i.kind !== 'loopback' && i.device && i.device !== i.name ? ' · ' + i.device : ''))),
+      h('div', { class: 'row inp-sethead' }, glyph(i), h('div', { class: 'grow inp-namebox' }, h('label', { class: 'inp-namef' }, h('span', { class: 'small inp-namel' }, 'Display name'), name), h('div', { class: 'small dim inp-src' }, sourceLine(i))),   // 0.7.3 t2234u: labeled name box + Source line
         ...inputBadges(i).map(([t, c]) => h('span', { class: 'pill ' + c }, t))),
       showMeter(i) ? meter(i) : null,
       h('div', { class: 'row wrap inp-setctl' },
