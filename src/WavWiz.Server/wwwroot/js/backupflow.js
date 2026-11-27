@@ -73,9 +73,11 @@ export function exportSettings(S) {
   if (adminOnlyToast(S)) return;
   return exportBackup();
 }
+/** 0.7.3 t2242u, pure: the Back up now toast says where the backup went - on the server PC, not on this phone or PC. */
+export const backedUpText = (whenText, pc) => `Backup saved on the server PC${pc ? ` (${pc})` : ''}, ${whenText}. The last 10 are kept there; restore one from File > Restore backup.`;
 /** Back up now: saves a snapshot on the server (the last 10 are kept). */
 export async function backUpNow(S) {
   if (adminOnlyToast(S)) return;
-  try { const b = await api('/backup/now', { method: 'POST' }); toast(`Backed up ${when(b.createdAt)}. Restore it from File > Restore backup.`); } catch (e) { toast(e.message, true); }
+  try { const b = await api('/backup/now', { method: 'POST' }); toast(backedUpText(when(b.createdAt), S?.auth?.machineName)); } catch (e) { toast(e.message, true); }
 }
 export { closePanel as closeBackupPanel, pulse };

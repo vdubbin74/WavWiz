@@ -92,11 +92,47 @@ export function settingsSearch(body, { show, showSub }) {
 }
 
 /** §7.1: Settings > General > Backup. Export one file; Import shows what will change, then asks. Admin only. */
-/** Export backup: Save As (File System Access) first, then fetch /api/v1/backup into the picked file; old browser download where the picker is missing. Cancel is silent. */
+/** Export backup: Save As (File System Access) first, then fetch /api/v1/backup into the picked file; old browser download where the picker is missing. Cancel is silent.
+ *  0.7.3 t2241u: on a real phone the app page is never sent to the file (iOS showed a full-screen "….wavwizbackup / Open in…" viewer with no way
+ *  back, worst in the Home Screen app): the file is fetched, then handed to the share sheet (Save to Files) where the phone can share files, else
+ *  saved from a Blob URL with the download attribute in a new tab. Desktop browsers are unchanged. */
+export const backupName = (d = new Date()) => { const p2 = n => String(n).padStart(2, '0'); return `WavWiz-${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.wavwizbackup`; };
+/** Pure: how this browser saves the backup - 'share' / 'blob' on a real phone, 'picker' (Save As) or 'link' (plain download) on a PC. */
+export const exportMode = (w, handset) => handset
+  ? (typeof w?.navigator?.share === 'function' && typeof w?.navigator?.canShare === 'function' && typeof w?.File === 'function' ? 'share' : 'blob')
+  : (typeof w?.showSaveFilePicker === 'function' ? 'picker' : 'link');
+/** A Blob saved without leaving the page: an <a download> on a Blob URL, opened in a new tab where download is not honored. */
+export function saveBlob(blob, name, doc = document, U = URL) {
+  const url = U.createObjectURL(blob), a = h('a', { href: url, download: name, target: '_blank', rel: 'noopener', hidden: true });
+  doc.body.append(a); a.click(); a.remove(); const t = setTimeout(() => { try { U.revokeObjectURL(url); } catch { /* ignore */ } }, 60000); t?.unref?.();
+}
+/** Phone: share a File (iOS / Android "Save to Files"); falls back to saveBlob. A share that needs a fresh tap asks for one. Cancel is silent. */
+export async function shareFile(blob, name, w = window) {
+  const file = new w.File([blob], name, { type: 'application/octet-stream' });
+  if (!w.navigator.canShare({ files: [file] })) { saveBlob(blob, name, w.document, w.URL); return 'blob'; }
+  const go = async () => { try { await w.navigator.share({ files: [file], title: name }); return 'shared'; } catch (e) { if (e?.name === 'AbortError') return 'cancel'; throw e; } };
+  try { return await go(); }
+  catch (e) {
+    if (e?.name !== 'NotAllowedError') { saveBlob(blob, name, w.document, w.URL); return 'blob'; }
+    // the download took long enough that the phone wants a new tap before it opens the share sheet
+    dialog('Your backup is ready', [h('p', null, `Tap Save, then pick Save to Files to keep ${name}.`)], [{ text: 'Save', cls: 'primary', onclick: () => { go().catch(() => saveBlob(blob, name, w.document, w.URL)); } }, { text: 'Cancel' }]);
+    return 'ask';
+  }
+}
 export async function exportBackup() {
-  const d = new Date(), p2 = n => String(n).padStart(2, '0'), name = `WavWiz-${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.wavwizbackup`;
-  if (typeof window.showSaveFilePicker !== 'function') {
+  const name = backupName(), mode = exportMode(window, typeof document !== 'undefined' && !!document.documentElement?.classList?.contains('handset'));
+  if (mode === 'link') {
     const a = h('a', { href: '/api/v1/backup', download: name }); document.body.append(a); a.click(); a.remove(); toast('Exporting your settings…'); return;
+  }
+  if (mode === 'share' || mode === 'blob') {   // 0.7.3 t2241u: a real phone - fetch, then share / save; the app page stays where it is
+    try {
+      toast('Preparing your backup…');
+      const r = await fetch('/api/v1/backup', { credentials: 'same-origin' });
+      if (!r.ok) throw new Error(`The server answered ${r.status}.`);
+      const blob = await r.blob();
+      if (mode === 'share') await shareFile(blob, name); else saveBlob(blob, name);
+    } catch (e) { toast('Backup not saved. ' + (e?.message || ''), true); }
+    return;
   }
   let handle;
   try { handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'WavWiz backup', accept: { 'application/octet-stream': ['.wavwizbackup'] } }] }); }

@@ -138,7 +138,7 @@ input[type=color]{width:46px;height:38px;padding:0;border:1px solid var(--fld-li
 .pill{display:inline-block;padding:1px 9px;border-radius:3px;font-size:11px;border:1px solid var(--line);white-space:nowrap}
 .pill.ok{border-color:#2b6b42;color:#7ee2a0} .pill.warn{border-color:#8a6a00;color:#ffd666} .pill.bad{border-color:#8a2b26;color:#ff9a90} .pill.idle,.pill.offline{color:var(--dim)}
 .toasts,#toasts{position:fixed;left:8px;right:8px;bottom:calc(70px + var(--safe-b));z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none;align-items:center}
-.toast{background:#2b3239;border:1px solid var(--line);border-left:4px solid var(--accent2);border-radius:3px;padding:9px 14px;max-width:560px;pointer-events:auto;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.toast{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--accent2);border-radius:3px;padding:9px 14px;max-width:560px;pointer-events:auto;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 .toast.bad{border-left-color:var(--red)}
 dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:4px;padding:0;width:min(720px,calc(calc(100vw / var(--z,1)) - 16px));max-height:calc(calc(100vh / var(--z,1)) - 24px);max-height:calc(calc(100dvh / var(--z,1)) - 24px);overflow:hidden}
 dialog[open]{display:flex;flex-direction:column}
@@ -6701,3 +6701,24 @@ html.phonelook .tree42.mx-on .sp42.mx-sp+.mx-drawer{--mxdl:8px}
 .mixbtn[aria-pressed=true] .ic svg{color:#fff}
 .mixbtn[aria-pressed=true]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 /* end 0.7.3 t2237u */
+/* 0.7.3 t2242u: toasts follow the theme - the toast was a fixed charcoal (#2b3239) while its text took the theme's ink, so a light theme
+   (Daylight, a peach custom theme) showed dark text on charcoal (about 1.3:1). Now panel2 + ink (10:1 or more in every preset); errors keep the
+   red edge with the same readable text; a lighter shadow on light themes. */
+html[data-scheme=light] .toast{box-shadow:0 4px 14px rgba(0,0,0,.22)}
+.toast.bad{color:var(--ink)}
+/* end 0.7.3 t2242u */
+/* 0.7.3 t2244u: Settings > Home network - addresses never break inside an IP; the adapter name stays whole; on the phone look each address is a
+   stacked row (IP, then adapter + network type) with a short "Use" on the right (the row already shows the address). */
+.nettbl .net-ip,.netlisten .mono{white-space:nowrap;word-break:normal}
+.netlisten b{word-break:normal;overflow-wrap:break-word}
+.nettbl .btn{white-space:nowrap}
+html.phonelook .nettbl,html.phonelook .nettbl tbody{display:block;width:100%}
+html.phonelook .nettbl tr{display:grid;grid-template-columns:minmax(0,auto) auto minmax(0,1fr) auto;grid-template-areas:"ip ip ip act" "ad pf . act";column-gap:8px;row-gap:3px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+html.phonelook .nettbl td{display:block;padding:0;border:0;min-width:0}
+html.phonelook .nettbl .net-ip{grid-area:ip;font-size:14px}
+html.phonelook .nettbl .net-ad{grid-area:ad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+html.phonelook .nettbl .net-pf{grid-area:pf}
+html.phonelook .nettbl .net-act{grid-area:act;justify-self:end;text-align:right}
+html.phonelook .nettbl .net-act .btn{min-height:32px;padding:0 14px}
+html.phonelook .nettbl .use-ip{display:none}
+/* end 0.7.3 t2244u */
