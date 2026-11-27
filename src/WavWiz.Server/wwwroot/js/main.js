@@ -52,6 +52,7 @@ import { startJukebox, jukeboxChip, openKiosk, askStopJukebox, jukeboxRunning, D
 import { radioFinderView } from './radiofinder.js';
 import { radioTab } from './radiotab.js';
 import { inputsView } from './inputs.js';   // 0.7.2 Library > Inputs
+import { pcNow, pcQueue } from './pcname.js';   // 0.7.3: inputs name their PC (This PC only on that PC)
 import { tagsView } from './tags.js';
 import { ripView } from './rip.js';
 import { remoteView } from './remote.js';
@@ -733,7 +734,7 @@ async function refreshNow() { try { const responseZone = globalThis.__wavwizZone
     const phone = matchMedia('(max-width:900px)').matches, phoneRead = startedPhone || phone;
     if (phone && responseRoute !== S._streamRoute) return;
     if (phoneRead && edit && !edit.canRead(read)) return;
-    S._nowZoneKey = responseZone; S._nowRoute = responseRoute; S.now = r.now; S.queue = r.queue.items; if (phoneRead) edit?.didRead(read);
+    S._nowZoneKey = responseZone; S._nowRoute = responseRoute; S.now = pcNow(r.now, S.auth); S.queue = pcQueue(r.queue.items, S.auth);   /* 0.7.3: input labels name their PC (This PC on that PC) */ if (phoneRead) edit?.didRead(read);
     // F248: ingest server position into the smooth clock; do not let valid-duration zero blips poison localPos.
     const at = performance.now(), rec = reconcileSmoothPosition(S._smooth, r.now, r.now?.positionMs, at);
     S._smooth = rec; S.localPos = rec.posMs; S.localAt = rec.at;

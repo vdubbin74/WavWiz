@@ -18,6 +18,7 @@ public static class AuthApi
             {
                 appVersion = WavWizInfo.Version, artCv = Library.ArtService.UrlVersion, channel = WavWizInfo.Channel, display = WavWizInfo.DisplayName, beta = true,
                 setupRequired = s.Auth.SetupRequired, thisMachine = AuthService.IsThisMachine(c.Connection.RemoteIpAddress),
+                machineName = AuthService.IsThisMachine(c.Connection.RemoteIpAddress) ? Environment.MachineName : null,   // 0.7.3: pcname.js shows "This PC" for this PC's own inputs
                 headless = s.Cfg.Headless, serverOs = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsLinux() ? "linux" : "other",
                 claim = s.Auth.SetupRequired && s.Claim is { Enabled: true } cl ? new { windowSecondsLeft = cl.WindowSecondsLeft, codeRequired = !cl.WindowOpen, file = cl.FilePath } : null,
                 authenticated = w != null && w.Role != Role.Player, role = w?.Role.ToString().ToLowerInvariant(), name = w?.Name,

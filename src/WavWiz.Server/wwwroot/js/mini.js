@@ -5,6 +5,7 @@ import './marquee.js';   // 0.4.8 F62: shared now-playing marquee
 // It never joins as a speaker (F2: opening or closing it never adds a second stream). In WavWiz Player it talks to its window over
 // chrome.webview (drag, pin, full app, close, position); in a browser it is a popup window.
 import { h, api, toast } from './util.js';
+import { pcNow } from './pcname.js';   // 0.7.3: input labels name their PC
 import * as Z from './zones40.js';
 import { applyTheme, loadTheme } from './theme.js';
 import { icon, setIcon } from './icons.js';
@@ -213,11 +214,11 @@ export function mountMini(root, { embedded = false, run = null, home = null, rep
   window.addEventListener('resize', slim); slim();
   if (!embedded && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => reportSize()).observe(root);
   async function act(path, body) { try { await api(path, { method: 'POST', body: body || {} }); } catch { /* view-only or offline */ } setTimeout(poll, 150); }
-  let lastArt = '';
+  let lastArt = '', mzAuth = null;
   async function poll() {
     try {
       await pollZones();
-      const r = await api('/stream'); now = r.now;
+      const r = await api('/stream'); now = pcNow(r.now, mzAuth);
       const it = now?.item, nl = nowLines(now), lv = nl.live; t.textContent = (it ? nl.title || it.title : '') || 'Nothing playing'; { const f = fitText(root.classList.contains('slim') ? 38 : 58, t.textContent.length); root.style.setProperty('--mp-tfs', f.title + 'px'); root.style.setProperty('--mp-afs', f.artist + 'px'); t.title = t.textContent; } { // 0.5.0 F130: condensed player shows the same labeled Artist · Album line as the flat Now Playing panel (album omitted when missing)
         const lab = (l, v) => [h('span', { class: 'np-aal' }, l), h('span', { class: 'np-aav' }, v)];
         a.replaceChildren(...(lv ? [...(nl.artist ? [...lab('Artist', nl.artist), h('span', { class: 'np-aadot', 'aria-hidden': 'true' }, '·')] : []), ...lab('Station', nl.station)]   // 0.7.0: radio = the song + Artist · Station
@@ -236,8 +237,8 @@ export function mountMini(root, { embedded = false, run = null, home = null, rep
     } catch { t.textContent = 'Not connected'; }
   }
   // 0.6.9 #9: the replica is NOT .embedded (so it wears every standalone rule; mini.css scopes them to body.minibody or .minicol)
-  if (embedded) { root.classList.add(replica ? 'mp-replica' : 'embedded'); paintPin(); poll(); timer = setInterval(poll, 1000); }
-  else (async () => { try { const s = await api('/auth/state'); setArtCv(s.artCv); } catch { /* ignore */ } paintPin(); send('ready', { pinned, opacity: opac / 100 }); reportSize(); poll(); timer = setInterval(poll, 1000); })();
+  if (embedded) { root.classList.add(replica ? 'mp-replica' : 'embedded'); api('/auth/state').then(s => { mzAuth = s; }).catch(() => {}); paintPin(); poll(); timer = setInterval(poll, 1000); }
+  else (async () => { try { const s = await api('/auth/state'); mzAuth = s; setArtCv(s.artCv); } catch { /* ignore */ } paintPin(); send('ready', { pinned, opacity: opac / 100 }); reportSize(); poll(); timer = setInterval(poll, 1000); })();
   return { root, rail, poll, destroy: () => { clearInterval(timer); sc.destroy(); }, setOpac, applyOpacity };
 
 }

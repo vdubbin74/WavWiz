@@ -132,7 +132,7 @@ public class Release072InputsTests
         var kinds = v.GetProperty("inputs").EnumerateArray().Select(x => x.GetProperty("kind").GetString()).ToList();
         Assert.Equal(new[] { "loopback", "aux", "spdif", "mic" }, kinds);
         var aux = await Input(admin, "aux");
-        Assert.False(aux.GetProperty("enabled").GetBoolean()); Assert.Equal("Aux in", aux.GetProperty("name").GetString()); Assert.Equal("This PC · Aux in", aux.GetProperty("source").GetString());
+        Assert.False(aux.GetProperty("enabled").GetBoolean()); Assert.Equal("Aux in", aux.GetProperty("name").GetString()); Assert.Equal(Environment.MachineName + " · Aux in", aux.GetProperty("source").GetString());   // 0.7.3: the PC's name, not "This PC"
         Assert.True((await Input(admin, "mic")).GetProperty("muted").GetBoolean());          // a mic starts muted (Announce only)
         var id = aux.GetProperty("id").GetString();
         Assert.Equal(HttpStatusCode.Forbidden, (await control.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true })).StatusCode);
@@ -156,7 +156,7 @@ public class Release072InputsTests
         await admin.PutAsJsonAsync($"/api/v1/inputs/{id}", new { enabled = true });
         syn.Level["in-aux-1"] = 0.3f;
         Assert.Equal(HttpStatusCode.OK, (await control.PostAsJsonAsync($"/api/v1/inputs/{id}/play", new { })).StatusCode);   // Control may play
-        var np = c.Now(); Assert.Equal("input", np.Item!.Kind); Assert.Equal("input:" + id, np.Item.Location); Assert.Equal("This PC · Aux in", np.Item.Artist);
+        var np = c.Now(); Assert.Equal("input", np.Item!.Kind); Assert.Equal("input:" + id, np.Item.Location); Assert.Equal(Environment.MachineName + " · Aux in", np.Item.Artist);
         await Until(() => Task.FromResult(syn.Started == 1), "the player was not asked to capture");
         await Until(async () => (await Input(admin, "aux")).TryGetProperty("peakDb", out var pk) && pk.ValueKind == JsonValueKind.Number && pk.GetDouble() > -15, "no level from the input");
         Assert.True((await Input(admin, "aux")).GetProperty("playing").GetBoolean());

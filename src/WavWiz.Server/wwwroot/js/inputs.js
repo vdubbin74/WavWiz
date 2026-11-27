@@ -3,6 +3,7 @@
 // Server: /api/v1/inputs (InputsApi). Events: 'inputs' (list changed) and 'inputlevel' ({ id, peakDb, phonoLow }) arrive as wavwiz:inputs / wavwiz:inputlevel.
 import { h, api, toast, getApiZone, dialog } from './util.js';
 import { canControl, isAdmin } from './ui.js';
+import { pcInput } from './pcname.js';   // 0.7.3: "PCBOXV2 · Speakers" on phones, "This PC · Speakers" on that PC
 
 export const INPUTS_TITLE = 'Audio inputs';
 export const NO_INPUTS = 'No audio inputs found on the server PC.';
@@ -143,7 +144,7 @@ export function inputsView(S) {
   function draw() {
     const list = data.inputs || [];
     note.textContent = list.length ? '' : (data.note || NO_INPUTS); note.hidden = !!list.length;
-    grid.replaceChildren(...list.map(tile));
+    grid.replaceChildren(...list.map(i => tile(pcInput(i, S.auth))));
   }
   async function reload() {
     try { data = await api('/inputs'); } catch (e) { data = { inputs: [], note: e.message }; }
@@ -225,7 +226,7 @@ export function inputsCard(S, { admin }) {
     const l = data.inputs || [];
     note.textContent = l.length ? (admin ? '' : 'Only an administrator can change audio inputs.') : (data.note || NO_INPUTS);
     note.hidden = !note.textContent;
-    list.replaceChildren(...l.map(row));
+    list.replaceChildren(...l.map(i => row(pcInput(i, S.auth))));
   }
   api('/inputs').then(r => { data = r; draw(); meterLease(card); }).catch(e => { note.textContent = e.message; });
   liveOn(card, 'wavwiz:inputs', () => api('/inputs').then(r => { data = r; draw(); }).catch(() => {}));

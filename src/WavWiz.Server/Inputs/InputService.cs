@@ -95,7 +95,11 @@ public sealed class InputService : IDisposable
     public static string ShortId(string playerId, string endpointId) => "i" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(playerId + "\n" + endpointId)))[..10].ToLowerInvariant();
 
     public static string KindLabel(string kind) => kind switch { "aux" => "Aux in", "spdif" => "S/PDIF in", "mic" => "Microphone", "loopback" => "Speakers (what you hear)", _ => "Input" };
-    public static string DefaultName(InputInfo i) => i.Kind switch { "aux" => "Aux in", "spdif" => "S/PDIF in", "loopback" => "This PC · Speakers", _ => string.IsNullOrWhiteSpace(i.Name) ? "Microphone" : i.Name };
+    public static string DefaultName(InputInfo i, string pc = "This PC") => i.Kind switch { "aux" => "Aux in", "spdif" => "S/PDIF in", "loopback" => pc + " · Speakers", _ => string.IsNullOrWhiteSpace(i.Name) ? "Microphone" : i.Name };
+    /// <summary>0.7.3: the name of the PC an input is on (its Player's Windows name), shown instead of "This PC" so a phone says "PCBOXV2 · Speakers".
+    /// A browser on that same PC turns it back into "This PC" (pcname.js, auth/state thisMachine + machineName).</summary>
+    public static string PcName(PlayerSession p) => p.Hello.MachineName is { Length: > 0 } m ? m : Environment.MachineName;
+    public static string SourceLabel(string pc, string kind) => pc + " · " + KindLabel(kind);
     /// <summary>The effective auto-start switch: as set, else on in Turntable mode (Aux in only) and off for everything else. Never on for mics or loopback.</summary>
     public static bool AutoStartOn(InputCfg c) => c.Kind == "aux" && c.Turntable && (c.AutoStart ?? true);
     public static float GainOf(double db) => (float)Math.Pow(10, Math.Clamp(double.IsFinite(db) ? db : 0, MinGainDb, MicMaxGainDb) / 20.0);
@@ -351,7 +355,7 @@ public sealed class InputService : IDisposable
             l.Privacy = false; l.Error = null; l.ErrorAtMs = long.MinValue / 2;   // 0.7.2 t2170u: Play is the user's retry (also after a privacy refusal)
             l.Feed.Flush(); l.Feed.Gain = GainOf(c.GainDb); l.Feed.Limit = LiveLimiter.Enabled(_s.Db);
             cond.RegisterFeed("input", l.Feed, l.Key);
-            cond.BeginLive("input", c.Name ?? DefaultName(l.Info), "This PC · " + KindLabel(l.Info.Kind), "Audio input", null, l.Key);
+            var pc = PcName(l.Sess); cond.BeginLive("input", c.Name ?? DefaultName(l.Info, pc), SourceLabel(pc, l.Info.Kind), "Audio input", null, l.Key);
             l.Cond = cond; l.Zone = zone; l.LinkedEverywhere = everywhere; l.AutoStarted = auto;
             all[id] = c with { LastZone = zone }; SaveCfg(all);
             ReconcileNoLock();
@@ -402,10 +406,10 @@ public sealed class InputService : IDisposable
             var cfg = LoadCfg();
             var list = _live.Values.OrderBy(l => l.Info.Kind switch { "loopback" => 0, "aux" => 1, "spdif" => 2, _ => 3 }).ThenBy(l => l.Info.Name, StringComparer.OrdinalIgnoreCase).Select(l =>
             {
-                var c = CfgOf(cfg, l);
+                var c = CfgOf(cfg, l); var pc = PcName(l.Sess);
                 return new
                 {
-                    id = l.Id, name = c.Name ?? DefaultName(l.Info), defaultName = DefaultName(l.Info), kind = l.Info.Kind, source = "This PC · " + KindLabel(l.Info.Kind), device = l.Info.Name,
+                    id = l.Id, name = c.Name ?? DefaultName(l.Info, pc), defaultName = DefaultName(l.Info, pc), kind = l.Info.Kind, source = SourceLabel(pc, l.Info.Kind), pc, device = l.Info.Name,
                     enabled = c.Enabled, gainDb = c.GainDb, maxGainDb = MaxGainFor(l.Info.Kind), turntable = c.Turntable, autoStart = AutoStartOn(c), liveSource = c.LiveSource, muted = l.Info.Kind == "mic" && !c.LiveSource,
                     bluetooth = l.Info.Bluetooth, note = l.Info.Note, playing = l.Cond != null, zone = l.Cond != null ? (l.Zone ?? "default") : null, groupId = l.Cond?.GroupId,
                     capturing = l.Capturing, peakDb = l.Capturing ? Math.Round(l.PeakDb, 1) : (double?)null, phonoLow = c.Turntable && l.Detector.PhonoLow, error = l.Error, privacy = l.Error != null && l.Privacy,
